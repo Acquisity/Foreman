@@ -1,13 +1,28 @@
 import {
   defaultGitHubAuth,
   type GitHubComment,
+  type GitHubInboundContext,
   githubChannel,
 } from "eve/channels/github";
-import type { InputRequest } from "eve/client";
 import { FACTORY_BRANCH_PREFIX, FACTORY_LABEL } from "../lib/constants.js";
 import { mentionPattern, resolveBotName } from "../lib/github/bot-name.js";
 import { githubCredentials } from "../lib/github/credentials.js";
 import { stampAutonomous, stampTrusted } from "../lib/trust.js";
+
+/**
+ * The name the factory answers to, resolved once at module load.
+ *
+ * @remarks
+ * Passing it to the channel config matters beyond mentions: the channel uses
+ * `botName` to strip the leading mention from a reply before delivery, which
+ * is what lets a reply like "@<bot> Yes" resolve a pending approval, and to
+ * render the reply instruction in its built-in human-in-the-loop prompts.
+ * Resolution falls back to "Foreman" if the connector metadata is briefly
+ * unreachable at boot.
+ */
+const BOT_NAME = await resolveBotName();
+
+const MENTION_PATTERN = mentionPattern(BOT_NAME);
 
 /**
  * Commenter roles allowed to start a session by mentioning the agent.
@@ -43,6 +58,48 @@ const isTrustedCommenter = (comment: GitHubComment): boolean => {
   return (
     typeof association === "string" && TRUSTED_ASSOCIATIONS.has(association)
   );
+};
+
+/**
+ * Repository roles allowed to hand an issue to the factory by labeling it.
+ *
+ * @remarks
+ * GitHub's fine-grained role names from the collaborator-permission endpoint.
+ * Triage is the floor: it is the permission normally required to apply a
+ * label by hand.
+ */
+const TRUSTED_LABELER_ROLES = new Set(["admin", "maintain", "write", "triage"]);
+
+/**
+ * Whether the webhook sender holds at least triage permission on the repo.
+ *
+ * @remarks
+ * The issues webhook carries the issue author's association, never the
+ * labeler's, and GitHub fires the `labeled` action even for labels attached
+ * at creation time, which issue templates let unauthenticated reporters do.
+ * Verifying the sender's permission against the API is what keeps the
+ * unattended pipeline maintainer-triggered. Fails closed: an API error
+ * acknowledges the event without dispatching.
+ */
+const isTrustedLabeler = async (
+  ctx: GitHubInboundContext
+): Promise<boolean> => {
+  try {
+    const response = await ctx.github.request<{
+      permission?: string;
+      role_name?: string;
+    }>({
+      method: "GET",
+      path: `/repos/${ctx.repository.owner}/${ctx.repository.name}/collaborators/${encodeURIComponent(ctx.sender.login)}/permission`,
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const role = response.body.role_name ?? response.body.permission;
+    return typeof role === "string" && TRUSTED_LABELER_ROLES.has(role);
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -83,118 +140,6 @@ const CI_FIX_TASK = [
 ].join("\n\n");
 
 /**
- * Longest value preview per input field in an approval prompt comment.
- *
- * @remarks
- * Clamping per field rather than per payload means a huge text field (a full
- * PR body, say) can never crowd out the short fields that carry the actual
- * decision, like `draft: false` on `updatePullRequest`.
- */
-const MAX_FIELD_PREVIEW = 120;
-
-/**
- * Tool-input fields left out of approval prompts: they are filled from
- * `FACTORY_REPO` by the extension's context and never carry the decision.
- */
-const IMPLIED_INPUT_FIELDS = new Set(["owner", "repo"]);
-
-/**
- * The thread the pending call targets, lifted out of the input and into the
- * prompt's headline (e.g. "on pull request #9").
- */
-const describeTarget = (
-  input: Record<string, unknown>
-): { key: string | null; suffix: string } => {
-  if (typeof input.pullNumber === "number") {
-    return {
-      key: "pullNumber",
-      suffix: ` on pull request #${input.pullNumber}`,
-    };
-  }
-  if (typeof input.issueNumber === "number") {
-    return { key: "issueNumber", suffix: ` on issue #${input.issueNumber}` };
-  }
-  return { key: null, suffix: "" };
-};
-
-/**
- * Renders one input-field value on a single line: whitespace flattened,
- * clamped to {@link MAX_FIELD_PREVIEW} with the full length noted, so the
- * approver sees the shape of every field without any one field taking over.
- */
-const formatFieldValue = (value: unknown): string => {
-  const rendered =
-    typeof value === "string"
-      ? value.replace(/\s+/gu, " ").trim()
-      : JSON.stringify(value);
-  if (rendered === undefined || rendered.length === 0) {
-    return "(empty)";
-  }
-  if (rendered.length <= MAX_FIELD_PREVIEW) {
-    return rendered;
-  }
-  return `${rendered.slice(0, MAX_FIELD_PREVIEW)}… (${rendered.length} chars)`;
-};
-
-/**
- * How to answer a prompt, appended to every input-request comment.
- *
- * @remarks
- * The mention requirement isn't decoration: every inbound comment passes
- * through `onComment`, which only dispatches mentions from owners, members,
- * and collaborators, so a bare "approve" never reaches the parked session.
- * That same gate is what makes a comment reply a real authorization signal
- * on a public repository.
- */
-const responseFooter = (botName: string): string =>
-  `Only repository owners, members, and collaborators can respond, and the reply must mention @${botName}; other replies are ignored.`;
-
-/**
- * Renders one pending input request as comment markdown: what is waiting
- * (the tool, its target, and its remaining input as a per-field list for
- * approvals, the question otherwise) and exactly how to reply.
- */
-const formatInputRequest = (request: InputRequest, botName: string): string => {
-  const lines: string[] = [];
-  if (request.kind === "tool-approval") {
-    const target = describeTarget(request.action.input);
-    lines.push(
-      `Waiting for approval to run \`${request.action.toolName}\`${target.suffix}:`
-    );
-    const fields = Object.entries(request.action.input).filter(
-      ([key]) => !IMPLIED_INPUT_FIELDS.has(key) && key !== target.key
-    );
-    if (fields.length > 0) {
-      lines.push("");
-      for (const [key, value] of fields) {
-        lines.push(`- ${key}: ${formatFieldValue(value)}`);
-      }
-    }
-  } else {
-    lines.push(request.prompt);
-  }
-  const options = request.options ?? [];
-  if (options.length > 0) {
-    lines.push("");
-    for (const option of options) {
-      lines.push(
-        `- Reply \`@${botName} ${option.label}\`${
-          option.description ? `: ${option.description}` : ""
-        }`
-      );
-    }
-  } else if (request.kind === "tool-approval") {
-    lines.push(
-      "",
-      `Reply \`@${botName} approve\` to allow it, or \`@${botName} deny\` to refuse.`
-    );
-  } else {
-    lines.push("", `Reply \`@${botName}\` followed by your answer.`);
-  }
-  return lines.join("\n");
-};
-
-/**
  * Task injected into the session dispatched when a pull request opens. The
  * PR's metadata and changed-file patches are already in the session's context
  * when this runs; the repo itself is checked out into the sandbox.
@@ -227,17 +172,18 @@ const PR_SUMMARY_TASK = [
  *   acknowledged without a session, so arbitrary accounts on a public repo
  *   cannot drive the agent's write tools.
  * - `onIssue` is the unattended intake: adding the factory label hands the
- *   issue to the pipeline. Only the `labeled` action dispatches, never a
- *   label carried on `opened`, because issue templates let unauthenticated
- *   reporters attach labels at open time. The factory label is matched
- *   against the issue's current `labels` array rather than a single "added
- *   label" field, because eve exposes the issue object as `issue.raw`, not
- *   the raw webhook payload that carries the just-added label. Applying a
- *   label requires triage permission, so the trigger is maintainer-initiated,
- *   but the turn itself runs unattended: the auth is rewritten to the
- *   constructed autonomous principal with the intake issue number stamped in,
- *   and the approval policies deny it everything except labels, progress
- *   comments on that one issue, and draft pull requests.
+ *   issue to the pipeline. Only the `labeled` action dispatches, and the
+ *   labeler's repository permission is verified against the API first,
+ *   because GitHub fires `labeled` even for labels attached at creation time
+ *   and issue templates let unauthenticated reporters do exactly that; below
+ *   triage, the event is acknowledged without a session. The factory label is
+ *   matched against the issue's current `labels` array rather than a single
+ *   "added label" field, because eve exposes the issue object as `issue.raw`,
+ *   not the raw webhook payload that carries the just-added label. The turn
+ *   itself runs unattended: the auth is rewritten to the constructed
+ *   autonomous principal with the intake issue number stamped in, and the
+ *   approval policies deny it everything except labels, progress comments on
+ *   that one issue, closing or reopening issues, and draft pull requests.
  * - `onPullRequest` dispatches only on the `opened` action and skips PRs
  *   opened by bots, which covers Dependabot and the factory's own
  *   `foreman[bot]` pull requests. It is deliberately not gated by
@@ -251,24 +197,17 @@ const PR_SUMMARY_TASK = [
  *   task bounds the loop by counting earlier fix-attempt comments on the
  *   thread. Requires the connector to subscribe to the `check_suite` webhook
  *   event.
- * - The `input.requested` handler posts a comment when a session parks on an
- *   approval or a question. The channel ships no built-in renderer for this
- *   event (as of eve 0.33), so without the handler a parked session waits
- *   silently, visible only in the run logs. The prompt spells out the reply
- *   incantation because `onComment` only forwards trusted mentions.
+ * - Human-in-the-loop prompts are the channel's own (eve ≥ 0.34 posts them by
+ *   default): when a session stops for approval or input, the channel renders
+ *   the request as a comment with a mention-based reply instruction. Passing
+ *   the resolved {@link BOT_NAME} is what makes both the instruction and the
+ *   reply's mention-stripping correct, and `onComment`'s gate is what keeps a
+ *   reply an authorization signal: only mentions from owners, members, and
+ *   collaborators ever reach the waiting session.
  */
 export default githubChannel({
-  botName: process.env.FACTORY_BOT_NAME ?? process.env.GITHUB_APP_SLUG,
+  botName: BOT_NAME,
   credentials: githubCredentials,
-  events: {
-    "input.requested": async (data, channel) => {
-      const botName = await resolveBotName();
-      const body = data.requests
-        .map((request) => formatInputRequest(request, botName))
-        .join("\n\n---\n\n");
-      await channel.thread.post([body, responseFooter(botName)].join("\n\n"));
-    },
-  },
   onCheckSuite: (ctx, suite) => {
     const raw = suite.raw as {
       head_branch?: unknown;
@@ -290,15 +229,13 @@ export default githubChannel({
       context: [CI_FIX_TASK],
     };
   },
-  onComment: async (ctx, comment) => {
-    const botName = await resolveBotName();
-    return !isIgnoredComment(comment, botName) &&
-      mentionPattern(botName).test(comment.body) &&
-      isTrustedCommenter(comment)
+  onComment: (ctx, comment) =>
+    !isIgnoredComment(comment, BOT_NAME) &&
+    MENTION_PATTERN.test(comment.body) &&
+    isTrustedCommenter(comment)
       ? { auth: stampTrusted(defaultGitHubAuth(ctx)) }
-      : null;
-  },
-  onIssue: (ctx, issue) => {
+      : null,
+  onIssue: async (ctx, issue) => {
     const { labels } = issue.raw as {
       labels?: ReadonlyArray<{ name?: unknown }>;
     };
@@ -308,7 +245,8 @@ export default githubChannel({
     if (
       issue.action !== "labeled" ||
       !hasFactoryLabel ||
-      ctx.sender.type === "Bot"
+      ctx.sender.type === "Bot" ||
+      !(await isTrustedLabeler(ctx))
     ) {
       return null;
     }
