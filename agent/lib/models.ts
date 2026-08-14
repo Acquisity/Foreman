@@ -4,7 +4,7 @@
 export const MODELS = {
   analyst: "openai/gpt-5.6-terra-fast",
   classifier: "openai/gpt-5.6-terra-fast",
-  implementer: "anthropic/claude-fable-5", // the station that writes the code gets the strongest coding model
+  implementer: "anthropic/claude-opus-5", // the station that writes the code gets the strongest coding model; fable-5 is 429-throttled on the shared gateway pool
   orchestrator: "openai/gpt-5.6-terra-fast",
   researcher: "openai/gpt-5.6-terra-fast",
   reviewer: "openai/gpt-5.6-terra-fast", // different vendor than implementer on purpose: independent review
