@@ -2,12 +2,12 @@
 // so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
 // Each agent.ts reads its entry here (model: MODELS.<agent>) instead of hardcoding a string.
 export const MODELS = {
-  analyst: "openai/gpt-5.6-terra-fast",
-  classifier: "openai/gpt-5.6-terra-fast",
-  implementer: "deepseek/deepseek-v4-pro-0813", // the station that writes the code gets the strongest coding model we can run unthrottled; claude-fable-5 is rate-capped on the shared gateway pool
-  orchestrator: "openai/gpt-5.6-terra-fast",
-  researcher: "openai/gpt-5.6-terra-fast",
-  reviewer: "openai/gpt-5.6-terra-fast", // different vendor than implementer on purpose: independent review
+  analyst: "deepseek/deepseek-v4-pro-0813",
+  classifier: "deepseek/deepseek-v4-pro-0813",
+  implementer: "deepseek/deepseek-v4-pro-0813",
+  orchestrator: "deepseek/deepseek-v4-pro-0813",
+  researcher: "deepseek/deepseek-v4-pro-0813",
+  reviewer: "deepseek/deepseek-v4-pro-0813",
 } as const;
 
 export type FactoryAgent = keyof typeof MODELS;
