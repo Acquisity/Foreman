@@ -9,9 +9,9 @@ import { requireEnv } from "../lib/constants.js";
  * App-scoped via Vercel Connect (OAuth registration against Axiom's hosted
  * server); tokens are minted per call and never exposed to the model.
  * Available to every session, unattended runs included — log evidence is
- * core bug-investigation input. TODO(read-only filter): once the connector
- * is authorized, list the server's tools and allowlist the read-only
- * surface if it exposes writes (e.g. monitors or dataset management).
+ * core bug-investigation input. Read-only by tool allowlist, built from
+ * the server's live tool list: queries, datasets, metrics, and monitor
+ * history stay; dashboard/monitor/notifier writes are excluded.
  */
 export default defineMcpClientConnection({
   auth: connect({
@@ -22,6 +22,25 @@ export default defineMcpClientConnection({
     principalType: "app",
   }),
   description:
-    "Axiom observability: datasets and APL queries over production structured logs.",
+    "Axiom observability, read-only: APL queries over production structured logs, datasets, metrics, dashboards, and monitor history.",
+  tools: {
+    allow: [
+      "checkMonitors",
+      "exportDashboard",
+      "getDashboard",
+      "getDatasetFields",
+      "getMetricTagValues",
+      "getMonitorHistory",
+      "getSavedQueries",
+      "listDashboards",
+      "listDatasets",
+      "listMetricTags",
+      "listMetrics",
+      "listNotifiers",
+      "queryDataset",
+      "queryMetrics",
+      "searchMetrics",
+    ],
+  },
   url: "https://mcp.axiom.co/mcp",
 });

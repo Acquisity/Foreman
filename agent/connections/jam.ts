@@ -10,7 +10,9 @@ import { requireEnv } from "../lib/constants.js";
  * server); tokens are minted per call and never exposed to the model.
  * Available to every session, unattended runs included — Jam recordings
  * (console logs, network traces, repro steps) are core bug-investigation
- * evidence. The surface is read-only by nature.
+ * evidence. Read-only by tool allowlist, built from the server's live tool
+ * list; comments, reactions, folder/link management, and archiving are
+ * excluded.
  */
 export default defineMcpClientConnection({
   auth: connect({
@@ -21,6 +23,29 @@ export default defineMcpClientConnection({
     principalType: "app",
   }),
   description:
-    "Jam bug reports: recordings, console logs, network traces, and reproduction details.",
+    "Jam bug reports, read-only: recordings, console logs, network requests, screenshots, user events, and video transcripts.",
+  tools: {
+    allow: [
+      "analyzeVideo",
+      "fetch",
+      "getConsoleLogs",
+      "getDetails",
+      "getFrames",
+      "getMetadata",
+      "getNetworkRequests",
+      "getRecordingLink",
+      "getRecordingUrlVerifyLink",
+      "getScreenshots",
+      "getUserEvents",
+      "getVideoTranscript",
+      "listFolders",
+      "listJams",
+      "listMembers",
+      "listRecordingLinkJams",
+      "listRecordingLinks",
+      "listRecordingUrls",
+      "search",
+    ],
+  },
   url: "https://mcp.jam.dev/mcp",
 });
