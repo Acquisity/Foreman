@@ -1,22 +1,44 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
+import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { requireEnv } from "../lib/constants.js";
+import { isAutonomous } from "../lib/trust.js";
 
 /**
- * Vercel MCP connection for deployment observability.
+ * Tools that mutate Vercel state. Allowed in attended sessions, denied on
+ * unattended factory runs so a prompt-injected labeled issue can never
+ * deploy or post to toolbar threads.
+ */
+const WRITE_TOOLS = new Set([
+  "deploy_to_vercel",
+  "change_toolbar_thread_resolve_status",
+  "reply_to_toolbar_thread",
+  "edit_toolbar_message",
+  "add_toolbar_reaction",
+]);
+
+/**
+ * Vercel MCP connection for deployment observability and attended deploys.
  *
  * @remarks
  * - Points at Vercel's hosted MCP server and authenticates app-scoped
- *   through a Vercel Connect connector (created with
- *   `vercel connect create mcp.vercel.com --connection-method mcp`), so
- *   tokens are minted per call and never exposed to the model.
- * - The tool allowlist is read-only on purpose: the server also exposes
- *   deploys, purchases (domains, credits, addons), and arbitrary CLI
- *   execution, none of which an unattended factory run should reach.
- *   Foreman deploys through git, never through MCP. New read-only tools
- *   the server grows must be added here explicitly.
+ *   through a Vercel Connect connector (created from the dashboard's
+ *   Connect page or `vercel connect create mcp.vercel.com`), so tokens are
+ *   minted per call and never exposed to the model.
+ * - The allowlist excludes purchases (domains, credits, addons) and
+ *   `use_vercel_cli` (arbitrary CLI execution) entirely — no session should
+ *   reach those. Write tools on the allowlist are approval-gated to
+ *   attended sessions only. New tools the server grows must be added here
+ *   explicitly.
  */
 export default defineMcpClientConnection({
+  approval: (ctx: ApprovalContext): ApprovalStatus =>
+    WRITE_TOOLS.has(ctx.toolName) && isAutonomous(ctx.session.auth.current)
+      ? {
+          reason: "Unattended factory runs do not write to Vercel.",
+          type: "denied",
+        }
+      : "not-applicable",
   auth: connect({
     connector: requireEnv(
       "VERCEL_MCP_CONNECTOR",
@@ -25,7 +47,7 @@ export default defineMcpClientConnection({
     principalType: "app",
   }),
   description:
-    "Vercel platform: projects, deployments, build and runtime logs, runtime errors, web analytics, and Vercel documentation search. Read-only.",
+    "Vercel platform: projects, deployments, build and runtime logs, runtime errors, web analytics, toolbar threads, deploys, and Vercel documentation search.",
   tools: {
     allow: [
       "search_vercel_documentation",
@@ -44,6 +66,9 @@ export default defineMcpClientConnection({
       "get_agent_run_trace",
       "get_access_to_vercel_url",
       "web_fetch_vercel_url",
+      "list_toolbar_threads",
+      "get_toolbar_thread",
+      ...WRITE_TOOLS,
     ],
   },
   url: "https://mcp.vercel.com",
