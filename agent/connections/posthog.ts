@@ -16,11 +16,11 @@ export default defineMcpClientConnection({
   auth: connect({
     connector: requireEnv(
       "POSTHOG_MCP_CONNECTOR",
-      "posthog/acquisity-foreman-posthog"
+      "mcp.eu.posthog.com/acquisity-foreman-posthog"
     ),
     principalType: "app",
   }),
   description:
     "PostHog product analytics: events, insights, funnels, session data, feature flags, and experiments.",
-  url: "https://mcp.posthog.com/mcp",
+  url: "https://mcp.eu.posthog.com/mcp",
 });
