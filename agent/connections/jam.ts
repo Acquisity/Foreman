@@ -1,26 +1,18 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { requireEnv } from "../lib/constants.js";
-import { isAutonomous } from "../lib/trust.js";
 
 /**
  * Jam MCP connection for bug report context.
  *
  * @remarks
  * App-scoped via Vercel Connect (OAuth registration against Jam's hosted
- * server). Denied on unattended factory runs; attended sessions are ungated.
- * Jam recordings carry user data (console logs, network traces), so access
- * stays behind a human.
+ * server); tokens are minted per call and never exposed to the model.
+ * Available to every session, unattended runs included — Jam recordings
+ * (console logs, network traces, repro steps) are core bug-investigation
+ * evidence. The surface is read-only by nature.
  */
 export default defineMcpClientConnection({
-  approval: (ctx: ApprovalContext): ApprovalStatus =>
-    isAutonomous(ctx.session.auth.current)
-      ? {
-          reason: "Unattended factory runs do not read Jam recordings.",
-          type: "denied",
-        }
-      : "not-applicable",
   auth: connect({
     connector: requireEnv(
       "JAM_MCP_CONNECTOR",

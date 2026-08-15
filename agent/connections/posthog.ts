@@ -1,25 +1,18 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { requireEnv } from "../lib/constants.js";
-import { isAutonomous } from "../lib/trust.js";
 
 /**
- * PostHog MCP connection for product analytics.
+ * PostHog MCP connection for product analytics evidence.
  *
  * @remarks
- * App-scoped via Vercel Connect (MCP automatic registration). Denied on
- * unattended factory runs because the server exposes writes (feature flags,
- * insights, annotations); attended sessions are ungated.
+ * App-scoped via Vercel Connect (MCP automatic registration); tokens are
+ * minted per call and never exposed to the model. Available to every
+ * session, unattended runs included. TODO(read-only filter): once the
+ * connector is authorized, list the server's tools and allowlist the
+ * read-only surface (feature-flag and insight writes excluded).
  */
 export default defineMcpClientConnection({
-  approval: (ctx: ApprovalContext): ApprovalStatus =>
-    isAutonomous(ctx.session.auth.current)
-      ? {
-          reason: "Unattended factory runs do not use PostHog.",
-          type: "denied",
-        }
-      : "not-applicable",
   auth: connect({
     connector: requireEnv(
       "POSTHOG_MCP_CONNECTOR",
@@ -28,6 +21,6 @@ export default defineMcpClientConnection({
     principalType: "app",
   }),
   description:
-    "PostHog product analytics: events, insights, funnels, feature flags, and experiments.",
+    "PostHog product analytics: events, insights, funnels, session data, feature flags, and experiments.",
   url: "https://mcp.posthog.com/mcp",
 });
