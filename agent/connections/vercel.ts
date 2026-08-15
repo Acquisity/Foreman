@@ -18,7 +18,10 @@ import { requireEnv } from "../lib/constants.js";
  */
 export default defineMcpClientConnection({
   auth: connect({
-    connector: requireEnv("VERCEL_MCP_CONNECTOR", "oauth/foreman-vercel-mcp"),
+    connector: requireEnv(
+      "VERCEL_MCP_CONNECTOR",
+      "mcp.vercel.com/acquisity-foreman"
+    ),
     principalType: "app",
   }),
   description:
