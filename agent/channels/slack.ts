@@ -21,4 +21,5 @@ export default slackChannel({
     const auth = defaultSlackAuth(message, ctx);
     return auth === null ? null : { auth: stampTrusted(auth) };
   },
+  threadContext: { since: "last-agent-reply" },
 });
