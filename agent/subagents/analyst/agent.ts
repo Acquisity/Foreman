@@ -82,7 +82,7 @@ export default defineAgent({
       },
       test_strategy: {
         description:
-          "What should be tested and how (unit, integration, manual), grounded in the repository's own test setup.",
+          "What should be tested and how (unit, integration, manual), grounded in the repository's own test setup, naming the exact commands to run and preferring ones scoped to the changed area over full-suite runs.",
         type: "string",
       },
     },
