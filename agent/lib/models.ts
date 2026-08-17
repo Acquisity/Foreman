@@ -53,7 +53,9 @@ export const loadModelOverrides = async (): Promise<ModelOverrides> => {
 
 // The session-start read: fail open to the compiled defaults (a Blob outage must never take the
 // factory down) and memoize briefly so one session start resolves all six agents from a single
-// consistent snapshot instead of six racing reads.
+// consistent snapshot instead of six racing reads. The cache is per server instance, so a swap
+// saved on one warm instance reaches the others within the TTL; the swap tools tell the caller
+// to allow that window.
 const OVERRIDES_CACHE_MS = 15_000;
 let overridesCache: { at: number; promise: Promise<ModelOverrides> } | null =
   null;

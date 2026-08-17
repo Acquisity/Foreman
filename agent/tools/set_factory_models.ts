@@ -32,8 +32,8 @@ export default defineTool({
     "Swap the model one or more factory agents run on, live. Pass a Vercel AI Gateway id " +
     "(provider/model, e.g. zai/glm-5.2) per agent to override it, or null to clear an override " +
     "back to the compiled default. Ids are verified against the live gateway catalog before " +
-    "anything is stored. Takes effect on sessions that start after the change; the current " +
-    "session keeps its model.",
+    "anything is stored. Takes effect on sessions that start after the change (allow up to 15 " +
+    "seconds for every server instance to pick it up); the current session keeps its model.",
   execute: async (input) => {
     let overrides: Awaited<ReturnType<typeof loadModelOverrides>>;
     try {
