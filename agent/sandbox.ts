@@ -17,6 +17,10 @@ import { vercel } from "eve/sandbox/vercel";
  * same environment runs everywhere. Running locally requires the project to be linked and
  * authenticated to Vercel.
  *
+ * The 2 vCPUs (4 GB memory) are pinned for Chromium: the platform default happens to match
+ * today, but an under-provisioned browser degrades as timeouts rather than errors, so the
+ * sizing stays explicit instead of riding a default that can change out from under us.
+ *
  * The bootstrap pre-installs agent-browser (with Chromium and its system libraries) at
  * template build time, so the `browser` extension's tools start from a warm snapshot instead
  * of paying the install on first use in every fresh sandbox; the revalidation key rebuilds
@@ -32,7 +36,7 @@ import { vercel } from "eve/sandbox/vercel";
  * @see {@link https://vercel.com/docs/sandbox | Vercel Sandbox}
  */
 export default defineSandbox({
-  backend: vercel(),
+  backend: vercel({ resources: { vcpus: 2 } }),
   async bootstrap({ use }: SandboxBootstrapContext): Promise<void> {
     const sandbox = await use();
     await installAgentBrowser(sandbox);
