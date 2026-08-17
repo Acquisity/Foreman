@@ -1,7 +1,6 @@
 import { defineMcpClientConnection } from "eve/connections";
-import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { linearAuth } from "../lib/constants.js";
-import { isAutonomous } from "../lib/trust.js";
+import { denyAutonomousWrites } from "../lib/github/approval.js";
 
 /**
  * Linear MCP connection for creating and cross-referencing issues.
@@ -18,13 +17,7 @@ import { isAutonomous } from "../lib/trust.js";
  *   and reversible, as before.
  */
 export default defineMcpClientConnection({
-  approval: (ctx: ApprovalContext): ApprovalStatus =>
-    isAutonomous(ctx.session.auth.current)
-      ? {
-          reason: "Unattended factory runs do not write to Linear.",
-          type: "denied",
-        }
-      : "not-applicable",
+  approval: denyAutonomousWrites("Linear"),
   auth: linearAuth,
   description: "Linear workspace: issues, projects, cycles, and comments.",
   url: "https://mcp.linear.app/mcp",
