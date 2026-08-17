@@ -1,6 +1,6 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
+import { requireEnv } from "../agent/lib/constants.js";
 
 /**
  * Resend MCP connection for transactional email evidence.

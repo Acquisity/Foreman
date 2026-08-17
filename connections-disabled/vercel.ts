@@ -1,7 +1,7 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
-import { denyAutonomousWrites } from "../lib/github/approval.js";
+import { requireEnv } from "../agent/lib/constants.js";
+import { denyAutonomousWrites } from "../agent/lib/github/approval.js";
 
 /**
  * Tools that mutate Vercel state. Allowed in attended sessions, denied on

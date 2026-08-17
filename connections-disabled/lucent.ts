@@ -1,6 +1,6 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
+import { requireEnv } from "../agent/lib/constants.js";
 
 /**
  * Lucent MCP connection for session-replay bug evidence.
