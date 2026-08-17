@@ -87,7 +87,16 @@ export default defineTool({
         overrides[agent] = value;
       }
     }
-    await writeModelOverrides(overrides);
+    try {
+      await writeModelOverrides(overrides);
+    } catch (error) {
+      return {
+        error: `Could not save the overrides, so nothing was changed: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+        success: false as const,
+      };
+    }
     return {
       effective: Object.fromEntries(
         FACTORY_AGENTS.map((agent) => [
