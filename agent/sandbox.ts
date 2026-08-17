@@ -1,4 +1,12 @@
-import { defineSandbox, type SandboxSessionContext } from "eve/sandbox";
+import {
+  agentBrowserRevalidationKey,
+  installAgentBrowser,
+} from "@agent-browser/eve/sandbox";
+import {
+  defineSandbox,
+  type SandboxBootstrapContext,
+  type SandboxSessionContext,
+} from "eve/sandbox";
 import { vercel } from "eve/sandbox/vercel";
 
 /**
@@ -8,6 +16,11 @@ import { vercel } from "eve/sandbox/vercel";
  * Pins the hosted Vercel Sandbox backend for both local development and production, so the
  * same environment runs everywhere. Running locally requires the project to be linked and
  * authenticated to Vercel.
+ *
+ * The bootstrap pre-installs agent-browser (with Chromium and its system libraries) at
+ * template build time, so the `browser` extension's tools start from a warm snapshot instead
+ * of paying the install on first use in every fresh sandbox; the revalidation key rebuilds
+ * the template when the pinned agent-browser version changes.
  *
  * The `onSession` hook marks `/workspace` as a safe git directory before the GitHub channel's
  * built-in per-turn checkout runs there. The sandbox filesystem is owned by the builder uid,
@@ -20,6 +33,10 @@ import { vercel } from "eve/sandbox/vercel";
  */
 export default defineSandbox({
   backend: vercel(),
+  async bootstrap({ use }: SandboxBootstrapContext): Promise<void> {
+    const sandbox = await use();
+    await installAgentBrowser(sandbox);
+  },
   async onSession({ use }: SandboxSessionContext): Promise<void> {
     const sandbox = await use();
     const result = await sandbox.run({
@@ -33,4 +50,5 @@ export default defineSandbox({
       );
     }
   },
+  revalidationKey: () => agentBrowserRevalidationKey(),
 });
