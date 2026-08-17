@@ -1,5 +1,5 @@
-import { defineAgent } from "eve";
-import { MODELS } from "../../lib/models.js";
+import { defineAgent, defineDynamic } from "eve";
+import { resolveModel } from "../../lib/models.js";
 
 /**
  * Station 4: independent review.
@@ -21,7 +21,11 @@ export default defineAgent({
     "code. The caller passes the work item, the analysis with acceptance criteria, the " +
     "branch name, and the implementer's report in the message, plus an artifact id when " +
     "the analyst saved its full detail as one.",
-  model: MODELS.reviewer,
+  model: defineDynamic({
+    events: {
+      "session.started": () => resolveModel("reviewer"),
+    },
+  }),
   outputSchema: {
     additionalProperties: false,
     properties: {

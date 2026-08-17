@@ -1,5 +1,5 @@
-import { defineAgent } from "eve";
-import { MODELS } from "./lib/models.js";
+import { defineAgent, defineDynamic } from "eve";
+import { resolveModel } from "./lib/models.js";
 
 /**
  * Root agent runtime configuration.
@@ -13,11 +13,19 @@ import { MODELS } from "./lib/models.js";
  * sessions while leaving room for the pipeline: the four stations draw from
  * the root session's remaining quota, and an implementation run needs far
  * more than a chat reply.
+ *
+ * The model resolves at session start through `resolveModel`, so a live
+ * override saved with `set_factory_models` applies to the next session
+ * without a redeploy; without one, the compiled default from `MODELS` runs.
  */
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: {
     maxOutputTokensPerSession: 100_000,
   },
-  model: MODELS.orchestrator,
+  model: defineDynamic({
+    events: {
+      "session.started": () => resolveModel("orchestrator"),
+    },
+  }),
 });
