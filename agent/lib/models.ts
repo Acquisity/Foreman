@@ -9,7 +9,8 @@ import { FACTORY_REPO } from "./constants.js";
 // These are the compiled defaults; a live override saved by set_factory_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start. The chat slot
 // is the orchestrator's Slack profile: sessions born on the Slack channel resolve it instead of
-// the orchestrator slot, so conversational replies can run a faster model than factory intake.
+// the orchestrator slot. It compiles to the same model as orchestrator; a set_factory_models
+// override on chat is what actually puts conversational replies on a faster model.
 export const MODELS = {
   analyst: "deepseek/deepseek-v4-pro-0813",
   chat: "deepseek/deepseek-v4-pro-0813",
@@ -55,8 +56,8 @@ export const loadModelOverrides = async (): Promise<ModelOverrides> => {
 };
 
 // The session-start read: fail open to the compiled defaults (a Blob outage must never take the
-// factory down) and memoize briefly so one session start resolves all six agents from a single
-// consistent snapshot instead of six racing reads. The cache is per server instance, so a swap
+// factory down) and memoize briefly so one session start resolves every agent slot from a single
+// consistent snapshot instead of racing reads. The cache is per server instance, so a swap
 // saved on one warm instance reaches the others within the TTL; the swap tools tell the caller
 // to allow that window.
 const OVERRIDES_CACHE_MS = 15_000;
