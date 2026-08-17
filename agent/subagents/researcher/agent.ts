@@ -1,5 +1,5 @@
-import { defineAgent } from "eve";
-import { MODELS } from "../../lib/models.js";
+import { defineAgent, defineDynamic } from "eve";
+import { resolveModel } from "../../lib/models.js";
 
 /**
  * Fresh-context web-research subagent.
@@ -24,7 +24,11 @@ export default defineAgent({
     "cited findings with confidence levels, plus the gaps it couldn't verify. May save a " +
     "long research memo as an artifact and return its id for later stations. The caller " +
     "passes the question and any known context in the message.",
-  model: MODELS.researcher,
+  model: defineDynamic({
+    events: {
+      "session.started": () => resolveModel("researcher"),
+    },
+  }),
   outputSchema: {
     additionalProperties: false,
     properties: {

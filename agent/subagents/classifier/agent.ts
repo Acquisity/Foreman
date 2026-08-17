@@ -1,5 +1,5 @@
-import { defineAgent } from "eve";
-import { MODELS } from "../../lib/models.js";
+import { defineAgent, defineDynamic } from "eve";
+import { resolveModel } from "../../lib/models.js";
 
 /**
  * Station 1: triage.
@@ -18,7 +18,11 @@ export default defineAgent({
     "priority, complexity, affected area, and whether it is actionable or needs " +
     "clarification. Fast triage only; no analysis or implementation. The caller passes " +
     "the work item verbatim in the message.",
-  model: MODELS.classifier,
+  model: defineDynamic({
+    events: {
+      "session.started": () => resolveModel("classifier"),
+    },
+  }),
   outputSchema: {
     additionalProperties: false,
     properties: {

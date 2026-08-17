@@ -67,31 +67,46 @@ export function commentPolicy(ctx: ApprovalContext): ApprovalStatus {
 }
 
 /**
- * The shared factory brain: durable notes about the target repository that
- * feed into every future run.
+ * Policy factory for writes to shared configuration every future run
+ * inherits (the factory brain, the live model overrides).
  *
  * @remarks
- * Reads are always allowed and never routed here; this policy gates writes
- * only. Because a brain entry becomes context for every later run, an
- * unattended run is denied writes rather than parked (nobody is watching, and
- * a labeled issue's body is untrusted input that must not be able to poison
- * the shared brain). Trusted callers and schedule turns write without a card;
- * every other human caller, the dev TUI included, parks on one.
+ * Reads are always allowed and never routed here; these policies gate writes
+ * only. Because such a write becomes context or behavior for every later
+ * run, an unattended run is denied rather than parked (nobody is watching,
+ * and a labeled issue's body is untrusted input that must not be able to
+ * poison shared state). Trusted callers and schedule turns write without a
+ * card; every other human caller, the dev TUI included, parks on one. The
+ * denial reason is per-surface so a relayed refusal names the right feature.
  */
-export function factoryBrainPolicy(ctx: ApprovalContext): ApprovalStatus {
-  const auth = ctx.session.auth.current;
-  if (isAutonomous(auth)) {
-    return {
-      reason:
-        "Unattended factory runs may read the factory brain but not write to it.",
-      type: "denied",
-    };
-  }
-  if (isTrusted(auth) || isScheduleAppAuth(auth)) {
-    return "not-applicable";
-  }
-  return "user-approval";
+function sharedConfigWritePolicy(unattendedReason: string) {
+  return (ctx: ApprovalContext): ApprovalStatus => {
+    const auth = ctx.session.auth.current;
+    if (isAutonomous(auth)) {
+      return { reason: unattendedReason, type: "denied" };
+    }
+    if (isTrusted(auth) || isScheduleAppAuth(auth)) {
+      return "not-applicable";
+    }
+    return "user-approval";
+  };
 }
+
+/**
+ * The shared factory brain: durable notes about the target repository that
+ * feed into every future run.
+ */
+export const factoryBrainPolicy = sharedConfigWritePolicy(
+  "Unattended factory runs may read the factory brain but not write to it."
+);
+
+/**
+ * The live model overrides: which model each factory agent runs on, applied
+ * to every session that starts after the change.
+ */
+export const modelSwapPolicy = sharedConfigWritePolicy(
+  "Unattended factory runs may not change the models the factory runs on."
+);
 
 /**
  * Label writes: the one reversible write an unattended run also needs, so it
