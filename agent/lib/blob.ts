@@ -31,6 +31,9 @@ export const FACTORY_BRAIN_PREFIX = "factory-brain/";
 /** Blob path prefix holding handoff artifacts passed between stations. */
 export const ARTIFACTS_PREFIX = "artifacts/";
 
+/** Blob path prefix holding the live station model overrides. */
+export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
+
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
  *
@@ -64,6 +67,11 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the shared factory brain",
     readTool: "read_factory_brain",
     writeTool: "update_factory_brain",
+  },
+  [MODEL_OVERRIDES_PREFIX]: {
+    label: "the live station model overrides",
+    readTool: "read_factory_models",
+    writeTool: "set_factory_models",
   },
   [USER_PREFERENCES_PREFIX]: {
     label: "user preferences",
@@ -175,20 +183,21 @@ export const readDocument = async (
  * write-once.
  *
  * @param key - The exact Blob pathname, derived by the owning feature module.
- * @param contents - The full Markdown document.
- * @param options - Whether an existing document at the key may be replaced.
+ * @param contents - The full document (Markdown unless `contentType` says otherwise).
+ * @param options - Whether an existing document at the key may be replaced, and an optional
+ * content type for the rare non-Markdown document (the model overrides are JSON).
  * @returns The stored blob's metadata (callers report `pathname`).
  */
 export const writeDocument = (
   key: string,
   contents: string,
-  options: { allowOverwrite: boolean }
+  options: { allowOverwrite: boolean; contentType?: string }
 ) =>
   put(key, contents, {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: options.allowOverwrite,
-    contentType: "text/markdown",
+    contentType: options.contentType ?? "text/markdown",
   });
 
 /**
