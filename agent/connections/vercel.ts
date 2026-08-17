@@ -1,21 +1,20 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { requireEnv } from "../lib/constants.js";
-import { isAutonomous } from "../lib/trust.js";
+import { denyAutonomousWrites } from "../lib/github/approval.js";
 
 /**
  * Tools that mutate Vercel state. Allowed in attended sessions, denied on
  * unattended factory runs so a prompt-injected labeled issue can never
  * deploy or post to toolbar threads.
  */
-const WRITE_TOOLS = new Set([
+const WRITE_TOOLS = [
   "deploy_to_vercel",
   "change_toolbar_thread_resolve_status",
   "reply_to_toolbar_thread",
   "edit_toolbar_message",
   "add_toolbar_reaction",
-]);
+] as const;
 
 /**
  * Vercel MCP connection for deployment observability and attended deploys.
@@ -32,13 +31,7 @@ const WRITE_TOOLS = new Set([
  *   explicitly.
  */
 export default defineMcpClientConnection({
-  approval: (ctx: ApprovalContext): ApprovalStatus =>
-    WRITE_TOOLS.has(ctx.toolName) && isAutonomous(ctx.session.auth.current)
-      ? {
-          reason: "Unattended factory runs do not write to Vercel.",
-          type: "denied",
-        }
-      : "not-applicable",
+  approval: denyAutonomousWrites("Vercel", WRITE_TOOLS),
   auth: connect({
     connector: requireEnv(
       "VERCEL_MCP_CONNECTOR",

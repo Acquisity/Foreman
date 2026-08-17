@@ -94,6 +94,37 @@ export function factoryBrainPolicy(ctx: ApprovalContext): ApprovalStatus {
 }
 
 /**
+ * Connection-wide policy for MCP servers whose writes must not run
+ * unattended.
+ *
+ * @remarks
+ * eve hands connection approval predicates the qualified tool name
+ * (`<connection>__<tool>`), so matching is by suffix, never bare equality.
+ * With no `writeTools` list, every tool on the connection counts as a
+ * write. Attended sessions stay ungated: unlike factory-brain writes,
+ * these servers' writes are app-scoped and reversible.
+ */
+export function denyAutonomousWrites(
+  surface: string,
+  writeTools?: readonly string[]
+) {
+  return (ctx: ApprovalContext): ApprovalStatus => {
+    const isWrite =
+      !writeTools ||
+      writeTools.some(
+        (tool) => ctx.toolName === tool || ctx.toolName.endsWith(`__${tool}`)
+      );
+    if (isWrite && isAutonomous(ctx.session.auth.current)) {
+      return {
+        reason: `Unattended factory runs do not write to ${surface}.`,
+        type: "denied",
+      };
+    }
+    return "not-applicable";
+  };
+}
+
+/**
  * Label writes: the one reversible write an unattended run also needs, so it
  * can mark the work item as picked up.
  */
