@@ -7,9 +7,12 @@ import { FACTORY_REPO } from "./constants.js";
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
 // so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
 // These are the compiled defaults; a live override saved by set_factory_models wins over them.
-// Each agent.ts resolves its model through resolveModel(<agent>) at session start.
+// Each agent.ts resolves its model through resolveModel(<agent>) at session start. The chat slot
+// is the orchestrator's Slack profile: sessions born on the Slack channel resolve it instead of
+// the orchestrator slot, so conversational replies can run a faster model than factory intake.
 export const MODELS = {
   analyst: "deepseek/deepseek-v4-pro-0813",
+  chat: "deepseek/deepseek-v4-pro-0813",
   classifier: "deepseek/deepseek-v4-pro-0813",
   implementer: "deepseek/deepseek-v4-pro-0813",
   orchestrator: "deepseek/deepseek-v4-pro-0813",

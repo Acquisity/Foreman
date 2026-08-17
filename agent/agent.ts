@@ -1,5 +1,6 @@
 import { defineAgent, defineDynamic } from "eve";
 import { resolveModel } from "./lib/models.js";
+import { isSlackSession } from "./lib/prompts.js";
 
 /**
  * Root agent runtime configuration.
@@ -17,6 +18,11 @@ import { resolveModel } from "./lib/models.js";
  * The model resolves at session start through `resolveModel`, so a live
  * override saved with `set_factory_models` applies to the next session
  * without a redeploy; without one, the compiled default from `MODELS` runs.
+ * Sessions born on the Slack channel resolve the `chat` slot instead of
+ * `orchestrator`: Slack traffic is mostly conversational, its replies land
+ * only when the turn completes, and the paired chat instructions profile
+ * carries no inline pipeline, so a faster model there shortens every reply
+ * without touching factory intake.
  */
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
@@ -25,7 +31,8 @@ export default defineAgent({
   },
   model: defineDynamic({
     events: {
-      "session.started": () => resolveModel("orchestrator"),
+      "session.started": (_event, ctx) =>
+        resolveModel(isSlackSession(ctx) ? "chat" : "orchestrator"),
     },
   }),
 });

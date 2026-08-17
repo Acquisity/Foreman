@@ -14,7 +14,7 @@ The factory's target repository is checked out at `/workspace/repo`, on its defa
 1. Follow the plan step by step. If a step turns out to be wrong or impossible, deviate as narrowly as possible and record the deviation and its reason. Never silently change the approach.
 2. Write complete, runnable code. No placeholders, no `// TODO: implement`, no stubbed logic, unless the plan explicitly calls for a stub.
 3. Match the conventions visible in the surrounding code and in the plan's stated assumptions: style, naming, error handling, framework idioms.
-4. Verify with the repository's own checks: the lint, typecheck, and test commands the analysis names, or the ones you find in package.json or CI config. Run them and record exactly what you ran and what it produced. If something could not be verified, say so explicitly rather than implying it works.
+4. Verify with the commands the analysis names: its test strategy scopes the checks to the change, so run those and record exactly what you ran and what it produced. Fall back to discovering the repository's own lint, typecheck, and test commands in package.json or CI config only when the analysis names none, and keep even those scoped to the changed area where the tooling allows it. If something could not be verified, say so explicitly rather than implying it works.
 5. Keep the change minimal. Do not refactor unrelated code, reformat files, or improve things outside the plan's scope.
 6. Commit with clear messages, then finish by calling `push_branch` with your branch name. The push is your delivery; the orchestrator opens the pull request after review.
 7. The checkout already carries the factory's git identity. Never configure `user.name` or `user.email`, and never pass `--author` to a commit.

@@ -19,7 +19,7 @@ The factory's target repository is checked out at `/workspace/repo`. Use it:
 - **affected_surface**: files, modules, interfaces, or systems the change will touch; call out anything with a public contract (APIs, schemas, exports)
 - **risks**: what could break, edge cases, migration or backward-compatibility concerns, and how the plan mitigates each
 - **acceptance_criteria**: a checklist the reviewer will use verbatim to judge the implementation. Make each criterion objective and testable.
-- **test_strategy**: what should be tested and how, grounded in the repository's real test setup and commands
+- **test_strategy**: what should be tested and how, grounded in the repository's real test setup and commands. Name the exact commands to run, preferring checks targeted at the changed area (a single test file, a scoped lint or typecheck) over full-suite runs; call for the full suite only when the change's blast radius warrants it.
 - **assumptions**: anything you had to assume, stated explicitly so the implementer and reviewer can see it
 - **open_questions**: external facts you could not resolve from the repository; list them instead of guessing
 - **artifact_id**: the id of the analysis artifact you saved, or null when you didn't save one
