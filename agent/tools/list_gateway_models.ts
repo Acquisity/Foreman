@@ -16,8 +16,10 @@ const MAX_RESULTS = 200;
 export default defineTool({
   description:
     "List models available on the Vercel AI Gateway, as provider/model ids. Pass a search " +
-    "term to filter (matched case-insensitively against id and name). Use it to resolve a " +
-    "person's model name to the exact gateway id before calling set_factory_models.",
+    "term to filter (matched case-insensitively against id and name). At most 200 results are " +
+    "returned; when truncated is true, narrow the search instead of concluding a model does " +
+    "not exist. Use it to resolve a person's model name to the exact gateway id before " +
+    "calling set_factory_models.",
   execute: async ({ search }) => {
     let all: Awaited<ReturnType<typeof listGatewayModels>>;
     try {
@@ -32,15 +34,17 @@ export default defineTool({
       };
     }
     const needle = search?.toLowerCase() ?? "";
-    const models = all
-      .filter(
-        (model) =>
-          needle === "" ||
-          model.id.toLowerCase().includes(needle) ||
-          model.name.toLowerCase().includes(needle)
-      )
-      .slice(0, MAX_RESULTS);
-    return { models, success: true as const };
+    const matched = all.filter(
+      (model) =>
+        needle === "" ||
+        model.id.toLowerCase().includes(needle) ||
+        model.name.toLowerCase().includes(needle)
+    );
+    return {
+      models: matched.slice(0, MAX_RESULTS),
+      success: true as const,
+      truncated: matched.length > MAX_RESULTS,
+    };
   },
   inputSchema: z.object({
     search: z
@@ -53,5 +57,6 @@ export default defineTool({
     error: z.string().optional(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),
     success: z.boolean(),
+    truncated: z.boolean().optional(),
   }),
 });
