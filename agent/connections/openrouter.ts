@@ -10,7 +10,7 @@ export default defineMcpClientConnection({
   auth: connect({
     connector: requireEnv(
       "OPENROUTER_MCP_CONNECTOR",
-      "mcp.openrouter.ai/acquisity-foreman-openrouter"
+      "mcp.openrouter.ai/acquisity-foreman-openrouter-v2"
     ),
     principalType: "user",
   }),
