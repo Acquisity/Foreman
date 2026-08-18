@@ -4,14 +4,14 @@ A map of how this agent is put together, for humans and AI agents working in the
 
 ## Project identification
 
-- **Name:** eve Software Factory (bot name Foreman)
+- **Name:** Foreman (Acquisity's general-purpose agent)
 - **Maintainer:** Vercel Labs
 - **License:** MIT
-- **Last updated:** 2026-08-14
+- **Last updated:** 2026-08-18
 
 ## Overview
 
-This is a software factory built on the [eve](https://eve.dev) agent framework: the root agent is an orchestrator that takes work items from GitHub (an issue labeled `factory`, or an @Foreman mention) and Linear (Agent Sessions), and moves each through four stations, each a declared subagent with its own instructions, sandbox, and tool surface: **classifier** (triage), **analyst** (plan with acceptance criteria, grounded in a repo checkout), **implementer** (executes the plan in its own checkout, runs the repo's checks, pushes a feature branch), and **reviewer** (independent verdict on the pushed branch, different model vendor, up to 2 revision cycles). The finished product is a draft pull request on `FACTORY_REPO`. People stay in the loop where judgment lives: merging isn't in the tool surface at all (a person merges in the GitHub UI). GitHub tools run without approval cards for every caller. The remaining approval policies gate non-GitHub surfaces: the factory brain, model swaps, and connection writes. The agent runs on Vercel, the same way locally (`eve dev`) and in production (`eve deploy`).
+Foreman is Acquisity's general-purpose agent built on the [eve](https://eve.dev) agent framework. Skills define its specialist modes, and the software factory is one of them: the `factory-pipeline` skill is the full station procedure, loaded on demand when a work item asks Foreman to fix, build, or change something in `FACTORY_REPO`. With no skill loaded, Foreman still handles whatever is delegated from the prompt alone: questions, summaries, triage, and routing. The system prompt resolves per caller through dynamic instructions: unattended factory runs (an issue labeled `factory`, red CI on a factory PR) run under the autonomous principal and get the full factory prompt inline, while every interactive session gets the general profile that reaches the pipeline through the dynamic `factory-pipeline` skill. The factory moves each work item through four stations, each a declared subagent with its own instructions, sandbox, and tool surface: **classifier** (triage), **analyst** (plan with acceptance criteria, grounded in a repo checkout), **implementer** (executes the plan in its own checkout, runs the repo's checks, pushes a feature branch), and **reviewer** (independent verdict on the pushed branch, different model vendor, up to 2 revision cycles). The finished product is a draft pull request on `FACTORY_REPO`. People stay in the loop where judgment lives: merging isn't in the tool surface at all (a person merges in the GitHub UI). GitHub tools run without approval cards for every caller. The remaining approval policies gate non-GitHub surfaces: the factory brain, model swaps, and connection writes. The agent runs on Vercel, the same way locally (`eve dev`) and in production (`eve deploy`).
 
 eve discovers every capability from the filesystem under `agent/`. There is no central registry or wiring file: a tool's name is its filename, a subagent's name is its directory, an extension's namespace is its filename.
 
@@ -20,10 +20,11 @@ eve discovers every capability from the filesystem under `agent/`. There is no c
 ```text
 agent/
   agent.ts                  # model resolution (no per-session output cap)
-  instructions.ts           # defineInstructions: the orchestrator prompt, resolved at build time (injects FACTORY_REPO)
+  instructions/
+    prompt.ts               # defineDynamic on turn.started: the system prompt, resolved per caller (autonomous -> FACTORY_PROMPT, interactive -> GENERAL_PROMPT)
   channels/
     github.ts               # eve GitHub channel via Vercel Connect; botName resolved from the connector's app slug; four hooks: onComment (mention, association-gated, stamps trusted), onIssue ('factory' label -> unattended pipeline under the autonomous principal), onCheckSuite (red CI on factory/* PRs -> unattended fix loop, capped at 2 attempts), onPullRequest (summary comment on opened PRs, bots skipped)
-    linear.ts               # eve Linear channel via Connect; Agent Sessions; stamps trusted (workspace membership is the gate), injects requester name
+    linear.ts               # eve Linear channel via Connect; Agent Sessions; stamps trusted (workspace membership is the gate), injects requester name and the factory intake task on issue delegation
     eve.ts                  # inbound route auth; dev-only localDevUser shim (user principal)
   connections/
     linear.ts               # Linear MCP server (mcp.linear.app); app-scoped auth via linearAuth; writes denied on unattended runs
@@ -46,6 +47,7 @@ agent/
     read_artifact.ts          # Blob: read a handoff artifact by id (read-only, open to every run)
   lib/
     constants.ts            # requireEnv + FACTORY_REPO/factoryRepo/FACTORY_LABEL + linearAuth
+    prompts.ts              # IDENTITY/WRITING/PIPELINE/MODEL_SWAPS/REPLIES_LAND/NEW_PRS/NOTES/GENERAL_MODE constants + FACTORY_PROMPT/GENERAL_PROMPT composition + isSlackSession
     trust.ts                # the single trust authority: AUTONOMOUS_PRINCIPAL, isAutonomous, isTrusted, isScheduleAppAuth, stampTrusted
     blob.ts                 # the shared Blob layer: reserved-namespace registry (all prefixes + guards) and read/write/delete document helpers
     user-preferences.ts     # principal-scoped Blob key derivation
@@ -57,9 +59,15 @@ agent/
       git-remote.ts         # validateBranch, brokerPolicy (firewall credential), mintInstallationToken, REMOTE_URL, REPO_DIR
       repo-sandbox.ts       # factoryBootstrap / factoryOnSession / factoryRevalidationKey shared by the three station sandboxes
   skills/                   # load-on-demand procedures, routed by description frontmatter
+    factory-pipeline.ts     # dynamic skill: the full station procedure (PIPELINE), advertised to interactive sessions only (autonomous sessions inline PIPELINE)
     writing-quality/        # AI-tells, plain English, prose specs
     triaging-issues/        # grounding a GitHub work item: dedupe, repo-native labels, ask-or-proceed, repro requests
     github-linear-bridging/ # bridged Linear issues: dedupe check, backlinks, team choice, two-way links
+    billing-triage/         # billing support triage: verify, classify, and route billing tickets
+    clarify-with-requester/ # ask-vs-investigate gate and the shared ask flow
+    slack-wording/          # Slack reply wording conventions
+    triage-investigate/     # investigation procedure for triage tickets
+    triage-policy/          # triage routing policy
 evals/                      # eve eval runner suite: smoke, routing/, safety/, pipeline/ (opt-in real run), helpers.ts, evals.config.ts
 ```
 
@@ -67,9 +75,11 @@ evals/                      # eve eval runner suite: smoke, routing/, safety/, p
 
 | Component | Lives in | eve primitive | Responsibility |
 | --- | --- | --- | --- |
-| Orchestrator | `agent/agent.ts` + `instructions.ts` | Agent | Routes work items through the stations in order, verifies handoffs, runs the review loop (max 2 cycles), opens the draft PR, reports back; never writes code itself |
+| Root agent | `agent/agent.ts` + `instructions/prompt.ts` | Agent | General-purpose agent: answers questions, summarizes, triages, and routes; when a work item asks for a fix or build, loads the factory-pipeline skill and runs the stations in order, verifies handoffs, runs the review loop (max 2 cycles), opens the draft PR, reports back; never writes code itself |
+| Prompt resolver | `agent/instructions/prompt.ts` | Dynamic instructions | Resolves the system prompt per caller at `turn.started`: autonomous (unattended factory) -> `FACTORY_PROMPT` inline, interactive -> `GENERAL_PROMPT` (pipeline via the skill) |
+| Skill resolver | `agent/skills/factory-pipeline.ts` | Dynamic skill | Advertises the `factory-pipeline` skill (the `PIPELINE` constant) to interactive sessions on `turn.started`; autonomous sessions inline `PIPELINE` and get no duplicate skill |
 | GitHub surface | `agent/channels/github.ts` | Channel | Intake and delivery: association-gated @Foreman mentions (stamped trusted), `factory`-label intake (rewritten to the autonomous principal, unattended framing injected), PR summary comments on opened PRs; replies render in-thread |
-| Linear surface | `agent/channels/linear.ts` | Channel | Linear Agent Sessions: users delegate issues to the factory; every session is stamped trusted (workspace membership); elicitations render natively |
+| Linear surface | `agent/channels/linear.ts` | Channel | Linear Agent Sessions: users delegate issues to the factory; every session is stamped trusted (workspace membership); delegating an issue injects the factory intake task (channel dispatch context) so the delegated issue runs the full pipeline; elicitations render natively |
 | Route auth | `agent/channels/eve.ts` | Channel | Inbound auth for the eve route; the `localDevUser` shim upgrades the dev principal to a user so user-scoped features work in the dev TUI |
 | GitHub tools | `agent/extensions/github.ts` | Extension | The orchestrator's GitHub surface as `github__*` tools: reads, triage writes, PR authoring; an explicit allowlist (no preset, no merge tools) with no approval gates |
 | Trust authority | `agent/lib/trust.ts` | Library | The only place caller trust is defined: trusted (stamped at dispatch), autonomous (label intake), schedule app auth; new capabilities gate on these predicates rather than inventing their own checks |
@@ -82,17 +92,17 @@ evals/                      # eve eval runner suite: smoke, routing/, safety/, p
 | User preferences | `agent/tools/{get,save,clear}_user_preferences.ts` + `agent/lib/user-preferences.ts` | Tools | Per-user standing preferences in Blob, keyed to the resolved principal (never model input) |
 | Factory brain | `agent/tools/{read,update}_factory_brain.ts` + `agent/lib/factory-brain.ts` | Tools | Shared, durable notes about the target repository in Blob, keyed to `FACTORY_REPO` (never model input); reads open to every run, writes gated by `factoryBrainPolicy` (trusted-write) |
 | Handoff artifacts | `agent/lib/artifacts/` + per-station `tools/{save,read}_artifact.ts` + root `agent/tools/read_artifact.ts` | Tools | Long Markdown documents stations pass by id in Blob: researcher and analyst save, analyst/implementer/reviewer read, the orchestrator relays only the id; ids validated by an anchored pattern so they can't escape the reserved prefix |
-| Skills | `agent/skills/` | Skill | Load-on-demand procedures: `writing-quality`, `triaging-issues`, `github-linear-bridging` |
+| Skills | `agent/skills/` | Skill | Load-on-demand procedures: `factory-pipeline`, `writing-quality`, `triaging-issues`, `github-linear-bridging`, `billing-triage`, `clarify-with-requester`, `slack-wording`, `triage-investigate`, `triage-policy` |
 | Evals | `evals/` | Evals | eve eval runner: routing and safety assertions (deny-by-default over the write-tool list), an opt-in full-pipeline run |
 
 Channels and the connection are I/O boundaries. Tools run in the app runtime (full `process.env`); the station git tools run their commands inside the station's sandbox. Skills only add instructions to context. Every station runs in **task mode** (its `agent.ts` declares an `outputSchema`), which means it returns structured output and can not request approvals or input; that is a design constraint, not an accident (see Security considerations).
 
 ## Data flow
 
-1. **Unattended intake (`factory` label):** a maintainer labels an issue `factory`. The `issues` webhook hits `onIssue`, which dispatches only on the `labeled` action and only after verifying the labeler holds at least triage permission on the repository (GitHub fires `labeled` even for labels attached at creation, which issue templates let unauthenticated reporters do). The session's auth is rewritten to the constructed autonomous principal, and an injected task frames the run: never ask, post questions and stop if clarification is needed, deliver a draft PR. The pipeline runs; the orchestrator opens the draft PR (`draft: true` needs no approval) and announces it in the closing reply the channel delivers to the issue.
+1. **Unattended intake (`factory` label):** a maintainer labels an issue `factory`. The `issues` webhook hits `onIssue`, which dispatches only on the `labeled` action and only after verifying the labeler holds at least triage permission on the repository (GitHub fires `labeled` even for labels attached at creation, which issue templates let unauthenticated reporters do). The session's auth is rewritten to the constructed autonomous principal, and an injected task frames the run: never ask, post questions and stop if clarification is needed, deliver a draft PR. The autonomous principal resolves the full factory prompt inline, so the run never depends on the model remembering to load a skill. The pipeline runs; the orchestrator opens the draft PR (`draft: true` needs no approval) and announces it in the closing reply the channel delivers to the issue.
 2. **Red CI on a factory PR:** a `check_suite` webhook with a failure conclusion, anchored to a pull request whose head branch starts with `factory/`, hits `onCheckSuite`. The session runs unattended on that PR's thread. The injected task self-limits: count earlier fix-attempt comments on the PR (each fresh session's only shared memory is the thread), stop and hand off to a person after 2, otherwise post an attempt comment, diagnose via `github__getCiFailureContext`, and run an implementer/reviewer revision that pushes to the same branch. Suites on branches people pushed never dispatch.
-3. **Attended intake (@Foreman mention):** `onComment` keeps the built-in mention and ignore rules, dispatches only for OWNER/MEMBER/COLLABORATOR commenters, and stamps `attributes.trusted`. The pipeline runs with the requester on the other end: clarifying questions go to them, GitHub writes run without approval cards.
-4. **Linear sessions:** a user delegates an issue in Linear; `onAgentSession` stamps trusted and injects the requester's name. The factory works the item, posts progress as Agent Activities, and reports the PR link back on the session. Cross-tracker conventions come from the `github-linear-bridging` skill.
+3. **Attended intake (@Foreman mention):** `onComment` keeps the built-in mention and ignore rules, dispatches only for OWNER/MEMBER/COLLABORATOR commenters, and stamps `attributes.trusted`. The session resolves the general prompt and loads the factory-pipeline skill for a real work item; the requester is on the other end, so clarifying questions go to them and GitHub writes run without approval cards.
+4. **Linear sessions:** a user delegates an issue in Linear; `onAgentSession` stamps trusted, injects the requester's name, and (on a `created` event carrying an issue) injects the factory intake task as channel dispatch context, so the delegated issue runs the full pipeline. `prompted` continuations in the same session do not re-inject the task. The factory works the item, posts progress as Agent Activities, and reports the PR link back on the session. Cross-tracker conventions come from the `github-linear-bridging` skill.
 5. **The pipeline itself:** the orchestrator grounds the work item (reads the real issue, dedupes via the `triaging-issues` skill), then delegates in order: classifier (text only) → optional researcher → analyst (reads its checkout) → implementer (branches, implements, verifies, `push_branch`) → reviewer (`checkout_branch`, judges the real diff). `request_changes` loops back to the implementer at most twice. Every delegation message is self-contained; stations never see the orchestrator's history. Long documents skip that inline path: the researcher and analyst can save a handoff artifact and return its id in `artifact_id`, the orchestrator relays the id, and downstream stations read the document themselves with `read_artifact`.
 6. **PR opened (by someone else):** `onPullRequest` dispatches on the `opened` action (bot senders skipped, which covers `foreman[bot]`'s own PRs) with a summary task injected; the agent posts one orienting comment with a changed-files table.
 
@@ -163,6 +173,9 @@ There is no application database. Anything that must outlive a session (for exam
 - **Extension:** a prebuilt eve package mounted at `agent/extensions/<ns>.ts`; its tools appear as `<ns>__<tool>`. Here: `github` (`@github-tools/eve-extension`).
 - **Tool:** a typed action authored with `defineTool`, run in the app runtime. Station tools run their commands in the station's sandbox.
 - **Skill:** a load-on-demand Markdown procedure; the packaged form requires `description` frontmatter used for routing.
+- **Dynamic instructions:** instructions resolved at runtime from session context (here, the caller) via `defineDynamic` on `turn.started`, instead of a static prompt.
+- **Dynamic skill:** a skill resolved at runtime via `defineDynamic` on `turn.started`; here, `factory-pipeline` is advertised to interactive sessions only (autonomous sessions inline `PIPELINE`).
+- **Channel dispatch context:** extra context a channel hook injects alongside auth when it dispatches a session (here, the GitHub intake task and the Linear intake task).
 - **Subagent / station:** a declared agent under `agent/subagents/<id>/` the root delegates to as a tool. It runs in a fresh child session and inherits nothing from the root (no instructions, tools, connections, or sandbox), so the caller passes everything in `message`. An `outputSchema` on its `agent.ts` makes every call task mode: structured output, and no stopping to wait for input.
 - **Task mode:** a child session that must run to completion and return structured output; it cannot ask questions or wait on approval.
 - **Autonomous principal:** the constructed identity (`github:foreman-factory`) unattended label-intake runs execute under, carrying the intake issue number as an auth attribute.

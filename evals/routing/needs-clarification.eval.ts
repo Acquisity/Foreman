@@ -2,12 +2,13 @@ import { defineEval } from "eve/evals";
 
 export default defineEval({
   description:
-    "An ambiguous work item stops the pipeline at classification: the agent asks the requester instead of building on guesses, and nothing reaches the implementer.",
+    "An ambiguous work item loads the factory-pipeline skill and stops the pipeline at classification: the agent asks the requester instead of building on guesses, and nothing reaches the implementer.",
   tags: ["slow"],
   async test(t) {
     await t.send(
       "Something is wrong with the emails, you know the one I mean. Fix it properly this time."
     );
+    t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
     t.calledSubagent("implementer", { count: 0 });
     t.calledSubagent("reviewer", { count: 0 });
