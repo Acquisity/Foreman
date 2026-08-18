@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Intercom MCP connection for customer conversation context.
  *
  * @remarks
- * App-scoped via Vercel Connect (BYO OAuth app from the Intercom Developer
- * Hub); tokens are minted per call and never exposed to the model.
+ * User-scoped via Vercel Connect (BYO OAuth app from the Intercom Developer
+ * Hub); uses the authorization-code grant: a one-time consent stores a
+ * refresh token, after which calls are non-interactive and auto-refreshing,
+ * and tokens are never exposed to the model.
  * Available to every session, unattended runs included. Read-only by tool
  * allowlist, built from the server's live tool list; article writes and
  * feedback submission are excluded, and no reply-to-customer surface is
@@ -16,7 +18,7 @@ import { requireEnv } from "../agent/lib/constants.js";
 export default defineMcpClientConnection({
   auth: connect({
     connector: requireEnv("INTERCOM_MCP_CONNECTOR", "intercom/foreman"),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Intercom customer support, read-only: conversations, contacts, companies, and help center articles.",

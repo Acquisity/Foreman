@@ -1,6 +1,6 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Every read scope PostHog's MCP resource publishes
@@ -91,9 +91,11 @@ const READ_SCOPES = [
  * PostHog MCP connection for product analytics evidence.
  *
  * @remarks
- * - App-scoped via Vercel Connect against PostHog's US cloud (Acquisity's
- *   region — `us.i.posthog.com`); tokens are minted per call and never
- *   exposed to the model. Available to every session, unattended runs
+ * - User-scoped via Vercel Connect against PostHog's US cloud (Acquisity's
+ *   region — `us.i.posthog.com`); uses the authorization-code grant: a
+ *   one-time consent stores a refresh token, after which calls are
+ *   non-interactive and auto-refreshing, and tokens are never exposed to
+ *   the model. Available to every session, unattended runs
  *   included.
  * - Read-only by OAuth scope: {@link READ_SCOPES} requests every `:read`
  *   scope and no writes, so write tools fail at the API even if exposed.
@@ -107,7 +109,7 @@ export default defineMcpClientConnection({
       "POSTHOG_MCP_CONNECTOR",
       "posthog/acquisity-foreman-posthog"
     ),
-    principalType: "app",
+    principalType: "user",
     tokenParams: { scopes: READ_SCOPES },
   }),
   description:

@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * PlanetScale MCP connection for production database investigation.
  *
  * @remarks
- * - App-scoped via Vercel Connect (MCP automatic registration). Tokens are
- *   minted per call and never exposed to the model.
+ * - User-scoped via Vercel Connect (MCP automatic registration). Uses the
+ *   authorization-code grant: a one-time consent stores a refresh token,
+ *   after which calls are non-interactive and auto-refreshing, and tokens
+ *   are never exposed to the model.
  * - Ungated on purpose: unattended factory runs investigate bug tickets and
  *   must assess fleet-wide blast radius, so queries are deliberately not
  *   pinned to one organization. Safety comes from the read-only allowlist —
@@ -21,7 +23,7 @@ export default defineMcpClientConnection({
       "PLANETSCALE_MCP_CONNECTOR",
       "planetscale/acquisity-foreman-planetscale"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "PlanetScale Postgres, read-only: organizations, databases, branches, schema, read queries against production data, and query Insights.",

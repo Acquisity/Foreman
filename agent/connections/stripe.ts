@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Stripe MCP connection for billing investigation.
  *
  * @remarks
- * App-scoped via Vercel Connect (MCP automatic registration); tokens are
- * minted per call and never exposed to the model. Available to every
+ * User-scoped via Vercel Connect (MCP automatic registration); uses the
+ * authorization-code grant: a one-time consent stores a refresh token,
+ * after which calls are non-interactive and auto-refreshing, and tokens are
+ * never exposed to the model. Available to every
  * session, unattended runs included. Read-only by tool allowlist, built
  * from the server's live tool list: `stripe_api_read` / `stripe_api_search`
  * cover the read API surface; `stripe_api_write` and account management are
@@ -19,7 +21,7 @@ export default defineMcpClientConnection({
       "STRIPE_MCP_CONNECTOR",
       "stripe/acquisity-foreman-stripe"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Stripe billing, read-only: customers, subscriptions, invoices, payments, refunds, disputes, products, and Stripe documentation search.",
