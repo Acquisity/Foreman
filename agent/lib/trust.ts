@@ -8,9 +8,9 @@ import type { SessionAuthContext } from "eve/context";
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
  * dispatch; the remaining approval policies (factoryBrainPolicy,
- * modelSwapPolicy, denyAutonomousWrites) deny it shared-config writes, because
- * an unattended turn has nobody to answer an approval card and would park
- * forever.
+ * modelSwapPolicy, denyAutonomousWrites) deny it non-GitHub writes (factory
+ * brain, model swaps, connection writes), because an unattended turn has
+ * nobody to answer an approval card and would park forever.
  */
 export const AUTONOMOUS_PRINCIPAL = "github:foreman-factory";
 
@@ -105,9 +105,12 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * Whether the dispatching channel stamped this caller as trusted.
  *
  * @remarks
- * This is the single caller check for routine repository writes. New
- * capabilities gate on this predicate (or {@link isAutonomous} /
- * {@link isScheduleAppAuth}) rather than inventing their own.
+ * GitHub tools run without approval cards for every caller, so this predicate
+ * is not a write gate there. It gates the shared-config write policies in
+ * `agent/lib/github/approval.ts`: trusted callers write the factory brain and
+ * model overrides directly, everyone else parks on a card. New capabilities
+ * gate on this predicate (or {@link isAutonomous} / {@link isScheduleAppAuth})
+ * rather than inventing their own.
  */
 export function isTrusted(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[TRUSTED_ATTRIBUTE] === "true";

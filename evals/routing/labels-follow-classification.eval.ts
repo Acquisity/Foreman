@@ -35,12 +35,13 @@ const toolCallOrder = (events: readonly MessageStreamEvent[]): string[] => {
 
 export default defineEval({
   description:
-    "Classifying a GitHub issue mirrors the result onto it as labels: the repo's vocabulary is read before any label write, and a label write (addLabels or updateIssue) is among the approvals the untrusted eval principal parks on; a progress comment may park alongside it. Needs at least one open issue (#1) on FACTORY_REPO.",
+    "Classifying a GitHub issue loads the factory-pipeline skill and mirrors the result onto the issue as labels: the repo's vocabulary is read before any label write, and a label write (addLabels or updateIssue) is among the approvals the untrusted eval principal parks on; a progress comment may park alongside it. Needs at least one open issue (#1) on FACTORY_REPO.",
   tags: ["fast", "needs-connect"],
   async test(t) {
     await t.send(
       "Run issue #1 on the repository through the classifier and mirror the classification onto the issue, then stop; do not run the analyst or any later station."
     );
+    t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
     t.calledSubagent("analyst", { count: 0 });
     t.calledSubagent("implementer", { count: 0 });
