@@ -26,7 +26,7 @@ Each station is its own agent with its own instructions, sandbox, and tools. The
 - **Label an issue `factory`.** The pipeline runs on its own, posts progress as stations complete, and ends with a draft PR linked to the issue.
 - **@mention it on an issue or PR.** Mentions from repo owners, members, and collaborators start an interactive session.
 - **Delegate in Linear.** Linear Agent Sessions run the same pipeline and report progress back in Linear.
-- **The dev TUI.** Hand it a task locally. Changes to GitHub wait for your approval.
+- **The dev TUI.** Hand it a task locally.
 - **Red CI on a factory PR.** Foreman diagnoses the failure and pushes a fix to its own branches, never yours.
 - **Someone opens a pull request.** Foreman posts one orienting comment for reviewers: a summary, not a review.
 
@@ -57,7 +57,7 @@ vercel env pull
 pnpm dev
 ```
 
-Hand the agent a task ("users report the password reset email arrives twice, fix it") and watch the four stations fire in order, ending in a draft PR on `FACTORY_REPO`. Local runs are treated as untrusted, so changes to GitHub wait for your approval in the TUI.
+Hand the agent a task ("users report the password reset email arrives twice, fix it") and watch the four stations fire in order, ending in a draft PR on `FACTORY_REPO`.
 
 ## Resources
 

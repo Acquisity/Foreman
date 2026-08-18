@@ -2,12 +2,11 @@ import { defineAgent, defineDynamic } from "eve";
 import { resolveModel } from "./lib/models.js";
 import { isSlackSession } from "./lib/prompts.js";
 
-// Root agent runtime configuration: the model and session budget for Foreman, the software
-// factory orchestrator; the rest of the surface (channels, connections, extensions, tools,
-// skills, subagents) is discovered from the filesystem under agent/. History compacts at 75% of
-// the context window, and the per-session output cap stops runaway sessions while leaving room
-// for the pipeline: the four stations draw from the root session's remaining quota, and an
-// implementation run needs far more than a chat reply.
+// Root agent runtime configuration: the model for Foreman, the software factory
+// orchestrator; the rest of the surface (channels, connections, extensions, tools,
+// skills, subagents) is discovered from the filesystem under agent/. History compacts at
+// 75% of the context window, and there is no per-session output cap: a run is billed per
+// session, not per line of output, and the cap was blocking legitimate implementation runs.
 //
 // The model resolves at session start through resolveModel, so a live override saved with
 // set_factory_models applies to the next session without a redeploy; without one, the compiled
@@ -17,9 +16,6 @@ import { isSlackSession } from "./lib/prompts.js";
 // model there shortens every reply without touching factory intake.
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
-  limits: {
-    maxOutputTokensPerSession: 100_000,
-  },
   model: defineDynamic({
     events: {
       "session.started": (_event, ctx) =>
