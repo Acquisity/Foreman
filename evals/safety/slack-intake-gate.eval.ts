@@ -34,7 +34,10 @@ export default defineEval({
     );
     t.check(
       parseIntakeOnlyChannels(""),
-      satisfies<Set<string>>((s) => s.size === 0, "is empty for an empty string")
+      satisfies<Set<string>>(
+        (s) => s.size === 0,
+        "is empty for an empty string"
+      )
     );
   },
 });
