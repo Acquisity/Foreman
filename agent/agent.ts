@@ -18,7 +18,7 @@ import { isSlackSession } from "./lib/prompts.js";
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: {
-    maxOutputTokensPerSession: 100_000,
+    maxOutputTokensPerSession: 300_000,
   },
   model: defineDynamic({
     events: {
