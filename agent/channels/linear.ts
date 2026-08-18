@@ -43,7 +43,7 @@ export default linearChannel({
     if (requesterName) {
       context.push(`The requesting user is ${requesterName}.`);
     }
-    if (event.action === "created" && event.agentSession.issue !== null) {
+    if (event.action === "created" && event.agentSession.issue) {
       context.push(LINEAR_INTAKE_TASK);
     }
     return { auth: stampTrusted(defaultLinearAuth(event)), context };
