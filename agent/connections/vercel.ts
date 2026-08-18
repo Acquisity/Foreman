@@ -1,7 +1,7 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
-import { denyAutonomousWrites } from "../agent/lib/github/approval.js";
+import { requireEnv } from "../lib/constants.js";
+import { denyAutonomousWrites } from "../lib/github/approval.js";
 
 /**
  * Tools that mutate Vercel state. Allowed in attended sessions, denied on
@@ -20,10 +20,13 @@ const WRITE_TOOLS = [
  * Vercel MCP connection for deployment observability and attended deploys.
  *
  * @remarks
- * - Points at Vercel's hosted MCP server and authenticates app-scoped
+ * - Points at Vercel's hosted MCP server and authenticates user-scoped
  *   through a Vercel Connect connector (created from the dashboard's
- *   Connect page or `vercel connect create mcp.vercel.com`), so tokens are
- *   minted per call and never exposed to the model.
+ *   Connect page or `vercel connect create mcp.vercel.com`). The connector
+ *   uses the authorization-code grant: a one-time consent
+ *   (`vercel connect token <uid> --yes`) stores a refresh token, after which
+ *   calls are non-interactive and auto-refreshing. Tokens are never exposed
+ *   to the model.
  * - The allowlist excludes purchases (domains, credits, addons) and
  *   `use_vercel_cli` (arbitrary CLI execution) entirely — no session should
  *   reach those. Write tools on the allowlist are approval-gated to
@@ -37,7 +40,7 @@ export default defineMcpClientConnection({
       "VERCEL_MCP_CONNECTOR",
       "mcp.vercel.com/acquisity-foreman"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Vercel platform: projects, deployments, build and runtime logs, runtime errors, web analytics, toolbar threads, deploys, and Vercel documentation search.",
