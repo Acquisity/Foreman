@@ -157,8 +157,7 @@ const PR_SUMMARY_TASK = [
  *   check: it keeps the default mention and ignore rules, then dispatches
  *   only when the commenter's `author_association` marks them as trusted with
  *   the repo (owner, member, or collaborator). The dispatch stamps the
- *   `trusted` auth attribute, which is what lets the approval policies run
- *   reversible writes without a card. Mentions from anyone else are
+ *   `trusted` auth attribute. Mentions from anyone else are
  *   acknowledged without a session, so arbitrary accounts on a public repo
  *   cannot drive the agent's write tools.
  * - `onIssue` is the unattended intake: adding the factory label hands the
@@ -172,8 +171,8 @@ const PR_SUMMARY_TASK = [
  *   not the raw webhook payload that carries the just-added label. The turn
  *   itself runs unattended: the auth is rewritten to the constructed
  *   autonomous principal with the intake issue number stamped in, and the
- *   approval policies deny it everything except labels, progress comments on
- *   that one issue, closing or reopening issues, and draft pull requests.
+ *   remaining approval policies deny it shared-config writes (factory brain,
+ *   model swaps, connections).
  * - `onPullRequest` dispatches only on the `opened` action and skips PRs
  *   opened by bots, which covers Dependabot and the factory's own
  *   `foreman[bot]` pull requests. It is deliberately not gated by
@@ -188,12 +187,12 @@ const PR_SUMMARY_TASK = [
  *   thread. Requires the connector to subscribe to the `check_suite` webhook
  *   event.
  * - Human-in-the-loop prompts are the channel's own (eve ≥ 0.34 posts them by
- *   default): when a session stops for approval or input, the channel renders
- *   the request as a comment with a mention-based reply instruction. Passing
- *   the `botName` resolver is what makes both the instruction and the reply's
+ *   default): when a session stops for input, the channel renders the request
+ *   as a comment with a mention-based reply instruction. Passing the
+ *   `botName` resolver is what makes both the instruction and the reply's
  *   mention-stripping correct, and `onComment`'s gate is what keeps a reply
- *   an authorization signal: only mentions from owners, members, and
- *   collaborators ever reach the waiting session.
+ *   a clarifying answer: only mentions from owners, members, and collaborators
+ *   ever reach the waiting session.
  */
 export default githubChannel({
   botName: resolveBotName,

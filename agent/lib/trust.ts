@@ -7,10 +7,10 @@ import type { SessionAuthContext } from "eve/context";
  * @remarks
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
- * dispatch; the approval policies deny it everything except labels, progress
- * comments on its own intake issue, closing or reopening issues, and draft
- * pull requests, because an unattended turn has nobody to answer an approval
- * card and would park forever.
+ * dispatch; the remaining approval policies (factoryBrainPolicy,
+ * modelSwapPolicy, denyAutonomousWrites) deny it shared-config writes, because
+ * an unattended turn has nobody to answer an approval card and would park
+ * forever.
  */
 export const AUTONOMOUS_PRINCIPAL = "github:foreman-factory";
 
@@ -46,9 +46,8 @@ export function stampTrusted(auth: SessionAuthContext): SessionAuthContext {
  *
  * @remarks
  * Stamped by {@link stampAutonomous} at dispatch, on the signed webhook, so
- * the approval policies can scope an unattended run's comment writes to its
- * own intake thread. Attribute values are strings; read it back through
- * {@link intakeIssueNumber}.
+ * the run can reference its own intake issue. Attribute values are strings;
+ * read it back through {@link intakeIssueNumber}.
  */
 export const INTAKE_ISSUE_ATTRIBUTE = "intakeIssue";
 
@@ -59,8 +58,8 @@ export const INTAKE_ISSUE_ATTRIBUTE = "intakeIssue";
  * @remarks
  * The GitHub channel calls this when the factory label is applied: the
  * webhook sender's identity is replaced (the turn must never run as the
- * labeler), and the issue number is stamped so `commentPolicy` can let the
- * run narrate on its own thread and nowhere else.
+ * labeler), and the issue number is stamped so the run can reference its own
+ * intake issue.
  */
 export function stampAutonomous(
   auth: SessionAuthContext,
