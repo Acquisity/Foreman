@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Sentry MCP connection for bug investigation evidence.
  *
  * @remarks
- * - App-scoped via Vercel Connect (MCP automatic registration). Tokens are
- *   minted per call and never exposed to the model. Available to every
+ * - User-scoped via Vercel Connect (MCP automatic registration). Uses the
+ *   authorization-code grant: a one-time consent stores a refresh token,
+ *   after which calls are non-interactive and auto-refreshing, and tokens
+ *   are never exposed to the model. Available to every
  *   session, unattended runs included.
  * - Read-only by consent, not by tool filter: the installation was granted
  *   only the "Inspect Issues & Events" capability (37 read-only tools —
@@ -23,7 +25,7 @@ export default defineMcpClientConnection({
       "SENTRY_MCP_CONNECTOR",
       "sentry/acquisity-foreman-sentry"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Sentry error tracking, read-only: issues, events, stack traces, breadcrumbs, traces, session replays, releases, and performance data.",

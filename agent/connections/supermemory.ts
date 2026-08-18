@@ -1,13 +1,13 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
-import { denyAutonomousWrites } from "../agent/lib/github/approval.js";
+import { requireEnv } from "../lib/constants.js";
+import { denyAutonomousWrites } from "../lib/github/approval.js";
 
 /**
  * Supermemory MCP connection for recalling and saving team context.
  *
  * @remarks
- * App-scoped via Vercel Connect. Supermemory's MCP rejects machine
+ * User-scoped via Vercel Connect. Supermemory's MCP rejects machine
  * (client_credentials) tokens, and its dynamic registration only mints
  * those for authenticated callers, so the connector holds a hand-registered
  * confidential OAuth client (registered against
@@ -30,7 +30,7 @@ export default defineMcpClientConnection({
       "SUPERMEMORY_MCP_CONNECTOR",
       "mcp.supermemory.ai/acquisity-foreman-supermemory"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Supermemory: semantic recall over saved memories, documents, and spaces, plus saving new memories on attended runs.",
