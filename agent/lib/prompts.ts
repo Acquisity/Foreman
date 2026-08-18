@@ -1,4 +1,5 @@
 import { FACTORY_REPO } from "./constants.js";
+import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
 
 // The agent's prompt text, split into shared sections so the general prompt, the factory
 // prompt, and the factory-pipeline skill compose from the same source and cannot drift.
@@ -123,3 +124,19 @@ export const GENERAL_PROMPT = [
   REPLIES_LAND,
   NOTES,
 ].join("\n\n");
+
+/**
+ * Selects the system prompt for a caller, keyed on the caller's principal.
+ *
+ * @remarks
+ * The autonomous principal (unattended factory runs: an issue labeled
+ * `factory`, red CI on a factory PR) gets FACTORY_PROMPT with the pipeline
+ * inline, so those runs never depend on the model remembering to load a
+ * skill. Every other principal (including a null principal, when there is no
+ * caller) gets GENERAL_PROMPT, which reaches the same pipeline through the
+ * factory-pipeline skill. The selection is total: anything unrecognized falls
+ * through to GENERAL_PROMPT.
+ */
+export function selectPrompt(principal: string | null | undefined): string {
+  return principal === AUTONOMOUS_PRINCIPAL ? FACTORY_PROMPT : GENERAL_PROMPT;
+}

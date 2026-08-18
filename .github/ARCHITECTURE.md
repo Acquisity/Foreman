@@ -59,7 +59,7 @@ agent/
       git-remote.ts         # validateBranch, brokerPolicy (firewall credential), mintInstallationToken, REMOTE_URL, REPO_DIR
       repo-sandbox.ts       # factoryBootstrap / factoryOnSession / factoryRevalidationKey shared by the three station sandboxes
   skills/                   # load-on-demand procedures, routed by description frontmatter
-    factory-pipeline.ts     # dynamic skill: the full station procedure (PIPELINE), advertised to every session
+    factory-pipeline.ts     # dynamic skill: the full station procedure (PIPELINE), advertised to interactive sessions only (autonomous sessions inline PIPELINE)
     writing-quality/        # AI-tells, plain English, prose specs
     triaging-issues/        # grounding a GitHub work item: dedupe, repo-native labels, ask-or-proceed, repro requests
     github-linear-bridging/ # bridged Linear issues: dedupe check, backlinks, team choice, two-way links
@@ -77,7 +77,7 @@ evals/                      # eve eval runner suite: smoke, routing/, safety/, p
 | --- | --- | --- | --- |
 | Root agent | `agent/agent.ts` + `instructions/prompt.ts` | Agent | General-purpose agent: answers questions, summarizes, triages, and routes; when a work item asks for a fix or build, loads the factory-pipeline skill and runs the stations in order, verifies handoffs, runs the review loop (max 2 cycles), opens the draft PR, reports back; never writes code itself |
 | Prompt resolver | `agent/instructions/prompt.ts` | Dynamic instructions | Resolves the system prompt per caller at `turn.started`: autonomous (unattended factory) -> `FACTORY_PROMPT` inline, interactive -> `GENERAL_PROMPT` (pipeline via the skill) |
-| Skill resolver | `agent/skills/factory-pipeline.ts` | Dynamic skill | Advertises the `factory-pipeline` skill (the `PIPELINE` constant) to every session on `turn.started` |
+| Skill resolver | `agent/skills/factory-pipeline.ts` | Dynamic skill | Advertises the `factory-pipeline` skill (the `PIPELINE` constant) to interactive sessions on `turn.started`; autonomous sessions inline `PIPELINE` and get no duplicate skill |
 | GitHub surface | `agent/channels/github.ts` | Channel | Intake and delivery: association-gated @Foreman mentions (stamped trusted), `factory`-label intake (rewritten to the autonomous principal, unattended framing injected), PR summary comments on opened PRs; replies render in-thread |
 | Linear surface | `agent/channels/linear.ts` | Channel | Linear Agent Sessions: users delegate issues to the factory; every session is stamped trusted (workspace membership); delegating an issue injects the factory intake task (channel dispatch context) so the delegated issue runs the full pipeline; elicitations render natively |
 | Route auth | `agent/channels/eve.ts` | Channel | Inbound auth for the eve route; the `localDevUser` shim upgrades the dev principal to a user so user-scoped features work in the dev TUI |
@@ -174,7 +174,7 @@ There is no application database. Anything that must outlive a session (for exam
 - **Tool:** a typed action authored with `defineTool`, run in the app runtime. Station tools run their commands in the station's sandbox.
 - **Skill:** a load-on-demand Markdown procedure; the packaged form requires `description` frontmatter used for routing.
 - **Dynamic instructions:** instructions resolved at runtime from session context (here, the caller) via `defineDynamic` on `turn.started`, instead of a static prompt.
-- **Dynamic skill:** a skill resolved at runtime via `defineDynamic` on `turn.started`; here, `factory-pipeline` is advertised to every session.
+- **Dynamic skill:** a skill resolved at runtime via `defineDynamic` on `turn.started`; here, `factory-pipeline` is advertised to interactive sessions only (autonomous sessions inline `PIPELINE`).
 - **Channel dispatch context:** extra context a channel hook injects alongside auth when it dispatches a session (here, the GitHub intake task and the Linear intake task).
 - **Subagent / station:** a declared agent under `agent/subagents/<id>/` the root delegates to as a tool. It runs in a fresh child session and inherits nothing from the root (no instructions, tools, connections, or sandbox), so the caller passes everything in `message`. An `outputSchema` on its `agent.ts` makes every call task mode: structured output, and no stopping to wait for input.
 - **Task mode:** a child session that must run to completion and return structured output; it cannot ask questions or wait on approval.
