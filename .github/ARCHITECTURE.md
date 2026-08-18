@@ -7,7 +7,7 @@ A map of how this agent is put together, for humans and AI agents working in the
 - **Name:** Foreman (Acquisity's general-purpose agent)
 - **Maintainer:** Vercel Labs
 - **License:** MIT
-- **Last updated:** 2026-08-18
+- **Last updated:** 2026-08-19
 
 ## Overview
 
