@@ -25,13 +25,14 @@ const firstCompleted = (
 
 export default defineEval({
   description:
-    "A work item that plainly turns on an external fact sends the researcher out alongside the classifier: both are dispatched before either returns, and both finish before the analyst plans.",
+    "A work item that plainly turns on an external fact loads the factory-pipeline skill and sends the researcher out alongside the classifier: both are dispatched before either returns, and both finish before the analyst plans.",
   tags: ["slow", "needs-connect"],
   async test(t) {
     await t.send(
       "Work item: our date parsing breaks on the new RFC 9557 timezone suffix format; we need to confirm what the released spec actually says and plan a fix. Classify this and produce the implementation plan, but stop after analysis and report the plan to me; do not implement anything yet."
     );
     t.succeeded();
+    t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
     t.calledSubagent("researcher");
     t.calledSubagent("analyst");

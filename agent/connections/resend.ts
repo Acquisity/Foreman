@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Resend MCP connection for transactional email evidence.
  *
  * @remarks
- * App-scoped via Vercel Connect (MCP automatic registration); tokens are
- * minted per call and never exposed to the model. Available to every
+ * User-scoped via Vercel Connect (MCP automatic registration); uses the
+ * authorization-code grant: a one-time consent stores a refresh token,
+ * after which calls are non-interactive and auto-refreshing, and tokens are
+ * never exposed to the model. Available to every
  * session, unattended runs included. Resend's OAuth grants `full_access`
  * only, so read-only is enforced here: the allowlist admits every `get-*` /
  * `list-*` tool from the server's live tool list and nothing else — no
@@ -19,7 +21,7 @@ export default defineMcpClientConnection({
       "RESEND_MCP_CONNECTOR",
       "resend/acquisity-foreman-resend"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Resend email, read-only: delivery status, logs, domains, contacts, segments, broadcasts, templates, and suppressions.",

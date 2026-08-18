@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Modem MCP connection for customer feedback evidence.
  *
  * @remarks
- * App-scoped via Vercel Connect against Modem's hosted server; tokens are
- * minted per call and never exposed to the model. The connector holds a
+ * User-scoped via Vercel Connect against Modem's hosted server; uses the
+ * authorization-code grant: a one-time consent stores a refresh token,
+ * after which calls are non-interactive and auto-refreshing, and tokens are
+ * never exposed to the model. The connector holds a
  * hand-registered public OAuth client (Modem's dynamic registration only
  * allows client_credentials for authenticated callers) plus a one-time
  * user consent. Modem's MCP enforces RFC 8707 resource binding: tokens
@@ -26,7 +28,7 @@ export default defineMcpClientConnection({
       "MODEM_MCP_CONNECTOR",
       "mcp.modem.dev/acquisity-foreman-modem"
     ),
-    principalType: "app",
+    principalType: "user",
     tokenParams: {
       resources: [MODEM_MCP_URL],
       scopes: ["data:read", "offline_access"],

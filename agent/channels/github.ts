@@ -171,8 +171,8 @@ const PR_SUMMARY_TASK = [
  *   not the raw webhook payload that carries the just-added label. The turn
  *   itself runs unattended: the auth is rewritten to the constructed
  *   autonomous principal with the intake issue number stamped in, and the
- *   remaining approval policies deny it shared-config writes (factory brain,
- *   model swaps, connections).
+ *   remaining approval policies deny it non-GitHub writes (factory brain,
+ *   model swaps, connection writes).
  * - `onPullRequest` dispatches only on the `opened` action and skips PRs
  *   opened by bots, which covers Dependabot and the factory's own
  *   `foreman[bot]` pull requests. It is deliberately not gated by

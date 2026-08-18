@@ -1,13 +1,15 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../agent/lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 
 /**
  * Jam MCP connection for bug report context.
  *
  * @remarks
- * App-scoped via Vercel Connect (OAuth registration against Jam's hosted
- * server); tokens are minted per call and never exposed to the model.
+ * User-scoped via Vercel Connect (OAuth registration against Jam's hosted
+ * server); uses the authorization-code grant: a one-time consent stores a
+ * refresh token, after which calls are non-interactive and auto-refreshing,
+ * and tokens are never exposed to the model.
  * Available to every session, unattended runs included — Jam recordings
  * (console logs, network traces, repro steps) are core bug-investigation
  * evidence. Read-only by tool allowlist, built from the server's live tool
@@ -20,7 +22,7 @@ export default defineMcpClientConnection({
       "JAM_MCP_CONNECTOR",
       "mcp.jam.dev/acquisity-foreman-jam"
     ),
-    principalType: "app",
+    principalType: "user",
   }),
   description:
     "Jam bug reports, read-only: recordings, console logs, network requests, screenshots, user events, and video transcripts.",

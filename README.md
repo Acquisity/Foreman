@@ -1,18 +1,20 @@
 <img width="100%" alt="eve Software Factory Banner" src=".github/banner.png" />
 
-# eve Software Factory Template
+# Foreman
 
 [![Docs](https://img.shields.io/badge/Documentation-000?style=flat-square&logo=readthedocs&logoColor=FFF&labelColor=000&color=000)](https://ask-foreman.dev/docs)
 [![Agent Stack](https://img.shields.io/badge/Agent%20Stack-000?style=flat-square&logo=vercel&logoColor=FFF&labelColor=000&color=000)](https://vercel.com/kb/agent-stack)
 [![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](LICENSE)
 
-Meet **Foreman**, an eve software factory that puts AI agents on every stage of the development loop and keeps people on the judgment calls.
+Meet **Foreman**, Acquisity's general-purpose agent. Skills define its specialist modes, and the software factory is one of them: when a work item asks Foreman to fix, build, or change something in your repository, it loads the factory-pipeline skill and runs the full line. With no skill loaded it still handles whatever you delegate, from questions and summaries to triage and routing.
 
-Foreman takes tasks from GitHub and Linear, moves each one through four stations, and delivers a reviewed draft pull request on your repository. You review, mark ready, and merge.
+The factory takes tasks from GitHub and Linear, moves each one through four stations, and delivers a reviewed draft pull request on your repository. You review, mark ready, and merge.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?project-name=eve-software-factory&repository-name=eve-software-factory-template&repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Feve-software-factory-template&env=FACTORY_REPO,FACTORY_LABEL&envDefaults=%7B%22FACTORY_LABEL%22%3A%22factory%22%7D&envDescription=FACTORY_REPO%20is%20the%20owner%2Frepo%20the%20factory%20works%20on.%20FACTORY_LABEL%20is%20the%20issue%20label%20that%20hands%20an%20issue%20to%20the%20factory%3B%20the%20default%20label%20is%20fine.&connect=%5B%7B%22type%22%3A%22github%22%2C%22env%22%3A%22GITHUB_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Fgithub%22%7D%2C%7B%22type%22%3A%22linear%22%2C%22env%22%3A%22LINEAR_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Flinear%22%7D%5D&stores=%5B%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D)
 
 ## How it works
+
+Foreman is a general-purpose agent whose specialist modes are skills. The factory-pipeline skill is the software factory: load it and Foreman runs the full station line.
 
 - **Classifier** triages the task: type, priority, complexity, actionable or not. When the task isn't actionable, Foreman asks the requester instead of building the wrong thing.
 - **Analyst** turns it into a plan with acceptance criteria, working from a live checkout of your repository.
