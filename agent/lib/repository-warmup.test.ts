@@ -7,11 +7,10 @@ import {
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
-  warmRevalidationKey,
+  warmSnapshotRevalidationKey,
 } from "./repository-warmup.js";
 
 const INVALID_REPOSITORY_PATTERN = /Invalid GitHub repository/u;
-const REVALIDATION_KEY_PATTERN = /^warm-1:foreman-lock-[0-9a-f]{64}$/u;
 
 describe("repository warm-up", () => {
   it("maps warmed slugs to fixed template paths and rejects invalid slugs", () => {
@@ -48,8 +47,17 @@ describe("repository warm-up", () => {
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });
   });
 
-  it("folds the warm-up revision and a lockfile hash into the revalidation key", () => {
-    const key = warmRevalidationKey();
-    assert.match(key, REVALIDATION_KEY_PATTERN);
+  it("folds the warm-up revision and snapshot id into the revalidation key", () => {
+    assert.equal(
+      warmSnapshotRevalidationKey("snap_123"),
+      "warm-1:snapshot-snap_123"
+    );
+  });
+
+  it("falls back to a 'none' snapshot id when no snapshot exists yet", () => {
+    assert.equal(
+      warmSnapshotRevalidationKey(undefined),
+      "warm-1:snapshot-none"
+    );
   });
 });

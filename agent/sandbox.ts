@@ -8,10 +8,7 @@ import {
   type SandboxSessionContext,
 } from "eve/sandbox";
 import { vercel } from "eve/sandbox/vercel";
-import {
-  warmAllRepositories,
-  warmRevalidationKey,
-} from "#lib/repository-warmup.js";
+import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
 
 /**
  * Root agent sandbox configuration.
@@ -30,11 +27,16 @@ import {
  * of paying the install on first use in every fresh sandbox; the revalidation key rebuilds
  * the template when the pinned agent-browser version changes.
  *
- * The bootstrap also pre-warms the factory repositories (Acquisity/Foreman and
- * Acquisity/Acquisity) by cloning and installing their dependencies at template build time,
- * so `prepare_repository` and the station sandboxes start from a warm checkout instead of a
- * full install on every fresh session. The revalidation key folds in the warm-up revision
- * and a hash of Foreman's lockfile so dependency bumps rebuild the template.
+ * The factory repositories (Acquisity/Foreman and Acquisity/Acquisity) are warmed out of
+ * band by the `warm-repository-snapshot` schedule, which clones, installs, and builds them in
+ * a throwaway sandbox and snapshots the result. The template starts from that snapshot via
+ * `source: { type: "snapshot", snapshotId }`, so `prepare_repository` and the station
+ * sandboxes begin from a warm checkout instead of a full install on every fresh session. The
+ * snapshot id is read synchronously from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` because `source`
+ * is fixed at template build time; when it is unset the template omits `source` and
+ * `prepare_repository` cold-clones, which is the safe fallback before the first snapshot
+ * exists. The revalidation key folds in the snapshot id so a rebuilt snapshot rebuilds the
+ * template.
  *
  * The `onSession` hook marks `/workspace` as a safe git directory before the GitHub channel's
  * built-in per-turn checkout runs there. The sandbox filesystem is owned by the builder uid,
@@ -45,12 +47,21 @@ import {
  *
  * @see {@link https://vercel.com/docs/sandbox | Vercel Sandbox}
  */
+
+const snapshotId = process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID;
+
+const backend = snapshotId
+  ? vercel({
+      resources: { vcpus: 2 },
+      source: { snapshotId, type: "snapshot" },
+    })
+  : vercel({ resources: { vcpus: 2 } });
+
 export default defineSandbox({
-  backend: vercel({ resources: { vcpus: 2 } }),
+  backend,
   async bootstrap({ use }: SandboxBootstrapContext): Promise<void> {
     const sandbox = await use();
     await installAgentBrowser(sandbox);
-    await warmAllRepositories(sandbox);
   },
   async onSession({ use }: SandboxSessionContext): Promise<void> {
     const sandbox = await use();
@@ -66,5 +77,8 @@ export default defineSandbox({
     }
   },
   revalidationKey: () =>
-    [agentBrowserRevalidationKey(), warmRevalidationKey()].join(":"),
+    [
+      agentBrowserRevalidationKey(),
+      warmSnapshotRevalidationKey(snapshotId),
+    ].join(":"),
 });
