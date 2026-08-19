@@ -110,36 +110,45 @@ const prepareWarmedOrClone = async (
     if (move.exitCode !== 0) {
       return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
     }
-    // The moved checkout is owned by the builder uid, not the session user,
-    // so git would abort with "detected dubious ownership" unless it is
-    // trusted first. The `safe.directory` for `/workspace` configured in
-    // `onSession` does not cover the nested repo (safe.directory is not
-    // recursive), and the later `safe.directory '${worktree}'` config runs
-    // after this step, so register `/workspace/repo` before any git command.
+
+    // From here `/workspace/repo` is populated, so any failure must roll it
+    // back or a retry in this session wedges on "already exists".
+    // The moved checkout is owned by the builder uid, not the session user, so
+    // git would abort with "detected dubious ownership" unless it is trusted
+    // first. The `safe.directory` for `/workspace` configured in `onSession`
+    // does not cover the nested repo (safe.directory is not recursive), and the
+    // later `safe.directory '${worktree}'` config runs after this step, so
+    // register `/workspace/repo` before any git command.
     const trust = await sandbox.run({
       command: "git config --global --add safe.directory /workspace/repo",
     });
     if (trust.exitCode !== 0) {
+      await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not trust the warmed checkout for ${repository}: ${String(trust.stderr || trust.stdout).trim()}`;
     }
     const refresh = await sandbox.run({
       command: `git -C /workspace/repo fetch ${remoteUrl(repository)} && git -C /workspace/repo reset --hard FETCH_HEAD`,
     });
     if (refresh.exitCode !== 0) {
+      await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not refresh ${repository}: ${String(refresh.stderr || refresh.stdout).trim()}`;
     }
-    const install = await sandbox.run({
-      command: warmInstallCommand(warmed.kind),
-      env: warmInstallEnv(warmed.kind),
-      workingDirectory: "/workspace/repo",
-    });
-    if (install.exitCode !== 0) {
-      return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
-    }
-    return null;
   } finally {
     await sandbox.setNetworkPolicy("allow-all");
   }
+
+  // Install after the brokered token window closes, so lifecycle scripts never
+  // run with the GitHub credential injected.
+  const install = await sandbox.run({
+    command: warmInstallCommand(warmed.kind),
+    env: warmInstallEnv(warmed.kind),
+    workingDirectory: "/workspace/repo",
+  });
+  if (install.exitCode !== 0) {
+    await sandbox.run({ command: "rm -rf /workspace/repo" });
+    return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
+  }
+  return null;
 };
 
 export default defineTool({

@@ -43,7 +43,9 @@ describe("repository warm-up", () => {
   it("selects the right install command and cache env per package manager", () => {
     assert.equal(warmInstallCommand("pnpm"), "pnpm install --frozen-lockfile");
     assert.equal(warmInstallCommand("bun"), "bun install --frozen-lockfile");
-    assert.deepEqual(warmInstallEnv("pnpm"), { PNPM_STORE_DIR });
+    assert.deepEqual(warmInstallEnv("pnpm"), {
+      pnpm_config_store_dir: PNPM_STORE_DIR,
+    });
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });
   });
 
@@ -59,5 +61,9 @@ describe("repository warm-up", () => {
       warmSnapshotRevalidationKey(undefined),
       "warm-1:snapshot-none"
     );
+  });
+
+  it("treats an empty snapshot id the same as an unset one", () => {
+    assert.equal(warmSnapshotRevalidationKey(""), "warm-1:snapshot-none");
   });
 });

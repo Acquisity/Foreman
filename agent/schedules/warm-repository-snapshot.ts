@@ -11,9 +11,13 @@ export default defineSchedule({
   cron: "0 0 * * *",
   run({ waitUntil }) {
     waitUntil(
-      createWarmSnapshot().then((id) => {
-        console.log("Warm snapshot id:", id);
-      })
+      createWarmSnapshot()
+        .then((id) => {
+          console.log("Warm snapshot id:", id);
+        })
+        .catch((error) => {
+          console.error("Warm snapshot creation failed:", error);
+        })
     );
   },
 });

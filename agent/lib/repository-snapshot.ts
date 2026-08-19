@@ -27,9 +27,13 @@ const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
 // resetting its timer, so only superseded ones age out.
 const SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Two clones plus installs and a full build exceed the 5-minute default, so
+// give the builder a generous timeout and enough CPUs to finish.
+const BUILD_TIMEOUT_MS = 30 * 60 * 1000;
+
 const failure = (
   label: string,
-  result: { exitCode: number; stdout: string; stderr: string }
+  result: { stdout: string; stderr: string }
 ): string => `${label}: ${String(result.stderr || result.stdout).trim()}`;
 
 /**
@@ -49,7 +53,6 @@ const run = async (
   if (result.exitCode !== 0) {
     throw new Error(
       failure(command, {
-        exitCode: result.exitCode,
         stderr: await result.stderr(),
         stdout: await result.stdout(),
       })
@@ -79,43 +82,59 @@ export const createWarmSnapshot = async (): Promise<string> => {
   const sandbox = await Sandbox.create({
     image: EVE_SANDBOX_IMAGE,
     networkPolicy,
-    resources: { vcpus: 2 },
+    resources: { vcpus: 4 },
+    timeout: BUILD_TIMEOUT_MS,
   });
 
-  await run(
-    sandbox,
-    `mkdir -p ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`
-  );
+  try {
+    await run(
+      sandbox,
+      `mkdir -p ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`
+    );
 
-  // A failure already names its repository in the error message, so the
-  // concurrent warm-up stays attributable while keeping the installs fast.
-  await Promise.all(
-    WARM_REPOSITORIES.map(async (repository) => {
-      const path = warmRepositoryPath(repository.slug);
-      const env = warmInstallEnv(repository.kind);
-      await run(
-        sandbox,
-        `git clone --depth 1 ${remoteUrl(repository.slug)} ${path}`
-      );
-      await run(sandbox, warmInstallCommand(repository.kind), {
-        cwd: path,
-        env,
-      });
-      if (repository.kind === "bun") {
-        await run(sandbox, "bun run build", { cwd: path, env });
-      }
-    })
-  );
+    // Clone first, while the brokered GitHub token is still injected; the
+    // install/build steps run after the token window closes so lifecycle
+    // scripts never execute with the credential on the wire.
+    await Promise.all(
+      WARM_REPOSITORIES.map(async (repository) => {
+        const path = warmRepositoryPath(repository.slug);
+        await run(
+          sandbox,
+          `git clone --depth 50 ${remoteUrl(repository.slug)} ${path}`
+        );
+      })
+    );
 
-  // Make the warm root and cache dirs writable too: the session user renames
-  // `/workspace/.foreman/warm/<slug>` to `/workspace/repo`, which needs write
-  // permission on the builder-owned parent (mode 755), and the runtime install
-  // writes into the shared package stores.
-  await run(
-    sandbox,
-    `chmod -R a+rwX ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`
-  );
+    await sandbox.update({ networkPolicy: "allow-all" });
 
-  const snapshot = await sandbox.snapshot({ expiration: SNAPSHOT_TTL_MS });
-  return snapshot.snapshotId;
+    await Promise.all(
+      WARM_REPOSITORIES.map(async (repository) => {
+        const path = warmRepositoryPath(repository.slug);
+        const env = warmInstallEnv(repository.kind);
+        await run(sandbox, warmInstallCommand(repository.kind), {
+          cwd: path,
+          env,
+        });
+        if (repository.kind === "bun") {
+          await run(sandbox, "bun run build", { cwd: path, env });
+        }
+      })
+    );
+
+    // Make the workspace writable for the session user, which runs as a
+    // different uid than the builder: it renames the warm checkout into
+    // `/workspace/repo` (write on `/workspace`), writes
+    // `/workspace/.foreman/repository.json` (write on `/workspace/.foreman`),
+    // and the runtime install writes into the shared package stores.
+    // `chmod -R a+rwX /workspace` covers all of them.
+    await run(sandbox, "chmod -R a+rwX /workspace");
+
+    const snapshot = await sandbox.snapshot({ expiration: SNAPSHOT_TTL_MS });
+    return snapshot.snapshotId;
+  } catch (error) {
+    // `snapshot()` stops the sandbox on the happy path only; on any failure
+    // the sandbox would otherwise keep running until its timeout.
+    await sandbox.stop().catch(() => undefined);
+    throw error;
+  }
 };

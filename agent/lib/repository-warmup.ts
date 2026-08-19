@@ -16,8 +16,8 @@ export const PNPM_STORE_DIR = "/workspace/.cache/pnpm-store";
 export const BUN_INSTALL_CACHE_DIR = "/workspace/.cache/bun";
 
 /**
- * Where warmed checkouts live in the template snapshot, outside the session
- * working tree and out of the marker directory's way.
+ * Where warmed checkouts live in the template snapshot, under `/workspace/.foreman`
+ * alongside the repository marker.
  */
 export const WARM_ROOT = "/workspace/.foreman/warm";
 
@@ -55,8 +55,12 @@ export const findWarmRepository = (slug: string): WarmRepository | null =>
     (repository) => repository.slug.toLowerCase() === slug.toLowerCase()
   ) ?? null;
 
+// pnpm reads its store dir from `pnpm_config_store_dir` (v11+), not a bare
+// `PNPM_STORE_DIR`; bun reads `BUN_INSTALL_CACHE_DIR` directly.
 export const warmInstallEnv = (kind: WarmKind): Record<string, string> =>
-  kind === "pnpm" ? { PNPM_STORE_DIR } : { BUN_INSTALL_CACHE_DIR };
+  kind === "pnpm"
+    ? { pnpm_config_store_dir: PNPM_STORE_DIR }
+    : { BUN_INSTALL_CACHE_DIR };
 
 export const warmInstallCommand = (kind: WarmKind): string =>
   kind === "pnpm"
@@ -72,4 +76,4 @@ export const warmInstallCommand = (kind: WarmKind): string =>
  */
 export const warmSnapshotRevalidationKey = (
   snapshotId: string | undefined
-): string => `warm-${WARM_UP_REVISION}:snapshot-${snapshotId ?? "none"}`;
+): string => `warm-${WARM_UP_REVISION}:snapshot-${snapshotId || "none"}`;
