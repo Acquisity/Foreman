@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { intakeOnlyPolicy } from "../../../lib/github/approval.js";
 import { githubCredentials } from "../../../lib/github/credentials.js";
 import {
   brokerPolicy,
@@ -21,6 +22,7 @@ import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
  * `finally` block drops the brokered credential again.
  */
 export default defineTool({
+  approval: intakeOnlyPolicy,
   description:
     "Push a committed feature branch from the prepared repository. Protected branches are refused and the validated literal GitHub URL is used instead of git remote configuration.",
   async execute(input, ctx) {
