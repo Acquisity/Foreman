@@ -17,7 +17,7 @@ const CREDENTIAL_PATTERNS = [
   /\bgh[a-z]_[A-Za-z0-9_]{8,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{8,}\b/g,
   /x-access-token:[^@\s"']+/gi,
-  /:\/\/[^/\s:@]+:[^/\s@]+@/g,
+  /:\/\/[^/\s@]+@/g,
   /\b(?:authorization|proxy-authorization)\b\s*[:=][^\r\n]*/gi,
   /\bbasic\s+[A-Za-z0-9+/=]{8,}/gi,
   /\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/gi,
