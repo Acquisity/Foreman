@@ -154,12 +154,20 @@ export default defineTool({
       return await withPipelineRunLock(
         `${target.slug.toLowerCase()}:${input.scope}`,
         async () => {
-          const existing = await readPipelineRun(target.slug, input.scope);
+          const stored = await readPipelineRun(target.slug, input.scope);
+          const existing = stored && {
+            ...stored,
+            headSha: stored.headSha?.toLowerCase() ?? null,
+          };
+          // The event carries the head this same call is recording, so it is the
+          // advance rather than a redelivery of an older one.
+          const advancing = Boolean(
+            normalizedInput.headSha &&
+              normalizedInput.headSha === normalizedInput.eventHeadSha
+          );
           if (
-            isStalePipelineEvent(
-              existing?.headSha?.toLowerCase(),
-              normalizedInput.eventHeadSha
-            )
+            !advancing &&
+            isStalePipelineEvent(existing?.headSha, normalizedInput.eventHeadSha)
           ) {
             return {
               currentHeadSha: existing?.headSha ?? null,
