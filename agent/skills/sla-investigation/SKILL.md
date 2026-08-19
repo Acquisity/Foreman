@@ -1,5 +1,5 @@
 ---
-description: "Daily SLA bug report: find new SLA bugs (Bug + Urgent/High, SLA started in the last 24h) for a feature, investigate each with the right tool, and post a bottom-line report to the feature's Slack channel tagging James Keeble. Load for every sla-report schedule dispatch."
+description: "Daily SLA bug report: find new SLA bugs (Bug + Urgent/High, SLA started at or after the window the dispatch provides) for a feature, investigate each with the right tool, and post a bottom-line report to the feature's Slack channel tagging James Keeble. Load for every sla-report schedule dispatch."
 ---
 
 # SLA investigation
@@ -12,7 +12,7 @@ A bug is in scope when all of these hold:
 
 - `label` includes `Bug`.
 - `priority` is `Urgent` (1) or `High` (2).
-- `slaStartedAt` is within the last 24 hours.
+- `slaStartedAt` is at or after the window start the dispatch provides.
 
 Bugs with no `slaStartedAt` are out of scope. Ignore `Done`, `Canceled`, and `Duplicate` states.
 
@@ -41,7 +41,7 @@ What it is: the source of truth for the ticket list and ticket details.
 What it's for: finding the new SLA bugs and reading their title, description, project, labels, priority, and SLA fields.
 
 How to use it:
-- `list_issues` with `team: "Engineering"`, `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["identifier", "title", "priority", "project", "labels", "state", "slaStartedAt", "slaBreachesAt", "url"]`, `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` within 24h and the feature's projects.
+- `list_issues` with `team: "Engineering"`, `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["identifier", "title", "priority", "project", "labels", "state", "slaStartedAt", "slaBreachesAt", "url"]`, `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
 - `get_issue` for the full description when the summary is truncated.
 
 ### Acquisity codebase (Acquisity/Acquisity)
