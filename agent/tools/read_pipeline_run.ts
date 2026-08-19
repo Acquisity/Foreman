@@ -1,9 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { readPipelineRun } from "#lib/pipeline-runs.js";
+import { pipelineScopeSchema, readPipelineRun } from "#lib/pipeline-runs.js";
 import { resolveRepositoryInput } from "#lib/repository.js";
-
-const PIPELINE_SCOPE_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/u;
 
 export default defineTool({
   description: "Read one durable factory pipeline run by repository and scope.",
@@ -26,6 +24,6 @@ export default defineTool({
   },
   inputSchema: z.object({
     repository: z.string().min(3).max(220),
-    scope: z.string().regex(PIPELINE_SCOPE_PATTERN),
+    scope: pipelineScopeSchema,
   }),
 });

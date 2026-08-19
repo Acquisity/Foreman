@@ -6,6 +6,7 @@ import {
   mergeFeedbackIds,
   nextBlockerRepeatCount,
   type PipelineRun,
+  pipelineScopeSchema,
   pipelineStageSchema,
   readPipelineRun,
   withPipelineRunLock,
@@ -38,7 +39,7 @@ const inputSchema = z.object({
   prNumber: z.number().int().positive().nullable().optional(),
   repository: z.string().min(3).max(220),
   requestReady: z.boolean().optional(),
-  scope: z.string().min(1).max(160),
+  scope: pipelineScopeSchema,
   stage: pipelineStageSchema,
 });
 

@@ -46,6 +46,10 @@ export type PipelineRun = z.infer<typeof pipelineRunSchema>;
 
 const PIPELINE_SCOPE_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/u;
 
+// Both pipeline tools validate the scope the same way, so a run that can be
+// written is always readable through its companion tool.
+export const pipelineScopeSchema = z.string().regex(PIPELINE_SCOPE_PATTERN);
+
 export const isStalePipelineEvent = (
   currentHeadSha: string | null | undefined,
   eventHeadSha: string | null | undefined
