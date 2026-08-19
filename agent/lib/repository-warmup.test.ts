@@ -4,6 +4,7 @@ import {
   BUN_INSTALL_CACHE_DIR,
   findWarmRepository,
   PNPM_STORE_DIR,
+  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -48,6 +49,11 @@ describe("repository warm-up", () => {
       pnpm_config_store_dir: PNPM_STORE_DIR,
     });
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });
+  });
+
+  it("builds only bun repositories after the warm install", () => {
+    assert.equal(warmBuildCommand("bun"), "bun run build");
+    assert.equal(warmBuildCommand("pnpm"), null);
   });
 
   it("folds the warm-up revision and snapshot id into the revalidation key", () => {

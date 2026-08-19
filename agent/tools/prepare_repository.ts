@@ -14,6 +14,7 @@ import {
 } from "#lib/repository.js";
 import {
   findWarmRepository,
+  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -147,6 +148,22 @@ const prepareWarmedOrClone = async (
   if (install.exitCode !== 0) {
     await sandbox.run({ command: "rm -rf /workspace/repo" });
     return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
+  }
+
+  // A bun checkout was pre-built in the snapshot, but the refresh to FETCH_HEAD
+  // changed tracked files, so its `.next`/`.turbo` output is stale. Rebuild it
+  // rather than trusting the snapshot's build.
+  const build = warmBuildCommand(warmed.kind);
+  if (build) {
+    const result = await sandbox.run({
+      command: build,
+      env: warmInstallEnv(warmed.kind),
+      workingDirectory: "/workspace/repo",
+    });
+    if (result.exitCode !== 0) {
+      await sandbox.run({ command: "rm -rf /workspace/repo" });
+      return `Could not build ${repository}: ${String(result.stderr || result.stdout).trim()}`;
+    }
   }
   return null;
 };

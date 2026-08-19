@@ -7,6 +7,7 @@ import {
   PNPM_STORE_DIR,
   WARM_REPOSITORIES,
   WARM_ROOT,
+  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -120,8 +121,9 @@ export const createWarmSnapshot = async (): Promise<string> => {
           cwd: path,
           env,
         });
-        if (repository.kind === "bun") {
-          await run(sandbox, "bun run build", { cwd: path, env });
+        const build = warmBuildCommand(repository.kind);
+        if (build) {
+          await run(sandbox, build, { cwd: path, env });
         }
       })
     );

@@ -72,6 +72,13 @@ export const warmInstallCommand = (kind: WarmKind): string =>
     ? "pnpm install --frozen-lockfile"
     : "bun install --frozen-lockfile";
 
+// Only bun repos need a post-install build (Foreman stations run `pnpm
+// validate`, never `pnpm run build`). The snapshot pre-builds bun repos, and
+// the session rebuilds them after refreshing to FETCH_HEAD so stale
+// `.next`/`.turbo` output does not survive the refresh.
+export const warmBuildCommand = (kind: WarmKind): string | null =>
+  kind === "bun" ? "bun run build" : null;
+
 /**
  * Build-time revalidation component for the warm-up. Folds in the warm-up
  * revision and the external snapshot id so a rebuilt snapshot (or the first
