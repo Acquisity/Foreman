@@ -74,7 +74,13 @@ export default defineEval({
             return false;
           }
           const value = inputs as Record<string, unknown>;
-          return value.owner === "Acquisity" && value.repo === "Foreman";
+          const issue =
+            value.issueNumber ?? value.issue_number ?? value.number;
+          return (
+            value.owner === "Acquisity" &&
+            value.repo === "Foreman" &&
+            (issue === undefined || issue === 1)
+          );
         });
         return writeAt !== -1 && readAt !== -1 && readAt < writeAt && bound;
       }
