@@ -1,4 +1,5 @@
 import { connect } from "@vercel/connect/eve";
+import { parseIntakeOnlyChannels } from "./slack-intake.js";
 
 /**
  * Reads a required environment variable, throwing if it is unset so
@@ -66,6 +67,13 @@ export const FOREMAN_REVIEW_BOT_LOGINS = new Set(
     .split(",")
     .map((login) => login.trim().toLowerCase())
     .filter((login) => REVIEW_BOT_LOGIN_PATTERN.test(login))
+);
+
+// Slack channel IDs where mentions are intake-only: work items are routed to
+// Linear instead of the implementation pipeline. Unset means no intake-only
+// channels.
+export const SLACK_INTAKE_ONLY_CHANNELS = parseIntakeOnlyChannels(
+  process.env.SLACK_INTAKE_ONLY_CHANNELS
 );
 
 /**

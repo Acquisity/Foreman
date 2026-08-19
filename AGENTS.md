@@ -41,6 +41,7 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 - The root `prepare_repository` tool reuses GitHub's channel checkout or clones at runtime, then writes `/workspace/.foreman/repository.json`. Stations read the marker rather than assuming a path.
 - Handoff artifacts are ids, not inlined long documents. Artifact ids remain anchored, size-bounded, and write-once.
 - The reconciliation schedule runs every ten minutes and must remain idempotent through durable run state, stale-head rejection, and feedback deduplication.
+- Slack channel IDs listed in `SLACK_INTAKE_ONLY_CHANNELS` are intake-only: conversation and investigation run as normal, but the session is stamped intake-only and `intakeOnlyPolicy` denies every push, so changes are filed to Linear instead of delivered from Slack.
 
 ## Code style
 
