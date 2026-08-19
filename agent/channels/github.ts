@@ -57,6 +57,24 @@ const isTrustedCommenter = (comment: GitHubComment): boolean => {
  * Triage is the floor: it is the permission normally required to apply a
  * label by hand.
  */
+/**
+ * Whether a pull request head is the factory's own work in this repository.
+ *
+ * @remarks
+ * The branch prefix alone is user-controlled: anyone can open a pull request
+ * from a fork whose head branch is named `foreman/...`. Autonomous
+ * stabilization must therefore also see the head living in the webhook
+ * repository itself, which only someone with push access can arrange.
+ */
+const isOwnFactoryHead = (
+  head: { ref?: unknown; repo?: { full_name?: unknown } } | undefined,
+  repositoryFullName: string
+): boolean =>
+  typeof head?.ref === "string" &&
+  head.ref.startsWith(FOREMAN_BRANCH_PREFIX) &&
+  typeof head.repo?.full_name === "string" &&
+  head.repo.full_name.toLowerCase() === repositoryFullName.toLowerCase();
+
 const TRUSTED_LABELER_ROLES = new Set(["admin", "maintain", "write", "triage"]);
 
 /**
@@ -189,8 +207,9 @@ const PR_SUMMARY_TASK = [
  *   and the injected task is scoped to posting a single summary comment.
  * - `onCheckSuite` is the red-CI fix loop, scoped to the factory's own work:
  *   it dispatches only when a suite completes with a failure conclusion on a
- *   pull request whose head branch carries the factory prefix, so a person's
- *   red PR never triggers an uninvited fix. The session runs unattended under
+ *   pull request whose head branch carries the factory prefix and whose head
+ *   lives in this repository, so neither a person's red PR nor a fork branch
+ *   named after the prefix triggers an uninvited fix. The session runs unattended under
  *   the autonomous principal, anchored to the pull request, and the injected
  *   task bounds the loop by counting earlier fix-attempt comments on the
  *   thread. Requires the connector to subscribe to the `check_suite` webhook
@@ -206,7 +225,7 @@ const PR_SUMMARY_TASK = [
 export default githubChannel({
   botName: resolveBotName,
   credentials: githubCredentials,
-  onCheckSuite: (ctx, suite) => {
+  onCheckSuite: async (ctx, suite) => {
     const raw = suite.raw as {
       head_branch?: unknown;
       check_suite?: { head_branch?: unknown };
@@ -220,6 +239,27 @@ export default githubChannel({
       typeof headBranch !== "string" ||
       !headBranch.startsWith(FOREMAN_BRANCH_PREFIX)
     ) {
+      return null;
+    }
+    // The suite payload carries no head repository, so confirm through the
+    // pull request that this head is the factory's own and not a fork branch
+    // named after the prefix.
+    try {
+      const response = await ctx.github.request<{
+        head?: { ref?: string; repo?: { full_name?: string } };
+      }>({
+        method: "GET",
+        path: `/repos/${ctx.repository.owner}/${ctx.repository.name}/pulls/${pullNumber}`,
+      });
+      if (
+        !(
+          response.ok &&
+          isOwnFactoryHead(response.body.head, ctx.repository.fullName)
+        )
+      ) {
+        return null;
+      }
+    } catch {
       return null;
     }
     return {
@@ -258,7 +298,7 @@ export default githubChannel({
     }
     try {
       const response = await ctx.github.request<{
-        head?: { ref?: string; sha?: string };
+        head?: { ref?: string; repo?: { full_name?: string }; sha?: string };
       }>({
         method: "GET",
         path: `/repos/${ctx.repository.owner}/${ctx.repository.name}/pulls/${pullNumber}`,
@@ -266,7 +306,7 @@ export default githubChannel({
       if (
         !(
           response.ok &&
-          response.body.head?.ref?.startsWith(FOREMAN_BRANCH_PREFIX)
+          isOwnFactoryHead(response.body.head, ctx.repository.fullName)
         )
       ) {
         return null;
@@ -275,7 +315,7 @@ export default githubChannel({
         auth: stampAutonomous(bound, pullNumber),
         context: [
           REVIEW_FEEDBACK_TASK,
-          `Feedback id: github-comment:${comment.id}. Current observed head: ${response.body.head.sha ?? "unknown"}.`,
+          `Feedback id: github-comment:${comment.id}. Current observed head: ${response.body.head?.sha ?? "unknown"}.`,
         ],
       };
     } catch {
@@ -318,11 +358,11 @@ export default githubChannel({
     if (pullRequest.action === "opened" && ctx.sender.type !== "Bot") {
       return { auth: bound, context: [PR_SUMMARY_TASK] };
     }
-    const raw = pullRequest.raw as { head?: { ref?: unknown } };
-    const headRef = raw.head?.ref;
+    const raw = pullRequest.raw as {
+      head?: { ref?: unknown; repo?: { full_name?: unknown } };
+    };
     return pullRequest.action === "synchronize" &&
-      typeof headRef === "string" &&
-      headRef.startsWith(FOREMAN_BRANCH_PREFIX)
+      isOwnFactoryHead(raw.head, ctx.repository.fullName)
       ? {
           auth: stampAutonomous(bound, pullRequest.pullRequestNumber),
           context: [
