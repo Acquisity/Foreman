@@ -55,11 +55,16 @@ export const findWarmRepository = (slug: string): WarmRepository | null =>
     (repository) => repository.slug.toLowerCase() === slug.toLowerCase()
   ) ?? null;
 
-// pnpm reads its store dir from `pnpm_config_store_dir` (v11+), not a bare
-// `PNPM_STORE_DIR`; bun reads `BUN_INSTALL_CACHE_DIR` directly.
+// pnpm reads its store dir from `pnpm_config_store_dir` (v11+) or
+// `npm_config_store_dir` (v10 and earlier); there is no packageManager pin, so
+// set both to avoid depending on whichever pnpm the eve image ships. bun reads
+// `BUN_INSTALL_CACHE_DIR` directly.
 export const warmInstallEnv = (kind: WarmKind): Record<string, string> =>
   kind === "pnpm"
-    ? { pnpm_config_store_dir: PNPM_STORE_DIR }
+    ? {
+        npm_config_store_dir: PNPM_STORE_DIR,
+        pnpm_config_store_dir: PNPM_STORE_DIR,
+      }
     : { BUN_INSTALL_CACHE_DIR };
 
 export const warmInstallCommand = (kind: WarmKind): string =>

@@ -44,6 +44,7 @@ describe("repository warm-up", () => {
     assert.equal(warmInstallCommand("pnpm"), "pnpm install --frozen-lockfile");
     assert.equal(warmInstallCommand("bun"), "bun install --frozen-lockfile");
     assert.deepEqual(warmInstallEnv("pnpm"), {
+      npm_config_store_dir: PNPM_STORE_DIR,
       pnpm_config_store_dir: PNPM_STORE_DIR,
     });
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });

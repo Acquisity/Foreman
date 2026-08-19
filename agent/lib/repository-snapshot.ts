@@ -27,9 +27,14 @@ const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
 // resetting its timer, so only superseded ones age out.
 const SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Two clones plus installs and a full build exceed the 5-minute default, so
-// give the builder a generous timeout and enough CPUs to finish.
-const BUILD_TIMEOUT_MS = 30 * 60 * 1000;
+// The schedule invocation that drives this build is capped by eve's Vercel
+// maxDuration ("max", 800s on Pro Fluid), so the sandbox timeout is bounded by
+// that ceiling, not by how long the build could take. Keeping the sandbox
+// timeout at the invocation ceiling means an orphaned sandbox (the function
+// killed mid-build) self-terminates instead of leaking past the function's
+// death. The build must fit inside this window; decoupling it from the
+// invocation is the follow-up if it does not.
+const BUILD_TIMEOUT_MS = 800_000;
 
 const failure = (
   label: string,
@@ -45,7 +50,7 @@ const run = async (
   options: { cwd?: string; env?: Record<string, string> } = {}
 ): Promise<void> => {
   const result = await sandbox.runCommand({
-    args: ["-c", command],
+    args: ["-lc", command],
     cmd: "/bin/bash",
     cwd: options.cwd,
     env: options.env,
