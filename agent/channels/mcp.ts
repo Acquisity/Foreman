@@ -37,9 +37,21 @@ import { requireEnv } from "../lib/constants.js";
  * doing repository work must name exactly one `owner/repo` or GitHub URL in
  * its text, the same rule as any other eve request.
  */
+/**
+ * The Basic username, and so the `principalId` every MCP session runs under.
+ *
+ * @remarks
+ * Fixed in code rather than read from the environment. It is the Vercel
+ * Connect grant subject, so changing it orphans every consent granted to the
+ * previous value, and an environment variable set to an empty string would
+ * resolve an empty `principalId` that authenticates but fails every
+ * user-scoped tool. A value that must never vary is not configuration.
+ */
+const MCP_USERNAME = "foreman-mcp";
+
 export default mcpChannel({
   auth: httpBasic({
     password: requireEnv("MCP_BASIC_PASSWORD", "a long random shared secret"),
-    username: process.env.MCP_BASIC_USER ?? "foreman-mcp",
+    username: MCP_USERNAME,
   }),
 });
