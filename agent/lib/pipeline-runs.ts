@@ -164,7 +164,7 @@ export const listActivePipelineRuns = async (): Promise<PipelineRun[]> => {
     return page.hasMore ? listAll(page.cursor, combined) : combined;
   };
   const blobs = await listAll();
-  const runs = await Promise.all(
+  const results = await Promise.allSettled(
     blobs.map(async (blob) => {
       const doc = await readDocument(blob.pathname);
       if (!doc.found) {
@@ -177,7 +177,9 @@ export const listActivePipelineRuns = async (): Promise<PipelineRun[]> => {
       }
     })
   );
-  return runs.filter(
-    (run): run is PipelineRun => run !== null && run.status === "active"
+  return results.flatMap((result) =>
+    result.status === "fulfilled" && result.value?.status === "active"
+      ? [result.value]
+      : []
   );
 };

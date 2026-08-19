@@ -14,7 +14,7 @@ import {
 export default defineTool({
   approval: modelSwapPolicy,
   description:
-    "Set global live model overrides for Foreman and its specialists. Pass a verified provider/model id or null to restore the compiled default. Changes apply to new sessions.",
+    "Set global live model overrides for Foreman and its specialists. Pass a verified provider/model id or null to restore the compiled default. Changes apply to new sessions and may take up to 15 seconds to reach every warm instance.",
   execute: async (input) => {
     let overrides: ModelOverrides;
     try {

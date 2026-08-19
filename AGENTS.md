@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 Foreman is Acquisity's general-purpose agent, built on eve. Slack and ordinary interactive work use a direct general path. The optional factory path normally runs classifier → investigator → analyst → implementer → reviewer, with researcher running in parallel with classifier when research is warranted, then stabilizes a normal pull request until it is ready to merge or escalated. Assigned Linear issues and trusted GitHub factory labels activate the factory deterministically; interactive sessions can request it or select it for complex, uncertain, risky, or review-heavy work. Foreman never merges.
 
-Repositories are selected per signed session or explicit request. GitHub webhooks are authoritative. Linear, Slack, and eve requests need exactly one `owner/repo` or GitHub URL. Never add an environment, memory, or preference fallback for repository identity.
+Repositories are selected per signed session or explicit request. GitHub webhooks are authoritative. Linear, Slack, and eve requests involving repository work need exactly one `owner/repo` or GitHub URL; ordinary conversation does not. Never add an environment, memory, or preference fallback for repository identity.
 
 The whole agent lives under `agent/`; evals live under `evals/`. See [ARCHITECTURE.md](./.github/ARCHITECTURE.md).
 

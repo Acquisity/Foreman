@@ -8,7 +8,11 @@ import {
   mintInstallationToken,
   validateBranch,
 } from "#lib/github/git-remote.js";
-import { readPreparedRepository, remoteUrl } from "#lib/repository.js";
+import {
+  readPreparedRepository,
+  remoteUrl,
+  repositoryFromAuth,
+} from "#lib/repository.js";
 
 export default defineTool({
   approval: deliveryPolicy,
@@ -27,6 +31,17 @@ export default defineTool({
     }
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
+    const authoritative = repositoryFromAuth(ctx.session.auth.current);
+    if (
+      authoritative &&
+      authoritative.slug.toLowerCase() !== prepared.slug.toLowerCase()
+    ) {
+      return {
+        error:
+          "Prepared repository does not match the session repository authority.",
+        success: false as const,
+      };
+    }
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
