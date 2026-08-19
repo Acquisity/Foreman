@@ -22,6 +22,11 @@ import {
  */
 const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
 
+// Snapshots expire 30 days after their last use so the daily rebuild does not
+// leak unbounded storage; the snapshot in active use as the template base keeps
+// resetting its timer, so only superseded ones age out.
+const SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 const failure = (
   label: string,
   result: { exitCode: number; stdout: string; stderr: string }
@@ -111,6 +116,6 @@ export const createWarmSnapshot = async (): Promise<string> => {
     `chmod -R a+rwX ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`
   );
 
-  const snapshot = await sandbox.snapshot({ expiration: 0 });
+  const snapshot = await sandbox.snapshot({ expiration: SNAPSHOT_TTL_MS });
   return snapshot.snapshotId;
 };

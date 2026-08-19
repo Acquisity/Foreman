@@ -86,7 +86,11 @@ const prepareWarmedOrClone = async (
   repository: string
 ): Promise<string | null> => {
   const warmed = findWarmRepository(repository);
-  const path = warmed ? warmRepositoryPath(repository) : null;
+  // Derive the path from the matched config's canonical slug, not the caller's
+  // casing: `findWarmRepository` matches case-insensitively, so a lowercase
+  // "acquisity/foreman" would otherwise compute a path that never exists and
+  // silently fall back to a cold clone.
+  const path = warmed ? warmRepositoryPath(warmed.slug) : null;
   const checkout = path
     ? await sandbox.run({ command: `test -d ${path}` })
     : null;
