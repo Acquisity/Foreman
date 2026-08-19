@@ -14,7 +14,6 @@ import {
 } from "#lib/repository.js";
 import {
   findWarmRepository,
-  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -106,6 +105,7 @@ const prepareWarmedOrClone = async (
 
   const token = await mintInstallationToken(githubCredentials);
   await sandbox.setNetworkPolicy(brokerPolicy(token));
+  let moved = true;
   try {
     const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
     if (move.exitCode !== 0) {
@@ -127,6 +127,9 @@ const prepareWarmedOrClone = async (
       await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not trust the warmed checkout for ${repository}: ${String(trust.stderr || trust.stdout).trim()}`;
     }
+    const before = await sandbox.run({
+      command: "git -C /workspace/repo rev-parse HEAD",
+    });
     const refresh = await sandbox.run({
       command: `git -C /workspace/repo fetch ${remoteUrl(repository)} && git -C /workspace/repo reset --hard FETCH_HEAD`,
     });
@@ -134,8 +137,18 @@ const prepareWarmedOrClone = async (
       await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not refresh ${repository}: ${String(refresh.stderr || refresh.stdout).trim()}`;
     }
+    const after = await sandbox.run({
+      command: "git -C /workspace/repo rev-parse HEAD",
+    });
+    moved = String(before.stdout).trim() !== String(after.stdout).trim();
   } finally {
     await sandbox.setNetworkPolicy("allow-all");
+  }
+
+  // If the refresh did not move HEAD, the snapshot is already at the remote
+  // HEAD and its install is current, so there is nothing to warm.
+  if (!moved) {
+    return null;
   }
 
   // Install after the brokered token window closes, so lifecycle scripts never
@@ -148,22 +161,6 @@ const prepareWarmedOrClone = async (
   if (install.exitCode !== 0) {
     await sandbox.run({ command: "rm -rf /workspace/repo" });
     return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
-  }
-
-  // A bun checkout was pre-built in the snapshot, but the refresh to FETCH_HEAD
-  // changed tracked files, so its `.next`/`.turbo` output is stale. Rebuild it
-  // rather than trusting the snapshot's build.
-  const build = warmBuildCommand(warmed.kind);
-  if (build) {
-    const result = await sandbox.run({
-      command: build,
-      env: warmInstallEnv(warmed.kind),
-      workingDirectory: "/workspace/repo",
-    });
-    if (result.exitCode !== 0) {
-      await sandbox.run({ command: "rm -rf /workspace/repo" });
-      return `Could not build ${repository}: ${String(result.stderr || result.stdout).trim()}`;
-    }
   }
   return null;
 };

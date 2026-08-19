@@ -51,7 +51,7 @@ describe("repository warm-up", () => {
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });
   });
 
-  it("builds only bun repositories after the warm install", () => {
+  it("selects a build command only for bun repositories", () => {
     assert.equal(warmBuildCommand("bun"), "bun run build");
     assert.equal(warmBuildCommand("pnpm"), null);
   });
