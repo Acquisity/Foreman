@@ -42,6 +42,21 @@ export const modelSwapPolicy = sharedConfigWritePolicy(
   "Unattended factory runs may not change the models the factory runs on."
 );
 
+/** Direct-session publication requires an explicit user approval card. */
+export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
+  if (isAutonomous(ctx.session.auth.current)) {
+    return {
+      reason:
+        "Unattended runs cannot publish without an authorized delivery handoff.",
+      type: "denied",
+    };
+  }
+  return isTrusted(ctx.session.auth.current) ||
+    isScheduleAppAuth(ctx.session.auth.current)
+    ? "not-applicable"
+    : "user-approval";
+};
+
 /**
  * Connection-wide policy for MCP servers whose writes must not run
  * unattended.

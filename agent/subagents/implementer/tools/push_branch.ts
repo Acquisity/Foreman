@@ -13,12 +13,11 @@ import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
  * repository.
  *
  * @remarks
- * The push is inert by construction, which is why it runs without approval
- * inside a task-mode station: `validateBranch` refuses `main`, `master`, and
+ * The push is constrained by construction: `validateBranch` refuses `main`, `master`, and
  * anything that isn't a plain branch name, so nothing this tool does can
  * change the default branch or merge. The credential is brokered at the
  * sandbox firewall and never enters the sandbox, and the push targets
- * {@link REMOTE_URL} literally, never the model-writable `origin` remote. The
+ * literal validated URL for the prepared repository, never the model-writable `origin` remote. The
  * `finally` block drops the brokered credential again.
  */
 export default defineTool({
@@ -49,6 +48,12 @@ export default defineTool({
       const head = await sandbox.run({
         command: `git -C '${prepared.worktree}' rev-parse '${input.branch}'`,
       });
+      if (head.exitCode !== 0) {
+        return {
+          error: "Could not verify the pushed commit.",
+          success: false as const,
+        };
+      }
       return {
         branch: input.branch,
         sha: String(head.stdout).trim(),

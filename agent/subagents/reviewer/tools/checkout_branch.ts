@@ -34,6 +34,7 @@ export default defineTool({
         success: false as const,
       };
     }
+    const headSha = input.headSha.toLowerCase();
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
     const url = remoteUrl(prepared.slug);
@@ -41,7 +42,7 @@ export default defineTool({
     try {
       await sandbox.setNetworkPolicy(brokerPolicy(token));
       const fetch = await sandbox.run({
-        command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && test "$(git -C '${prepared.worktree}' rev-parse FETCH_HEAD)" = '${input.headSha}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' '${input.headSha}' && git -C '${prepared.worktree}' reset --hard '${input.headSha}'`,
+        command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && test "$(git -C '${prepared.worktree}' rev-parse FETCH_HEAD)" = '${headSha}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' '${headSha}' && git -C '${prepared.worktree}' reset --hard '${headSha}'`,
       });
       if (fetch.exitCode !== 0) {
         return {

@@ -74,7 +74,7 @@ export default defineTool({
       };
     } catch (error) {
       return {
-        error: `Could not save overrides: ${error instanceof Error ? error.message : "unknown error"}`,
+        error: `Could not save overrides; no changes were made: ${error instanceof Error ? error.message : "unknown error"}`,
         success: false as const,
       };
     }

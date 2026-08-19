@@ -48,7 +48,12 @@ export const FOREMAN_FACTORY_LABEL =
 export const FOREMAN_BRANCH_PREFIX =
   process.env.FOREMAN_BRANCH_PREFIX ?? "foreman/";
 
-if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*\/$/.test(FOREMAN_BRANCH_PREFIX)) {
+if (
+  !/^[A-Za-z0-9][A-Za-z0-9._/-]*\/$/.test(FOREMAN_BRANCH_PREFIX) ||
+  FOREMAN_BRANCH_PREFIX.slice(0, -1)
+    .split("/")
+    .some((part) => part === "" || part === "." || part === "..")
+) {
   throw new Error(
     "FOREMAN_BRANCH_PREFIX must be a safe branch prefix ending in '/'."
   );

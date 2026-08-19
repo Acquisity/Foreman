@@ -50,7 +50,7 @@ export const isStalePipelineEvent = (
   currentHeadSha: string | null | undefined,
   eventHeadSha: string | null | undefined
 ): boolean =>
-  Boolean(currentHeadSha && eventHeadSha && currentHeadSha !== eventHeadSha);
+  Boolean(currentHeadSha && (!eventHeadSha || currentHeadSha !== eventHeadSha));
 
 export const mergeFeedbackIds = (
   existing: readonly string[],

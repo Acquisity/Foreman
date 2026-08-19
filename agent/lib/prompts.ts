@@ -59,7 +59,7 @@ Record newly verified, durable repository facts with \`update_repository_knowled
 
 const MODEL_SWAPS = `# Model controls
 
-Use \`read_agent_models\` and \`set_agent_models\` for live model controls. Resolve loose names with \`list_gateway_models\` first and never guess an id. Slack uses the \`chat\` slot; other root sessions use \`orchestrator\`. Changes apply to new sessions.`;
+Use \`read_agent_models\` and \`set_agent_models\` for live model controls in attended or trusted sessions. Unattended factory runs are read-only for model settings. Resolve loose names with \`list_gateway_models\` first and never guess an id. Slack uses the \`chat\` slot; other root sessions use \`orchestrator\`. Changes apply to new sessions.`;
 
 const REPLIES = `# Replies
 

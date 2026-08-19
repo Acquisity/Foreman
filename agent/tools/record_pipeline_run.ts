@@ -20,9 +20,17 @@ const inputSchema = z.object({
   actionableFeedbackRemaining: z.boolean().optional(),
   blockers: z.array(z.string().max(500)).max(50).optional(),
   checksPassed: z.boolean().optional(),
-  eventHeadSha: z.string().length(40).nullable().optional(),
+  eventHeadSha: z
+    .string()
+    .regex(/^[a-f0-9]{40}$/iu)
+    .nullable()
+    .optional(),
   feedbackIds: z.array(z.string().min(1).max(160)).max(100).optional(),
-  headSha: z.string().length(40).nullable().optional(),
+  headSha: z
+    .string()
+    .regex(/^[a-f0-9]{40}$/iu)
+    .nullable()
+    .optional(),
   internalApproved: z.boolean().optional(),
   linearIssueId: z.string().max(160).nullable().optional(),
   linearSessionId: z.string().max(160).nullable().optional(),
@@ -79,14 +87,23 @@ const buildRun = (
 ): PipelineRun => {
   const blockers = normalizeBlockers(input.blockers, existing);
   const blockerRepeatCount = nextRepeatCount(input.blockers, existing);
-  const internalApproved =
-    input.internalApproved ?? existing?.internalApproved ?? false;
-  const checksPassed = input.checksPassed ?? existing?.checksPassed ?? false;
-  const mergeable = input.mergeable ?? existing?.mergeable ?? false;
-  const actionableFeedbackRemaining =
-    input.actionableFeedbackRemaining ??
-    existing?.actionableFeedbackRemaining ??
-    true;
+  const headChanged = Boolean(
+    input.headSha && input.headSha !== existing?.headSha
+  );
+  const internalApproved = headChanged
+    ? (input.internalApproved ?? false)
+    : (input.internalApproved ?? existing?.internalApproved ?? false);
+  const checksPassed = headChanged
+    ? (input.checksPassed ?? false)
+    : (input.checksPassed ?? existing?.checksPassed ?? false);
+  const mergeable = headChanged
+    ? (input.mergeable ?? false)
+    : (input.mergeable ?? existing?.mergeable ?? false);
+  const actionableFeedbackRemaining = headChanged
+    ? true
+    : (input.actionableFeedbackRemaining ??
+      existing?.actionableFeedbackRemaining ??
+      true);
   const ready = isPipelineReady({
     actionableFeedbackRemaining,
     blockers,
