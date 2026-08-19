@@ -38,11 +38,13 @@ Each station is its own agent with its own instructions, sandbox, and tools. The
 
 The Vercel deploy flow sets up everything: the **GitHub** connector, **Linear** connector, **Vercel Blob** store, and a prompt for the `FACTORY_REPO` and `FACTORY_LABEL` environment variables.
 
+Two things must line up before the first deployment can finish. `FACTORY_REPO` must name a real repository in `owner/repo` format, and the GitHub App behind the connector you select must be installed with access to that repository. The deployment clones `FACTORY_REPO` up front to prewarm the station sandboxes, so a repository the app cannot reach fails the deploy with an error naming the repository and the fix: `Cannot access <owner/repo>` when the token mint or authorization is refused, or `Cannot clone <owner/repo>: GitHub reports the repository as not found` when the repository does not exist or is private and invisible to the app (GitHub reports both identically). Install the app on the repository (or fix the value), then redeploy.
+
 Configuration (see `.env.example`):
 
 | Variable | Required | Default | What it does |
 | --- | --- | --- | --- |
-| `FACTORY_REPO` | Yes | — | The `owner/repo` the factory works on (the build fails without it) |
+| `FACTORY_REPO` | Yes | — | An existing GitHub repository in `owner/repo` format; the selected GitHub App must have access to it (the deploy fails otherwise) |
 | `FACTORY_SETUP_COMMAND` | No | — | Runs once inside the sandbox checkout at build time (e.g. `pnpm install`), so every run starts with dependencies already installed |
 | `FACTORY_LABEL` | No | `factory` | The issue label that hands an issue to the factory |
 | `FACTORY_BRANCH_PREFIX` | No | `factory/` | Branch prefix marking the factory's own PRs, which are the only branches automated CI fixes touch |
