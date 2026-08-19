@@ -29,9 +29,17 @@ import { requireEnv } from "../lib/constants.js";
  * through `agent_update`.
  *
  * The credential is shared, not per person, so callers are not stamped
- * trusted: an MCP turn has the standing of an untrusted commenter and cannot
- * write repository knowledge, model settings, or non-GitHub connections. Split
- * this into one strategy per teammate before widening that.
+ * trusted and cannot write repository knowledge, model settings, or non-GitHub
+ * connections. They can still do ordinary repository work: branch, commit,
+ * push, and open a pull request on any repository the GitHub App can write,
+ * the same as a Slack or Linear caller. The comparison to an untrusted GitHub
+ * commenter would be wrong, because `onComment` drops those before a session
+ * exists.
+ *
+ * So the password is the whole gate, and one password covers everyone. That is
+ * the deliberate cost of avoiding a consent round per teammate. Rotate it when
+ * somebody leaves, and split this into one strategy per teammate when MCP
+ * callers need distinct identities or trusted standing.
  *
  * There is no dispatch hook here to stamp a repository, so an MCP message
  * doing repository work must name exactly one `owner/repo` or GitHub URL in
