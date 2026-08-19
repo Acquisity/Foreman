@@ -12,6 +12,12 @@ import {
   resolveRepository,
   resolveRepositoryInput,
 } from "#lib/repository.js";
+import {
+  findWarmRepository,
+  warmInstallCommand,
+  warmInstallEnv,
+  warmRepositoryPath,
+} from "#lib/repository-warmup.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
 
@@ -69,6 +75,57 @@ const cloneExplicitRepository = async (
   }
 };
 
+/**
+ * Prepares a warmed repository by moving its pre-warmed checkout into
+ * `/workspace/repo`, refreshing it to the remote HEAD, and running a warm
+ * install. Falls back to a cold clone for any repository that was not
+ * pre-warmed (or whose warmed checkout is missing).
+ */
+const prepareWarmedOrClone = async (
+  sandbox: SandboxSession,
+  repository: string
+): Promise<string | null> => {
+  const warmed = findWarmRepository(repository);
+  const path = warmed ? warmRepositoryPath(repository) : null;
+  const checkout = path
+    ? await sandbox.run({ command: `test -d ${path}` })
+    : null;
+  if (!(warmed && checkout) || checkout.exitCode !== 0) {
+    return cloneExplicitRepository(sandbox, repository);
+  }
+
+  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
+  if (occupied.exitCode === 0) {
+    return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
+  }
+
+  const token = await mintInstallationToken(githubCredentials);
+  await sandbox.setNetworkPolicy(brokerPolicy(token));
+  try {
+    const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
+    if (move.exitCode !== 0) {
+      return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
+    }
+    const refresh = await sandbox.run({
+      command: `git -C /workspace/repo fetch ${remoteUrl(repository)} && git -C /workspace/repo reset --hard FETCH_HEAD`,
+    });
+    if (refresh.exitCode !== 0) {
+      return `Could not refresh ${repository}: ${String(refresh.stderr || refresh.stdout).trim()}`;
+    }
+    const install = await sandbox.run({
+      command: warmInstallCommand(warmed.kind),
+      env: warmInstallEnv(warmed.kind),
+      workingDirectory: "/workspace/repo",
+    });
+    if (install.exitCode !== 0) {
+      return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
+    }
+    return null;
+  } finally {
+    await sandbox.setNetworkPolicy("allow-all");
+  }
+};
+
 export default defineTool({
   description:
     "Select and prepare a GitHub repository workspace for direct work or factory mode. A signed GitHub webhook repository is authoritative. On other channels pass the one explicit owner/repo or GitHub URL from the request. Call this before editing files or delegating a repository station.",
@@ -108,9 +165,9 @@ export default defineTool({
 
     const worktree = await detectWorktree(sandbox);
     if (worktree === "/workspace/repo") {
-      const cloneError = await cloneExplicitRepository(sandbox, target.slug);
-      if (cloneError) {
-        return { error: cloneError, success: false as const };
+      const prepareError = await prepareWarmedOrClone(sandbox, target.slug);
+      if (prepareError) {
+        return { error: prepareError, success: false as const };
       }
     }
 
