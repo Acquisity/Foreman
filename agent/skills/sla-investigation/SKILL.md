@@ -22,9 +22,9 @@ Categorize by the Linear `project` field, not the title. The known mapping:
 
 | Feature | Linear projects |
 | --- | --- |
-| Cold Email | Cold Email Core, Cold Email Leads, Cold Email Agent |
-| AI SDR | AI SDR Core, AI SDR Scheduling, AI SDR Escalation & Classification |
-| CRM | CRM, CRM Calendar Scheduling |
+| Cold Email | Cold Email Core, Cold Email Leads, Cold Email Agent, Cold Email Infra |
+| AI SDR | AI SDR Core, AI SDR Scheduling, AI SDR Escalation & Classification, AI SDR Inbox & UI |
+| CRM | CRM, CRM Calendar Scheduling, CRM Phone Calling & Texting |
 | AI Website Builder | AI Website Builder |
 | Whitelabel Partners | Whitelabel Partners |
 
@@ -41,7 +41,7 @@ What it is: the source of truth for the ticket list and ticket details.
 What it's for: finding the new SLA bugs and reading their title, description, project, labels, priority, and SLA fields.
 
 How to use it:
-- `list_issues` with `label: "Bug"`, `priority: 1` and `priority: 2` (two calls), then filter locally to `slaStartedAt` within 24h and the feature's projects.
+- `list_issues` with `team: "Engineering"`, `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["identifier", "title", "priority", "project", "labels", "state", "slaStartedAt", "slaBreachesAt", "url"]`, `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` within 24h and the feature's projects.
 - `get_issue` for the full description when the summary is truncated.
 
 ### Acquisity codebase (Acquisity/Acquisity)
@@ -58,7 +58,7 @@ What it is: read-only production Postgres.
 
 What it's for: blast radius. Counting affected rows, workspaces, or users when the bug is a data problem.
 
-How to use it: `execute_read_query` against the production branch. Read only; never run a write. Prefer a bounded `COUNT` or a small `SELECT` over a full scan.
+How to use it: `planetscale__planetscale_execute_read_query` against the production branch. Read only; never run a write. Prefer a bounded `COUNT` or a small `SELECT` over a full scan.
 
 ### Inngest (inngest connection)
 
@@ -74,7 +74,7 @@ What it is: error tracking.
 
 What it's for: error volume and affected users. The `userCount` on a matched issue is the fastest blast-radius signal.
 
-How to use it: search issues for the error signature from the ticket, then read the issue's count and user count.
+How to use it: `sentry__search_issues` for the error signature from the ticket, then `sentry__search_events` for the event and affected-user counts.
 
 ### Axiom (axiom connection)
 
@@ -86,10 +86,10 @@ How to use it: `queryDataset` with an APL query over the relevant dataset, bound
 
 ## Report format
 
-Post one message per bug, bottom line, natural language, no em dashes, no bold. Tag James Keeble with `<@U0BA7JK9XRV>`.
+Post one message covering every in-scope bug for this feature, bottom line, natural language, no em dashes, no bold. Tag James Keeble with `<@U0BA7JK9XRV>` once at the top, then repeat the block below for each bug. The session delivers a single channel message, so do not plan on separate posts.
 
 ```
-<@U0BA7JK9XRV> new SLA bug in <feature>
+<@U0BA7JK9XRV> <count> new SLA bug(s) in <feature>
 
 <one natural language line dont use jargon and speak coherently. State it simply and concisely, like one human talking to another, grounded in the ticket and code>
 
