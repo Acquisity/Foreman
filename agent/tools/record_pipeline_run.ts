@@ -176,6 +176,25 @@ export default defineTool({
               success: false as const,
             };
           }
+          // A redelivered webhook carries feedback this run already processed.
+          // Recording it again would count the unchanged blocker set a second
+          // time and escalate without a new attempt.
+          const redelivered =
+            existing !== null &&
+            (input.feedbackIds?.length ?? 0) > 0 &&
+            (input.feedbackIds ?? []).every((id) =>
+              existing.processedFeedback.includes(id)
+            );
+          if (redelivered) {
+            return {
+              blockerRepeatCount: existing.blockerRepeatCount,
+              duplicate: true,
+              processedFeedback: existing.processedFeedback,
+              ready: existing.status === "ready",
+              run: existing,
+              success: true as const,
+            };
+          }
           const run = buildRun(normalizedInput, target, existing);
           await writePipelineRun(run);
           return {
