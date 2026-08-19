@@ -3,6 +3,7 @@ import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
+import { resolveBotName } from "#lib/github/bot-name.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "#lib/github/git-remote.js";
 import {
@@ -113,7 +114,9 @@ export default defineTool({
       }
     }
 
-    const identity = process.env.FOREMAN_BOT_NAME ?? "Foreman";
+    // The same identity the GitHub channel answers to, so commits carry the
+    // deployed App's name instead of a guess.
+    const identity = await resolveBotName().catch(() => "Foreman");
     const safeIdentity = SAFE_IDENTITY_PATTERN.test(identity)
       ? identity
       : "Foreman";
