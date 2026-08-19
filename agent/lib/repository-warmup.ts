@@ -38,6 +38,10 @@ export interface WarmRepository {
  * Repositories pre-warmed into the template snapshot. Foreman warms only its
  * dependency install (stations run `pnpm validate`, never `pnpm run build`);
  * Acquisity warms both install and build so `.next`/`.turbo` are ready.
+ *
+ * Note: only Foreman's lockfile feeds the revalidation key, so Acquisity's
+ * freshness is not snapshot-tracked here; its session-time `bun install` and
+ * the scheduled recreation follow-up keep it current.
  */
 const WARM_REPOSITORIES: readonly WarmRepository[] = [
   { kind: "pnpm", slug: "Acquisity/Foreman" },
@@ -80,9 +84,10 @@ const failure = (
 
 /**
  * Clones, installs (and builds, for Bun repos) one repository into its fixed
- * warm path. The checkout and its `node_modules` land in the template
- * snapshot; `chmod` makes them readable/writable by the session user, which
- * runs as a different uid than the builder.
+ * warm path. The whole checkout — including `.git`, the tracked working-tree
+ * files, and `node_modules` — lands in the template snapshot; `chmod` makes
+ * them readable/writable by the session user, which runs as a different uid
+ * than the builder, so the later `git reset --hard` and station edits succeed.
  */
 const warmRepository = async (
   sandbox: SandboxSession,
@@ -120,7 +125,7 @@ const warmRepository = async (
   }
 
   const chmod = await sandbox.run({
-    command: `chmod -R a+rwX ${path}/node_modules`,
+    command: `chmod -R a+rwX ${path}`,
   });
   if (chmod.exitCode !== 0) {
     throw new Error(
@@ -148,15 +153,20 @@ export const warmAllRepositories = async (
     if (mkdir.exitCode !== 0) {
       throw new Error(failure("Could not create warm-up directories", mkdir));
     }
+    // A failure already names its repository in the error message, so the
+    // concurrent warm-up stays attributable while keeping the installs fast.
     await Promise.all(
       WARM_REPOSITORIES.map((repository) => warmRepository(sandbox, repository))
     );
+    // Make the warm root writable too: the session user renames
+    // `/workspace/.foreman/warm/<slug>` to `/workspace/repo`, which needs
+    // write permission on the builder-owned parent (mode 755).
     const chmod = await sandbox.run({
-      command: `chmod -R a+rwX ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`,
+      command: `chmod -R a+rwX ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`,
     });
     if (chmod.exitCode !== 0) {
       throw new Error(
-        failure("Could not make warm-up caches world-writable", chmod)
+        failure("Could not make warm-up directories world-writable", chmod)
       );
     }
   } finally {
