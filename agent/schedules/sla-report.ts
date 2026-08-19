@@ -1,6 +1,7 @@
 import { defineSchedule } from "eve/schedules";
 import slack from "../channels/slack.js";
 import { readDocument, SLA_REPORT_PREFIX, writeDocument } from "../lib/blob.js";
+import { slaWindowStart } from "../lib/sla-window.js";
 
 const FEATURE_CHANNELS = [
   { channelId: "C0BAA1KUNP8", feature: "Cold Email" },
@@ -29,25 +30,24 @@ const OWNER_AUTH = {
 } as const;
 
 const LAST_RUN_KEY = `${SLA_REPORT_PREFIX}last-run.txt`;
-const MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Start of the window this run reports on: the previous dispatch, so a missed
- * or delayed tick is caught up rather than dropped, floored at seven days so a
- * long outage cannot replay the whole backlog. The blob's own `uploadedAt` is
- * the timestamp, so the marker itself needs no contents.
+ * Start of the window this run reports on. A Blob failure falls back to the
+ * first-run window rather than skipping the day: reporting a short window is
+ * recoverable, dispatching nothing is not.
  *
- * ponytail: the marker is written at dispatch, not at session completion, so a
- * session that fails after dispatch loses its window. The heartbeat DM is what
- * surfaces that; add per-feature markers if it turns out to matter.
+ * The marker is written at dispatch rather than at session completion, so a
+ * session that fails afterwards loses its window. The heartbeat is what
+ * surfaces that; per-feature markers would close it if it proves to matter.
  */
 const windowStartIso = async (): Promise<string> => {
-  const floor = Date.now() - MAX_WINDOW_MS;
-  const marker = await readDocument(LAST_RUN_KEY);
-  const previous = marker.found ? Date.parse(marker.uploadedAt) : Number.NaN;
-  return new Date(
-    Number.isNaN(previous) ? floor : Math.max(previous, floor)
-  ).toISOString();
+  try {
+    const marker = await readDocument(LAST_RUN_KEY);
+    return slaWindowStart(marker.found ? marker.content : null, Date.now());
+  } catch (error) {
+    console.error("SLA report last-run marker read failed.", error);
+    return slaWindowStart(null, Date.now());
+  }
 };
 
 export default defineSchedule({
@@ -76,22 +76,27 @@ export default defineSchedule({
       }
     }
 
-    const heartbeat = to(slack, { channelId: OWNER_USER_ID }).send(
-      `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}. Always post this line, including when every count is zero.`,
-      { auth: OWNER_AUTH }
-    );
-    waitUntil(
-      heartbeat.catch((error) => {
-        console.error("SLA report heartbeat dispatch failed.", error);
-      })
-    );
+    try {
+      const heartbeat = to(slack, { channelId: OWNER_USER_ID }).send(
+        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}. This run always posts, so the skill's rule about staying silent when there are no bugs does not apply here: report zero counts as zeros.`,
+        { auth: OWNER_AUTH }
+      );
+      waitUntil(
+        heartbeat.catch((error) => {
+          console.error("SLA report heartbeat dispatch failed.", error);
+        })
+      );
+    } catch (error) {
+      console.error("SLA report heartbeat setup failed.", error);
+    }
 
     waitUntil(
-      writeDocument(LAST_RUN_KEY, "", { allowOverwrite: true }).catch(
-        (error) => {
-          console.error("SLA report last-run marker write failed.", error);
-        }
-      )
+      writeDocument(LAST_RUN_KEY, new Date().toISOString(), {
+        allowOverwrite: true,
+        contentType: "text/plain",
+      }).catch((error) => {
+        console.error("SLA report last-run marker write failed.", error);
+      })
     );
   },
 });
