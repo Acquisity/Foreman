@@ -3,7 +3,6 @@ import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
-import { intakeOnlyPolicy } from "#lib/github/approval.js";
 import { FALLBACK_BOT_NAME, resolveBotName } from "#lib/github/bot-name.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "#lib/github/git-remote.js";
@@ -71,7 +70,6 @@ const cloneExplicitRepository = async (
 };
 
 export default defineTool({
-  approval: intakeOnlyPolicy,
   description:
     "Select and prepare a GitHub repository workspace for direct work or factory mode. A signed GitHub webhook repository is authoritative. On other channels pass the one explicit owner/repo or GitHub URL from the request. Call this before editing files or delegating a repository station.",
   async execute({ repository }, ctx) {

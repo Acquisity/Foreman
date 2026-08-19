@@ -15,20 +15,19 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * Sessions): every mention is stamped trusted at dispatch. Keep the app out
  * of open channels, or move trust to a per-user check before widening it.
  * Channels listed in SLACK_INTAKE_ONLY_CHANNELS are intake-only: their
- * mentions stay trusted, so conversation runs as normal, but the session is
- * stamped intake-only and intakeOnlyPolicy denies prepare_repository, so no
- * repository work can start there on either path. INTAKE_ONLY_TASK tells the
- * model to file the request as a Linear issue instead.
+ * mentions stay trusted, so conversation and investigation run as normal, but
+ * the session is stamped intake-only and intakeOnlyPolicy denies every push,
+ * on the direct path and inside the stations alike. INTAKE_ONLY_TASK tells
+ * the model to file the change as a Linear issue instead.
  */
 
 // Task injected into a mention from an intake-only channel. The hard gate is
-// intakeOnlyPolicy on prepare_repository, which denies repository work for
-// these sessions; this text tells the model what to do with the denial.
+// intakeOnlyPolicy on the push tools, which denies delivery for these
+// sessions; this text tells the model what to do instead.
 const INTAKE_ONLY_TASK = [
-  "This message came from a Slack channel that is intake-only: nobody there can action code changes directly, so treat it as a request to be routed, not as a work order to execute here.",
-  "Do not do any repository work for anything said in this channel, on either path: no editing files, no branches, no pull requests, and no delegating a repository station. Repository preparation is denied for this session, so there is no way around this and no reason to try.",
-  "If the message is a work item (a fix, a build, or a change request), create a Linear issue that captures it, leave it unassigned for triage, and tell the requester it has been filed and will be picked up from the tracker.",
-  "Conversation is unaffected: answer questions, discuss the request, and follow up in the thread as normal.",
+  "This message came from a Slack channel that is intake-only: nobody there can authorize shipping code, so treat it as a request to be routed, not as a work order to execute here.",
+  "Answer questions and investigate as deeply as the thread needs, reading the repository included. Do not deliver a change: no pushed branch and no pull request, on either path. Pushing is denied for this session, so there is no way around it and no reason to try.",
+  "If the message is a work item (a fix, a build, or a change request), create a Linear issue that captures it along with anything you found, leave it unassigned for triage, and tell the requester it has been filed and will be picked up from the tracker.",
 ].join("\n\n");
 
 export default slackChannel({

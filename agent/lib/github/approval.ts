@@ -49,6 +49,10 @@ export const modelSwapPolicy = sharedConfigWritePolicy(
 
 /** Direct-session publication requires an explicit user approval card. */
 export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
+  const intake = intakeOnlyPolicy(ctx);
+  if (intake !== "not-applicable") {
+    return intake;
+  }
   if (isAutonomous(ctx.session.auth.current)) {
     return {
       reason:
@@ -91,20 +95,21 @@ export function denyAutonomousWrites(
 }
 
 /**
- * Repository work requested from an intake-only channel.
+ * Delivery requested from an intake-only channel.
  *
  * @remarks
  * Denied rather than parked: nobody in an intake-only channel is authorized
- * to action code changes, so an approval card would only route the decision
- * to the wrong person. Conversation, reads outside a repository workspace,
- * and filing the request to Linear all stay available; the denial reason is
- * what the model relays back and acts on.
+ * to ship code, so an approval card would only route the decision to the
+ * wrong person, and a station running in task mode cannot park at all.
+ * Everything short of delivery stays available, reading and investigating a
+ * repository included, so a follow-up question in the thread still gets a
+ * real answer. The denial reason is what the model relays back and acts on.
  */
 export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
   isIntakeOnly(ctx.session.auth.current)
     ? {
         reason:
-          "This channel is intake-only. File the request as a Linear issue for triage instead of preparing a repository.",
+          "This channel is intake-only. Investigate and answer here, but file the change as a Linear issue for triage instead of delivering it.",
         type: "denied",
       }
     : "not-applicable";

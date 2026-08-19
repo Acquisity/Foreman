@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
-import { intakeOnlyPolicy } from "./github/approval.js";
+import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { parseIntakeOnlyChannels } from "./slack-intake.js";
 import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
 
@@ -16,7 +16,7 @@ const auth: SessionAuthContext = {
 const approvalFor = (current: SessionAuthContext) =>
   ({
     session: { auth: { current } },
-    toolName: "prepare_repository",
+    toolName: "push_branch",
   }) as unknown as ApprovalContext;
 
 describe("intake-only channels", () => {
@@ -33,11 +33,13 @@ describe("intake-only channels", () => {
     );
   });
 
-  it("denies repository preparation for an intake-only session", () => {
+  it("denies delivery for an intake-only session", () => {
     const stamped = stampIntakeOnly(stampTrusted(auth));
     assert.equal(isIntakeOnly(stamped), true);
-    const status = intakeOnlyPolicy(approvalFor(stamped));
-    assert.equal(typeof status === "object" && status.type, "denied");
+    for (const policy of [intakeOnlyPolicy, deliveryPolicy]) {
+      const status = policy(approvalFor(stamped));
+      assert.equal(typeof status === "object" && status.type, "denied");
+    }
   });
 
   it("leaves every other session untouched, trusted ones included", () => {
@@ -46,6 +48,10 @@ describe("intake-only channels", () => {
     assert.equal(
       intakeOnlyPolicy(approvalFor(stampTrusted(auth))),
       "not-applicable"
+    );
+    assert.equal(
+      deliveryPolicy(approvalFor(stampTrusted(auth))),
+      "user-approval"
     );
   });
 });
