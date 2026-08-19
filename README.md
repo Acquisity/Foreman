@@ -38,7 +38,7 @@ Each station is its own agent with its own instructions, sandbox, and tools. The
 
 The Vercel deploy flow sets up everything: the **GitHub** connector, **Linear** connector, **Vercel Blob** store, and a prompt for the `FACTORY_REPO` and `FACTORY_LABEL` environment variables.
 
-Two things must line up before the first deployment can finish. `FACTORY_REPO` must name a real repository in `owner/repo` format, and the GitHub App behind the connector you select must be installed with access to that repository. The deployment clones `FACTORY_REPO` up front to prewarm the station sandboxes, so a repository the app cannot reach fails the deploy with a `Cannot access <owner/repo>` error; install the app on the repository (or fix the value), then redeploy.
+Two things must line up before the first deployment can finish. `FACTORY_REPO` must name a real repository in `owner/repo` format, and the GitHub App behind the connector you select must be installed with access to that repository. The deployment clones `FACTORY_REPO` up front to prewarm the station sandboxes, so a repository the app cannot reach fails the deploy with an error naming the repository and the fix: `Cannot access <owner/repo>` when the token mint or authorization is refused, or `Cannot clone <owner/repo>: GitHub reports the repository as not found` when the repository does not exist or is private and invisible to the app (GitHub reports both identically). Install the app on the repository (or fix the value), then redeploy.
 
 Configuration (see `.env.example`):
 

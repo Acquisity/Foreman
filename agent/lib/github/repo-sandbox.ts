@@ -5,8 +5,8 @@ import type {
 } from "eve/sandbox";
 import { FACTORY_REPO } from "../constants.js";
 import {
-  appAccessMessage,
   describeCloneFailure,
+  describeTokenMintFailure,
   safeErrorMessage,
   sanitizeCommandOutput,
 } from "./bootstrap-diagnostics.js";
@@ -39,17 +39,21 @@ async function runOrThrow(
   }
 }
 
-// Mints the brokered installation token, translating a refusal (typically
-// "App authorization required" from Connect) into the actionable message.
-// The original error rides along as the cause; the token itself never
-// appears in either.
+// Mints the brokered installation token, translating the failure into an
+// actionable message: an authorization refusal (typically "App authorization
+// required" from Connect) points at the app installation, anything else (a
+// Connect timeout, rate limit, or connector misconfiguration) points at the
+// connector with the sanitized original failure. The original error rides
+// along as the cause; the token itself never appears in either.
 async function mintTokenOrExplain(
   mint: () => Promise<string>
 ): Promise<string> {
   try {
     return await mint();
   } catch (error) {
-    throw new Error(appAccessMessage(FACTORY_REPO), { cause: error });
+    throw new Error(describeTokenMintFailure(FACTORY_REPO, error), {
+      cause: error,
+    });
   }
 }
 

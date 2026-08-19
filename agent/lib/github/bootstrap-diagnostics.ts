@@ -17,6 +17,7 @@ const CREDENTIAL_PATTERNS = [
   /\bgh[a-z]_[A-Za-z0-9_]{8,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{8,}\b/g,
   /x-access-token:[^@\s"']+/gi,
+  /:\/\/[^/\s:@]+:[^/\s@]+@/g,
   /\b(?:authorization|proxy-authorization)\b\s*[:=][^\r\n]*/gi,
   /\bbasic\s+[A-Za-z0-9+/=]{8,}/gi,
   /\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/gi,
@@ -87,6 +88,27 @@ export function describeCloneFailure(repo: string, detail: string): string {
     return appAccessMessage(repo);
   }
   return `Failed to clone ${repo} while building the factory sandbox template. ${safe.trim()}`;
+}
+
+const MINT_REFUSAL_EVIDENCE =
+  /app authorization|authorization required|not authorized|not installed|forbidden|error:? 40[13]|status(?: code)?:? 40[13]|access denied/i;
+
+/**
+ * Classifies a failed installation-token mint.
+ *
+ * @remarks
+ * An authorization refusal (Connect's "App authorization required", a 401/403
+ * from GitHub) means the app installation is the problem and gets
+ * {@link appAccessMessage}. Anything else - a Connect timeout, rate limit, or
+ * connector misconfiguration - is not fixed by reinstalling the app, so the
+ * message points at the connector and carries the sanitized original failure.
+ */
+export function describeTokenMintFailure(repo: string, error: unknown): string {
+  const detail = safeErrorMessage(error).slice(0, MAX_DETAIL_LENGTH).trim();
+  if (MINT_REFUSAL_EVIDENCE.test(detail)) {
+    return appAccessMessage(repo);
+  }
+  return `Failed to mint a GitHub installation token for ${repo} through the selected connector: ${detail || "unknown error"}. This is a connector or availability problem, not repository access; check the GitHub connector's configuration and Vercel Connect status, then retry or redeploy.`;
 }
 
 /**
