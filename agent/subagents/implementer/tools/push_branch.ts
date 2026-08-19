@@ -4,10 +4,9 @@ import { githubCredentials } from "../../../lib/github/credentials.js";
 import {
   brokerPolicy,
   mintInstallationToken,
-  REMOTE_URL,
-  REPO_DIR,
   validateBranch,
 } from "../../../lib/github/git-remote.js";
+import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 
 /**
  * Pushes a committed feature branch of the sandbox checkout to the factory
@@ -23,18 +22,21 @@ import {
  * `finally` block drops the brokered credential again.
  */
 export default defineTool({
-  description: `Push a local branch of the ${REPO_DIR} checkout to the factory repository. The branch must already exist locally with the work committed and the checks run; main and master are refused. After a successful push, report the branch name in your structured output so the orchestrator can open the pull request.`,
+  description:
+    "Push a committed feature branch from the prepared repository. Protected branches are refused and the validated literal GitHub URL is used instead of git remote configuration.",
   async execute(input, ctx) {
     const refusal = validateBranch(input.branch);
     if (refusal) {
       return { error: refusal, success: false as const };
     }
     const sandbox = await ctx.getSandbox();
+    const prepared = await readPreparedRepository(sandbox);
+    const url = remoteUrl(prepared.slug);
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
       const push = await sandbox.run({
-        command: `git -C ${REPO_DIR} push ${REMOTE_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
+        command: `git -C '${prepared.worktree}' push ${url} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
       });
       if (push.exitCode !== 0) {
         return {
@@ -45,7 +47,7 @@ export default defineTool({
         };
       }
       const head = await sandbox.run({
-        command: `git -C ${REPO_DIR} rev-parse '${input.branch}'`,
+        command: `git -C '${prepared.worktree}' rev-parse '${input.branch}'`,
       });
       return {
         branch: input.branch,
@@ -61,7 +63,7 @@ export default defineTool({
       .string()
       .min(1)
       .describe(
-        "Branch name in /workspace/repo to push, e.g. factory/bug-dedupe-reset-emails"
+        "Feature branch from the prepared repository, e.g. foreman/bug-dedupe-reset-emails"
       ),
   }),
 });

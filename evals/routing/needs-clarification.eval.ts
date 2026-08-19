@@ -6,7 +6,7 @@ export default defineEval({
   tags: ["slow"],
   async test(t) {
     await t.send(
-      "Something is wrong with the emails, you know the one I mean. Fix it properly this time."
+      "Use factory mode for Acquisity/Foreman. Something is wrong with the emails, you know the one I mean. Fix it properly this time."
     );
     t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");

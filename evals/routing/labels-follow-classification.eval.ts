@@ -35,18 +35,19 @@ const toolCallOrder = (events: readonly MessageStreamEvent[]): string[] => {
 
 export default defineEval({
   description:
-    "Classifying a GitHub issue loads the factory-pipeline skill and mirrors the result onto the issue as labels: the repo's vocabulary is read before any label write, and a label write (addLabels or updateIssue) is among the approvals the untrusted eval principal parks on; a progress comment may park alongside it. Needs at least one open issue (#1) on FACTORY_REPO.",
+    "Classifying Acquisity/Foreman issue #1 uses that explicit repository, reads its label vocabulary before any write, and never consults a deployment-wide repository setting.",
   // Not tagged `fast`: this eval needs a live repository with an open issue,
   // which a cheap local loop cannot provide, so it runs only as a separately
   // provisioned `needs-connect` test.
   tags: ["needs-connect"],
   async test(t) {
     await t.send(
-      "Run issue #1 on the repository through the classifier and mirror the classification onto the issue, then stop; do not run the analyst or any later station."
+      "Use factory mode to classify Acquisity/Foreman issue #1 and mirror the classification onto that issue, then stop before investigation."
     );
     t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
     t.calledSubagent("analyst", { count: 0 });
+    t.calledSubagent("investigator", { count: 0 });
     t.calledSubagent("implementer", { count: 0 });
     t.parked();
     t.check(

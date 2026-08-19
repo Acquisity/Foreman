@@ -3,7 +3,7 @@ import { isAutonomous, isScheduleAppAuth, isTrusted } from "../trust.js";
 
 /**
  * Policy factory for writes to shared configuration every future run
- * inherits (the factory brain, the live model overrides).
+ * inherits (repository knowledge and live model overrides).
  *
  * @remarks
  * Reads are always allowed and never routed here; these policies gate writes
@@ -28,11 +28,10 @@ function sharedConfigWritePolicy(unattendedReason: string) {
 }
 
 /**
- * The shared factory brain: durable notes about the target repository that
- * feed into every future run.
+ * Verified repository knowledge that can feed future runs for that repository.
  */
-export const factoryBrainPolicy = sharedConfigWritePolicy(
-  "Unattended factory runs may read the factory brain but not write to it."
+export const repositoryKnowledgePolicy = sharedConfigWritePolicy(
+  "Unattended runs may read repository knowledge but not write to it."
 );
 
 /**

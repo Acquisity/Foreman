@@ -1,6 +1,5 @@
 import type { GitHubChannelCredentials } from "eve/channels/github";
 import type { SandboxNetworkPolicy } from "eve/sandbox";
-import { FACTORY_REPO } from "../constants.js";
 
 const PROTECTED_BRANCHES = new Set(["main", "master"]);
 
@@ -25,7 +24,6 @@ export const REPO_DIR = "/workspace/repo";
  * remotes) is model-writable and must not be able to redirect the brokered
  * credential, so the git helpers never go through `origin`.
  */
-export const REMOTE_URL = `https://github.com/${FACTORY_REPO}.git`;
 
 /**
  * Returns the refusal reason, or null when the branch name may be used in a

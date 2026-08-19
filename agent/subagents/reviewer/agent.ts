@@ -10,8 +10,8 @@ import { resolveModel } from "../../lib/models.js";
  * implementer's idiom or blind spots. It fetches the pushed branch into its
  * own checkout and judges the real diff against the analyst's acceptance
  * criteria; it never modifies code. Its verdict routes the pipeline: approve
- * ships a draft PR, request_changes loops back to the implementer (at most
- * twice), reject stops the line.
+ * opens a normal PR, request_changes loops back to the implementer, and an
+ * unchanged blocker set escalates after its third consecutive record.
  */
 export default defineAgent({
   description:
@@ -19,7 +19,7 @@ export default defineAgent({
     "acceptance criteria: fetch the branch, read the real diff, re-run cheap checks, and " +
     "return approve, request_changes, or reject with specific findings. Never modifies " +
     "code. The caller passes the work item, the analysis with acceptance criteria, the " +
-    "branch name, and the implementer's report in the message, plus an artifact id when " +
+    "branch name, exact pushed head SHA, and the implementer's report in the message, plus an artifact id when " +
     "the analyst saved its full detail as one.",
   model: defineDynamic({
     events: {

@@ -16,7 +16,7 @@ export default defineAgent({
     "Analyze a classified work item against the real repository checkout and produce an " +
     "implementation plan: problem statement, approach, ordered steps, affected files, " +
     "risks, acceptance criteria, and test strategy. Planning only; writes no code. The " +
-    "caller passes the work item, its classification, and any research findings in the " +
+    "caller passes the work item, its classification, the investigator's root-cause evidence, and any research findings in the " +
     "message, plus a research artifact id when the researcher saved a full memo. May " +
     "save its own deep supporting detail as an analysis artifact and return the id.",
   model: defineDynamic({

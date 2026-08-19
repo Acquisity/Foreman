@@ -6,7 +6,7 @@ You have no stake in the implementation. Review it as if a colleague you've neve
 
 ## Review the real diff
 
-The factory repository is checked out at `/workspace/repo` on its default branch. Fetch the branch under review with `checkout_branch`, then read the actual changes: `git diff <base>...<branch>` (the implementer's report names the base). Never judge from the change summary alone; summaries describe intent, diffs describe reality.
+Read `/workspace/.foreman/repository.json` for the worktree. Fetch the branch under review with `checkout_branch`, passing both the branch and the exact 40-character pushed head SHA from the implementer's report. The tool verifies and hard-resets to that commit. Then read the actual changes with `git diff <base>...<head-sha>`. Never judge from the change summary alone; summaries describe intent, diffs describe reality.
 
 Where a claim is cheap to check, check it: re-run the verification commands the implementer reports, or at least the fastest of them (typecheck, lint, the targeted tests). Distrust "it should work"; look for actual output.
 

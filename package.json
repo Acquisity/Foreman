@@ -1,8 +1,8 @@
 {
-  "name": "eve-software-factory-template",
+  "name": "foreman-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Foreman, the eve Software Factory.",
+  "description": "Foreman, Acquisity's general-purpose eve agent with an optional software factory mode.",
   "license": "MIT",
   "type": "module",
   "imports": {

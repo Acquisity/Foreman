@@ -9,7 +9,7 @@ import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
  * rather than a per-feature one. This module owns that layout: the reserved prefixes, what each
  * holds, and which tool owns it. Any general-purpose Blob tool added later must consult
  * {@link reservedNamespaceForPath} / {@link reservedNamespaceForUrl} before acting, so a managed
- * document (the factory brain, a user's preferences, a handoff artifact) can't be reached or
+ * document (repository knowledge, a user's preferences, a handoff artifact) can't be reached or
  * overwritten through a generic file operation.
  *
  * Feature modules import their prefix from here rather than declaring their own. The dependency
@@ -25,14 +25,20 @@ import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
 /** Blob path prefix holding per-user preference files. */
 export const USER_PREFERENCES_PREFIX = "user-preferences/";
 
-/** Blob path prefix holding the shared factory brain. */
+/** Legacy Blob prefix retained only for repository-knowledge read migration. */
 export const FACTORY_BRAIN_PREFIX = "factory-brain/";
+
+/** Blob path prefix holding verified, repository-scoped knowledge. */
+export const REPOSITORY_KNOWLEDGE_PREFIX = "repository-knowledge/";
 
 /** Blob path prefix holding handoff artifacts passed between stations. */
 export const ARTIFACTS_PREFIX = "artifacts/";
 
 /** Blob path prefix holding the live station model overrides. */
 export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
+
+/** Blob path prefix holding durable repository and pull-request pipeline runs. */
+export const PIPELINE_RUNS_PREFIX = "pipeline-runs/";
 
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
@@ -64,14 +70,24 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     writeTool: "save_artifact",
   },
   [FACTORY_BRAIN_PREFIX]: {
-    label: "the shared factory brain",
-    readTool: "read_factory_brain",
-    writeTool: "update_factory_brain",
+    label: "legacy factory knowledge",
+    readTool: "read_repository_knowledge",
+    writeTool: "update_repository_knowledge",
   },
   [MODEL_OVERRIDES_PREFIX]: {
-    label: "the live station model overrides",
-    readTool: "read_factory_models",
-    writeTool: "set_factory_models",
+    label: "the live agent model overrides",
+    readTool: "read_agent_models",
+    writeTool: "set_agent_models",
+  },
+  [PIPELINE_RUNS_PREFIX]: {
+    label: "factory pipeline run state",
+    readTool: "read_pipeline_run",
+    writeTool: "record_pipeline_run",
+  },
+  [REPOSITORY_KNOWLEDGE_PREFIX]: {
+    label: "repository knowledge",
+    readTool: "read_repository_knowledge",
+    writeTool: "update_repository_knowledge",
   },
   [USER_PREFERENCES_PREFIX]: {
     label: "user preferences",

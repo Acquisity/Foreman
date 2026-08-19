@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-// linear-context.ts imports constants.ts, which reads FACTORY_REPO and
-// LINEAR_CONNECTOR at module load; set them before the dynamic import below.
-process.env.FACTORY_REPO = "acme/widgets";
+// linear-context.ts reads LINEAR_CONNECTOR at module load.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
 const { LINEAR_INTAKE_TASK, buildLinearContext } = await import(

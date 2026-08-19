@@ -1,29 +1,28 @@
-import { createHash } from "node:crypto";
 import { gateway } from "ai";
 import { z } from "zod";
 import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
-import { FACTORY_REPO } from "./constants.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
 // so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
-// These are the compiled defaults; a live override saved by set_factory_models wins over them.
+// These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start. The chat slot
 // is the orchestrator's Slack profile: sessions born on the Slack channel resolve it instead of
-// the orchestrator slot. It compiles to the same model as orchestrator; a set_factory_models
+// the orchestrator slot. It compiles to the same model as orchestrator; a set_agent_models
 // override on chat is what actually puts conversational replies on a faster model.
 export const MODELS = {
   analyst: "deepseek/deepseek-v4-pro-0813",
   chat: "deepseek/deepseek-v4-pro-0813",
   classifier: "deepseek/deepseek-v4-pro-0813",
   implementer: "deepseek/deepseek-v4-pro-0813",
+  investigator: "deepseek/deepseek-v4-pro-0813",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   researcher: "deepseek/deepseek-v4-pro-0813",
-  reviewer: "deepseek/deepseek-v4-pro-0813",
+  reviewer: "anthropic/claude-opus-4.8",
 } as const;
 
-export type FactoryAgent = keyof typeof MODELS;
+export type AgentModelSlot = keyof typeof MODELS;
 
-export const FACTORY_AGENTS = Object.keys(MODELS) as FactoryAgent[];
+export const AGENT_MODEL_SLOTS = Object.keys(MODELS) as AgentModelSlot[];
 
 // A gateway model id is <provider>/<model>. The pattern is anchored and the length bounded
 // because ids arrive as model input and end up stored where every future session reads them.
@@ -32,17 +31,14 @@ const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
 export const isValidModelId = (id: string): boolean =>
   id.length <= 128 && MODEL_ID_PATTERN.test(id);
 
-export type ModelOverrides = Partial<Record<FactoryAgent, string>>;
+export type ModelOverrides = Partial<Record<AgentModelSlot, string>>;
 
-const overridesSchema = z.partialRecord(z.enum(FACTORY_AGENTS), z.string());
+const overridesSchema = z.partialRecord(z.enum(AGENT_MODEL_SLOTS), z.string());
 
-// Keyed on FACTORY_REPO like the factory brain: derived at module load, never from model input,
-// hashed so the public object path carries no raw owner/repo.
-const MODEL_OVERRIDES_KEY = `${MODEL_OVERRIDES_PREFIX}${createHash("sha256")
-  .update(FACTORY_REPO)
-  .digest("hex")}.json`;
+// Global to Foreman rather than repository-scoped.
+const MODEL_OVERRIDES_KEY = `${MODEL_OVERRIDES_PREFIX}foreman.json`;
 
-// The strict read: Blob or parse failures propagate. set_factory_models mutates on top of this,
+// The strict read: Blob or parse failures propagate. set_agent_models mutates on top of this,
 // because merging onto a silently-empty base would wipe overrides the call never named.
 export const loadModelOverrides = async (): Promise<ModelOverrides> => {
   const doc = await readDocument(MODEL_OVERRIDES_KEY);
@@ -86,11 +82,11 @@ export const writeModelOverrides = async (
 // What a session actually runs on: the live override when one is saved, the compiled default
 // otherwise. Resolved once per session (session.started), so a swap applies to sessions that
 // start after it, never mid-conversation.
-export const resolveModel = async (agent: FactoryAgent): Promise<string> =>
+export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
 
 // The gateway catalog, through the same authenticated provider eve's model calls use.
-// set_factory_models checks membership here before storing an id: a stored id the gateway
+// set_agent_models checks membership here before storing an id: a stored id the gateway
 // doesn't know would fail every future session at start, with no session left to undo it.
 export const listGatewayModels = async (): Promise<
   { id: string; name: string }[]
