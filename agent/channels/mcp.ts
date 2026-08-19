@@ -8,7 +8,7 @@ import { requireEnv } from "../lib/constants.js";
  * `agent_update`, and `agent_cancel`.
  *
  * @remarks
- * One shared HTTP Basic credential from `MCP_BASIC_USER` and
+ * One shared HTTP Basic credential: the fixed username below and the secret in
  * `MCP_BASIC_PASSWORD`, in development as well as production. `localDev()` is
  * deliberately not in the walk: it would resolve a second, dev-only principal,
  * and a principal is a Vercel Connect grant subject. Every user-scoped
