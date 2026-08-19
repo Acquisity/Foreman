@@ -91,7 +91,7 @@ export function describeCloneFailure(repo: string, detail: string): string {
 }
 
 const MINT_REFUSAL_EVIDENCE =
-  /app authorization|authorization required|not authorized|not installed|forbidden|error:? 40[13]|status(?: code)?:? 40[13]|access denied/i;
+  /app authorization|authorization required|not authorized|unauthorized|not installed|forbidden|error:? 40[13]|status(?: code)?:? 40[13]|access denied/i;
 
 /**
  * Classifies a failed installation-token mint.
