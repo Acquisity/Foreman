@@ -16,8 +16,9 @@
     "eval": "eve eval",
     "fix": "ultracite fix",
     "start": "eve start",
+    "test": "tsx --test \"agent/**/*.test.ts\"",
     "typecheck": "tsc",
-    "validate": "pnpm run check && pnpm run typecheck && eve info"
+    "validate": "pnpm run check && pnpm run typecheck && pnpm run test && eve info"
   },
   "dependencies": {
     "@agent-browser/eve": "^0.34.0",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.8",
     "@types/node": "~24.13.3",
+    "tsx": "^4.23.12",
     "typescript": "7.0.2",
     "ultracite": "^7.10.2"
   },

@@ -1,5 +1,6 @@
 import { connectLinearCredentials } from "@vercel/connect/eve";
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
+import { buildLinearContext } from "../lib/linear-context.js";
 import { stampTrusted } from "../lib/trust.js";
 
 /**
@@ -10,23 +11,20 @@ import { stampTrusted } from "../lib/trust.js";
  * verifies inbound webhooks by their Vercel OIDC signature. The
  * `onAgentSession` hook keeps the default created/prompted dispatch, stamps
  * the caller as trusted (only workspace members can open an Agent Session, so
- * membership is the gate here), and adds the requester's name as session
- * context when Linear provides it, for attribution in progress notes and
- * reports.
+ * membership is the gate here), and builds the session context through
+ * `buildLinearContext` (agent/lib/linear-context.ts): the requester's
+ * name for attribution, plus the factory intake task when an issue is
+ * delegated on a `created` event. `prompted` continuations in the same session
+ * do not re-inject the task.
  */
 export default linearChannel({
   credentials: connectLinearCredentials(
     process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent"
   ),
   onAgentSession: (_ctx, event) => {
-    if (event.action !== "created" && event.action !== "prompted") {
+    const context = buildLinearContext(event);
+    if (context === null) {
       return null;
-    }
-    const requester = event.agentActivity?.user ?? event.agentSession.creator;
-    const context: string[] = [];
-    const requesterName = requester?.displayName ?? requester?.name;
-    if (requesterName) {
-      context.push(`The requesting user is ${requesterName}.`);
     }
     return { auth: stampTrusted(defaultLinearAuth(event)), context };
   },
