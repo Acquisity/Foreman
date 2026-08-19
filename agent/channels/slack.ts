@@ -1,5 +1,6 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
 import { defaultSlackAuth, slackChannel } from "eve/channels/slack";
+import { extractRepositories, stampRepository } from "../lib/repository.js";
 import { stampTrusted } from "../lib/trust.js";
 
 /**
@@ -19,7 +20,18 @@ export default slackChannel({
   ),
   onAppMention: (ctx, message) => {
     const auth = defaultSlackAuth(message, ctx);
-    return auth === null ? null : { auth: stampTrusted(auth) };
+    if (auth === null) {
+      return null;
+    }
+    const repositories = extractRepositories(message.text);
+    const trusted = stampTrusted(auth);
+    const [repository] = repositories;
+    return {
+      auth:
+        repositories.length === 1 && repository
+          ? stampRepository(trusted, repository.slug, "explicit")
+          : trusted,
+    };
   },
   threadContext: { since: "last-agent-reply" },
 });

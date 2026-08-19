@@ -9,7 +9,7 @@ export default defineEval({
       "Switch the implementer to zai/glm-5.2. Use the exact id I gave you; no need to look anything up. Make the change now."
     );
     t.parked();
-    t.requireInputRequest({ toolName: "set_factory_models" });
-    t.calledTool("set_factory_models", { status: "pending" });
+    t.requireInputRequest({ toolName: "set_agent_models" });
+    t.calledTool("set_agent_models", { status: "pending" });
   },
 });

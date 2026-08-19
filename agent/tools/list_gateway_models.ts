@@ -8,7 +8,7 @@ const MAX_RESULTS = 200;
  * Tool that lists the models available on the Vercel AI Gateway.
  *
  * @remarks
- * This is the lookup step before `set_factory_models`: it turns a person's loose model name
+ * This is the lookup step before `set_agent_models`: it turns a person's loose model name
  * ("glm 5.2") into the exact gateway id (`zai/glm-5.2`). Read-only, so it needs no approval
  * gate. Goes through the gateway provider from the `ai` SDK, which authenticates the same way
  * eve's own model calls do, instead of hand-rolling credential resolution.
@@ -19,7 +19,7 @@ export default defineTool({
     "term to filter (matched case-insensitively against id and name). At most 200 results are " +
     "returned; when truncated is true, narrow the search instead of concluding a model does " +
     "not exist. Use it to resolve a person's model name to the exact gateway id before " +
-    "calling set_factory_models.",
+    "calling set_agent_models.",
   execute: async ({ search }) => {
     let all: Awaited<ReturnType<typeof listGatewayModels>>;
     try {

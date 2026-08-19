@@ -19,7 +19,7 @@ import { denyAutonomousWrites } from "../lib/github/approval.js";
  * `add_memory`, is denied on unattended runs so a poisoned issue body
  * cannot plant durable context every future session recalls; attended
  * sessions write without a card because a memory is scoped and
- * deletable, unlike the factory brain. The server's interactive
+ * deletable, unlike authoritative repository knowledge. The server's interactive
  * widget tools (guided-save, upload-file, memory-graph, space switching)
  * are excluded: they target human MCP clients, not stations.
  */

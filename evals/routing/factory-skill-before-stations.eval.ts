@@ -26,7 +26,7 @@ export default defineEval({
   tags: ["fast"],
   async test(t) {
     await t.send(
-      "Work item: users report that password reset emails sometimes arrive twice. Run it through the pipeline."
+      "Use factory mode for Acquisity/Foreman: users report that password reset emails sometimes arrive twice. Run the full pipeline."
     );
     t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");

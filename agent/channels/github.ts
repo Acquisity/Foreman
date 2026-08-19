@@ -4,9 +4,13 @@ import {
   type GitHubInboundContext,
   githubChannel,
 } from "eve/channels/github";
-import { FACTORY_BRANCH_PREFIX, FACTORY_LABEL } from "../lib/constants.js";
+import {
+  FOREMAN_BRANCH_PREFIX,
+  FOREMAN_FACTORY_LABEL,
+} from "../lib/constants.js";
 import { mentionPattern, resolveBotName } from "../lib/github/bot-name.js";
 import { githubCredentials } from "../lib/github/credentials.js";
+import { stampRepository } from "../lib/repository.js";
 import { stampAutonomous, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -44,6 +48,24 @@ const isTrustedCommenter = (comment: GitHubComment): boolean => {
     typeof association === "string" && TRUSTED_ASSOCIATIONS.has(association)
   );
 };
+
+/**
+ * Whether a pull request head is the factory's own work in this repository.
+ *
+ * @remarks
+ * The branch prefix alone is user-controlled: anyone can open a pull request
+ * from a fork whose head branch is named `foreman/...`. Autonomous
+ * stabilization must therefore also see the head living in the webhook
+ * repository itself, which only someone with push access can arrange.
+ */
+const isOwnFactoryHead = (
+  head: { ref?: unknown; repo?: { full_name?: unknown } } | undefined,
+  repositoryFullName: string
+): boolean =>
+  typeof head?.ref === "string" &&
+  head.ref.startsWith(FOREMAN_BRANCH_PREFIX) &&
+  typeof head.repo?.full_name === "string" &&
+  head.repo.full_name.toLowerCase() === repositoryFullName.toLowerCase();
 
 /**
  * Repository roles allowed to hand an issue to the factory by labeling it.
@@ -93,17 +115,17 @@ const isTrustedLabeler = async (
  * when this runs.
  */
 const FACTORY_INTAKE_TASK = [
-  `This issue was handed to the factory with the "${FACTORY_LABEL}" label, and this run is unattended: nobody is watching to answer a question or approve an action, so never use ask_question and never attempt an action that needs approval.`,
+  `This issue was handed to factory mode with the "${FOREMAN_FACTORY_LABEL}" label, and this run is unattended: nobody is watching to answer a question or approve an action, so never use ask_question and never attempt an action that needs approval.`,
   "Run the work item through the full pipeline. If the classifier needs clarification, post its questions as a comment on the issue and stop; someone will re-label the issue when they've answered.",
   "Keep the requester in the loop as you go: post a short comment on this issue when a station completes, except the last one. Comments on this issue are the one conversational write this run has; you cannot comment anywhere else.",
-  "Deliver the finished work as a draft pull request, then end the run with a reply that links it. The reply is delivered to this issue by the channel and replaces the progress comment for this final step; never announce the pull request with the comment tool.",
+  "Deliver the finished work as a normal pull request after internal review passes, then stabilize it until it is ready to merge or must be escalated. End the run with a reply that links it. Never merge it.",
 ].join("\n\n");
 
 /**
  * How many automated CI-fix attempts a factory pull request gets before the
  * factory pauses and hands the problem to a person.
  */
-const MAX_CI_FIX_ATTEMPTS = 2;
+const MAX_CI_FIX_ATTEMPTS = 3;
 
 /**
  * Task injected when a check suite fails on one of the factory's own pull
@@ -118,10 +140,15 @@ const MAX_CI_FIX_ATTEMPTS = 2;
  * to count.
  */
 const CI_FIX_TASK = [
-  "A CI check suite failed on one of the factory's own pull requests. This run is unattended: nobody is watching to answer a question or approve an action, so never use ask_question and never attempt an action that needs approval.",
-  "Before anything else, read the pull request and its check runs fresh. If the checks are green by now, or the failure belongs to a commit that is no longer the branch head, stop without posting anything.",
-  `Count your own earlier fix-attempt comments on this pull request. If there are already ${MAX_CI_FIX_ATTEMPTS}, do not attempt another fix. Post one comment saying the factory is pausing its automated CI fixes on this pull request to avoid looping, ${MAX_CI_FIX_ATTEMPTS} attempts have not turned the checks green, and further troubleshooting needs a person. Then stop.`,
-  "Otherwise, first post a short comment that a CI fix attempt is starting and what looks broken (future runs count these comments to know when to stop). Diagnose with github__getCiFailureContext, then run the fix as a revision: send the implementer the pull request's context, its branch name, and your diagnosis, and have the reviewer judge the updated branch. Pushing the fix re-runs the checks; do not open a new pull request.",
+  "A CI check suite failed on a Foreman pull request. This run is unattended. Load factory-pipeline and read the durable pipeline run before acting.",
+  "Fetch the pull request and checks fresh. Pass the event head SHA to record_pipeline_run so a stale event is rejected. Deduplicate the check id. If the failure is not for the current head, stop without posting.",
+  `Diagnose the current failure, revise the existing branch, and rerun the independent reviewer at the exact new pushed SHA. Continue while blockers change. If the same blocker set reaches ${MAX_CI_FIX_ATTEMPTS} consecutive records, update the PR and originating Linear context with the escalation and stop. Never open another pull request and never merge.`,
+].join("\n\n");
+
+const REVIEW_FEEDBACK_TASK = [
+  "A trusted repository collaborator left feedback on a Foreman pull request. This is an unattended stabilization turn.",
+  "Load factory-pipeline. Read the durable pipeline run and the current pull request head. Deduplicate this comment by its stable id and ignore it if it is already processed or belongs to a stale head.",
+  "Decide whether the feedback is actionable. For actionable feedback, revise the existing branch and rerun the independent reviewer at the exact pushed SHA. Record the feedback and blocker transition. Escalate only after the same blocker set repeats three consecutive times. Never merge.",
 ].join("\n\n");
 
 /**
@@ -171,7 +198,7 @@ const PR_SUMMARY_TASK = [
  *   not the raw webhook payload that carries the just-added label. The turn
  *   itself runs unattended: the auth is rewritten to the constructed
  *   autonomous principal with the intake issue number stamped in, and the
- *   remaining approval policies deny it non-GitHub writes (factory brain,
+ *   remaining approval policies deny it non-GitHub writes (repository knowledge,
  *   model swaps, connection writes).
  * - `onPullRequest` dispatches only on the `opened` action and skips PRs
  *   opened by bots, which covers Dependabot and the factory's own
@@ -180,8 +207,9 @@ const PR_SUMMARY_TASK = [
  *   and the injected task is scoped to posting a single summary comment.
  * - `onCheckSuite` is the red-CI fix loop, scoped to the factory's own work:
  *   it dispatches only when a suite completes with a failure conclusion on a
- *   pull request whose head branch carries the factory prefix, so a person's
- *   red PR never triggers an uninvited fix. The session runs unattended under
+ *   pull request whose head branch carries the factory prefix and whose head
+ *   lives in this repository, so neither a person's red PR nor a fork branch
+ *   named after the prefix triggers an uninvited fix. The session runs unattended under
  *   the autonomous principal, anchored to the pull request, and the injected
  *   task bounds the loop by counting earlier fix-attempt comments on the
  *   thread. Requires the connector to subscribe to the `check_suite` webhook
@@ -197,7 +225,7 @@ const PR_SUMMARY_TASK = [
 export default githubChannel({
   botName: resolveBotName,
   credentials: githubCredentials,
-  onCheckSuite: (ctx, suite) => {
+  onCheckSuite: async (ctx, suite) => {
     const raw = suite.raw as {
       head_branch?: unknown;
       check_suite?: { head_branch?: unknown };
@@ -209,12 +237,40 @@ export default githubChannel({
       suite.conclusion !== "failure" ||
       pullNumber === undefined ||
       typeof headBranch !== "string" ||
-      !headBranch.startsWith(FACTORY_BRANCH_PREFIX)
+      !headBranch.startsWith(FOREMAN_BRANCH_PREFIX)
     ) {
       return null;
     }
+    // The suite payload carries no head repository, so confirm through the
+    // pull request that this head is the factory's own and not a fork branch
+    // named after the prefix.
+    try {
+      const response = await ctx.github.request<{
+        head?: { ref?: string; repo?: { full_name?: string } };
+      }>({
+        method: "GET",
+        path: `/repos/${ctx.repository.owner}/${ctx.repository.name}/pulls/${pullNumber}`,
+      });
+      if (
+        !(
+          response.ok &&
+          isOwnFactoryHead(response.body.head, ctx.repository.fullName)
+        )
+      ) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
     return {
-      auth: stampAutonomous(defaultGitHubAuth(ctx), pullNumber),
+      auth: stampAutonomous(
+        stampRepository(
+          defaultGitHubAuth(ctx),
+          ctx.repository.fullName,
+          "github-webhook"
+        ),
+        pullNumber
+      ),
       context: [CI_FIX_TASK],
     };
   },
@@ -225,11 +281,46 @@ export default githubChannel({
     if (botName === null) {
       return null;
     }
-    return !isIgnoredComment(comment, botName) &&
-      mentionPattern(botName).test(comment.body) &&
-      isTrustedCommenter(comment)
-      ? { auth: stampTrusted(defaultGitHubAuth(ctx)) }
-      : null;
+    if (isIgnoredComment(comment, botName) || !isTrustedCommenter(comment)) {
+      return null;
+    }
+    const bound = stampRepository(
+      defaultGitHubAuth(ctx),
+      ctx.repository.fullName,
+      "github-webhook"
+    );
+    if (mentionPattern(botName).test(comment.body)) {
+      return { auth: stampTrusted(bound) };
+    }
+    const pullNumber = ctx.conversation.pullRequestNumber;
+    if (pullNumber === null) {
+      return null;
+    }
+    try {
+      const response = await ctx.github.request<{
+        head?: { ref?: string; repo?: { full_name?: string }; sha?: string };
+      }>({
+        method: "GET",
+        path: `/repos/${ctx.repository.owner}/${ctx.repository.name}/pulls/${pullNumber}`,
+      });
+      if (
+        !(
+          response.ok &&
+          isOwnFactoryHead(response.body.head, ctx.repository.fullName)
+        )
+      ) {
+        return null;
+      }
+      return {
+        auth: stampAutonomous(bound, pullNumber),
+        context: [
+          REVIEW_FEEDBACK_TASK,
+          `Feedback id: github-comment:${comment.id}. Current observed head: ${response.body.head?.sha ?? "unknown"}.`,
+        ],
+      };
+    } catch {
+      return null;
+    }
   },
   onIssue: async (ctx, issue) => {
     const { labels } = issue.raw as {
@@ -237,7 +328,7 @@ export default githubChannel({
     };
     const hasFactoryLabel =
       Array.isArray(labels) &&
-      labels.some((entry) => entry?.name === FACTORY_LABEL);
+      labels.some((entry) => entry?.name === FOREMAN_FACTORY_LABEL);
     if (
       issue.action !== "labeled" ||
       !hasFactoryLabel ||
@@ -247,12 +338,37 @@ export default githubChannel({
       return null;
     }
     return {
-      auth: stampAutonomous(defaultGitHubAuth(ctx), issue.issueNumber),
+      auth: stampAutonomous(
+        stampRepository(
+          defaultGitHubAuth(ctx),
+          ctx.repository.fullName,
+          "github-webhook"
+        ),
+        issue.issueNumber
+      ),
       context: [FACTORY_INTAKE_TASK],
     };
   },
-  onPullRequest: (ctx, pullRequest) =>
-    pullRequest.action === "opened" && ctx.sender.type !== "Bot"
-      ? { auth: defaultGitHubAuth(ctx), context: [PR_SUMMARY_TASK] }
-      : null,
+  onPullRequest: (ctx, pullRequest) => {
+    const bound = stampRepository(
+      defaultGitHubAuth(ctx),
+      ctx.repository.fullName,
+      "github-webhook"
+    );
+    if (pullRequest.action === "opened" && ctx.sender.type !== "Bot") {
+      return { auth: bound, context: [PR_SUMMARY_TASK] };
+    }
+    const raw = pullRequest.raw as {
+      head?: { ref?: unknown; repo?: { full_name?: unknown } };
+    };
+    return pullRequest.action === "synchronize" &&
+      isOwnFactoryHead(raw.head, ctx.repository.fullName)
+      ? {
+          auth: stampAutonomous(bound, pullRequest.pullRequestNumber),
+          context: [
+            `A new head ${pullRequest.headSha ?? "unknown"} was pushed to this Foreman pull request. Load factory-pipeline, reconcile the durable run against this exact current head, rerun independent review when needed, and continue stabilization without merging.`,
+          ],
+        }
+      : null;
+  },
 });

@@ -61,6 +61,10 @@ export default defineAgent({
         items: { type: "string" },
         type: "array",
       },
+      head_sha: {
+        description: "The full 40-character SHA pushed for independent review.",
+        type: "string",
+      },
       known_limitations: {
         description: "Anything the reviewer should scrutinize.",
         items: { type: "string" },
@@ -93,6 +97,7 @@ export default defineAgent({
       "branch",
       "base",
       "pushed",
+      "head_sha",
       "change_summary",
       "verification",
       "deviations",

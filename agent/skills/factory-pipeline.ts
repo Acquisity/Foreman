@@ -14,10 +14,11 @@ export default defineDynamic({
         ? null
         : defineSkill({
             description:
-              "Load when the conversation asks Foreman to actually fix, build, or change " +
-              "something in the target repository: the full station pipeline procedure, from " +
-              "grounding the work item through classifier, analyst, implementer, reviewer, and " +
-              "the draft pull request.",
+              "Load when the user explicitly requests factory mode, a task has substantial " +
+              "complexity, uncertainty, risk, or review depth, or an assigned work item requires " +
+              "the full line: repository intake, classifier, root-cause investigator, analyst, " +
+              "implementer, independent reviewer, pull request stabilization, and readiness. " +
+              "Do not load merely because a small task changes files.",
             markdown: PIPELINE,
           }),
   },

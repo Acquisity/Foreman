@@ -4,67 +4,72 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-Foreman is Acquisity's general-purpose agent, built on the [eve](https://eve.dev) framework. Skills define its specialist modes, and the factory is one of them: when a work item asks Foreman to fix, build, or change something in the configured repository (`FACTORY_REPO`), it loads the `factory-pipeline` skill and runs the full line; with no skill loaded it still handles whatever is delegated from the prompt alone. Work arrives from GitHub (an issue labeled `factory` runs unattended; @Foreman mentions from owners/members/collaborators run attended), from Linear Agent Sessions (delegating an issue injects the factory intake task), and from Slack mentions. The factory moves every item through four declared subagent stations in order: **classifier** (triage, fast model) → **analyst** (plan + acceptance criteria, own repo checkout) → **implementer** (codes, verifies, pushes a feature branch from its own checkout) → **reviewer** (independent verdict on the pushed branch, different model vendor, max 2 revision cycles). The orchestrator then opens a draft PR; marking it ready and merging are not in the tool surface; a person merges in the GitHub UI. Per-user preferences live in **Vercel Blob**, alongside a shared, per-repo **factory brain** (durable notes about the target repository) under a reserved Blob prefix, readable by every run but writable only by trusted callers, and **handoff artifacts**: long Markdown documents (research memos, analysis detail) that stations pass to each other by id under the reserved `artifacts/` prefix instead of inlining them through the orchestrator. The prompt text lives in `agent/lib/prompts.ts` and resolves per caller in `agent/instructions/prompt.ts`: unattended factory runs (an issue labeled `factory`, red CI on a factory PR) run under the autonomous principal and get the full factory prompt inline; every interactive session gets the general profile, which reaches the pipeline through the `factory-pipeline` skill.
+Foreman is Acquisity's general-purpose agent, built on eve. Slack and ordinary interactive work use a direct general path. The optional factory path normally runs classifier → investigator → analyst → implementer → reviewer, with researcher running in parallel with classifier when research is warranted, then stabilizes a normal pull request until it is ready to merge or escalated. Assigned Linear issues and trusted GitHub factory labels activate the factory deterministically; interactive sessions can request it or select it for complex, uncertain, risky, or review-heavy work. Foreman never merges.
 
-The whole agent is defined under `agent/`. eve discovers capabilities from the filesystem. See [`ARCHITECTURE.md`](./.github/ARCHITECTURE.md) for the component map, data flow, trust model, and boundaries.
+Repositories are selected per signed session or explicit request. GitHub webhooks are authoritative. Linear, Slack, and eve requests involving repository work need exactly one `owner/repo` or GitHub URL; ordinary conversation does not. Never add an environment, memory, or preference fallback for repository identity.
 
-## Setup & commands
+The whole agent lives under `agent/`; evals live under `evals/`. See [ARCHITECTURE.md](./.github/ARCHITECTURE.md).
+
+## Commands
 
 ```bash
-pnpm install        # install dependencies (Node 24.x)
-pnpm dev            # eve dev — local TUI; run /model once to link a model provider
-pnpm typecheck      # tsc (TypeScript, no emit)
-pnpm check          # ultracite (Biome) lint + format check
-pnpm fix            # ultracite (Biome) auto-fix
-pnpm build          # eve build
-pnpm eval           # eve eval — run the evals suite (see tags below; costs real tokens)
-eve deploy          # manual deploy to Vercel production; normally unneeded, pushing main auto-deploys via the GitHub integration
-npx eve info        # print the discovered surface + discovery diagnostics
-pnpm validate       # check + typecheck + eve info in one command
+pnpm install
+pnpm dev
+pnpm typecheck
+pnpm check
+pnpm fix
+pnpm build
+pnpm eval
+pnpm test
+pnpm validate
+npx eve info
 ```
 
-**Verify changes with `pnpm validate` (lint, typecheck, and discovery diagnostics must all report 0 errors / 0 warnings), then exercise the agent in the `pnpm dev` TUI.** The evals suite (`pnpm eval --tag fast`) guards routing and safety behavior; `pnpm eval pipeline/full-pipeline` runs the whole line and pushes a real branch, so run it deliberately and against a scratch repo.
+Verify with `pnpm validate`, then exercise both direct and factory paths in `pnpm dev`. Evals cost real tokens. Run `pipeline/full-pipeline` only with `PIPELINE_SCRATCH_REPO` set to a scratch repository.
 
-## eve conventions
+## Eve conventions
 
-- **Read the relevant guide in `node_modules/eve/docs/` before writing code.** Don't invent framework APIs; confirm them against the docs.
-- **Identity comes from the filesystem, never a `name` field.** A tool at `agent/tools/agent.ts` is the tool `agent`; a connection at `agent/connections/linear.ts` registers as `linear`; a subagent directory `agent/subagents/classifier/` lowers into the tool `classifier`.
-- Authored slots: `agent/agent.ts` (model + session budget), `agent/instructions/prompt.ts` (`defineDynamic` over the prompt constants in `agent/lib/prompts.ts`; resolved per turn by caller, autonomous vs interactive, injecting `FACTORY_REPO` at build), `agent/tools/*.ts` (`defineTool`), `agent/connections/*.ts`, `agent/extensions/*.ts`, `agent/channels/*.ts`, `agent/skills/<name>/SKILL.md`, `agent/subagents/<id>/agent.ts` (`defineAgent`), per-agent `sandbox.ts`.
-- **Model assignments are centralized** in `agent/lib/models.ts`: the `MODELS` map holds the compiled defaults, and `resolveModel(<agent>)` lays live Blob-stored overrides over them at session start (every `agent.ts` resolves through it via `defineDynamic`, so a swap needs no redeploy). The overrides live under the reserved `model-overrides/` prefix, written only by `set_factory_models` (gated like the brain: unattended runs denied), read back by `read_factory_models`, with `list_gateway_models` resolving loose names to exact gateway ids. Override reads fail open to the defaults so a Blob outage can't drop a station. The `chat` slot is the orchestrator's Slack profile: Slack-born sessions resolve it instead of `orchestrator`, so conversational replies can run a faster model than factory intake. One split is deliberate by design even though the compiled defaults are currently uniform: when tiering models, put `implementer` on the strongest coding model and keep `reviewer` on a different vendor, so the review stays independent.
-- **Extensions:** `agent/extensions/<ns>.ts` mounts a prebuilt eve extension; the filename is the namespace and its tools appear to the model as `<ns>__<tool>` (here: `github__*` from `@github-tools/eve-extension`). Config keys (`include`) use bare tool names.
-- **Channels:** `github` (eve GitHub channel via Vercel Connect, botName resolved from the connector's app slug; `onComment` keeps the built-in mention/ignore rules, dispatches only for OWNER/MEMBER/COLLABORATOR commenters, and stamps `attributes.trusted`; `onIssue` dispatches only on the `labeled` action for the `factory` label, verifies the labeler holds at least triage permission (labels attached at issue creation also fire `labeled`), and rewrites the principal to the autonomous one, so the run is unattended by construction; `onCheckSuite` dispatches only for failed suites on `factory/*` pull requests, unattended, with the fix loop capped by counting attempt comments on the PR thread; `onPullRequest` posts a summary comment on opened PRs, bot senders skipped), `linear` (Agent Sessions; every session stamped trusted since workspace membership is the gate; delegating an issue on a `created` event injects the factory intake task so the delegated issue runs the full pipeline, while `prompted` continuations do not re-inject it), `slack` (mentions via Vercel Connect, channel membership as the gate, every mention stamped trusted; Slack-born sessions load the `chat` model slot), plus the `eve` route-auth channel.
-- **Subagents are the stations.** Declared under `agent/subagents/<id>/`; `description` is required (the routing hint) and each station's `agent.ts` also declares an `outputSchema`, which makes every delegation run in **task mode**: structured output, no parking. A declared subagent runs in a fresh child session and **inherits nothing** from the root (no instructions, skills, connections, tools, or sandbox), so the orchestrator packs everything into the `message`, and any capability a station needs lives in the station's own directory (its `sandbox.ts`, its `tools/`). Long documents travel between stations as **handoff artifacts**: the researcher and analyst save them with `save_artifact`, downstream stations open them with `read_artifact`, and the orchestrator relays only the id (the factories live in `agent/lib/artifacts/`).
-- **Approval-gated tools must not live in task-mode children.** A task-mode session cannot park, so a station tool that returned `user-approval` would strand the run. Anything needing approval belongs on the root; station side effects must be inert by construction, like `push_branch` (feature branches only, validated names, brokered credential).
-- **`agent/lib/trust.ts` is the single trust authority.** Channels stamp trust at dispatch; the remaining approval policies (`factoryBrainPolicy`, `modelSwapPolicy`, `denyAutonomousWrites`) gate non-GitHub surfaces (factory brain writes, model swaps, Linear and disabled connections), and GitHub tools run without approval cards. A new capability never invents its own caller check; gate on the existing predicates.
-- **Station sandboxes** share their bootstrap/session logic via `agent/lib/github/repo-sandbox.ts`: the clone and `FACTORY_SETUP_COMMAND` run once per template build, sessions pay a fetch. Git operations always target the literal remote URL (never `origin`) with the token injected at the sandbox firewall.
-- **Tools** run in the app runtime (full `process.env`), one default export per file; station git tools run their commands in the station's sandbox via `ctx.getSandbox()`. Gate destructive root tools with `approval` from `eve/tools/approval` (here: `clear_user_preferences`), or with a trust policy from `agent/lib/github/approval.ts` when the gate depends on the caller (here: `update_factory_brain`, gated by `factoryBrainPolicy` so unattended runs can't write shared context).
-- **Connections** are MCP servers, one file per service under `agent/connections/`; list the directory for the current set. `linear` (`https://mcp.linear.app/mcp`) shares app-scoped auth through `linearAuth` in `agent/lib/constants.ts`, and its connection-wide `approval` predicate denies writes on unattended runs; the rest are connector-brokered and mostly narrowed to read tools, but each file carries its own filter and gating, so check the file before assuming a connection is read-only.
-- **Skills** are load-on-demand. A packaged skill (`<name>/SKILL.md`) requires `description` frontmatter; that description is the routing hint. The skills here are `billing-triage`, `clarify-with-requester`, `factory-pipeline` (the station procedure, shared verbatim with the factory prompt via the `PIPELINE` constant in `agent/lib/prompts.ts`), `github-linear-bridging`, `slack-wording`, `triage-investigate`, `triage-policy`, `triaging-issues`, and `writing-quality`. Skills are per-agent: stations don't see the root's skills.
-- **Evals** live in `evals/` (`defineEval`, one file per case; `evals.config.ts` sets the judge model). Category directories are the failure taxonomy (`routing/`, `safety/`, `pipeline/`); `helpers.ts` carries the shared write-tool list so read-only evals assert deny-by-default (`notCalledTool` over the whole list). Tags: `fast` (cheap loop), `slow`, `needs-connect` (asserts calls that must succeed against real Connect auth), `pipeline` (pushes a real branch; opt-in).
-- After editing, **check LSP diagnostics / `pnpm typecheck`** and fix type errors before moving on.
+- Read the relevant version-matched guide under `node_modules/eve/docs/` before using an API.
+- Identity comes from filesystem paths, never a `name` field.
+- Authored capabilities live only under `agent/`; evals live beside it.
+- Declared subagents inherit no prompt, tools, connections, skills, or sandbox unless authored. Repository stations explicitly share the prepared parent sandbox through `defineSandbox(({ parent }) => parent.sandbox)`.
+- Task-mode children cannot park. Keep approval-gated capabilities on the root; child git writes must remain safe by construction.
+- `agent/lib/models.ts` owns global model defaults and overrides. Public tools are `read_agent_models` and `set_agent_models`.
+- `agent/lib/trust.ts` is the single trust authority. Shared repository knowledge and model writes use policies from `agent/lib/github/approval.ts`.
+- GitHub extension calls pass `owner` and `repo` explicitly. Never restore a fixed extension context.
+- Repository selection and validation live in `agent/lib/repository.ts`. GitHub channel hooks stamp signed webhook authority before the model runs.
+- The root `prepare_repository` tool reuses GitHub's channel checkout or clones at runtime, then writes `/workspace/.foreman/repository.json`. Stations read the marker rather than assuming a path.
+- Handoff artifacts are ids, not inlined long documents. Artifact ids remain anchored, size-bounded, and write-once.
+- The reconciliation schedule runs every ten minutes and must remain idempotent through durable run state, stale-head rejection, and feedback deduplication.
 
 ## Code style
 
-- Linting and formatting are handled by **Ultracite** (a Biome preset). Run `pnpm check` before finishing and `pnpm fix` to auto-fix. Config is in `biome.jsonc`; the kebab-case filename rule is disabled there because eve tools use snake_case names.
-- TypeScript strict; ESM with `NodeNext` resolution (relative imports need a `.js` extension). Prefer `const`, arrow functions, optional chaining / nullish coalescing.
-- Validate tool input/output with `zod` schemas.
-- Prose in markdown files is not hard-wrapped: write each paragraph or bullet as one line.
-- Agent-facing text (instructions, skill bodies, tool and subagent descriptions) follows the "How you write" rules in `agent/lib/prompts.ts`: no em dashes, no machine-made words, no bold for emphasis. It carries behavior only, never framework plumbing (how approvals render, sign-in flows) or references to tools and skills the reading agent can't access — station instructions especially, since stations see none of the root's surface.
+- TypeScript strict, ESM with NodeNext; relative imports include `.js`.
+- Validate tool inputs and outputs with Zod where practical.
+- Prefer `const`, arrow functions, optional chaining, and nullish coalescing.
+- Ultracite/Biome owns formatting. Use `pnpm fix`, then `pnpm check`.
+- Markdown prose is not hard-wrapped.
+- Agent-facing text uses plain language, no em dashes, no bold for emphasis, and no references to capabilities the reading agent does not have.
 
 ## Security
 
-- **Never ask the user for API keys, client secrets, or any other credentials.**
-- **Never commit secrets.** `.env*` is gitignored. Connector UIDs are read from env (`GITHUB_CONNECTOR`, `LINEAR_CONNECTOR`); GitHub and Linear auth is brokered by Vercel Connect (tokens resolved per call, never exposed to the model) and Blob auth is via the project's OIDC token. `FACTORY_REPO` is required at module load (`requireEnv`), so a missing value fails discovery; `FACTORY_SETUP_COMMAND` is optional.
-- **Git safety is structural; keep it that way.** Sandbox git always targets the literal `https://github.com/<FACTORY_REPO>.git` URL, never `origin` (remote config in a sandbox is model-writable), with the installation token injected at the sandbox firewall (`brokerPolicy`) so it never enters the sandbox. Everything interpolated into a git command passes `validateBranch`, which also refuses `main`/`master`. Don't weaken these when adding git capabilities.
-- **Respect the trust model.** Trust is stamped at dispatch by the channels; GitHub tools run without approval cards, and merge tools are excluded from the allowlist. When adding a tool or connection, pick its policy from `agent/lib/github/approval.ts` (or the trust predicates) instead of hardcoding `"never"`.
-- If you ever build a `RegExp` from data, escape it (literal match) and bound the input length.
-- Gate irreversible or high-impact actions behind `approval` (here: `clear_user_preferences`, plus `factoryBrainPolicy` and `modelSwapPolicy` on the factory brain and model swap tools).
-- Every reserved Blob prefix is declared in the namespace registry in `agent/lib/blob.ts`, alongside the shared read/write/delete document helpers all Blob tools go through. Any general-purpose Blob tool added later must consult the registry's guards before acting, so a managed document can't be reached through a generic file operation; add a namespace there, never as a loose constant in a feature module.
-- For per-user storage, derive the key from the resolved principal (`ctx.session.auth.current`), never from model input — see `agent/lib/user-preferences.ts`. The preference files live under the reserved `user-preferences/` Blob prefix, reachable only through the principal-scoped preference tools.
-- The shared **factory brain** derives its key from `FACTORY_REPO`, never from model input or a caller principal — see `agent/lib/factory-brain.ts`. It lives under the reserved `factory-brain/` Blob prefix, reachable only through `read_factory_brain` / `update_factory_brain`; writes are gated by `factoryBrainPolicy` (unattended runs denied, trusted callers direct, everyone else parks) so an untrusted issue body can't poison the context every future run reads.
-- **Handoff artifacts** live under the reserved `artifacts/` Blob prefix, reachable only through `save_artifact` / `read_artifact` — see `agent/lib/artifacts/config.ts`. Ids are model-supplied on read, so every id must pass the anchored `ARTIFACT_ID_PATTERN` (no dots or slashes) before it is interpolated into a Blob key; that is what keeps a station from addressing the brain or a preference file through the artifact tools. Saves never overwrite and are size-bounded, which keeps both tools inert enough to live in task-mode stations without approval.
+- Never ask for or commit credentials. Connector UIDs come from environment; tokens are brokered by Vercel Connect and Blob uses project OIDC.
+- GitHub webhook repository context is authoritative. Message text cannot redirect it.
+- Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration.
+- Credentials are injected at the sandbox firewall and removed in `finally`; they never enter the sandbox process.
+- Every interpolated branch passes `validateBranch`, which rejects protected branches, refs, `HEAD`, traversal, and unsafe characters.
+- Merge tools remain excluded. A feature branch and pull request are the delivery boundary in both execution paths.
+- Factory label intake verifies the labeler's repository permission. Trusted comments use signed association data.
+- Autonomous runs cannot write repository knowledge, global model settings, or write-capable non-GitHub connections.
+- All Blob prefixes are registered in `agent/lib/blob.ts`. General Blob tools must consult the registry.
+- Repository knowledge keys derive from the explicit or signed selected repository. Reads may fall back to the matching legacy document; trusted writes always use `repository-knowledge/`.
+- Pipeline state is repository-and-scope bound. It stores current head, processed feedback, readiness signals, and blocker history. Ignore stale events, deduplicate stable ids, and escalate on the third unchanged blocker set.
+- Per-user preferences derive keys from `ctx.session.auth.current`; never accept a principal from model input and never store a repository target as a preference.
+- Supermemory is attended-session recall, never repository authority or autonomous shared memory.
+- Any regex built from data must escape literals and bound input length.
 
 ## Before committing
 
-- `pnpm validate` passes (Ultracite check, `tsc`, and `eve info` with 0 errors / 0 warnings).
-- No secrets, `node_modules`, or build output (`.eve`, `.vercel`, `.output`) staged.
+- `pnpm validate` passes with zero errors and warnings.
+- No secrets, `node_modules`, `.eve`, `.vercel`, `.output`, or build artifacts are staged.
+- Do not commit, push, open a PR, mark ready, or merge without the user's authorization. A Linear ticket must exist before a PR is opened.

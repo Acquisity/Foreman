@@ -7,15 +7,16 @@ export default defineEval({
   tags: ["slow", "needs-connect"],
   async test(t) {
     await t.send(
-      "Work item: users report that password reset emails sometimes arrive twice. Classify this and produce the implementation plan, but stop after analysis and report the plan to me; do not implement anything yet."
+      "Use factory mode on Acquisity/Foreman. Users report that password reset emails sometimes arrive twice. Classify, investigate the root cause, and produce the implementation plan, but stop after analysis."
     );
     t.succeeded();
     t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
+    t.calledSubagent("investigator");
     t.calledSubagent("analyst");
     t.calledSubagent("implementer", { count: 0 });
     t.eventsSatisfy("classifier is delegated to before the analyst", (events) =>
-      calledInOrder(events, ["classifier", "analyst"])
+      calledInOrder(events, ["classifier", "investigator", "analyst"])
     );
   },
 });

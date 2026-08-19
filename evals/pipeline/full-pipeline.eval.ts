@@ -3,11 +3,16 @@ import { calledInOrder, STATIONS } from "../helpers.js";
 
 export default defineEval({
   description:
-    "A small real work item runs the whole line: all four stations fire in order and the final report names the branch or draft pull request that was delivered. Opt-in: this pushes a real branch to FACTORY_REPO, so run it deliberately against a scratch repository (pnpm eval pipeline/full-pipeline).",
+    "An explicit scratch-repository work item runs the complete factory line and delivers an internally approved normal pull request. Opt-in because it pushes a real branch.",
   tags: ["slow", "needs-connect", "pipeline"],
   async test(t) {
+    const repository = process.env.PIPELINE_SCRATCH_REPO;
+    if (!repository) {
+      t.skip("Set PIPELINE_SCRATCH_REPO to an owner/repo scratch repository.");
+      return;
+    }
     await t.send(
-      "Work item: add a short 'Reporting bugs' section to the README that asks reporters to include their version and reproduction steps. Run the full pipeline and deliver the result."
+      `Use factory mode on ${repository}. Add a short Reporting bugs section to the README that asks reporters to include their version and reproduction steps. Run the full pipeline and deliver a normal pull request.`
     );
     t.succeeded();
     for (const station of STATIONS) {
@@ -18,7 +23,7 @@ export default defineEval({
     );
     t.judge.autoevals
       .closedQA(
-        "Does the submission report completed work and point at a concrete deliverable, naming a branch or a draft pull request (a link or an identifier), with a review verdict?"
+        "Does the submission name a concrete branch or normal pull request and report the independent review verdict without claiming to merge it?"
       )
       .atLeast(0.5);
   },
