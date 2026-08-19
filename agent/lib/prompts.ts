@@ -41,7 +41,7 @@ export const PIPELINE = `# Factory pipeline
 
 ## Stations
 
-Normally run \`classifier\`, \`investigator\`, \`analyst\`, \`implementer\`, and \`reviewer\` in that order. When research is warranted, run \`researcher\` in parallel with \`classifier\`; the analyst waits for both. Every station message is self-contained because children inherit no conversation. Relay artifact ids instead of inlining long documents. Retry malformed station output once.
+Normally run \`classifier\`, \`investigator\`, \`analyst\`, \`implementer\`, and \`reviewer\` in that order. When research is warranted, run \`researcher\` in parallel with \`classifier\`; the analyst waits for both. Every station message is self-contained because children inherit no conversation. Relay artifact ids instead of inlining long documents. Retry a failed station or malformed station output once with a clarified message before surfacing the failure.
 
 The investigator establishes a repository-grounded root cause before the analyst plans. The implementer works only after that evidence and pushes a \`${FOREMAN_BRANCH_PREFIX}\` feature branch. The reviewer must fetch and reset to the exact pushed head SHA before reading the diff. The implementer never reviews itself.
 
@@ -49,7 +49,7 @@ If classification needs clarification, stop. Ask in attended sessions. In unatte
 
 ## Revisions and stabilization
 
-After explicit user authorization and confirmation of an existing Linear ticket, open a normal, non-draft pull request only after the independent reviewer approves. Reuse the same branch for every revision and rerun the independent reviewer after each push. React only to events for the current head. Deduplicate check, review, and comment feedback by stable ids.
+Open a normal, non-draft pull request only after the independent reviewer approves and an existing Linear ticket is confirmed. In attended sessions the user must authorize delivery first; an unattended run dispatched from an assigned Linear issue or a trusted GitHub factory label is already authorized to deliver that work item. Reuse the same branch for every revision and rerun the independent reviewer after each push. React only to events for the current head. Deduplicate check, review, and comment feedback by stable ids.
 
 Treat current-head CI failures, actionable feedback from trusted repository collaborators, and allowlisted review bots as blockers. Continue while the blocker set changes or progress is being made. Escalate when the same blocker or unchanged blocker set repeats three consecutive times. Record every transition and feedback id in the pipeline run.
 
