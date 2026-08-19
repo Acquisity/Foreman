@@ -1,5 +1,10 @@
 import type { ApprovalContext, ApprovalStatus } from "eve/tools";
-import { isAutonomous, isScheduleAppAuth, isTrusted } from "../trust.js";
+import {
+  isAutonomous,
+  isIntakeOnly,
+  isScheduleAppAuth,
+  isTrusted,
+} from "../trust.js";
 
 /**
  * Policy factory for writes to shared configuration every future run
@@ -84,3 +89,22 @@ export function denyAutonomousWrites(
     return "not-applicable";
   };
 }
+
+/**
+ * Repository work requested from an intake-only channel.
+ *
+ * @remarks
+ * Denied rather than parked: nobody in an intake-only channel is authorized
+ * to action code changes, so an approval card would only route the decision
+ * to the wrong person. Conversation, reads outside a repository workspace,
+ * and filing the request to Linear all stay available; the denial reason is
+ * what the model relays back and acts on.
+ */
+export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
+  isIntakeOnly(ctx.session.auth.current)
+    ? {
+        reason:
+          "This channel is intake-only. File the request as a Linear issue for triage instead of preparing a repository.",
+        type: "denied",
+      }
+    : "not-applicable";
