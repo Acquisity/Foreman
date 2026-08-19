@@ -31,7 +31,7 @@ export const parseRepository = (value: string): RepositoryTarget | null => {
     return null;
   }
   const [owner, repo] = normalized.split("/");
-  if (!(owner && repo)) {
+  if (!(owner && repo) || repo === "." || repo === "..") {
     return null;
   }
   return { owner, repo, slug: `${owner}/${repo}` };
@@ -130,7 +130,7 @@ export const resolveRepositoryInput = (
       "Repository selection is ambiguous. Provide exactly one GitHub owner/repo slug or URL."
     );
   }
-  return resolveRepository(extracted[0]?.slug ?? input, auth);
+  return resolveRepository(extracted[0]?.slug, auth);
 };
 
 export const repositoryHash = (repository: string): string => {

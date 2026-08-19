@@ -11,5 +11,10 @@ export default defineEval({
     t.succeeded();
     t.loadedSkill("factory-pipeline");
     t.calledSubagent("classifier");
+    t.calledSubagent("investigator", { count: 0 });
+    t.calledSubagent("analyst", { count: 0 });
+    t.calledSubagent("implementer", { count: 0 });
+    t.calledSubagent("reviewer", { count: 0 });
+    t.calledTool("github__createPullRequest", { count: 0 });
   },
 });

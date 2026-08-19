@@ -85,12 +85,19 @@ export default defineTool({
     const sandbox = await ctx.getSandbox();
     const marker = await readExistingMarker(sandbox);
     if (marker) {
-      return marker.slug === target.slug
+      const markerSlug =
+        typeof marker.slug === "string" ? marker.slug.toLowerCase() : null;
+      const markerWorktree =
+        marker.worktree === "/workspace" ||
+        marker.worktree === "/workspace/repo"
+          ? marker.worktree
+          : null;
+      return markerSlug === target.slug.toLowerCase() && markerWorktree
         ? {
             repository: target.slug,
             reused: true,
             success: true as const,
-            worktree: String(marker.worktree),
+            worktree: markerWorktree,
           }
         : {
             error: `This session already prepared ${String(marker.slug)} and cannot switch to ${target.slug}. Start a new session.`,

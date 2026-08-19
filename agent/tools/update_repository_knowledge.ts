@@ -11,7 +11,7 @@ import {
 export default defineTool({
   approval: repositoryKnowledgePolicy,
   description:
-    "Overwrite the verified knowledge document for one selected repository. Read and merge first. A write always uses the new repository-knowledge namespace, which migrates any legacy fallback on the next trusted write.",
+    "Overwrite the verified knowledge document for one selected repository. Read and merge first. A write always targets the new repository-knowledge namespace. Any legacy factory-brain document is left in place and is no longer read once this document exists.",
   async execute({ knowledge, repository }, ctx) {
     try {
       const target = resolveRepositoryInput(

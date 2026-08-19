@@ -39,6 +39,8 @@ export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 
 /** Blob path prefix holding durable repository and pull-request pipeline runs. */
 export const PIPELINE_RUNS_PREFIX = "pipeline-runs/";
+/** Blob path prefix indexing currently active pipeline runs for reconciliation. */
+export const ACTIVE_PIPELINE_RUNS_PREFIX = "pipeline-active/";
 
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
@@ -81,6 +83,11 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
   },
   [PIPELINE_RUNS_PREFIX]: {
     label: "factory pipeline run state",
+    readTool: "read_pipeline_run",
+    writeTool: "record_pipeline_run",
+  },
+  [ACTIVE_PIPELINE_RUNS_PREFIX]: {
+    label: "active factory pipeline index",
     readTool: "read_pipeline_run",
     writeTool: "record_pipeline_run",
   },

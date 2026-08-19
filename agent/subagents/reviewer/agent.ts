@@ -19,7 +19,7 @@ export default defineAgent({
     "acceptance criteria: fetch the branch, read the real diff, re-run cheap checks, and " +
     "return approve, request_changes, or reject with specific findings. Never modifies " +
     "code. The caller passes the work item, the analysis with acceptance criteria, the " +
-    "branch name, exact pushed head SHA, and the implementer's report in the message, plus an artifact id when " +
+    "branch name, immutable pull request base SHA, exact pushed head SHA, and the implementer's report in the message, plus an artifact id when " +
     "the analyst saved its full detail as one.",
   model: defineDynamic({
     events: {

@@ -13,8 +13,8 @@ export default defineSchedule({
       if (run.prNumber === null) {
         continue;
       }
-      waitUntil(
-        to(github, {
+      try {
+        const dispatch = to(github, {
           owner: run.owner,
           pullRequestNumber: run.prNumber,
           repo: run.repo,
@@ -26,8 +26,21 @@ export default defineSchedule({
               run.prNumber
             ),
           }
-        )
-      );
+        );
+        waitUntil(
+          dispatch.catch((error) => {
+            console.error(
+              `Pipeline reconciliation failed for ${run.repository} PR #${run.prNumber}.`,
+              error
+            );
+          })
+        );
+      } catch (error) {
+        console.error(
+          `Pipeline reconciliation setup failed for ${run.repository} PR #${run.prNumber}.`,
+          error
+        );
+      }
     }
   },
 });

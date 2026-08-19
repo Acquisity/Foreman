@@ -45,7 +45,7 @@ export default defineTool({
         found: false,
         knowledge: "",
         legacy: false,
-        repository,
+        repository: null,
       };
     }
   },

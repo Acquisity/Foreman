@@ -1,6 +1,11 @@
-import { list } from "@vercel/blob";
+import { del, list } from "@vercel/blob";
 import { z } from "zod";
-import { PIPELINE_RUNS_PREFIX, readDocument, writeDocument } from "./blob.js";
+import {
+  ACTIVE_PIPELINE_RUNS_PREFIX,
+  PIPELINE_RUNS_PREFIX,
+  readDocument,
+  writeDocument,
+} from "./blob.js";
 import { repositoryHash } from "./repository.js";
 
 export const pipelineStageSchema = z.enum([
@@ -98,6 +103,32 @@ const scopeKey = (scope: string): string => {
 export const pipelineRunKey = (repository: string, scope: string): string =>
   `${PIPELINE_RUNS_PREFIX}${repositoryHash(repository)}/${scopeKey(scope)}.json`;
 
+const activePipelineRunKey = (repository: string, scope: string): string =>
+  `${ACTIVE_PIPELINE_RUNS_PREFIX}${repositoryHash(repository)}/${scopeKey(scope)}.json`;
+
+const runLocks = new Map<string, Promise<void>>();
+export const withPipelineRunLock = async <T>(
+  key: string,
+  task: () => Promise<T>
+): Promise<T> => {
+  const previous = runLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.then(() => current);
+  runLocks.set(key, queued);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (runLocks.get(key) === queued) {
+      runLocks.delete(key);
+    }
+  }
+};
+
 export const readPipelineRun = async (
   repository: string,
   scope: string
@@ -112,6 +143,15 @@ export const writePipelineRun = async (run: PipelineRun): Promise<void> => {
     JSON.stringify(run, null, 2),
     { allowOverwrite: true, contentType: "application/json" }
   );
+  const activeKey = activePipelineRunKey(run.repository, run.scope);
+  if (run.status === "active") {
+    await writeDocument(activeKey, JSON.stringify(run, null, 2), {
+      allowOverwrite: true,
+      contentType: "application/json",
+    });
+  } else {
+    await del(activeKey);
+  }
 };
 
 export const listActivePipelineRuns = async (): Promise<PipelineRun[]> => {
@@ -119,7 +159,7 @@ export const listActivePipelineRuns = async (): Promise<PipelineRun[]> => {
     cursor?: string,
     previous: Awaited<ReturnType<typeof list>>["blobs"] = []
   ): Promise<Awaited<ReturnType<typeof list>>["blobs"]> => {
-    const page = await list({ cursor, prefix: PIPELINE_RUNS_PREFIX });
+    const page = await list({ cursor, prefix: ACTIVE_PIPELINE_RUNS_PREFIX });
     const combined = [...previous, ...page.blobs];
     return page.hasMore ? listAll(page.cursor, combined) : combined;
   };

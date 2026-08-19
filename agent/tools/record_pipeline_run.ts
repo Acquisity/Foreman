@@ -8,6 +8,7 @@ import {
   type PipelineRun,
   pipelineStageSchema,
   readPipelineRun,
+  withPipelineRunLock,
   writePipelineRun,
 } from "#lib/pipeline-runs.js";
 import {
@@ -39,10 +40,13 @@ const normalizeBlockers = (
   blockers: readonly string[] | undefined,
   existing: PipelineRun | null
 ): string[] =>
-  [...new Set(blockers ?? existing?.blockers ?? [])]
-    .map((blocker) => blocker.trim())
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
+  [
+    ...new Set(
+      (blockers ?? existing?.blockers ?? [])
+        .map((blocker) => blocker.trim())
+        .filter(Boolean)
+    ),
+  ].sort((left, right) => left.localeCompare(right));
 
 const nextRepeatCount = (
   supplied: readonly string[] | undefined,
@@ -125,23 +129,28 @@ export default defineTool({
         input.repository,
         ctx.session.auth.current
       );
-      const existing = await readPipelineRun(target.slug, input.scope);
-      if (isStalePipelineEvent(existing?.headSha, input.eventHeadSha)) {
-        return {
-          currentHeadSha: existing?.headSha ?? null,
-          stale: true,
-          success: false as const,
-        };
-      }
-      const run = buildRun(input, target, existing);
-      await writePipelineRun(run);
-      return {
-        blockerRepeatCount: run.blockerRepeatCount,
-        processedFeedback: run.processedFeedback,
-        ready: run.status === "ready",
-        run,
-        success: true as const,
-      };
+      return await withPipelineRunLock(
+        `${target.slug}:${input.scope}`,
+        async () => {
+          const existing = await readPipelineRun(target.slug, input.scope);
+          if (isStalePipelineEvent(existing?.headSha, input.eventHeadSha)) {
+            return {
+              currentHeadSha: existing?.headSha ?? null,
+              stale: true,
+              success: false as const,
+            };
+          }
+          const run = buildRun(input, target, existing);
+          await writePipelineRun(run);
+          return {
+            blockerRepeatCount: run.blockerRepeatCount,
+            processedFeedback: run.processedFeedback,
+            ready: run.status === "ready",
+            run,
+            success: true as const,
+          };
+        }
+      );
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Run update failed.",

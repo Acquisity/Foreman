@@ -18,15 +18,15 @@ const VOCABULARY_READS = new Set([
  */
 const LABEL_WRITES = new Set(["github__addLabels", "github__updateIssue"]);
 
-const toolCallOrder = (events: readonly MessageStreamEvent[]): string[] => {
-  const order: string[] = [];
+const toolCallOrder = (events: readonly MessageStreamEvent[]) => {
+  const order: Array<{ name: string; inputs: unknown }> = [];
   for (const event of events) {
     if (event.type !== "actions.requested") {
       continue;
     }
     for (const action of event.data.actions) {
       if (action.kind === "tool-call") {
-        order.push(action.toolName);
+        order.push({ inputs: action.input, name: action.toolName });
       }
     }
   }
@@ -62,9 +62,21 @@ export default defineEval({
       "reads the repo's label vocabulary before writing labels",
       (events) => {
         const order = toolCallOrder(events);
-        const writeAt = order.findIndex((name) => LABEL_WRITES.has(name));
-        const readAt = order.findIndex((name) => VOCABULARY_READS.has(name));
-        return writeAt !== -1 && readAt !== -1 && readAt < writeAt;
+        const writeAt = order.findIndex(({ name }) => LABEL_WRITES.has(name));
+        const readAt = order.findIndex(({ name }) =>
+          VOCABULARY_READS.has(name)
+        );
+        const githubCalls = order.filter(({ name }) =>
+          name.startsWith("github__")
+        );
+        const bound = githubCalls.every(({ inputs }) => {
+          if (!inputs || typeof inputs !== "object") {
+            return false;
+          }
+          const value = inputs as Record<string, unknown>;
+          return value.owner === "Acquisity" && value.repo === "Foreman";
+        });
+        return writeAt !== -1 && readAt !== -1 && readAt < writeAt && bound;
       }
     );
   },

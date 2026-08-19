@@ -12,12 +12,13 @@ export default defineTool({
         ctx.session.auth.current
       );
       const run = await readPipelineRun(target.slug, scope);
-      return { found: run !== null, run };
+      return { found: run !== null, run, success: true as const };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Run read failed.",
         found: false,
         run: null,
+        success: false as const,
       };
     }
   },
