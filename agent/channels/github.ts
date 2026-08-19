@@ -50,14 +50,6 @@ const isTrustedCommenter = (comment: GitHubComment): boolean => {
 };
 
 /**
- * Repository roles allowed to hand an issue to the factory by labeling it.
- *
- * @remarks
- * GitHub's fine-grained role names from the collaborator-permission endpoint.
- * Triage is the floor: it is the permission normally required to apply a
- * label by hand.
- */
-/**
  * Whether a pull request head is the factory's own work in this repository.
  *
  * @remarks
@@ -75,6 +67,14 @@ const isOwnFactoryHead = (
   typeof head.repo?.full_name === "string" &&
   head.repo.full_name.toLowerCase() === repositoryFullName.toLowerCase();
 
+/**
+ * Repository roles allowed to hand an issue to the factory by labeling it.
+ *
+ * @remarks
+ * GitHub's fine-grained role names from the collaborator-permission endpoint.
+ * Triage is the floor: it is the permission normally required to apply a
+ * label by hand.
+ */
 const TRUSTED_LABELER_ROLES = new Set(["admin", "maintain", "write", "triage"]);
 
 /**

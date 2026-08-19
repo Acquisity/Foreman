@@ -3,7 +3,7 @@ import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
-import { resolveBotName } from "#lib/github/bot-name.js";
+import { FALLBACK_BOT_NAME, resolveBotName } from "#lib/github/bot-name.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "#lib/github/git-remote.js";
 import {
@@ -116,10 +116,10 @@ export default defineTool({
 
     // The same identity the GitHub channel answers to, so commits carry the
     // deployed App's name instead of a guess.
-    const identity = await resolveBotName().catch(() => "Foreman");
+    const identity = await resolveBotName().catch(() => FALLBACK_BOT_NAME);
     const safeIdentity = SAFE_IDENTITY_PATTERN.test(identity)
       ? identity
-      : "Foreman";
+      : FALLBACK_BOT_NAME;
     const config = await sandbox.run({
       command: `git config --global --add safe.directory '${worktree}' && git config --global user.name '${safeIdentity}[bot]' && git config --global user.email '${safeIdentity.toLowerCase()}[bot]@users.noreply.github.com' && mkdir -p /workspace/.foreman`,
     });
