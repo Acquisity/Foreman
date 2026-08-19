@@ -146,18 +146,28 @@ export default defineTool({
         input.repository,
         ctx.session.auth.current
       );
+      const normalizedInput = {
+        ...input,
+        eventHeadSha: input.eventHeadSha?.toLowerCase() ?? input.eventHeadSha,
+        headSha: input.headSha?.toLowerCase() ?? input.headSha,
+      };
       return await withPipelineRunLock(
-        `${target.slug}:${input.scope}`,
+        `${target.slug.toLowerCase()}:${input.scope}`,
         async () => {
           const existing = await readPipelineRun(target.slug, input.scope);
-          if (isStalePipelineEvent(existing?.headSha, input.eventHeadSha)) {
+          if (
+            isStalePipelineEvent(
+              existing?.headSha?.toLowerCase(),
+              normalizedInput.eventHeadSha
+            )
+          ) {
             return {
               currentHeadSha: existing?.headSha ?? null,
               stale: true,
               success: false as const,
             };
           }
-          const run = buildRun(input, target, existing);
+          const run = buildRun(normalizedInput, target, existing);
           await writePipelineRun(run);
           return {
             blockerRepeatCount: run.blockerRepeatCount,

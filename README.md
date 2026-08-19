@@ -25,7 +25,7 @@ After internal review, Foreman opens a normal pull request and stabilizes the sa
 There is no deployment-wide repository setting.
 
 - GitHub sessions use the repository from the signed webhook. Issue or comment text cannot redirect an unattended run.
-- Linear, Slack, and eve requests must include exactly one `owner/repo` or GitHub URL.
+- Linear, Slack, and eve requests involving repository work must include exactly one `owner/repo` or GitHub URL. Ordinary conversation does not require a repository target.
 - Missing or ambiguous targets require clarification.
 - Workspaces clone at runtime when a GitHub channel checkout is unavailable. Factory stations share the prepared parent workspace, and the reviewer fetches and resets to the exact pushed SHA.
 - Git credentials are injected at the sandbox firewall. Clone, fetch, and push commands use the validated literal GitHub URL, never mutable remote configuration.

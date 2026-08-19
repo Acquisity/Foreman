@@ -51,10 +51,7 @@ export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
       type: "denied",
     };
   }
-  return isTrusted(ctx.session.auth.current) ||
-    isScheduleAppAuth(ctx.session.auth.current)
-    ? "not-applicable"
-    : "user-approval";
+  return "user-approval";
 };
 
 /**

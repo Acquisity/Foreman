@@ -43,8 +43,8 @@ export default defineTool({
       };
     }
     const token = await mintInstallationToken(githubCredentials);
-    await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
+      await sandbox.setNetworkPolicy(brokerPolicy(token));
       const result = await sandbox.run({
         command: `git -C '${prepared.worktree}' push ${remoteUrl(prepared.slug)} 'refs/heads/${branch}:refs/heads/${branch}'`,
       });

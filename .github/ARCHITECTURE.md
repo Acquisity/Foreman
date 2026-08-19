@@ -43,6 +43,7 @@ All Blob namespaces are registered in `agent/lib/blob.ts`.
 
 - `repository-knowledge/<repository-hash>.md`: verified shared facts. Reads fall back to legacy `factory-brain/<repository-hash>.md`; trusted writes always use the new namespace.
 - `pipeline-runs/<repository-hash>/<scope>.json`: stabilization state.
+- `pipeline-active/<repository-hash>/<scope>.json`: active-run index consumed by reconciliation.
 - `model-overrides/foreman.json`: global model overrides used at session start.
 - `user-preferences/<principal-hash>.md`: private principal preferences.
 - `artifacts/<validated-id>.md`: write-once station handoffs.

@@ -9,7 +9,7 @@ export const REPOSITORY_MARKER = "/workspace/.foreman/repository.json";
 const REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/;
 const GITHUB_URL_PATTERN =
-  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!])/giu;
+  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!)\]}])/giu;
 const SLUG_PATTERN =
   /(?<![A-Za-z0-9._/-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100})(?![A-Za-z0-9._/-])/gu;
 const GIT_SUFFIX_PATTERN = /\.git$/u;
