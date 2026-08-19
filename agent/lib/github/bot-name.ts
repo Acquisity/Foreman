@@ -20,7 +20,7 @@ let resolvedFromConnector: string | undefined;
  *
  * @remarks
  * Resolution order:
- * 1. `FACTORY_BOT_NAME`, then `GITHUB_APP_SLUG`, for explicit overrides.
+ * 1. `FOREMAN_BOT_NAME`, then `GITHUB_APP_SLUG`, for explicit overrides.
  * 2. The GitHub App's own slug from the Connect connector's metadata
  *    (`vendor.appSlug`), so the mention automatically follows whatever the
  *    deployer named their app. Fetched with the deployment's OIDC token and
@@ -38,7 +38,7 @@ let resolvedFromConnector: string | undefined;
  * registers it, and a guessed handle can belong to a real GitHub user.
  */
 export async function resolveBotName(): Promise<string> {
-  const override = process.env.FACTORY_BOT_NAME ?? process.env.GITHUB_APP_SLUG;
+  const override = process.env.FOREMAN_BOT_NAME ?? process.env.GITHUB_APP_SLUG;
   if (override) {
     return override;
   }

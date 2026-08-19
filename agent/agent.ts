@@ -9,7 +9,7 @@ import { isSlackSession } from "./lib/prompts.js";
 // session, not per line of output, and the cap was blocking legitimate implementation runs.
 //
 // The model resolves at session start through resolveModel, so a live override saved with
-// set_factory_models applies to the next session without a redeploy; without one, the compiled
+// set_agent_models applies to the next session without a redeploy; without one, the compiled
 // default from MODELS runs. Sessions born on the Slack channel resolve the chat slot instead of
 // orchestrator: Slack traffic is mostly conversational, its replies land only when the turn
 // completes, and the paired chat instructions profile carries no inline pipeline, so a faster

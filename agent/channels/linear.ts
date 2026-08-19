@@ -1,6 +1,7 @@
 import { connectLinearCredentials } from "@vercel/connect/eve";
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import { buildLinearContext } from "../lib/linear-context.js";
+import { extractRepositories, stampRepository } from "../lib/repository.js";
 import { stampTrusted } from "../lib/trust.js";
 
 /**
@@ -26,6 +27,17 @@ export default linearChannel({
     if (context === null) {
       return null;
     }
-    return { auth: stampTrusted(defaultLinearAuth(event)), context };
+    const repositories = extractRepositories(
+      JSON.stringify(event.agentSession.issue ?? {})
+    );
+    const auth = stampTrusted(defaultLinearAuth(event));
+    const [repository] = repositories;
+    return {
+      auth:
+        repositories.length === 1 && repository
+          ? stampRepository(auth, repository.slug, "explicit")
+          : auth,
+      context,
+    };
   },
 });

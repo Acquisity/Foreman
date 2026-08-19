@@ -1,5 +1,4 @@
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
-import { FACTORY_REPO } from "./constants.js";
 
 /**
  * Task injected when an issue is delegated to the agent in a Linear Agent
@@ -8,7 +7,7 @@ import { FACTORY_REPO } from "./constants.js";
  * session rather than posting and stopping.
  */
 export const LINEAR_INTAKE_TASK = [
-  `This issue was delegated to you in a Linear Agent Session. Run it through the full factory pipeline now: ground the issue, then classifier, analyst, implementer, reviewer, and deliver a draft pull request on ${FACTORY_REPO}. Load the factory-pipeline skill and follow it end to end.`,
+  "This assigned Linear issue activates factory mode. Resolve exactly one repository from an explicit owner/repo or GitHub URL in the signed issue context, then prepare it. If the repository is absent or ambiguous, ask before delegating. Load the factory-pipeline skill and run classifier, root-cause investigator, analyst, implementer, and independent reviewer, then open a normal pull request and stabilize it to readiness.",
   "A person is watching this Agent Session, so when the classifier needs clarification, ask them and wait; report progress as you go.",
 ].join("\n\n");
 

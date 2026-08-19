@@ -1,75 +1,65 @@
-<img width="100%" alt="eve Software Factory Banner" src=".github/banner.png" />
+<img width="100%" alt="Foreman" src=".github/banner.png" />
 
 # Foreman
 
-[![Docs](https://img.shields.io/badge/Documentation-000?style=flat-square&logo=readthedocs&logoColor=FFF&labelColor=000&color=000)](https://ask-foreman.dev/docs)
-[![Agent Stack](https://img.shields.io/badge/Agent%20Stack-000?style=flat-square&logo=vercel&logoColor=FFF&labelColor=000&color=000)](https://vercel.com/kb/agent-stack)
-[![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](LICENSE)
+Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). It answers questions, investigates connected systems, operates services, and can make well-scoped repository changes directly. Its software factory is an optional mode for work that benefits from deeper investigation, planning, implementation, independent review, and pull request stabilization.
 
-Meet **Foreman**, Acquisity's general-purpose agent. Skills define its specialist modes, and the software factory is one of them: when a work item asks Foreman to fix, build, or change something in your repository, it loads the factory-pipeline skill and runs the full line. With no skill loaded it still handles whatever you delegate, from questions and summaries to triage and routing.
+## Execution paths
 
-The factory takes tasks from GitHub and Linear, moves each one through four stations, and delivers a reviewed draft pull request on your repository. You review, mark ready, and merge.
+General mode is the default for Slack and ordinary interactive sessions. Small code and documentation changes stay direct: Foreman resolves the repository, prepares a workspace, creates a `foreman/` feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request when requested. It does not invoke factory stations merely because files change.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?project-name=eve-software-factory&repository-name=eve-software-factory-template&repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Feve-software-factory-template&env=FACTORY_REPO,FACTORY_LABEL&envDefaults=%7B%22FACTORY_LABEL%22%3A%22factory%22%7D&envDescription=FACTORY_REPO%20is%20the%20owner%2Frepo%20the%20factory%20works%20on.%20FACTORY_LABEL%20is%20the%20issue%20label%20that%20hands%20an%20issue%20to%20the%20factory%3B%20the%20default%20label%20is%20fine.&connect=%5B%7B%22type%22%3A%22github%22%2C%22env%22%3A%22GITHUB_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Fgithub%22%7D%2C%7B%22type%22%3A%22linear%22%2C%22env%22%3A%22LINEAR_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Flinear%22%7D%5D&stores=%5B%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D)
+Factory mode runs these stations in order:
 
-## How it works
+1. Classifier: triage and clarification.
+2. Investigator: repository-grounded reproduction and root cause.
+3. Analyst: plan, risks, acceptance criteria, and verification strategy.
+4. Implementer: code, checks, commit, and feature-branch push.
+5. Reviewer: independent review of the exact pushed commit.
 
-Foreman is a general-purpose agent whose specialist modes are skills. The factory-pipeline skill is the software factory: load it and Foreman runs the full station line.
+An assigned Linear issue and a trusted GitHub `factory` label activate factory mode deterministically. Interactive users can request it explicitly, and Foreman may select it when complexity, uncertainty, risk, or requested review depth warrants the full line. Slack has no factory default.
 
-- **Classifier** triages the task: type, priority, complexity, actionable or not. When the task isn't actionable, Foreman asks the requester instead of building the wrong thing.
-- **Analyst** turns it into a plan with acceptance criteria, working from a live checkout of your repository.
-- **Implementer** executes the plan in its own sandbox, verifies with your repo's own checks, and pushes a branch.
-- **Reviewer** independently judges everything against the real diff, with evidence for each verdict.
+After internal review, Foreman opens a normal pull request and stabilizes the same branch against current-head CI failures and actionable feedback from trusted collaborators or allowlisted review bots. A ten-minute reconciliation schedule recovers missed webhooks. It reports `ready to merge` only when internal review approves the current head, required checks pass, GitHub reports no conflict, and no actionable trusted feedback remains. Foreman never merges.
 
-Each station is its own agent with its own instructions, sandbox, and tools. The Reviewer sees only the pushed branch, never the Implementer's reasoning. Between runs, Foreman keeps a **factory brain**: notes about your repository that every run starts from. See [the pipeline](https://ask-foreman.dev/docs/pipeline) and [factory memory](https://ask-foreman.dev/docs/memory) for the full picture.
+## Repository targeting
 
-## How work arrives
+There is no deployment-wide repository setting.
 
-- **Label an issue `factory`.** The pipeline runs on its own, posts progress as stations complete, and ends with a draft PR linked to the issue.
-- **@mention it on an issue or PR.** Mentions from repo owners, members, and collaborators start an interactive session.
-- **Delegate in Linear.** Linear Agent Sessions run the same pipeline and report progress back in Linear.
-- **The dev TUI.** Hand it a task locally.
-- **Red CI on a factory PR.** Foreman diagnoses the failure and pushes a fix to its own branches, never yours.
-- **Someone opens a pull request.** Foreman posts one orienting comment for reviewers: a summary, not a review.
+- GitHub sessions use the repository from the signed webhook. Issue or comment text cannot redirect an unattended run.
+- Linear, Slack, and eve requests involving repository work must include exactly one `owner/repo` or GitHub URL. Ordinary conversation does not require a repository target.
+- Missing or ambiguous targets require clarification.
+- Workspaces clone at runtime when a GitHub channel checkout is unavailable. Factory stations share the prepared parent workspace, and the reviewer fetches and resets to the exact pushed SHA.
+- Git credentials are injected at the sandbox firewall. Clone, fetch, and push commands use the validated literal GitHub URL, never mutable remote configuration.
 
-## Deploy
+## Durable state
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?project-name=eve-software-factory&repository-name=eve-software-factory-template&repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Feve-software-factory-template&env=FACTORY_REPO,FACTORY_LABEL&envDefaults=%7B%22FACTORY_LABEL%22%3A%22factory%22%7D&envDescription=FACTORY_REPO%20is%20the%20owner%2Frepo%20the%20factory%20works%20on.%20FACTORY_LABEL%20is%20the%20issue%20label%20that%20hands%20an%20issue%20to%20the%20factory%3B%20the%20default%20label%20is%20fine.&connect=%5B%7B%22type%22%3A%22github%22%2C%22env%22%3A%22GITHUB_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Fgithub%22%7D%2C%7B%22type%22%3A%22linear%22%2C%22env%22%3A%22LINEAR_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Flinear%22%7D%5D&stores=%5B%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D)
+- `repository-knowledge/<repository-hash>.md` stores verified repository conventions and recurring build or review facts. Reads fall back to the matching legacy `factory-brain/` document until the next trusted write migrates it.
+- `pipeline-runs/` stores repository-and-source or repository-and-PR state, including Linear context, head SHA, stage, processed feedback, and blocker history.
+- `model-overrides/foreman.json` stores global agent model overrides.
+- `user-preferences/` remains principal-scoped. Supermemory can support broader attended-session recall, but neither is repository authority.
+- `artifacts/` stores size-bounded, validated handoff documents between stations.
 
-The Vercel deploy flow sets up everything: the **GitHub** connector, **Linear** connector, **Vercel Blob** store, and a prompt for the `FACTORY_REPO` and `FACTORY_LABEL` environment variables.
+## Configuration
 
-Configuration (see `.env.example`):
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GITHUB_CONNECTOR` | connector fallback | GitHub channel, API, and brokered git credentials |
+| `LINEAR_CONNECTOR` | connector fallback | Linear Agent Sessions and MCP |
+| `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
+| `FOREMAN_BRANCH_PREFIX` | `foreman/` | Foreman-owned feature branches |
+| `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
+| `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 
-| Variable | Required | Default | What it does |
-| --- | --- | --- | --- |
-| `FACTORY_REPO` | Yes | — | The `owner/repo` the factory works on (the build fails without it) |
-| `FACTORY_SETUP_COMMAND` | No | — | Runs once inside the sandbox checkout at build time (e.g. `pnpm install`), so every run starts with dependencies already installed |
-| `FACTORY_LABEL` | No | `factory` | The issue label that hands an issue to the factory |
-| `FACTORY_BRANCH_PREFIX` | No | `factory/` | Branch prefix marking the factory's own PRs, which are the only branches automated CI fixes touch |
-| `FACTORY_BOT_NAME` | No | the GitHub App's slug | The `@mention` name, resolved from the connector automatically when unset |
-| `GITHUB_CONNECTOR` / `LINEAR_CONNECTOR` | Yes | — | Set automatically from Vercel Connect connector UIDs |
+See [.env.example](.env.example) for all connection UIDs. No repository or setup command is configured through the environment.
 
-## Local development
-
-Link the project you deployed (or a fresh one), pull its environment, and start the TUI:
+## Development
 
 ```bash
-vercel link
-vercel env pull
+pnpm install
 pnpm dev
+pnpm validate
+pnpm eval --tag fast
 ```
 
-Hand the agent a task ("users report the password reset email arrives twice, fix it") and watch the four stations fire in order, ending in a draft PR on `FACTORY_REPO`.
+`pnpm validate` runs formatting and lint checks, TypeScript, unit tests, and Eve discovery diagnostics. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
 
-## Resources
-
-- [Foreman Docs](https://ask-foreman.dev/docs)
-- [Vercel Connect](https://vercel.com/docs/connect)
-- [eve Documentation](https://eve.dev/docs/introduction)
-- [GitHub Tools eve Extension](https://github-tools.com/frameworks/eve-extension)
-
-## Explore more templates
-
-- [eve Marketing Team](https://vercel.com/templates/eve/eve-marketing-team)
-- [eve Personal Agent](https://vercel.com/templates/nuxt/eve-personal-agent)
-- [eve Sanity Copilot](https://vercel.com/templates/eve/eve-sanity-copilot)
+Deployment uses Vercel Connect for GitHub and Linear, Vercel Blob for durable documents, Vercel Sandbox for workspaces, and Vercel AI Gateway for models.

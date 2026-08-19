@@ -1,6 +1,7 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
 import { defaultSlackAuth, slackChannel } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
+import { extractRepositories, stampRepository } from "../lib/repository.js";
 import { stampTrusted } from "../lib/trust.js";
 
 /**
@@ -37,10 +38,16 @@ export default slackChannel({
     if (auth === null) {
       return null;
     }
+    const repositories = extractRepositories(message.text);
     const trusted = stampTrusted(auth);
+    const [repository] = repositories;
+    const stamped =
+      repositories.length === 1 && repository
+        ? stampRepository(trusted, repository.slug, "explicit")
+        : trusted;
     return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
-      ? { auth: trusted, context: [INTAKE_ONLY_TASK] }
-      : { auth: trusted };
+      ? { auth: stamped, context: [INTAKE_ONLY_TASK] }
+      : { auth: stamped };
   },
   threadContext: { since: "last-agent-reply" },
 });

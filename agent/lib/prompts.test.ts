@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-// prompts.ts imports constants.ts, which reads FACTORY_REPO and LINEAR_CONNECTOR
-// at module load; set them before the dynamic import below.
-process.env.FACTORY_REPO = "acme/widgets";
+// prompts.ts reads LINEAR_CONNECTOR at module load.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
 const { FACTORY_PROMPT, GENERAL_PROMPT, PIPELINE, selectPrompt } = await import(

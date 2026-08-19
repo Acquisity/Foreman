@@ -1,8 +1,8 @@
 {
-  "name": "eve-software-factory-template",
+  "name": "foreman-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Foreman, the eve Software Factory.",
+  "description": "Foreman, Acquisity's general-purpose eve agent with an optional software factory mode.",
   "license": "MIT",
   "type": "module",
   "imports": {
@@ -26,7 +26,7 @@
     "@vercel/blob": "^2.8.0",
     "@vercel/connect": "0.8.0",
     "ai": "^7.0.63",
-    "eve": "^0.37.0",
+    "eve": "^0.39.1",
     "zod": "4.4.3"
   },
   "devDependencies": {

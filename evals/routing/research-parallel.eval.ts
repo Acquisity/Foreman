@@ -29,7 +29,7 @@ export default defineEval({
   tags: ["slow", "needs-connect"],
   async test(t) {
     await t.send(
-      "Work item: our date parsing breaks on the new RFC 9557 timezone suffix format; we need to confirm what the released spec actually says and plan a fix. Classify this and produce the implementation plan, but stop after analysis and report the plan to me; do not implement anything yet."
+      "Use factory mode for Acquisity/Foreman. Our date parsing breaks on the new RFC 9557 timezone suffix format; confirm the released spec and produce a root-cause investigation and implementation plan, then stop before implementation."
     );
     t.succeeded();
     t.loadedSkill("factory-pipeline");

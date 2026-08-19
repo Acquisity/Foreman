@@ -107,7 +107,7 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * @remarks
  * GitHub tools run without approval cards for every caller, so this predicate
  * is not a write gate there. It gates the shared-config write policies in
- * `agent/lib/github/approval.ts`: trusted callers write the factory brain and
+ * `agent/lib/github/approval.ts`: trusted callers write repository knowledge and
  * model overrides directly, everyone else parks on a card. New capabilities
  * gate on this predicate (or {@link isAutonomous} / {@link isScheduleAppAuth})
  * rather than inventing their own.

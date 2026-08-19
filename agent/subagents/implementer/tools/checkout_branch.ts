@@ -4,10 +4,9 @@ import { githubCredentials } from "../../../lib/github/credentials.js";
 import {
   brokerPolicy,
   mintInstallationToken,
-  REMOTE_URL,
-  REPO_DIR,
   validateBranch,
 } from "../../../lib/github/git-remote.js";
+import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 
 /**
  * Fetches an existing factory branch and checks it out in the sandbox, for
@@ -20,18 +19,21 @@ import {
  * git command line.
  */
 export default defineTool({
-  description: `Fetch an existing branch of the factory repository and check it out in ${REPO_DIR}. Use this on a revision run, when the reviewer's findings name a branch that already exists; fresh work starts from the default branch with plain git instead.`,
+  description:
+    "Fetch an existing branch from the prepared repository by literal validated URL and check it out for a revision.",
   async execute(input, ctx) {
     const refusal = validateBranch(input.branch);
     if (refusal) {
       return { error: refusal, success: false as const };
     }
     const sandbox = await ctx.getSandbox();
+    const prepared = await readPreparedRepository(sandbox);
+    const url = remoteUrl(prepared.slug);
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
       const fetch = await sandbox.run({
-        command: `git -C ${REPO_DIR} fetch ${REMOTE_URL} '${input.branch}' && git -C ${REPO_DIR} checkout -B '${input.branch}' FETCH_HEAD`,
+        command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' FETCH_HEAD`,
       });
       if (fetch.exitCode !== 0) {
         return {
@@ -42,7 +44,7 @@ export default defineTool({
         };
       }
       const head = await sandbox.run({
-        command: `git -C ${REPO_DIR} rev-parse HEAD`,
+        command: `git -C '${prepared.worktree}' rev-parse HEAD`,
       });
       return {
         branch: input.branch,

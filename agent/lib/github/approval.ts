@@ -3,7 +3,7 @@ import { isAutonomous, isScheduleAppAuth, isTrusted } from "../trust.js";
 
 /**
  * Policy factory for writes to shared configuration every future run
- * inherits (the factory brain, the live model overrides).
+ * inherits (repository knowledge and live model overrides).
  *
  * @remarks
  * Reads are always allowed and never routed here; these policies gate writes
@@ -28,11 +28,10 @@ function sharedConfigWritePolicy(unattendedReason: string) {
 }
 
 /**
- * The shared factory brain: durable notes about the target repository that
- * feed into every future run.
+ * Verified repository knowledge that can feed future runs for that repository.
  */
-export const factoryBrainPolicy = sharedConfigWritePolicy(
-  "Unattended factory runs may read the factory brain but not write to it."
+export const repositoryKnowledgePolicy = sharedConfigWritePolicy(
+  "Unattended runs may read repository knowledge but not write to it."
 );
 
 /**
@@ -43,6 +42,18 @@ export const modelSwapPolicy = sharedConfigWritePolicy(
   "Unattended factory runs may not change the models the factory runs on."
 );
 
+/** Direct-session publication requires an explicit user approval card. */
+export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
+  if (isAutonomous(ctx.session.auth.current)) {
+    return {
+      reason:
+        "Unattended runs cannot publish without an authorized delivery handoff.",
+      type: "denied",
+    };
+  }
+  return "user-approval";
+};
+
 /**
  * Connection-wide policy for MCP servers whose writes must not run
  * unattended.
@@ -51,7 +62,7 @@ export const modelSwapPolicy = sharedConfigWritePolicy(
  * eve hands connection approval predicates the qualified tool name
  * (`<connection>__<tool>`), so matching is by suffix, never bare equality.
  * With no `writeTools` list, every tool on the connection counts as a
- * write. Attended sessions stay ungated: unlike factory-brain writes,
+ * write. Attended sessions stay ungated for ordinary shared configuration,
  * these servers' writes are app-scoped and reversible.
  */
 export function denyAutonomousWrites(
