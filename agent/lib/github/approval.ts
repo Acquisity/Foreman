@@ -62,7 +62,7 @@ export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
  * eve hands connection approval predicates the qualified tool name
  * (`<connection>__<tool>`), so matching is by suffix, never bare equality.
  * With no `writeTools` list, every tool on the connection counts as a
- * write. Attended sessions stay ungated: unlike factory-brain writes,
+ * write. Attended sessions stay ungated for ordinary shared configuration,
  * these servers' writes are app-scoped and reversible.
  */
 export function denyAutonomousWrites(
