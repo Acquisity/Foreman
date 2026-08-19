@@ -18,11 +18,14 @@ const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
  * The fetch targets the factory repository's URL literally with a credential
  * brokered at the sandbox firewall (never entering the sandbox), mirroring
  * the implementer's tools. `validateBranch` bounds what can be interpolated
- * into the git command line.
+ * into the git command line. The reset is followed by `git clean -fd` so
+ * untracked leftovers from the implementer's turn in the shared sandbox
+ * cannot be read as part of the reviewed commit; ignored files such as
+ * `node_modules` are kept on purpose, since the reviewer reruns checks.
  */
 export default defineTool({
   description:
-    "Fetch the branch under review, verify it matches the exact pushed head SHA, then hard-reset the shared workspace to that commit before independent review.",
+    "Fetch the branch under review, verify it matches the exact pushed head SHA, then hard-reset and clean the shared workspace to that commit before independent review.",
   async execute(input, ctx) {
     const refusal = validateBranch(input.branch);
     if (refusal) {
@@ -42,7 +45,7 @@ export default defineTool({
     try {
       await sandbox.setNetworkPolicy(brokerPolicy(token));
       const fetch = await sandbox.run({
-        command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && test "$(git -C '${prepared.worktree}' rev-parse FETCH_HEAD)" = '${headSha}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' '${headSha}' && git -C '${prepared.worktree}' reset --hard '${headSha}'`,
+        command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && test "$(git -C '${prepared.worktree}' rev-parse FETCH_HEAD)" = '${headSha}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' '${headSha}' && git -C '${prepared.worktree}' reset --hard '${headSha}' && git -C '${prepared.worktree}' clean -fd -e .foreman/`,
       });
       if (fetch.exitCode !== 0) {
         return {
