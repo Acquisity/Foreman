@@ -96,8 +96,8 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
   },
   [SLA_REPORT_PREFIX]: {
     label: "the daily SLA report dispatch marker",
-    readTool: "the sla-report schedule",
-    writeTool: "the sla-report schedule",
+    readTool: "no tool; the sla-report schedule owns this namespace",
+    writeTool: "no tool; the sla-report schedule owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",
