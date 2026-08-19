@@ -168,7 +168,10 @@ export default defineTool({
           );
           if (
             !advancing &&
-            isStalePipelineEvent(existing?.headSha, normalizedInput.eventHeadSha)
+            isStalePipelineEvent(
+              existing?.headSha,
+              normalizedInput.eventHeadSha
+            )
           ) {
             return {
               currentHeadSha: existing?.headSha ?? null,

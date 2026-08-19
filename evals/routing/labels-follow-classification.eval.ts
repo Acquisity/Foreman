@@ -74,8 +74,7 @@ export default defineEval({
             return false;
           }
           const value = inputs as Record<string, unknown>;
-          const issue =
-            value.issueNumber ?? value.issue_number ?? value.number;
+          const issue = value.issueNumber ?? value.issue_number ?? value.number;
           return (
             value.owner === "Acquisity" &&
             value.repo === "Foreman" &&
