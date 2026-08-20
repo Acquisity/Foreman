@@ -15,6 +15,10 @@ This is more automated than a normal review-follow-up pass:
 - If the comment is valid, implement the smallest correct fix, verify it, make one atomic commit for that comment, push immediately, and reply with the commit.
 - If the comment is wrong or out of scope, reply with the technical reason and leave it unresolved for human visibility.
 
+## Linear Ticket
+
+Before doing anything else, confirm the PR has an associated Linear ticket. If none exists, create one with the Linear connection and link it to the PR. Never open or update a PR without a Linear ticket.
+
 ## Invocation
 
 Invoke this skill explicitly by naming it in the prompt:
