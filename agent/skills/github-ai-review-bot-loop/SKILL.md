@@ -17,7 +17,7 @@ This is more automated than a normal review-follow-up pass:
 
 ## Linear Ticket
 
-Before doing anything else, confirm the PR has an associated Linear ticket. If none exists, create one with the Linear connection and link it to the PR. Never open or update a PR without a Linear ticket.
+Before doing anything else, confirm the PR has an associated Linear ticket. If none exists, create one with the Linear connection and link it to the PR: Foreman-related work goes in the Foreman project, other work goes in the Engineering Team. Never open or update a PR without a Linear ticket.
 
 ## Invocation
 
