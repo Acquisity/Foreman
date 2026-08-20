@@ -33,12 +33,12 @@ const denyWrites = denyUnattendedWrites("Linear");
  */
 export default defineMcpClientConnection({
   approval: (ctx) => {
-    const isScheduledRead =
+    const isTrackerRead =
       !isAutonomous(ctx.session.auth.current) &&
       SCHEDULED_READ_TOOLS.some(
         (tool) => ctx.toolName === tool || ctx.toolName.endsWith(`__${tool}`)
       );
-    return isScheduledRead ? "not-applicable" : denyWrites(ctx);
+    return isTrackerRead ? "not-applicable" : denyWrites(ctx);
   },
   auth: linearAuth,
   description: "Linear workspace: issues, projects, cycles, and comments.",

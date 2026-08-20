@@ -1,3 +1,8 @@
+/**
+ * Lives in `lib/` rather than beside the connection because eve discovers one
+ * connection per file under `agent/connections/`, so a test file there is read
+ * as a connection and fails the build.
+ */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ApprovalContext } from "eve/tools";
@@ -20,6 +25,10 @@ test("linear connection approval", async (t) => {
   await t.test("lets a scheduled run read the tracker", () => {
     assert.equal(approve("linear__list_issues", SCHEDULED), "not-applicable");
     assert.equal(approve("linear__get_issue", SCHEDULED), "not-applicable");
+  });
+
+  await t.test("matches an unqualified tool name too", () => {
+    assert.equal(approve("list_issues", SCHEDULED), "not-applicable");
   });
 
   await t.test("denies a scheduled run every other Linear tool", () => {

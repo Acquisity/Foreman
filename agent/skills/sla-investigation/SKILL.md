@@ -43,9 +43,9 @@ What it is: the source of truth for the ticket list and ticket details.
 What it's for: finding the new SLA bugs and reading their title, description, project, labels, priority, and SLA fields.
 
 How to use it:
-- `list_issues` with `team: "Engineering"`, `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["title", "priority", "project", "labels", "status", "slaStartedAt", "slaBreachesAt", "url"]` (those are the exact enum members the tool accepts; `identifier` and `state` are not among them and a wrong member fails the call), `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
+- `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name has to match exactly and `"Engineering"` alone silently returns nothing, so pass the id), `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["title", "priority", "project", "labels", "status", "slaStartedAt", "slaBreachesAt", "url"]` (those are the exact enum members the tool accepts; `identifier` and `state` are not among them and a wrong member fails the call), `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
 - `get_issue` for the full description when the summary is truncated.
-- The query does not return `identifier`, so take the `ENG-XXXX` the report template asks for from the returned `url` (or from `get_issue`).
+- `id` is always returned and holds the `ENG-XXXX` identifier the report template asks for, so it does not need requesting.
 
 These two are the only Linear tools a scheduled run can reach; every other Linear tool is denied for it.
 
