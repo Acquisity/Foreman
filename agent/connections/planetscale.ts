@@ -10,14 +10,18 @@ import { requireEnv } from "../lib/constants.js";
  *   api-key connector (created in the Connect dashboard: API Key type). The
  *   runtime resolves it per call like every other connection and it never
  *   reaches the model.
- * - Read-only on two layers: the token grants read-query permissions only
- *   (`connect_production_read_only_branch`, not `connect_production_branch`),
- *   and the tool allowlist excludes `planetscale_execute_write_query`. Read
- *   queries run as a short-lived `pg_read_all_data` role and respect
- *   row-level security.
+ * - Read-only on two layers: the token grants the read-only set
+ *   (`read_organization`, `read_databases`, `read_database`, `read_branch`)
+ *   plus read-query permissions (`connect_production_read_only_branch`,
+ *   `delete_production_read_only_branch_password`), with
+ *   `connect_production_branch` left off so writes stay blocked. The tool
+ *   allowlist also excludes `planetscale_execute_write_query`. Read queries
+ *   run as a short-lived `pg_read_all_data` role and respect row-level
+ *   security.
  * - Ungated on purpose: unattended factory runs investigate bug tickets and
- *   must assess fleet-wide blast radius, so queries are deliberately not
- *   pinned to one organization.
+ *   must assess fleet-wide blast radius. The service token is scoped to a
+ *   single organization, so reach across databases is a property of the
+ *   token's grants rather than the auth mode.
  */
 export default defineMcpClientConnection({
   auth: connect({
