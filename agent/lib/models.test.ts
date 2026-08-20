@@ -39,9 +39,13 @@ describe("parseModelOverrides", () => {
     assert.deepEqual(overrides, { reviewer: "anthropic/claude-opus-4.8" });
   });
 
-  it("throws on non-string values", () => {
-    assert.throws(() =>
-      parseModelOverrides(JSON.stringify({ orchestrator: 123 }))
+  it("drops non-string values", () => {
+    const overrides = parseModelOverrides(
+      JSON.stringify({
+        orchestrator: 123,
+        reviewer: "anthropic/claude-opus-4.8",
+      })
     );
+    assert.deepEqual(overrides, { reviewer: "anthropic/claude-opus-4.8" });
   });
 });

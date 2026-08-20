@@ -32,22 +32,24 @@ export type ModelOverrides = Partial<Record<AgentModelSlot, string>>;
 // Global to Foreman rather than repository-scoped.
 const MODEL_OVERRIDES_KEY = `${MODEL_OVERRIDES_PREFIX}foreman.json`;
 
-// Parse a stored overrides document, dropping keys that are no longer slots
-// (e.g. a persisted `chat` override) and ids that fail validation, so a stale
-// key can never break set_agent_models.
+// Parse a stored overrides document by reading only the known slots, dropping
+// unknown keys (e.g. a persisted `chat` override), non-string values, and ids
+// that fail validation, so a stale key can never break set_agent_models.
 export const parseModelOverrides = (content: string): ModelOverrides => {
-  const raw = z.record(z.string(), z.string()).parse(JSON.parse(content));
-  return Object.fromEntries(
-    Object.entries(raw)
-      .filter(([slot]) =>
-        (AGENT_MODEL_SLOTS as readonly string[]).includes(slot)
-      )
-      .filter(([, id]) => isValidModelId(id))
-  ) as ModelOverrides;
+  const raw = z.record(z.string(), z.unknown()).parse(JSON.parse(content));
+  const overrides: ModelOverrides = {};
+  for (const slot of AGENT_MODEL_SLOTS) {
+    const id = raw[slot];
+    if (typeof id === "string" && isValidModelId(id)) {
+      overrides[slot] = id;
+    }
+  }
+  return overrides;
 };
 
-// The strict read: Blob or parse failures propagate. set_agent_models mutates on top of this,
-// because merging onto a silently-empty base would wipe overrides the call never named.
+// The strict read: a Blob failure or unparseable JSON propagates, because
+// set_agent_models mutates on top of this and merging onto a silently-empty
+// base would wipe overrides the call never named.
 export const loadModelOverrides = async (): Promise<ModelOverrides> => {
   const doc = await readDocument(MODEL_OVERRIDES_KEY);
   if (!doc.found) {

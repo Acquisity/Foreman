@@ -6,16 +6,6 @@ import { stampTrusted } from "../lib/trust.js";
 
 /**
  * Linear channel: Agent Sessions in, Agent Activities out, via Vercel Connect.
- *
- * @remarks
- * Credentials are brokered by Vercel Connect, which supplies the app token and
- * verifies inbound webhooks by their Vercel OIDC signature. The
- * `onAgentSession` hook keeps the default created/prompted dispatch, stamps
- * the caller as trusted (only workspace members can open an Agent Session, so
- * membership is the gate here), and builds the session context through
- * `buildLinearContext` (agent/lib/linear-context.ts): the requester's
- * name for attribution. Linear sessions stay general by default, so a
- * `created` event with an issue adds no factory instruction.
  */
 export default linearChannel({
   credentials: connectLinearCredentials(

@@ -17,9 +17,9 @@ const REPOSITORIES = `# Repository selection and workspaces
 - For direct changes, create a branch starting with \`${FOREMAN_BRANCH_PREFIX}\`, make the smallest complete change, run proportionate checks, and use \`push_branch\` or open a pull request only after the user explicitly authorizes delivery. An existing Linear ticket is required before opening a pull request. Never push a protected branch and never merge.
 - Repository knowledge records verified conventions and recurring build or review facts. Pass the selected repository explicitly to \`read_repository_knowledge\` and \`update_repository_knowledge\`. Broader attended-session recall may use Supermemory, but it is never repository authority or autonomous shared memory.`;
 
-const GENERAL_MODE = `# General mode
+export const GENERAL_MODE = `# General mode
 
-Most work stays in general mode. Answer questions, investigate, use connected services, and perform small repository edits directly. A Slack request does not enter factory mode merely because files will change. Do not call classifier, investigator, analyst, implementer, or reviewer for an ordinary small edit or documentation change.
+Most work stays in general mode. Answer questions, investigate, use connected services, and perform small repository edits directly. A request does not enter factory mode merely because files will change. Do not call classifier, investigator, analyst, implementer, or reviewer for an ordinary small edit or documentation change.
 
 Factory mode is appropriate when the user explicitly requests it, when a trusted GitHub factory label activates it, or when complexity, uncertainty, risk, or requested review depth warrants the full line. For an interactive task that starts small but proves substantially broader or riskier, briefly report the escalation, load \`factory-pipeline\`, then follow it. Selection is based on the task, never on whether a repository is configured.`;
 

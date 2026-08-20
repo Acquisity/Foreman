@@ -14,7 +14,7 @@ export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   model: defineDynamic({
     events: {
-      "session.started": (_event, _ctx) => resolveModel("orchestrator"),
+      "session.started": () => resolveModel("orchestrator"),
     },
   }),
 });

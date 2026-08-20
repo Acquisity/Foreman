@@ -4,9 +4,8 @@ import { describe, it } from "node:test";
 // prompts.ts reads LINEAR_CONNECTOR at module load.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
-const { FACTORY_PROMPT, GENERAL_PROMPT, PIPELINE, selectPrompt } = await import(
-  "./prompts.js"
-);
+const { FACTORY_PROMPT, GENERAL_MODE, GENERAL_PROMPT, PIPELINE, selectPrompt } =
+  await import("./prompts.js");
 const { AUTONOMOUS_PRINCIPAL } = await import("./trust.js");
 
 describe("selectPrompt", () => {
@@ -32,5 +31,9 @@ describe("selectPrompt", () => {
       assert.equal(prompt, GENERAL_PROMPT);
       assert.ok(!prompt.includes(PIPELINE));
     }
+  });
+
+  it("does not list Linear assignment as a factory trigger", () => {
+    assert.ok(!GENERAL_MODE.includes("when a Linear issue is assigned to you"));
   });
 });

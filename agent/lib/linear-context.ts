@@ -1,16 +1,7 @@
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-/**
- * Builds the dispatch context for a Linear Agent Session event, or null when
- * the event should not dispatch.
- *
- * @remarks
- * Keeps the default created/prompted dispatch: any other action returns null.
- * The requester's name is added as context when Linear provides it, for
- * attribution in progress notes and reports. `created` and `prompted` add only
- * requester attribution and no factory instruction; Linear-assigned sessions
- * stay general by default.
- */
+// Kept in its own module so linear-context.test.ts can import it without
+// pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
 export function buildLinearContext(
   event: LinearAgentSessionEvent
 ): string[] | null {
