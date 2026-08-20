@@ -5,16 +5,21 @@ import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { slaWindowStart } from "../lib/sla-window.js";
 import { stampIntakeOnly, UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
 
-const FEATURE_CHANNELS = [
-  { channelId: "C0BAA1KUNP8", feature: "Cold Email" },
-  { channelId: "C0BC0H4GA9J", feature: "AI SDR" },
-  { channelId: "C0BAA18DFB8", feature: "CRM" },
-  { channelId: "C0B9WJVRXNK", feature: "AI Website Builder" },
-  { channelId: "C0BB6C1DURW", feature: "Whitelabel Partners" },
-] as const;
-
 const SLACK_TEAM_ID = "T0A9AUZJXC2";
 const OWNER_USER_ID = "U0BBHB86PUY";
+
+/** Who each channel's report tags. Support is cross-cutting, so it tags both. */
+const JAMES = "<@U0BA7JK9XRV>";
+const AARON = `<@${OWNER_USER_ID}>`;
+
+const FEATURE_CHANNELS = [
+  { channelId: "C0BAA1KUNP8", feature: "Cold Email", tag: JAMES },
+  { channelId: "C0BC0H4GA9J", feature: "AI SDR", tag: JAMES },
+  { channelId: "C0BAA18DFB8", feature: "CRM", tag: JAMES },
+  { channelId: "C0B9WJVRXNK", feature: "AI Website Builder", tag: JAMES },
+  { channelId: "C0BB6C1DURW", feature: "Whitelabel Partners", tag: JAMES },
+  { channelId: "C0B9WJWTC15", feature: "Support", tag: `${JAMES} ${AARON}` },
+] as const;
 
 /**
  * The schedule runs as the owner rather than as the app, because the
@@ -86,10 +91,10 @@ export default defineSchedule({
   cron: "0 9 * * *",
   async run({ to, waitUntil }) {
     const { markerRead, since } = await readWindow();
-    for (const { feature, channelId } of FEATURE_CHANNELS) {
+    for (const { feature, channelId, tag } of FEATURE_CHANNELS) {
       try {
         const dispatch = to(slack, { channelId }).send(
-          `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag James Keeble. The repository for any code lookup is Acquisity/Acquisity. If there are none, post nothing.`,
+          `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag ${tag} in the header line. The repository for any code lookup is Acquisity/Acquisity. If there are none, post nothing.`,
           { auth: authFor(channelId) }
         );
         waitUntil(

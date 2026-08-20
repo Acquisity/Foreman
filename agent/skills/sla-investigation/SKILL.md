@@ -1,5 +1,5 @@
 ---
-description: "Daily SLA bug report: find new SLA bugs (Bug + Urgent/High, SLA started at or after the window the dispatch provides) for a feature, investigate each with the right tool, and post a bottom-line report to the feature's Slack channel tagging James Keeble. Load for every sla-report schedule dispatch."
+description: "Daily SLA bug report: find new SLA bugs (Bug + Urgent/High, SLA started at or after the window the dispatch provides) for a feature, investigate each with the right tool, and post a bottom-line report to the feature's Slack channel tagging whoever the dispatch names. Load for every sla-report schedule dispatch."
 ---
 
 # SLA investigation
@@ -29,8 +29,9 @@ Categorize by the Linear `project` field, not the title. The known mapping:
 | CRM | CRM, CRM Calendar Scheduling, CRM Phone Calling & Texting |
 | AI Website Builder | AI Website Builder |
 | Whitelabel Partners | Whitelabel Partners |
+| Support | Support |
 
-Keep this mapping current. A bug whose project maps to no feature (`Support` is the common one, and it can be about any feature) belongs to no channel, so leave it out of the channel reports. The daily health line names those bugs in the owner DM instead, so they are visible rather than dropped. Never guess a feature from the title.
+Keep this mapping current. Support is not a product area, it is where cross-cutting customer-reported bugs land, so its channel report tags Aaron as well as James. A bug whose project matches no row belongs to no channel, so leave it out of the channel reports; the daily health line names those in the owner DM instead, so a new project is visible rather than dropped. Never guess a feature from the title.
 
 ## Tools: what each is for and how to use it
 
@@ -93,10 +94,10 @@ How to use it: `queryDataset` with an APL query over the relevant dataset, bound
 
 Load `slack-wording` before writing the message. It is mandatory for anything posted to Slack and its rules win wherever they disagree with the shape below.
 
-Post one message covering every in-scope bug for this feature, bottom line, natural language, no em dashes, no bold. Tag James Keeble with `<@U0BA7JK9XRV>` in the header line only, then repeat the per-bug block under it. The session delivers a single channel message, so do not plan on separate posts.
+Post one message covering every in-scope bug for this feature, bottom line, natural language, no em dashes, no bold. Tag whoever the dispatch names, in the header line only, then repeat the per-bug block under it. The session delivers a single channel message, so do not plan on separate posts.
 
 ```
-<@U0BA7JK9XRV> <count> new SLA bug(s) in <feature>
+<the mentions the dispatch gave you> <count> new SLA bug(s) in <feature>
 
 <one natural language line dont use jargon and speak coherently. State it simply and concisely, like one human talking to another, grounded in the ticket and code>
 
