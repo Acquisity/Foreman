@@ -96,8 +96,15 @@ const readWindow = async (): Promise<{
   }
 };
 
+/**
+ * 13:00 UTC every day, which is 09:00 America/New_York while daylight saving
+ * is in effect and 08:00 once it ends. Vercel evaluates cron in UTC and
+ * `defineSchedule` takes no timezone, so a fixed expression cannot track the
+ * switch; drifting an hour earlier in winter is the harmless direction for a
+ * report whose point is that bugs are not sitting unseen.
+ */
 export default defineSchedule({
-  cron: "0 9 * * *",
+  cron: "0 13 * * *",
   async run({ to, waitUntil }) {
     const { markerRead, since } = await readWindow();
     for (const { feature, channelId, tag } of FEATURE_CHANNELS) {
