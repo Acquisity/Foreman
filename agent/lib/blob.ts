@@ -37,6 +37,9 @@ export const ARTIFACTS_PREFIX = "artifacts/";
 /** Blob path prefix holding the live station model overrides. */
 export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 
+/** Blob path prefix holding the daily SLA report's last successful dispatch marker. */
+export const SLA_REPORT_PREFIX = "sla-report/";
+
 /** Blob path prefix holding durable repository and pull-request pipeline runs. */
 export const PIPELINE_RUNS_PREFIX = "pipeline-runs/";
 /** Blob path prefix indexing currently active pipeline runs for reconciliation. */
@@ -90,6 +93,11 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "active factory pipeline index",
     readTool: "read_pipeline_run",
     writeTool: "record_pipeline_run",
+  },
+  [SLA_REPORT_PREFIX]: {
+    label: "the daily SLA report dispatch marker",
+    readTool: "no tool; the sla-report schedule owns this namespace",
+    writeTool: "no tool; the sla-report schedule owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",

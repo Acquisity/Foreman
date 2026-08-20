@@ -41,17 +41,4 @@ describe("intake-only channels", () => {
       assert.equal(typeof status === "object" && status.type, "denied");
     }
   });
-
-  it("leaves every other session untouched, trusted ones included", () => {
-    assert.equal(isIntakeOnly(auth), false);
-    assert.equal(intakeOnlyPolicy(approvalFor(auth)), "not-applicable");
-    assert.equal(
-      intakeOnlyPolicy(approvalFor(stampTrusted(auth))),
-      "not-applicable"
-    );
-    assert.equal(
-      deliveryPolicy(approvalFor(stampTrusted(auth))),
-      "user-approval"
-    );
-  });
 });

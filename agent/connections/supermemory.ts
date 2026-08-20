@@ -1,7 +1,7 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
-import { denyAutonomousWrites } from "../lib/github/approval.js";
+import { denyUnattendedWrites } from "../lib/github/approval.js";
 
 /**
  * Supermemory MCP connection for recalling and saving team context.
@@ -24,7 +24,7 @@ import { denyAutonomousWrites } from "../lib/github/approval.js";
  * are excluded: they target human MCP clients, not stations.
  */
 export default defineMcpClientConnection({
-  approval: denyAutonomousWrites("Supermemory", ["add_memory"]),
+  approval: denyUnattendedWrites("Supermemory", ["add_memory"]),
   auth: connect({
     connector: requireEnv(
       "SUPERMEMORY_MCP_CONNECTOR",
