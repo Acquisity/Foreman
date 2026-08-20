@@ -1,9 +1,16 @@
 import { parseRepository } from "./repository.js";
 
 /**
- * Warm-up revision. Bump it whenever the warm-up mechanics change (a new
- * repository, a different install command, or a cache layout move) so eve
- * rebuilds the template snapshot instead of reusing a stale one.
+ * Warm-up revision: a manual lever for forcing a template rebuild.
+ *
+ * @remarks
+ * Changing the warm-up mechanics (a new repository, a different install
+ * command, a cache layout move) does not need a bump. Those now run in
+ * `createWarmSnapshot`, not in the template build, and reach the template only
+ * through the snapshot id, which is different for every rebuild and already
+ * moves the revalidation key. Rebuilding the template against an unchanged
+ * snapshot id would only re-seed the same stale snapshot. Bump this when
+ * something outside the snapshot has to invalidate the template.
  */
 export const WARM_UP_REVISION = "1";
 
