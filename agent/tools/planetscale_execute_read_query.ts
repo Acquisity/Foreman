@@ -12,24 +12,26 @@ import {
  * Maximum serialized size of the rows returned to the model, in bytes.
  *
  * The workflow stream caps each chunk at 10 MB, but the real consumer is the
- * model context, not the stream. 1 MB of JSON is already on the order of a
- * quarter-million tokens, so a result at this cap is still usable while staying
- * far under the stream limit. When a query returns more, the tool truncates and
- * flags it so the model narrows the query instead of concluding from a partial
- * result.
+ * model context, not the stream. 256 KB of JSON is roughly 64k tokens, which
+ * stays comfortably under the reviewer slot's 200k window while still leaving
+ * far more than the stream limit. When a query returns more, the tool truncates
+ * and flags it so the model narrows the query instead of concluding from a
+ * partial result.
  */
-const MAX_RESULT_BYTES = 1024 * 1024;
+const MAX_RESULT_BYTES = 256 * 1024;
 
-/** Bounded preview of raw text returned when a result cannot be parsed. */
-const RAW_PREVIEW_BYTES = 4000;
+/** Bounded preview (in UTF-16 code units) of raw text when a result cannot be parsed. */
+const RAW_PREVIEW_CHARS = 4000;
 
 export default defineTool({
   description:
     "Run a read-only SQL query against PlanetScale production Postgres and return the rows. " +
-    "Results are capped at 1 MB; when `truncated` is true the rows are partial, so narrow the " +
+    "Results are capped at 256 KB; when `truncated` is true the rows are partial, so narrow the " +
     "query (a bounded COUNT, a tighter WHERE, or a LIMIT) and re-run rather than concluding " +
     "from a partial result. When `oversizedRow` is true a single row alone exceeded the cap, " +
-    "so select fewer or narrower columns instead of re-running the same query. Never run a write.",
+    "so select fewer or narrower columns instead of re-running the same query. When " +
+    "`envelopeTooLarge` is true the server returned oversized metadata, so retry with a plain " +
+    "query. When `raw` is present the result could not be parsed, so inspect it. Never run a write.",
   async execute(input, ctx) {
     const { token } = await ctx.getToken(planetscaleAuth);
 
@@ -76,7 +78,7 @@ export default defineTool({
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Result parse failed.",
-        raw: text.slice(0, RAW_PREVIEW_BYTES),
+        raw: text.slice(0, RAW_PREVIEW_CHARS),
         success: false as const,
       };
     }

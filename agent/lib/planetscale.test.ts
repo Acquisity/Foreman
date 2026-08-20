@@ -345,6 +345,18 @@ describe("buildReadQueryResult", () => {
     assert.equal(result.success, true);
     assert.deepEqual(result.columns, ["id"]);
   });
+
+  it("drops passthrough when the envelope alone exceeds the cap", () => {
+    const result = buildReadQueryResult(
+      [{ id: 1 }],
+      { note: "x".repeat(2000) },
+      1024
+    );
+    assert.equal(result.envelopeTooLarge, true);
+    assert.equal(result.note, undefined);
+    assert.deepEqual(result.rows, []);
+    assert.ok(Buffer.byteLength(JSON.stringify(result), "utf8") < 1024);
+  });
 });
 
 describe("PlanetscaleHttpError", () => {

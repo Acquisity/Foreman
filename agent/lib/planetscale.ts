@@ -369,9 +369,23 @@ export function buildReadQueryResult(
     "utf8"
   );
   const truncated = truncateRows(rows, capBytes, overheadBytes);
+  if (truncated.envelopeTooLarge) {
+    // The passthrough fields alone consumed the budget; drop them so the
+    // returned object stays under the cap instead of echoing a huge envelope.
+    return {
+      envelopeTooLarge: true,
+      oversizedRow: false,
+      resultBytes: 0,
+      returnedRows: 0,
+      rows: [],
+      success: true,
+      totalRows: rows.length,
+      truncated: true,
+    };
+  }
   return {
     ...passthrough,
-    envelopeTooLarge: truncated.envelopeTooLarge,
+    envelopeTooLarge: false,
     oversizedRow: truncated.oversizedRow,
     resultBytes: truncated.resultBytes,
     returnedRows: truncated.returnedRows,
