@@ -6,7 +6,7 @@ Foreman talks to GitHub through the `github__*` eve extension. There is no GitHu
 
 - `github__getPullRequestContext` — returns PR metadata: number, URL, title, head and base branch, repository, author, and related state. Use this to resolve the target PR.
 - `github__listPullRequestReviews` — returns review bodies only: `{ id, state, body, author, url, submittedAt }`. It does not return inline review comments. Use this to read top-level review summaries.
-- `github__listIssueComments` — returns PR-level issue comments, including bot summaries and release notes. Use this to catch bot feedback posted outside review threads.
+- `github__listIssueComments` — returns PR-level issue comments, including bot summaries and release notes. Use this to catch bot feedback posted outside review threads. Bodies are truncated to ~500 chars by default, so pass `detail: 'full'` to read complete findings.
 - `github__listPullRequestFiles` — returns the changed files and diff context for the PR. Use this to locate the code around a referenced line.
 - `github__addPullRequestComment` — posts a PR-level comment. This is the only reply path.
 - `github__listCheckRuns` / `github__getCiFailureContext` — return CI status and failure context for verification.

@@ -43,7 +43,7 @@ Use the github-ai-review-bot-loop skill to fetch and classify AI bot comments, n
 - `push_branch` for pushing the branch
 - `github__getPullRequestContext` for PR metadata
 - `github__listPullRequestReviews` for review bodies
-- `github__listIssueComments` for PR-level issue comments
+- `github__listIssueComments` for PR-level issue comments (pass `detail: 'full'` for complete bodies)
 - `github__listPullRequestFiles` for changed files and diff context
 - `github__addPullRequestComment` for PR-level replies
 - `github__listCheckRuns` and `github__getCiFailureContext` for verification context
@@ -80,7 +80,7 @@ Use the `github__*` tools consistently for reads and writes during a loop iterat
 
 - `github__getPullRequestContext` for PR metadata and state.
 - `github__listPullRequestReviews` for review bodies (state, body, author, submittedAt). It does not return inline review comments.
-- `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes. This is where most bot findings land.
+- `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes. This is where most bot findings land. Bodies are truncated to ~500 chars by default, so pass `detail: 'full'` to read complete findings.
 - `github__listPullRequestFiles` for changed files and diff context.
 
 Fetch all pages of reviews and issue comments before deciding the PR is clean. Inline review comments are not fetchable; there is no tool that reads `pulls/comments`.
