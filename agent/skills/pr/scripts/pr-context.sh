@@ -13,13 +13,6 @@ branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 sha="$(git rev-parse --short HEAD)"
 default_branch="${DEFAULT_BRANCH:-main}"
 
-if command -v gh >/dev/null 2>&1; then
-  gh_default="$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
-  if [[ -n "$gh_default" && "$gh_default" != "null" ]]; then
-    default_branch="$gh_default"
-  fi
-fi
-
 remote_default="origin/$default_branch"
 git fetch --quiet origin "$default_branch" 2>/dev/null || true
 
@@ -38,12 +31,6 @@ fi
 echo "status_start"
 git status --short --branch
 echo "status_end"
-
-if [[ -n "$branch" ]] && command -v gh >/dev/null 2>&1; then
-  echo "open_prs_start"
-  gh pr list --head "$branch" --state open --json number,url,baseRefName,isDraft,title 2>/dev/null || true
-  echo "open_prs_end"
-fi
 
 probable_base="$default_branch"
 

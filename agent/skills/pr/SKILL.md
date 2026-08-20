@@ -28,7 +28,7 @@ bash agent/skills/pr/scripts/pr-context.sh
 
 If the skill is being run outside the repository root, compute the skill directory at runtime and run `pr-context.sh` from `$SKILL_DIR/scripts/pr-context.sh`.
 
-Note: `pr-context.sh` is copied verbatim from the source skill. Its `gh`-dependent default-branch and open-PR detection no-ops in Foreman (no `gh` CLI); use `github__getPullRequestContext` and `github__listPullRequests` instead.
+Note: `pr-context.sh` inspects local Git state only. Foreman has no `gh` CLI, so default-branch and open-PR detection come from `github__getPullRequestContext` and `github__listPullRequests` in the steps below.
 
 Then inspect enough local state to understand what will be committed:
 
