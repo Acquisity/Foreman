@@ -114,3 +114,29 @@ export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
         type: "denied",
       }
     : "not-applicable";
+
+/**
+ * Marking a pull request ready for review, which `updatePullRequest` performs
+ * by sending `draft: false`.
+ *
+ * @remarks
+ * Denied rather than parked, for the same reason delivery no longer parks: an
+ * approval card cannot be answered from Slack, and a Linear agent session runs
+ * with nobody watching for one, so a card there is a session that never
+ * finishes. A denial reaches the model as a reason it can relay and work
+ * around, which keeps the run moving.
+ *
+ * Only the readiness transition is gated. Editing a title, body, base branch,
+ * or open and closed state stays ungated, as does converting a pull request
+ * back to a draft, because none of those present work as reviewable.
+ */
+export const pullRequestReadinessPolicy = (
+  ctx: ApprovalContext
+): ApprovalStatus =>
+  (ctx.toolInput as { draft?: unknown } | undefined)?.draft === false
+    ? {
+        reason:
+          "Marking a pull request ready for review needs the user to ask for it. Open or update the pull request, say it is ready, and leave the transition to them.",
+        type: "denied",
+      }
+    : "not-applicable";

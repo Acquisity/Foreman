@@ -1,4 +1,5 @@
 import githubExtension from "@github-tools/eve-extension";
+import { pullRequestReadinessPolicy } from "../lib/github/approval.js";
 import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
 
 /**
@@ -18,7 +19,15 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  *   extension attaches `always()` to every write tool in the allowlist, so
  *   opening a pull request or leaving a comment raises an approval card on
  *   every call. Slack cannot answer one, which parks the session for good.
- *   The allowlist, not a per-call card, is what bounds these writes.
+ *   The allowlist is one bound on these writes, not the only one: every tool
+ *   resolves its own credential, `owner` and `repo` are always explicit, and
+ *   `pullRequestReadinessPolicy` denies the one transition that presents work
+ *   as reviewable.
+ * - `overrides` gates `updatePullRequest` on that policy. It denies rather than
+ *   parks, so the run keeps moving on every surface. Note that moving
+ *   `requireApproval` to the per-tool object form would silently re-gate every
+ *   tool absent from the object with `always()`, so the override is the safe
+ *   place for a per-tool rule.
  */
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
@@ -55,5 +64,6 @@ export default githubExtension({
     "listCheckRuns",
     "getCiFailureContext",
   ],
+  overrides: { updatePullRequest: { approval: pullRequestReadinessPolicy } },
   requireApproval: false,
 });
