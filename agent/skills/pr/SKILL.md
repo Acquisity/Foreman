@@ -23,7 +23,7 @@ The user wants a practical shipping workflow, not a long planning exercise. Insp
 Run the bundled context script first when available:
 
 ```bash
-bash agent/skills/pr/scripts/pr-context.sh
+bash "$HOME/.agents/skills/pr/scripts/pr-context.sh"
 ```
 
 If the skill is being run outside the repository root, compute the skill directory at runtime and run `pr-context.sh` from `$SKILL_DIR/scripts/pr-context.sh`.
@@ -46,7 +46,7 @@ Also check the default branch and existing PRs with `github__getPullRequestConte
 If HEAD is detached:
 
 1. Create a new branch from the current commit.
-2. Choose a short branch name from the actual change: `foreman/<plain-slug>`.
+2. Choose a short branch name from the actual change, using the configured branch prefix (default `foreman/`, from `FOREMAN_BRANCH_PREFIX`): `<prefix><plain-slug>`.
 3. If the name already exists, append the short SHA.
 
 Example:

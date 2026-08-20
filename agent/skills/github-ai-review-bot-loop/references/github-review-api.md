@@ -5,7 +5,7 @@ Foreman talks to GitHub through the `github__*` eve extension. There is no GitHu
 ## Available Tools
 
 - `github__getPullRequestContext` — returns PR metadata: number, URL, title, head and base branch, repository, author, and related state. Use this to resolve the target PR.
-- `github__listPullRequestReviews` — returns review bodies and review comments, including author login, body, path, line, and timestamps. Use this to enumerate bot feedback.
+- `github__listPullRequestReviews` — returns review bodies only: `{ id, state, body, author, url, submittedAt }`. It does not return inline review comments. Use this to read top-level review summaries.
 - `github__listIssueComments` — returns PR-level issue comments, including bot summaries and release notes. Use this to catch bot feedback posted outside review threads.
 - `github__listPullRequestFiles` — returns the changed files and diff context for the PR. Use this to locate the code around a referenced line.
 - `github__addPullRequestComment` — posts a PR-level comment. This is the only reply path.
@@ -14,7 +14,7 @@ Foreman talks to GitHub through the `github__*` eve extension. There is no GitHu
 
 ## Bot Identification
 
-The in-scope allowlist is environment-driven. Read `FOREMAN_REVIEW_BOT_LOGINS`, a comma-separated list of lowercase GitHub logins, defaulting to empty when unset. A comment is in scope only when its author login (lowercased) is in that list.
+The in-scope allowlist is environment-driven. `FOREMAN_REVIEW_BOT_LOGINS` is a comma-separated list of lowercase GitHub logins, default empty, which the host injects into the prompt; it is not readable from the sandbox. A comment is in scope only when its author login (lowercased) is in that list.
 
 Common bots to configure: CodeRabbit (`coderabbitai`, `coderabbitai[bot]`), Cubic (`cubic-dev-ai`, `cubic-dev-ai[bot]`), Devin (`devin-ai-integration`, `devin-ai-integration[bot]`, `devin[bot]`), and React Doctor (`github-actions[bot]` only when the body contains a React Doctor marker).
 
@@ -28,6 +28,6 @@ Dedupe processed comments with `.context/review-bot-loop-state.json`. Store at l
 
 ## Gaps
 
-- No inline-thread enumeration: `github__listPullRequestReviews` returns comments but does not expose GitHub review-thread resolution state (`isResolved` / `isOutdated`).
+- No inline review comments: `github__listPullRequestReviews` returns review bodies only, and no tool reads `pulls/comments`, so inline review comments are invisible.
 - No reply-to-review-comment tool: replies are PR-level only.
 - No `resolveReviewThread` tool: inline-thread resolution requires a human or a future tool.

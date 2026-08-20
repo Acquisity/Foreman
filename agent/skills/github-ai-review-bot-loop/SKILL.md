@@ -42,7 +42,7 @@ Use the github-ai-review-bot-loop skill to fetch and classify AI bot comments, n
 - `bash` for local git commands
 - `push_branch` for pushing the branch
 - `github__getPullRequestContext` for PR metadata
-- `github__listPullRequestReviews` for review bodies and comments
+- `github__listPullRequestReviews` for review bodies
 - `github__listIssueComments` for PR-level issue comments
 - `github__listPullRequestFiles` for changed files and diff context
 - `github__addPullRequestComment` for PR-level replies
@@ -79,15 +79,15 @@ Record:
 Use the `github__*` tools consistently for reads and writes during a loop iteration:
 
 - `github__getPullRequestContext` for PR metadata and state.
-- `github__listPullRequestReviews` for review bodies and review comments, including author, body, path, line, and timestamps.
-- `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes.
-- `github__listPullRequestFiles` for changed files and diff hunks.
+- `github__listPullRequestReviews` for review bodies (state, body, author, submittedAt). It does not return inline review comments.
+- `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes. This is where most bot findings land.
+- `github__listPullRequestFiles` for changed files and diff context.
 
-Fetch all pages of reviews, issue comments, and review comments before deciding the PR is clean.
+Fetch all pages of reviews and issue comments before deciding the PR is clean. Inline review comments are not fetchable; there is no tool that reads `pulls/comments`.
 
 ### 3. Identify In-Scope AI Bot Comments
 
-The in-scope bot allowlist is environment-driven, not hardcoded. Read `FOREMAN_REVIEW_BOT_LOGINS`, a comma-separated list of lowercase GitHub logins, defaulting to empty when unset. Only comments whose author login (lowercased) is in that list are in scope.
+The in-scope bot allowlist is environment-driven, not hardcoded. It is the `FOREMAN_REVIEW_BOT_LOGINS` set (comma-separated lowercase GitHub logins, default empty), which the host injects into the prompt; it is not readable from the sandbox. Only comments whose author login (lowercased) is in that set are in scope.
 
 Common bots to configure in `FOREMAN_REVIEW_BOT_LOGINS`:
 
@@ -98,27 +98,24 @@ Common bots to configure in `FOREMAN_REVIEW_BOT_LOGINS`:
 
 Humans, CI status comments, dependency bots, deployment bots, coverage reports, and unrelated `github-actions[bot]` comments are out of scope by default. Do not silently expand the loop scope beyond `FOREMAN_REVIEW_BOT_LOGINS`.
 
-Keep human-authored replies in the thread as context, but do not auto-resolve a thread if a human is waiting for an answer that the bot comment does not cover.
 
 ### 4. Skip Already Answered Comments
 
 Foreman has no self-login lookup and no inline-thread resolution tool, so dedupe with local state. Use `.context/review-bot-loop-state.json` to remember processed comment IDs and `updatedAt` values. A comment is already handled when its ID is recorded and its `updatedAt` is unchanged.
 
-Do not reprocess a handled comment unless its `updatedAt` changes or a new in-scope reply appears after our state entry. Because Foreman cannot read or set thread resolution state, a fixed, duplicate, or stale thread stays marked handled in local state and is left for a human to resolve; there is no resolve-retry loop.
+Do not reprocess a handled comment unless its `updatedAt` changes. Because Foreman cannot read or set review-thread resolution state, a fixed, duplicate, or stale finding stays marked handled in local state and is left for a human to resolve; there is no resolve-retry loop.
 
 The state file is local bookkeeping and must never be staged or committed.
 
-### 5. Build A Thread Packet
+### 5. Build A Finding Packet
 
-For each live AI bot thread, build a compact packet:
+For each live in-scope review body or PR-level comment, build a compact packet:
 
-- thread/comment ID
+- comment or review ID
 - comment URL
 - author and created/updated time
-- path and line range
-- diff hunk
-- full bot comment body
-- current code excerpt around the referenced line
+- full body
+- the changed files and diff context from `github__listPullRequestFiles`
 - relevant tests or nearby validation commands
 - current branch and dirty-file status
 
@@ -126,7 +123,7 @@ The packet should be enough for a worker to decide without refetching the whole 
 
 ### 6. Handle PR-Level Comments
 
-Inline review threads have resolution state; PR-level comments do not. React Doctor and bot summary comments may contain actionable findings without a resolvable thread.
+Review bodies and PR-level comments carry the findings; Foreman cannot read inline review comments or thread resolution state. Bot summaries and release notes may contain actionable findings.
 
 For each in-scope PR-level comment:
 
@@ -139,7 +136,7 @@ For each in-scope PR-level comment:
 
 Do not attempt to resolve PR-level comments. Their deduplication is local state, not GitHub thread resolution.
 
-### 7. Use A Worker Per Thread Or PR-Level Comment
+### 7. Use A Worker Per Finding
 
 When sub-agent tooling is available, hand one packet at a time to a worker. Process write-capable workers sequentially on the same PR branch to avoid conflicting commits. It is fine to run read-only classification workers in parallel, then apply/reply sequentially.
 
@@ -150,7 +147,7 @@ You own one GitHub AI review bot comment.
 
 Inputs:
 - PR URL, repository, branch, and base branch
-- Thread or PR-level packet with IDs, file, line, diff hunk, body, and current code context
+- Finding packet with ID, URL, body, and current code context
 - A writes_allowed flag: true only when the user asked to handle, fix, reject, reply, resolve, or run the loop; false for read-only runs
 - Current dirty-worktree constraints
 
@@ -171,7 +168,7 @@ If valid_fix or valid_partial:
 1. Create a mini plan.
 2. Make the smallest correct code change.
 3. Add or update focused tests when the behavior is testable.
-4. Run focused checks only: `pnpm check` on changed files, `pnpm exec tsx --test <file>` for a focused test, or the local check that directly covers the edit.
+4. Run focused checks only, using the target repository's own scripts (its lint command on changed files and its test command for the nearest test), or the local check that directly covers the edit.
 5. Capture the pre-edit diff, then stage only the generated patch. If a target file already has pre-existing changes, stop instead of staging the whole file. Commit only this comment's changes with a concise commit message.
 6. Push to the PR branch immediately with push_branch.
 7. Reply with the short commit SHA and what changed.
@@ -213,7 +210,7 @@ Use these decision rules:
 - Partially fix when the bug is real but the bot's exact patch is wrong.
 - Mark stale when a later commit or current code already makes the thread obsolete.
 
-For this repo, per atomic commit run focused checks only. Run full `pnpm typecheck` once per loop iteration before declaring the iteration clean, not after every commit. Never commit unrelated dirty files.
+Per atomic commit run focused checks only, using the target repository's own package manager and scripts (check `read_repository_knowledge` or the repo's package.json rather than assuming pnpm). Run the repo's full typecheck once per loop iteration before declaring the iteration clean, not after every commit. Never commit unrelated dirty files.
 
 ### 9. GitHub Writes
 
@@ -244,7 +241,7 @@ For monitor mode:
 2. Fetch live in-scope AI bot feedback.
 3. Process all actionable threads and PR-level comments.
 4. Refresh PR state after every push or GitHub write.
-5. Run `pnpm typecheck` once for the iteration when code changed or before declaring the iteration clean.
+5. Run the target repository's typecheck once for the iteration when code changed or before declaring the iteration clean.
 6. Update the last-activity timestamp after every push or GitHub write.
 7. Sleep 60 seconds.
 8. Reset the clean-window timer whenever a new live in-scope bot comment appears.
