@@ -10,10 +10,10 @@ This is more automated than a normal review-follow-up pass:
 
 - Poll for new live AI bot comments until a clean window elapses.
 - Use the `github__*` tools for fetching and writing.
-- Delegate each live thread or PR-level comment to a focused worker when sub-agents are available.
+- Delegate each finding to a focused worker when sub-agents are available.
 - Decide whether the bot is right before editing code.
 - If the comment is valid, implement the smallest correct fix, verify it, make one atomic commit for that comment, push immediately, and reply with the commit.
-- If the comment is wrong or out of scope, reply with the technical reason and leave the thread unresolved for human visibility.
+- If the comment is wrong or out of scope, reply with the technical reason and leave it unresolved for human visibility.
 
 ## Invocation
 
@@ -87,17 +87,16 @@ Fetch all pages of reviews and issue comments before deciding the PR is clean. I
 
 ### 3. Identify In-Scope AI Bot Comments
 
-The in-scope bot allowlist is environment-driven, not hardcoded. It is the `FOREMAN_REVIEW_BOT_LOGINS` set (comma-separated lowercase GitHub logins, default empty), which the host injects into the prompt; it is not readable from the sandbox. Only comments whose author login (lowercased) is in that set are in scope.
+The in-scope bot allowlist is environment-driven, not hardcoded. It is the `FOREMAN_REVIEW_BOT_LOGINS` set (comma-separated lowercase GitHub logins, default empty). It is not readable from the sandbox, so the in-scope logins must be supplied in the request or prompt. Only comments whose author login (lowercased) is in that set are in scope.
 
 Common bots to configure in `FOREMAN_REVIEW_BOT_LOGINS`:
 
 - CodeRabbit: `coderabbitai`, `coderabbitai[bot]`
 - Cubic: `cubic-dev-ai`, `cubic-dev-ai[bot]`
 - Devin: `devin-ai-integration`, `devin-ai-integration[bot]`, `devin[bot]`
-- React Doctor: `github-actions[bot]` only when the body contains a React Doctor marker such as `React Doctor`, `react-doctor`, `millionco/react-doctor`, or `react-doctor/`
+- `github-actions[bot]` is shared with CI, so it cannot be safely allowlisted; bots that post under it (for example React Doctor) are out of scope.
 
 Humans, CI status comments, dependency bots, deployment bots, coverage reports, and unrelated `github-actions[bot]` comments are out of scope by default. Do not silently expand the loop scope beyond `FOREMAN_REVIEW_BOT_LOGINS`.
-
 
 ### 4. Skip Already Answered Comments
 
@@ -172,13 +171,13 @@ If valid_fix or valid_partial:
 5. Capture the pre-edit diff, then stage only the generated patch. If a target file already has pre-existing changes, stop instead of staging the whole file. Commit only this comment's changes with a concise commit message.
 6. Push to the PR branch immediately with push_branch.
 7. Reply with the short commit SHA and what changed.
-8. Inline-thread resolution is not available in Foreman; leave the thread for a human or a future tool. Do not resolve PR-level comments because they have no resolution state.
+8. Inline-thread resolution is not available in Foreman; leave the finding for a human or a future tool. Do not resolve PR-level comments because they have no resolution state.
 
 If reject_incorrect or reject_scope:
 1. Verify against current code before rejecting.
 2. Post a concise technical reply explaining why no code change is being made.
-3. Do not resolve the thread.
-4. Record the thread or PR-level comment as handled.
+3. Do not resolve the comment.
+4. Record the finding as handled.
 
 If duplicate:
 1. Confirm the shared fix or prior reply covers this comment.
@@ -208,7 +207,7 @@ Use these decision rules:
 - Fix real correctness, security, data-loss, authorization, accessibility, performance, type-safety, and migration-safety issues.
 - Reject suggestions that contradict the current API contract, ignore tenancy or permissions, regress required behavior, duplicate existing safeguards, or propose broad refactors unrelated to the PR.
 - Partially fix when the bug is real but the bot's exact patch is wrong.
-- Mark stale when a later commit or current code already makes the thread obsolete.
+- Mark stale when a later commit or current code already makes the finding obsolete.
 
 Per atomic commit run focused checks only, using the target repository's own package manager and scripts (check `read_repository_knowledge` or the repo's package.json rather than assuming pnpm). Run the repo's full typecheck once per loop iteration before declaring the iteration clean, not after every commit. Never commit unrelated dirty files.
 
@@ -219,7 +218,7 @@ Replies are PR-level via `github__addPullRequestComment`. Foreman has no `resolv
 - All replies are posted as PR-level comments.
 - Inline-thread resolution requires a human or a future tool; this skill cannot resolve threads.
 
-For fixed inline comments:
+For fixed findings:
 
 ```text
 Fixed in `<short-sha>` by moving the authorization check before the write path and adding coverage for the denied case.
@@ -231,7 +230,7 @@ For disagreements:
 I checked `<path>` and am not applying this suggestion. The existing guard runs before `<operation>`, so the proposed extra check would be redundant and would not change the failure mode. No code change here.
 ```
 
-Do not resolve disagreement threads.
+Do not claim a disagreement was resolved.
 
 ### 10. Polling Loop
 
@@ -239,7 +238,7 @@ For monitor mode:
 
 1. Initialize the last-activity timestamp to the current time for this invocation.
 2. Fetch live in-scope AI bot feedback.
-3. Process all actionable threads and PR-level comments.
+3. Process all actionable findings.
 4. Refresh PR state after every push or GitHub write.
 5. Run the target repository's typecheck once for the iteration when code changed or before declaring the iteration clean.
 6. Update the last-activity timestamp after every push or GitHub write.
@@ -265,10 +264,10 @@ End with:
 
 ## Common Pitfalls
 
-- Do not use flat PR comments as the source of truth for inline review state.
+- Flat PR comments are the only review feedback available; there is no inline review state to read.
 - Do not treat all `github-actions[bot]` comments as React Doctor.
 - Do not let multiple write-capable workers commit to the same branch at the same time.
 - Do not stage unrelated user changes.
-- Do not silently ignore top-level AI review bodies; some bots put actionable comments there instead of inline threads.
-- Do not auto-resolve human comments just because they are in a bot-started thread.
-- Do not claim a thread was resolved; Foreman has no thread-resolution tool.
+- Do not silently ignore top-level AI review bodies; some bots put actionable comments there instead of review threads.
+- Do not auto-resolve human comments just because a bot also commented on the PR.
+- Do not claim a finding was resolved; Foreman has no thread-resolution tool.

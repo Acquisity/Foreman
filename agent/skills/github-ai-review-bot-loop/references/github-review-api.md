@@ -10,13 +10,13 @@ Foreman talks to GitHub through the `github__*` eve extension. There is no GitHu
 - `github__listPullRequestFiles` — returns the changed files and diff context for the PR. Use this to locate the code around a referenced line.
 - `github__addPullRequestComment` — posts a PR-level comment. This is the only reply path.
 - `github__listCheckRuns` / `github__getCiFailureContext` — return CI status and failure context for verification.
-- `github__createPullRequest` / `github__updatePullRequest` / `github__listPullRequests` — PR lifecycle tools (used by the `pr` skill, not this loop).
+- `github__createPullRequest` / `github__updatePullRequest` / `github__listPullRequests` — PR lifecycle tools, not used by this loop.
 
 ## Bot Identification
 
-The in-scope allowlist is environment-driven. `FOREMAN_REVIEW_BOT_LOGINS` is a comma-separated list of lowercase GitHub logins, default empty, which the host injects into the prompt; it is not readable from the sandbox. A comment is in scope only when its author login (lowercased) is in that list.
+The in-scope allowlist is environment-driven. `FOREMAN_REVIEW_BOT_LOGINS` is a comma-separated list of lowercase GitHub logins, default empty. It is not readable from the sandbox, so the in-scope logins must be supplied in the request or prompt. A comment is in scope only when its author login (lowercased) is in that list.
 
-Common bots to configure: CodeRabbit (`coderabbitai`, `coderabbitai[bot]`), Cubic (`cubic-dev-ai`, `cubic-dev-ai[bot]`), Devin (`devin-ai-integration`, `devin-ai-integration[bot]`, `devin[bot]`), and React Doctor (`github-actions[bot]` only when the body contains a React Doctor marker).
+Common bots to configure: CodeRabbit (`coderabbitai`, `coderabbitai[bot]`), Cubic (`cubic-dev-ai`, `cubic-dev-ai[bot]`), and Devin (`devin-ai-integration`, `devin-ai-integration[bot]`, `devin[bot]`). `github-actions[bot]` is shared with CI and cannot be safely allowlisted.
 
 ## Reply Path
 
