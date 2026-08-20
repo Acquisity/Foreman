@@ -140,3 +140,28 @@ export const pullRequestReadinessPolicy = (
         type: "denied",
       }
     : "not-applicable";
+
+/**
+ * Deleting the calling user's own saved preferences.
+ *
+ * @remarks
+ * The tool derives its Blob key from the framework-resolved principal, so a
+ * session can only ever clear its own user's document, and an attended user
+ * asking for it in the session is the authorization. An unattended turn has
+ * no such request behind it: schedules dispatch under a real user principal
+ * and read attacker-writable tracker content, so injected text could reach
+ * this tool and delete that user's preferences.
+ *
+ * Denied rather than parked, like every other gate here. A card cannot be
+ * answered from Slack, and an unattended run has nobody to answer one at all.
+ */
+export const userPreferencesDeletionPolicy = (
+  ctx: ApprovalContext
+): ApprovalStatus =>
+  isUnattended(ctx.session.auth.current)
+    ? {
+        reason:
+          "Unattended runs may not delete saved preferences. Only the signed-in user can ask for that, in their own session.",
+        type: "denied",
+      }
+    : "not-applicable";
