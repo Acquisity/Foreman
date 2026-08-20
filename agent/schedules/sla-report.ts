@@ -2,6 +2,7 @@ import { defineSchedule } from "eve/schedules";
 import slack from "../channels/slack.js";
 import { readDocument, SLA_REPORT_PREFIX, writeDocument } from "../lib/blob.js";
 import { slaWindowStart } from "../lib/sla-window.js";
+import { UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
 
 const FEATURE_CHANNELS = [
   { channelId: "C0BAA1KUNP8", feature: "Cold Email" },
@@ -20,9 +21,18 @@ const OWNER_USER_ID = "U0BBHB86PUY";
  * `principalType: "user"` connections. eve keys stored grants by issuer and
  * principal id, so both must match what an inbound Slack message builds.
  * Delivery is unaffected: Slack posts always go out on the bot token.
+ *
+ * The user principal would otherwise make these turns look attended, so they
+ * carry the unattended stamp: `isUnattended` denies shared-config, Linear, and
+ * Supermemory writes outright rather than parking a card on a person who is
+ * asleep when this runs.
  */
 const OWNER_AUTH = {
-  attributes: { team_id: SLACK_TEAM_ID, user_id: OWNER_USER_ID },
+  attributes: {
+    team_id: SLACK_TEAM_ID,
+    [UNATTENDED_ATTRIBUTE]: "true",
+    user_id: OWNER_USER_ID,
+  },
   authenticator: "slack-webhook",
   issuer: `slack:${SLACK_TEAM_ID}`,
   principalId: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
@@ -39,25 +49,35 @@ const LAST_RUN_KEY = `${SLA_REPORT_PREFIX}last-run.txt`;
  * The marker is written at dispatch rather than at session completion, so a
  * session that fails afterwards loses its window. The heartbeat is what
  * surfaces that; per-feature markers would close it if it proves to matter.
+ *
+ * `markerRead` gates that write. A read failure must not overwrite a marker
+ * this run could not see, or a multi-day gap would be narrowed to one day and
+ * lost permanently instead of caught up on the next tick.
  */
-const windowStartIso = async (): Promise<string> => {
+const readWindow = async (): Promise<{
+  markerRead: boolean;
+  since: string;
+}> => {
   try {
     const marker = await readDocument(LAST_RUN_KEY);
-    return slaWindowStart(marker.found ? marker.content : null, Date.now());
+    return {
+      markerRead: true,
+      since: slaWindowStart(marker.found ? marker.content : null, Date.now()),
+    };
   } catch (error) {
     console.error("SLA report last-run marker read failed.", error);
-    return slaWindowStart(null, Date.now());
+    return { markerRead: false, since: slaWindowStart(null, Date.now()) };
   }
 };
 
 export default defineSchedule({
   cron: "0 9 * * *",
   async run({ to, waitUntil }) {
-    const since = await windowStartIso();
+    const { markerRead, since } = await readWindow();
     for (const { feature, channelId } of FEATURE_CHANNELS) {
       try {
         const dispatch = to(slack, { channelId }).send(
-          `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag James Keeble. If there are none, post nothing.`,
+          `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag James Keeble. The repository for any code lookup is Acquisity/Acquisity. If there are none, post nothing.`,
           { auth: OWNER_AUTH }
         );
         waitUntil(
@@ -90,13 +110,15 @@ export default defineSchedule({
       console.error("SLA report heartbeat setup failed.", error);
     }
 
-    waitUntil(
-      writeDocument(LAST_RUN_KEY, new Date().toISOString(), {
-        allowOverwrite: true,
-        contentType: "text/plain",
-      }).catch((error) => {
-        console.error("SLA report last-run marker write failed.", error);
-      })
-    );
+    if (markerRead) {
+      waitUntil(
+        writeDocument(LAST_RUN_KEY, new Date().toISOString(), {
+          allowOverwrite: true,
+          contentType: "text/plain",
+        }).catch((error) => {
+          console.error("SLA report last-run marker write failed.", error);
+        })
+      );
+    }
   },
 });
