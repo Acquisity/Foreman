@@ -46,13 +46,32 @@ export const modelSwapPolicy = attendedWritePolicy(
 );
 
 /**
- * Rebuilding the warm repository snapshot: a several-minute sandbox build
- * that costs real compute, so it follows the same ladder as the other
- * shared-state writes rather than running on anyone's say-so.
+ * Rebuilding the warm repository snapshot: a several-minute sandbox build that
+ * costs real compute.
+ *
+ * @remarks
+ * Denies rather than parks. Slack and Linear cannot answer an approval card, so
+ * a card there is a session that never finishes, and nobody outside the trusted
+ * set has a reason to spend the compute in the first place. Slack mentions and
+ * Linear agent sessions are stamped trusted at dispatch, so a request from
+ * either surface runs the rebuild directly.
  */
-export const warmSnapshotPolicy = attendedWritePolicy(
-  "Unattended runs may not rebuild the warm repository snapshot."
-);
+export const warmSnapshotPolicy = (ctx: ApprovalContext): ApprovalStatus => {
+  const auth = ctx.session.auth.current;
+  if (isUnattended(auth)) {
+    return {
+      reason: "Unattended runs may not rebuild the warm repository snapshot.",
+      type: "denied",
+    };
+  }
+  return isTrusted(auth) || isScheduleAppAuth(auth)
+    ? "not-applicable"
+    : {
+        reason:
+          "Rebuilding the warm repository snapshot is limited to trusted callers.",
+        type: "denied",
+      };
+};
 
 const publishPolicy = attendedWritePolicy(
   "Unattended runs cannot publish without an authorized delivery handoff."
