@@ -32,6 +32,15 @@ const FEATURE_CHANNELS = [
  * carry the unattended stamp: `isUnattended` denies shared-config, Linear, and
  * Supermemory writes outright rather than parking a card on a person who is
  * asleep when this runs.
+ *
+ * Known gap, deliberately not solved here: if a user grant lapses, eve's
+ * default `authorization.required` handler posts "Connect with <name> to
+ * continue" into whichever feature channel that session targets, and delivers
+ * the sign-in button ephemerally to `attributes.user_id`. The credential never
+ * goes public and the notice edits itself once resolved, but the run stalls
+ * until a person signs in, which a schedule should not need. The only override
+ * is the channel-wide handler in `agent/channels/slack.ts`, which would change
+ * behavior for every human Slack session too, so it is a separate decision.
  */
 const OWNER_AUTH = {
   attributes: {
