@@ -16,8 +16,10 @@ import { pullRequestReadinessPolicy } from "./approval.js";
  */
 const REQUIRE_APPROVAL_FALSE = /requireApproval:\s*false/u;
 const MERGE_TOOL = /"\w*[Mm]erge\w*"/u;
+const INTAKE_OVERRIDE =
+  /createPullRequest:\s*\{\s*approval:\s*intakeOnlyPolicy\s*\}/u;
 const READINESS_OVERRIDE =
-  /overrides:\s*\{\s*updatePullRequest:\s*\{\s*approval:\s*pullRequestReadinessPolicy\s*\}\s*\}/u;
+  /updatePullRequest:\s*\{\s*approval:\s*pullRequestReadinessPolicy\s*\}/u;
 const DOC_ONLY_PHRASE = /load-bearing/u;
 
 const source = readFileSync(
@@ -45,6 +47,10 @@ describe("github extension config", () => {
 
   it("gates the readiness transition", () => {
     assert.match(call, READINESS_OVERRIDE);
+  });
+
+  it("gates pull request creation on the intake-only rule", () => {
+    assert.match(call, INTAKE_OVERRIDE);
   });
 });
 

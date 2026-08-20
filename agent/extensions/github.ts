@@ -1,5 +1,8 @@
 import githubExtension from "@github-tools/eve-extension";
-import { pullRequestReadinessPolicy } from "../lib/github/approval.js";
+import {
+  intakeOnlyPolicy,
+  pullRequestReadinessPolicy,
+} from "../lib/github/approval.js";
 import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
 
 /**
@@ -22,8 +25,10 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  *   resolves its own credential, `owner` and `repo` are always explicit, and
  *   `pullRequestReadinessPolicy` denies the one transition that presents work
  *   as reviewable.
- * - `overrides` gates `updatePullRequest` on that policy. It denies rather than
- *   parks, so the run keeps moving on every surface. Note that moving
+ * - `overrides` gates `updatePullRequest` on that policy, and `createPullRequest`
+ *   on `intakeOnlyPolicy`, because opening a pull request is delivery too and an
+ *   intake-only channel files to Linear instead of shipping. Both deny rather
+ *   than park, so the run keeps moving on every surface. Note that moving
  *   `requireApproval` to the per-tool object form would silently re-gate every
  *   tool absent from the object with `always()`, so the override is the safe
  *   place for a per-tool rule.
@@ -63,6 +68,9 @@ export default githubExtension({
     "listCheckRuns",
     "getCiFailureContext",
   ],
-  overrides: { updatePullRequest: { approval: pullRequestReadinessPolicy } },
+  overrides: {
+    createPullRequest: { approval: intakeOnlyPolicy },
+    updatePullRequest: { approval: pullRequestReadinessPolicy },
+  },
   requireApproval: false,
 });
