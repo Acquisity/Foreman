@@ -11,3 +11,4 @@ dist
 *.tsbuildinfo
 docs/research/
 *-oauth-client*.json
+.context/
