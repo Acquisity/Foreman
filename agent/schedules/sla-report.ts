@@ -24,8 +24,8 @@ const FEATURE_CHANNELS = [
 /**
  * The schedule runs as the owner rather than as the app, because the
  * investigation reaches Sentry and Axiom, which are `principalType: "user"`
- * connections. eve keys stored grants by issuer and
- * principal id, so both must match what an inbound Slack message builds.
+ * connections. eve keys stored grants by issuer and principal id, so both
+ * must match what an inbound Slack message builds.
  * Delivery is unaffected: Slack posts always go out on the bot token.
  *
  * The user principal would otherwise make these turns look attended, so they
