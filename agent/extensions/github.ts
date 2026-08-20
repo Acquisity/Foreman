@@ -14,6 +14,11 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  *   in the GitHub UI), and so are repo administration, gists (they 403 over
  *   Connect installation tokens), releases, and CI mutation. Omitting merge
  *   tools is the only remaining protection on writes.
+ * - `requireApproval: false` is load-bearing, not decorative. Left unset, the
+ *   extension attaches `always()` to every write tool in the allowlist, so
+ *   opening a pull request or leaving a comment raises an approval card on
+ *   every call. Slack cannot answer one, which parks the session for good.
+ *   The allowlist, not a per-call card, is what bounds these writes.
  */
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
@@ -50,4 +55,5 @@ export default githubExtension({
     "listCheckRuns",
     "getCiFailureContext",
   ],
+  requireApproval: false,
 });

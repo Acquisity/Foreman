@@ -1,5 +1,4 @@
 import { defineTool } from "eve/tools";
-import { always } from "eve/tools/approval";
 import { z } from "zod";
 import { deleteDocument } from "#lib/blob.js";
 import { userPreferencesKey } from "#lib/user-preferences.js";
@@ -10,11 +9,12 @@ import { userPreferencesKey } from "#lib/user-preferences.js";
  * @remarks
  * The Blob key is derived from the framework-resolved principal (`ctx.session.auth.current`),
  * never from model input, so a session can only ever clear its own user's preferences.
- * Deletion is irreversible, so it is gated on human approval via `always()`.
+ * Deletion is irreversible, but it only ever runs when the user asks for it in the
+ * session, and that request is the authorization. An approval card here would park
+ * a Slack session permanently, because Slack cannot deliver an answer to one.
  * Authorization resolves from the ambient Vercel OIDC credentials.
  */
 export default defineTool({
-  approval: always(),
   description:
     "Permanently delete this user's saved preferences. Use only when the user " +
     "explicitly asks to reset or forget their preferences. This is irreversible.",
