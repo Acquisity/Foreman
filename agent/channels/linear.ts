@@ -6,6 +6,11 @@ import { stampTrusted } from "../lib/trust.js";
 
 /**
  * Linear channel: Agent Sessions in, Agent Activities out, via Vercel Connect.
+ *
+ * @remarks
+ * Vercel Connect supplies the app token and verifies inbound webhooks by their
+ * Vercel OIDC signature. Only workspace members can open an Agent Session, so
+ * workspace membership is the gate behind {@link stampTrusted}.
  */
 export default linearChannel({
   credentials: connectLinearCredentials(

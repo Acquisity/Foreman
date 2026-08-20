@@ -8,6 +8,8 @@ const { FACTORY_PROMPT, GENERAL_MODE, GENERAL_PROMPT, PIPELINE, selectPrompt } =
   await import("./prompts.js");
 const { AUTONOMOUS_PRINCIPAL } = await import("./trust.js");
 
+const CHANNEL_NAME = /Linear|Slack/;
+
 describe("selectPrompt", () => {
   it("selects FACTORY_PROMPT for the autonomous principal and inlines the pipeline", () => {
     const prompt = selectPrompt(AUTONOMOUS_PRINCIPAL);
@@ -33,7 +35,7 @@ describe("selectPrompt", () => {
     }
   });
 
-  it("does not list Linear assignment as a factory trigger", () => {
-    assert.ok(!GENERAL_MODE.includes("when a Linear issue is assigned to you"));
+  it("does not name any channel in general-mode routing", () => {
+    assert.ok(!CHANNEL_NAME.test(GENERAL_MODE));
   });
 });
