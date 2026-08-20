@@ -106,13 +106,9 @@ export const createWarmSnapshot = async (): Promise<string> => {
       `mkdir -p ${WARM_ROOT} ${PNPM_STORE_DIR} ${BUN_INSTALL_CACHE_DIR}`
     );
 
-    if (WARM_REPOSITORIES.some((repository) => repository.kind === "bun")) {
-      await run(sandbox, bunInstallCommand());
-    }
-
     // Clone first, while the brokered GitHub token is still injected; the
-    // install/build steps run after the token window closes so lifecycle
-    // scripts never execute with the credential on the wire.
+    // install steps run after the token window closes so lifecycle scripts
+    // never execute with the credential on the wire.
     await Promise.all(
       WARM_REPOSITORIES.map(async (repository) => {
         const path = warmRepositoryPath(repository.slug);
@@ -124,6 +120,12 @@ export const createWarmSnapshot = async (): Promise<string> => {
     );
 
     await sandbox.update({ networkPolicy: "allow-all" });
+
+    // Also after the token window: installing bun runs the npm package's own
+    // lifecycle scripts, which is the same hazard as a repository's.
+    if (WARM_REPOSITORIES.some((repository) => repository.kind === "bun")) {
+      await run(sandbox, bunInstallCommand());
+    }
 
     await Promise.all(
       WARM_REPOSITORIES.map(async (repository) => {
