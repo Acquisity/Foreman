@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildReadQueryResult,
   callPlanetscaleReadQuery,
+  PlanetscaleHttpError,
   parseReadQueryResult,
   truncateRows,
 } from "./planetscale.js";
@@ -10,6 +12,7 @@ const NON_JSON_ERROR = /non-JSON/;
 const UNRECOGNIZED_SHAPE_ERROR = /unrecognized result shape/;
 const QUERY_FAILED_ERROR = /query failed/;
 const SYNTAX_ERROR = /syntax error/;
+const NOTIFICATION_FAILED_ERROR = /notifications\/initialized failed/;
 
 describe("truncateRows", () => {
   it("keeps every row when the total is under the cap", () => {
@@ -43,6 +46,7 @@ describe("truncateRows", () => {
     assert.equal(result.returnedRows, 0);
     assert.equal(result.resultBytes, 2);
     assert.equal(result.oversizedRow, false);
+    assert.equal(result.envelopeTooLarge, false);
   });
 
   it("measures byte length, not character length", () => {
@@ -305,6 +309,94 @@ describe("callPlanetscaleReadQuery", () => {
         { fetch: fetchStub }
       ),
       SYNTAX_ERROR
+    );
+  });
+});
+
+describe("envelopeTooLarge", () => {
+  it("flags when the overhead alone exceeds the cap", () => {
+    const result = truncateRows([{ id: 1 }], 10, 20);
+    assert.equal(result.envelopeTooLarge, true);
+    assert.equal(result.oversizedRow, false);
+    assert.deepEqual(result.rows, []);
+    assert.equal(result.truncated, true);
+    assert.equal(result.totalRows, 1);
+  });
+});
+
+describe("buildReadQueryResult", () => {
+  it("keeps the full returned object under the stream limit at the cap", () => {
+    const rows = Array.from({ length: 3_000_000 }, (_, i) => i % 1000);
+    const result = buildReadQueryResult(rows, {}, 1024 * 1024);
+    const serialized = Buffer.byteLength(JSON.stringify(result), "utf8");
+    assert.ok(serialized < 10_485_760);
+    assert.equal(result.truncated, true);
+  });
+
+  it("preserves passthrough fields and wins on metadata collisions", () => {
+    const result = buildReadQueryResult(
+      [{ id: 1 }],
+      { columns: ["id"], truncated: "server-says-no" },
+      1024 * 1024
+    );
+    assert.equal(result.truncated, false);
+    assert.equal(result.success, true);
+    assert.deepEqual(result.columns, ["id"]);
+  });
+});
+
+describe("PlanetscaleHttpError", () => {
+  it("carries the HTTP status for re-auth mapping", async () => {
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "initialize") {
+        return Promise.resolve(
+          new Response(JSON.stringify({}), { status: 401 })
+        );
+      }
+      throw new Error("unreachable");
+    };
+    await assert.rejects(
+      callPlanetscaleReadQuery(
+        "secret-token",
+        { query: "SELECT 1" },
+        { fetch: fetchStub }
+      ),
+      (error) => {
+        assert.ok(error instanceof PlanetscaleHttpError);
+        assert.equal(error.status, 401);
+        return true;
+      }
+    );
+  });
+
+  it("checks the notifications/initialized status", async () => {
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "initialize") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1,
+              jsonrpc: "2.0",
+              result: { protocolVersion: "2025-06-18" },
+            }),
+            { headers: { "Content-Type": "application/json" }, status: 200 }
+          )
+        );
+      }
+      if (body.method === "notifications/initialized") {
+        return Promise.resolve(new Response("", { status: 500 }));
+      }
+      throw new Error("unreachable");
+    };
+    await assert.rejects(
+      callPlanetscaleReadQuery(
+        "secret-token",
+        { query: "SELECT 1" },
+        { fetch: fetchStub }
+      ),
+      NOTIFICATION_FAILED_ERROR
     );
   });
 });

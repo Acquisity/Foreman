@@ -2,24 +2,31 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { planetscaleAuth } from "#lib/constants.js";
 import {
+  buildReadQueryResult,
   callPlanetscaleReadQuery,
+  PlanetscaleHttpError,
   parseReadQueryResult,
-  truncateRows,
 } from "#lib/planetscale.js";
 
 /**
  * Maximum serialized size of the rows returned to the model, in bytes.
  *
- * The workflow stream caps each chunk at 10 MB; staying at 8 MB leaves headroom
- * for the surrounding JSON envelope and metadata so a single result never
- * exceeds the per-chunk limit.
+ * The workflow stream caps each chunk at 10 MB, but the real consumer is the
+ * model context, not the stream. 1 MB of JSON is already on the order of a
+ * quarter-million tokens, so a result at this cap is still usable while staying
+ * far under the stream limit. When a query returns more, the tool truncates and
+ * flags it so the model narrows the query instead of concluding from a partial
+ * result.
  */
-const MAX_RESULT_BYTES = 8 * 1024 * 1024;
+const MAX_RESULT_BYTES = 1024 * 1024;
+
+/** Bounded preview of raw text returned when a result cannot be parsed. */
+const RAW_PREVIEW_BYTES = 4000;
 
 export default defineTool({
   description:
     "Run a read-only SQL query against PlanetScale production Postgres and return the rows. " +
-    "Results are capped at 8 MB; when `truncated` is true the rows are partial, so narrow the " +
+    "Results are capped at 1 MB; when `truncated` is true the rows are partial, so narrow the " +
     "query (a bounded COUNT, a tighter WHERE, or a LIMIT) and re-run rather than concluding " +
     "from a partial result. When `oversizedRow` is true a single row alone exceeded the cap, " +
     "so select fewer or narrower columns instead of re-running the same query. Never run a write.",
@@ -47,6 +54,15 @@ export default defineTool({
     try {
       text = await callPlanetscaleReadQuery(token, args);
     } catch (error) {
+      // A grant revoked mid-flight surfaces as a downstream 401/403; re-challenge
+      // so eve evicts the dead bearer and mints a fresh token instead of handing
+      // the model a dead-token error.
+      if (
+        error instanceof PlanetscaleHttpError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        ctx.requireAuth(planetscaleAuth);
+      }
       return {
         error: error instanceof Error ? error.message : "Read query failed.",
         success: false as const,
@@ -60,38 +76,16 @@ export default defineTool({
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : "Result parse failed.",
+        raw: text.slice(0, RAW_PREVIEW_BYTES),
         success: false as const,
       };
     }
 
-    // Measure everything that will surround the rows array in the returned
-    // object, using upper-bound values for the numbers, so the final
-    // serialized output stays under the stream's per-chunk limit.
-    const overheadBytes = Buffer.byteLength(
-      JSON.stringify({
-        ...passthrough,
-        oversizedRow: true,
-        resultBytes: MAX_RESULT_BYTES,
-        returnedRows: rows.length,
-        success: true,
-        totalRows: rows.length,
-        truncated: true,
-      }),
-      "utf8"
-    );
-
-    const truncated = truncateRows(rows, MAX_RESULT_BYTES, overheadBytes);
-    return {
-      ...passthrough,
-      oversizedRow: truncated.oversizedRow,
-      resultBytes: truncated.resultBytes,
-      returnedRows: truncated.returnedRows,
-      rows: truncated.rows,
-      success: true as const,
-      totalRows: truncated.totalRows,
-      truncated: truncated.truncated,
-    };
+    return buildReadQueryResult(rows, passthrough, MAX_RESULT_BYTES);
   },
+  // Hand-copied from the PlanetScale MCP server's published schema for
+  // `planetscale_execute_read_query`; keep in sync with the server if it adds
+  // or renames fields.
   inputSchema: z.object({
     branch: z.string().optional().describe("The branch name."),
     database: z.string().optional().describe("The database name."),
@@ -107,8 +101,10 @@ export default defineTool({
       .describe("Whether to run against a read replica."),
   }),
   outputSchema: z.looseObject({
+    envelopeTooLarge: z.boolean().optional(),
     error: z.string().optional(),
     oversizedRow: z.boolean().optional(),
+    raw: z.string().optional(),
     resultBytes: z.number().optional(),
     returnedRows: z.number().optional(),
     rows: z.array(z.unknown()).optional(),

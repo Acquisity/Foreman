@@ -21,10 +21,30 @@ const MCP_PROTOCOL_VERSION = "2025-06-18";
 /** Tool name on the PlanetScale MCP server for a read query. */
 const READ_QUERY_TOOL = "planetscale_execute_read_query";
 
+/**
+ * Per-request timeout, matching the PlanetScale MCP server's own 50s query
+ * deadline so a hung upstream cannot hold the workflow step indefinitely.
+ */
+const REQUEST_TIMEOUT_MS = 50_000;
+
 /** Options for {@link callPlanetscaleReadQuery}. */
 export interface CallPlanetscaleReadQueryOptions {
   /** Injectable `fetch` for tests; defaults to the global `fetch`. */
   fetch?: typeof fetch;
+}
+
+/**
+ * An HTTP-level failure from the PlanetScale MCP endpoint, carrying the status
+ * so the caller can map 401/403 to a re-authorization challenge.
+ */
+export class PlanetscaleHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "PlanetscaleHttpError";
+    this.status = status;
+  }
 }
 
 /** A single JSON-RPC response message, narrowed to the fields we read. */
@@ -98,7 +118,8 @@ function joinContentText(
  * The full handshake is performed per call: `initialize`, echo the
  * `mcp-session-id` header when present, `notifications/initialized`, then
  * `tools/call`. The token is sent only as `Authorization: Bearer <token>` and
- * never appears in the returned value.
+ * never appears in the returned value. HTTP failures throw
+ * {@link PlanetscaleHttpError} so the caller can re-challenge on 401/403.
  *
  * @param token - The PlanetScale service-token SECRET.
  * @param args - The tool arguments (e.g. `{ query, database, branch }`).
@@ -131,9 +152,11 @@ export async function callPlanetscaleReadQuery(
     }),
     headers: baseHeaders,
     method: "POST",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!initializeResponse.ok) {
-    throw new Error(
+    throw new PlanetscaleHttpError(
+      initializeResponse.status,
       `PlanetScale MCP initialize failed: HTTP ${initializeResponse.status}.`
     );
   }
@@ -151,14 +174,23 @@ export async function callPlanetscaleReadQuery(
     ...(sessionId ? { "mcp-session-id": sessionId } : {}),
   };
 
-  await fetchImpl(PLANETSCALE_MCP_URL, {
+  const notificationResponse = await fetchImpl(PLANETSCALE_MCP_URL, {
     body: JSON.stringify({
       jsonrpc: JSON_RPC_VERSION,
       method: "notifications/initialized",
     }),
     headers: sessionHeaders,
     method: "POST",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  if (!notificationResponse.ok) {
+    throw new PlanetscaleHttpError(
+      notificationResponse.status,
+      `PlanetScale MCP notifications/initialized failed: HTTP ${notificationResponse.status}.`
+    );
+  }
+  // Consume the body so the socket is released.
+  await notificationResponse.text();
 
   const callResponse = await fetchImpl(PLANETSCALE_MCP_URL, {
     body: JSON.stringify({
@@ -169,9 +201,11 @@ export async function callPlanetscaleReadQuery(
     }),
     headers: sessionHeaders,
     method: "POST",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!callResponse.ok) {
-    throw new Error(
+    throw new PlanetscaleHttpError(
+      callResponse.status,
       `PlanetScale MCP tools/call failed: HTTP ${callResponse.status}.`
     );
   }
@@ -195,9 +229,11 @@ export async function callPlanetscaleReadQuery(
 
 /** Result of {@link truncateRows}. */
 export interface TruncateRowsResult {
+  /** Whether the overhead (passthrough plus metadata) alone exceeded the cap. */
+  envelopeTooLarge: boolean;
   /** Whether a single row alone exceeded the cap, so nothing was kept. */
   oversizedRow: boolean;
-  /** Serialized byte length of the kept rows array (`JSON.stringify(kept)`). */
+  /** Serialized byte length of the kept rows array (`Buffer.byteLength(JSON.stringify(kept))`). */
   resultBytes: number;
   /** The number of rows kept. */
   returnedRows: number;
@@ -215,10 +251,10 @@ export interface TruncateRowsResult {
  * rows are kept in order until adding the next would exceed the budget.
  *
  * The budget accounts for the array brackets and the comma between each pair
- * of kept rows, so `resultBytes` equals `JSON.stringify(kept).length`. Pass
- * `overheadBytes` as the measured size of everything else in the returned
- * object (metadata keys plus passthrough fields) so the full serialized output
- * stays under the cap.
+ * of kept rows, so `resultBytes` equals the UTF-8 byte length of
+ * `JSON.stringify(kept)`. Pass `overheadBytes` as the measured size of
+ * everything else in the returned object (metadata keys plus passthrough
+ * fields) so the full serialized output stays under the cap.
  *
  * @param rows - The rows to truncate.
  * @param capBytes - The maximum serialized byte size of the full result.
@@ -231,7 +267,8 @@ export function truncateRows(
   overheadBytes = 0
 ): TruncateRowsResult {
   const kept: unknown[] = [];
-  const rowsBudget = capBytes - overheadBytes;
+  const envelopeTooLarge = overheadBytes >= capBytes;
+  const rowsBudget = Math.max(0, capBytes - overheadBytes);
   // "[" and "]" bracket the array; each row after the first adds a comma.
   let resultBytes = 2;
   for (const row of rows) {
@@ -244,7 +281,8 @@ export function truncateRows(
     resultBytes += rowBytes + commaBytes;
   }
   return {
-    oversizedRow: kept.length === 0 && rows.length > 0,
+    envelopeTooLarge,
+    oversizedRow: !envelopeTooLarge && kept.length === 0 && rows.length > 0,
     resultBytes,
     returnedRows: kept.length,
     rows: kept,
@@ -296,4 +334,47 @@ export function parseReadQueryResult(text: string): ParseReadQueryResult {
   throw new Error(
     "PlanetScale read query returned an unrecognized result shape."
   );
+}
+
+/**
+ * Builds the final tool result for a read query: measures the overhead of
+ * everything that will surround the rows array, truncates the rows to fit the
+ * remaining budget, and returns the assembled object. Exported so the
+ * end-to-end size invariant can be tested directly.
+ *
+ * @param rows - The parsed rows.
+ * @param passthrough - Other top-level fields from the server result.
+ * @param capBytes - The maximum serialized byte size of the full result.
+ * @returns The assembled result object.
+ */
+export function buildReadQueryResult(
+  rows: unknown[],
+  passthrough: Record<string, unknown>,
+  capBytes: number
+): Record<string, unknown> {
+  const overheadBytes = Buffer.byteLength(
+    JSON.stringify({
+      ...passthrough,
+      envelopeTooLarge: false,
+      oversizedRow: true,
+      resultBytes: capBytes,
+      returnedRows: rows.length,
+      success: true,
+      totalRows: rows.length,
+      truncated: true,
+    }),
+    "utf8"
+  );
+  const truncated = truncateRows(rows, capBytes, overheadBytes);
+  return {
+    ...passthrough,
+    envelopeTooLarge: truncated.envelopeTooLarge,
+    oversizedRow: truncated.oversizedRow,
+    resultBytes: truncated.resultBytes,
+    returnedRows: truncated.returnedRows,
+    rows: truncated.rows,
+    success: true,
+    totalRows: truncated.totalRows,
+    truncated: truncated.truncated,
+  };
 }
