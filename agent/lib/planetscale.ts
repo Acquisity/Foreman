@@ -155,9 +155,10 @@ export async function callPlanetscaleReadQuery(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!initializeResponse.ok) {
+    const detail = (await initializeResponse.text()).slice(0, 500);
     throw new PlanetscaleHttpError(
       initializeResponse.status,
-      `PlanetScale MCP initialize failed: HTTP ${initializeResponse.status}.`
+      `PlanetScale MCP initialize failed: HTTP ${initializeResponse.status}. ${detail}`
     );
   }
   const sessionId = initializeResponse.headers.get("mcp-session-id");
@@ -184,9 +185,10 @@ export async function callPlanetscaleReadQuery(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!notificationResponse.ok) {
+    const detail = (await notificationResponse.text()).slice(0, 500);
     throw new PlanetscaleHttpError(
       notificationResponse.status,
-      `PlanetScale MCP notifications/initialized failed: HTTP ${notificationResponse.status}.`
+      `PlanetScale MCP notifications/initialized failed: HTTP ${notificationResponse.status}. ${detail}`
     );
   }
   // Consume the body so the socket is released.
@@ -204,9 +206,10 @@ export async function callPlanetscaleReadQuery(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!callResponse.ok) {
+    const detail = (await callResponse.text()).slice(0, 500);
     throw new PlanetscaleHttpError(
       callResponse.status,
-      `PlanetScale MCP tools/call failed: HTTP ${callResponse.status}.`
+      `PlanetScale MCP tools/call failed: HTTP ${callResponse.status}. ${detail}`
     );
   }
   const callMessage = extractMessage(await callResponse.text());

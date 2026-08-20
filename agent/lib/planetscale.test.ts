@@ -13,6 +13,8 @@ const UNRECOGNIZED_SHAPE_ERROR = /unrecognized result shape/;
 const QUERY_FAILED_ERROR = /query failed/;
 const SYNTAX_ERROR = /syntax error/;
 const NOTIFICATION_FAILED_ERROR = /notifications\/initialized failed/;
+const NO_RESULT_ERROR = /no JSON-RPC result/;
+const INVALID_TOKEN_ERROR = /invalid token/;
 
 describe("truncateRows", () => {
   it("keeps every row when the total is under the cap", () => {
@@ -397,6 +399,73 @@ describe("PlanetscaleHttpError", () => {
         { fetch: fetchStub }
       ),
       NOTIFICATION_FAILED_ERROR
+    );
+  });
+});
+
+describe("HTTP failure paths", () => {
+  function jsonResponse(
+    body: unknown,
+    init?: { status?: number; headers?: Record<string, string> }
+  ): Promise<Response> {
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        headers: { "Content-Type": "application/json", ...init?.headers },
+        status: init?.status ?? 200,
+      })
+    );
+  }
+
+  it("includes a bounded body slice in a tools/call HTTP failure", async () => {
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "initialize") {
+        return jsonResponse({
+          id: 1,
+          jsonrpc: "2.0",
+          result: { protocolVersion: "2025-06-18" },
+        });
+      }
+      if (body.method === "notifications/initialized") {
+        return jsonResponse({});
+      }
+      if (body.method === "tools/call") {
+        return Promise.resolve(new Response("invalid token", { status: 403 }));
+      }
+      throw new Error("unreachable");
+    };
+    await assert.rejects(
+      callPlanetscaleReadQuery(
+        "secret-token",
+        { query: "SELECT 1" },
+        { fetch: fetchStub }
+      ),
+      (error) => {
+        assert.ok(error instanceof PlanetscaleHttpError);
+        assert.equal(error.status, 403);
+        assert.match(error.message, INVALID_TOKEN_ERROR);
+        return true;
+      }
+    );
+  });
+
+  it("throws when the response carries no JSON-RPC result", async () => {
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "initialize") {
+        return Promise.resolve(
+          new Response("not a json-rpc response", { status: 200 })
+        );
+      }
+      throw new Error("unreachable");
+    };
+    await assert.rejects(
+      callPlanetscaleReadQuery(
+        "secret-token",
+        { query: "SELECT 1" },
+        { fetch: fetchStub }
+      ),
+      NO_RESULT_ERROR
     );
   });
 });
