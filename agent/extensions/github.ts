@@ -13,8 +13,7 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  * - `include` is the allowlist; there is no preset. Reads, triage writes, and
  *   PR authoring are in; merge tools are deliberately absent (a person merges
  *   in the GitHub UI), and so are repo administration, gists (they 403 over
- *   Connect installation tokens), releases, and CI mutation. Omitting merge
- *   tools is the only remaining protection on writes.
+ *   Connect installation tokens), releases, and CI mutation.
  * - `requireApproval: false` is load-bearing, not decorative. Left unset, the
  *   extension attaches `always()` to every write tool in the allowlist, so
  *   opening a pull request or leaving a comment raises an approval card on
