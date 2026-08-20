@@ -16,7 +16,7 @@ Factory mode runs these stations in order:
 4. Implementer: code, checks, commit, and feature-branch push.
 5. Reviewer: independent review of the exact pushed commit.
 
-An assigned Linear issue and a trusted GitHub `factory` label activate factory mode deterministically. Interactive users can request it explicitly, and Foreman may select it when complexity, uncertainty, risk, or requested review depth warrants the full line. Slack has no factory default.
+A trusted GitHub `factory` label activates factory mode deterministically. Interactive users can request it explicitly, and Foreman may select it when complexity, uncertainty, risk, or requested review depth warrants the full line. Linear and Slack have no factory default.
 
 After internal review, Foreman opens a normal pull request and stabilizes the same branch against current-head CI failures and actionable feedback from trusted collaborators or allowlisted review bots. A ten-minute reconciliation schedule recovers missed webhooks. It reports `ready to merge` only when internal review approves the current head, required checks pass, GitHub reports no conflict, and no actionable trusted feedback remains. Foreman never merges.
 

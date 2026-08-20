@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-const { LINEAR_INTAKE_TASK, buildLinearContext } = await import(
-  "./linear-context.js"
-);
+const { buildLinearContext } = await import("./linear-context.js");
 
 function makeEvent(overrides: {
   action: string;
@@ -34,34 +32,13 @@ function makeEvent(overrides: {
 }
 
 describe("buildLinearContext", () => {
-  it("includes the intake task when created with an issue", () => {
-    const context = buildLinearContext(
-      makeEvent({ action: "created", issue: { id: "issue-1" } })
-    );
-    assert.ok(context);
-    assert.ok(context.includes(LINEAR_INTAKE_TASK));
-  });
-
-  it("omits the intake task when created without an issue (undefined)", () => {
-    const context = buildLinearContext(makeEvent({ action: "created" }));
-    assert.ok(context);
-    assert.ok(!context.includes(LINEAR_INTAKE_TASK));
-  });
-
-  it("omits the intake task when created with a null issue", () => {
-    const context = buildLinearContext(
-      makeEvent({ action: "created", issue: null })
-    );
-    assert.ok(context);
-    assert.ok(!context.includes(LINEAR_INTAKE_TASK));
-  });
-
-  it("omits the intake task when prompted with an issue", () => {
-    const context = buildLinearContext(
-      makeEvent({ action: "prompted", issue: { id: "issue-1" } })
-    );
-    assert.ok(context);
-    assert.ok(!context.includes(LINEAR_INTAKE_TASK));
+  it("adds no context for created and prompted dispatches", () => {
+    for (const action of ["created", "prompted"]) {
+      const context = buildLinearContext(
+        makeEvent({ action, issue: { id: "issue-1" } })
+      );
+      assert.deepEqual(context, []);
+    }
   });
 
   it("returns null for unsupported actions", () => {

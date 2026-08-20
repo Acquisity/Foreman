@@ -14,11 +14,10 @@ export default defineDynamic({
         ? null
         : defineSkill({
             description:
-              "Load when the user explicitly requests factory mode, a task has substantial " +
-              "complexity, uncertainty, risk, or review depth, or an assigned work item requires " +
-              "the full line: repository intake, classifier, root-cause investigator, analyst, " +
-              "implementer, independent reviewer, pull request stabilization, and readiness. " +
-              "Do not load merely because a small task changes files.",
+              "Load when the user explicitly requests factory mode, or a task has substantial " +
+              "complexity, uncertainty, risk, or review depth: repository intake, classifier, " +
+              "root-cause investigator, analyst, implementer, independent reviewer, pull request " +
+              "stabilization, and readiness. Do not load merely because a small task changes files.",
             markdown: PIPELINE,
           }),
   },

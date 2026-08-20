@@ -4,9 +4,9 @@ Foreman is a repository-neutral eve agent with a general execution path and an o
 
 ## Routing
 
-General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and ordinary Linear conversation remain general. The `factory-pipeline` skill is advertised by task characteristics: explicit factory requests, complexity, uncertainty, risk, or requested review depth.
+General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and Linear sessions (including assigned issues) remain general by default. The `factory-pipeline` skill is advertised by task characteristics: explicit factory requests, complexity, uncertainty, risk, or requested review depth.
 
-Factory mode activates deterministically for a Linear `created` Agent Session carrying an assigned issue and for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
+Factory mode activates deterministically only for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
 
 ## Repository binding
 
@@ -31,7 +31,7 @@ Readiness requires all of: internal approval for the current head, passing requi
 ## Channels and trust
 
 - GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Label intake additionally checks the labeler's repository permission. Signed repository context is stamped before any model step.
-- Linear Agent Sessions are trusted by workspace membership. `created` with an issue injects factory intake; `prompted` only continues the current mode.
+- Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the current mode.
 - Slack mentions are trusted by channel membership and have no factory default.
 - The Eve HTTP channel uses local dev or Vercel OIDC auth.
 
