@@ -8,7 +8,7 @@ import type { SessionAuthContext } from "eve/context";
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
  * dispatch; the remaining approval policies (factoryBrainPolicy,
- * modelSwapPolicy, denyAutonomousWrites) deny it non-GitHub writes (factory
+ * modelSwapPolicy, denyUnattendedWrites) deny it non-GitHub writes (factory
  * brain, model swaps, connection writes), because an unattended turn has
  * nobody to answer an approval card and would park forever.
  */
@@ -92,6 +92,30 @@ export function intakeIssueNumber(
   }
   const issue = Number(stamped);
   return Number.isSafeInteger(issue) && issue > 0 ? issue : null;
+}
+
+/**
+ * Auth attribute marking a session that nobody is watching, even though it
+ * carries a real user principal.
+ *
+ * @remarks
+ * Schedules that reach `principalType: "user"` connections must dispatch under
+ * the granting user, so they cannot use {@link AUTONOMOUS_PRINCIPAL}. Without
+ * this stamp such a turn would look attended: approval cards would park with
+ * nobody to answer them, and the unattended write denials would not fire.
+ */
+export const UNATTENDED_ATTRIBUTE = "unattended";
+
+/**
+ * Whether nobody is watching this session, whether it runs under
+ * {@link AUTONOMOUS_PRINCIPAL} or under a user principal a schedule stamped
+ * with {@link UNATTENDED_ATTRIBUTE}. Write policies gate on this; anything
+ * specific to factory intake keeps using {@link isAutonomous}.
+ */
+export function isUnattended(auth: SessionAuthContext | null): boolean {
+  return (
+    isAutonomous(auth) || auth?.attributes[UNATTENDED_ATTRIBUTE] === "true"
+  );
 }
 
 /**

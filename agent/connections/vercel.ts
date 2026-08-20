@@ -1,7 +1,7 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
-import { denyAutonomousWrites } from "../lib/github/approval.js";
+import { denyUnattendedWrites } from "../lib/github/approval.js";
 
 /**
  * Tools that mutate Vercel state. Allowed in attended sessions, denied on
@@ -34,7 +34,7 @@ const WRITE_TOOLS = [
  *   explicitly.
  */
 export default defineMcpClientConnection({
-  approval: denyAutonomousWrites("Vercel", WRITE_TOOLS),
+  approval: denyUnattendedWrites("Vercel", WRITE_TOOLS),
   auth: connect({
     connector: requireEnv(
       "VERCEL_MCP_CONNECTOR",
