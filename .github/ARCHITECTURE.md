@@ -4,9 +4,9 @@ Foreman is a repository-neutral eve agent with a general execution path and an o
 
 ## Routing
 
-General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and ordinary Linear conversation remain general. The `factory-pipeline` skill is advertised by task characteristics: explicit factory requests, complexity, uncertainty, risk, or requested review depth.
+General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and Linear sessions (including assigned issues) remain general by default. The `factory-pipeline` skill is advertised by task characteristics: explicit factory requests, complexity, uncertainty, risk, or requested review depth.
 
-Factory mode activates deterministically for a Linear `created` Agent Session carrying an assigned issue and for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
+Factory mode activates deterministically only for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
 
 ## Repository binding
 
@@ -24,14 +24,14 @@ Every clone, fetch, and push targets `https://github.com/<validated-owner>/<vali
 
 The ordered stations are classifier, investigator, analyst, implementer, and reviewer. The root investigates relevant production tools before planning and passes self-contained evidence to children. Task-mode children cannot park and receive only their authored tools and the shared sandbox.
 
-After the reviewer approves the exact pushed head, and only with explicit user authorization plus an existing Linear ticket, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only; internal review approval is not user authorization. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, PR synchronizations, and the ten-minute `reconcile-pipelines` schedule drive revisions on the existing branch. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
+After the reviewer approves the exact pushed head and an existing Linear ticket is confirmed, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, PR synchronizations, and the ten-minute `reconcile-pipelines` schedule drive revisions on the existing branch. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
 
 Readiness requires all of: internal approval for the current head, passing required checks, mergeability, no actionable trusted feedback, and no blockers. Readiness and escalation are reported to the PR and originating Linear context. Merge tools are absent.
 
 ## Channels and trust
 
 - GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Label intake additionally checks the labeler's repository permission. Signed repository context is stamped before any model step.
-- Linear Agent Sessions are trusted by workspace membership. `created` with an issue injects factory intake; `prompted` only continues the current mode.
+- Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the current mode.
 - Slack mentions are trusted by channel membership and have no factory default.
 - The Eve HTTP channel uses local dev or Vercel OIDC auth.
 

@@ -1,12 +1,12 @@
 import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
-import { denyAutonomousWrites } from "../lib/github/approval.js";
+import { denyUnattendedWrites } from "../lib/github/approval.js";
 
 const WRITE_TOOLS = ["send-message"] as const;
 
 export default defineMcpClientConnection({
-  approval: denyAutonomousWrites("OpenRouter", WRITE_TOOLS),
+  approval: denyUnattendedWrites("OpenRouter", WRITE_TOOLS),
   auth: connect({
     connector: requireEnv(
       "OPENROUTER_MCP_CONNECTOR",

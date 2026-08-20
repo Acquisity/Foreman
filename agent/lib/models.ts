@@ -5,13 +5,9 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
 // so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
-// Each agent.ts resolves its model through resolveModel(<agent>) at session start. The chat slot
-// is the orchestrator's Slack profile: sessions born on the Slack channel resolve it instead of
-// the orchestrator slot. It compiles to the same model as orchestrator; a set_agent_models
-// override on chat is what actually puts conversational replies on a faster model.
+// Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
   analyst: "deepseek/deepseek-v4-pro-0813",
-  chat: "deepseek/deepseek-v4-pro-0813",
   classifier: "deepseek/deepseek-v4-pro-0813",
   implementer: "deepseek/deepseek-v4-pro-0813",
   investigator: "deepseek/deepseek-v4-pro-0813",
@@ -33,22 +29,33 @@ export const isValidModelId = (id: string): boolean =>
 
 export type ModelOverrides = Partial<Record<AgentModelSlot, string>>;
 
-const overridesSchema = z.partialRecord(z.enum(AGENT_MODEL_SLOTS), z.string());
-
 // Global to Foreman rather than repository-scoped.
 const MODEL_OVERRIDES_KEY = `${MODEL_OVERRIDES_PREFIX}foreman.json`;
 
-// The strict read: Blob or parse failures propagate. set_agent_models mutates on top of this,
-// because merging onto a silently-empty base would wipe overrides the call never named.
+// Parse a stored overrides document by reading only the known slots, dropping
+// unknown keys (e.g. a persisted `chat` override), non-string values, and ids
+// that fail validation, so a stale key can never break set_agent_models.
+export const parseModelOverrides = (content: string): ModelOverrides => {
+  const raw = z.record(z.string(), z.unknown()).parse(JSON.parse(content));
+  const overrides: ModelOverrides = {};
+  for (const slot of AGENT_MODEL_SLOTS) {
+    const id = raw[slot];
+    if (typeof id === "string" && isValidModelId(id)) {
+      overrides[slot] = id;
+    }
+  }
+  return overrides;
+};
+
+// The strict read: a Blob failure or unparseable JSON propagates, because
+// set_agent_models mutates on top of this and merging onto a silently-empty
+// base would wipe overrides the call never named.
 export const loadModelOverrides = async (): Promise<ModelOverrides> => {
   const doc = await readDocument(MODEL_OVERRIDES_KEY);
   if (!doc.found) {
     return {};
   }
-  const parsed = overridesSchema.parse(JSON.parse(doc.content));
-  return Object.fromEntries(
-    Object.entries(parsed).filter(([, id]) => isValidModelId(id))
-  );
+  return parseModelOverrides(doc.content);
 };
 
 // The session-start read: fail open to the compiled defaults (a Blob outage must never take the

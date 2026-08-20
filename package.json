@@ -27,7 +27,7 @@
     "@vercel/connect": "0.8.0",
     "@vercel/sandbox": "^3.0.0",
     "ai": "^7.0.63",
-    "eve": "^0.39.1",
+    "eve": "^0.40.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
