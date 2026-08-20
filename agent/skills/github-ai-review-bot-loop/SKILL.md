@@ -17,7 +17,7 @@ This is more automated than a normal review-follow-up pass:
 
 ## Linear Ticket
 
-Confirm the PR has an associated Linear ticket before doing anything else. In an attended session, if none exists, create one with the Linear connection and link it to the PR: Foreman-related work goes in the Foreman project, other work goes in the Engineering Team. In an unattended (autonomous) run, Linear writes are denied, so confirm the ticket from the durable pipeline run or the PR body and escalate when there is none. Never open or update a PR without a Linear ticket.
+A Linear ticket gates only the write path, not read-only runs. A fetch-and-classify run never needs one. Before the first push or PR reply, confirm the PR has an associated Linear ticket. In an attended session, if none exists, create and link one by following the `github-linear-bridging` skill, which owns team selection; do not guess a project or team here. In an unattended (autonomous) run, Linear writes are denied, so confirm the ticket from the durable pipeline run or the PR body and escalate when there is none.
 
 ## Invocation
 
