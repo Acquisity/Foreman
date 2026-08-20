@@ -43,6 +43,7 @@ Use the github-ai-review-bot-loop skill to fetch and classify AI bot comments, n
 - `push_branch` for pushing the branch
 - `github__getPullRequestContext` for PR metadata
 - `github__listPullRequestReviews` for review bodies and comments
+- `github__listIssueComments` for PR-level issue comments
 - `github__listPullRequestFiles` for changed files and diff context
 - `github__addPullRequestComment` for PR-level replies
 - `github__listCheckRuns` and `github__getCiFailureContext` for verification context
@@ -79,9 +80,10 @@ Use the `github__*` tools consistently for reads and writes during a loop iterat
 
 - `github__getPullRequestContext` for PR metadata and state.
 - `github__listPullRequestReviews` for review bodies and review comments, including author, body, path, line, and timestamps.
+- `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes.
 - `github__listPullRequestFiles` for changed files and diff hunks.
 
-Fetch all pages of reviews and comments before deciding the PR is clean.
+Fetch all pages of reviews, issue comments, and review comments before deciding the PR is clean.
 
 ### 3. Identify In-Scope AI Bot Comments
 
@@ -116,11 +118,9 @@ For each live AI bot thread, build a compact packet:
 - path and line range
 - diff hunk
 - full bot comment body
-- any existing replies
 - current code excerpt around the referenced line
 - relevant tests or nearby validation commands
 - current branch and dirty-file status
-- whether the latest comment is by us, a bot, or a human
 
 The packet should be enough for a worker to decide without refetching the whole PR.
 
@@ -150,7 +150,8 @@ You own one GitHub AI review bot comment.
 
 Inputs:
 - PR URL, repository, branch, and base branch
-- Thread or PR-level packet with IDs, file, line, diff hunk, body, replies, and current code context
+- Thread or PR-level packet with IDs, file, line, diff hunk, body, and current code context
+- A writes_allowed flag: true only when the user asked to handle, fix, reject, reply, resolve, or run the loop; false for read-only runs
 - Current dirty-worktree constraints
 
 Decide critically whether the bot suggestion is valid.
@@ -164,12 +165,14 @@ Classify as one of:
 - stale_or_outdated
 - needs_human
 
+When writes_allowed is false, classify and return the decision without committing, pushing, or replying.
+
 If valid_fix or valid_partial:
 1. Create a mini plan.
 2. Make the smallest correct code change.
 3. Add or update focused tests when the behavior is testable.
-4. Run focused checks only: `pnpm check` on changed files, `npx tsx --test <file>` for a focused test, or the local check that directly covers the edit.
-5. Commit only the files for this comment with a concise commit message.
+4. Run focused checks only: `pnpm check` on changed files, `pnpm exec tsx --test <file>` for a focused test, or the local check that directly covers the edit.
+5. Capture the pre-edit diff, then stage only the generated patch. If a target file already has pre-existing changes, stop instead of staging the whole file. Commit only this comment's changes with a concise commit message.
 6. Push to the PR branch immediately with push_branch.
 7. Reply with the short commit SHA and what changed.
 8. Inline-thread resolution is not available in Foreman; leave the thread for a human or a future tool. Do not resolve PR-level comments because they have no resolution state.
@@ -237,16 +240,17 @@ Do not resolve disagreement threads.
 
 For monitor mode:
 
-1. Fetch live in-scope AI bot feedback.
-2. Process all actionable threads and PR-level comments.
-3. Refresh PR state after every push or GitHub write.
-4. Run `pnpm typecheck` once for the iteration when code changed or before declaring the iteration clean.
-5. Update the last-write timestamp after every push or GitHub write.
-6. Sleep 60 seconds.
-7. Reset the clean-window timer whenever a new live in-scope bot comment appears.
-8. Stop when the 10-minute clean window, or the user-specified clean window, elapses with no new live in-scope bot comments, or when the user stops the run.
+1. Initialize the last-activity timestamp to the current time for this invocation.
+2. Fetch live in-scope AI bot feedback.
+3. Process all actionable threads and PR-level comments.
+4. Refresh PR state after every push or GitHub write.
+5. Run `pnpm typecheck` once for the iteration when code changed or before declaring the iteration clean.
+6. Update the last-activity timestamp after every push or GitHub write.
+7. Sleep 60 seconds.
+8. Reset the clean-window timer whenever a new live in-scope bot comment appears.
+9. Stop when the 10-minute clean window, or the user-specified clean window, elapses with no new live in-scope bot comments, or when the user stops the run.
 
-The clean window is measured from the later of the last push or last GitHub write. If new comments arrive while fixes are being pushed, prioritize the refreshed state over earlier packets.
+The clean window is measured from the last-activity timestamp. If new comments arrive while fixes are being pushed, prioritize the refreshed state over earlier packets.
 
 ### 11. Final Response
 

@@ -17,10 +17,12 @@ Review changed CI, workflow, and repository automation files for concrete workfl
 
 - `pull_request_target` is not combined with fork-controlled checkout, scripts, caches, or package installs.
 - PR/comment/issue-triggered workflows do not execute untrusted branch content with write tokens or secrets.
+- `workflow_run`-triggered workflows validate that checkout and execution do not use untrusted pull-request code or unverified artifacts.
+- `repository_dispatch` handlers validate the caller and `client_payload` before using either in commands, paths, or privileged operations.
 - `permissions` are explicit and least-privilege per job. Avoid broad `contents: write`, `actions: write`, `id-token: write`, or `pull-requests: write` unless needed.
 - Secrets are not exposed to fork PR code, shell output, artifacts, cache keys, PR comments, logs, or generated files.
-- Shell commands quote GitHub context, PR titles/bodies/comments/labels, branch names, file paths, and workflow inputs before execution.
-- Third-party actions are pinned consistently with repo policy or at least to stable versions; mutable `@latest` use is justified or avoided.
+- Shell commands pass untrusted GitHub context (PR titles/bodies/comments/labels, branch names, file paths, workflow inputs) through `env:` variables or action inputs rather than inline `${{ ... }}` expressions, and quote those variables when referenced.
+- Third-party actions are pinned to full-length commit SHAs by default; mutable tags such as `@v4` or `@latest` are allowed only when repository policy permits them and the review records the trust rationale.
 - Artifact and cache restore paths cannot overwrite scripts/config used later by privileged steps.
 - Self-hosted or custom runners are not used for untrusted PR execution unless isolation is explicit.
 - `workflow_dispatch`, `workflow_call`, and issue-comment commands validate inputs and restrict who can trigger privileged operations.
@@ -28,9 +30,12 @@ Review changed CI, workflow, and repository automation files for concrete workfl
 
 ## Severity Guidance
 
-- High: changed workflow can expose secrets, run attacker-controlled code with write privileges, or compromise a privileged runner.
+- Urgent: changed workflow can expose secrets, run attacker-controlled code with write privileges, or cause data loss.
+- High: changed workflow can compromise a privileged runner or broaden an existing privilege boundary.
 - Medium: injection, broad permissions, mutable action, or artifact/cache risk with plausible exploitation.
 - Low/info: least-privilege or pinning improvement with concrete workflow relevance.
+
+State the impact and blast radius in every finding's rationale.
 
 ## False-Positive Controls
 

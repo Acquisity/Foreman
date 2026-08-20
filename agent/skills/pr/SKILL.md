@@ -10,8 +10,8 @@ The user wants a practical shipping workflow, not a long planning exercise. Insp
 
 ## Core Rules
 
-- Create new PRs as drafts by default. Mark a PR ready for review only when the user explicitly asks.
-- Never merge a PR. Opening, updating, and marking ready are the only GitHub PR actions this skill performs.
+- Create new PRs as drafts by default. The ready-for-review transition is human-gated: say the PR is ready and leave the transition to the user.
+- Never merge a PR. Opening and updating are the only GitHub PR actions this skill performs.
 - Do not use a pull request template. Write a plain, direct body.
 - Keep PR titles and bodies direct and descriptive. Avoid inflated language, vague claims, and big abstract wording.
 - Use concise, plain titles. Do not use conventional-commit prefixes such as `fix:`, `feat:`, or `chore:`.
@@ -110,7 +110,7 @@ If an open PR exists:
 
 - Do not create another PR.
 - If you committed new changes, pushing is enough.
-- If the existing PR is a draft and the user explicitly asked to ship, mark it ready with `github__updatePullRequest`.
+- If the existing PR is a draft and the user explicitly asked to mark it ready, say it is ready and leave the transition to them.
 
 If no open PR exists, create one with `github__createPullRequest`, passing the base, head branch, a direct title, and the body. Create it as a draft by default.
 
