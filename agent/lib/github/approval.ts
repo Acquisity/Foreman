@@ -7,35 +7,30 @@ import {
 } from "../trust.js";
 
 /**
- * Policy factory for writes to shared configuration every future run
- * inherits (repository knowledge and live model overrides).
+ * Policy factory for the shared write ladder.
  *
  * @remarks
- * Reads are always allowed and never routed here; these policies gate writes
- * only. Because such a write becomes context or behavior for every later
- * run, an unattended run is denied rather than parked (nobody is watching,
- * and a labeled issue's body is untrusted input that must not be able to
- * poison shared state). Trusted callers and schedule turns write without a
- * card; every other human caller, the dev TUI included, parks on one. The
- * denial reason is per-surface so a relayed refusal names the right feature.
+ * Autonomous runs are denied (nobody is watching to answer an approval
+ * card), trusted callers and schedule turns write without a card, and every
+ * other human caller, the dev TUI included, parks on one. The denial reason
+ * is per-surface so a relayed refusal names the right feature.
  */
-function sharedConfigWritePolicy(unattendedReason: string) {
+function attendedWritePolicy(unattendedReason: string) {
   return (ctx: ApprovalContext): ApprovalStatus => {
     const auth = ctx.session.auth.current;
     if (isAutonomous(auth)) {
       return { reason: unattendedReason, type: "denied" };
     }
-    if (isTrusted(auth) || isScheduleAppAuth(auth)) {
-      return "not-applicable";
-    }
-    return "user-approval";
+    return isTrusted(auth) || isScheduleAppAuth(auth)
+      ? "not-applicable"
+      : "user-approval";
   };
 }
 
 /**
  * Verified repository knowledge that can feed future runs for that repository.
  */
-export const repositoryKnowledgePolicy = sharedConfigWritePolicy(
+export const repositoryKnowledgePolicy = attendedWritePolicy(
   "Unattended runs may read repository knowledge but not write to it."
 );
 
@@ -43,32 +38,23 @@ export const repositoryKnowledgePolicy = sharedConfigWritePolicy(
  * The live model overrides: which model each factory agent runs on, applied
  * to every session that starts after the change.
  */
-export const modelSwapPolicy = sharedConfigWritePolicy(
+export const modelSwapPolicy = attendedWritePolicy(
   "Unattended factory runs may not change the models the factory runs on."
 );
 
+const publishPolicy = attendedWritePolicy(
+  "Unattended runs cannot publish without an authorized delivery handoff."
+);
+
 /**
- * Direct-session publication. Trusted callers publish without a card; an
- * untrusted attended caller parks on one; unattended and intake-only runs are
- * denied (nobody is watching to answer, and intake-only channels cannot ship).
+ * Direct-session publication. Adds the intake-only gate on top of the shared
+ * write ladder: an intake-only channel cannot ship at all, and otherwise
+ * trusted callers and schedule turns publish without a card while an
+ * untrusted attended caller parks on one.
  */
 export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
   const intake = intakeOnlyPolicy(ctx);
-  if (intake !== "not-applicable") {
-    return intake;
-  }
-  const auth = ctx.session.auth.current;
-  if (isAutonomous(auth)) {
-    return {
-      reason:
-        "Unattended runs cannot publish without an authorized delivery handoff.",
-      type: "denied",
-    };
-  }
-  if (isTrusted(auth)) {
-    return "not-applicable";
-  }
-  return "user-approval";
+  return intake === "not-applicable" ? publishPolicy(ctx) : intake;
 };
 
 /**

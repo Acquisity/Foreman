@@ -105,12 +105,14 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * Whether the dispatching channel stamped this caller as trusted.
  *
  * @remarks
- * This predicate gates both the shared-config write policies in
- * `agent/lib/github/approval.ts` and `deliveryPolicy`: trusted callers write
- * repository knowledge and model overrides directly and push without a card,
- * everyone else parks on one. New capabilities gate on this predicate (or
- * {@link isAutonomous} / {@link isScheduleAppAuth}) rather than inventing
- * their own.
+ * This predicate gates the shared-config write policies in
+ * `agent/lib/github/approval.ts` and `deliveryPolicy` (wired to the root
+ * `push_branch` tool only): trusted callers write repository knowledge and
+ * model overrides directly and push without a card, everyone else parks on
+ * one. The GitHub extension write tools (createPullRequest, addIssueComment,
+ * etc.) remain ungated for every caller. New capabilities gate on this
+ * predicate (or {@link isAutonomous} / {@link isScheduleAppAuth}) rather than
+ * inventing their own.
  */
 export function isTrusted(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[TRUSTED_ATTRIBUTE] === "true";
@@ -120,10 +122,12 @@ export function isTrusted(auth: SessionAuthContext | null): boolean {
  * The app principal eve stamps on schedule-dispatched turns.
  *
  * @remarks
- * No schedule ships in this template, but the approval policies already
- * recognize the principal so a schedule added later (see the README's
- * extending section) inherits sensible write behavior: reversible writes run,
- * anything that ships still parks for a person. It is never a user identity.
+ * The reconciliation schedule (`agent/schedules/reconcile-pipelines.ts`)
+ * stamps {@link stampAutonomous} before dispatch, so its turns are denied
+ * delivery as autonomous rather than parked. This predicate recognizes the
+ * raw app principal for a future schedule that dispatches without that
+ * stamp, and the write policies treat it as trusted. It is never a user
+ * identity.
  */
 export function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
   return (

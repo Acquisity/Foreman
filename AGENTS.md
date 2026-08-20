@@ -73,4 +73,4 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 
 - `pnpm validate` passes with zero errors and warnings.
 - No secrets, `node_modules`, `.eve`, `.vercel`, `.output`, or build artifacts are staged.
-- A Linear ticket must exist before a PR is opened.
+- Do not commit, push, open a PR, mark ready, or merge without the user's authorization. A Linear ticket must exist before a PR is opened.

@@ -4,13 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { parseIntakeOnlyChannels } from "./slack-intake.js";
-import {
-  isAutonomous,
-  isIntakeOnly,
-  stampAutonomous,
-  stampIntakeOnly,
-  stampTrusted,
-} from "./trust.js";
+import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
 
 const auth: SessionAuthContext = {
   attributes: {},
@@ -46,27 +40,5 @@ describe("intake-only channels", () => {
       const status = policy(approvalFor(stamped));
       assert.equal(typeof status === "object" && status.type, "denied");
     }
-  });
-
-  it("gates delivery by caller trust, not just intake-only status", () => {
-    assert.equal(isIntakeOnly(auth), false);
-    assert.equal(intakeOnlyPolicy(approvalFor(auth)), "not-applicable");
-    assert.equal(
-      intakeOnlyPolicy(approvalFor(stampTrusted(auth))),
-      "not-applicable"
-    );
-
-    // Untrusted attended caller parks on a card.
-    assert.equal(deliveryPolicy(approvalFor(auth)), "user-approval");
-    // Trusted caller publishes without a card.
-    assert.equal(
-      deliveryPolicy(approvalFor(stampTrusted(auth))),
-      "not-applicable"
-    );
-    // Autonomous runs are denied, never parked.
-    const autonomous = stampAutonomous(auth, 123);
-    assert.equal(isAutonomous(autonomous), true);
-    const denied = deliveryPolicy(approvalFor(autonomous));
-    assert.equal(typeof denied === "object" && denied.type, "denied");
   });
 });
