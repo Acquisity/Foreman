@@ -129,12 +129,14 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * Whether the dispatching channel stamped this caller as trusted.
  *
  * @remarks
- * GitHub tools run without approval cards for every caller, so this predicate
- * is not a write gate there. It gates the shared-config write policies in
- * `agent/lib/github/approval.ts`: trusted callers write repository knowledge and
- * model overrides directly, everyone else parks on a card. New capabilities
- * gate on this predicate (or {@link isAutonomous} / {@link isScheduleAppAuth})
- * rather than inventing their own.
+ * This predicate gates the shared-config write policies in
+ * `agent/lib/github/approval.ts` and `deliveryPolicy` (wired to the root
+ * `push_branch` tool only): trusted callers write repository knowledge and
+ * model overrides directly and push without a card, everyone else parks on
+ * one. The GitHub extension write tools (createPullRequest, addIssueComment,
+ * etc.) remain ungated for every caller. New capabilities gate on this
+ * predicate (or {@link isUnattended} / {@link isScheduleAppAuth}) rather than
+ * inventing their own.
  */
 export function isTrusted(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[TRUSTED_ATTRIBUTE] === "true";
@@ -144,10 +146,14 @@ export function isTrusted(auth: SessionAuthContext | null): boolean {
  * The app principal eve stamps on schedule-dispatched turns.
  *
  * @remarks
- * No schedule ships in this template, but the approval policies already
- * recognize the principal so a schedule added later (see the README's
- * extending section) inherits sensible write behavior: reversible writes run,
- * anything that ships still parks for a person. It is never a user identity.
+ * Every schedule that ships marks itself unattended before dispatch:
+ * `reconcile-pipelines.ts` stamps {@link stampAutonomous}, `sla-report.ts`
+ * sets {@link UNATTENDED_ATTRIBUTE}. Both are caught by
+ * {@link isUnattended} and denied, so neither reaches this predicate. It
+ * recognizes the raw app principal for a future schedule that dispatches
+ * without either marker, and the write policies treat that as trusted. Mark
+ * new schedules unattended unless they are meant to write without a card.
+ * It is never a user identity.
  */
 export function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
   return (
