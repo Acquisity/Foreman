@@ -4,10 +4,10 @@ import { brokerPolicy, mintInstallationToken } from "./github/git-remote.js";
 import { remoteUrl } from "./repository.js";
 import {
   BUN_INSTALL_CACHE_DIR,
+  bunInstallCommand,
   PNPM_STORE_DIR,
   WARM_REPOSITORIES,
   WARM_ROOT,
-  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -68,9 +68,15 @@ const run = async (
 };
 
 /**
- * Builds the warm repository snapshot: clones, installs (and builds, for Bun
- * repos) every configured repository in a throwaway sandbox running eve's own
- * image, then snapshots the result and returns the snapshot id.
+ * Builds the warm repository snapshot: clones and installs every configured
+ * repository in a throwaway sandbox running eve's own image, then snapshots the
+ * result and returns the snapshot id.
+ *
+ * Dependencies only, no build. Acquisity/Acquisity validates a long list of
+ * required API keys and secrets at build time, and secrets never enter a
+ * Foreman sandbox, so a pre-build here could only ever fail. Stations build on
+ * demand with the environment they are given, against the warm install this
+ * produces.
  *
  * Driven by the `rebuild_warm_snapshot` tool. The produced id is what
  * `agent/sandbox.ts` reads from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to seed the
@@ -101,8 +107,8 @@ export const createWarmSnapshot = async (): Promise<string> => {
     );
 
     // Clone first, while the brokered GitHub token is still injected; the
-    // install/build steps run after the token window closes so lifecycle
-    // scripts never execute with the credential on the wire.
+    // install steps run after the token window closes so lifecycle scripts
+    // never execute with the credential on the wire.
     await Promise.all(
       WARM_REPOSITORIES.map(async (repository) => {
         const path = warmRepositoryPath(repository.slug);
@@ -115,18 +121,19 @@ export const createWarmSnapshot = async (): Promise<string> => {
 
     await sandbox.update({ networkPolicy: "allow-all" });
 
+    // Also after the token window: installing bun runs the npm package's own
+    // lifecycle scripts, which is the same hazard as a repository's.
+    if (WARM_REPOSITORIES.some((repository) => repository.kind === "bun")) {
+      await run(sandbox, bunInstallCommand());
+    }
+
     await Promise.all(
       WARM_REPOSITORIES.map(async (repository) => {
         const path = warmRepositoryPath(repository.slug);
-        const env = warmInstallEnv(repository.kind);
         await run(sandbox, warmInstallCommand(repository.kind), {
           cwd: path,
-          env,
+          env: warmInstallEnv(repository.kind),
         });
-        const build = warmBuildCommand(repository.kind);
-        if (build) {
-          await run(sandbox, build, { cwd: path, env });
-        }
       })
     );
 

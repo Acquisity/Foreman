@@ -1,9 +1,16 @@
 import { parseRepository } from "./repository.js";
 
 /**
- * Warm-up revision. Bump it whenever the warm-up mechanics change (a new
- * repository, a different install command, or a cache layout move) so eve
- * rebuilds the template snapshot instead of reusing a stale one.
+ * Warm-up revision: a manual lever for forcing a template rebuild.
+ *
+ * @remarks
+ * Changing the warm-up mechanics (a new repository, a different install
+ * command, a cache layout move) does not need a bump. Those now run in
+ * `createWarmSnapshot`, not in the template build, and reach the template only
+ * through the snapshot id, which is different for every rebuild and already
+ * moves the revalidation key. Rebuilding the template against an unchanged
+ * snapshot id would only re-seed the same stale snapshot. Bump this when
+ * something outside the snapshot has to invalidate the template.
  */
 export const WARM_UP_REVISION = "1";
 
@@ -29,9 +36,13 @@ export interface WarmRepository {
 }
 
 /**
- * Repositories pre-warmed into the template snapshot. Foreman warms only its
- * dependency install (stations run `pnpm validate`, never `pnpm run build`);
- * Acquisity warms both install and build so `.next`/`.turbo` are ready.
+ * Repositories pre-warmed into the template snapshot, dependencies only.
+ *
+ * @remarks
+ * Neither is pre-built. Foreman never needed one (stations run `pnpm
+ * validate`, never `pnpm run build`), and Acquisity's build validates a long
+ * list of required API keys, which a sandbox that secrets never enter cannot
+ * satisfy. Stations build on demand against the warm install.
  */
 export const WARM_REPOSITORIES: readonly WarmRepository[] = [
   { kind: "pnpm", slug: "Acquisity/Foreman" },
@@ -72,13 +83,26 @@ export const warmInstallCommand = (kind: WarmKind): string =>
     ? "pnpm install --frozen-lockfile"
     : "bun install --frozen-lockfile";
 
-// Only bun repos need a post-install build (Foreman stations run `pnpm
-// validate`, never `pnpm run build`). The snapshot pre-builds bun repos so
-// `.next`/`.turbo` start warm; the session skips a rebuild after refreshing
-// to FETCH_HEAD because Next and Turbo invalidate by content hash, so stale
-// output is a cache miss rather than a correctness hazard.
-export const warmBuildCommand = (kind: WarmKind): string | null =>
-  kind === "bun" ? "bun run build" : null;
+/**
+ * The bun the snapshot installs, matching the `setup-bun` pin in
+ * Acquisity/Acquisity's own CI so the warm install reads `bun.lock` the same
+ * way its build machines do. Bump it when that pin moves.
+ */
+export const BUN_VERSION = "1.3.5";
+
+/**
+ * Installs bun into the snapshot at a path every uid shares.
+ *
+ * @remarks
+ * The eve sandbox image ships node, npm, and pnpm but not bun, so a bun
+ * repository cannot install without this. `npm install -g` lands the binary in
+ * `/usr/local/bin`, which is on the default PATH for the session user as well
+ * as the snapshot builder, so the runtime install in `prepare_repository` finds
+ * it too. The official installer would put it under the builder's HOME, where
+ * the session user could not reach it.
+ */
+export const bunInstallCommand = (): string =>
+  `npm install -g bun@${BUN_VERSION}`;
 
 /**
  * Build-time revalidation component for the warm-up. Folds in the warm-up

@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   BUN_INSTALL_CACHE_DIR,
+  BUN_VERSION,
+  bunInstallCommand,
   findWarmRepository,
   PNPM_STORE_DIR,
-  warmBuildCommand,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -51,9 +52,8 @@ describe("repository warm-up", () => {
     assert.deepEqual(warmInstallEnv("bun"), { BUN_INSTALL_CACHE_DIR });
   });
 
-  it("selects a build command only for bun repositories", () => {
-    assert.equal(warmBuildCommand("bun"), "bun run build");
-    assert.equal(warmBuildCommand("pnpm"), null);
+  it("installs bun where every uid on the default PATH can reach it", () => {
+    assert.equal(bunInstallCommand(), `npm install -g bun@${BUN_VERSION}`);
   });
 
   it("folds the warm-up revision and snapshot id into the revalidation key", () => {
