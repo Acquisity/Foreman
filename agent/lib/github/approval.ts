@@ -56,16 +56,20 @@ export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
 
 /**
  * Connection-wide policy for MCP servers whose writes must not run
- * unattended.
+ * unattended, whether the run is a factory turn or a schedule dispatching
+ * under a real user (see {@link isUnattended}).
  *
  * @remarks
  * eve hands connection approval predicates the qualified tool name
  * (`<connection>__<tool>`), so matching is by suffix, never bare equality.
  * With no `writeTools` list, every tool on the connection counts as a
- * write. Attended sessions stay ungated for ordinary shared configuration,
- * these servers' writes are app-scoped and reversible.
+ * write, which is default-deny: a connection that an unattended run must
+ * still read from names its reads at the call site rather than trying to
+ * enumerate every write the server might grow. Attended sessions stay
+ * ungated for ordinary shared configuration, these servers' writes are
+ * app-scoped and reversible.
  */
-export function denyAutonomousWrites(
+export function denyUnattendedWrites(
   surface: string,
   writeTools?: readonly string[]
 ) {
