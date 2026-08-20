@@ -73,9 +73,10 @@ export const warmInstallCommand = (kind: WarmKind): string =>
     : "bun install --frozen-lockfile";
 
 // Only bun repos need a post-install build (Foreman stations run `pnpm
-// validate`, never `pnpm run build`). The snapshot pre-builds bun repos, and
-// the session rebuilds them after refreshing to FETCH_HEAD so stale
-// `.next`/`.turbo` output does not survive the refresh.
+// validate`, never `pnpm run build`). The snapshot pre-builds bun repos so
+// `.next`/`.turbo` start warm; the session skips a rebuild after refreshing
+// to FETCH_HEAD because Next and Turbo invalidate by content hash, so stale
+// output is a cache miss rather than a correctness hazard.
 export const warmBuildCommand = (kind: WarmKind): string | null =>
   kind === "bun" ? "bun run build" : null;
 
