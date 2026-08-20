@@ -83,7 +83,7 @@ Use the `github__*` tools consistently for reads and writes during a loop iterat
 - `github__listIssueComments` for PR-level issue comments, including bot summaries and release notes. This is where most bot findings land. Bodies are truncated to ~500 chars by default, so pass `detail: 'full'` to read complete findings.
 - `github__listPullRequestFiles` for changed files and diff context.
 
-Fetch all pages of reviews and issue comments before deciding the PR is clean. Inline review comments are not fetchable; there is no tool that reads `pulls/comments`.
+Fetch all pages of reviews and issue comments before deciding the PR is clean. These tools do not auto-paginate; iterate `page` off `perPage` until no more results come back. Inline review comments are not fetchable; there is no tool that reads `pulls/comments`.
 
 ### 3. Identify In-Scope AI Bot Comments
 
