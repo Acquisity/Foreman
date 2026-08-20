@@ -30,7 +30,7 @@ Categorize by the Linear `project` field, not the title. The known mapping:
 | AI Website Builder | AI Website Builder |
 | Whitelabel Partners | Whitelabel Partners |
 
-Keep this mapping current. If a bug's project does not map to any feature, skip it.
+Keep this mapping current. A bug whose project maps to no feature (`Support` is the common one, and it can be about any feature) belongs to no channel, so leave it out of the channel reports. The daily health line names those bugs in the owner DM instead, so they are visible rather than dropped. Never guess a feature from the title.
 
 ## Tools: what each is for and how to use it
 

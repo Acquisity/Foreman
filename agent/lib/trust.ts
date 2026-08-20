@@ -157,3 +157,32 @@ export function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
     auth.principalType === "runtime"
   );
 }
+
+/**
+ * Auth attribute marking a session dispatched from an intake-only channel.
+ *
+ * @remarks
+ * Stamped by the Slack channel at dispatch, next to the trust decision, on
+ * the signed webhook. Conversation in those channels runs normally; the
+ * attribute is what `intakeOnlyPolicy` in `agent/lib/github/approval.ts`
+ * gates repository work on, so the stop gate never depends on the model
+ * honoring injected instructions.
+ */
+export const INTAKE_ONLY_ATTRIBUTE = "intakeOnly";
+
+/**
+ * Returns a copy of `auth` carrying the {@link INTAKE_ONLY_ATTRIBUTE} stamp.
+ */
+export function stampIntakeOnly(auth: SessionAuthContext): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [INTAKE_ONLY_ATTRIBUTE]: "true" },
+  };
+}
+
+/**
+ * Whether the dispatching channel marked this session intake-only.
+ */
+export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
+  return auth !== null && auth.attributes[INTAKE_ONLY_ATTRIBUTE] === "true";
+}

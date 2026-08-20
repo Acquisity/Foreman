@@ -1,8 +1,9 @@
 import { defineSchedule } from "eve/schedules";
 import slack from "../channels/slack.js";
 import { readDocument, SLA_REPORT_PREFIX, writeDocument } from "../lib/blob.js";
+import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { slaWindowStart } from "../lib/sla-window.js";
-import { UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
+import { stampIntakeOnly, UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
 
 const FEATURE_CHANNELS = [
   { channelId: "C0BAA1KUNP8", feature: "Cold Email" },
@@ -38,6 +39,17 @@ const OWNER_AUTH = {
   principalId: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
   principalType: "user",
 } as const;
+
+/**
+ * The schedule builds its own auth rather than receiving a signed webhook, so
+ * it has to apply the intake-only stamp the Slack channel would have applied.
+ * Without this a feature channel listed in SLACK_INTAKE_ONLY_CHANNELS would
+ * lose its delivery gate for exactly these sessions.
+ */
+const authFor = (channelId: string) =>
+  SLACK_INTAKE_ONLY_CHANNELS.has(channelId)
+    ? stampIntakeOnly(OWNER_AUTH)
+    : OWNER_AUTH;
 
 const LAST_RUN_KEY = `${SLA_REPORT_PREFIX}last-run.txt`;
 
@@ -78,7 +90,7 @@ export default defineSchedule({
       try {
         const dispatch = to(slack, { channelId }).send(
           `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag James Keeble. The repository for any code lookup is Acquisity/Acquisity. If there are none, post nothing.`,
-          { auth: OWNER_AUTH }
+          { auth: authFor(channelId) }
         );
         waitUntil(
           dispatch.catch((error) => {
@@ -98,8 +110,8 @@ export default defineSchedule({
 
     try {
       const heartbeat = to(slack, { channelId: OWNER_USER_ID }).send(
-        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}. This run always posts, so the skill's rule about staying silent when there are no bugs does not apply here: report zero counts as zeros.`,
-        { auth: OWNER_AUTH }
+        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}, then one line listing any in-scope bug whose project maps to no feature, by identifier and project, so a new or cross-cutting project is visible instead of dropped. This run always posts, so the skill's rule about staying silent when there are no bugs does not apply here: report zero counts as zeros.`,
+        { auth: authFor(OWNER_USER_ID) }
       );
       waitUntil(
         heartbeat.catch((error) => {
