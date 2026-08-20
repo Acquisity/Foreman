@@ -45,6 +45,15 @@ export const modelSwapPolicy = attendedWritePolicy(
   "Unattended runs may not change the models the factory runs on."
 );
 
+/**
+ * Rebuilding the warm repository snapshot: a several-minute sandbox build
+ * that costs real compute, so it follows the same ladder as the other
+ * shared-state writes rather than running on anyone's say-so.
+ */
+export const warmSnapshotPolicy = attendedWritePolicy(
+  "Unattended runs may not rebuild the warm repository snapshot."
+);
+
 const publishPolicy = attendedWritePolicy(
   "Unattended runs cannot publish without an authorized delivery handoff."
 );

@@ -28,12 +28,11 @@ const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
 // resetting its timer, so only superseded ones age out.
 const SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-// The schedule invocation that drives this build is capped by eve's Vercel
-// maxDuration ("max", 800s on Pro Fluid), so the sandbox timeout is bounded by
-// that ceiling, not by how long the build could take. Keeping the sandbox
-// timeout at the invocation ceiling means an orphaned sandbox (the function
-// killed mid-build) self-terminates instead of leaking past the function's
-// death. The build must fit inside this window; decoupling it from the
+// The invocation that drives this build is capped by eve's Vercel maxDuration
+// ("max", 800s on Pro Fluid), so the sandbox timeout is bounded by that
+// ceiling, not by how long the build could take. Keeping the sandbox timeout at
+// the invocation ceiling means an orphaned sandbox (the function killed
+// mid-build) self-terminates instead of leaking past the function's death. The build must fit inside this window; decoupling it from the
 // invocation is the follow-up if it does not.
 const BUILD_TIMEOUT_MS = 800_000;
 
@@ -71,8 +70,9 @@ const run = async (
  * repos) every configured repository in a throwaway sandbox running eve's own
  * image, then snapshots the result and returns the snapshot id.
  *
- * The produced id is what `agent/sandbox.ts` reads from
- * `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to seed the session template. The whole
+ * Driven by the `rebuild_warm_snapshot` tool. The produced id is what
+ * `agent/sandbox.ts` reads from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to seed the
+ * session template. The whole
  * checkout — including `.git`, the tracked working-tree files, and
  * `node_modules` — lands in the snapshot; `chmod` makes them readable/writable
  * by the session user, which runs as a different uid than the snapshot builder,

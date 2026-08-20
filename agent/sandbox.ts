@@ -28,8 +28,11 @@ import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
  * the template when the pinned agent-browser version changes.
  *
  * The factory repositories (Acquisity/Foreman and Acquisity/Acquisity) are warmed out of
- * band by the `warm-repository-snapshot` schedule, which clones, installs, and builds them in
- * a throwaway sandbox and snapshots the result. The template starts from that snapshot via
+ * band by the `rebuild_warm_snapshot` tool, which clones, installs, and builds them in a
+ * throwaway sandbox and snapshots the result. It is run on request, when the warm-up itself
+ * changes, rather than on a cadence: `prepare_repository` refreshes the warmed checkout to
+ * the remote HEAD on every session, so an older snapshot costs a slightly longer install,
+ * not correctness. The template starts from that snapshot via
  * `source: { type: "snapshot", snapshotId }`, so `prepare_repository` and the station
  * sandboxes begin from a warm checkout instead of a full install on every fresh session. The
  * snapshot id is read synchronously from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` because `source`
