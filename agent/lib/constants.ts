@@ -104,3 +104,33 @@ export const linearAuth = connect({
     scopes: ["read", "write", "issues:create", "comments:create"],
   },
 });
+
+/**
+ * Shared PlanetScale authorization via Vercel Connect.
+ *
+ * Single source of truth for the PlanetScale connector so both the MCP
+ * connection and the authored read-query tool resolve the same service
+ * token. The token is the PlanetScale service-token SECRET only, sent as
+ * `Authorization: Bearer <token>` and never exposed to the model.
+ *
+ * @remarks
+ * - App-scoped (`principalType: "app"`), so no per-user consent flow is
+ *   required; tokens are minted for the installation itself.
+ * - Tokens are requested per call via `ctx.getToken(planetscaleAuth)`, cached
+ *   per step by eve, and never exposed to the model.
+ * - The connector UID comes from the `PLANETSCALE_MCP_CONNECTOR` environment
+ *   variable (e.g. `planet-scale-read-only-foreman/acquisity-foreman-planet-scale`);
+ *   the module throws at load time if it is not set.
+ *
+ * @example
+ * ```ts
+ * const { token } = await ctx.getToken(planetscaleAuth);
+ * ```
+ */
+export const planetscaleAuth = connect({
+  connector: requireEnv(
+    "PLANETSCALE_MCP_CONNECTOR",
+    "planet-scale-read-only-foreman/acquisity-foreman-planet-scale"
+  ),
+  principalType: "app",
+});

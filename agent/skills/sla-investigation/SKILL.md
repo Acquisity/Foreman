@@ -64,7 +64,7 @@ What it is: read-only production Postgres.
 
 What it's for: blast radius. Counting affected rows, workspaces, or users when the bug is a data problem.
 
-How to use it: `planetscale__planetscale_execute_read_query` against the production branch. Read only; never run a write. Prefer a bounded `COUNT` or a small `SELECT` over a full scan.
+How to use it: `planetscale_execute_read_query` against the production branch. Read only; never run a write. Prefer a bounded `COUNT` or a small `SELECT` over a full scan. Results are capped at 256 KB; when `truncated` is true the rows are partial, so narrow the query and re-run. When `oversizedRow` is true select fewer columns; when `envelopeTooLarge` is true the server returned oversized metadata; when `raw` is present the result could not be parsed.
 
 ### Inngest (inngest connection)
 

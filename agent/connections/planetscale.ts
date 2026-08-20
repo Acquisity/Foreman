@@ -1,6 +1,5 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
+import { planetscaleAuth } from "../lib/constants.js";
 
 /**
  * PlanetScale MCP connection for production database investigation.
@@ -18,21 +17,20 @@ import { requireEnv } from "../lib/constants.js";
  *   allowlist also excludes `planetscale_execute_write_query`. Read queries
  *   run as a short-lived `pg_read_all_data` role and respect row-level
  *   security.
+ * - `planetscale_execute_read_query` is intentionally absent from the
+ *   allowlist: it returns the full rows array with no size limit, which can
+ *   exceed the workflow stream's per-chunk limit. The authored
+ *   `planetscale_execute_read_query` tool (agent/tools) calls it directly and
+ *   truncates the result instead.
  * - Ungated on purpose: unattended factory runs investigate bug tickets and
  *   must assess fleet-wide blast radius. The service token is scoped to a
  *   single organization, so reach across databases is a property of the
  *   token's grants rather than the auth mode.
  */
 export default defineMcpClientConnection({
-  auth: connect({
-    connector: requireEnv(
-      "PLANETSCALE_MCP_CONNECTOR",
-      "planet-scale-read-only-foreman/acquisity-foreman-planet-scale"
-    ),
-    principalType: "app",
-  }),
+  auth: planetscaleAuth,
   description:
-    "PlanetScale Postgres, read-only: organizations, databases, branches, schema, read queries against production data, and query Insights.",
+    "PlanetScale Postgres, read-only: organizations, databases, branches, schema, and query Insights.",
   tools: {
     allow: [
       "planetscale_list_organizations",
@@ -42,7 +40,6 @@ export default defineMcpClientConnection({
       "planetscale_list_branches",
       "planetscale_get_branch",
       "planetscale_get_branch_schema",
-      "planetscale_execute_read_query",
       "planetscale_get_insights",
       "planetscale_list_schema_recommendations",
       "planetscale_search_documentation",

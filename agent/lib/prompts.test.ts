@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-// prompts.ts reads LINEAR_CONNECTOR at module load.
+// prompts.ts reads LINEAR_CONNECTOR and PLANETSCALE_MCP_CONNECTOR at module
+// load (both auth providers live in constants.ts).
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
+process.env.PLANETSCALE_MCP_CONNECTOR =
+  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const { FACTORY_PROMPT, GENERAL_MODE, GENERAL_PROMPT, PIPELINE, selectPrompt } =
   await import("./prompts.js");
