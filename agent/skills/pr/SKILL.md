@@ -23,7 +23,7 @@ The user wants a practical shipping workflow, not a long planning exercise. Insp
 Run the bundled context script first when available:
 
 ```bash
-bash .agents/skills/pr/scripts/pr-context.sh
+bash agent/skills/pr/scripts/pr-context.sh
 ```
 
 If the skill is being run outside the repository root, compute the skill directory at runtime and run `pr-context.sh` from `$SKILL_DIR/scripts/pr-context.sh`.

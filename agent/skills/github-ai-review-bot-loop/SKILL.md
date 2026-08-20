@@ -1,5 +1,5 @@
 ---
-description: "Watch a GitHub PR for AI code-review comments from configured review bots (CodeRabbit, Cubic, React Doctor, Devin); critically fix or rebut each one; commit and push atomic fixes; reply at the PR level; and keep polling until a clean window is reached. Use when the user asks to monitor, babysit, triage, handle, fix, reject, reply to, or resolve AI review-bot feedback on the current branch's PR."
+description: "Watch a GitHub PR for AI code-review comments from bots configured in FOREMAN_REVIEW_BOT_LOGINS; critically fix or rebut each one; commit and push atomic fixes; reply at the PR level; and keep polling until a clean window is reached. Use when the user asks to monitor, babysit, triage, handle, fix, reject, reply to, or resolve AI review-bot feedback on the current branch's PR."
 ---
 
 # GitHub AI Review Bot Loop
@@ -98,13 +98,13 @@ Humans, CI status comments, dependency bots, deployment bots, coverage reports, 
 
 Keep human-authored replies in the thread as context, but do not auto-resolve a thread if a human is waiting for an answer that the bot comment does not cover.
 
-### 4. Skip Already Answered Threads
+### 4. Skip Already Answered Comments
 
 Foreman has no self-login lookup and no inline-thread resolution tool, so dedupe with local state. Use `.context/review-bot-loop-state.json` to remember processed comment IDs and `updatedAt` values. A comment is already handled when its ID is recorded and its `updatedAt` is unchanged.
 
-An unresolved thread whose latest comment is ours is already handled only when our reply intentionally leaves the thread unresolved, such as a `reject_incorrect`, `reject_scope`, or `needs_human` outcome. Do not reprocess those threads unless the bot or a human replied after our reply. If our reply claimed a `valid_fix`, `valid_partial`, `duplicate`, or `stale_or_outdated` outcome that should have been resolved and GitHub still reports the thread as unresolved, keep the thread eligible for resolve retry until it is resolved. This prevents repeated disagreement replies without hiding failed resolve writes.
+Do not reprocess a handled comment unless its `updatedAt` changes or a new in-scope reply appears after our state entry. Because Foreman cannot read or set thread resolution state, a fixed, duplicate, or stale thread stays marked handled in local state and is left for a human to resolve; there is no resolve-retry loop.
 
-If a comment's `updatedAt` changes or a new in-scope reply appears after our state entry, classify it again.
+The state file is local bookkeeping and must never be staged or committed.
 
 ### 5. Build A Thread Packet
 
@@ -168,7 +168,7 @@ If valid_fix or valid_partial:
 1. Create a mini plan.
 2. Make the smallest correct code change.
 3. Add or update focused tests when the behavior is testable.
-4. Run focused checks only: pnpm check on changed files, pnpm test <file>, or the local check that directly covers the edit.
+4. Run focused checks only: `pnpm check` on changed files, `npx tsx --test <file>` for a focused test, or the local check that directly covers the edit.
 5. Commit only the files for this comment with a concise commit message.
 6. Push to the PR branch immediately with push_branch.
 7. Reply with the short commit SHA and what changed.
@@ -265,8 +265,6 @@ End with:
 ## Common Pitfalls
 
 - Do not use flat PR comments as the source of truth for inline review state.
-- Do not resolve before the reply or fix is visible on GitHub.
-- Do not resolve disagreement threads.
 - Do not treat all `github-actions[bot]` comments as React Doctor.
 - Do not let multiple write-capable workers commit to the same branch at the same time.
 - Do not stage unrelated user changes.
