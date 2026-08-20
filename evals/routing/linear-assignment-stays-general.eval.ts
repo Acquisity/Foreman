@@ -6,7 +6,7 @@ export default defineEval({
   tags: ["fast"],
   async test(t) {
     await t.send(
-      "This issue was assigned to you in Linear. For Acquisity/Foreman, fix the off-by-one error in the pagination helper as the smallest direct change."
+      "This issue was assigned to you in Linear. For Acquisity/Foreman, fix the off-by-one error in the pagination helper."
     );
     t.succeeded();
     t.loadedSkill("factory-pipeline", { count: 0 });

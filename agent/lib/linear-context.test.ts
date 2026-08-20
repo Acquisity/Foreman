@@ -41,6 +41,15 @@ describe("buildLinearContext", () => {
     assert.ok(!context.some((entry) => entry.includes("factory")));
   });
 
+  it("dispatches a prompted continuation with an issue without a factory instruction", () => {
+    const context = buildLinearContext(
+      makeEvent({ action: "prompted", issue: { id: "issue-1" } })
+    );
+    assert.ok(context);
+    assert.equal(context.length, 0);
+    assert.ok(!context.some((entry) => entry.includes("factory")));
+  });
+
   it("returns null for unsupported actions", () => {
     assert.equal(buildLinearContext(makeEvent({ action: "updated" })), null);
   });

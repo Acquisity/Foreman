@@ -14,9 +14,8 @@ import { stampTrusted } from "../lib/trust.js";
  * the caller as trusted (only workspace members can open an Agent Session, so
  * membership is the gate here), and builds the session context through
  * `buildLinearContext` (agent/lib/linear-context.ts): the requester's
- * name for attribution, plus the factory intake task when an issue is
- * delegated on a `created` event. `prompted` continuations in the same session
- * do not re-inject the task.
+ * name for attribution. Linear sessions stay general by default, so a
+ * `created` event with an issue adds no factory instruction.
  */
 export default linearChannel({
   credentials: connectLinearCredentials(
