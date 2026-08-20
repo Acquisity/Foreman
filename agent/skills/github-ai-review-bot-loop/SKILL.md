@@ -246,7 +246,7 @@ For monitor mode:
 4. Refresh PR state after every push or GitHub write.
 5. Run the target repository's typecheck once for the iteration when code changed or before declaring the iteration clean.
 6. Update the last-activity timestamp after every push or GitHub write.
-7. Sleep 60 seconds.
+7. Call the `sleep` tool with `{ seconds: 60 }`.
 8. Reset the clean-window timer whenever a new live in-scope bot comment appears.
 9. Stop when the 10-minute clean window, or the user-specified clean window, elapses with no new live in-scope bot comments, or when the user stops the run.
 
