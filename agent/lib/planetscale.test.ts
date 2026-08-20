@@ -9,6 +9,7 @@ import {
 const NON_JSON_ERROR = /non-JSON/;
 const UNRECOGNIZED_SHAPE_ERROR = /unrecognized result shape/;
 const QUERY_FAILED_ERROR = /query failed/;
+const SYNTAX_ERROR = /syntax error/;
 
 describe("truncateRows", () => {
   it("keeps every row when the total is under the cap", () => {
@@ -18,18 +19,20 @@ describe("truncateRows", () => {
     assert.equal(result.totalRows, 3);
     assert.equal(result.returnedRows, 3);
     assert.deepEqual(result.rows, rows);
-    assert.equal(result.resultBytes, 24); // three `{"id":N}` of 8 bytes each
+    // [{"id":1},{"id":2},{"id":3}] = 2 brackets + 3*8 + 2 commas.
+    assert.equal(result.resultBytes, 28);
   });
 
   it("drops rows once the cap would be exceeded", () => {
     const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
-    // 8 bytes per row; cap fits two rows (16) but not three (24).
-    const result = truncateRows(rows, 16);
+    // Each row is 8 bytes; the array adds 2 brackets and a comma per pair.
+    // [{"id":1}] is 10 bytes, [{"id":1},{"id":2}] is 19 bytes.
+    const result = truncateRows(rows, 18);
     assert.equal(result.truncated, true);
     assert.equal(result.totalRows, 3);
-    assert.equal(result.returnedRows, 2);
-    assert.deepEqual(result.rows, [{ id: 1 }, { id: 2 }]);
-    assert.equal(result.resultBytes, 16);
+    assert.equal(result.returnedRows, 1);
+    assert.deepEqual(result.rows, [{ id: 1 }]);
+    assert.equal(result.resultBytes, 10);
   });
 
   it("returns an empty result for an empty input", () => {
@@ -38,15 +41,51 @@ describe("truncateRows", () => {
     assert.equal(result.truncated, false);
     assert.equal(result.totalRows, 0);
     assert.equal(result.returnedRows, 0);
-    assert.equal(result.resultBytes, 0);
+    assert.equal(result.resultBytes, 2);
+    assert.equal(result.oversizedRow, false);
   });
 
   it("measures byte length, not character length", () => {
     // "é" is two UTF-8 bytes, so the cap must account for that.
     const rows = [{ name: "é" }];
     const result = truncateRows(rows, 1024);
-    assert.equal(result.resultBytes, Buffer.byteLength('{"name":"é"}', "utf8"));
+    assert.equal(
+      result.resultBytes,
+      Buffer.byteLength('[{"name":"é"}]', "utf8")
+    );
     assert.equal(result.truncated, false);
+  });
+
+  it("accounts for overhead bytes in the budget", () => {
+    const rows = [{ id: 1 }, { id: 2 }];
+    // Without overhead, cap 19 fits both rows (19 bytes).
+    assert.equal(truncateRows(rows, 19).returnedRows, 2);
+    // One byte of overhead shrinks the budget enough to keep only one row.
+    assert.equal(truncateRows(rows, 19, 1).returnedRows, 1);
+  });
+
+  it("flags a single row that alone exceeds the cap", () => {
+    const result = truncateRows([{ blob: "x".repeat(100) }], 10);
+    assert.equal(result.oversizedRow, true);
+    assert.equal(result.returnedRows, 0);
+    assert.deepEqual(result.rows, []);
+    assert.equal(result.truncated, true);
+    assert.equal(result.totalRows, 1);
+  });
+
+  it("keeps the serialized rows array under the cap for many small rows", () => {
+    // Small rows are the worst case: the commas between rows dominate the
+    // payload, so this is the regression the ticket is about.
+    const rows = Array.from({ length: 3_000_000 }, (_, i) => i % 1000);
+    const capBytes = 8 * 1024 * 1024;
+    const overheadBytes = 500;
+    const result = truncateRows(rows, capBytes, overheadBytes);
+    assert.ok(result.resultBytes <= capBytes - overheadBytes);
+    assert.equal(
+      Buffer.byteLength(JSON.stringify(result.rows), "utf8"),
+      result.resultBytes
+    );
+    assert.equal(result.truncated, true);
   });
 });
 
@@ -151,10 +190,12 @@ describe("callPlanetscaleReadQuery", () => {
       assert.equal(call.headers.get("Authorization"), "Bearer secret-token");
     }
 
-    // The session id is echoed on the post-initialize requests.
+    // The session id and protocol version are echoed on post-initialize requests.
     assert.equal(calls[0].headers.get("mcp-session-id"), null);
     assert.equal(calls[1].headers.get("mcp-session-id"), "session-abc");
     assert.equal(calls[2].headers.get("mcp-session-id"), "session-abc");
+    assert.equal(calls[1].headers.get("MCP-Protocol-Version"), "2025-06-18");
+    assert.equal(calls[2].headers.get("MCP-Protocol-Version"), "2025-06-18");
 
     // The tools/call carries the tool name and arguments verbatim.
     assert.equal(calls[2].body.method, "tools/call");
@@ -196,7 +237,7 @@ describe("callPlanetscaleReadQuery", () => {
     assert.equal(text, '[{"id":1}]');
   });
 
-  it("throws when tools/call returns an error", async () => {
+  it("throws when tools/call returns a JSON-RPC error", async () => {
     const fetchStub: typeof fetch = (_url, init) => {
       const body = JSON.parse(String(init?.body));
       if (body.method === "initialize") {
@@ -226,6 +267,44 @@ describe("callPlanetscaleReadQuery", () => {
         { fetch: fetchStub }
       ),
       QUERY_FAILED_ERROR
+    );
+  });
+
+  it("throws with the server's error text when the tool reports isError", async () => {
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "initialize") {
+        return jsonResponse({
+          id: 1,
+          jsonrpc: "2.0",
+          result: { protocolVersion: "2025-06-18" },
+        });
+      }
+      if (body.method === "notifications/initialized") {
+        return jsonResponse({});
+      }
+      if (body.method === "tools/call") {
+        return jsonResponse({
+          id: 2,
+          jsonrpc: "2.0",
+          result: {
+            content: [
+              { text: 'syntax error at or near "SELEC"', type: "text" },
+            ],
+            isError: true,
+          },
+        });
+      }
+      throw new Error(`Unexpected method: ${body.method}`);
+    };
+
+    await assert.rejects(
+      callPlanetscaleReadQuery(
+        "secret-token",
+        { query: "SELEC 1" },
+        { fetch: fetchStub }
+      ),
+      SYNTAX_ERROR
     );
   });
 });

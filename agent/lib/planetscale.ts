@@ -34,6 +34,7 @@ interface JsonRpcMessage {
   jsonrpc?: string;
   result?: {
     content?: Array<{ type?: string; text?: string }>;
+    isError?: boolean;
     [key: string]: unknown;
   };
 }
@@ -78,6 +79,16 @@ function extractMessage(body: string): JsonRpcMessage {
     return withError;
   }
   throw new Error("PlanetScale MCP response contained no JSON-RPC result.");
+}
+
+/** Joins the text parts of an MCP `content` array into one string. */
+function joinContentText(
+  content: Array<{ type?: string; text?: string }> | undefined
+): string {
+  return (content ?? [])
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .filter((text): text is string => typeof text === "string")
+    .join("");
 }
 
 /**
@@ -134,9 +145,11 @@ export async function callPlanetscaleReadQuery(
     );
   }
 
-  const sessionHeaders = sessionId
-    ? { ...baseHeaders, "mcp-session-id": sessionId }
-    : baseHeaders;
+  const sessionHeaders = {
+    ...baseHeaders,
+    "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+    ...(sessionId ? { "mcp-session-id": sessionId } : {}),
+  };
 
   await fetchImpl(PLANETSCALE_MCP_URL, {
     body: JSON.stringify({
@@ -169,16 +182,22 @@ export async function callPlanetscaleReadQuery(
     );
   }
 
-  const content = callMessage.result?.content ?? [];
-  return content
-    .map((part) => (part.type === "text" ? part.text : ""))
-    .filter((text): text is string => typeof text === "string")
-    .join("");
+  const { result } = callMessage;
+  if (result?.isError === true) {
+    const errorText = joinContentText(result.content);
+    throw new Error(
+      `PlanetScale read query failed: ${errorText || "unknown error"}.`
+    );
+  }
+
+  return joinContentText(result?.content);
 }
 
 /** Result of {@link truncateRows}. */
 export interface TruncateRowsResult {
-  /** The byte length of the kept rows after `JSON.stringify`. */
+  /** Whether a single row alone exceeded the cap, so nothing was kept. */
+  oversizedRow: boolean;
+  /** Serialized byte length of the kept rows array (`JSON.stringify(kept)`). */
   resultBytes: number;
   /** The number of rows kept. */
   returnedRows: number;
@@ -191,29 +210,41 @@ export interface TruncateRowsResult {
 }
 
 /**
- * Deterministically truncates `rows` so their serialized size stays within
- * `capBytes`. Each row is `JSON.stringify`'d exactly once; rows are kept in
- * order until adding the next would exceed the cap.
+ * Deterministically truncates `rows` so the serialized rows array stays within
+ * `capBytes` minus `overheadBytes`. Each row is `JSON.stringify`'d exactly once;
+ * rows are kept in order until adding the next would exceed the budget.
+ *
+ * The budget accounts for the array brackets and the comma between each pair
+ * of kept rows, so `resultBytes` equals `JSON.stringify(kept).length`. Pass
+ * `overheadBytes` as the measured size of everything else in the returned
+ * object (metadata keys plus passthrough fields) so the full serialized output
+ * stays under the cap.
  *
  * @param rows - The rows to truncate.
- * @param capBytes - The maximum serialized byte size to keep.
+ * @param capBytes - The maximum serialized byte size of the full result.
+ * @param overheadBytes - Serialized size of everything except the rows array.
  * @returns The kept rows plus truncation metadata.
  */
 export function truncateRows(
   rows: unknown[],
-  capBytes: number
+  capBytes: number,
+  overheadBytes = 0
 ): TruncateRowsResult {
   const kept: unknown[] = [];
-  let resultBytes = 0;
+  const rowsBudget = capBytes - overheadBytes;
+  // "[" and "]" bracket the array; each row after the first adds a comma.
+  let resultBytes = 2;
   for (const row of rows) {
     const rowBytes = Buffer.byteLength(JSON.stringify(row), "utf8");
-    if (resultBytes + rowBytes > capBytes) {
+    const commaBytes = kept.length > 0 ? 1 : 0;
+    if (resultBytes + rowBytes + commaBytes > rowsBudget) {
       break;
     }
     kept.push(row);
-    resultBytes += rowBytes;
+    resultBytes += rowBytes + commaBytes;
   }
   return {
+    oversizedRow: kept.length === 0 && rows.length > 0,
     resultBytes,
     returnedRows: kept.length,
     rows: kept,
@@ -243,9 +274,11 @@ export function parseReadQueryResult(text: string): ParseReadQueryResult {
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new Error("PlanetScale read query returned non-JSON content.", {
-      cause: error,
-    });
+    const prefix = text.slice(0, 200);
+    throw new Error(
+      `PlanetScale read query returned non-JSON content: ${prefix}${text.length > 200 ? "..." : ""}`,
+      { cause: error }
+    );
   }
 
   if (Array.isArray(parsed)) {

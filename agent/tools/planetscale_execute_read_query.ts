@@ -21,7 +21,8 @@ export default defineTool({
     "Run a read-only SQL query against PlanetScale production Postgres and return the rows. " +
     "Results are capped at 8 MB; when `truncated` is true the rows are partial, so narrow the " +
     "query (a bounded COUNT, a tighter WHERE, or a LIMIT) and re-run rather than concluding " +
-    "from a partial result. Never run a write.",
+    "from a partial result. When `oversizedRow` is true a single row alone exceeded the cap, " +
+    "so select fewer or narrower columns instead of re-running the same query. Never run a write.",
   async execute(input, ctx) {
     const { token } = await ctx.getToken(planetscaleAuth);
 
@@ -63,8 +64,33 @@ export default defineTool({
       };
     }
 
-    const truncated = truncateRows(rows, MAX_RESULT_BYTES);
-    return { ...truncated, ...passthrough };
+    // Measure everything that will surround the rows array in the returned
+    // object, using upper-bound values for the numbers, so the final
+    // serialized output stays under the stream's per-chunk limit.
+    const overheadBytes = Buffer.byteLength(
+      JSON.stringify({
+        ...passthrough,
+        oversizedRow: true,
+        resultBytes: MAX_RESULT_BYTES,
+        returnedRows: rows.length,
+        success: true,
+        totalRows: rows.length,
+        truncated: true,
+      }),
+      "utf8"
+    );
+
+    const truncated = truncateRows(rows, MAX_RESULT_BYTES, overheadBytes);
+    return {
+      ...passthrough,
+      oversizedRow: truncated.oversizedRow,
+      resultBytes: truncated.resultBytes,
+      returnedRows: truncated.returnedRows,
+      rows: truncated.rows,
+      success: true as const,
+      totalRows: truncated.totalRows,
+      truncated: truncated.truncated,
+    };
   },
   inputSchema: z.object({
     branch: z.string().optional().describe("The branch name."),
@@ -80,15 +106,14 @@ export default defineTool({
       .optional()
       .describe("Whether to run against a read replica."),
   }),
-  outputSchema: z
-    .object({
-      error: z.string().optional(),
-      resultBytes: z.number().optional(),
-      returnedRows: z.number().optional(),
-      rows: z.array(z.unknown()).optional(),
-      success: z.boolean().optional(),
-      totalRows: z.number().optional(),
-      truncated: z.boolean().optional(),
-    })
-    .passthrough(),
+  outputSchema: z.looseObject({
+    error: z.string().optional(),
+    oversizedRow: z.boolean().optional(),
+    resultBytes: z.number().optional(),
+    returnedRows: z.number().optional(),
+    rows: z.array(z.unknown()).optional(),
+    success: z.boolean().optional(),
+    totalRows: z.number().optional(),
+    truncated: z.boolean().optional(),
+  }),
 });
