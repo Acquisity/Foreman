@@ -22,6 +22,11 @@ import { planetscaleAuth } from "../lib/constants.js";
  *   exceed the workflow stream's per-chunk limit. The authored
  *   `planetscale_execute_read_query` tool (agent/tools) calls it directly and
  *   truncates the result instead.
+ * - `planetscale_get_branch_schema` is intentionally absent from the
+ *   allowlist: it returns the complete schema for every table with no size
+ *   limit, which can exceed the workflow stream's per-chunk limit. Schema is
+ *   still reachable through `planetscale_execute_read_query` against
+ *   `information_schema`.
  * - Ungated on purpose: unattended factory runs investigate bug tickets and
  *   must assess fleet-wide blast radius. The service token is scoped to a
  *   single organization, so reach across databases is a property of the
@@ -30,7 +35,7 @@ import { planetscaleAuth } from "../lib/constants.js";
 export default defineMcpClientConnection({
   auth: planetscaleAuth,
   description:
-    "PlanetScale Postgres, read-only: organizations, databases, branches, schema, and query Insights.",
+    "PlanetScale Postgres, read-only: organizations, databases, branches, and query Insights.",
   tools: {
     allow: [
       "planetscale_list_organizations",
@@ -39,7 +44,6 @@ export default defineMcpClientConnection({
       "planetscale_get_database",
       "planetscale_list_branches",
       "planetscale_get_branch",
-      "planetscale_get_branch_schema",
       "planetscale_get_insights",
       "planetscale_list_schema_recommendations",
       "planetscale_search_documentation",
