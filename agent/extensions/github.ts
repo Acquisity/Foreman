@@ -1,4 +1,8 @@
 import githubExtension from "@github-tools/eve-extension";
+import {
+  intakeOnlyPolicy,
+  pullRequestReadinessPolicy,
+} from "../lib/github/approval.js";
 import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
 
 /**
@@ -12,8 +16,22 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  * - `include` is the allowlist; there is no preset. Reads, triage writes, and
  *   PR authoring are in; merge tools are deliberately absent (a person merges
  *   in the GitHub UI), and so are repo administration, gists (they 403 over
- *   Connect installation tokens), releases, and CI mutation. Omitting merge
- *   tools is the only remaining protection on writes.
+ *   Connect installation tokens), releases, and CI mutation.
+ * - `requireApproval: false` is load-bearing, not decorative. Left unset, the
+ *   extension attaches `always()` to every write tool in the allowlist, so
+ *   opening a pull request or leaving a comment raises an approval card on
+ *   every call. Slack cannot answer one, which parks the session for good.
+ *   The allowlist is one bound on these writes, not the only one: every tool
+ *   resolves its own credential, `owner` and `repo` are always explicit, and
+ *   `pullRequestReadinessPolicy` denies the one transition that presents work
+ *   as reviewable.
+ * - `overrides` gates `updatePullRequest` on that policy, and `createPullRequest`
+ *   on `intakeOnlyPolicy`, because opening a pull request is delivery too and an
+ *   intake-only channel files to Linear instead of shipping. Both deny rather
+ *   than park, so the run keeps moving on every surface. Note that moving
+ *   `requireApproval` to the per-tool object form would silently re-gate every
+ *   tool absent from the object with `always()`, so the override is the safe
+ *   place for a per-tool rule.
  */
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
@@ -50,4 +68,9 @@ export default githubExtension({
     "listCheckRuns",
     "getCiFailureContext",
   ],
+  overrides: {
+    createPullRequest: { approval: intakeOnlyPolicy },
+    updatePullRequest: { approval: pullRequestReadinessPolicy },
+  },
+  requireApproval: false,
 });

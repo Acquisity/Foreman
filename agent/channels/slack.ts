@@ -1,11 +1,17 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
-import { defaultSlackAuth, slackChannel } from "eve/channels/slack";
+import {
+  defaultSlackAuth,
+  type SlackInboundMessageContext,
+  type SlackMessage,
+  slackChannel,
+} from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositories, stampRepository } from "../lib/repository.js";
 import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
 
 /**
- * Slack channel: mentions in, threaded progress out, via Vercel Connect.
+ * Slack channel: mentions and direct messages in, threaded progress out, via
+ * Vercel Connect.
  *
  * @remarks
  * Credentials are brokered by Vercel Connect, which supplies the bot token
@@ -19,6 +25,12 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * the session is stamped intake-only and intakeOnlyPolicy denies every push,
  * on the direct path and inside the stations alike. INTAKE_ONLY_TASK tells
  * the model to file the change as a Linear issue instead.
+ *
+ * Mentions and direct messages run the same dispatch. eve only falls back to
+ * its built-in handler for a surface this file leaves unauthored, and that
+ * default stamps nothing: a DM dispatched through it carries no trust, no
+ * repository selection, and no intake-only marker, so every delivery from a
+ * DM parked on an approval card that Slack cannot deliver an answer to.
  */
 
 // Task injected into a mention from an intake-only channel. The hard gate is
@@ -30,25 +42,28 @@ const INTAKE_ONLY_TASK = [
   "If the message is a work item (a fix, a build, or a change request), create a Linear issue that captures it along with anything you found, leave it unassigned for triage, and tell the requester it has been filed and will be picked up from the tracker.",
 ].join("\n\n");
 
+const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
+  const auth = defaultSlackAuth(message, ctx);
+  if (auth === null) {
+    return null;
+  }
+  const repositories = extractRepositories(message.text);
+  const trusted = stampTrusted(auth);
+  const [repository] = repositories;
+  const stamped =
+    repositories.length === 1 && repository
+      ? stampRepository(trusted, repository.slug, "explicit")
+      : trusted;
+  return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
+    ? { auth: stampIntakeOnly(stamped), context: [INTAKE_ONLY_TASK] }
+    : { auth: stamped };
+};
+
 export default slackChannel({
   credentials: connectSlackCredentials(
     process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
   ),
-  onAppMention: (ctx, message) => {
-    const auth = defaultSlackAuth(message, ctx);
-    if (auth === null) {
-      return null;
-    }
-    const repositories = extractRepositories(message.text);
-    const trusted = stampTrusted(auth);
-    const [repository] = repositories;
-    const stamped =
-      repositories.length === 1 && repository
-        ? stampRepository(trusted, repository.slug, "explicit")
-        : trusted;
-    return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
-      ? { auth: stampIntakeOnly(stamped), context: [INTAKE_ONLY_TASK] }
-      : { auth: stamped };
-  },
+  onAppMention: dispatch,
+  onDirectMessage: dispatch,
   threadContext: { since: "last-agent-reply" },
 });

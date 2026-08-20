@@ -114,3 +114,54 @@ export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
         type: "denied",
       }
     : "not-applicable";
+
+/**
+ * Marking a pull request ready for review, which `updatePullRequest` performs
+ * by sending `draft: false`.
+ *
+ * @remarks
+ * Denied rather than parked, for the same reason delivery no longer parks: an
+ * approval card cannot be answered from Slack, and a Linear agent session runs
+ * with nobody watching for one, so a card there is a session that never
+ * finishes. A denial reaches the model as a reason it can relay and work
+ * around, which keeps the run moving.
+ *
+ * Only the readiness transition is gated. Editing a title, body, base branch,
+ * or open and closed state stays ungated, as does converting a pull request
+ * back to a draft, because none of those present work as reviewable.
+ */
+export const pullRequestReadinessPolicy = (
+  ctx: ApprovalContext
+): ApprovalStatus =>
+  (ctx.toolInput as { draft?: unknown } | undefined)?.draft === false
+    ? {
+        reason:
+          "Marking a pull request ready for review needs the user to ask for it. Open or update the pull request, say it is ready, and leave the transition to them.",
+        type: "denied",
+      }
+    : "not-applicable";
+
+/**
+ * Deleting the calling user's own saved preferences.
+ *
+ * @remarks
+ * The tool derives its Blob key from the framework-resolved principal, so a
+ * session can only ever clear its own user's document, and an attended user
+ * asking for it in the session is the authorization. An unattended turn has
+ * no such request behind it: schedules dispatch under a real user principal
+ * and read attacker-writable tracker content, so injected text could reach
+ * this tool and delete that user's preferences.
+ *
+ * Denied rather than parked, like every other gate here. A card cannot be
+ * answered from Slack, and an unattended run has nobody to answer one at all.
+ */
+export const userPreferencesDeletionPolicy = (
+  ctx: ApprovalContext
+): ApprovalStatus =>
+  isUnattended(ctx.session.auth.current)
+    ? {
+        reason:
+          "Unattended runs may not delete saved preferences. Only the signed-in user can ask for that, in their own session.",
+        type: "denied",
+      }
+    : "not-applicable";

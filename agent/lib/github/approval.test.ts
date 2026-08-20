@@ -13,6 +13,7 @@ import {
   denyUnattendedWrites,
   modelSwapPolicy,
   repositoryKnowledgePolicy,
+  userPreferencesDeletionPolicy,
 } from "./approval.js";
 
 const auth: SessionAuthContext = {
@@ -139,5 +140,28 @@ describe("denyUnattendedWrites", () => {
       policy(approvalFor(auth, "supermemory__add_memory")),
       "not-applicable"
     );
+  });
+});
+
+describe("userPreferencesDeletionPolicy", () => {
+  it("denies a schedule dispatched under a real user", () => {
+    const status = userPreferencesDeletionPolicy(approvalFor(unattendedAuth));
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+
+  it("denies an autonomous run", () => {
+    const status = userPreferencesDeletionPolicy(
+      approvalFor(stampAutonomous(auth, 7))
+    );
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+
+  it("lets an attended user clear their own preferences", () => {
+    for (const current of [auth, stampTrusted(auth)]) {
+      assert.equal(
+        userPreferencesDeletionPolicy(approvalFor(current)),
+        "not-applicable"
+      );
+    }
   });
 });
