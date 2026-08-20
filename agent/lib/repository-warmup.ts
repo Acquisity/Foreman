@@ -29,9 +29,13 @@ export interface WarmRepository {
 }
 
 /**
- * Repositories pre-warmed into the template snapshot. Foreman warms only its
- * dependency install (stations run `pnpm validate`, never `pnpm run build`);
- * Acquisity warms both install and build so `.next`/`.turbo` are ready.
+ * Repositories pre-warmed into the template snapshot, dependencies only.
+ *
+ * @remarks
+ * Neither is pre-built. Foreman never needed one (stations run `pnpm
+ * validate`, never `pnpm run build`), and Acquisity's build validates a long
+ * list of required API keys, which a sandbox that secrets never enter cannot
+ * satisfy. Stations build on demand against the warm install.
  */
 export const WARM_REPOSITORIES: readonly WarmRepository[] = [
   { kind: "pnpm", slug: "Acquisity/Foreman" },
