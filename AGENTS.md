@@ -41,6 +41,7 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 - The root `prepare_repository` tool reuses GitHub's channel checkout or clones at runtime, then writes `/workspace/.foreman/repository.json`. Stations read the marker rather than assuming a path.
 - Handoff artifacts are ids, not inlined long documents. Artifact ids remain anchored, size-bounded, and write-once.
 - The reconciliation schedule runs every ten minutes and must remain idempotent through durable run state, stale-head rejection, and feedback deduplication.
+- Author every inbound Slack surface in `agent/channels/slack.ts`. eve falls back to its built-in handler for any surface left unauthored, and that default stamps no trust, no repository, and no intake-only marker, so a caller arrives untrusted and delivery parks on an approval card. Slack cannot answer one: Vercel Connect forwards Events API events only, never interactive payloads, and eve matches a typed answer against the option id exactly, which the channel's `<slack_message>` envelope defeats.
 - Slack channel IDs listed in `SLACK_INTAKE_ONLY_CHANNELS` are intake-only: conversation and investigation run as normal, but the session is stamped intake-only and `intakeOnlyPolicy` denies every push, so changes are filed to Linear instead of delivered from Slack.
 
 ## Code style
@@ -73,4 +74,5 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 
 - `pnpm validate` passes with zero errors and warnings.
 - No secrets, `node_modules`, `.eve`, `.vercel`, `.output`, or build artifacts are staged.
-- Do not commit, push, open a PR, mark ready, or merge without the user's authorization. A Linear ticket must exist before a PR is opened.
+- A request to do the work and deliver it is the authorization to branch, commit, push, and open a PR. Carry it through and report the result instead of stopping to ask. A Linear ticket must exist before a PR is opened; create one when none exists.
+- Marking a PR ready and merging still need the user's explicit word.
