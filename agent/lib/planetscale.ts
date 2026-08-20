@@ -1,0 +1,266 @@
+/**
+ * PlanetScale read-query access, hand-rolled over the MCP Streamable HTTP
+ * transport.
+ *
+ * The PlanetScale MCP connection is read-only, but its `execute_read_query`
+ * tool returns the full rows array with no size limit. A single wide query
+ * can exceed the workflow stream's 10 MB per-chunk limit and kill the session,
+ * so this module calls the tool directly and truncates the rows before they
+ * are handed back to the model.
+ */
+
+/** The PlanetScale MCP endpoint (Streamable HTTP transport). */
+const PLANETSCALE_MCP_URL = "https://mcp.pscale.dev/mcp/planetscale";
+
+/** JSON-RPC protocol version. */
+const JSON_RPC_VERSION = "2.0";
+
+/** MCP protocol version negotiated during `initialize`. */
+const MCP_PROTOCOL_VERSION = "2025-06-18";
+
+/** Tool name on the PlanetScale MCP server for a read query. */
+const READ_QUERY_TOOL = "planetscale_execute_read_query";
+
+/** Options for {@link callPlanetscaleReadQuery}. */
+export interface CallPlanetscaleReadQueryOptions {
+  /** Injectable `fetch` for tests; defaults to the global `fetch`. */
+  fetch?: typeof fetch;
+}
+
+/** A single JSON-RPC response message, narrowed to the fields we read. */
+interface JsonRpcMessage {
+  error?: unknown;
+  id?: number | string | null;
+  jsonrpc?: string;
+  result?: {
+    content?: Array<{ type?: string; text?: string }>;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Parses a JSON-RPC response body, preferring a plain JSON body and falling
+ * back to Server-Sent Events (`data:`-line) extraction.
+ *
+ * @param body - The raw response body text.
+ * @returns The first message carrying a `result` or `error`.
+ */
+function extractMessage(body: string): JsonRpcMessage {
+  try {
+    return JSON.parse(body) as JsonRpcMessage;
+  } catch {
+    // Fall through to SSE extraction.
+  }
+
+  const messages: JsonRpcMessage[] = [];
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) {
+      continue;
+    }
+    const payload = trimmed.slice("data:".length).trim();
+    if (!payload) {
+      continue;
+    }
+    try {
+      messages.push(JSON.parse(payload) as JsonRpcMessage);
+    } catch {
+      // Ignore malformed SSE lines.
+    }
+  }
+
+  const withResult = messages.find((message) => message.result !== undefined);
+  const withError = messages.find((message) => message.error !== undefined);
+  if (withResult) {
+    return withResult;
+  }
+  if (withError) {
+    return withError;
+  }
+  throw new Error("PlanetScale MCP response contained no JSON-RPC result.");
+}
+
+/**
+ * Calls `planetscale_execute_read_query` on the PlanetScale MCP server over
+ * Streamable HTTP and returns the concatenated text of its `result.content`.
+ *
+ * The full handshake is performed per call: `initialize`, echo the
+ * `mcp-session-id` header when present, `notifications/initialized`, then
+ * `tools/call`. The token is sent only as `Authorization: Bearer <token>` and
+ * never appears in the returned value.
+ *
+ * @param token - The PlanetScale service-token SECRET.
+ * @param args - The tool arguments (e.g. `{ query, database, branch }`).
+ * @param opts - Optional overrides, primarily `fetch` for tests.
+ * @returns The concatenated text of the tool's `result.content`.
+ */
+export async function callPlanetscaleReadQuery(
+  token: string,
+  args: Record<string, unknown>,
+  opts?: CallPlanetscaleReadQueryOptions
+): Promise<string> {
+  const fetchImpl = opts?.fetch ?? fetch;
+
+  const baseHeaders: Record<string, string> = {
+    Accept: "application/json, text/event-stream",
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  const initializeResponse = await fetchImpl(PLANETSCALE_MCP_URL, {
+    body: JSON.stringify({
+      id: 1,
+      jsonrpc: JSON_RPC_VERSION,
+      method: "initialize",
+      params: {
+        capabilities: {},
+        clientInfo: { name: "foreman-agent", version: "0.0.0" },
+        protocolVersion: MCP_PROTOCOL_VERSION,
+      },
+    }),
+    headers: baseHeaders,
+    method: "POST",
+  });
+  if (!initializeResponse.ok) {
+    throw new Error(
+      `PlanetScale MCP initialize failed: HTTP ${initializeResponse.status}.`
+    );
+  }
+  const sessionId = initializeResponse.headers.get("mcp-session-id");
+  const initializeMessage = extractMessage(await initializeResponse.text());
+  if (initializeMessage.error !== undefined) {
+    throw new Error(
+      `PlanetScale MCP initialize error: ${JSON.stringify(initializeMessage.error)}.`
+    );
+  }
+
+  const sessionHeaders = sessionId
+    ? { ...baseHeaders, "mcp-session-id": sessionId }
+    : baseHeaders;
+
+  await fetchImpl(PLANETSCALE_MCP_URL, {
+    body: JSON.stringify({
+      jsonrpc: JSON_RPC_VERSION,
+      method: "notifications/initialized",
+    }),
+    headers: sessionHeaders,
+    method: "POST",
+  });
+
+  const callResponse = await fetchImpl(PLANETSCALE_MCP_URL, {
+    body: JSON.stringify({
+      id: 2,
+      jsonrpc: JSON_RPC_VERSION,
+      method: "tools/call",
+      params: { arguments: args, name: READ_QUERY_TOOL },
+    }),
+    headers: sessionHeaders,
+    method: "POST",
+  });
+  if (!callResponse.ok) {
+    throw new Error(
+      `PlanetScale MCP tools/call failed: HTTP ${callResponse.status}.`
+    );
+  }
+  const callMessage = extractMessage(await callResponse.text());
+  if (callMessage.error !== undefined) {
+    throw new Error(
+      `PlanetScale MCP tools/call error: ${JSON.stringify(callMessage.error)}.`
+    );
+  }
+
+  const content = callMessage.result?.content ?? [];
+  return content
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .filter((text): text is string => typeof text === "string")
+    .join("");
+}
+
+/** Result of {@link truncateRows}. */
+export interface TruncateRowsResult {
+  /** The byte length of the kept rows after `JSON.stringify`. */
+  resultBytes: number;
+  /** The number of rows kept. */
+  returnedRows: number;
+  /** The rows kept, in original order, until the byte cap would be exceeded. */
+  rows: unknown[];
+  /** The total number of rows in the input. */
+  totalRows: number;
+  /** Whether any rows were dropped because the cap was reached. */
+  truncated: boolean;
+}
+
+/**
+ * Deterministically truncates `rows` so their serialized size stays within
+ * `capBytes`. Each row is `JSON.stringify`'d exactly once; rows are kept in
+ * order until adding the next would exceed the cap.
+ *
+ * @param rows - The rows to truncate.
+ * @param capBytes - The maximum serialized byte size to keep.
+ * @returns The kept rows plus truncation metadata.
+ */
+export function truncateRows(
+  rows: unknown[],
+  capBytes: number
+): TruncateRowsResult {
+  const kept: unknown[] = [];
+  let resultBytes = 0;
+  for (const row of rows) {
+    const rowBytes = Buffer.byteLength(JSON.stringify(row), "utf8");
+    if (resultBytes + rowBytes > capBytes) {
+      break;
+    }
+    kept.push(row);
+    resultBytes += rowBytes;
+  }
+  return {
+    resultBytes,
+    returnedRows: kept.length,
+    rows: kept,
+    totalRows: rows.length,
+    truncated: kept.length < rows.length,
+  };
+}
+
+/** Result of {@link parseReadQueryResult}. */
+export interface ParseReadQueryResult {
+  /** Any other top-level fields, preserved verbatim. */
+  passthrough: Record<string, unknown>;
+  /** The rows array extracted from the query result. */
+  rows: unknown[];
+}
+
+/**
+ * Parses the text returned by `planetscale_execute_read_query` into a rows
+ * array plus any other top-level fields. Accepts either a bare JSON array or
+ * an object with a `rows` array; other object fields are preserved verbatim.
+ *
+ * @param text - The raw text of the tool's `result.content`.
+ * @returns The rows and passthrough fields.
+ */
+export function parseReadQueryResult(text: string): ParseReadQueryResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error("PlanetScale read query returned non-JSON content.", {
+      cause: error,
+    });
+  }
+
+  if (Array.isArray(parsed)) {
+    return { passthrough: {}, rows: parsed };
+  }
+
+  if (parsed !== null && typeof parsed === "object") {
+    const object = parsed as Record<string, unknown>;
+    if (Array.isArray(object.rows)) {
+      const { rows, ...passthrough } = object;
+      return { passthrough, rows };
+    }
+  }
+
+  throw new Error(
+    "PlanetScale read query returned an unrecognized result shape."
+  );
+}

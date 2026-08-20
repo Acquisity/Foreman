@@ -9,6 +9,8 @@ import type { ApprovalContext } from "eve/tools";
 import { AUTONOMOUS_PRINCIPAL, UNATTENDED_ATTRIBUTE } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
+process.env.PLANETSCALE_MCP_CONNECTOR ??=
+  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 const linear = (await import("../connections/linear.js")).default;
 
 const approve = (toolName: string, auth: Record<string, unknown> | null) =>
