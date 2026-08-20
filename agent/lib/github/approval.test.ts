@@ -13,6 +13,7 @@ import {
   denyUnattendedWrites,
   modelSwapPolicy,
   repositoryKnowledgePolicy,
+  warmSnapshotPolicy,
 } from "./approval.js";
 
 const auth: SessionAuthContext = {
@@ -111,6 +112,40 @@ describe("modelSwapPolicy", () => {
 
   it("denies an autonomous principal", () => {
     const status = modelSwapPolicy(approvalFor(stampAutonomous(auth, 123)));
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+});
+
+describe("warmSnapshotPolicy", () => {
+  it("denies an autonomous principal", () => {
+    const status = warmSnapshotPolicy(approvalFor(stampAutonomous(auth, 123)));
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+
+  it("denies a trusted-but-unattended principal", () => {
+    const status = warmSnapshotPolicy(
+      approvalFor(stampTrusted(unattendedAuth))
+    );
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+
+  it("lets a trusted caller rebuild without a card", () => {
+    assert.equal(
+      warmSnapshotPolicy(approvalFor(stampTrusted(auth))),
+      "not-applicable"
+    );
+  });
+
+  it("lets a schedule-app principal rebuild without a card", () => {
+    assert.equal(
+      warmSnapshotPolicy(approvalFor(scheduleAppAuth)),
+      "not-applicable"
+    );
+  });
+
+  it("denies an untrusted attended caller instead of parking on a card", () => {
+    const status = warmSnapshotPolicy(approvalFor(auth));
+    assert.notEqual(status, "user-approval");
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
