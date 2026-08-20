@@ -23,17 +23,19 @@ import {
  */
 const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
 
-// Snapshots expire 30 days after their last use so the daily rebuild does not
-// leak unbounded storage; the snapshot in active use as the template base keeps
-// resetting its timer, so only superseded ones age out.
+// Snapshots expire 30 days after their last use. Rebuilds are human-driven and
+// rare, so the TTL bounds storage from superseded snapshots when a rebuild does
+// happen; the active snapshot, pinned as the template base, keeps resetting its
+// timer on use so it stays alive between rebuilds.
 const SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // The invocation that drives this build is capped by eve's Vercel maxDuration
 // ("max", 800s on Pro Fluid), so the sandbox timeout is bounded by that
 // ceiling, not by how long the build could take. Keeping the sandbox timeout at
 // the invocation ceiling means an orphaned sandbox (the function killed
-// mid-build) self-terminates instead of leaking past the function's death. The build must fit inside this window; decoupling it from the
-// invocation is the follow-up if it does not.
+// mid-build) self-terminates instead of leaking past the function's death. The
+// build must fit inside this window; decoupling it from the invocation is the
+// follow-up if it does not.
 const BUILD_TIMEOUT_MS = 800_000;
 
 const failure = (
@@ -72,11 +74,11 @@ const run = async (
  *
  * Driven by the `rebuild_warm_snapshot` tool. The produced id is what
  * `agent/sandbox.ts` reads from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to seed the
- * session template. The whole
- * checkout — including `.git`, the tracked working-tree files, and
- * `node_modules` — lands in the snapshot; `chmod` makes them readable/writable
- * by the session user, which runs as a different uid than the snapshot builder,
- * so the later `git reset --hard` and station edits succeed.
+ * session template. The whole checkout — including `.git`, the tracked
+ * working-tree files, and `node_modules` — lands in the snapshot; `chmod` makes
+ * them readable/writable by the session user, which runs as a different uid
+ * than the snapshot builder, so the later `git reset --hard` and station edits
+ * succeed.
  */
 export const createWarmSnapshot = async (): Promise<string> => {
   const token = await mintInstallationToken(githubCredentials);
