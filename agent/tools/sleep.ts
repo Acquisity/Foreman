@@ -20,7 +20,7 @@ const MAX_SLEEP_SECONDS = 600;
 const base = sleep();
 
 export default defineTool({
-  description: `${base.description} The wait is capped at ${MAX_SLEEP_SECONDS} seconds (10 minutes).`,
+  description: `${base.description} The wait is capped at ${MAX_SLEEP_SECONDS} seconds.`,
   execute: base.execute,
   inputSchema: z.strictObject({
     seconds: z
