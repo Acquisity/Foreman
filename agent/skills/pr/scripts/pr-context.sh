@@ -39,6 +39,7 @@ if [[ -n "$branch" ]] && git rev-parse --verify "$remote_default" >/dev/null 2>&
   best_ts=0
   current_remote="origin/$branch"
 
+  refs="$(git for-each-ref --format='%(refname:short)%09%(objectname)%09%(committerdate:unix)' refs/remotes/origin)"
   while IFS=$'\t' read -r ref_name ref_sha ref_ts; do
     [[ "$ref_name" == "origin/HEAD" ]] && continue
     [[ "$ref_name" == "$remote_default" ]] && continue
@@ -51,7 +52,7 @@ if [[ -n "$branch" ]] && git rev-parse --verify "$remote_default" >/dev/null 2>&
         best_ts="$ref_ts"
       fi
     fi
-  done < <(git for-each-ref --format='%(refname:short)%09%(objectname)%09%(committerdate:unix)' refs/remotes/origin)
+  done <<< "$refs"
 
   if [[ -n "$best_ref" ]]; then
     probable_base="${best_ref#origin/}"
