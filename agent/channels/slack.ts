@@ -19,6 +19,14 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * the session is stamped intake-only and intakeOnlyPolicy denies every push,
  * on the direct path and inside the stations alike. INTAKE_ONLY_TASK tells
  * the model to file the change as a Linear issue instead.
+ *
+ * Messages sent while a turn is running steer the session: eve defaults
+ * channels to `turnPolicy: "steer"`, so a follow-up mention is buffered, the
+ * active turn is cooperatively cancelled at the next step boundary, and a
+ * replacement turn answers the new message. This is the default rather than
+ * an explicit setting (the Slack channel config does not expose `turnPolicy`),
+ * and it is what makes a mid-task mention get answered after the next tool
+ * call.
  */
 
 // Task injected into a mention from an intake-only channel. The hard gate is
