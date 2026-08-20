@@ -1,5 +1,5 @@
 import type { ApprovalContext, ApprovalStatus } from "eve/tools";
-import { isAutonomous, isScheduleAppAuth, isTrusted } from "../trust.js";
+import { isScheduleAppAuth, isTrusted, isUnattended } from "../trust.js";
 
 /**
  * Policy factory for writes to shared configuration every future run
@@ -17,7 +17,7 @@ import { isAutonomous, isScheduleAppAuth, isTrusted } from "../trust.js";
 function sharedConfigWritePolicy(unattendedReason: string) {
   return (ctx: ApprovalContext): ApprovalStatus => {
     const auth = ctx.session.auth.current;
-    if (isAutonomous(auth)) {
+    if (isUnattended(auth)) {
       return { reason: unattendedReason, type: "denied" };
     }
     if (isTrusted(auth) || isScheduleAppAuth(auth)) {
@@ -39,12 +39,12 @@ export const repositoryKnowledgePolicy = sharedConfigWritePolicy(
  * to every session that starts after the change.
  */
 export const modelSwapPolicy = sharedConfigWritePolicy(
-  "Unattended factory runs may not change the models the factory runs on."
+  "Unattended runs may not change the models the factory runs on."
 );
 
 /** Direct-session publication requires an explicit user approval card. */
 export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
-  if (isAutonomous(ctx.session.auth.current)) {
+  if (isUnattended(ctx.session.auth.current)) {
     return {
       reason:
         "Unattended runs cannot publish without an authorized delivery handoff.",
@@ -75,9 +75,9 @@ export function denyAutonomousWrites(
       writeTools.some(
         (tool) => ctx.toolName === tool || ctx.toolName.endsWith(`__${tool}`)
       );
-    if (isWrite && isAutonomous(ctx.session.auth.current)) {
+    if (isWrite && isUnattended(ctx.session.auth.current)) {
       return {
-        reason: `Unattended factory runs do not write to ${surface}.`,
+        reason: `Unattended runs do not write to ${surface}.`,
         type: "denied",
       };
     }
