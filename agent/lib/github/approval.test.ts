@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
-import { stampAutonomous, stampIntakeOnly, stampTrusted } from "../trust.js";
+import {
+  stampAutonomous,
+  stampIntakeOnly,
+  stampTrusted,
+  UNATTENDED_ATTRIBUTE,
+} from "../trust.js";
 import {
   deliveryPolicy,
-  denyAutonomousWrites,
+  denyUnattendedWrites,
   modelSwapPolicy,
   repositoryKnowledgePolicy,
 } from "./approval.js";
@@ -22,6 +27,11 @@ const scheduleAppAuth: SessionAuthContext = {
   authenticator: "app",
   principalId: "eve:app",
   principalType: "runtime",
+};
+
+const unattendedAuth: SessionAuthContext = {
+  ...auth,
+  attributes: { [UNATTENDED_ATTRIBUTE]: "true" },
 };
 
 const approvalFor = (current: SessionAuthContext, toolName = "push_branch") =>
@@ -44,6 +54,11 @@ describe("deliveryPolicy", () => {
 
   it("denies an autonomous principal", () => {
     const status = deliveryPolicy(approvalFor(stampAutonomous(auth, 123)));
+    assert.equal(typeof status === "object" && status.type, "denied");
+  });
+
+  it("denies a schedule dispatched under a real user, even when trusted", () => {
+    const status = deliveryPolicy(approvalFor(stampTrusted(unattendedAuth)));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
@@ -100,8 +115,8 @@ describe("modelSwapPolicy", () => {
   });
 });
 
-describe("denyAutonomousWrites", () => {
-  const policy = denyAutonomousWrites("Supermemory", ["add_memory"]);
+describe("denyUnattendedWrites", () => {
+  const policy = denyUnattendedWrites("Supermemory", ["add_memory"]);
 
   it("denies an autonomous write", () => {
     const status = policy(

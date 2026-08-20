@@ -1,24 +1,27 @@
 import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import {
-  isAutonomous,
   isIntakeOnly,
   isScheduleAppAuth,
   isTrusted,
+  isUnattended,
 } from "../trust.js";
 
 /**
  * Policy factory for the shared write ladder.
  *
  * @remarks
- * Autonomous runs are denied (nobody is watching to answer an approval
- * card), trusted callers and schedule turns write without a card, and every
- * other human caller, the dev TUI included, parks on one. The denial reason
- * is per-surface so a relayed refusal names the right feature.
+ * Unattended runs are denied rather than parked: nobody is watching to
+ * answer an approval card, and because these writes become context or
+ * behavior for every later run, untrusted input reaching one could poison
+ * shared state. Trusted callers and schedule turns write without a card,
+ * and every other human caller, the dev TUI included, parks on one. Reads
+ * are never routed here. The denial reason is per-surface so a relayed
+ * refusal names the right feature.
  */
 function attendedWritePolicy(unattendedReason: string) {
   return (ctx: ApprovalContext): ApprovalStatus => {
     const auth = ctx.session.auth.current;
-    if (isAutonomous(auth)) {
+    if (isUnattended(auth)) {
       return { reason: unattendedReason, type: "denied" };
     }
     return isTrusted(auth) || isScheduleAppAuth(auth)
@@ -39,7 +42,7 @@ export const repositoryKnowledgePolicy = attendedWritePolicy(
  * to every session that starts after the change.
  */
 export const modelSwapPolicy = attendedWritePolicy(
-  "Unattended factory runs may not change the models the factory runs on."
+  "Unattended runs may not change the models the factory runs on."
 );
 
 const publishPolicy = attendedWritePolicy(
@@ -59,16 +62,20 @@ export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
 
 /**
  * Connection-wide policy for MCP servers whose writes must not run
- * unattended.
+ * unattended, whether the run is a factory turn or a schedule dispatching
+ * under a real user (see {@link isUnattended}).
  *
  * @remarks
  * eve hands connection approval predicates the qualified tool name
  * (`<connection>__<tool>`), so matching is by suffix, never bare equality.
  * With no `writeTools` list, every tool on the connection counts as a
- * write. Attended sessions stay ungated for ordinary shared configuration,
- * these servers' writes are app-scoped and reversible.
+ * write, which is default-deny: a connection that an unattended run must
+ * still read from names its reads at the call site rather than trying to
+ * enumerate every write the server might grow. Attended sessions stay
+ * ungated for ordinary shared configuration, these servers' writes are
+ * app-scoped and reversible.
  */
-export function denyAutonomousWrites(
+export function denyUnattendedWrites(
   surface: string,
   writeTools?: readonly string[]
 ) {
@@ -78,9 +85,9 @@ export function denyAutonomousWrites(
       writeTools.some(
         (tool) => ctx.toolName === tool || ctx.toolName.endsWith(`__${tool}`)
       );
-    if (isWrite && isAutonomous(ctx.session.auth.current)) {
+    if (isWrite && isUnattended(ctx.session.auth.current)) {
       return {
-        reason: `Unattended factory runs do not write to ${surface}.`,
+        reason: `Unattended runs do not write to ${surface}.`,
         type: "denied",
       };
     }

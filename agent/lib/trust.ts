@@ -8,7 +8,7 @@ import type { SessionAuthContext } from "eve/context";
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
  * dispatch; the remaining approval policies (factoryBrainPolicy,
- * modelSwapPolicy, denyAutonomousWrites) deny it non-GitHub writes (factory
+ * modelSwapPolicy, denyUnattendedWrites) deny it non-GitHub writes (factory
  * brain, model swaps, connection writes), because an unattended turn has
  * nobody to answer an approval card and would park forever.
  */
@@ -95,6 +95,30 @@ export function intakeIssueNumber(
 }
 
 /**
+ * Auth attribute marking a session that nobody is watching, even though it
+ * carries a real user principal.
+ *
+ * @remarks
+ * Schedules that reach `principalType: "user"` connections must dispatch under
+ * the granting user, so they cannot use {@link AUTONOMOUS_PRINCIPAL}. Without
+ * this stamp such a turn would look attended: approval cards would park with
+ * nobody to answer them, and the unattended write denials would not fire.
+ */
+export const UNATTENDED_ATTRIBUTE = "unattended";
+
+/**
+ * Whether nobody is watching this session, whether it runs under
+ * {@link AUTONOMOUS_PRINCIPAL} or under a user principal a schedule stamped
+ * with {@link UNATTENDED_ATTRIBUTE}. Write policies gate on this; anything
+ * specific to factory intake keeps using {@link isAutonomous}.
+ */
+export function isUnattended(auth: SessionAuthContext | null): boolean {
+  return (
+    isAutonomous(auth) || auth?.attributes[UNATTENDED_ATTRIBUTE] === "true"
+  );
+}
+
+/**
  * Whether the session runs unattended under {@link AUTONOMOUS_PRINCIPAL}.
  */
 export function isAutonomous(auth: SessionAuthContext | null): boolean {
@@ -111,7 +135,7 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * model overrides directly and push without a card, everyone else parks on
  * one. The GitHub extension write tools (createPullRequest, addIssueComment,
  * etc.) remain ungated for every caller. New capabilities gate on this
- * predicate (or {@link isAutonomous} / {@link isScheduleAppAuth}) rather than
+ * predicate (or {@link isUnattended} / {@link isScheduleAppAuth}) rather than
  * inventing their own.
  */
 export function isTrusted(auth: SessionAuthContext | null): boolean {
@@ -122,12 +146,14 @@ export function isTrusted(auth: SessionAuthContext | null): boolean {
  * The app principal eve stamps on schedule-dispatched turns.
  *
  * @remarks
- * The reconciliation schedule (`agent/schedules/reconcile-pipelines.ts`)
- * stamps {@link stampAutonomous} before dispatch, so its turns are denied
- * delivery as autonomous rather than parked. This predicate recognizes the
- * raw app principal for a future schedule that dispatches without that
- * stamp, and the write policies treat it as trusted. It is never a user
- * identity.
+ * Every schedule that ships marks itself unattended before dispatch:
+ * `reconcile-pipelines.ts` stamps {@link stampAutonomous}, `sla-report.ts`
+ * sets {@link UNATTENDED_ATTRIBUTE}. Both are caught by
+ * {@link isUnattended} and denied, so neither reaches this predicate. It
+ * recognizes the raw app principal for a future schedule that dispatches
+ * without either marker, and the write policies treat that as trusted. Mark
+ * new schedules unattended unless they are meant to write without a card.
+ * It is never a user identity.
  */
 export function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
   return (
