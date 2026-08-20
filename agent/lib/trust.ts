@@ -105,12 +105,12 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * Whether the dispatching channel stamped this caller as trusted.
  *
  * @remarks
- * GitHub tools run without approval cards for every caller, so this predicate
- * is not a write gate there. It gates the shared-config write policies in
- * `agent/lib/github/approval.ts`: trusted callers write repository knowledge and
- * model overrides directly, everyone else parks on a card. New capabilities
- * gate on this predicate (or {@link isAutonomous} / {@link isScheduleAppAuth})
- * rather than inventing their own.
+ * This predicate gates both the shared-config write policies in
+ * `agent/lib/github/approval.ts` and `deliveryPolicy`: trusted callers write
+ * repository knowledge and model overrides directly and push without a card,
+ * everyone else parks on one. New capabilities gate on this predicate (or
+ * {@link isAutonomous} / {@link isScheduleAppAuth}) rather than inventing
+ * their own.
  */
 export function isTrusted(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[TRUSTED_ATTRIBUTE] === "true";

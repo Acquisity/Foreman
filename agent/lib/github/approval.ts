@@ -47,18 +47,26 @@ export const modelSwapPolicy = sharedConfigWritePolicy(
   "Unattended factory runs may not change the models the factory runs on."
 );
 
-/** Direct-session publication requires an explicit user approval card. */
+/**
+ * Direct-session publication. Trusted callers publish without a card; an
+ * untrusted attended caller parks on one; unattended and intake-only runs are
+ * denied (nobody is watching to answer, and intake-only channels cannot ship).
+ */
 export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
   const intake = intakeOnlyPolicy(ctx);
   if (intake !== "not-applicable") {
     return intake;
   }
-  if (isAutonomous(ctx.session.auth.current)) {
+  const auth = ctx.session.auth.current;
+  if (isAutonomous(auth)) {
     return {
       reason:
         "Unattended runs cannot publish without an authorized delivery handoff.",
       type: "denied",
     };
+  }
+  if (isTrusted(auth)) {
+    return "not-applicable";
   }
   return "user-approval";
 };
