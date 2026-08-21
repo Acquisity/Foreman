@@ -56,7 +56,7 @@ Billing flows in one direction. A subscription starts in the customer's workspac
 
 Amounts always come from Stripe, never from the ticket text and never from the workspace alone. Everything else is read in flow order.
 
-Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Connection tools are called by their qualified name, `<connection>__<tool>`, so Stripe's `stripe_api_read` is `stripe__stripe_api_read`; the bare names above are the server-side names. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
+Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Connection tools are called by their qualified name, `<connection>__<tool>`, so Stripe's `stripe_api_read` is `stripe__stripe_api_read`; the bare names above are the server-side names. `planetscale_execute_read_query` is the exception: it is a root tool, called bare, never as `planetscale__planetscale_execute_read_query`. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
 
 ### Where the chain breaks
 
@@ -162,9 +162,14 @@ What happened and why, including where the customer's account of it
 differs from the systems of record.
 
 ## Exposure
-The amount in dispute, taken from Stripe and no other source, with the
-currency, the charge or subscription ids it comes from, the customer
-balance, and any prior credit notes against the same charges.
+For the money buckets (`refund`, `overcharged`, `coupon_code`,
+`stripe_credit`): the amount in dispute, taken from Stripe and no other
+source, with the currency, the charge or subscription ids it comes from,
+the customer balance, and any prior credit notes against the same charges.
+
+For `credits`: the feature balance in dispute, expected against actual,
+read from Autumn and PlanetScale. No Stripe amount applies, because
+product credits are not money that moved.
 
 ## Proposed action
 What a human should do, step by step, with the charge or subscription
