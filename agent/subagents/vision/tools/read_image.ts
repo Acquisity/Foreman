@@ -43,17 +43,26 @@ export default defineTool({
       );
     }
     const sandbox = await ctx.getSandbox();
-    const bytes = await sandbox.readBinaryFile({ path });
-    if (bytes === null) {
+    const stream = await sandbox.readFile({ path });
+    if (stream === null) {
       throw new Error(`No file at ${path}.`);
     }
-    if (bytes.byteLength > MAX_IMAGE_BYTES) {
-      throw new Error(
-        `${path} is ${Math.round(bytes.byteLength / 1024)} KiB, over the 3 MiB limit for one image. Resize or crop it first.`
-      );
+    // Streamed and checked chunk by chunk rather than read whole and measured
+    // after, so a path that names something enormous (a core dump, a tarball
+    // with an image extension) costs one chunk over the limit, not its size.
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for await (const chunk of stream) {
+      total += chunk.byteLength;
+      if (total > MAX_IMAGE_BYTES) {
+        throw new Error(
+          `${path} is over the 3 MiB limit for one image. Resize or crop it first.`
+        );
+      }
+      chunks.push(chunk);
     }
     return {
-      base64: Buffer.from(bytes).toString("base64"),
+      base64: Buffer.concat(chunks).toString("base64"),
       mediaType,
       path,
     };
