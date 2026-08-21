@@ -186,7 +186,9 @@ Apply the fewest labels that place the ticket:
 
 ## Step 7 — Attach the Triage investigation document
 
-Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
+Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
+
+No file upload is involved. `save_document` takes the Markdown directly and an issue is a valid parent, so the attachment route (`prepare_attachment_upload`, a raw PUT, then `create_attachment_from_upload`) is neither needed nor wanted here. Keep the URL it returns: Step 8's comment links it.
 
 - One document per ticket. A later revisit updates it with `patch`, never creates a second.
 - Keep it under roughly 20 KB. It is a handoff, not a transcript. Counts and the specific rows that prove the finding, not raw dumps.
