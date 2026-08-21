@@ -6,16 +6,16 @@ Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). I
 
 ## Surfaces
 
-Foreman runs on four channels, each deciding trust at dispatch on a signed webhook:
+Foreman runs on four channels, with a couple of extensions and a set of mostly read-only service connections:
 
-- **GitHub** is the main intake and delivery surface. Trusted mentions (owners, members, collaborators) dispatch interactive sessions; a trusted `factory` label hands an issue to the pipeline unattended; red CI on a Foreman pull request triggers a fix loop.
-- **Linear** runs Agent Sessions trusted by workspace membership. Assigned issues stay general by default; the factory loads on demand.
-- **Slack** runs mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code.
-- **eve** is the HTTP channel for the local dev TUI and Vercel OIDC.
+- **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions; a trusted `factory` label hands an issue to the pipeline unattended; red CI on a Foreman pull request triggers a fix loop.
+- **Linear** — Agent Sessions trusted by workspace membership. Assigned issues stay general by default; the factory loads on demand.
+- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code.
+- **eve** — the HTTP channel for the local dev TUI and Vercel OIDC.
 
-Two extensions add tools the model calls directly: a GitHub API surface (reads, triage, PR authoring; no merge) and a browser (agent-browser, runs inside the sandbox).
+The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman connects to a set of mostly read-only services through MCP: Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
+Foreman also connects to mostly read-only services through MCP: Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
 
 ## Skills
 
