@@ -141,9 +141,9 @@ Post one message covering every in-scope bug for this feature. Bottom line, natu
 
 Tag the dispatch's mentions in the header line only. Inside a bug's block, tag its assignee. Bold is allowed only on the numbered title line, which is what makes the message scannable; nowhere else.
 
-The session delivers a single channel message, so do not plan on separate posts.
+The session delivers one message to the channel, so do not plan on separate posts.
 
-```
+```text
 <the mentions the dispatch gave you> <count> new SLA bug(s) in <feature>
 
 *1. <short title, plain language>* (<@assignee>)
@@ -161,10 +161,4 @@ Blank line between blocks. The `Ticket:` line is a real Slack link: paste the ti
 
 ## When there are no bugs
 
-Deliver nothing at all. Not a summary, not an explanation of why there was nothing, not a note that you checked. Reply with exactly
-
-```
-<eve-empty-delivery/>
-```
-
-and no other text. Anything else you write is posted to the channel, which is the failure this rule exists to prevent.
+Deliver nothing at all. Not a summary, not an explanation of why there was nothing, not a note that you checked. Reply with exactly `<eve-empty-delivery/>` and no other text, unfenced and unquoted. Anything else you write is posted to the channel, which is the failure this rule exists to prevent.
