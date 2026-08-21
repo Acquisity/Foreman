@@ -194,7 +194,7 @@ Apply the fewest labels that place the ticket:
 
 ## Step 7 — Attach the Triage investigation document
 
-Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
+Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out. Where this skill says to record or say something in the report, it means this document, unless it names the comment.
 
 No file upload is involved. `save_document` takes the Markdown directly and an issue is a valid parent, so the attachment route (`prepare_attachment_upload`, a raw PUT, then `create_attachment_from_upload`) is neither needed nor wanted here. Keep the URL it returns: Step 8's comment links it.
 
@@ -217,7 +217,7 @@ The customer already has their answer from Step 8. Nothing here changes what the
 
 Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
 
-A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the report that the parent was unassigned.
+A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Step 5A state in the same pass, so it never sits open in anyone's queue.
 
 ### When the root cause warrants action
 
@@ -227,7 +227,7 @@ The customer ticket does not become the engineering ticket. A master ticket owns
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
 2. Match on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
-3. If a master already owns the cause: read the master's assignee, then set this ticket's `parentId` to that master and its `assignee` to the master's assignee in the same `save_issue` call (the field is `assignee`, not `assigneeId`), so the child never sits under a master owned by someone else. Where the master has no assignee, fall back to the area-routing roster below and say in the report that the master was unassigned. Then comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
+3. If a master already owns the cause: read the master's assignee, then set this ticket's `parentId` to that master and its `assignee` to the master's assignee in the same `save_issue` call (the field is `assignee`, not `assigneeId`), so the child never sits under a master owned by someone else. Where the master has no assignee, fall back to the area-routing roster below and say in the document that the master was unassigned. Then comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
 4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call.
 5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
