@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Neon MCP connection for database investigation.
@@ -16,7 +16,7 @@ import { requireEnv } from "../lib/constants.js";
  *   run_sql would accept writes without that URL flag, so keep it in place.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "NEON_MCP_CONNECTOR",
       "mcp.neon.tech/acquisity-foreman-neon"

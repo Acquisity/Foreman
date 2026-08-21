@@ -26,6 +26,11 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * on the direct path and inside the stations alike. INTAKE_ONLY_TASK tells
  * the model to file the change as a Linear issue instead.
  *
+ * Those channels also never show a sign-in prompt: user-scoped connections
+ * authorize through `userConnect`, which denies a missing grant instead of
+ * posting a status line and parking the turn on a consent flow nobody in an
+ * intake channel can complete.
+ *
  * Mentions and direct messages run the same dispatch. eve only falls back to
  * its built-in handler for a surface this file leaves unauthored, and that
  * default stamps nothing: a DM dispatched through it carries no trust, no

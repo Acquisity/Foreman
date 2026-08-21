@@ -1,7 +1,7 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
 import { denyUnattendedWrites } from "../lib/github/approval.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Supermemory MCP connection for recalling and saving team context.
@@ -25,7 +25,7 @@ import { denyUnattendedWrites } from "../lib/github/approval.js";
  */
 export default defineMcpClientConnection({
   approval: denyUnattendedWrites("Supermemory", ["add_memory"]),
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "SUPERMEMORY_MCP_CONNECTOR",
       "mcp.supermemory.ai/acquisity-foreman-supermemory"

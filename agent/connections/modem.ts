@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Modem MCP connection for customer feedback evidence.
@@ -23,7 +23,7 @@ import { requireEnv } from "../lib/constants.js";
 const MODEM_MCP_URL = "https://mcp.modem.dev/mcp";
 
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "MODEM_MCP_CONNECTOR",
       "mcp.modem.dev/acquisity-foreman-modem"

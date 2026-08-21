@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Jam MCP connection for bug report context.
@@ -17,7 +17,7 @@ import { requireEnv } from "../lib/constants.js";
  * excluded.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "JAM_MCP_CONNECTOR",
       "mcp.jam.dev/acquisity-foreman-jam"
