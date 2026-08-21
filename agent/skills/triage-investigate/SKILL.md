@@ -68,7 +68,7 @@ Search Linear for the same symptom, in several wordings: the user outcome, the v
 
 Classify each plausible match by outcome, not keyword overlap:
 
-- `SAME_OUTCOME`: same symptom and same cause. It is a duplicate. Identify the parent, comment, and route in one Linear update.
+- `SAME_OUTCOME`: same symptom and same cause. It is a duplicate. Identify the parent, comment, and route in one Linear update. The duplicate takes the parent's assignee, as Step 9 describes.
 - `PARTIAL_OR_ADJACENT`: related but a distinct outcome. Relate it, do not close it.
 - `STALE_OR_SUPERSEDED`: already fixed or already rejected. Point at the fix or the decision.
 - `NOT_RELEVANT`: move on.
@@ -178,7 +178,7 @@ Bands:
 
 A workaround does not enter the weighting. It makes the customer's day survivable; it does not make the defect smaller. Letting one lower the band would mean the better we get at unblocking people, the less likely the cause is ever fixed.
 
-Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review. This is not licence to inflate: the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority.
+Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review. This is not licence to inflate: the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority and the parent's assignee.
 
 ## Step 6A — Label the ticket
 
@@ -194,7 +194,7 @@ Apply the fewest labels that place the ticket:
 
 ## Step 7 — Attach the Triage investigation document
 
-Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
+Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out. Where this skill says to record or say something in the report, it means this document, unless it names the comment.
 
 No file upload is involved. `save_document` takes the Markdown directly and an issue is a valid parent, so the attachment route (`prepare_attachment_upload`, a raw PUT, then `create_attachment_from_upload`) is neither needed nor wanted here. Keep the URL it returns: Step 8's comment links it.
 
@@ -205,7 +205,7 @@ No file upload is involved. `save_document` takes the Markdown directly and an i
 
 ## Step 8 — Comment on the ticket
 
-Write the report comment from the template below via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The evidence lives in the document, not here.
+Write the report comment from the template below via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The template's four blocks are a ceiling, not a starting point. The evidence lives in the document, not here.
 
 ## Step 9 — Route
 
@@ -213,7 +213,11 @@ The customer already has their answer from Step 8. Nothing here changes what the
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Step 5A state. Do not assign an area owner. Nothing goes to engineering.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Step 5A state. Nothing goes to engineering.
+
+Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
+
+A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Step 5A state in the same pass, so it never sits open in anyone's queue.
 
 ### When the root cause warrants action
 
@@ -223,8 +227,8 @@ The customer ticket does not become the engineering ticket. A master ticket owns
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
 2. Match on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
-3. If a master already owns the cause: set this ticket's `parentId` to that master so it becomes a child, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
-4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it.
+3. If a master already owns the cause: read the master's assignee, then set this ticket's `parentId` to that master and its `assignee` to the master's assignee in the same `save_issue` call (the field is `assignee`, not `assigneeId`), so the child never sits under a master owned by someone else. Where the master has no assignee, fall back to the area-routing roster below and say in the document that the master was unassigned. Then comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
+4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call.
 5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
 ### Area-routing roster
@@ -241,7 +245,7 @@ Take the product area from the ticket's Linear `project`. Never infer it from th
 
 The roster exists on the production ENG team only. Tickets on the SAN sandbox team always route to Aaron Fraga, whatever the area. If you cannot tell which area an issue belongs to, assign Aaron Fraga and say why the area was ambiguous. If a project has no lead set or the roster is unavailable on a run, assign Aaron Fraga and say in the report that routing needs a human. A guessed owner is worse than an explicit hand-off. Never route to retired or legacy projects.
 
-Prefix internal notes with `## Internal`.
+Internal notes go in the Triage investigation document, never in the ticket comment. Identity resolution, routing rationale, customer email addresses, queries, and anything else engineering needs and the requester does not, belong in the document's Evidence, Code path, and Next steps sections. A customer-facing comment carries no `## Internal` section.
 
 ## Step 10 — Slack-facing reply
 
@@ -249,7 +253,7 @@ Load the slack-wording skill before writing. Give a concrete finding, hand the n
 
 ## Follow-ups
 
-Answer follow-ups with the gathered evidence, post `## Internal` notes, cap the back-and-forth, and on the third reply give a clear close.
+Answer follow-ups with the gathered evidence, keep the internal detail in the document, cap the back-and-forth, and on the third reply give a clear close.
 
 ## Linear report template
 
@@ -269,6 +273,68 @@ when there is nothing that would.>
 ```
 
 The unblock leads. Someone stuck cares about working again before they care about the cause. Never silently drop it: a missing unblock line and one nobody looked for read the same. The engineering ticket is not named here: once Step 9 makes this report a child, Linear shows the parent on the issue itself.
+
+Those blocks are the whole comment. Each is at most two short paragraphs, and no heading appears beyond the title. These never appear in a comment, whatever the investigation turned up:
+
+- per-month or per-week breakdowns
+- corrections to the figures the reporter gave
+- cohort-wide counts beyond the one line saying how many workspaces are affected
+- code paths, files, functions, commits
+- queries and their raw output
+- identity resolution: how the email resolved, which organization ids matched, which was picked
+- routing rationale: which master was chosen, which area owner it went to, why
+- a `## Internal` section of any kind
+
+All of it goes in the Triage investigation document that the last line links. The reader of the comment should reach the sentence telling them what to do without scrolling.
+
+### Good comment
+
+Two short paragraphs, the tickets linked inline, the document attached below.
+
+```markdown
+Duplicate of [ENG-12820](<link>) Michael Simon - AI SDR not answering emails: same
+customer and same ask, filed 17 Aug. That ticket now carries the full investigation
+and is attached to the active incident [ENG-12983](<link>) Restore and bulletproof
+Instantly webhook reply delivery, the 13 August Instantly webhook outage.
+
+Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage.
+Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR
+had nothing to answer. The webhook is restored and the AI SDR is answering again
+(5 replies today, 10 yesterday). Missed replies are being recovered by
+[ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Asking
+the requester to confirm which specific emails Michael expected answered, to catch
+anything still broken today.
+
+[Triage investigation](<link>)
+```
+
+This one is a duplicate, so the pointer to the ticket that now owns it leads and the unblock rides in the bottom line. On a ticket that is not a duplicate, the unblock is the first block.
+
+### Bad comment
+
+Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment.
+
+```markdown
+## Summary
+...
+
+## What we found
+Reply counts by month, Jun through Aug, with the figure in the ticket corrected
+from 40 to 12.
+
+## Blast radius
+The whole cohort, org by org, with the query.
+
+## Open question
+...
+
+## Internal
+Resolved identity: user_id, organization_id, the customer's email addresses, and
+which of the three matching workspaces was picked and why. Routed to the AI SDR
+area owner because the project is AI SDR.
+```
+
+Nothing in the bad comment is wrong. It is all in the wrong place. The headings, the month-by-month breakdown, the corrected figure, the cohort count, the identity resolution, and the `## Internal` block all belong in the document, and the one sentence the reader needed is buried under them.
 
 ## Triage investigation document template
 
