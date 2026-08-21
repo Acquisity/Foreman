@@ -9,6 +9,7 @@ import {
   pipelineScopeSchema,
   pipelineStageSchema,
   readPipelineRun,
+  terminalPipelineState,
   withPipelineRunLock,
   writePipelineRun,
 } from "#lib/pipeline-runs.js";
@@ -36,6 +37,7 @@ const inputSchema = z.object({
   linearIssueId: z.string().max(160).nullable().optional(),
   linearSessionId: z.string().max(160).nullable().optional(),
   mergeable: z.boolean().optional(),
+  merged: z.boolean().optional(),
   prNumber: z.number().int().positive().nullable().optional(),
   repository: z.string().min(3).max(220),
   requestReady: z.boolean().optional(),
@@ -67,20 +69,6 @@ const nextRepeatCount = (
     supplied
   );
 
-const terminalState = (
-  ready: boolean,
-  escalated: boolean,
-  requestedStage: RecordInput["stage"]
-): Pick<PipelineRun, "stage" | "status"> => {
-  if (escalated) {
-    return { stage: "escalated", status: "escalated" };
-  }
-  if (ready) {
-    return { stage: "ready", status: "ready" };
-  }
-  return { stage: requestedStage, status: "active" };
-};
-
 const buildRun = (
   input: RecordInput,
   target: RepositoryTarget,
@@ -105,6 +93,10 @@ const buildRun = (
     : (input.actionableFeedbackRemaining ??
       existing?.actionableFeedbackRemaining ??
       true);
+  // Merged is sticky: once a pull request is merged the run is terminal for
+  // good, so a later record that omits `merged` (for example a comment on the
+  // merged pull request) cannot reactivate it and re-arm the reconcile loop.
+  const merged = input.merged === true || existing?.merged === true;
   const ready = isPipelineReady({
     actionableFeedbackRemaining,
     blockers,
@@ -113,7 +105,12 @@ const buildRun = (
     mergeable,
     requested: input.requestReady === true,
   });
-  const state = terminalState(ready, blockerRepeatCount >= 3, input.stage);
+  const state = terminalPipelineState(
+    ready,
+    blockerRepeatCount >= 3,
+    merged,
+    input.stage
+  );
   return {
     ...state,
     actionableFeedbackRemaining,
@@ -125,6 +122,7 @@ const buildRun = (
     linearIssueId: input.linearIssueId ?? existing?.linearIssueId ?? null,
     linearSessionId: input.linearSessionId ?? existing?.linearSessionId ?? null,
     mergeable,
+    merged,
     owner: target.owner,
     prNumber: input.prNumber ?? existing?.prNumber ?? null,
     processedFeedback: mergeFeedbackIds(
@@ -140,7 +138,7 @@ const buildRun = (
 
 export default defineTool({
   description:
-    "Create or advance durable factory pipeline state scoped to a repository and source or pull request. Deduplicates feedback, rejects stale-head events, counts unchanged blocker sets, escalates on the third repeat, and only records readiness when every readiness condition is true.",
+    "Create or advance durable factory pipeline state scoped to a repository and source or pull request. Deduplicates feedback, rejects stale-head events, counts unchanged blocker sets, escalates on the third repeat, marks the run terminal when the pull request is merged, and only records readiness when every readiness condition is true.",
   async execute(input, ctx) {
     try {
       const target = resolveRepositoryInput(
@@ -202,6 +200,7 @@ export default defineTool({
           await writePipelineRun(run);
           return {
             blockerRepeatCount: run.blockerRepeatCount,
+            merged: run.merged,
             processedFeedback: run.processedFeedback,
             ready: run.status === "ready",
             run,

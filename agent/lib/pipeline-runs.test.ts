@@ -6,6 +6,7 @@ import {
   mergeFeedbackIds,
   nextBlockerRepeatCount,
   pipelineRunKey,
+  terminalPipelineState,
 } from "./pipeline-runs.js";
 
 describe("pipeline stabilization state", () => {
@@ -46,5 +47,37 @@ describe("pipeline stabilization state", () => {
       pipelineRunKey("Acquisity/Foreman", "pr:12"),
       pipelineRunKey("Acquisity/Other", "pr:12")
     );
+  });
+
+  it("ends a run terminal when its pull request is merged", () => {
+    // A merged PR is delivered whether or not the independent reviewer
+    // certified the head, so merge short-circuits the readiness gate and
+    // reaches the non-active `ready` status the reconcile schedule skips.
+    assert.deepEqual(terminalPipelineState(false, false, true, "stabilizing"), {
+      stage: "ready",
+      status: "ready",
+    });
+    assert.deepEqual(terminalPipelineState(false, false, true, "ready"), {
+      stage: "ready",
+      status: "ready",
+    });
+  });
+
+  it("keeps an open, uncertified run active", () => {
+    assert.deepEqual(
+      terminalPipelineState(false, false, false, "stabilizing"),
+      {
+        stage: "stabilizing",
+        status: "active",
+      }
+    );
+    assert.deepEqual(terminalPipelineState(true, false, false, "stabilizing"), {
+      stage: "ready",
+      status: "ready",
+    });
+    assert.deepEqual(terminalPipelineState(false, true, false, "stabilizing"), {
+      stage: "escalated",
+      status: "escalated",
+    });
   });
 });

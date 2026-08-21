@@ -31,6 +31,7 @@ export const pipelineRunSchema = z.object({
   linearIssueId: z.string().nullable().default(null),
   linearSessionId: z.string().nullable().default(null),
   mergeable: z.boolean().default(false),
+  merged: z.boolean().default(false),
   owner: z.string(),
   prNumber: z.number().int().positive().nullable().default(null),
   processedFeedback: z.array(z.string()).default([]),
@@ -96,6 +97,54 @@ export const isPipelineReady = (input: {
   input.mergeable &&
   !input.actionableFeedbackRemaining &&
   input.blockers.length === 0;
+
+/**
+ * Resolves a pipeline run's terminal {@link PipelineRun.stage} and
+ * {@link PipelineRun.status} from its readiness, escalation, and merge state.
+ *
+ * @remarks
+ * Only `active` runs are recovered by the reconciliation schedule, so a run
+ * reaches a stable, non-recovered state only when this returns a status other
+ * than `active`. Three forces can end a run:
+ *
+ * - `merged`: the pull request was merged, so the run is delivered and
+ *   terminal whether or not the independent reviewer certified the head. This
+ *   is the path a run takes when a human merges a pull request the factory was
+ *   still stabilizing; without it the run stays `active` and the reconcile
+ *   schedule recovers it every tick forever. `merged` is sticky: once a run is
+ *   merged it is terminal for good, so a later record (for example a comment
+ *   on the merged pull request) cannot reactivate it.
+ * - `escalated`: the same blocker set repeated three times, so a person must
+ *   intervene.
+ * - `ready`: every readiness condition held and readiness was requested.
+ *
+ * Merge takes precedence over escalation and readiness: a merged pull request is
+ * delivered, and `ready` is the honest terminal for it. The escalation history
+ * (blocker set and repeat count) is preserved on the run regardless.
+ *
+ * @param ready - Whether every readiness condition held and was requested.
+ * @param escalated - Whether the blocker set repeated three times.
+ * @param merged - Whether the pull request was merged.
+ * @param requestedStage - The stage the caller asked to record.
+ * @returns The terminal stage and status for the run.
+ */
+export const terminalPipelineState = (
+  ready: boolean,
+  escalated: boolean,
+  merged: boolean,
+  requestedStage: PipelineRun["stage"]
+): Pick<PipelineRun, "stage" | "status"> => {
+  if (merged) {
+    return { stage: "ready", status: "ready" };
+  }
+  if (escalated) {
+    return { stage: "escalated", status: "escalated" };
+  }
+  if (ready) {
+    return { stage: "ready", status: "ready" };
+  }
+  return { stage: requestedStage, status: "active" };
+};
 
 const scopeKey = (scope: string): string => {
   if (!PIPELINE_SCOPE_PATTERN.test(scope)) {
