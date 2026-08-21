@@ -104,7 +104,7 @@ Query around the time the claim names. A deployment that landed just before the 
 
 ## Intercom (`intercom__`)
 
-`search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search`, `search_articles`, `list_articles`, `get_article`, `fetch`.
+`search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search_articles`, `list_articles`, `get_article`.
 
 Two uses.
 
