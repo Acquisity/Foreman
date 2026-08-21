@@ -105,7 +105,7 @@ These systems are indexed on different axes, and most of them are not indexed on
 
 A lane you could not figure out how to search is `Could not run`, not evidence of absence. Never report a failed search strategy as a clean result.
 
-Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data.
+Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Connection tools are called by their qualified name, `<connection>__<tool>`, so Inngest's `get_run_trace` is `inngest__get_run_trace`; the bare names in the lanes below are the server-side names. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data.
 
 - Background work: AI SDR runs, syncs, scrapes, imports, provisioning. Inngest `list_function_runs` for the function named in the code path, then `get_run_trace` on a failing run.
 - Errors, crashes, stack traces: Sentry `find_issues` or `search_issues`, then `get_issue_details` for the stacktrace and the first and last seen, to date the failure against the claim. Its natural-language search depends on a provider configured server-side and can be unavailable while the rest works.

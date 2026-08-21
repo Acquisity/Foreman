@@ -56,7 +56,7 @@ Billing flows in one direction. A subscription starts in the customer's workspac
 
 Amounts always come from Stripe, never from the ticket text and never from the workspace alone. Everything else is read in flow order.
 
-Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
+Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Connection tools are called by their qualified name, `<connection>__<tool>`, so Stripe's `stripe_api_read` is `stripe__stripe_api_read`; the bare names above are the server-side names. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
 
 ### Where the chain breaks
 

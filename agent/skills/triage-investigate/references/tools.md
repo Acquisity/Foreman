@@ -2,17 +2,29 @@
 
 Exact tool names for the Step 4 lanes. Every name below was read from this repository: the `tools.allow` list in `agent/connections/<name>.ts`, or the tool's own definition in `agent/tools/`. Names marked as verified externally were confirmed against the vendor's own documentation, linked inline.
 
-Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and a call invented from the wrong one fails in a way that reads like the data is missing. When a tool you want is not listed here, read the connection's live tool list first. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and a call invented from the wrong one fails in a way that reads like the data is missing.
 
 Two connections have no allowlist and expose their server's full surface, so this file cannot enumerate them completely: Sentry and PostHog. Both are covered below with what is confirmed.
 
-## Repository
+## How tool names work
+
+Two kinds of tool appear below, and they are called differently.
+
+**Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
+
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+
+`planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
+
+Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+
+## Repository (root tools, no prefix)
 
 `prepare_repository`, `grep`, `glob` are authored tools in `agent/tools/`. `read_file` and `bash` are eve framework tools, registered automatically.
 
 `prepare_repository` takes `Acquisity/Acquisity`, refreshes the checkout to the remote HEAD, and returns `{ worktree, reused }`. It does not return a commit SHA; get it from `git -C <worktree> rev-parse HEAD`.
 
-## PlanetScale
+## PlanetScale (`planetscale__`)
 
 `planetscale_execute_read_query` is an authored tool in `agent/tools/`, not the MCP tool of the same name. The MCP original is deliberately excluded from the allowlist because it returns the full rows array unbounded, which can kill the session; the authored wrapper truncates instead.
 
@@ -22,7 +34,7 @@ Also allowlisted, from the connection: `planetscale_list_databases`, `planetscal
 
 `planetscale_get_branch_schema` is excluded for the same size reason. Read schema through `information_schema` instead.
 
-## Linear
+## Linear (`linear__`)
 
 `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment`.
 
@@ -32,13 +44,13 @@ Also allowlisted, from the connection: `planetscale_list_databases`, `planetscal
 
 The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the name `"Engineering"` returns nothing silently.
 
-## Inngest
+## Inngest (`inngest__`)
 
 `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health`.
 
 Start from the function named in the code path found in 4.2, then `get_run_trace` on a failing run for the step that broke.
 
-## Sentry
+## Sentry (`sentry__`)
 
 No allowlist, so the full server surface is available. Confirmed tool names from the vendor: `find_organizations`, `find_projects`, `find_issues`, `search_issues`, `get_issue_details`, `search_events`, `search_issue_events`.
 
@@ -46,7 +58,7 @@ No allowlist, so the full server surface is available. Confirmed tool names from
 
 Docs: <https://mcp.sentry.dev/>, tool source at <https://github.com/getsentry/sentry-mcp>.
 
-## Axiom
+## Axiom (`axiom__`)
 
 `queryDataset`, `listDatasets`, `getDatasetFields`, `queryMetrics`, `listMetrics`, `searchMetrics`, `listMetricTags`, `getMetricTagValues`, `checkMonitors`, `getMonitorHistory`, `getSavedQueries`, `listDashboards`, `getDashboard`, `exportDashboard`, `listNotifiers`.
 
@@ -56,7 +68,7 @@ APL cannot query metrics. Metrics go through `queryMetrics`, which uses MPL. A m
 
 Docs: <https://axiom.co/docs/apl/introduction>, worked examples at <https://axiom.co/docs/apl/tutorial>.
 
-## PostHog
+## PostHog (`posthog__`)
 
 No allowlist. The server exposes a single tool, `exec`, which runs a named PostHog command; the `command` parameter's own description carries the syntax. Read it before composing a call.
 
@@ -64,36 +76,36 @@ Commands relevant to an investigation include `persons`, `session-recording`, `e
 
 There is no tool that finds a person by display name. Resolve the person first through `persons` using the email or distinct id pinned in Step 1A, then read their recordings. Composing a call like `posthog_get_session_recordings` will fail; that tool does not exist.
 
-## Lucent
+## Lucent (`lucent__`)
 
 `list_issues`, `get_issue`, `list_insights`.
 
 Indexed by symptom, not by customer. Search the behavior, never who reported it.
 
-## Jam
+## Jam (`jam__`)
 
 `search`, `fetch`, `listJams`, `getDetails`, `getMetadata`, `getConsoleLogs`, `getNetworkRequests`, `getUserEvents`, `getScreenshots`, `getFrames`, `getVideoTranscript`, `analyzeVideo`, `getRecordingLink`, `getRecordingUrlVerifyLink`, `listRecordingLinks`, `listRecordingLinkJams`, `listRecordingUrls`, `listFolders`, `listMembers`.
 
 Only useful when the ticket carries a Jam link. `getConsoleLogs` and `getNetworkRequests` are usually worth more than the video.
 
-## Vercel
+## Vercel (`vercel__`)
 
 `get_runtime_errors`, `get_runtime_logs`, `list_deployments`, `get_deployment`, `get_deployment_build_logs`, `list_projects`, `get_project`, `list_teams`, `get_web_analytics`, `search_vercel_documentation`, `web_fetch_vercel_url`, `get_access_to_vercel_url`, `list_agent_runs`, `get_agent_run`, `get_agent_run_trace`, `list_agent_run_projects`, `list_toolbar_threads`, `get_toolbar_thread`.
 
 Query around the time the claim names. A deployment that landed just before the reported window is worth checking against `list_deployments`.
 
-## Intercom
+## Intercom (`intercom__`)
 
 `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search`, `search_articles`, `list_articles`, `get_article`, `fetch`.
 
 Use it to find whether other customers reported the same thing, which is frequency evidence for severity weighting.
 
-## Resend
+## Resend (`resend__`)
 
 `list-emails`, `get-email`, `list-logs`, `get-log`, `list-domains`, `get-domain`, `list-suppressions`, `get-suppression`, `list-contacts`, `get-contact`, `list-broadcasts`, `get-broadcast`, `list-templates`, `get-template`, `list-webhooks`, `get-webhook`, `list-segments`, `get-segment`, `list-topics`, `get-topic`, and the received-email and attachment variants.
 
 These names are kebab-case, not snake_case. `list_emails` is not a tool; `list-emails` is.
 
-## Modem
+## Modem (`modem__`)
 
 `search_modem`. Natural-language search over customer feedback.
