@@ -39,7 +39,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 1. **Step 0 classification** — money vs product, redirect if the channel mismatches.
 2. **Identity gate** — resolve the org by email and pin `organization_id` before any other lookup, exactly as the triage-investigate skill's Step 1A describes. If the email maps to more than one org or the identity is ambiguous, stop and ask.
-3. **Approval trail** — read the ticket comments via the Linear connection and the Slack thread, and quote any prior approval or promise verbatim. Never assume an approval exists.
+3. **Approval trail** — read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
 4. **Systems of record** — read each one named below. Read-only everywhere.
 5. **Clarifying questions** — batched, before any verdict, capped at three rounds.
 6. **Verdict** — classification, justification checklist, and discretion note.
@@ -79,7 +79,7 @@ These are real and recurring. Check each one before concluding the customer is a
 
 **A failed sync can run the other way.** After a failed billing sync the Autumn subscriptions are gone while the customer still has working inboxes and domains and keeps using them, so they are getting them for free. It is rare, and it will not be what the ticket is about, but surface it when you see it. The remedy is reattaching the plans in Autumn, which is a proposal for a human like any other. Never propose recovering past unbilled usage on your own judgment: say what was used, for how long, and let a person decide whether to bill for it.
 
-The first and third are the same defect seen from either side, and both are product defects as well as money problems. Record them under Observations so the product triage path can own the root cause.
+The first and third run in opposite directions and are separate defects: one is a deletion that fails to propagate out of the workspace, the other is a provisioning record lost while the entitlement survives. They need separate root causes and separate owners. Both are product defects as well as money problems, so record each under Observations for the product triage path.
 
 ### Reading the code
 
@@ -162,7 +162,9 @@ What happened and why, including where the customer's account of it
 differs from the systems of record.
 
 ## Exposure
-The amount in dispute, quantified from primary data.
+The amount in dispute, taken from Stripe and no other source, with the
+currency, the charge or subscription ids it comes from, the customer
+balance, and any prior credit notes against the same charges.
 
 ## Proposed action
 What a human should do, step by step, with the charge or subscription

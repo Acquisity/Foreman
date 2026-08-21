@@ -48,7 +48,7 @@ Pin the `organization_id` it returns and scope every later query to it yourself.
 
 Never select credential-shaped columns. Never draw a conclusion from a result where `truncated` is true; narrow the query and re-run.
 
-If the email resolves to nothing, or the hit conflicts with the customer or workspace name on the ticket, that is an identity conflict. Do not fall back to name matching: run the clarify-with-requester stop-gate, or proceed on the best candidate and state the conflict in the report.
+Exactly one production match continues the investigation. Zero matches, several matches, or a hit that conflicts with the customer or workspace name on the ticket is an identity conflict. Do not fall back to name matching and do not pick a best candidate: run the clarify-with-requester stop-gate and say which organizations matched.
 
 ## Step 2 — Check for an existing investigation
 
@@ -115,29 +115,29 @@ Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](r
 - Deployment or edge failures: Vercel `get_runtime_errors` and `get_runtime_logs` around the reported time.
 - Whether others hit it: Intercom `search_conversations` and Modem `search_modem`.
 
-### 4.5 Rehash the claim against the evidence
+### 4.5 Record the lanes
 
-Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the investigation stance above. Run Gate 2 (the stop-gate) before any verdict.
+Fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report.
+
+### 4.6 Rehash the claim against the evidence
+
+The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the investigation stance above. Run Gate 2 (the stop-gate) before any verdict.
 
 A `Bug` verdict requires all three: a named file and function, direct evidence from 4.3 or 4.4, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
 
 Verdict quality bar: name the cause, not the mechanism.
 
-### 4.6 Find the unblock
+### 4.7 Find the unblock
 
 The verdict says what is wrong. It does not say what the customer does tomorrow morning. Answer that separately, and answer it even when the verdict is `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix.
 
-Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in 4.5 is what tells you which of these would actually work, which is why this comes after the verdict and not before.
+Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in 4.6 is what tells you which of these would actually work, which is why this comes after the verdict and not before.
 
 When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
 
 When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
-
-### 4.7 Record the lanes
-
-Before writing the verdict, fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report.
 
 ## Step 5 — Decide the handling path
 
@@ -170,7 +170,7 @@ Bands:
 
 A workaround does not enter the weighting. It makes the customer's day survivable; it does not make the defect smaller. Letting one lower the band would mean the better we get at unblocking people, the less likely the cause is ever fixed.
 
-Between two bands take the higher one and write the rationale where the verdict lives. Overestimate, then calibrate down with a domain expert. Duplicates inherit the parent's priority.
+Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review. This is not licence to inflate: the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority.
 
 ## Step 6A — Label the ticket
 
@@ -194,7 +194,7 @@ Apply the fewest labels that place the ticket:
 
 The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it.
 
-1. Search for an existing master. `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `label: "master"`, plus a search on the cause found in Step 4.
+1. Search for an existing master. `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and the master label, resolved from `list_issue_labels` rather than assumed (it is `master` today), plus a search on the cause found in Step 4.
 2. Match on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
 3. If a master already owns the cause: add this ticket to its `relatedTo`, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3.
 4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type and `master`, priority per Step 6, and assigned to the area owner from the roster below. Then add this ticket to its `relatedTo`.
@@ -202,7 +202,7 @@ The customer ticket does not become the engineering ticket. A master ticket owns
 
 ### Area-routing roster
 
-Assign by the product area the issue is in. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
+Take the product area from the ticket's Linear `project`. Never infer it from the title or the symptom. When the project is missing, or maps to no area below, assign Aaron Fraga and record in the report that routing needs a human. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
 
 - AI SDR: Koppany Kondricz (`koppany.kondricz@acquisity.ai`)
 - Cold Email: Anthony Adewale (`anthony.adewale@acquisity.ai`)
@@ -223,7 +223,7 @@ Create one issue-scoped Linear document per ticket: `save_document` with `issue`
 - One document per ticket. A later revisit updates it with `patch`, never creates a second.
 - Keep it under roughly 20 KB. It is a handoff, not a transcript. Counts and the specific rows that prove the finding, not raw dumps.
 - Never paste credential-shaped columns into it.
-- When Step 7 created or updated a master, the document goes on the master too, or the master's body links this one.
+- The full document stays on the customer ticket. A Linear document inherits the visibility of the issue it hangs from, so attaching this one to a shared master would expose one customer's identity and production rows to everyone who can see that master. Put only the aggregate evidence on the master: the root cause, the blast radius figure, and the code path, with no organization id, email, or customer rows.
 
 ## Step 9 — Comment on the ticket
 
@@ -241,18 +241,18 @@ Answer follow-ups with the gathered evidence, post `## Internal` notes, cap the 
 
 Prose, not a field list. The classification, priority, and handling path are already set on the ticket as state, priority, and labels; repeating them in the comment is noise.
 
-```
+```markdown
 ## Triage investigation
 
-<What gets them working now, and who does it. Omit only when there is
-nothing that would.>
+<What gets them working now, and who does it. `None found: <reason>`
+when there is nothing that would.>
 
 <The root cause in one or two plain sentences, in the customer's terms.>
 
 Tracked in <ENG-XXXX>. [Triage investigation](<document link>)
 ```
 
-The unblock leads. Someone stuck cares about working again before they care about the cause. Drop the `Tracked in` sentence when the ticket is not engineering actionable.
+The unblock leads. Someone stuck cares about working again before they care about the cause. Never silently drop it: a missing unblock line and one nobody looked for read the same. Drop the `Tracked in` sentence when the ticket is not engineering actionable.
 
 ## Triage investigation document template
 
@@ -274,15 +274,18 @@ Every lane from 4.2 through 4.4: the queries run and what they returned,
 or `Not applicable: <reason>`, or `Could not run: <reason>`.
 
 ## Blast radius
-Quantified: N orgs, N users, and the query that counted them.
+N orgs and N users as an exact figure, or the tightest bound with what
+blocks the exact count. Always with the query that produced it and the
+date counted.
 
 ## Code path
 Files and functions in Acquisity/Acquisity that the cause runs through,
 with the commit the investigation read.
 
 ## Unblock
-What gets the customer working now, who performs it, and whether it has
-been done. `None found: <reason>` when there is nothing.
+What gets the customer working now, who performs it, whether it has been
+done, and confirmation that it costs the customer neither data nor money.
+`None found: <reason>` when there is nothing.
 
 ## Ruled out
 What was checked and eliminated, so the next agent does not redo it.

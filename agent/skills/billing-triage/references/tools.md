@@ -1,6 +1,6 @@
 # Billing investigation tools
 
-Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, or from the tool's own definition in `agent/tools/`, except where a vendor doc is linked.
+Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, or from the tool's own definition in `agent/tools/`, except the Autumn section, which is marked separately because that connection does not exist yet.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and an invented call fails in a way that reads like the customer has no data.
 
@@ -31,6 +31,8 @@ Also allowlisted, from the connection: `planetscale_list_organizations`, `planet
 Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`.
 
 ## Autumn (`autumn__`)
+
+Not connected yet. There is no `agent/connections/autumn.ts`; only the connector is provisioned, as `AUTUMN_MCP_CONNECTOR` in `.env.example`. The names below come from the Autumn MCP server's own surface, not from an allowlist in this repository, and they are unverified here until the connection lands. Until then, every Autumn check is `Could not run: Autumn not connected`.
 
 `getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances.
 
