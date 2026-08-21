@@ -8,6 +8,8 @@ Goal: find the root cause without spending a developer's time, leave a plain-lan
 
 A customer-reported ticket is never routed to an area owner as engineering work. It carries the explanation and closes. When the root cause warrants action, a master ticket owns that work and the report attaches to it.
 
+These tickets are filed by our own support and CS people in channels the team can see, about customers they are helping. The reader of a comment is a colleague, not an anonymous member of the public, so write for them: name workspaces, quote evidence, and say what you found. The risk worth guarding against is a customer's data landing on a shared engineering ticket, not a colleague seeing their own customer's workspace name.
+
 Behind every one of these tickets is a person running a business on this product. Finding the cause is half the job; the other half is that they can work again. Never let a correct verdict stand in for that.
 
 ## Investigation stance
@@ -48,7 +50,13 @@ Pin the `organization_id` it returns and scope every later query to it yourself.
 
 Never select credential-shaped columns. Never draw a conclusion from a result where `truncated` is true; narrow the query and re-run.
 
-Exactly one production match continues the investigation. Zero matches, several matches, or a hit that conflicts with the customer or workspace name on the ticket is an identity conflict. Do not fall back to name matching and do not pick a best candidate: run the clarify-with-requester stop-gate and ask the requester which workspace the report concerns. Do not list the candidates in the question. A production membership match proves the email exists in those workspaces; it does not prove the person who filed the ticket is that customer, and answering an unverified reporter with a list of a customer's workspaces hands it to anyone who can file a ticket. Record the candidates in the investigation document, which is the internal handoff, and let the requester supply the name.
+One production match is the answer: pin it and carry on.
+
+Several matches are normal, not a problem. They are all workspaces this email belongs to, so pick the one the report is about (the campaign, record, or timing in the ticket almost always says which), pin it, and name the others in the investigation document. Ask the requester only when the choice would change the verdict and the evidence cannot settle it, and keep investigating while you wait.
+
+No match, or a hit that conflicts with the customer or workspace name, is worth saying out loud, but it is not a reason to stop. Investigate what the ticket, the code, and the runtime lanes can still show, state the identity problem in the report, and ask the requester for the workspace. Never do name matching in place of the email anchor.
+
+Ending an investigation with nothing but an identity question is a failure. Someone is waiting, and the ticket should carry whatever was found either way.
 
 ## Step 2 — Check for an existing investigation
 
@@ -77,7 +85,7 @@ Work the lanes in order. Every lane is recorded in the Triage investigation docu
 
 ### 4.1 State the claim
 
-Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, the investigation has not started. Run the clarify-with-requester Gate 1 instead of guessing.
+Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
 
 ### 4.2 Locate it in the code
 
