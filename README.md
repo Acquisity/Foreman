@@ -37,7 +37,7 @@ A researcher station runs in parallel with the classifier when a work item turns
 
 A trusted GitHub `factory` label activates factory mode deterministically. Interactive users can request it explicitly, and Foreman may select it when complexity, uncertainty, risk, or requested review depth warrants the full line. Linear and Slack have no factory default.
 
-After internal review, Foreman opens a normal pull request and stabilizes the same branch against current-head CI failures and actionable feedback from trusted collaborators or allowlisted review bots. A ten-minute reconciliation schedule recovers missed webhooks. It reports `ready to merge` only when internal review approves the current head, required checks pass, GitHub reports no conflict, and no actionable trusted feedback remains. Foreman never merges.
+After internal review, Foreman opens a normal pull request and stabilizes the same branch against current-head CI failures and actionable feedback from trusted collaborators or allowlisted review bots. It reports `ready to merge` only when internal review approves the current head, required checks pass, GitHub reports no conflict, and no actionable trusted feedback remains. Foreman never merges.
 
 ## Trust and safety
 
@@ -57,7 +57,7 @@ There is no deployment-wide repository setting.
 All durable state lives in one Vercel Blob store. Reserved prefixes are registered in `agent/lib/blob.ts`.
 
 - `repository-knowledge/<repository-hash>.md` stores verified repository conventions and recurring build or review facts. Reads fall back to the matching legacy `factory-brain/` document until the next trusted write migrates it.
-- `pipeline-runs/` stores repository-and-source or repository-and-PR state, including Linear context, head SHA, stage, processed feedback, and blocker history. `pipeline-active/` indexes runs for reconciliation.
+- `pipeline-runs/` stores repository-and-source or repository-and-PR state, including Linear context, head SHA, stage, processed feedback, and blocker history.
 - `model-overrides/foreman.json` stores global agent model overrides.
 - `user-preferences/` is principal-scoped. Supermemory supports broader attended-session recall, but neither is repository authority.
 - `artifacts/` stores size-bounded, write-once handoff documents between stations.
@@ -65,7 +65,6 @@ All durable state lives in one Vercel Blob store. Reserved prefixes are register
 
 ## Schedules
 
-- `reconcile-pipelines` runs every ten minutes and recovers missed webhooks for active factory runs.
 - `sla-report` runs daily at 13:00 UTC, dispatching a per-feature SLA bug investigation into each feature's Slack channel plus a health heartbeat.
 
 ## Configuration

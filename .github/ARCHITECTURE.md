@@ -24,7 +24,7 @@ Every clone, fetch, and push targets `https://github.com/<validated-owner>/<vali
 
 The ordered stations are classifier, investigator, analyst, implementer, and reviewer. The root investigates relevant production tools before planning and passes self-contained evidence to children. Task-mode children cannot park and receive only their authored tools and the shared sandbox.
 
-After the reviewer approves the exact pushed head and an existing Linear ticket is confirmed, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, PR synchronizations, and the ten-minute `reconcile-pipelines` schedule drive revisions on the existing branch. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
+After the reviewer approves the exact pushed head and an existing Linear ticket is confirmed, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, and PR synchronizations drive revisions on the existing branch. Webhooks are the only trigger; there is no reconciliation schedule. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
 
 Readiness requires all of: internal approval for the current head, passing required checks, mergeability, no actionable trusted feedback, and no blockers. Readiness and escalation are reported to the PR and originating Linear context. Merge tools are absent.
 
@@ -43,7 +43,6 @@ All Blob namespaces are registered in `agent/lib/blob.ts`.
 
 - `repository-knowledge/<repository-hash>.md`: verified shared facts. Reads fall back to legacy `factory-brain/<repository-hash>.md`; trusted writes always use the new namespace.
 - `pipeline-runs/<repository-hash>/<scope>.json`: stabilization state.
-- `pipeline-active/<repository-hash>/<scope>.json`: active-run index consumed by reconciliation.
 - `model-overrides/foreman.json`: global model overrides used at session start.
 - `user-preferences/<principal-hash>.md`: private principal preferences.
 - `artifacts/<validated-id>.md`: write-once station handoffs.
