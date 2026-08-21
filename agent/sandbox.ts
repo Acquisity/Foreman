@@ -45,8 +45,8 @@ import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
  * built-in per-turn checkout runs there. The sandbox filesystem is owned by the builder uid,
  * not the session user, so without this git aborts every command with "detected dubious
  * ownership in repository at '/workspace'", the channel swallows the failed checkout, and the
- * turn runs with no working tree. The station sandboxes handle the same hazard for
- * `/workspace/repo` in `agent/lib/github/repo-sandbox.ts`.
+ * turn runs with no working tree. The same hazard for `/workspace/repo`
+ * and the prepared worktree is handled in `agent/tools/prepare_repository.ts`.
  *
  * @see {@link https://vercel.com/docs/sandbox | Vercel Sandbox}
  */

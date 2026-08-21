@@ -17,15 +17,6 @@ const BRANCH_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$/;
 export const REPO_DIR = "/workspace/repo";
 
 /**
- * The URL every clone, fetch, and push targets, literally.
- *
- * @remarks
- * Git remote config inside a sandbox (`pushurl`, `pushDefault`, per-branch
- * remotes) is model-writable and must not be able to redirect the brokered
- * credential, so the git helpers never go through `origin`.
- */
-
-/**
  * Returns the refusal reason, or null when the branch name may be used in a
  * git command.
  *

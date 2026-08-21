@@ -9,6 +9,5 @@ node_modules
 dist
 .DS_Store
 *.tsbuildinfo
-docs/research/
 *-oauth-client*.json
 .context/
