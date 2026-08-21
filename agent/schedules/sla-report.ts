@@ -110,7 +110,7 @@ export default defineSchedule({
     for (const { feature, channelId, tag } of FEATURE_CHANNELS) {
       try {
         const dispatch = to(slack, { channelId }).send(
-          `Daily SLA check for ${feature}. Load the sla-investigation skill, then find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. For each one, investigate and post a bottom-line report (What is it, blast radius / users impacted, linked ticket) and tag ${tag} in the header line. The repository for any code lookup is Acquisity/Acquisity. If there are none, post nothing.`,
+          `Daily SLA check for ${feature}. Load the sla-investigation skill and follow it end to end. Find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. Run the skill's required investigation on every one of them, including opening the repository, before you write anything. The repository for any code lookup is Acquisity/Acquisity. Post one report in the skill's format, tagging ${tag} in the header line and each bug's assignee in its own block. Delivery is conditional: if there are no in-scope bugs, reply with exactly <eve-empty-delivery/> and no other text, so nothing at all is posted. Do not explain that you found none.`,
           { auth: authFor(channelId) }
         );
         waitUntil(
@@ -131,7 +131,7 @@ export default defineSchedule({
 
     try {
       const heartbeat = to(slack, { channelId: OWNER_USER_ID }).send(
-        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}, then one line listing any in-scope bug whose project maps to no feature, by identifier and project, so a new or cross-cutting project is visible instead of dropped. This run always posts, so the skill's rule about staying silent when there are no bugs does not apply here: report zero counts as zeros.`,
+        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}, then one line listing any in-scope bug whose project maps to no feature, by identifier and project, so a new or cross-cutting project is visible instead of dropped. This run always posts, so neither the skill's required investigation nor its empty-delivery rule applies here: never reply with the empty-delivery marker, and report zero counts as zeros.`,
         { auth: authFor(OWNER_USER_ID) }
       );
       waitUntil(
