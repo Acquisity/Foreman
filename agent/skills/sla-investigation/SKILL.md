@@ -151,13 +151,13 @@ The session delivers a single channel message, so do not plan on separate posts.
 Impact: <what the user hits and how it blocks them>
 Root cause: <one sentence, from code you read this run, or "not identified yet">
 Affected: <the number you measured, or the scope in words, or "could not determine">
-Ticket: <https://linear.app/acquisity/issue/ENG-XXXX/slug|ENG-XXXX>
+Ticket: <the ticket's own url field|ENG-XXXX>
 
 *2. <next bug>* (<@assignee>)
 ...
 ```
 
-Blank line between blocks. The `Ticket:` line is a real Slack link built from the `url` field: `<url|ENG-XXXX>`, so the message shows `ENG-XXXX` and clicks through. A bare `ENG-XXXX` is wrong.
+Blank line between blocks. The `Ticket:` line is a real Slack link: paste the ticket's `url` field verbatim on the left of the pipe and its `ENG-XXXX` identifier on the right, so the message shows `ENG-XXXX` and clicks through. Never hand-build that URL from the identifier, and never write a bare `ENG-XXXX`.
 
 ## When there are no bugs
 
