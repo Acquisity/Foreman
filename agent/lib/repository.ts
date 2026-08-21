@@ -8,8 +8,12 @@ export const REPOSITORY_MARKER = "/workspace/.foreman/repository.json";
 
 const REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/;
+// The trailing boundary lists every delimiter a URL is quoted or wrapped in,
+// not just whitespace and punctuation. The Linear channel extracts from
+// `JSON.stringify(issue)`, where every URL ends at a double quote, so a
+// boundary that omitted it stamped nothing at all from a Linear session.
 const GITHUB_URL_PATTERN =
-  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!)\]}])/giu;
+  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!)\]}>"'|`])/giu;
 const SLUG_PATTERN =
   /(?<![A-Za-z0-9._/-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100})(?![A-Za-z0-9._/-])/gu;
 const GIT_SUFFIX_PATTERN = /\.git$/u;

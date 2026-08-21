@@ -64,6 +64,18 @@ describe("repository targeting", () => {
       ).map(({ slug }) => slug),
       ["Acquisity/Foreman"]
     );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        JSON.stringify({ url: "https://github.com/Acquisity/Foreman" })
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "<https://github.com/Acquisity/Foreman> and `https://github.com/Acquisity/Foreman`"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
   });
 
   it("makes signed GitHub repository context authoritative", () => {
