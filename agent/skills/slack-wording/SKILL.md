@@ -6,6 +6,8 @@ description: "Mandatory wording rules for any message posted to a Slack thread â
 
 The audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it.
 
+Scope: replies in a ticket thread, where the reader may forward the message onward. Internal engineering reports that exist to route work, such as the daily SLA report, are not in scope and carry their own format; they need ticket links, assignee tags, and root cause, all of which the rules below forbid.
+
 ## Never in a Slack-facing message
 
 - Linear issue IDs, ticket numbers, statuses, duplicate status, internal routing language.

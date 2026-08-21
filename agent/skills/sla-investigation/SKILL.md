@@ -33,9 +33,40 @@ Categorize by the Linear `project` field, not the title. The known mapping:
 
 Keep this mapping current. Support is not a product area, it is where cross-cutting customer-reported bugs land, so its channel report tags Aaron as well as James. A bug whose project matches no row belongs to no channel, so leave it out of the channel reports; the daily health line names those in the owner DM instead, so a new project is visible rather than dropped. Never guess a feature from the title.
 
+## Assignee to Slack member id
+
+Tag the assignee in their bug's block. Slack only renders a real mention from a member id, so look the Linear assignee name up here and write `<@ID>`. Never write a plain `@Name`: it renders as text and notifies nobody.
+
+| Linear assignee | Slack mention |
+| --- | --- |
+| Aaron Fraga | `<@U0BBHB86PUY>` |
+| Anthony Adewale | `<@U0BAKLSC8KX>` |
+| Anuj Bhatt | `<@U0BA7JC9KFZ>` |
+| Armando D'angelo | `<@U0BAQTLB8V7>` |
+| Augustas Armalis | `<@U0BASM3S9J8>` |
+| Blaise Gulaj | `<@U0A8VG31ALX>` |
+| Chetandeep Soni | `<@U0BA7JHRQPR>` |
+| Christian Mendiola | `<@U0BBT6THN00>` |
+| Ebubeker Rexha | `<@U0BCM53EPUH>` |
+| Edmund Valencia | `<@U0BAVGDQ3E1>` |
+| Elis Bushaj | `<@U0BF35FRX89>` |
+| Ellaine Dela Fuente | `<@U0BAHE01L07>` |
+| James Keeble | `<@U0BA7JK9XRV>` |
+| Jared Stauffer | `<@U0BAP2W1F3L>` |
+| Jil Patel | `<@U0BAQTM65TK>` |
+| Kenneth Bacud | `<@U0BAWRWB87Q>` |
+| Koppany Kondricz | `<@U0BA7JPMD39>` |
+| Mahmut Jomaa | `<@U0BAKLZ3JTF>` |
+| Paolo de Guzman | `<@U0BAHDX5SS3>` |
+| Pieter Venter | `<@U0BAM0YRHML>` |
+| Rose Pilarek | `<@U0BAP4RNVDG>` |
+| Tasnim Abbas | `<@U0BASM8SB9S>` |
+
+An assignee missing from this table, or a ticket with no assignee, gets `(unassigned)` in that spot. Do not guess a member id.
+
 ## Tools: what each is for and how to use it
 
-Reach for the smallest tool that answers the question. Do not open every tool for every bug.
+Reach for the smallest tool that answers a given question. That is about not over-querying: it never excuses skipping the required investigation below, which every bug gets.
 
 ### Linear (linear connection)
 
@@ -44,9 +75,9 @@ What it is: the source of truth for the ticket list and ticket details.
 What it's for: finding the new SLA bugs and reading their title, description, project, labels, priority, and SLA fields.
 
 How to use it:
-- `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name has to match exactly and `"Engineering"` alone silently returns nothing, so pass the id), `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["title", "priority", "project", "labels", "status", "slaStartedAt", "slaBreachesAt", "url"]` (those are the exact enum members the tool accepts; `identifier` and `state` are not among them and a wrong member fails the call), `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
+- `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name has to match exactly and `"Engineering"` alone silently returns nothing, so pass the id), `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["title", "priority", "project", "labels", "status", "slaStartedAt", "slaBreachesAt", "url", "assignee"]` (those are the exact enum members the tool accepts; `identifier` and `state` are not among them and a wrong member fails the call), `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
 - `get_issue` for the full description when the summary is truncated.
-- `id` is always returned and holds the `ENG-XXXX` identifier the report template asks for, so it does not need requesting.
+- `id` is always returned and holds the `ENG-XXXX` identifier. `url` is the ticket link the report needs, so always request it; never write a bare `ENG-XXXX` with no link behind it.
 
 These two are the only Linear tools a scheduled run can reach; every other Linear tool is denied for it.
 
@@ -90,21 +121,49 @@ What it's for: log evidence when the ticket names a symptom but not an error, an
 
 How to use it: `queryDataset` with an APL query over the relevant dataset, bounded to a recent window.
 
+## Required investigation, per bug
+
+This is a checklist to run to completion, not a menu. Run every step for every in-scope bug before writing a single line of the report.
+
+1. Read the full ticket with `get_issue`.
+2. Open the code. `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file` to follow the path the bug actually touches. A ticket that already names a file and line is a claim to verify, not an answer: line numbers go stale as files are rewritten, so confirm the code is really there and say so if it has moved.
+3. Get a blast-radius number from the tool that owns it. A data problem is a `planetscale_execute_read_query` `COUNT`. An error is a Sentry `userCount`. A failing job is Inngest run counts. A display or layout bug has no count to fetch, so describe the scope in words and move on.
+4. Self-check before writing. For each bug: did I open the repo, and is every number one I measured rather than inferred? If not, go back, or write "could not determine" in the report.
+
+Never fill a gap with a guess dressed as a finding. "Could not determine" is a correct answer; a plausible invention is not.
+
+Known blocker: the PlanetScale token can list databases and branches but is not scoped to run queries, so `planetscale_execute_read_query` returns 403 "Permission denied". If that happens, report the blast radius as not determined and say the query is permission-blocked. Do not retry it for the other bugs in the same run.
+
 ## Report format
 
-Load `slack-wording` before writing the message. It is mandatory for anything posted to Slack and its rules win wherever they disagree with the shape below.
+Post one message covering every in-scope bug for this feature. Bottom line, natural language, plain terms a non-engineer can read, no em dashes.
 
-Post one message covering every in-scope bug for this feature, bottom line, natural language, no em dashes, no bold. Tag whoever the dispatch names, in the header line only, then repeat the per-bug block under it. The session delivers a single channel message, so do not plan on separate posts.
+Tag the dispatch's mentions in the header line only. Inside a bug's block, tag its assignee. Bold is allowed only on the numbered title line, which is what makes the message scannable; nowhere else.
+
+The session delivers a single channel message, so do not plan on separate posts.
 
 ```
 <the mentions the dispatch gave you> <count> new SLA bug(s) in <feature>
 
-<one natural language line dont use jargon and speak coherently. State it simply and concisely, like one human talking to another, grounded in the ticket and code>
+*1. <short title, plain language>* (<@assignee>)
+<one line saying what the bug is, grounded in the ticket and the code>
+Impact: <what the user hits and how it blocks them>
+Root cause: <one sentence from the code, or "not identified yet">
+Affected: <the number you measured, or the scope in words, or "could not determine">
+Ticket: <https://linear.app/acquisity/issue/ENG-XXXX/slug|ENG-XXXX>
 
-Problem from user perspective: <what is the user experiencing with this bug. hows it blocking them etc.>
-Root cause identified: <if yes. natural language explain in one sentence. if no. say unsure>
-Users/workspaces affected (this is blast radius): <number amount. dont list out every user or workspace>
-Ticket link: <linked ENG-XXXX>
+*2. <next bug>* (<@assignee>)
+...
 ```
 
-All in actual simple language/laymans terms. If blast radius cannot be determined quickly, say so rather than guessing. If there are no new SLA bugs, post nothing.
+Blank line between blocks. The `Ticket:` line is a real Slack link built from the `url` field: `<url|ENG-XXXX>`, so the message shows `ENG-XXXX` and clicks through. A bare `ENG-XXXX` is wrong.
+
+## When there are no bugs
+
+Deliver nothing at all. Not a summary, not an explanation of why there was nothing, not a note that you checked. Reply with exactly
+
+```
+<eve-empty-delivery/>
+```
+
+and no other text. Anything else you write is posted to the channel, which is the failure this rule exists to prevent.
