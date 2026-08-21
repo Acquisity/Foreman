@@ -150,9 +150,8 @@ export function isTrusted(auth: SessionAuthContext | null): boolean {
  *
  * @remarks
  * Every schedule that ships marks itself unattended before dispatch:
- * `reconcile-pipelines.ts` stamps {@link stampAutonomous}, `sla-report.ts`
- * sets {@link UNATTENDED_ATTRIBUTE}. Both are caught by
- * {@link isUnattended} and denied, so neither reaches this predicate. It
+ * `sla-report.ts` sets {@link UNATTENDED_ATTRIBUTE}, which is caught by
+ * {@link isUnattended} and denied, so it never reaches this predicate. It
  * recognizes the raw app principal for a future schedule that dispatches
  * without either marker, and the write policies treat that as trusted. Mark
  * new schedules unattended unless they are meant to write without a card.

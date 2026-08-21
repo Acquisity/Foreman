@@ -1,11 +1,5 @@
-import { del, list } from "@vercel/blob";
 import { z } from "zod";
-import {
-  ACTIVE_PIPELINE_RUNS_PREFIX,
-  PIPELINE_RUNS_PREFIX,
-  readDocument,
-  writeDocument,
-} from "./blob.js";
+import { PIPELINE_RUNS_PREFIX, readDocument, writeDocument } from "./blob.js";
 import { repositoryHash } from "./repository.js";
 
 export const pipelineStageSchema = z.enum([
@@ -107,9 +101,6 @@ const scopeKey = (scope: string): string => {
 export const pipelineRunKey = (repository: string, scope: string): string =>
   `${PIPELINE_RUNS_PREFIX}${repositoryHash(repository)}/${scopeKey(scope)}.json`;
 
-const activePipelineRunKey = (repository: string, scope: string): string =>
-  `${ACTIVE_PIPELINE_RUNS_PREFIX}${repositoryHash(repository)}/${scopeKey(scope)}.json`;
-
 const runLocks = new Map<string, Promise<void>>();
 export const withPipelineRunLock = async <T>(
   key: string,
@@ -146,44 +137,5 @@ export const writePipelineRun = async (run: PipelineRun): Promise<void> => {
     pipelineRunKey(run.repository, run.scope),
     JSON.stringify(run, null, 2),
     { allowOverwrite: true, contentType: "application/json" }
-  );
-  const activeKey = activePipelineRunKey(run.repository, run.scope);
-  if (run.status === "active") {
-    await writeDocument(activeKey, JSON.stringify(run, null, 2), {
-      allowOverwrite: true,
-      contentType: "application/json",
-    });
-  } else {
-    await del(activeKey);
-  }
-};
-
-export const listActivePipelineRuns = async (): Promise<PipelineRun[]> => {
-  const listAll = async (
-    cursor?: string,
-    previous: Awaited<ReturnType<typeof list>>["blobs"] = []
-  ): Promise<Awaited<ReturnType<typeof list>>["blobs"]> => {
-    const page = await list({ cursor, prefix: ACTIVE_PIPELINE_RUNS_PREFIX });
-    const combined = [...previous, ...page.blobs];
-    return page.hasMore ? listAll(page.cursor, combined) : combined;
-  };
-  const blobs = await listAll();
-  const results = await Promise.allSettled(
-    blobs.map(async (blob) => {
-      const doc = await readDocument(blob.pathname);
-      if (!doc.found) {
-        return null;
-      }
-      try {
-        return pipelineRunSchema.parse(JSON.parse(doc.content));
-      } catch {
-        return null;
-      }
-    })
-  );
-  return results.flatMap((result) =>
-    result.status === "fulfilled" && result.value?.status === "active"
-      ? [result.value]
-      : []
   );
 };
