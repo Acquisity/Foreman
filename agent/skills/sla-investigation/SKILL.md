@@ -125,12 +125,13 @@ How to use it: `queryDataset` with an APL query over the relevant dataset, bound
 
 This is a checklist to run to completion, not a menu. Run every step for every in-scope bug before writing a single line of the report.
 
-1. Read the full ticket with `get_issue`.
-2. Open the code. `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file` to follow the path the bug actually touches. A ticket that already names a file and line is a claim to verify, not an answer: line numbers go stale as files are rewritten, so confirm the code is really there and say so if it has moved.
-3. Get a blast-radius number from the tool that owns it. A data problem is a `planetscale_execute_read_query` `COUNT`. An error is a Sentry `userCount`. A failing job is Inngest run counts. A display or layout bug has no count to fetch, so describe the scope in words and move on.
-4. Self-check before writing. For each bug: did I open the repo, and is every number one I measured rather than inferred? If not, go back, or write "could not determine" in the report.
+1. Read the full ticket with `get_issue`, for the symptom only. Everything else in it, including a "root cause" section, a named file and line, a linked pull request, or an explanation left by another agent, is a hypothesis someone else wrote. It is where to start looking, never what to report.
+2. Reinvestigate from scratch. `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file` to trace the behavior yourself from the entry point the user actually hits down to the line that produces it. A ticket's hypothesis is confirmed only when you have read that line in this run and can say which file, which function, and what it does wrong. Line and file references go stale as the code is rewritten, so a ticket that names one is telling you where to look, not what you will find.
+3. Say so when your trace and the ticket disagree. Report what the code does and note that the ticket's claim did not hold, whether the location moved or the explanation was wrong. Never reconcile the two by quietly repeating the ticket.
+4. Get a blast-radius number from the tool that owns it. A data problem is a `planetscale_execute_read_query` `COUNT`. An error is a Sentry `userCount`. A failing job is Inngest run counts. A display or layout bug has no count to fetch, so describe the scope in words and move on.
+5. Self-check before writing. For each bug: which file did I open, and is the root cause line I am about to write traceable to something I read in this run rather than something the ticket told me? Is every number one I measured rather than inferred? Anything that fails this goes in the report as not identified or could not determine.
 
-Never fill a gap with a guess dressed as a finding. "Could not determine" is a correct answer; a plausible invention is not.
+Never fill a gap with a guess dressed as a finding, and never launder a ticket's claim into your own by restating it. "Root cause: not identified yet" and "could not determine" are correct answers; a plausible invention, or a confident echo of someone else's guess, is not.
 
 Known blocker: the PlanetScale token can list databases and branches but is not scoped to run queries, so `planetscale_execute_read_query` returns 403 "Permission denied". If that happens, report the blast radius as not determined and say the query is permission-blocked. Do not retry it for the other bugs in the same run.
 
@@ -148,7 +149,7 @@ The session delivers a single channel message, so do not plan on separate posts.
 *1. <short title, plain language>* (<@assignee>)
 <one line saying what the bug is, grounded in the ticket and the code>
 Impact: <what the user hits and how it blocks them>
-Root cause: <one sentence from the code, or "not identified yet">
+Root cause: <one sentence, from code you read this run, or "not identified yet">
 Affected: <the number you measured, or the scope in words, or "could not determine">
 Ticket: <https://linear.app/acquisity/issue/ENG-XXXX/slug|ENG-XXXX>
 
