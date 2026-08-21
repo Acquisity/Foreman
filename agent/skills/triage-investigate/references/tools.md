@@ -104,9 +104,15 @@ Query around the time the claim names. A deployment that landed just before the 
 
 ## Intercom (`intercom__`)
 
-`search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search`, `search_articles`, `list_articles`, `get_article`, `fetch`.
+`search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search`, `search_articles`, `list_articles`, `get_article`, `fetch`.
 
-Use it to find whether other customers reported the same thing, which is frequency evidence for severity weighting.
+Two uses.
+
+The conversation behind this report. If the ticket carries an Intercom link, pass it straight to `fetch`, which accepts a URL. Otherwise `search_contacts` with `email` set to the address pinned in Step 1A, then `search_conversations` with `contact_ids`, then `get_conversation` for the full thread. `get_contact` returns the profile only and holds no conversations, so it is not a step on this path.
+
+Whether others hit the same thing, which is frequency evidence for severity weighting. Use `search`, not `search_conversations`: `search_conversations` filters structured fields and has no free-text, while `search` takes a DSL query such as `object_type:conversations q:"campaign stopped sending"`.
+
+`search` returns ids prefixed (`contact_<uuid>`), but `contact_ids` wants them raw. Strip the prefix or the filter matches nothing.
 
 ## Resend (`resend__`)
 

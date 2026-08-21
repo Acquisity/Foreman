@@ -93,7 +93,7 @@ A claim you cannot place in the code is not ready for a Bug verdict.
 
 PlanetScale is the production database and the only database this skill reads. Customer data is never in Neon; a triage investigation has no reason to open that connection.
 
-Then count the blast radius, unscoped from this customer: how many orgs and users are in the same state. Always attempt it, and aim for an exact figure from a query, not an estimate and not an adjective. Record the query and the date counted alongside the number, because the count ages.
+Then count the blast radius, unscoped from this customer: how many distinct orgs and users are in the same state, each counted once however many times they reported it. Always attempt it, and aim for an exact figure from a query, not an estimate and not an adjective. Record the query and the date counted alongside the number, because the count ages.
 
 When an exact count is genuinely not reachable, say so with the tightest bound the data supports and name what blocks the exact figure. A bounded count with its reason is usable; a vague one is not.
 
@@ -113,7 +113,7 @@ Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](r
 - Email delivery, bounces, spam placement: Resend `list-emails`, `get-email`, `list-logs`, `list-suppressions`. These names are kebab-case, not snake_case.
 - What the user actually did: the Jam link on the ticket when there is one, though usually there is not. PostHog runs through a single `exec` tool taking a named command; resolve the person with `persons` on the email or distinct id from Step 1A, then read `session-recording`. It cannot find anyone by display name. Lucent (`list_issues`, `get_issue`) is indexed by symptom, not by customer, so search it for the behavior (`responses not displaying`) and never for who reported it.
 - Deployment or edge failures: Vercel `get_runtime_errors` and `get_runtime_logs` around the reported time.
-- Whether others hit it: Intercom `search_conversations` and Modem `search_modem`.
+- The conversation behind the report, and whether others hit it: Intercom, via the link on the ticket or the email pinned in Step 1A. Modem `search_modem` for feedback beyond support threads.
 
 ### 4.5 Record the lanes
 
@@ -184,7 +184,22 @@ Apply the fewest labels that place the ticket:
 
 `save_issue` replaces the whole label set: labels already on the ticket and not included in the call are removed. Read the current labels first and pass the union, never just the new ones.
 
-## Step 7 — Route
+## Step 7 — Attach the Triage investigation document
+
+Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
+
+- One document per ticket. A later revisit updates it with `patch`, never creates a second.
+- Keep it under roughly 20 KB. It is a handoff, not a transcript. Counts and the specific rows that prove the finding, not raw dumps.
+- Never paste credential-shaped columns into it.
+- The full document stays on the customer ticket. A Linear document inherits the visibility of the issue it hangs from, so attaching this one to a shared master would expose one customer's identity and production rows to everyone who can see that master. Put only the aggregate evidence on the master: the root cause, the blast radius figure, and the code path, with no organization id, email, or customer rows.
+
+## Step 8 — Comment on the ticket
+
+Write the report comment from the template below via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The evidence lives in the document, not here.
+
+## Step 9 — Route
+
+The customer already has their answer from Step 8. Nothing here changes what they were told; it changes what engineering sees. Never hold the comment back for this step.
 
 ### When the ticket is not engineering actionable
 
@@ -194,10 +209,10 @@ Apply the fewest labels that place the ticket:
 
 The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it.
 
-1. Search for an existing master. `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and the master label, resolved from `list_issue_labels` rather than assumed (it is `master` today), plus a search on the cause found in Step 4.
+1. Search for an existing master. `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and the master label, resolved from `list_issue_labels` rather than assumed (it is `master` today), plus a search on four axes: the cause, the code path from 4.2, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug.
 2. Match on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
-3. If a master already owns the cause: add this ticket to its `relatedTo`, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3.
-4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type and `master`, priority per Step 6, and assigned to the area owner from the roster below. Then add this ticket to its `relatedTo`.
+3. If a master already owns the cause: set this ticket's `parentId` to that master so it becomes a child, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
+4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it.
 5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
 ### Area-routing roster
@@ -215,19 +230,6 @@ Take the product area from the ticket's Linear `project`. Never infer it from th
 The roster exists on the production ENG team only. Tickets on the SAN sandbox team always route to Aaron Fraga, whatever the area. If you cannot tell which area an issue belongs to, assign Aaron Fraga and say why the area was ambiguous. If a project has no lead set or the roster is unavailable on a run, assign Aaron Fraga and say in the report that routing needs a human. A guessed owner is worse than an explicit hand-off. Never route to retired or legacy projects.
 
 Prefix internal notes with `## Internal`.
-
-## Step 8 — Attach the Triage investigation document
-
-Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out.
-
-- One document per ticket. A later revisit updates it with `patch`, never creates a second.
-- Keep it under roughly 20 KB. It is a handoff, not a transcript. Counts and the specific rows that prove the finding, not raw dumps.
-- Never paste credential-shaped columns into it.
-- The full document stays on the customer ticket. A Linear document inherits the visibility of the issue it hangs from, so attaching this one to a shared master would expose one customer's identity and production rows to everyone who can see that master. Put only the aggregate evidence on the master: the root cause, the blast radius figure, and the code path, with no organization id, email, or customer rows.
-
-## Step 9 — Comment on the ticket
-
-Write the report comment from the template below via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The evidence lives in the document, not here.
 
 ## Step 10 — Slack-facing reply
 
@@ -249,10 +251,12 @@ when there is nothing that would.>
 
 <The root cause in one or two plain sentences, in the customer's terms.>
 
-Tracked in <ENG-XXXX>. [Triage investigation](<document link>)
+<How many workspaces are affected, or "only yours" when it is one.>
+
+[Triage investigation](<document link>)
 ```
 
-The unblock leads. Someone stuck cares about working again before they care about the cause. Never silently drop it: a missing unblock line and one nobody looked for read the same. Drop the `Tracked in` sentence when the ticket is not engineering actionable.
+The unblock leads. Someone stuck cares about working again before they care about the cause. Never silently drop it: a missing unblock line and one nobody looked for read the same. The engineering ticket is not named here: once Step 9 makes this report a child, Linear shows the parent on the issue itself.
 
 ## Triage investigation document template
 
