@@ -190,6 +190,7 @@ export default defineTool({
             return {
               blockerRepeatCount: existing.blockerRepeatCount,
               duplicate: true,
+              merged: existing.merged,
               processedFeedback: existing.processedFeedback,
               ready: existing.status === "ready",
               run: existing,
