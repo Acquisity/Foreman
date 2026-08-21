@@ -111,7 +111,11 @@ What it is: product analytics for the app, read-only.
 
 What it's for: blast radius for anything a user experiences but that throws no error and corrupts no row. Interface bugs, layout bugs, broken flows, a feature nobody can complete. This is the tool that turns "anyone on a small screen" into a number.
 
-How to use it: `exec` with a HogQL query through `query`, counting distinct persons or sessions that actually hit the affected surface, bounded to a recent window. Narrow to the conditions the bug needs: the page or component from the ticket, plus whatever separates affected users from unaffected ones, such as a viewport size, a plan, or a browser. `web-analytics` and `heatmaps` answer the same question for a page as a whole, and `session-recording` finds real sessions to confirm the behavior when a count alone is not convincing.
+How to use it: every call goes through the single `exec` tool as a CLI-style string in its `command` argument, plus a `context` argument saying why you are calling it. There is no `query` argument. The sequence is `search <pattern>` to find a tool, `info <tool_name>` once for its schema, then `call <tool_name> <json>`.
+
+Confirm the data exists before counting it. `call read-data-schema {"query": {"kind": "events"}}` lists the events this project actually records, and `kind: "event_properties"` lists one event's properties. Event names vary per project, so never query a name taken from a ticket or assumed from convention, `$pageview` included. If the event is not there, the count cannot be made and the report says so.
+
+Then count with the tool that fits: `query-trends` for how many distinct persons or sessions hit the affected surface in a window, with a breakdown when the bug only affects some of them; `query-web-stats` for per-page visitor and device numbers; `execute-sql` for anything those cannot express. `query-session-recordings-list` finds real sessions when a number alone is not convincing.
 
 ### Sentry (sentry connection)
 
