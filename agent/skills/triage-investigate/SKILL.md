@@ -1,5 +1,5 @@
 ---
-description: "Full Engineering Triage investigation procedure — read the ticket, pin the customer, check duplicates, investigate the claim across code, production data, and runtime evidence, classify, label, attach the report to a root-cause master, and reply. Load before investigating any triage ticket."
+description: "Full Engineering Triage procedure and policy — the investigation stance, reading the ticket, pinning the customer, duplicates, investigating the claim across code, production data, and runtime evidence, unblocking the customer, classifying, severity weighting and priority bands, labels, the area-routing roster, root-cause masters, and the reply. Load before investigating any triage ticket."
 ---
 
 # Triage investigate
@@ -7,6 +7,28 @@ description: "Full Engineering Triage investigation procedure — read the ticke
 Goal: find the root cause without spending a developer's time, leave a plain-language explanation and next steps on the ticket, record the full investigation where the next agent can read it, and hand engineering one master ticket per root cause instead of one ticket per customer report.
 
 A customer-reported ticket is never routed to an area owner as engineering work. It carries the explanation and closes. When the root cause warrants action, a master ticket owns that work and the report attaches to it.
+
+Behind every one of these tickets is a person running a business on this product. Finding the cause is half the job; the other half is that they can work again. Never let a correct verdict stand in for that.
+
+## Investigation stance
+
+Start skeptical that the report is a product bug. Before calling anything a bug, rule out:
+
+- user or account setup
+- workspace, campaign, domain, inbox, CRM, or provider configuration
+- permissions, billing, entitlements, limits, credits, expected product behavior
+- provider or platform limitations
+- duplicate reports or already-known issues
+
+`Bug` is the last classification, only with direct evidence of an internal failure: logs, failed jobs, schema mismatch, provider or API error, repeatable incorrect behavior, or data the user could not have caused. Every finding carries proof of work and a quantified blast radius, not adjectives.
+
+Exactly one classification per finding:
+
+- `User Error`: settings, configuration, operator-solvable, or needs-human-review cases support can explain or follow up on without a platform limitation or bug.
+- `Platform Limitation`: expected limitation, provider limitation, billing, entitlement, or plan limit, or known unsupported behavior.
+- `Bug`: direct evidence of internal failure that settings, configuration, and platform limits do not explain.
+
+A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, do not force one of the three: hand back what is known with the missing confirmation named, no ticket, and nothing that reads as settled.
 
 ## Step 0 — Is this a money ask?
 
@@ -95,13 +117,25 @@ Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](r
 
 ### 4.5 Rehash the claim against the evidence
 
-Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the triage-policy skill. Run Gate 2 (the stop-gate) before any verdict.
+Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the investigation stance above. Run Gate 2 (the stop-gate) before any verdict.
 
 A `Bug` verdict requires all three: a named file and function, direct evidence from 4.3 or 4.4, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
 
 Verdict quality bar: name the cause, not the mechanism.
 
-### 4.6 Record the lanes
+### 4.6 Find the unblock
+
+The verdict says what is wrong. It does not say what the customer does tomorrow morning. Answer that separately, and answer it even when the verdict is `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix.
+
+Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in 4.5 is what tells you which of these would actually work, which is why this comes after the verdict and not before.
+
+When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
+
+When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
+
+The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
+
+### 4.7 Record the lanes
 
 Before writing the verdict, fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report.
 
@@ -109,13 +143,34 @@ Before writing the verdict, fill the Triage investigation document's Evidence an
 
 Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`.
 
+The handling path classifies the root cause, not the remedy. A ticket can be `Engineering Todo` and have had the customer unblocked in the same pass; the two are recorded separately and neither cancels the other.
+
 ## Step 5A — Decide the final Linear state
 
 Set the state that matches the handling path.
 
 ## Step 6 — Set Linear priority
 
-Use the triage-policy skill's severity weighting. Never leave a ticket at No priority. `save_issue` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
+Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `save_issue` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
+
+Weigh these in order:
+
+1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
+2. Blast radius, quantified from primary data in 4.3, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
+3. Frequency. A small failure that hits every send or sync outweighs a severe one that fires rarely.
+4. Customer tier. Enterprise or partner exposure breaks ties only. Never a reason to inflate a band.
+5. Money. An active billing or refund blocker is at least `High`.
+
+Bands:
+
+- `Urgent`: production outage, security or data-loss risk, major revenue or customer-trust incident, or a core workflow blocked for many orgs.
+- `High`: multiple orgs blocked on a core workflow, money issue requiring action, repeat production failure, or an enterprise customer blocked.
+- `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
+- `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
+
+A workaround does not enter the weighting. It makes the customer's day survivable; it does not make the defect smaller. Letting one lower the band would mean the better we get at unblocking people, the less likely the cause is ever fixed.
+
+Between two bands take the higher one and write the rationale where the verdict lives. Overestimate, then calibrate down with a domain expert. Duplicates inherit the parent's priority.
 
 ## Step 6A — Label the ticket
 
@@ -141,11 +196,25 @@ The customer ticket does not become the engineering ticket. A master ticket owns
 
 1. Search for an existing master. `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `label: "master"`, plus a search on the cause found in Step 4.
 2. Match on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
-3. If a master already owns the cause: add this ticket to its `relatedTo`, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 4.
-4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type and `master`, priority per Step 6, and assigned to the area owner from the triage-policy roster. Then add this ticket to its `relatedTo`.
+3. If a master already owns the cause: add this ticket to its `relatedTo`, comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3.
+4. If no master owns the cause: create one with the master template below, on the ENG team, labelled with the type and `master`, priority per Step 6, and assigned to the area owner from the roster below. Then add this ticket to its `relatedTo`.
 5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
-Prefix internal notes with `## Internal`. On the SAN team, always route to Aaron Fraga (`aaron.fraga@acquisity.ai`).
+### Area-routing roster
+
+Assign by the product area the issue is in. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
+
+- AI SDR: Koppany Kondricz (`koppany.kondricz@acquisity.ai`)
+- Cold Email: Anthony Adewale (`anthony.adewale@acquisity.ai`)
+- Website Builder: James Keeble (`james.keeble@aiacquisition.com`)
+- Core Platform: Anuj Bhatt (`anuj.bhatt@acquisity.ai`), fallback James Keeble
+- CRM: Ebubeker Rexha (`ebubeker.rexha@acquisity.ai`)
+- Acquisity Agent (AI Consultant): Jil Patel (`jil.patel@acquisity.ai`)
+- Anything else: Aaron Fraga (`aaron.fraga@acquisity.ai`)
+
+The roster exists on the production ENG team only. Tickets on the SAN sandbox team always route to Aaron Fraga, whatever the area. If you cannot tell which area an issue belongs to, assign Aaron Fraga and say why the area was ambiguous. If a project has no lead set or the roster is unavailable on a run, assign Aaron Fraga and say in the report that routing needs a human. A guessed owner is worse than an explicit hand-off. Never route to retired or legacy projects.
+
+Prefix internal notes with `## Internal`.
 
 ## Step 8 — Attach the Triage investigation document
 
@@ -175,14 +244,15 @@ Prose, not a field list. The classification, priority, and handling path are alr
 ```
 ## Triage investigation
 
-<The root cause in one or two plain sentences, in the customer's terms.>
+<What gets them working now, and who does it. Omit only when there is
+nothing that would.>
 
-<What happens next, and who does it.>
+<The root cause in one or two plain sentences, in the customer's terms.>
 
 Tracked in <ENG-XXXX>. [Triage investigation](<document link>)
 ```
 
-Drop the `Tracked in` sentence when the ticket is not engineering actionable.
+The unblock leads. Someone stuck cares about working again before they care about the cause. Drop the `Tracked in` sentence when the ticket is not engineering actionable.
 
 ## Triage investigation document template
 
@@ -209,6 +279,10 @@ Quantified: N orgs, N users, and the query that counted them.
 ## Code path
 Files and functions in Acquisity/Acquisity that the cause runs through,
 with the commit the investigation read.
+
+## Unblock
+What gets the customer working now, who performs it, and whether it has
+been done. `None found: <reason>` when there is nothing.
 
 ## Ruled out
 What was checked and eliminated, so the next agent does not redo it.
