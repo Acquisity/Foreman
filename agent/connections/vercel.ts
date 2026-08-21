@@ -1,7 +1,7 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
 import { denyUnattendedWrites } from "../lib/github/approval.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Tools that mutate Vercel state. Allowed in attended sessions, denied on
@@ -35,7 +35,7 @@ const WRITE_TOOLS = [
  */
 export default defineMcpClientConnection({
   approval: denyUnattendedWrites("Vercel", WRITE_TOOLS),
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "VERCEL_MCP_CONNECTOR",
       "mcp.vercel.com/acquisity-foreman"

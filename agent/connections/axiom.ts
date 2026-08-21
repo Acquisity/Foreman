@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Axiom MCP connection for production log queries.
@@ -16,7 +16,7 @@ import { requireEnv } from "../lib/constants.js";
  * history stay; dashboard/monitor/notifier writes are excluded.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "AXIOM_MCP_CONNECTOR",
       "mcp.axiom.co/acquisity-foreman-axiom"

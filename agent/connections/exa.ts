@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Exa MCP connection for web search and research.
@@ -12,7 +12,7 @@ import { requireEnv } from "../lib/constants.js";
  * research access.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "EXA_MCP_CONNECTOR",
       "mcp.exa.ai/acquisity-foreman-exa"

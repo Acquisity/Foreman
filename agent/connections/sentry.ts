@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Sentry MCP connection for bug investigation evidence.
@@ -20,7 +20,7 @@ import { requireEnv } from "../lib/constants.js";
  *   with more capabilities would widen this connection, so don't.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "SENTRY_MCP_CONNECTOR",
       "sentry/acquisity-foreman-sentry"

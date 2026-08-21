@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Resend MCP connection for transactional email evidence.
@@ -16,7 +16,7 @@ import { requireEnv } from "../lib/constants.js";
  * sending, no create/update/remove, no suppression edits.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "RESEND_MCP_CONNECTOR",
       "resend/acquisity-foreman-resend"

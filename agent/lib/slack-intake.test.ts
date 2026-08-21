@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import {
+  ConnectionAuthorizationRequiredError,
+  type ConnectionPrincipal,
+} from "eve/connections";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { parseIntakeOnlyChannels } from "./slack-intake.js";
 import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
+import {
+  INTAKE_ONLY_SIGN_IN_REASON,
+  intakeOnlySignInDenial,
+} from "./user-connect.js";
 
 const auth: SessionAuthContext = {
   attributes: {},
@@ -40,5 +48,37 @@ describe("intake-only channels", () => {
       const status = policy(approvalFor(stamped));
       assert.equal(typeof status === "object" && status.type, "denied");
     }
+  });
+
+  it("denies a lapsed sign-in instead of prompting for it", () => {
+    const principalFor = (auth_: SessionAuthContext): ConnectionPrincipal => ({
+      attributes: auth_.attributes,
+      id: auth_.principalId,
+      type: "user",
+    });
+    const required = new ConnectionAuthorizationRequiredError("jam");
+    const denial = intakeOnlySignInDenial(
+      required,
+      principalFor(stampIntakeOnly(auth))
+    );
+    assert.equal(denial?.reason, INTAKE_ONLY_SIGN_IN_REASON);
+    assert.equal(denial?.retryable, false);
+    assert.equal(denial?.connectionName, "jam");
+    assert.equal((denial?.message ?? "").includes("jam"), true);
+
+    // A developer channel keeps the normal consent flow, and an unrelated
+    // failure is never rewritten into a sign-in denial.
+    assert.equal(
+      intakeOnlySignInDenial(required, principalFor(auth)),
+      undefined
+    );
+    assert.equal(intakeOnlySignInDenial(required, { type: "app" }), undefined);
+    assert.equal(
+      intakeOnlySignInDenial(
+        new Error("mcp server unreachable"),
+        principalFor(stampIntakeOnly(auth))
+      ),
+      undefined
+    );
   });
 });

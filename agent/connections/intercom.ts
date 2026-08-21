@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Intercom MCP connection for customer conversation context.
@@ -16,7 +16,7 @@ import { requireEnv } from "../lib/constants.js";
  * admitted.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv("INTERCOM_MCP_CONNECTOR", "intercom/foreman"),
     principalType: "user",
   }),

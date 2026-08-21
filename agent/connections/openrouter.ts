@@ -1,13 +1,13 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
 import { denyUnattendedWrites } from "../lib/github/approval.js";
+import { userConnect } from "../lib/user-connect.js";
 
 const WRITE_TOOLS = ["send-message"] as const;
 
 export default defineMcpClientConnection({
   approval: denyUnattendedWrites("OpenRouter", WRITE_TOOLS),
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "OPENROUTER_MCP_CONNECTOR",
       "mcp.openrouter.ai/acquisity-foreman-openrouter"

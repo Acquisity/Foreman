@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Every read scope PostHog's MCP resource publishes
@@ -104,7 +104,7 @@ const READ_SCOPES = [
  *   (public client + PKCE), set in the Connect dashboard after creation.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "POSTHOG_MCP_CONNECTOR",
       "posthog/acquisity-foreman-posthog"

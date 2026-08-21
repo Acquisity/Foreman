@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Stripe MCP connection for billing investigation.
@@ -16,7 +16,7 @@ import { requireEnv } from "../lib/constants.js";
  * excluded so money-moving operations are unreachable.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: userConnect({
     connector: requireEnv(
       "STRIPE_MCP_CONNECTOR",
       "stripe/acquisity-foreman-stripe"
