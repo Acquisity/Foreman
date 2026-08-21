@@ -76,7 +76,7 @@ What it's for: finding the new SLA bugs and reading their title, description, pr
 
 How to use it:
 - `list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name has to match exactly and `"Engineering"` alone silently returns nothing, so pass the id), `label: "Bug"`, `priority: 1` and `priority: 2` (two calls). Pass `fields: ["title", "priority", "project", "labels", "status", "slaStartedAt", "slaBreachesAt", "url", "assignee"]` (those are the exact enum members the tool accepts; `identifier` and `state` are not among them and a wrong member fails the call), `includeArchived: false`, and `limit: 250`, and follow `hasNextPage` with the returned cursor until it is false. Then filter locally to `slaStartedAt` at or after the `since` timestamp the dispatch provided, and the feature's projects.
-- `get_issue` for the full description when the summary is truncated.
+- `get_issue` for every in-scope bug, always. `list_issues` returns a summary; the investigation below needs the full ticket, so read it even when the summary looks complete.
 - `id` is always returned and holds the `ENG-XXXX` identifier. `url` is the ticket link the report needs, so always request it; never write a bare `ENG-XXXX` with no link behind it.
 
 These two are the only Linear tools a scheduled run can reach; every other Linear tool is denied for it.
