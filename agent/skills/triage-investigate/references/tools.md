@@ -30,9 +30,17 @@ Use the built-in `connection_search` to discover what a connection actually expo
 
 Read the result flags before trusting the rows: `truncated` means rows are missing, `oversizedRow` means one row alone exceeded the cap so select fewer columns, `envelopeTooLarge` means the server returned oversized metadata, and `raw` means the result could not be parsed.
 
-Also allowlisted, from the connection: `planetscale_list_databases`, `planetscale_list_branches`, `planetscale_get_database`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`.
+Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
 
-`planetscale_get_branch_schema` is excluded for the same size reason. Read schema through `information_schema` instead.
+`planetscale_get_branch_schema` does not exist on this connection. The allowlist excludes it for returning every table's schema unbounded, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Read schema through `information_schema` instead, which is verified working:
+
+```sql
+SELECT table_schema, table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_name = '<table>'
+```
+
+Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`. An `information_schema` query needs that last one passed explicitly.
 
 ## Linear (`linear__`)
 
