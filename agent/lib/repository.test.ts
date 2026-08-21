@@ -4,6 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import { validateBranch } from "./github/git-remote.js";
 import {
   extractRepositories,
+  extractRepositoryUrls,
   parseRepository,
   remoteUrl,
   resolveRepository,
@@ -46,6 +47,22 @@ describe("repository targeting", () => {
     assert.throws(
       () => resolveRepositoryInput("Acquisity/Foreman and example/other", auth),
       AMBIGUOUS_REPOSITORY_PATTERN
+    );
+  });
+
+  it("never reads a channel repository out of a bare slug", () => {
+    const message =
+      "please begin work and use review bot loop skill but remember github tools are found in channels/github.ts";
+    assert.deepEqual(extractRepositoryUrls(message), []);
+    assert.deepEqual(
+      extractRepositories(message).map(({ slug }) => slug),
+      ["channels/github.ts"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "ship it from https://github.com/Acquisity/Foreman, see channels/github.ts"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
     );
   });
 

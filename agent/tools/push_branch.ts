@@ -31,14 +31,19 @@ export default defineTool({
     }
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
+    // Only a signed GitHub webhook binds the session, and that binding is a
+    // hard gate: message text must not retarget a push away from the
+    // repository the webhook came from. An "explicit" authority is a default,
+    // not a gate. `resolveRepository` already lets a request override it, so
+    // `prepare_repository` can legitimately have prepared another repository,
+    // and refusing here left those sessions unable to deliver anything at all.
     const authoritative = repositoryFromAuth(ctx.session.auth.current);
     if (
-      authoritative &&
+      authoritative?.source === "github-webhook" &&
       authoritative.slug.toLowerCase() !== prepared.slug.toLowerCase()
     ) {
       return {
-        error:
-          "Prepared repository does not match the session repository authority.",
+        error: `This signed GitHub session is bound to ${authoritative.slug} and cannot push to ${prepared.slug}.`,
         success: false as const,
       };
     }

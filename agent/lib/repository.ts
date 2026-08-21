@@ -37,15 +37,41 @@ export const parseRepository = (value: string): RepositoryTarget | null => {
   return { owner, repo, slug: `${owner}/${repo}` };
 };
 
-export const extractRepositories = (text: string): RepositoryTarget[] => {
+/**
+ * Repositories named by a full GitHub URL.
+ *
+ * @remarks
+ * This is the only extraction a non-webhook channel may promote to session
+ * authority. A bare `owner/repo` token cannot be told apart from ordinary
+ * prose: `channels/github.ts`, `lib/utils`, `and/or` and `24/7` all parse as
+ * slugs, and stamping one binds the session to a repository that does not
+ * exist. A `github.com/<owner>/<repo>` link carries the host, so it says
+ * "repository" and nothing else does.
+ */
+export const extractRepositoryUrls = (text: string): RepositoryTarget[] => {
   const repositories = new Map<string, RepositoryTarget>();
-  const bounded = text.slice(0, 100_000);
-  for (const match of bounded.matchAll(GITHUB_URL_PATTERN)) {
+  for (const match of text.slice(0, 100_000).matchAll(GITHUB_URL_PATTERN)) {
     const parsed = parseRepository(`${match[1]}/${match[2]}`);
     if (parsed) {
       repositories.set(parsed.slug.toLowerCase(), parsed);
     }
   }
+  return [...repositories.values()];
+};
+
+/**
+ * Repositories named anywhere in a caller-supplied string, by URL or by a bare
+ * `owner/repo` slug. Use it for text the model deliberately passed as a
+ * repository argument, never for free text arriving from a channel.
+ */
+export const extractRepositories = (text: string): RepositoryTarget[] => {
+  const repositories = new Map<string, RepositoryTarget>(
+    extractRepositoryUrls(text).map((target) => [
+      target.slug.toLowerCase(),
+      target,
+    ])
+  );
+  const bounded = text.slice(0, 100_000);
   for (const match of bounded.matchAll(SLUG_PATTERN)) {
     const parsed = parseRepository(match[1] ?? "");
     if (parsed) {
