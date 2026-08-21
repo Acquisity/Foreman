@@ -14,6 +14,8 @@ export const MODELS = {
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   researcher: "deepseek/deepseek-v4-pro-0813",
   reviewer: "anthropic/claude-opus-4.8",
+  // Cheap and vision-capable: this slot reads pixels, it does not reason.
+  vision: "openai/gpt-5.6-luna",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;
