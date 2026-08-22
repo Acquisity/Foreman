@@ -76,6 +76,26 @@ describe("repository targeting", () => {
       ).map(({ slug }) => slug),
       ["Acquisity/Foreman"]
     );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        JSON.stringify({
+          body: "see https://github.com/Acquisity/Foreman\nnext",
+        })
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "https://github.com/Acquisity/Foreman.v2 and https://github.com/Acquisity/Foreman.git."
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman.v2", "Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "ready at https://github.com/Acquisity/Foreman/pull/38?tab=files."
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
   });
 
   it("makes signed GitHub repository context authoritative", () => {

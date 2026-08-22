@@ -8,12 +8,17 @@ export const REPOSITORY_MARKER = "/workspace/.foreman/repository.json";
 
 const REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/;
-// The trailing boundary lists every delimiter a URL is quoted or wrapped in,
-// not just whitespace and punctuation. The Linear channel extracts from
-// `JSON.stringify(issue)`, where every URL ends at a double quote, so a
-// boundary that omitted it stamped nothing at all from a Linear session.
+// The repository name runs to the first character a repository name cannot
+// contain, with no boundary list: every delimiter a URL is ever quoted,
+// escaped, or wrapped in is outside the character class already. Enumerating
+// them instead missed the double quote and the backslash that
+// `JSON.stringify(issue)` puts after a URL on the Linear channel, and a lazy
+// capture stopped at the first dot, truncating `Acquisity/Foreman.v2` to
+// another repository that exists. Only a trailing dot needs trimming, because
+// a sentence can end on one and a repository name may contain one.
 const GITHUB_URL_PATTERN =
-  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!)\]}>"'|`])/giu;
+  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)/giu;
+const TRAILING_DOT_PATTERN = /\.+$/u;
 const SLUG_PATTERN =
   /(?<![A-Za-z0-9._/-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100})(?![A-Za-z0-9._/-])/gu;
 const GIT_SUFFIX_PATTERN = /\.git$/u;
@@ -55,7 +60,8 @@ export const parseRepository = (value: string): RepositoryTarget | null => {
 export const extractRepositoryUrls = (text: string): RepositoryTarget[] => {
   const repositories = new Map<string, RepositoryTarget>();
   for (const match of text.slice(0, 100_000).matchAll(GITHUB_URL_PATTERN)) {
-    const parsed = parseRepository(`${match[1]}/${match[2]}`);
+    const repo = (match[2] ?? "").replace(TRAILING_DOT_PATTERN, "");
+    const parsed = parseRepository(`${match[1]}/${repo}`);
     if (parsed) {
       repositories.set(parsed.slug.toLowerCase(), parsed);
     }
