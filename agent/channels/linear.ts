@@ -1,7 +1,7 @@
 import { connectLinearCredentials } from "@vercel/connect/eve";
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import { buildLinearContext } from "../lib/linear-context.js";
-import { extractRepositories, stampRepository } from "../lib/repository.js";
+import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { stampTrusted } from "../lib/trust.js";
 
 /**
@@ -21,7 +21,10 @@ export default linearChannel({
     if (context === null) {
       return null;
     }
-    const repositories = extractRepositories(
+    // URLs only: a bare `owner/repo` token in an issue title, description, or
+    // comment is indistinguishable from a file path like `channels/github.ts`,
+    // and stamping one binds the session to a repository that does not exist.
+    const repositories = extractRepositoryUrls(
       JSON.stringify(event.agentSession.issue ?? {})
     );
     const auth = stampTrusted(defaultLinearAuth(event));

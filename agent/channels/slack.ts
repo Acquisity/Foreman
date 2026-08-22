@@ -6,7 +6,7 @@ import {
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
-import { extractRepositories, stampRepository } from "../lib/repository.js";
+import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -31,6 +31,14 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * posting a status line and parking the turn on a consent flow nobody in an
  * intake channel can complete.
  *
+ * Only a full GitHub URL in the message selects the session repository. A bare
+ * `owner/repo` token is not extracted here, because prose cannot be told apart
+ * from a slug: `channels/github.ts` parses as owner `channels`, repo
+ * `github.ts`, and stamping it bound the session to a repository that does not
+ * exist, after which nothing could be pushed. The model still reads the slug
+ * out of the message and passes it to `prepare_repository`, which is the
+ * selection path the prompt already describes.
+ *
  * Mentions and direct messages run the same dispatch. eve only falls back to
  * its built-in handler for a surface this file leaves unauthored, and that
  * default stamps nothing: a DM dispatched through it carries no trust, no
@@ -52,7 +60,7 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
   if (auth === null) {
     return null;
   }
-  const repositories = extractRepositories(message.text);
+  const repositories = extractRepositoryUrls(message.text);
   const trusted = stampTrusted(auth);
   const [repository] = repositories;
   const stamped =

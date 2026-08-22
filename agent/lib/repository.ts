@@ -8,11 +8,22 @@ export const REPOSITORY_MARKER = "/workspace/.foreman/repository.json";
 
 const REPOSITORY_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100}$/;
+// The repository name runs to the first character a repository name cannot
+// contain, with no boundary list: every delimiter a URL is ever quoted,
+// escaped, or wrapped in is outside the character class already. Enumerating
+// them instead missed the double quote and the backslash that
+// `JSON.stringify(issue)` puts after a URL on the Linear channel, and a lazy
+// capture stopped at the first dot, truncating `Acquisity/Foreman.v2` to
+// another repository that exists. Only a trailing dot needs trimming, because
+// a sentence can end on one and a repository name may contain one.
 const GITHUB_URL_PATTERN =
-  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?(?=$|[\s/#?.,!)\]}])/giu;
+  /https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)/giu;
+const TRAILING_DOT_PATTERN = /\.+$/u;
 const SLUG_PATTERN =
   /(?<![A-Za-z0-9._/-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100})(?![A-Za-z0-9._/-])/gu;
-const GIT_SUFFIX_PATTERN = /\.git$/u;
+// Case-insensitive: a clone URL may carry `.GIT`, and GitHub does not host a
+// repository whose name ends in `.git` in any casing.
+const GIT_SUFFIX_PATTERN = /\.git$/iu;
 
 export interface RepositoryTarget {
   readonly owner: string;
@@ -37,15 +48,42 @@ export const parseRepository = (value: string): RepositoryTarget | null => {
   return { owner, repo, slug: `${owner}/${repo}` };
 };
 
-export const extractRepositories = (text: string): RepositoryTarget[] => {
+/**
+ * Repositories named by a full GitHub URL.
+ *
+ * @remarks
+ * This is the only extraction a non-webhook channel may promote to session
+ * authority. A bare `owner/repo` token cannot be told apart from ordinary
+ * prose: `channels/github.ts`, `lib/utils`, `and/or` and `24/7` all parse as
+ * slugs, and stamping one binds the session to a repository that does not
+ * exist. A `github.com/<owner>/<repo>` link carries the host, so it says
+ * "repository" and nothing else does.
+ */
+export const extractRepositoryUrls = (text: string): RepositoryTarget[] => {
   const repositories = new Map<string, RepositoryTarget>();
-  const bounded = text.slice(0, 100_000);
-  for (const match of bounded.matchAll(GITHUB_URL_PATTERN)) {
-    const parsed = parseRepository(`${match[1]}/${match[2]}`);
+  for (const match of text.slice(0, 100_000).matchAll(GITHUB_URL_PATTERN)) {
+    const repo = (match[2] ?? "").replace(TRAILING_DOT_PATTERN, "");
+    const parsed = parseRepository(`${match[1]}/${repo}`);
     if (parsed) {
       repositories.set(parsed.slug.toLowerCase(), parsed);
     }
   }
+  return [...repositories.values()];
+};
+
+/**
+ * Repositories named anywhere in a caller-supplied string, by URL or by a bare
+ * `owner/repo` slug. Use it for text the model deliberately passed as a
+ * repository argument, never for free text arriving from a channel.
+ */
+export const extractRepositories = (text: string): RepositoryTarget[] => {
+  const repositories = new Map<string, RepositoryTarget>(
+    extractRepositoryUrls(text).map((target) => [
+      target.slug.toLowerCase(),
+      target,
+    ])
+  );
+  const bounded = text.slice(0, 100_000);
   for (const match of bounded.matchAll(SLUG_PATTERN)) {
     const parsed = parseRepository(match[1] ?? "");
     if (parsed) {

@@ -4,6 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import { validateBranch } from "./github/git-remote.js";
 import {
   extractRepositories,
+  extractRepositoryUrls,
   parseRepository,
   remoteUrl,
   resolveRepository,
@@ -46,6 +47,60 @@ describe("repository targeting", () => {
     assert.throws(
       () => resolveRepositoryInput("Acquisity/Foreman and example/other", auth),
       AMBIGUOUS_REPOSITORY_PATTERN
+    );
+  });
+
+  it("never reads a channel repository out of a bare slug", () => {
+    const message =
+      "please begin work and use review bot loop skill but remember github tools are found in channels/github.ts";
+    assert.deepEqual(extractRepositoryUrls(message), []);
+    assert.deepEqual(
+      extractRepositories(message).map(({ slug }) => slug),
+      ["channels/github.ts"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "ship it from https://github.com/Acquisity/Foreman, see channels/github.ts"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        JSON.stringify({ url: "https://github.com/Acquisity/Foreman" })
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "<https://github.com/Acquisity/Foreman> and `https://github.com/Acquisity/Foreman`"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        JSON.stringify({
+          body: "see https://github.com/Acquisity/Foreman\nnext",
+        })
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "https://github.com/Acquisity/Foreman.v2 and https://github.com/Acquisity/Foreman.git."
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman.v2", "Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "ready at https://github.com/Acquisity/Foreman/pull/38?tab=files."
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "clone https://github.com/Acquisity/Foreman.GIT"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
     );
   });
 
