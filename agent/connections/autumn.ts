@@ -47,9 +47,12 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   authorization-code grant with PKCE: a one-time consent stores a refresh
  *   token, after which calls are non-interactive and auto-refreshing, and
  *   tokens are never exposed to the model.
- * - Grants are per user. Vercel Connect keys a stored grant by a subject it
- *   derives from the session principal, so each person consents once before
- *   Autumn answers in their sessions.
+ * - Grants are per principal, not per person. Vercel Connect keys a stored
+ *   grant by a subject it derives from the session principal, and a person
+ *   arrives under a different one on each surface (`slack:<team>:<user>` from
+ *   Slack, `linear:<user>` from a Linear agent session, their Vercel account
+ *   from the CLI). Consent is needed once per surface someone reads Autumn
+ *   from, not once per person.
  *
  *   This is a real gap on the Asks path, not a settled design: a ticket filed
  *   from Slack runs under the AIA requester, who has no Autumn account and
