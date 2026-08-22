@@ -37,7 +37,7 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 - `agent/lib/models.ts` owns global model defaults and overrides. Public tools are `read_agent_models` and `set_agent_models`.
 - `agent/lib/trust.ts` is the single trust authority. Shared repository knowledge and model writes use policies from `agent/lib/github/approval.ts`.
 - GitHub extension calls pass `owner` and `repo` explicitly. Never restore a fixed extension context.
-- Repository selection and validation live in `agent/lib/repository.ts`. GitHub channel hooks stamp signed webhook authority before the model runs.
+- Repository selection and validation live in `agent/lib/repository.ts`. GitHub channel hooks stamp signed webhook authority before the model runs. Slack and Linear stamp a session repository only from a full GitHub URL: a bare `owner/repo` token in free text cannot be told apart from a file path like `channels/github.ts`, and stamping one used to bind the session to a repository that does not exist and block every push. The model still reads the slug out of the request and passes it to `prepare_repository`. Only a signed webhook binds a push to one repository; an explicit authority is a default the request can override.
 - The root `prepare_repository` tool reuses GitHub's channel checkout or clones at runtime, then writes `/workspace/.foreman/repository.json`. Stations read the marker rather than assuming a path.
 - Handoff artifacts are ids, not inlined long documents. Artifact ids remain anchored, size-bounded, and write-once.
 - Pipeline stabilization is webhook-driven only. There is no reconciliation schedule, and no polling loop may be reintroduced.
