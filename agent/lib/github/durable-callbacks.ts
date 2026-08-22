@@ -27,8 +27,10 @@ import { intakeOnlyPolicy, pullRequestReadinessPolicy } from "./approval.js";
  */
 const CARRIER_INPUT = z.record(z.string(), z.unknown());
 
-/** Matches the extension's own truncation, which its dist applies to diffs. */
+/** Per-file patch limit, matching the one the extension's dist applies. */
 const MAX_PATCH_LENGTH = 4000;
+
+/** File body limit, matching the one the extension's dist applies. */
 const MAX_CONTENT_LENGTH = 20_000;
 
 const truncate = (text: string, limit: number) =>
