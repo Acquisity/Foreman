@@ -50,7 +50,16 @@ const READ_SCOPES = [
  * - No `denyUnattendedWrites` gate: with writes excluded at the grant, a
  *   later allowlist widening still fails at Autumn's API, and a third copy
  *   of the write-tool list would only drift out of sync with this one.
+ * - `resources` carries the RFC 8707 resource indicator. Autumn publishes
+ *   protected-resource metadata, which is what obliges a client to bind the
+ *   token to the MCP it is for. Whether Autumn rejects an unbound token is
+ *   unverified, and it costs nothing if it does not, but the failure mode it
+ *   prevents is the one Modem hit: consent succeeds, the auth server calls
+ *   the token valid, and every tool call 401s in a way that reads like
+ *   Autumn was never connected.
  */
+const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
+
 export default defineMcpClientConnection({
   auth: userConnect({
     connector: requireEnv(
@@ -58,7 +67,7 @@ export default defineMcpClientConnection({
       "mcp.useautumn.com/acquisity-foreman-autumn"
     ),
     principalType: "user",
-    tokenParams: { scopes: READ_SCOPES },
+    tokenParams: { resources: [AUTUMN_MCP_URL], scopes: READ_SCOPES },
   }),
   description:
     "Autumn billing provisioning, read-only: customers, their plans, add-ons, subscriptions and feature balances, the plan and feature catalog, entities, rewards, and request logs.",
@@ -80,5 +89,5 @@ export default defineMcpClientConnection({
       "searchRequestLogs",
     ],
   },
-  url: "https://mcp.useautumn.com/mcp",
+  url: AUTUMN_MCP_URL,
 });
