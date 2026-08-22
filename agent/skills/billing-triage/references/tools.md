@@ -1,6 +1,6 @@
 # Billing investigation tools
 
-Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, or from the tool's own definition in `agent/tools/`, except the Autumn section, which is marked separately because that connection does not exist yet.
+Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, from the tool's own definition in `agent/tools/`, or from eve's own built-in tool surface.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and an invented call fails in a way that reads like the customer has no data.
 
@@ -32,13 +32,17 @@ Connection coordinates, confirmed live: organization `acquisity`, database `acqu
 
 ## Autumn (`autumn__`)
 
-Not connected yet. There is no `agent/connections/autumn.ts`; only the connector is provisioned, as `AUTUMN_MCP_CONNECTOR` in `.env.example`. The names below come from the Autumn MCP server's own surface, not from an allowlist in this repository, and they are unverified here until the connection lands. Until then, every Autumn check is `Could not run: Autumn not connected`.
+`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` to find a customer id, `getCurrentOrganization` for the org the token is scoped to, and `queryRequestLogs` or `searchRequestLogs` when you need to see what Autumn was actually asked to do.
 
-`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances.
+Also allowlisted: `listRewards`, `getAgentRules`, `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
+
+Autumn is user-scoped, so a teammate who has never consented gets a sign-in failure rather than data. That is `Could not run`, not an empty result: never read it as the customer having no Autumn account.
+
+The server also exposes write tools that attach a plan, create a balance, grant a reward, or update a subscription. None are allowlisted, and the connection's OAuth grant carries no write scope, so none can move money or grant entitlement from here regardless of what a ticket asks for. This skill proposes; a human executes.
+
+`getOrCreateCustomer` reads like a getter and creates on a miss, so it is excluded as a write. The `preview*` tools are excluded too: they compute without applying, but each one stages an attach, a balance grant, a catalog change, or a subscription update.
 
 Line items for domains and inboxes are both named generically. The identifier is in the metadata, shaped `xxxxxxxxx{domain.co}`. Read metadata on every line item before counting or matching.
-
-Write tools exist on this server and are out of scope here: anything that attaches a plan, creates a balance, or updates a subscription moves money or grants entitlement. This skill proposes; a human executes.
 
 ## Stripe (`stripe__`)
 
