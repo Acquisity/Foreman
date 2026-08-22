@@ -60,12 +60,42 @@ const READ_SCOPES = [
  */
 const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
 
+/**
+ * The one Autumn grant every session borrows, as `<issuer>|<id>` matching the
+ * principal that consented (a Slack principal is `slack:<team>|slack:<team>:<user>`).
+ *
+ * @remarks
+ * Vercel Connect stores a grant per subject and derives that subject from the
+ * session principal, so by default an Asks ticket looks up a grant belonging to
+ * the AIA requester who typed the slash command. They have no Autumn account
+ * and their channel is intake-only, where {@link userConnect} denies a missing
+ * grant outright rather than showing a consent card nobody there can complete.
+ * Autumn would fail on every ticket it exists to answer.
+ *
+ * Pinning the subject makes one operator's consent serve every session, and
+ * eve refreshes that grant on its own from then on. The connection stays
+ * read-only, so what a borrowed grant can do is bounded by the token's scopes.
+ *
+ * Unset, the connection falls back to per-user grants and behaves like Stripe
+ * and Intercom, which have the same gap on this path and are not fixed here.
+ */
+const SHARED_GRANT = process.env.AUTUMN_GRANT_SUBJECT?.split("|");
+
 export default defineMcpClientConnection({
   auth: userConnect({
     connector: requireEnv(
       "AUTUMN_MCP_CONNECTOR",
       "mcp.useautumn.com/acquisity-foreman-autumn"
     ),
+    createSubject: (principal) => {
+      const [issuer, id] = SHARED_GRANT ?? [];
+      if (issuer !== undefined && id !== undefined) {
+        return { id, issuer, type: "user" };
+      }
+      return principal.type === "user"
+        ? { id: principal.id, issuer: principal.issuer, type: "user" }
+        : { type: "app" };
+    },
     principalType: "user",
     tokenParams: { resources: [AUTUMN_MCP_URL], scopes: READ_SCOPES },
   }),
