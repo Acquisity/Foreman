@@ -21,7 +21,6 @@ const INTAKE_OVERRIDE =
 const READINESS_OVERRIDE =
   /updatePullRequest:\s*\{\s*approval:\s*durableReadinessApproval\s*\}/u;
 const CALLBACK_VALUE = /(?:approval|toModelOutput):\s*([\w.]+)/gu;
-const DURABLE_NAME = /^durable/u;
 /**
  * The five tools whose descriptors carry the extension's own `toModelOutput`.
  * Left alone, that callback has no durable descriptor, and eve 0.44 drops the
@@ -81,10 +80,15 @@ describe("github extension config", () => {
 
   it("passes only durable callbacks, never a policy written elsewhere", () => {
     const values = [...call.matchAll(CALLBACK_VALUE)].map(([, value]) => value);
-    assert.equal(values.length, MODEL_OUTPUT_TOOLS.length + 2);
-    for (const value of values) {
-      assert.match(value, DURABLE_NAME);
-    }
+    assert.deepEqual(values, [
+      "durableModelOutput", // compareCommits
+      "durableIntakeOnlyApproval", // createPullRequest
+      "durableModelOutput", // getCommit
+      "durableModelOutput", // getFileContent
+      "durableModelOutput", // getPullRequestContext
+      "durableModelOutput", // listPullRequestFiles
+      "durableReadinessApproval", // updatePullRequest
+    ]);
   });
 });
 
