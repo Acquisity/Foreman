@@ -1,12 +1,13 @@
 import { defineSchedule } from "eve/schedules";
 import slack from "../channels/slack.js";
 import { readDocument, SLA_REPORT_PREFIX, writeDocument } from "../lib/blob.js";
-import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
+import {
+  OWNER_USER_ID,
+  SLACK_INTAKE_ONLY_CHANNELS,
+  SLACK_TEAM_ID,
+} from "../lib/constants.js";
 import { slaWindowStart } from "../lib/sla-window.js";
 import { stampIntakeOnly, UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
-
-const SLACK_TEAM_ID = "T0A9AUZJXC2";
-const OWNER_USER_ID = "U0BBHB86PUY";
 
 /** Who each channel's report tags. Support is cross-cutting, so it tags both. */
 const JAMES = "<@U0BA7JK9XRV>";

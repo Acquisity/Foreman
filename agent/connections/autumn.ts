@@ -1,5 +1,5 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
+import { OWNER_GRANT_SUBJECT, requireEnv } from "../lib/constants.js";
 import { userConnect } from "../lib/user-connect.js";
 
 /**
@@ -27,6 +27,8 @@ const READ_SCOPES = [
   "analytics:read",
 ];
 
+const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
+
 /**
  * Autumn MCP connection for what a customer was actually provisioned.
  *
@@ -35,11 +37,22 @@ const READ_SCOPES = [
  *   Autumn's auth server at `https://api.useautumn.com/api/auth`); uses the
  *   authorization-code grant with PKCE: a one-time consent stores a refresh
  *   token, after which calls are non-interactive and auto-refreshing, and
- *   tokens are never exposed to the model. Every teammate needs that consent
- *   once before Autumn answers in their sessions.
+ *   tokens are never exposed to the model.
+ * - Every session reads through the owner's grant, never the caller's.
+ *   Connect stores a grant per subject and derives that subject from the
+ *   session principal, so by default an Asks ticket would look up a grant
+ *   belonging to the AIA teammate who typed the slash command. They have no
+ *   Autumn account, and their channel is intake-only, where {@link userConnect}
+ *   denies a missing grant outright rather than showing a consent card nobody
+ *   there can complete. Autumn would fail on every ticket it exists to answer,
+ *   and refreshing would not help: the owner's refresh token is never
+ *   consulted, because it belongs to a different subject. Pinning
+ *   {@link OWNER_GRANT_SUBJECT} makes one consent serve every session, for the
+ *   same reason the SLA schedule runs as the owner. Every read is attributed
+ *   to the owner and dies with their grant, which is the accepted trade.
  * - Read-only twice over. {@link READ_SCOPES} narrows the grant itself, and
  *   the allowlist below narrows what the model can discover, built from the
- *   server's live tool list.
+ *   server's live tool list. That bound is what makes a borrowed grant safe.
  * - `getOrCreateCustomer` is excluded: it reads like a getter and creates on
  *   a miss, so it is a write.
  * - The `preview*` tools compute without applying, confirmed against the
@@ -58,44 +71,13 @@ const READ_SCOPES = [
  *   the token valid, and every tool call 401s in a way that reads like
  *   Autumn was never connected.
  */
-const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
-
-/**
- * The one Autumn grant every session borrows, as `<issuer>|<id>` matching the
- * principal that consented (a Slack principal is `slack:<team>|slack:<team>:<user>`).
- *
- * @remarks
- * Vercel Connect stores a grant per subject and derives that subject from the
- * session principal, so by default an Asks ticket looks up a grant belonging to
- * the AIA requester who typed the slash command. They have no Autumn account
- * and their channel is intake-only, where {@link userConnect} denies a missing
- * grant outright rather than showing a consent card nobody there can complete.
- * Autumn would fail on every ticket it exists to answer.
- *
- * Pinning the subject makes one operator's consent serve every session, and
- * eve refreshes that grant on its own from then on. The connection stays
- * read-only, so what a borrowed grant can do is bounded by the token's scopes.
- *
- * Unset, the connection falls back to per-user grants and behaves like Stripe
- * and Intercom, which have the same gap on this path and are not fixed here.
- */
-const SHARED_GRANT = process.env.AUTUMN_GRANT_SUBJECT?.split("|");
-
 export default defineMcpClientConnection({
   auth: userConnect({
     connector: requireEnv(
       "AUTUMN_MCP_CONNECTOR",
       "mcp.useautumn.com/acquisity-foreman-autumn"
     ),
-    createSubject: (principal) => {
-      const [issuer, id] = SHARED_GRANT ?? [];
-      if (issuer !== undefined && id !== undefined) {
-        return { id, issuer, type: "user" };
-      }
-      return principal.type === "user"
-        ? { id: principal.id, issuer: principal.issuer, type: "user" }
-        : { type: "app" };
-    },
+    createSubject: () => ({ ...OWNER_GRANT_SUBJECT, type: "user" }),
     principalType: "user",
     tokenParams: { resources: [AUTUMN_MCP_URL], scopes: READ_SCOPES },
   }),

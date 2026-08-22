@@ -76,6 +76,30 @@ export const SLACK_INTAKE_ONLY_CHANNELS = parseIntakeOnlyChannels(
   process.env.SLACK_INTAKE_ONLY_CHANNELS
 );
 
+/** Acquisity's Slack workspace, and the owner within it. */
+export const SLACK_TEAM_ID = "T0A9AUZJXC2";
+export const OWNER_USER_ID = "U0BBHB86PUY";
+
+/**
+ * The Vercel Connect grant subject for the owner's Slack principal.
+ *
+ * @remarks
+ * Connect stores a grant per subject and derives that subject from the session
+ * principal, so a user-scoped connection only answers for someone who has
+ * consented. Two places need the owner's subject specifically. The SLA
+ * schedule builds an auth context out of these ids so its turns reuse the
+ * owner's Sentry and Axiom grants, and the Autumn connection pins this subject
+ * so requester-facing sessions borrow the owner's grant rather than looking up
+ * one belonging to a teammate who has no Autumn account.
+ *
+ * The shape matches what an inbound Slack message builds, which is what makes
+ * the lookup hit: change either id and every stored grant keyed on it is lost.
+ */
+export const OWNER_GRANT_SUBJECT = {
+  id: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
+  issuer: `slack:${SLACK_TEAM_ID}`,
+} as const;
+
 /**
  * Shared Linear authorization via Vercel Connect.
  *
