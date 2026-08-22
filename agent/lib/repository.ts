@@ -21,7 +21,9 @@ const GITHUB_URL_PATTERN =
 const TRAILING_DOT_PATTERN = /\.+$/u;
 const SLUG_PATTERN =
   /(?<![A-Za-z0-9._/-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9._-]{1,100})(?![A-Za-z0-9._/-])/gu;
-const GIT_SUFFIX_PATTERN = /\.git$/u;
+// Case-insensitive: a clone URL may carry `.GIT`, and GitHub does not host a
+// repository whose name ends in `.git` in any casing.
+const GIT_SUFFIX_PATTERN = /\.git$/iu;
 
 export interface RepositoryTarget {
   readonly owner: string;

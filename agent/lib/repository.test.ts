@@ -96,6 +96,12 @@ describe("repository targeting", () => {
       ).map(({ slug }) => slug),
       ["Acquisity/Foreman"]
     );
+    assert.deepEqual(
+      extractRepositoryUrls(
+        "clone https://github.com/Acquisity/Foreman.GIT"
+      ).map(({ slug }) => slug),
+      ["Acquisity/Foreman"]
+    );
   });
 
   it("makes signed GitHub repository context authoritative", () => {
