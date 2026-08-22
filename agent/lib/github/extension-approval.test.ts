@@ -17,9 +17,22 @@ import { pullRequestReadinessPolicy } from "./approval.js";
 const REQUIRE_APPROVAL_FALSE = /requireApproval:\s*false/u;
 const MERGE_TOOL = /"\w*[Mm]erge\w*"/u;
 const INTAKE_OVERRIDE =
-  /createPullRequest:\s*\{\s*approval:\s*intakeOnlyPolicy\s*\}/u;
+  /createPullRequest:\s*\{\s*approval:\s*durableIntakeOnlyApproval\s*\}/u;
 const READINESS_OVERRIDE =
-  /updatePullRequest:\s*\{\s*approval:\s*pullRequestReadinessPolicy\s*\}/u;
+  /updatePullRequest:\s*\{\s*approval:\s*durableReadinessApproval\s*\}/u;
+const CALLBACK_VALUE = /(?:approval|toModelOutput):\s*([\w.]+)/gu;
+/**
+ * The five tools whose descriptors carry the extension's own `toModelOutput`.
+ * Left alone, that callback has no durable descriptor, and eve 0.44 drops the
+ * whole 31-tool map rather than the one entry.
+ */
+const MODEL_OUTPUT_TOOLS = [
+  "compareCommits",
+  "getCommit",
+  "getFileContent",
+  "getPullRequestContext",
+  "listPullRequestFiles",
+];
 const DOC_ONLY_PHRASE = /load-bearing/u;
 
 const source = readFileSync(
@@ -51,6 +64,31 @@ describe("github extension config", () => {
 
   it("gates pull request creation on the intake-only rule", () => {
     assert.match(call, INTAKE_OVERRIDE);
+  });
+
+  it("overrides the model output of every tool that ships its own", () => {
+    for (const tool of MODEL_OUTPUT_TOOLS) {
+      assert.match(
+        call,
+        new RegExp(
+          `${tool}:\\s*\\{\\s*toModelOutput:\\s*durableModelOutput\\s*\\}`,
+          "u"
+        )
+      );
+    }
+  });
+
+  it("passes only durable callbacks, never a policy written elsewhere", () => {
+    const values = [...call.matchAll(CALLBACK_VALUE)].map(([, value]) => value);
+    assert.deepEqual(values, [
+      "durableModelOutput", // compareCommits
+      "durableIntakeOnlyApproval", // createPullRequest
+      "durableModelOutput", // getCommit
+      "durableModelOutput", // getFileContent
+      "durableModelOutput", // getPullRequestContext
+      "durableModelOutput", // listPullRequestFiles
+      "durableReadinessApproval", // updatePullRequest
+    ]);
   });
 });
 
