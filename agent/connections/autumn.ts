@@ -10,9 +10,16 @@ import { userConnect } from "../lib/user-connect.js";
  * the tool filter.
  *
  * @remarks
- * `rewards:read` is published by the auth server
- * (`/.well-known/oauth-authorization-server`) but not by the MCP resource
- * metadata; `listRewards` needs it.
+ * Taken from the auth server's `/.well-known/oauth-authorization-server`, not
+ * from the MCP resource metadata, which is incomplete: it omits `rewards:read`
+ * even though `listRewards` needs it. Since that mapping cannot be trusted,
+ * every read scope the connector grants is requested rather than the subset
+ * the allowlist looks like it needs. `migrations:read` and `platform:read` are
+ * the tools whose backing scope is not deducible (`getAgentRules`,
+ * `queryRequestLogs`, `searchRequestLogs`), and guessing wrong would 403 at
+ * call time in a way that reads like the customer having no data. Breadth here
+ * costs nothing: the point is that no scope is a write, not that reads are
+ * minimal.
  */
 const READ_SCOPES = [
   "openid",
@@ -24,7 +31,9 @@ const READ_SCOPES = [
   "rewards:read",
   "balances:read",
   "billing:read",
+  "migrations:read",
   "analytics:read",
+  "platform:read",
 ];
 
 const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
