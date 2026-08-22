@@ -1,5 +1,5 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { OWNER_GRANT_SUBJECT, requireEnv } from "../lib/constants.js";
+import { requireEnv } from "../lib/constants.js";
 import { userConnect } from "../lib/user-connect.js";
 
 /**
@@ -47,18 +47,21 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   authorization-code grant with PKCE: a one-time consent stores a refresh
  *   token, after which calls are non-interactive and auto-refreshing, and
  *   tokens are never exposed to the model.
- * - Every session reads through the owner's grant, never the caller's.
- *   Connect stores a grant per subject and derives that subject from the
- *   session principal, so by default an Asks ticket would look up a grant
- *   belonging to the AIA teammate who typed the slash command. They have no
- *   Autumn account, and their channel is intake-only, where {@link userConnect}
- *   denies a missing grant outright rather than showing a consent card nobody
- *   there can complete. Autumn would fail on every ticket it exists to answer,
- *   and refreshing would not help: the owner's refresh token is never
- *   consulted, because it belongs to a different subject. Pinning
- *   {@link OWNER_GRANT_SUBJECT} makes one consent serve every session, for the
- *   same reason the SLA schedule runs as the owner. Every read is attributed
- *   to the owner and dies with their grant, which is the accepted trade.
+ * - Grants are per principal, not per person. Vercel Connect keys a stored
+ *   grant by a subject it derives from the session principal, and a person
+ *   arrives under a different one on each surface (`slack:<team>:<user>` from
+ *   Slack, `linear:<user>` from a Linear agent session, their Vercel account
+ *   from the CLI). Consent is needed once per surface someone reads Autumn
+ *   from, not once per person.
+ *
+ *   This is a real gap on the Asks path, not a settled design: a ticket filed
+ *   from Slack runs under the AIA requester, who has no Autumn account and
+ *   whose channel is intake-only, where {@link userConnect} denies rather than
+ *   prompting. Pinning the subject with `createSubject` was tried and reverted:
+ *   consent completed and the callback landed, but Connect then reported the
+ *   user unauthorized, because the issuer-prefixed subject it was handed is not
+ *   where the grant had been stored. Stripe and Intercom have the same gap.
+ *   Solve it against a verified mechanism rather than a reasoned-about one.
  * - Read-only twice over. {@link READ_SCOPES} narrows the grant itself, and
  *   the allowlist below narrows what the model can discover, built from the
  *   server's live tool list. That bound is what makes a borrowed grant safe.
@@ -86,7 +89,6 @@ export default defineMcpClientConnection({
       "AUTUMN_MCP_CONNECTOR",
       "mcp.useautumn.com/acquisity-foreman-autumn"
     ),
-    createSubject: () => ({ ...OWNER_GRANT_SUBJECT, type: "user" }),
     principalType: "user",
     tokenParams: { resources: [AUTUMN_MCP_URL], scopes: READ_SCOPES },
   }),
