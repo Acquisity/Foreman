@@ -1,9 +1,10 @@
 import githubExtension from "@github-tools/eve-extension";
-import {
-  intakeOnlyPolicy,
-  pullRequestReadinessPolicy,
-} from "../lib/github/approval.js";
 import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
+import {
+  durableIntakeOnlyApproval,
+  durableModelOutput,
+  durableReadinessApproval,
+} from "../lib/github/durable-callbacks.js";
 
 /**
  * GitHub tool surface for the orchestrator, mounted as an eve extension.
@@ -32,6 +33,12 @@ import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
  *   `requireApproval` to the per-tool object form would silently re-gate every
  *   tool absent from the object with `always()`, so the override is the safe
  *   place for a per-tool rule.
+ * - Every callback in `overrides` comes from `durable-callbacks.ts`, and the
+ *   five tools that ship their own `toModelOutput` are overridden for no other
+ *   reason. eve 0.44 drops the whole 31-tool map when one callback lacks a
+ *   durable descriptor, and only a callback authored inline in a `defineTool`
+ *   call has one. Passing a policy or a projection written anywhere else here
+ *   removes the GitHub surface from every session, silently.
  */
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
@@ -69,8 +76,13 @@ export default githubExtension({
     "getCiFailureContext",
   ],
   overrides: {
-    createPullRequest: { approval: intakeOnlyPolicy },
-    updatePullRequest: { approval: pullRequestReadinessPolicy },
+    compareCommits: { toModelOutput: durableModelOutput },
+    createPullRequest: { approval: durableIntakeOnlyApproval },
+    getCommit: { toModelOutput: durableModelOutput },
+    getFileContent: { toModelOutput: durableModelOutput },
+    getPullRequestContext: { toModelOutput: durableModelOutput },
+    listPullRequestFiles: { toModelOutput: durableModelOutput },
+    updatePullRequest: { approval: durableReadinessApproval },
   },
   requireApproval: false,
 });
