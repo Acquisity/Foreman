@@ -38,7 +38,9 @@ Also allowlisted: `listRewards`, `getAgentRules`, `dateToEpochMilliseconds`, `ep
 
 Autumn is user-scoped, so a teammate who has never consented gets a sign-in failure rather than data. That is `Could not run`, not an empty result: never read it as the customer having no Autumn account.
 
-`getOrCreateCustomer` reads like a getter and creates on a miss, so it is excluded as a write. The `preview*` tools are excluded too: they compute without applying, but each one stages an attach, a balance grant, a catalog change, or a subscription update, and this skill proposes rather than executes.
+The server also exposes write tools that attach a plan, create a balance, grant a reward, or update a subscription. None are allowlisted, and the connection's OAuth grant carries no write scope, so none can move money or grant entitlement from here regardless of what a ticket asks for. This skill proposes; a human executes.
+
+`getOrCreateCustomer` reads like a getter and creates on a miss, so it is excluded as a write. The `preview*` tools are excluded too: they compute without applying, but each one stages an attach, a balance grant, a catalog change, or a subscription update.
 
 Line items for domains and inboxes are both named generically. The identifier is in the metadata, shaped `xxxxxxxxx{domain.co}`. Read metadata on every line item before counting or matching.
 
