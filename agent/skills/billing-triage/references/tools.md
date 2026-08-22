@@ -1,6 +1,6 @@
 # Billing investigation tools
 
-Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, or from the tool's own definition in `agent/tools/`.
+Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, from the tool's own definition in `agent/tools/`, or from eve's own built-in tool surface.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and an invented call fails in a way that reads like the customer has no data.
 
