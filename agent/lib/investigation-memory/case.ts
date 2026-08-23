@@ -130,7 +130,7 @@ const MAX_DECODE_PASSES = 5;
  */
 function fullyDecoded(value: string): string {
   let current = value;
-  for (let pass = 0; pass < MAX_DECODE_PASSES; pass++) {
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
     let next: string;
     try {
       next = decodeURIComponent(current);
