@@ -207,7 +207,7 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
  * collaborator is exactly the caller the two must not agree on.
  *
  * Stamped only on operational surfaces that run triage: Linear Agent Sessions,
- * the routed Slack intake channels, and the local dev TUI. Never on GitHub
+ * every Slack surface the app is invited into, and the local dev TUI. Never on GitHub
  * sessions, never on unattended factory runs, and never on schedules.
  */
 export const INVESTIGATION_MEMORY_ATTRIBUTE = "investigationMemory";
