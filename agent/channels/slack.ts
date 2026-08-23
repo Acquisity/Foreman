@@ -8,7 +8,11 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { slackIntakeContext } from "../lib/slack-intake.js";
-import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
+import {
+  stampIntakeOnly,
+  stampInvestigationMemory,
+  stampTrusted,
+} from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -55,10 +59,16 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
   const repositories = extractRepositoryUrls(message.text);
   const trusted = stampTrusted(auth);
   const [repository] = repositories;
-  const stamped =
+  const withRepository =
     repositories.length === 1 && repository
       ? stampRepository(trusted, repository.slug, "explicit")
       : trusted;
+  // Investigation memory follows the same gate as trust here: the app is only
+  // invited into Acquisity channels, so channel membership is the boundary.
+  // Restricting it to the routed intake channels was tighter than the design
+  // asked for and left developer channels silently without history, which
+  // reads as memory being broken rather than being off.
+  const stamped = stampInvestigationMemory(withRepository);
   return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
     ? {
         auth: stampIntakeOnly(stamped),

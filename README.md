@@ -54,7 +54,7 @@ There is no deployment-wide repository setting.
 
 ## Durable state
 
-All durable state lives in one Vercel Blob store. Reserved prefixes are registered in `agent/lib/blob.ts`.
+Durable documents live in one Vercel Blob store. Reserved prefixes are registered in `agent/lib/blob.ts`. Investigation memory is separate, in its own Postgres database.
 
 - `repository-knowledge/<repository-hash>.md` stores verified repository conventions and recurring build or review facts. Reads fall back to the matching legacy `factory-brain/` document until the next trusted write migrates it.
 - `pipeline-runs/` stores repository-and-source or repository-and-PR state, including Linear context, head SHA, stage, processed feedback, and blocker history.
@@ -62,6 +62,8 @@ All durable state lives in one Vercel Blob store. Reserved prefixes are register
 - `user-preferences/` is principal-scoped. Supermemory supports broader attended-session recall, but neither is repository authority.
 - `artifacts/` stores size-bounded, write-once handoff documents between stations.
 - `sla-report/` stores the daily SLA report dispatch marker.
+
+Completed triage investigations are indexed in a private Foreman-owned Postgres database, reached through `FOREMAN_MEMORY_DATABASE_URL` and never through the read-only Neon MCP connection. The schema lives in `migrations/` and applies with `pnpm db:migrate`. It holds sanitized case patterns, not customer data: PlanetScale remains the only production database and the only source of current blast radius. Access is fail-closed and stamped per channel, so GitHub sessions and unattended runs cannot read or write it.
 
 ## Schedules
 
@@ -78,6 +80,7 @@ All durable state lives in one Vercel Blob store. Reserved prefixes are register
 | `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
+| `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 
 See [.env.example](.env.example) for all MCP connection UIDs. No repository or setup command is configured through the environment.

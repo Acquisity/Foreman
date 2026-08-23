@@ -37,6 +37,8 @@ Readiness requires all of: internal approval for the current head, passing requi
 
 `agent/lib/trust.ts` is the sole caller-trust authority. Autonomous runs are denied writes to shared repository knowledge, global model configuration, and write-capable non-GitHub connections. Trusted attended callers write directly; other callers receive approval prompts.
 
+Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
+
 ## Storage
 
 All Blob namespaces are registered in `agent/lib/blob.ts`.
@@ -47,7 +49,9 @@ All Blob namespaces are registered in `agent/lib/blob.ts`.
 - `user-preferences/<principal-hash>.md`: private principal preferences.
 - `artifacts/<validated-id>.md`: write-once station handoffs.
 
-Supermemory is available for broader attended-session recall, never as repository authority or autonomous shared memory.
+Supermemory is available for broader attended-session recall, never as repository authority or autonomous shared memory, and never the backing store for investigation memory.
+
+Investigation memory is a private Foreman-owned Postgres database, separate from Blob, from Acquisity production data, and from the read-only `neon__*` MCP connection. `FOREMAN_MEMORY_DATABASE_URL` is server-side only. `migrations/` holds the schema, applied explicitly with `pnpm db:migrate`, never at agent startup. Each completed triage investigation has one active revision, scoped by the tenant key plus one primary feature derived from the ticket's Linear project, with evidence-backed affected features and dependency keys alongside it. Corrections insert a new revision and supersede the old one in the same transaction; nothing is deleted, so a ticket accumulates rows and exactly one of them is active. Rows are meant to carry sanitized patterns only. The tool boundary enforces what a pattern can enforce, and only over free text: bounded lengths, and rejection of email addresses, organization and user ids, connection strings, and credential-shaped tokens. The evidence fields are deliberately looser, because the identifier rule cannot tell an organization id from a Sentry request id or an Inngest run id: evidence handles, error signatures, code paths, and symptoms accept opaque identifiers, while the prose that describes the customer's situation does not. The source ticket and document links are only bounded and shape-checked. They point at our own Linear and are written by an authorized triage session, so there is no adversary to harden them against. Nothing there recognizes an arbitrary production row or log line, so keeping those out is the triage procedure's job, and they belong in the ticket's `Triage investigation` document. `agent/lib/investigation-memory/` owns the taxonomy, the schemas, and the store.
 
 ## Verification
 

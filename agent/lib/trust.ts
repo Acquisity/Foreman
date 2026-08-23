@@ -194,3 +194,51 @@ export function stampIntakeOnly(auth: SessionAuthContext): SessionAuthContext {
 export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[INTAKE_ONLY_ATTRIBUTE] === "true";
 }
+
+/**
+ * Auth attribute marking a session authorized to read and write investigation
+ * memory.
+ *
+ * @remarks
+ * Deliberately separate from {@link TRUSTED_ATTRIBUTE}. Trust answers whether
+ * a caller may write shared repository configuration; this answers whether
+ * they may read Acquisity's internal customer-support investigation history,
+ * which is a narrower question with a different answer. A trusted GitHub
+ * collaborator is exactly the caller the two must not agree on.
+ *
+ * Stamped only on operational surfaces that run triage: Linear Agent Sessions,
+ * every Slack surface the app is invited into, and the local dev TUI. Never on GitHub
+ * sessions, never on unattended factory runs, and never on schedules.
+ */
+export const INVESTIGATION_MEMORY_ATTRIBUTE = "investigationMemory";
+
+/**
+ * Returns a copy of `auth` carrying the {@link INVESTIGATION_MEMORY_ATTRIBUTE}
+ * stamp.
+ */
+export function stampInvestigationMemory(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: {
+      ...auth.attributes,
+      [INVESTIGATION_MEMORY_ATTRIBUTE]: "true",
+    },
+  };
+}
+
+/**
+ * Whether the dispatching channel authorized this session for investigation
+ * memory. Fail-closed: an unstamped session, and every session that predates
+ * the stamp, reads nothing.
+ */
+export function canUseInvestigationMemory(
+  auth: SessionAuthContext | null
+): boolean {
+  return (
+    auth !== null &&
+    auth.attributes[INVESTIGATION_MEMORY_ATTRIBUTE] === "true" &&
+    !isUnattended(auth)
+  );
+}

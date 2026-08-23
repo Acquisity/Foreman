@@ -22,6 +22,7 @@ pnpm build
 pnpm eval
 pnpm test
 pnpm validate
+pnpm db:migrate
 npx eve info
 ```
 
@@ -70,6 +71,11 @@ Verify with `pnpm validate`, then exercise both direct and factory paths in `pnp
 - Pipeline state is repository-and-scope bound. It stores current head, processed feedback, readiness signals, and blocker history. Ignore stale events, deduplicate stable ids, and escalate on the third unchanged blocker set.
 - Per-user preferences derive keys from `ctx.session.auth.current`; never accept a principal from model input and never store a repository target as a preference.
 - Supermemory is attended-session recall, never repository authority or autonomous shared memory.
+- Investigation memory is Foreman's own Postgres, reached only through `FOREMAN_MEMORY_DATABASE_URL` and the tools in `agent/tools/*_investigation_*.ts`. It is not repository knowledge, not user preferences, not pipeline state, and not the read-only `neon__*` MCP connection, which stays unrelated to memory. PlanetScale remains the only production and customer-data database, and the only source of a current blast radius: a stored affected count is a dated figure from one past investigation, never the current one.
+- Investigation-memory access is its own stamp in `agent/lib/trust.ts`, deliberately narrower than `trusted`. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it. GitHub sessions, unattended factory runs, and schedules never do, and an unstamped session reads nothing. Writes additionally require an attended session and are denied, never parked.
+- A case's product area comes from the ticket's Linear project through the mapping in `agent/lib/investigation-memory/scope.ts`, never from a symptom, a title, a repository, or an environment variable. An unmapped project records nothing and routes to Aaron Fraga as the triage skill already requires. There is no generic `shared` scope: one case has one primary feature, plus evidence-backed affected features and dependency keys.
+- The shared case store holds sanitized patterns. Customer emails, organization and user ids, production rows, logs, attachments, and credentials are rejected at the tool boundary and stay in the ticket's `Triage investigation` document. Corrections supersede prior conclusions without deleting them.
+- Retrieved cases are historical analogies, never current truth. They can raise a possible-wider-incident signal; they cannot declare an outage, mark a duplicate, pick a master, or set severity. A memory failure never holds a ticket or changes a verdict.
 - Any regex built from data must escape literals and bound input length.
 
 ## Before committing

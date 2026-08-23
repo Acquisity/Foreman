@@ -2,7 +2,7 @@ import { connectLinearCredentials } from "@vercel/connect/eve";
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
-import { stampTrusted } from "../lib/trust.js";
+import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
  * Linear channel: Agent Sessions in, Agent Activities out, via Vercel Connect.
@@ -27,7 +27,12 @@ export default linearChannel({
     const repositories = extractRepositoryUrls(
       JSON.stringify(event.agentSession.issue ?? {})
     );
-    const auth = stampTrusted(defaultLinearAuth(event));
+    // Every Agent Session is opened by a workspace member, which is the same
+    // gate triage itself runs behind, so Linear is an authorized investigation
+    // memory surface.
+    const auth = stampInvestigationMemory(
+      stampTrusted(defaultLinearAuth(event))
+    );
     const [repository] = repositories;
     return {
       auth:

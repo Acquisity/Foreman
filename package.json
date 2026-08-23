@@ -12,6 +12,7 @@
   "scripts": {
     "build": "eve build",
     "check": "ultracite check",
+    "db:migrate": "tsx scripts/migrate.ts",
     "dev": "eve dev",
     "eval": "eve eval",
     "fix": "ultracite fix",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@agent-browser/eve": "^0.34.0",
     "@github-tools/eve-extension": "^0.3.2",
+    "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.8.0",
     "@vercel/connect": "0.8.0",
     "@vercel/sandbox": "^3.0.0",
