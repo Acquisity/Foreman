@@ -157,6 +157,38 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, true);
   });
 
+  await t.test("keeps the identifiers the evidence is made of", () => {
+    const id = "3f8b1c2d-4e5f-4a6b-8c9d-0e1f2a3b4c5d";
+    for (const patch of [
+      { errorSignatures: [`InstantlyRateLimit: 429 req_id=${id}`] },
+      { codePaths: [`apps/api/src/send.ts sendBatch (run ${id})`] },
+      { symptoms: [`Banner reads: request ${id} failed`] },
+    ]) {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, ...patch }).success,
+        true,
+        JSON.stringify(patch)
+      );
+    }
+  });
+
+  await t.test("still refuses identity in the prose fields", () => {
+    const id = "3f8b1c2d-4e5f-4a6b-8c9d-0e1f2a3b4c5d";
+    for (const patch of [
+      { rootCause: `Org ${id} lost every send.` },
+      { ruledOut: [`Not org-specific: ${id} was fine`] },
+      { claim: "jane.doe@example.com says sends stopped." },
+      // A credential is refused everywhere, evidence fields included.
+      { errorSignatures: ["auth failed with sk_live_abcdef1234567890"] },
+    ]) {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, ...patch }).success,
+        false,
+        JSON.stringify(patch)
+      );
+    }
+  });
+
   await t.test("accepts ordinary Linear links", () => {
     const result = casePayloadSchema.safeParse({
       ...payload,

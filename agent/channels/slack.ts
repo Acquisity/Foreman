@@ -7,10 +7,7 @@ import {
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
-import {
-  resolveSlackIntakeWorkflow,
-  slackIntakeContext,
-} from "../lib/slack-intake.js";
+import { slackIntakeContext } from "../lib/slack-intake.js";
 import {
   stampIntakeOnly,
   stampInvestigationMemory,
@@ -66,13 +63,12 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
     repositories.length === 1 && repository
       ? stampRepository(trusted, repository.slug, "explicit")
       : trusted;
-  // Investigation memory is authorized per channel, not per workspace: the
-  // routed intake channels are where triage runs, and everywhere else the app
-  // happens to be invited stays fail-closed until someone routes it too.
-  const stamped =
-    resolveSlackIntakeWorkflow(message.channelId) === undefined
-      ? withRepository
-      : stampInvestigationMemory(withRepository);
+  // Investigation memory follows the same gate as trust here: the app is only
+  // invited into Acquisity channels, so channel membership is the boundary.
+  // Restricting it to the routed intake channels was tighter than the design
+  // asked for and left developer channels silently without history, which
+  // reads as memory being broken rather than being off.
+  const stamped = stampInvestigationMemory(withRepository);
   return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
     ? {
         auth: stampIntakeOnly(stamped),

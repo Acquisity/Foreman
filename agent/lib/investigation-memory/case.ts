@@ -97,6 +97,14 @@ export function forbiddenReason(
  * Bounded free text that must pass the data-minimization guards. Exported so
  * anything else the model writes into shared memory, a correction reason
  * included, goes through the same policy rather than a looser copy of it.
+ *
+ * @remarks
+ * `allowIdentifiers` exists because the identifier rule cannot tell an
+ * organization id from a Sentry request id or an Inngest run id, and the
+ * evidence fields are made of the latter. Applying it there rejected the whole
+ * case over the very details worth recording, which would have left the store
+ * quietly empty rather than leaking less. It stays on the fields that describe
+ * the customer's situation in prose, which is where naming one would happen.
  */
 export const cleanText = (max: number, allowIdentifiers = false) =>
   z
@@ -146,7 +154,7 @@ export const casePayloadSchema = z
     claim: cleanText(400).describe(
       "The Step 4.1 testable claim, in one sentence."
     ),
-    codePaths: cleanList(10, 200).describe(
+    codePaths: cleanList(10, 200, true).describe(
       "Files and functions the claim runs through, from Step 4.2."
     ),
     commitSha: z
@@ -179,7 +187,7 @@ export const casePayloadSchema = z
       .describe(
         "Shared systems involved: instantly, webhooks, inngest, authentication, billing."
       ),
-    errorSignatures: cleanList(8, 200).describe(
+    errorSignatures: cleanList(8, 200, true).describe(
       "Error identifiers or messages with secrets and identifiers removed."
     ),
     evidenceRefs: cleanList(10, 200, true).describe(
@@ -204,7 +212,7 @@ export const casePayloadSchema = z
       .trim()
       .regex(/^[A-Z]{2,10}-\d{1,9}$/, "A Linear identifier such as ENG-12345."),
     sourceIssueUrl: sourceUrl(),
-    symptoms: cleanList(8, 200).describe(
+    symptoms: cleanList(8, 200, true).describe(
       "What the user saw, in the product's own words."
     ),
   })
