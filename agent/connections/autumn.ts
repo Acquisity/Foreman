@@ -12,9 +12,10 @@ import { userConnect } from "../lib/user-connect.js";
  * @remarks
  * Autumn's auth-server metadata advertises more read scopes, but the real
  * authorization callback rejects `rewards:read`, `migrations:read`, and
- * `platform:read` with `invalid_scope`. The scope set below is the one proven
- * to succeed in Vercel Connect, so tool access stays within the actual grant
- * instead of trusting published metadata that this client cannot obtain.
+ * `platform:read` with `invalid_scope`. It did not reject `analytics:read`,
+ * but no remaining allowlisted tool needs it and it was not part of the
+ * successful Connect grant. The scope set below stays within that actual
+ * grant instead of trusting published metadata that this client cannot obtain.
  */
 const READ_SCOPES = [
   "openid",
