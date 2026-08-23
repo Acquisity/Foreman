@@ -82,7 +82,7 @@ export default defineTool({
       .regex(/^[A-Z]{2,10}-\d{1,9}$/)
       .optional()
       .describe(
-        "Narrow to one ticket's own case, for example before correcting it. Ranking and the result limit cannot hide it."
+        "Look up one ticket's own case, for example before correcting it. This is an identity lookup: it ignores the other filters and the time window, so ranking, the result limit, and an old case cannot hide it."
       ),
     text: z
       .string()

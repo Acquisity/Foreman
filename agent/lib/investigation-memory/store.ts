@@ -208,14 +208,20 @@ const SEARCH_SQL = `WITH scoped AS (
   FROM investigation_cases
   WHERE tenant_key = $1
     AND status = 'active'
-    AND (primary_feature_key = $2
+    -- A ticket lookup ($10) is an identity question, not a relevance search,
+    -- so it bypasses scope, component, provider, classification, and the time
+    -- window. Leaving those on would let a case older than the window, or one
+    -- reached through a narrower filter, hide the very case a correction needs.
+    AND ($10::text IS NULL OR source_issue_id = $10)
+    AND ($10::text IS NOT NULL
+      OR primary_feature_key = $2
       OR $2 = ANY (affected_feature_keys)
       OR dependency_keys && $3::text[])
-    AND ($4::text IS NULL OR component = $4)
-    AND ($5::text IS NULL OR provider = $5)
-    AND ($6::text IS NULL OR classification = $6)
-    AND created_at >= now() - ($7::int * INTERVAL '1 day')
-    AND ($10::text IS NULL OR source_issue_id = $10)
+    AND ($10::text IS NOT NULL OR $4::text IS NULL OR component = $4)
+    AND ($10::text IS NOT NULL OR $5::text IS NULL OR provider = $5)
+    AND ($10::text IS NOT NULL OR $6::text IS NULL OR classification = $6)
+    AND ($10::text IS NOT NULL
+      OR created_at >= now() - ($7::int * INTERVAL '1 day'))
 )
 SELECT ${PROJECTION_COLUMNS}, scope_rank,
   CASE WHEN $8::text IS NULL THEN 0
