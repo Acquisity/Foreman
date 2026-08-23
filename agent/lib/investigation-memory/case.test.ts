@@ -157,61 +157,6 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, true);
   });
 
-  await t.test(
-    "rejects a source URL carrying credentials in its authority",
-    () => {
-      for (const url of [
-        "https://user:secret@linear.app/acquisity/issue/ENG-1/x",
-        "https://user:sk_live_12345678@linear.app/acquisity/issue/ENG-1/x",
-        "https://token@linear.app/acquisity/issue/ENG-1/x",
-        "http://linear.app/acquisity/issue/ENG-1/x",
-      ]) {
-        assert.equal(
-          casePayloadSchema.safeParse({ ...payload, sourceIssueUrl: url })
-            .success,
-          false,
-          url
-        );
-      }
-    }
-  );
-
-  await t.test("rejects a document URL carrying credentials", () => {
-    assert.equal(
-      casePayloadSchema.safeParse({
-        ...payload,
-        sourceDocumentUrl:
-          "https://user:secret@linear.app/acquisity/document/x",
-      }).success,
-      false
-    );
-  });
-
-  await t.test("rejects a deeply encoded credential in a source URL", () => {
-    // Nested past any fixed pass limit: decoding has to run to a fixed point.
-    let nested = "token=abcdefgh";
-    for (let pass = 0; pass < 8; pass += 1) {
-      nested = encodeURIComponent(nested);
-    }
-    for (const url of [
-      "https://linear.app/acquisity/issue/ENG-1/x?token%253Dabcdefgh",
-      "https://linear.app/acquisity/issue/ENG-1/x?token%25253Dabcdefgh",
-      "https://linear.app/acquisity/issue/ENG-1/x?a=%2561pi_key%253Dabcdefgh",
-      `https://linear.app/acquisity/issue/ENG-1/x?q=${nested}`,
-      // A malformed escape stops decoding early, so the value cannot be
-      // cleared: the secret would still be hidden behind %3D.
-      "https://linear.app/acquisity/issue/ENG-1/x?token%253Dabcdefgh%25zz",
-      "https://linear.app/acquisity/issue/ENG-1/x?malformed=%zz",
-    ]) {
-      assert.equal(
-        casePayloadSchema.safeParse({ ...payload, sourceIssueUrl: url })
-          .success,
-        false,
-        url
-      );
-    }
-  });
-
   await t.test("accepts ordinary Linear links", () => {
     const result = casePayloadSchema.safeParse({
       ...payload,

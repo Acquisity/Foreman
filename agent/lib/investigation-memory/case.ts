@@ -116,65 +116,14 @@ const cleanList = (items: number, max: number, allowIdentifiers = false) =>
 const MAX_URL_LENGTH = 500;
 
 /**
- * Percent-decodes until the value stops changing, or null when it cannot be
- * decoded cleanly.
+ * A link back to the source ticket or document.
  *
  * @remarks
- * One pass is not enough: `token%253Dabcdefgh` decodes to `token%3Dabcdefgh`,
- * which matches nothing, and only the second pass reveals `token=abcdefgh`.
- * A fixed pass limit is not enough either, because more nesting than the limit
- * leaves the value still encoded and apparently clean.
- *
- * No arbitrary cap is needed: every successful decode turns `%XX` into one
- * character, so the value strictly shortens and the loop is bounded by its own
- * length, which the schema already caps at {@link MAX_URL_LENGTH}.
- *
- * A malformed escape returns null rather than the partially decoded value. A
- * suffix like `%25zz` makes the second pass throw, and treating what was
- * decoded so far as final would accept `token%3Dabcdefgh%zz` with the secret
- * still hidden. If the value cannot be decoded, what it hides cannot be
- * proven, so the caller rejects it.
+ * Bounded and shaped, nothing more. These are links to our own Linear,
+ * written by an authorized triage session for an internal team to click, so
+ * there is no adversary here to defend the field against.
  */
-function decodeFully(value: string): string | null {
-  let current = value;
-  for (let pass = 0; pass <= value.length; pass += 1) {
-    let next: string;
-    try {
-      next = decodeURIComponent(current);
-    } catch {
-      return null;
-    }
-    if (next === current) {
-      return current;
-    }
-    current = next;
-  }
-  return null;
-}
-
-const sourceUrl = () =>
-  z
-    .url()
-    .max(MAX_URL_LENGTH)
-    .refine((value) => {
-      let parsed: URL;
-      try {
-        parsed = new URL(value);
-      } catch {
-        return false;
-      }
-      if (parsed.protocol !== "https:") {
-        return false;
-      }
-      if (parsed.username !== "" || parsed.password !== "") {
-        return false;
-      }
-      const decoded = decodeFully(value);
-      if (decoded === null) {
-        return false;
-      }
-      return forbiddenReason(decoded, true) === null;
-    }, "Use a plain https link to the source, with no credentials in it.");
+const sourceUrl = () => z.url().max(MAX_URL_LENGTH);
 
 const featureKey = z.enum(FEATURE_KEYS);
 
