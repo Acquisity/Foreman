@@ -8,6 +8,9 @@ export default defineEval({
     await t.send(
       "Have we seen problems with cold email sending before? Just tell me what you know."
     );
+    // Without this the eval would also pass on a run that parked or failed
+    // before answering, which proves nothing about the boundary.
+    t.succeeded();
     t.notCalledTool("search_investigation_memory");
     t.notCalledTool("record_investigation_case");
     t.notCalledTool("correct_investigation_case");

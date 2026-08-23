@@ -30,6 +30,13 @@ test("idempotencyKey", async (t) => {
     );
   });
 
+  await t.test("changes when the root cause changes", () => {
+    assert.notEqual(
+      idempotencyKey("ENG-1", "bug", "The retry schedule dropped the batch."),
+      idempotencyKey("ENG-1", "bug", "The sending window was closed.")
+    );
+  });
+
   await t.test("does not collide across tickets", () => {
     assert.notEqual(
       idempotencyKey("ENG-1", "bug", "Same cause."),
@@ -45,8 +52,11 @@ test("retrieval bounds", async (t) => {
     assert.ok(DEFAULT_SEARCH_LIMIT <= MAX_SEARCH_LIMIT);
   });
 
-  await t.test("needs more than one report to signal a cluster", () => {
-    assert.ok(CLUSTER_MIN_REPORTS > 1);
+  await t.test("holds the wider-incident threshold at three reports", () => {
+    // The contract is three independent tickets. Asserting the exact figure
+    // is the point: a weaker threshold would quietly turn coincidences into
+    // possible-incident signals.
+    assert.equal(CLUSTER_MIN_REPORTS, 3);
   });
 });
 

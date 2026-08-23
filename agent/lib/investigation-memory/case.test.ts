@@ -120,8 +120,12 @@ test("casePayloadSchema", async (t) => {
       sourceIssueUrl: payload.sourceIssueUrl,
     });
     assert.deepEqual(parsed.affectedFeatureKeys, []);
+    assert.deepEqual(parsed.codePaths, []);
     assert.deepEqual(parsed.dependencyKeys, []);
+    assert.deepEqual(parsed.errorSignatures, []);
     assert.deepEqual(parsed.evidenceRefs, []);
+    assert.deepEqual(parsed.ruledOut, []);
+    assert.deepEqual(parsed.symptoms, []);
   });
 
   await t.test("requires a counted date whenever a count is given", () => {
