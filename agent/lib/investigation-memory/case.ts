@@ -108,6 +108,47 @@ const clean = (max: number, allowIdentifiers = false) =>
 const cleanList = (items: number, max: number, allowIdentifiers = false) =>
   z.array(clean(max, allowIdentifiers)).max(items).default([]);
 
+/** Longest URL accepted for a link back to the source ticket or document. */
+const MAX_URL_LENGTH = 500;
+
+/**
+ * A link back to the source, restricted to what a Linear link actually is.
+ *
+ * @remarks
+ * `z.url()` defers to the WHATWG parser, which accepts userinfo:
+ * `https://user:secret@host/path` is a valid URL, and both URL fields are
+ * stored and returned in the model projection, so a credential parked in the
+ * authority would sail past every other guard in this file. Reject userinfo
+ * outright, require https, and run the same forbidden-pattern check over the
+ * decoded URL. Opaque identifiers are allowed, because a link back to the
+ * source is the same category as an evidence handle.
+ */
+const sourceUrl = () =>
+  z
+    .url()
+    .max(MAX_URL_LENGTH)
+    .refine((value) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(value);
+      } catch {
+        return false;
+      }
+      if (parsed.protocol !== "https:") {
+        return false;
+      }
+      if (parsed.username !== "" || parsed.password !== "") {
+        return false;
+      }
+      let decoded = value;
+      try {
+        decoded = decodeURIComponent(value);
+      } catch {
+        // A malformed escape sequence stays as written and is checked as-is.
+      }
+      return forbiddenReason(decoded, true) === null;
+    }, "Use a plain https link to the source, with no credentials in it.");
+
 const featureKey = z.enum(FEATURE_KEYS);
 
 /**
@@ -179,12 +220,12 @@ export const casePayloadSchema = z
     ruledOut: cleanList(10, 200).describe(
       "Conclusions that were ruled out, not the queries that ruled them out."
     ),
-    sourceDocumentUrl: z.url().max(500).optional(),
+    sourceDocumentUrl: sourceUrl().optional(),
     sourceIssueId: z
       .string()
       .trim()
       .regex(/^[A-Z]{2,10}-\d{1,9}$/, "A Linear identifier such as ENG-12345."),
-    sourceIssueUrl: z.url().max(500),
+    sourceIssueUrl: sourceUrl(),
     symptoms: cleanList(8, 200).describe(
       "What the user saw, in the product's own words."
     ),

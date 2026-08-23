@@ -153,6 +153,47 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, true);
   });
 
+  await t.test(
+    "rejects a source URL carrying credentials in its authority",
+    () => {
+      for (const url of [
+        "https://user:secret@linear.app/acquisity/issue/ENG-1/x",
+        "https://user:sk_live_12345678@linear.app/acquisity/issue/ENG-1/x",
+        "https://token@linear.app/acquisity/issue/ENG-1/x",
+        "http://linear.app/acquisity/issue/ENG-1/x",
+      ]) {
+        assert.equal(
+          casePayloadSchema.safeParse({ ...payload, sourceIssueUrl: url })
+            .success,
+          false,
+          url
+        );
+      }
+    }
+  );
+
+  await t.test("rejects a document URL carrying credentials", () => {
+    assert.equal(
+      casePayloadSchema.safeParse({
+        ...payload,
+        sourceDocumentUrl:
+          "https://user:secret@linear.app/acquisity/document/x",
+      }).success,
+      false
+    );
+  });
+
+  await t.test("accepts ordinary Linear links", () => {
+    const result = casePayloadSchema.safeParse({
+      ...payload,
+      sourceDocumentUrl:
+        "https://linear.app/acquisity/document/triage-investigation-7ad9869c3488",
+      sourceIssueUrl:
+        "https://linear.app/acquisity/issue/ENG-12345/campaign-sends-stopped",
+    });
+    assert.equal(result.success, true);
+  });
+
   await t.test("rejects a malformed Linear identifier", () => {
     assert.equal(
       casePayloadSchema.safeParse({ ...payload, sourceIssueId: "12345" })
