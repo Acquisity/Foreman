@@ -47,6 +47,7 @@ export default defineTool({
         limit: input.limit,
         primaryFeatureKey,
         provider: input.provider,
+        sourceIssueId: input.sourceIssueId,
         text: input.text,
         windowDays: input.windowDays,
       });
@@ -75,6 +76,14 @@ export default defineTool({
         "The Linear project id read off the current issue. It picks the product scope; nothing else may."
       ),
     provider: z.string().trim().min(1).max(60).optional(),
+    sourceIssueId: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{2,10}-\d{1,9}$/)
+      .optional()
+      .describe(
+        "Narrow to one ticket's own case, for example before correcting it. Ranking and the result limit cannot hide it."
+      ),
     text: z
       .string()
       .trim()

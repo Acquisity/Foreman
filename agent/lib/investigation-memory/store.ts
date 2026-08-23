@@ -179,6 +179,7 @@ export interface SearchParams {
   limit?: number;
   primaryFeatureKey: FeatureKey;
   provider?: string;
+  sourceIssueId?: string;
   text?: string;
   windowDays?: number;
 }
@@ -214,6 +215,7 @@ const SEARCH_SQL = `WITH scoped AS (
     AND ($5::text IS NULL OR provider = $5)
     AND ($6::text IS NULL OR classification = $6)
     AND created_at >= now() - ($7::int * INTERVAL '1 day')
+    AND ($10::text IS NULL OR source_issue_id = $10)
 )
 SELECT ${PROJECTION_COLUMNS}, scope_rank,
   CASE WHEN $8::text IS NULL THEN 0
@@ -263,6 +265,7 @@ export async function searchCases(params: SearchParams): Promise<SearchResult> {
       params.windowDays ?? DEFAULT_SEARCH_WINDOW_DAYS,
       text,
       limit,
+      params.sourceIssueId ?? null,
     ]),
     sql.query(CLUSTER_SQL, [
       TENANT_KEY,
@@ -470,11 +473,17 @@ export async function recordCase(
     // model a raw Postgres error.
     if (isActiveCaseConflict(error)) {
       const winner = await activeCase(sql, payload.sourceIssueId);
-      return {
-        created: false,
-        existingCaseId: winner?.id ?? "",
-        reason: "active_case_exists",
-      };
+      // Only answer "an active case already exists" when one actually does.
+      // The revision constraint can also fire against a superseded row, and
+      // reporting that as a live case with an empty id would send the model
+      // off to correct something it cannot find.
+      if (winner) {
+        return {
+          created: false,
+          existingCaseId: winner.id,
+          reason: "active_case_exists",
+        };
+      }
     }
     throw error;
   }

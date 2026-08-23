@@ -279,7 +279,7 @@ The product area comes from the ticket's Linear project. Affected features go in
 
 A failure here changes nothing about the ticket. Say so internally and move on. Do not retry into a second case, do not hold the comment, and do not revisit the verdict.
 
-If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it, or from a search for this ticket. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
+If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back: a plain search is ranked and capped, and a ticket's own case can fall outside the results, but narrowing to the ticket returns it whatever else is in that feature. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 
 ## Follow-ups
 
