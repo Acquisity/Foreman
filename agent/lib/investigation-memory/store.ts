@@ -470,7 +470,8 @@ export type CorrectionResult =
       supersededCaseId: string;
     }
   | { caseId: string; created: false; reason: "already_recorded" }
-  | { created: false; reason: "prior_case_not_active" };
+  | { created: false; reason: "prior_case_not_active" }
+  | { created: false; reason: "prior_case_other_ticket" };
 
 /**
  * Supersedes an earlier conclusion with a new revision.
@@ -497,6 +498,15 @@ export async function correctCase(
   const [prior] = rows;
   if (!prior) {
     return { created: false, reason: "prior_case_not_active" };
+  }
+  // A correction belongs to one ticket's chain. Superseding a case from
+  // another ticket would leave that ticket with no active conclusion at all,
+  // and would take this ticket's revision number from a history it is not
+  // part of. The database cannot catch it: the two rows are independently
+  // valid, and the one-active-case index only fires when the other ticket
+  // already has a live case.
+  if (prior.source_issue_id !== payload.sourceIssueId) {
+    return { created: false, reason: "prior_case_other_ticket" };
   }
 
   const key = idempotencyKey(

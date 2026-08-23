@@ -46,12 +46,17 @@ export default defineTool({
           supersededCaseId: result.supersededCaseId,
         };
       }
+      const reasons = {
+        already_recorded:
+          "This correction is already recorded. Nothing changed.",
+        prior_case_not_active:
+          "That case is not the active revision for its ticket, so there is nothing to supersede. Search memory again and correct the current case.",
+        prior_case_other_ticket:
+          "That case belongs to a different ticket. A correction replaces the active case for this ticket only. Search memory for this ticket's own case id and use that.",
+      } as const;
       return {
         caseId: "caseId" in result ? result.caseId : undefined,
-        reason:
-          result.reason === "already_recorded"
-            ? "This correction is already recorded. Nothing changed."
-            : "That case is not the active revision for its ticket, so there is nothing to supersede. Search memory again and correct the current case.",
+        reason: reasons[result.reason],
         recorded: false as const,
       };
     } catch (error) {
