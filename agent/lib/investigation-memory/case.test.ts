@@ -124,6 +124,35 @@ test("casePayloadSchema", async (t) => {
     assert.deepEqual(parsed.evidenceRefs, []);
   });
 
+  await t.test("requires a counted date whenever a count is given", () => {
+    for (const counts of [
+      { affectedOrgCount: 3 },
+      { affectedUserCount: 7 },
+      { affectedOrgCount: 3, affectedUserCount: 7 },
+    ]) {
+      const result = casePayloadSchema.safeParse({ ...payload, ...counts });
+      assert.equal(result.success, false, JSON.stringify(counts));
+    }
+  });
+
+  await t.test("accepts counts carrying their counted date", () => {
+    const result = casePayloadSchema.safeParse({
+      ...payload,
+      affectedOrgCount: 3,
+      affectedUserCount: 7,
+      countedAt: "2026-08-23",
+    });
+    assert.equal(result.success, true);
+  });
+
+  await t.test("accepts a counted date on its own", () => {
+    const result = casePayloadSchema.safeParse({
+      ...payload,
+      countedAt: "2026-08-23",
+    });
+    assert.equal(result.success, true);
+  });
+
   await t.test("rejects a malformed Linear identifier", () => {
     assert.equal(
       casePayloadSchema.safeParse({ ...payload, sourceIssueId: "12345" })

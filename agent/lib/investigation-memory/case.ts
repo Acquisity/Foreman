@@ -115,74 +115,100 @@ const featureKey = z.enum(FEATURE_KEYS);
  * derives it from `linearProjectId`, so the model cannot choose the bucket a
  * case lands in.
  */
-export const casePayloadSchema = z.object({
-  affectedFeatureKeys: z
-    .array(featureKey)
-    .max(MAX_SCOPE_ENTRIES)
-    .default([])
-    .describe(
-      "Other features this investigation showed evidence of affecting. Evidence, not suspicion. Empty is normal."
+export const casePayloadSchema = z
+  .object({
+    affectedFeatureKeys: z
+      .array(featureKey)
+      .max(MAX_SCOPE_ENTRIES)
+      .default([])
+      .describe(
+        "Other features this investigation showed evidence of affecting. Evidence, not suspicion. Empty is normal."
+      ),
+    affectedOrgCount: z.int().min(0).max(10_000_000).optional(),
+    affectedUserCount: z.int().min(0).max(10_000_000).optional(),
+    claim: clean(400).describe("The Step 4.1 testable claim, in one sentence."),
+    codePaths: cleanList(10, 200).describe(
+      "Files and functions the claim runs through, from Step 4.2."
     ),
-  affectedOrgCount: z.int().min(0).max(10_000_000).optional(),
-  affectedUserCount: z.int().min(0).max(10_000_000).optional(),
-  claim: clean(400).describe("The Step 4.1 testable claim, in one sentence."),
-  codePaths: cleanList(10, 200).describe(
-    "Files and functions the claim runs through, from Step 4.2."
-  ),
-  commitSha: z
-    .string()
-    .regex(/^[0-9a-f]{7,40}$/)
-    .optional(),
-  component: clean(80)
-    .optional()
-    .describe("Normalized component name, when one is clear."),
-  confidence: z.enum(CONFIDENCES),
-  countedAt: z.iso
-    .date()
-    .optional()
-    .describe("The date the affected counts were queried. Required with them."),
-  dependencyKeys: z
-    .array(
-      z
-        .string()
-        .trim()
-        .max(40)
-        .refine(isDependencyKey, "Use a short lowercase key like `instantly`.")
-    )
-    .max(MAX_SCOPE_ENTRIES)
-    .default([])
-    .describe(
-      "Shared systems involved: instantly, webhooks, inngest, authentication, billing."
+    commitSha: z
+      .string()
+      .regex(/^[0-9a-f]{7,40}$/)
+      .optional(),
+    component: clean(80)
+      .optional()
+      .describe("Normalized component name, when one is clear."),
+    confidence: z.enum(CONFIDENCES),
+    countedAt: z.iso
+      .date()
+      .optional()
+      .describe(
+        "The date the affected counts were queried. Required whenever either count is given."
+      ),
+    dependencyKeys: z
+      .array(
+        z
+          .string()
+          .trim()
+          .max(40)
+          .refine(
+            isDependencyKey,
+            "Use a short lowercase key like `instantly`."
+          )
+      )
+      .max(MAX_SCOPE_ENTRIES)
+      .default([])
+      .describe(
+        "Shared systems involved: instantly, webhooks, inngest, authentication, billing."
+      ),
+    errorSignatures: cleanList(8, 200).describe(
+      "Error identifiers or messages with secrets and identifiers removed."
     ),
-  errorSignatures: cleanList(8, 200).describe(
-    "Error identifiers or messages with secrets and identifiers removed."
-  ),
-  evidenceRefs: cleanList(10, 200, true).describe(
-    "Stable handles only: Sentry issue ids, Inngest run ids, provider event ids, the document link. Never a payload."
-  ),
-  linearProjectId: z
-    .uuid()
-    .describe("The source issue's Linear project id. It picks the feature."),
-  observedFrom: z.iso.datetime().optional(),
-  observedTo: z.iso.datetime().optional(),
-  provider: clean(60).optional(),
-  resolution: clean(1000)
-    .optional()
-    .describe("The fix or the customer unblock, when one is known."),
-  rootCause: clean(1000).describe("The evidence-backed conclusion."),
-  ruledOut: cleanList(10, 200).describe(
-    "Conclusions that were ruled out, not the queries that ruled them out."
-  ),
-  sourceDocumentUrl: z.url().max(500).optional(),
-  sourceIssueId: z
-    .string()
-    .trim()
-    .regex(/^[A-Z]{2,10}-\d{1,9}$/, "A Linear identifier such as ENG-12345."),
-  sourceIssueUrl: z.url().max(500),
-  symptoms: cleanList(8, 200).describe(
-    "What the user saw, in the product's own words."
-  ),
-});
+    evidenceRefs: cleanList(10, 200, true).describe(
+      "Stable handles only: Sentry issue ids, Inngest run ids, provider event ids, the document link. Never a payload."
+    ),
+    linearProjectId: z
+      .uuid()
+      .describe("The source issue's Linear project id. It picks the feature."),
+    observedFrom: z.iso.datetime().optional(),
+    observedTo: z.iso.datetime().optional(),
+    provider: clean(60).optional(),
+    resolution: clean(1000)
+      .optional()
+      .describe("The fix or the customer unblock, when one is known."),
+    rootCause: clean(1000).describe("The evidence-backed conclusion."),
+    ruledOut: cleanList(10, 200).describe(
+      "Conclusions that were ruled out, not the queries that ruled them out."
+    ),
+    sourceDocumentUrl: z.url().max(500).optional(),
+    sourceIssueId: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{2,10}-\d{1,9}$/, "A Linear identifier such as ENG-12345."),
+    sourceIssueUrl: z.url().max(500),
+    symptoms: cleanList(8, 200).describe(
+      "What the user saw, in the product's own words."
+    ),
+  })
+  .check((ctx) => {
+    // A count without the date it was taken is unusable: a blast radius ages,
+    // and the reader cannot tell whether the figure is a week or a year old.
+    // `investigation_cases_counted_at_check` enforces this in the database too;
+    // catching it here turns a raw Postgres error after a completed
+    // investigation into an input error the model can fix on the spot.
+    const { affectedOrgCount, affectedUserCount, countedAt } = ctx.value;
+    if (
+      countedAt === undefined &&
+      (affectedOrgCount !== undefined || affectedUserCount !== undefined)
+    ) {
+      ctx.issues.push({
+        code: "custom",
+        input: ctx.value,
+        message:
+          "countedAt is required whenever an affected count is given. Record the date the count was queried.",
+        path: ["countedAt"],
+      });
+    }
+  });
 
 export type CasePayload = z.output<typeof casePayloadSchema>;
 
