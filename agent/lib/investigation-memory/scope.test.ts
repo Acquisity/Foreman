@@ -55,6 +55,14 @@ test("scope taxonomy", async (t) => {
     assert.ok(!Object.keys(FEATURES).includes("shopify_store_builder"));
   });
 
+  await t.test("maps Domains & Inboxes to its own area, not cold email", () => {
+    assert.equal(
+      featureForProject("9f2e1f4a-f878-4481-96f8-3eb15f048390"),
+      "domains_inboxes"
+    );
+    assert.equal(FEATURES.domains_inboxes.lifecycle, "live");
+  });
+
   await t.test("carries Acquisity Agent as planned, not live", () => {
     assert.equal(FEATURES.acquisity_agent.lifecycle, "planned");
     assert.equal(FEATURES.cold_email.lifecycle, "live");

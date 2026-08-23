@@ -20,6 +20,7 @@ export const TENANT_KEY = "acquisity";
 /** Stable feature keys, one per owning product area. */
 export const FEATURE_KEYS = [
   "cold_email",
+  "domains_inboxes",
   "ai_sdr",
   "crm",
   "website_builder",
@@ -45,6 +46,14 @@ export interface Feature {
  *
  * Shopify Store Builder is deliberately absent. It is not live and is no
  * longer part of Acquisity.
+ *
+ * `domains_inboxes` is its own area rather than part of `cold_email`. The
+ * tickets there are provisioning and purchase failures (orders that never
+ * provision, domains stuck in error, orphaned inboxes, checkout and refund
+ * confusion), not campaign sending behavior. Folding them into cold email
+ * would mix "the domain never provisioned" analogies with "the campaign
+ * stopped sending" ones, which is the opposite of what retrieval needs. A
+ * case that spans both records the other side as an affected feature.
  */
 export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
   acquisity_agent: { label: "Acquisity Agent", lifecycle: "planned" },
@@ -52,6 +61,7 @@ export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
   cold_email: { label: "Cold Email", lifecycle: "live" },
   core_platform: { label: "Core Platform", lifecycle: "live" },
   crm: { label: "CRM", lifecycle: "live" },
+  domains_inboxes: { label: "Domains & Inboxes", lifecycle: "live" },
   website_builder: { label: "Website Builder", lifecycle: "live" },
 };
 
@@ -59,12 +69,11 @@ export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
  * Linear project id to owning feature.
  *
  * @remarks
- * Only projects whose name states the area outright are mapped. Several live
- * projects (Domains & Inboxes, Onboarding Flow, Workflows, Public API,
- * Acquisity Ingress, the AI Ads projects, Whitelabel Partners) plausibly sit
- * under one of these areas, but assigning them would be the inference this
- * design exists to prevent, so they stay unmapped until someone decides where
- * they belong. An unmapped project is not an error: the case is simply not
+ * Only projects whose owning area has been decided are mapped. Several live
+ * projects (Onboarding Flow, Workflows, Public API, Acquisity Ingress, the AI
+ * Ads projects, Whitelabel Partners) plausibly sit under one of these areas,
+ * but assigning them would be the inference this design exists to prevent, so
+ * they stay unmapped until someone decides where they belong. An unmapped project is not an error: the case is simply not
  * recorded, and triage proceeds exactly as it does today.
  *
  * Ids are Linear project ids, which are stable across renames.
@@ -74,6 +83,7 @@ export const LINEAR_PROJECT_FEATURES: Readonly<Record<string, FeatureKey>> = {
   "2d1ef833-7012-487d-b257-ff4eced47feb": "crm", // CRM Calendar Scheduling
   "9c0e091f-9a09-4978-a096-f6b8943a1718": "ai_sdr", // AI SDR Escalation & Classification
   "9c27321a-6027-499c-9235-7c3fcc3e0cd8": "crm", // CRM
+  "9f2e1f4a-f878-4481-96f8-3eb15f048390": "domains_inboxes", // Domains & Inboxes
   "33cd50d6-bf41-4133-89e5-a349346f4479": "acquisity_agent", // Acquisity Agent
   "50a332cc-402c-4abf-961f-4cdd05f9afdf": "cold_email", // Cold Email Leads
   "52fa1548-6f61-4732-8afc-20891168f91c": "cold_email", // Cold Email Core
