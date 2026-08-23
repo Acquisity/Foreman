@@ -115,6 +115,36 @@ const cleanList = (items: number, max: number, allowIdentifiers = false) =>
 /** Longest URL accepted for a link back to the source ticket or document. */
 const MAX_URL_LENGTH = 500;
 
+/** Decode passes applied before the forbidden-pattern check. */
+const MAX_DECODE_PASSES = 5;
+
+/**
+ * Percent-decodes until the value stops changing, so a double-encoded
+ * credential cannot slip past the pattern check.
+ *
+ * @remarks
+ * One pass is not enough: `token%253Dabcdefgh` decodes to `token%3Dabcdefgh`,
+ * which matches nothing, and only the second pass reveals `token=abcdefgh`.
+ * Passes are capped because this runs on model input, and a malformed escape
+ * leaves the value as written rather than throwing.
+ */
+function fullyDecoded(value: string): string {
+  let current = value;
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(current);
+    } catch {
+      return current;
+    }
+    if (next === current) {
+      return current;
+    }
+    current = next;
+  }
+  return current;
+}
+
 /**
  * A link back to the source, restricted to what a Linear link actually is.
  *
@@ -144,13 +174,7 @@ const sourceUrl = () =>
       if (parsed.username !== "" || parsed.password !== "") {
         return false;
       }
-      let decoded = value;
-      try {
-        decoded = decodeURIComponent(value);
-      } catch {
-        // A malformed escape sequence stays as written and is checked as-is.
-      }
-      return forbiddenReason(decoded, true) === null;
+      return forbiddenReason(fullyDecoded(value), true) === null;
     }, "Use a plain https link to the source, with no credentials in it.");
 
 const featureKey = z.enum(FEATURE_KEYS);

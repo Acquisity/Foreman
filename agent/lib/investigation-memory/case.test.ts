@@ -187,6 +187,21 @@ test("casePayloadSchema", async (t) => {
     );
   });
 
+  await t.test("rejects a double-encoded credential in a source URL", () => {
+    for (const url of [
+      "https://linear.app/acquisity/issue/ENG-1/x?token%253Dabcdefgh",
+      "https://linear.app/acquisity/issue/ENG-1/x?token%25253Dabcdefgh",
+      "https://linear.app/acquisity/issue/ENG-1/x?a=%2561pi_key%253Dabcdefgh",
+    ]) {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, sourceIssueUrl: url })
+          .success,
+        false,
+        url
+      );
+    }
+  });
+
   await t.test("accepts ordinary Linear links", () => {
     const result = casePayloadSchema.safeParse({
       ...payload,
