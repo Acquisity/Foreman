@@ -64,7 +64,7 @@ export default defineTool({
       console.error("Investigation memory correction failed.", error);
       return {
         reason:
-          "Investigation memory was unavailable. The prior investigation remains unchanged.",
+          "The correction could not be confirmed. Search again before retrying.",
         recorded: false as const,
       };
     }
