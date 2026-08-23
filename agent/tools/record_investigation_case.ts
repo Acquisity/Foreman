@@ -49,8 +49,9 @@ export default defineTool({
         recorded: false as const,
       };
     } catch (error) {
+      console.error("Investigation memory write failed.", error);
       return {
-        reason: error instanceof Error ? error.message : "Write failed.",
+        reason: "The investigation itself stands.",
         recorded: false as const,
       };
     }

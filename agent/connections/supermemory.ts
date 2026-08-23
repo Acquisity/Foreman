@@ -33,7 +33,7 @@ export default defineMcpClientConnection({
     principalType: "user",
   }),
   description:
-    "Supermemory: semantic recall over saved memories, documents, and spaces, plus saving new memories on attended runs.",
+    "Supermemory: attended-session semantic recall over saved memories, documents, and spaces. It is unrelated to triage investigation memory, repository authority, and databases.",
   tools: {
     allow: [
       "search_memory",

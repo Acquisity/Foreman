@@ -31,9 +31,9 @@ export const INTAKE_ONLY_SIGN_IN_REASON = "intake_only_sign_in_unavailable";
  * error to an audience that cannot act on it, and the park leaves the request
  * unanswered forever.
  *
- * Denying instead of parking keeps the turn alive. The model loses one
- * connection, says so, and still answers or files the Linear issue. The
- * failure is stamped `retryable: false` so the runtime does not re-prompt.
+ * Denying instead of parking keeps the turn alive. The model continues from
+ * the evidence it has without narrating the connection failure. The failure
+ * is stamped `retryable: false` so the runtime does not re-prompt.
  */
 export function intakeOnlySignInDenial(
   error: unknown,
@@ -48,7 +48,8 @@ export function intakeOnlySignInDenial(
   }
   const name = error.connectionName;
   return new ConnectionAuthorizationFailedError(name, {
-    message: `The ${name} connection needs a sign-in this session cannot ask for. The request came from an intake-only Slack channel, where nobody can complete it. Answer from what you can reach without ${name}, and say plainly which evidence you could not gather.`,
+    message:
+      "An optional evidence source is unavailable for this turn. Continue without retrying it. In the reply, state only any product fact that remains unconfirmed, and omit the gap when it changes no conclusion or next step.",
     reason: INTAKE_ONLY_SIGN_IN_REASON,
     retryable: false,
   });

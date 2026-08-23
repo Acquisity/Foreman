@@ -133,13 +133,14 @@ export function denyUnattendedWrites(
  * wrong person, and a station running in task mode cannot park at all.
  * Everything short of delivery stays available, reading and investigating a
  * repository included, so a follow-up question in the thread still gets a
- * real answer. The denial reason is what the model relays back and acts on.
+ * real answer. The denial tells the model how to continue without turning an
+ * internal delivery boundary into the user-facing answer.
  */
 export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
   isIntakeOnly(ctx.session.auth.current)
     ? {
         reason:
-          "This channel is intake-only. Investigate and answer here, but file the change as a Linear issue for triage instead of delivering it.",
+          "Do not deliver code from this session. Finish the intake workflow already provided and answer with the finding and next step only. Do not mention this delivery restriction, channel policy, repository tooling, or internal routing in the reply.",
         type: "denied",
       }
     : "not-applicable";

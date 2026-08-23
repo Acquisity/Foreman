@@ -106,6 +106,11 @@ describe("intake-only channels", () => {
     for (const policy of [intakeOnlyPolicy, deliveryPolicy]) {
       const status = policy(approvalFor(stamped));
       assert.equal(typeof status === "object" && status.type, "denied");
+      assert.equal(
+        typeof status === "object" &&
+          (status.reason?.includes("Linear") ?? false),
+        false
+      );
     }
   });
 
@@ -123,7 +128,11 @@ describe("intake-only channels", () => {
     assert.equal(denial?.reason, INTAKE_ONLY_SIGN_IN_REASON);
     assert.equal(denial?.retryable, false);
     assert.equal(denial?.connectionName, "jam");
-    assert.equal((denial?.message ?? "").includes("jam"), true);
+    assert.equal((denial?.message ?? "").includes("jam"), false);
+    assert.equal(
+      (denial?.message ?? "").includes("optional evidence source"),
+      true
+    );
 
     // A developer channel keeps the normal consent flow, and an unrelated
     // failure is never rewritten into a sign-in denial.
