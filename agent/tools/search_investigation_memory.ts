@@ -60,7 +60,7 @@ export default defineTool({
   },
   inputSchema: z.object({
     classification: z.enum(CLASSIFICATIONS).optional(),
-    component: z.string().trim().max(80).optional(),
+    component: z.string().trim().min(1).max(80).optional(),
     dependencyKeys: z
       .array(z.string().trim().max(40).refine(isDependencyKey))
       .max(MAX_SCOPE_ENTRIES)
@@ -74,7 +74,7 @@ export default defineTool({
       .describe(
         "The Linear project id read off the current issue. It picks the product scope; nothing else may."
       ),
-    provider: z.string().trim().max(60).optional(),
+    provider: z.string().trim().min(1).max(60).optional(),
     text: z
       .string()
       .trim()
