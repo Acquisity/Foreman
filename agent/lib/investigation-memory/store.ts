@@ -3,6 +3,7 @@ import { type NeonQueryFunction, neon } from "@neondatabase/serverless";
 import type {
   CasePayload,
   CaseProjection,
+  CaseStatus,
   Classification,
   Confidence,
 } from "./case.js";
@@ -537,10 +538,19 @@ export async function correctCase(
   correctionReason: string
 ): Promise<CorrectionResult> {
   const sql = db();
+  // Read the prior case whatever its status. A correction that already
+  // succeeded leaves it superseded, and filtering on `active` here would make
+  // a replay of that completed write look like a failure before the
+  // idempotency check below could recognize it.
   const rows = (await sql.query(
-    "SELECT id, revision, source_issue_id FROM investigation_cases WHERE tenant_key = $1 AND id = $2 AND status = 'active'",
+    "SELECT id, revision, source_issue_id, status FROM investigation_cases WHERE tenant_key = $1 AND id = $2",
     [TENANT_KEY, supersedesCaseId]
-  )) as { id: string; revision: number; source_issue_id: string }[];
+  )) as {
+    id: string;
+    revision: number;
+    source_issue_id: string;
+    status: CaseStatus;
+  }[];
   const [prior] = rows;
   if (!prior) {
     return { created: false, reason: "prior_case_not_active" };
@@ -563,6 +573,12 @@ export async function correctCase(
   const replay = await caseIdFor(sql, key);
   if (replay !== null) {
     return { caseId: replay, created: false, reason: "already_recorded" };
+  }
+
+  // Only now does the status matter: this is a genuinely new correction, so
+  // the case it names has to still be the live one.
+  if (prior.status !== "active") {
+    return { created: false, reason: "prior_case_not_active" };
   }
 
   const id = randomUUID();
