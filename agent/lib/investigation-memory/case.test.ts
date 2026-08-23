@@ -187,11 +187,21 @@ test("casePayloadSchema", async (t) => {
     );
   });
 
-  await t.test("rejects a double-encoded credential in a source URL", () => {
+  await t.test("rejects a deeply encoded credential in a source URL", () => {
+    // Nested past any fixed pass limit: decoding has to run to a fixed point.
+    let nested = "token=abcdefgh";
+    for (let pass = 0; pass < 8; pass += 1) {
+      nested = encodeURIComponent(nested);
+    }
     for (const url of [
       "https://linear.app/acquisity/issue/ENG-1/x?token%253Dabcdefgh",
       "https://linear.app/acquisity/issue/ENG-1/x?token%25253Dabcdefgh",
       "https://linear.app/acquisity/issue/ENG-1/x?a=%2561pi_key%253Dabcdefgh",
+      `https://linear.app/acquisity/issue/ENG-1/x?q=${nested}`,
+      // A malformed escape stops decoding early, so the value cannot be
+      // cleared: the secret would still be hidden behind %3D.
+      "https://linear.app/acquisity/issue/ENG-1/x?token%253Dabcdefgh%25zz",
+      "https://linear.app/acquisity/issue/ENG-1/x?malformed=%zz",
     ]) {
       assert.equal(
         casePayloadSchema.safeParse({ ...payload, sourceIssueUrl: url })

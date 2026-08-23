@@ -115,48 +115,43 @@ const cleanList = (items: number, max: number, allowIdentifiers = false) =>
 /** Longest URL accepted for a link back to the source ticket or document. */
 const MAX_URL_LENGTH = 500;
 
-/** Decode passes applied before the forbidden-pattern check. */
-const MAX_DECODE_PASSES = 5;
-
 /**
- * Percent-decodes until the value stops changing, so a double-encoded
- * credential cannot slip past the pattern check.
+ * Percent-decodes until the value stops changing, or null when it cannot be
+ * decoded cleanly.
  *
  * @remarks
  * One pass is not enough: `token%253Dabcdefgh` decodes to `token%3Dabcdefgh`,
  * which matches nothing, and only the second pass reveals `token=abcdefgh`.
- * Passes are capped because this runs on model input, and a malformed escape
- * leaves the value as written rather than throwing.
+ * A fixed pass limit is not enough either, because more nesting than the limit
+ * leaves the value still encoded and apparently clean.
+ *
+ * No arbitrary cap is needed: every successful decode turns `%XX` into one
+ * character, so the value strictly shortens and the loop is bounded by its own
+ * length, which the schema already caps at {@link MAX_URL_LENGTH}.
+ *
+ * A malformed escape returns null rather than the partially decoded value. A
+ * suffix like `%25zz` makes the second pass throw, and treating what was
+ * decoded so far as final would accept `token%3Dabcdefgh%zz` with the secret
+ * still hidden. If the value cannot be decoded, what it hides cannot be
+ * proven, so the caller rejects it.
  */
-function fullyDecoded(value: string): string {
+function decodeFully(value: string): string | null {
   let current = value;
-  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+  for (let pass = 0; pass <= value.length; pass += 1) {
     let next: string;
     try {
       next = decodeURIComponent(current);
     } catch {
-      return current;
+      return null;
     }
     if (next === current) {
       return current;
     }
     current = next;
   }
-  return current;
+  return null;
 }
 
-/**
- * A link back to the source, restricted to what a Linear link actually is.
- *
- * @remarks
- * `z.url()` defers to the WHATWG parser, which accepts userinfo:
- * `https://user:secret@host/path` is a valid URL, and both URL fields are
- * stored and returned in the model projection, so a credential parked in the
- * authority would sail past every other guard in this file. Reject userinfo
- * outright, require https, and run the same forbidden-pattern check over the
- * decoded URL. Opaque identifiers are allowed, because a link back to the
- * source is the same category as an evidence handle.
- */
 const sourceUrl = () =>
   z
     .url()
@@ -174,7 +169,11 @@ const sourceUrl = () =>
       if (parsed.username !== "" || parsed.password !== "") {
         return false;
       }
-      return forbiddenReason(fullyDecoded(value), true) === null;
+      const decoded = decodeFully(value);
+      if (decoded === null) {
+        return false;
+      }
+      return forbiddenReason(decoded, true) === null;
     }, "Use a plain https link to the source, with no credentials in it.");
 
 const featureKey = z.enum(FEATURE_KEYS);
