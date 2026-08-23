@@ -56,8 +56,7 @@ export default defineTool({
       console.error("Investigation memory search failed.", error);
       return {
         available: false as const,
-        reason:
-          "Investigation memory was unavailable. Continue from current evidence.",
+        reason: "Continue from current evidence.",
       };
     }
   },
