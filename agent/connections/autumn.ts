@@ -3,23 +3,19 @@ import { requireEnv } from "../lib/constants.js";
 import { userConnect } from "../lib/user-connect.js";
 
 /**
- * Every read scope Autumn's MCP resource and auth server publish, plus the
+ * The read scopes accepted by this connector's actual OAuth callback, plus the
  * OIDC basics. `offline_access` only enables refresh tokens. Autumn splits
- * read and write into distinct scopes, so the token can read the whole
- * billing surface and write none of it: writes fail at the API, not just at
- * the tool filter.
+ * read and write into distinct scopes, so the token can read the billing
+ * surface Foreman needs and write none of it: writes fail at the API, not just
+ * at the tool filter.
  *
  * @remarks
- * Taken from the auth server's `/.well-known/oauth-authorization-server`, not
- * from the MCP resource metadata, which is incomplete: it omits `rewards:read`
- * even though `listRewards` needs it. Since that mapping cannot be trusted,
- * every read scope the connector grants is requested rather than the subset
- * the allowlist looks like it needs. `migrations:read` and `platform:read` are
- * the tools whose backing scope is not deducible (`getAgentRules`,
- * `queryRequestLogs`, `searchRequestLogs`), and guessing wrong would 403 at
- * call time in a way that reads like the customer having no data. Breadth here
- * costs nothing: the point is that no scope is a write, not that reads are
- * minimal.
+ * Autumn's auth-server metadata advertises more read scopes, but the real
+ * authorization callback rejects `rewards:read`, `migrations:read`, and
+ * `platform:read` with `invalid_scope`. It did not reject `analytics:read`,
+ * but no remaining allowlisted tool needs it and it was not part of the
+ * successful Connect grant. The scope set below stays within that actual
+ * grant instead of trusting published metadata that this client cannot obtain.
  */
 const READ_SCOPES = [
   "openid",
@@ -28,12 +24,8 @@ const READ_SCOPES = [
   "customers:read",
   "features:read",
   "plans:read",
-  "rewards:read",
   "balances:read",
   "billing:read",
-  "migrations:read",
-  "analytics:read",
-  "platform:read",
 ];
 
 const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
@@ -47,12 +39,10 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   authorization-code grant with PKCE: a one-time consent stores a refresh
  *   token, after which calls are non-interactive and auto-refreshing, and
  *   tokens are never exposed to the model.
- * - Grants are per principal, not per person. Vercel Connect keys a stored
- *   grant by a subject it derives from the session principal, and a person
- *   arrives under a different one on each surface (`slack:<team>:<user>` from
- *   Slack, `linear:<user>` from a Linear agent session, their Vercel account
- *   from the CLI). Consent is needed once per surface someone reads Autumn
- *   from, not once per person.
+ * - Grants are keyed by a subject Vercel Connect derives from the session
+ *   principal. A person can arrive under different subjects from Slack, Linear,
+ *   and the CLI, so cross-surface consent coverage is untested here. Do not
+ *   assume it without checking.
  *
  *   This is a real gap on the Asks path, not a settled design: a ticket filed
  *   from Slack runs under the AIA requester, who has no Autumn account and
@@ -93,12 +83,11 @@ export default defineMcpClientConnection({
     tokenParams: { resources: [AUTUMN_MCP_URL], scopes: READ_SCOPES },
   }),
   description:
-    "Autumn billing provisioning, read-only: customers, their plans, add-ons, subscriptions and feature balances, the plan and feature catalog, entities, rewards, and request logs.",
+    "Autumn billing provisioning, read-only: customers, their plans, add-ons, subscriptions and feature balances, the plan and feature catalog, and entities.",
   tools: {
     allow: [
       "dateToEpochMilliseconds",
       "epochMillisecondsToDate",
-      "getAgentRules",
       "getCurrentOrganization",
       "getCustomer",
       "getEntity",
@@ -107,9 +96,6 @@ export default defineMcpClientConnection({
       "listEntities",
       "listFeatures",
       "listPlans",
-      "listRewards",
-      "queryRequestLogs",
-      "searchRequestLogs",
     ],
   },
   url: AUTUMN_MCP_URL,

@@ -32,9 +32,9 @@ Connection coordinates, confirmed live: organization `acquisity`, database `acqu
 
 ## Autumn (`autumn__`)
 
-`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` to find a customer id, `getCurrentOrganization` for the org the token is scoped to, and `queryRequestLogs` or `searchRequestLogs` when you need to see what Autumn was actually asked to do.
+`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
 
-Also allowlisted: `listRewards`, `getAgentRules`, `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
+Also allowlisted: `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
 
 Autumn is user-scoped, so a teammate who has never consented gets a sign-in failure rather than data. That is `Could not run`, not an empty result: never read it as the customer having no Autumn account.
 
