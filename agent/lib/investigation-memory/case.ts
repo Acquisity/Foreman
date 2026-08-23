@@ -93,8 +93,12 @@ export function forbiddenReason(
   return null;
 }
 
-/** Bounded free text that must pass the data-minimization guards. */
-const clean = (max: number, allowIdentifiers = false) =>
+/**
+ * Bounded free text that must pass the data-minimization guards. Exported so
+ * anything else the model writes into shared memory, a correction reason
+ * included, goes through the same policy rather than a looser copy of it.
+ */
+export const cleanText = (max: number, allowIdentifiers = false) =>
   z
     .string()
     .trim()
@@ -106,7 +110,7 @@ const clean = (max: number, allowIdentifiers = false) =>
     });
 
 const cleanList = (items: number, max: number, allowIdentifiers = false) =>
-  z.array(clean(max, allowIdentifiers)).max(items).default([]);
+  z.array(cleanText(max, allowIdentifiers)).max(items).default([]);
 
 /** Longest URL accepted for a link back to the source ticket or document. */
 const MAX_URL_LENGTH = 500;
@@ -167,7 +171,9 @@ export const casePayloadSchema = z
       ),
     affectedOrgCount: z.int().min(0).max(10_000_000).optional(),
     affectedUserCount: z.int().min(0).max(10_000_000).optional(),
-    claim: clean(400).describe("The Step 4.1 testable claim, in one sentence."),
+    claim: cleanText(400).describe(
+      "The Step 4.1 testable claim, in one sentence."
+    ),
     codePaths: cleanList(10, 200).describe(
       "Files and functions the claim runs through, from Step 4.2."
     ),
@@ -175,7 +181,7 @@ export const casePayloadSchema = z
       .string()
       .regex(/^[0-9a-f]{7,40}$/)
       .optional(),
-    component: clean(80)
+    component: cleanText(80)
       .optional()
       .describe("Normalized component name, when one is clear."),
     confidence: z.enum(CONFIDENCES),
@@ -212,11 +218,11 @@ export const casePayloadSchema = z
       .describe("The source issue's Linear project id. It picks the feature."),
     observedFrom: z.iso.datetime().optional(),
     observedTo: z.iso.datetime().optional(),
-    provider: clean(60).optional(),
-    resolution: clean(1000)
+    provider: cleanText(60).optional(),
+    resolution: cleanText(1000)
       .optional()
       .describe("The fix or the customer unblock, when one is known."),
-    rootCause: clean(1000).describe("The evidence-backed conclusion."),
+    rootCause: cleanText(1000).describe("The evidence-backed conclusion."),
     ruledOut: cleanList(10, 200).describe(
       "Conclusions that were ruled out, not the queries that ruled them out."
     ),

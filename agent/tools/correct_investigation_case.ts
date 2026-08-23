@@ -4,6 +4,7 @@ import { investigationMemoryWritePolicy } from "#lib/github/approval.js";
 import {
   CLASSIFICATIONS,
   casePayloadSchema,
+  cleanText,
 } from "#lib/investigation-memory/case.js";
 import { featureForProject } from "#lib/investigation-memory/scope.js";
 import { correctCase } from "#lib/investigation-memory/store.js";
@@ -68,12 +69,9 @@ export default defineTool({
   },
   inputSchema: casePayloadSchema.extend({
     classification: z.enum(CLASSIFICATIONS),
-    correctionReason: z
-      .string()
-      .trim()
-      .min(1)
-      .max(500)
-      .describe("What the new evidence showed that the old conclusion missed."),
+    correctionReason: cleanText(500).describe(
+      "What the new evidence showed that the old conclusion missed."
+    ),
     supersedesCaseId: z
       .uuid()
       .describe("The `caseId` of the active case this replaces."),
