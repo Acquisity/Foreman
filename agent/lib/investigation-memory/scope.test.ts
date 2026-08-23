@@ -28,6 +28,12 @@ test("featureForProject", async (t) => {
     assert.equal(featureForProject(undefined), null);
   });
 
+  await t.test("fails closed on an inherited object property name", () => {
+    for (const name of ["constructor", "toString", "__proto__", "valueOf"]) {
+      assert.equal(featureForProject(name), null, name);
+    }
+  });
+
   await t.test("never guesses from a symptom or a name", () => {
     assert.equal(featureForProject("Cold Email Agent"), null);
     assert.equal(featureForProject("cold_email"), null);

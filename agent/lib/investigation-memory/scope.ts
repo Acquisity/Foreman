@@ -96,7 +96,13 @@ export function featureForProject(
   if (typeof linearProjectId !== "string") {
     return null;
   }
-  return LINEAR_PROJECT_FEATURES[linearProjectId.toLowerCase()] ?? null;
+  // Own-property check, not a bare index: a plain object literal still
+  // inherits `constructor`, `toString`, and friends, and a lookup for one of
+  // those names would return a truthy function that `?? null` never catches.
+  const key = linearProjectId.toLowerCase();
+  return Object.hasOwn(LINEAR_PROJECT_FEATURES, key)
+    ? LINEAR_PROJECT_FEATURES[key]
+    : null;
 }
 
 /** Whether a model-supplied string is one of the known feature keys. */
