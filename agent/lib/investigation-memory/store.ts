@@ -381,6 +381,20 @@ export type WriteResult =
   | { caseId: string; created: false; reason: "already_recorded" }
   | { created: false; existingCaseId: string; reason: "active_case_exists" };
 
+/** Names of the constraints that mean "this ticket already has a live case". */
+const ACTIVE_CASE_CONSTRAINTS = [
+  "investigation_cases_one_active",
+  "investigation_cases_revision_unique",
+];
+
+/** Whether a driver error is the one-active-case conflict rather than anything else. */
+function isActiveCaseConflict(error: unknown): boolean {
+  if (error instanceof Error) {
+    return ACTIVE_CASE_CONSTRAINTS.some((name) => error.message.includes(name));
+  }
+  return false;
+}
+
 async function caseIdFor(
   sql: NeonQueryFunction<false, false>,
   key: string
@@ -439,14 +453,31 @@ export async function recordCase(
   }
 
   const id = randomUUID();
-  const rows = (await sql.query(
-    INSERT_SQL,
-    insertParams(id, feature, payload, classification, {
-      correctionReason: null,
-      revision: 1,
-      supersedesCaseId: null,
-    })
-  )) as { id: string }[];
+  let rows: { id: string }[];
+  try {
+    rows = (await sql.query(
+      INSERT_SQL,
+      insertParams(id, feature, payload, classification, {
+        correctionReason: null,
+        revision: 1,
+        supersedesCaseId: null,
+      })
+    )) as { id: string }[];
+  } catch (error) {
+    // Another attended session recorded this ticket between the pre-check and
+    // the insert. The database is the arbiter, so translate its conflict into
+    // the same structured answer the pre-check gives instead of handing the
+    // model a raw Postgres error.
+    if (isActiveCaseConflict(error)) {
+      const winner = await activeCase(sql, payload.sourceIssueId);
+      return {
+        created: false,
+        existingCaseId: winner?.id ?? "",
+        reason: "active_case_exists",
+      };
+    }
+    throw error;
+  }
   const [inserted] = rows;
   if (inserted) {
     return { caseId: inserted.id, created: true, revision: 1 };
