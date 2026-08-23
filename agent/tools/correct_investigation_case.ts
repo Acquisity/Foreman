@@ -61,8 +61,10 @@ export default defineTool({
         recorded: false as const,
       };
     } catch (error) {
+      console.error("Investigation memory correction failed.", error);
       return {
-        reason: error instanceof Error ? error.message : "Correction failed.",
+        reason:
+          "Investigation memory was unavailable. The prior investigation remains unchanged.",
         recorded: false as const,
       };
     }

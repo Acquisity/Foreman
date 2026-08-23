@@ -35,7 +35,7 @@ import { planetscaleAuth } from "../lib/constants.js";
 export default defineMcpClientConnection({
   auth: planetscaleAuth,
   description:
-    "PlanetScale Postgres, read-only: organizations, databases, branches, and query Insights.",
+    "PlanetScale production/customer Postgres, read-only: organizations, databases, branches, and query Insights. It is current production evidence, never investigation memory.",
   tools: {
     allow: [
       "planetscale_list_organizations",

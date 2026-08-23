@@ -24,7 +24,7 @@ export default defineMcpClientConnection({
     principalType: "user",
   }),
   description:
-    "Neon Postgres, read-only: projects, branches, schema, read queries, slow queries, explain plans, and logs.",
+    "Other Neon Postgres databases, read-only: projects, branches, schema, read queries, slow queries, explain plans, and logs. Unrelated to Foreman's investigation memory and never the PlanetScale production/customer database.",
   tools: {
     allow: [
       "list_projects",

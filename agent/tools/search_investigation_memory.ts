@@ -53,9 +53,11 @@ export default defineTool({
       });
       return { available: true as const, cases, cluster, primaryFeatureKey };
     } catch (error) {
+      console.error("Investigation memory search failed.", error);
       return {
         available: false as const,
-        reason: error instanceof Error ? error.message : "Search failed.",
+        reason:
+          "Investigation memory was unavailable. Continue from current evidence.",
       };
     }
   },
