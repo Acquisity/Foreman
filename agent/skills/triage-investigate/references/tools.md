@@ -30,7 +30,7 @@ Use the built-in `connection_search` to discover what a connection actually expo
 
 `search_investigation_memory` takes the ticket's Linear project id, which is what picks the product area. An unmapped project returns `available: false`, and so does an unreachable or unconfigured store; both are normal and neither blocks the investigation. Results are capped at 10, default 5.
 
-`record_investigation_case` runs once, after the Triage investigation document is attached and the classification is final. It refuses payloads carrying email addresses, organization or user ids, connection strings, or credential-shaped tokens, so keep those in the document. A second write for the same ticket is refused: a changed conclusion goes through `correct_investigation_case` with the case id from search.
+`record_investigation_case` runs once, after the Triage investigation document is attached and the classification is final. It refuses payloads carrying email addresses, organization or user ids, connection strings, or credential-shaped tokens, so keep those in the document. A second write for the same ticket is refused: a changed conclusion goes through `correct_investigation_case`, which takes the full corrected case plus the active case id. Keep the `caseId` the original write returned, since a later search is bounded by result limit and time window and may not surface the case you need to correct.
 
 Both writes are denied outright in sessions that are not authorized triage surfaces, and in unattended runs. The denial is the answer; there is no approval card to wait on.
 

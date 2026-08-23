@@ -93,6 +93,8 @@ Reduce the ticket to one testable sentence: what the user says happened, what th
 
 Only now, with the claim written and the ticket's Linear project read in Step 1, call `search_investigation_memory`. Pass the project id from the ticket, the claim or the visible error text, and the component, provider, and dependency keys you already know. The project is what picks the product area; never pass one inferred from the symptom, the title, or the repository.
 
+A ticket with no project has nothing to search. Record `Unavailable: no Linear project` in the report and carry on with the investigation. Do not invent a project id to satisfy the call, and do not pick the project of a ticket that merely looks similar. Routing already sends an unprojected ticket to Aaron Fraga.
+
 What comes back is past Foreman investigations, sanitized: no customer identity, no production rows. Treat each one as a candidate analogy and nothing more. For every plausible match, write into the report why it matches this claim and what evidence would disconfirm it, then go and check that evidence. A historical `User Error` verdict does not settle this ticket, and a historical root cause is not this ticket's root cause until the current code and current data say so.
 
 The affected counts on a case are the figures from that investigation on the date they were counted. They are never this ticket's blast radius. Count it again in 4.3.
@@ -277,7 +279,7 @@ The product area comes from the ticket's Linear project. Affected features go in
 
 A failure here changes nothing about the ticket. Say so internally and move on. Do not retry into a second case, do not hold the comment, and do not revisit the verdict.
 
-If later evidence overturns a conclusion you already recorded, use `correct_investigation_case` with the case id and what the new evidence showed. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
+If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it, or from a search for this ticket. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 
 ## Follow-ups
 
