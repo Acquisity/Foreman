@@ -7,6 +7,7 @@ import {
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
+import { slackIntakeContext } from "../lib/slack-intake.js";
 import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -23,8 +24,8 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * Channels listed in SLACK_INTAKE_ONLY_CHANNELS are intake-only: their
  * mentions stay trusted, so conversation and investigation run as normal, but
  * the session is stamped intake-only and intakeOnlyPolicy denies every push,
- * on the direct path and inside the stations alike. INTAKE_ONLY_TASK tells
- * the model to file the change as a Linear issue instead.
+ * on the direct path and inside the stations alike. The channel mapping tells
+ * the model which intake workflow and skills to use.
  *
  * Those channels also never show a sign-in prompt: user-scoped connections
  * authorize through `userConnect`, which denies a missing grant instead of
@@ -46,15 +47,6 @@ import { stampIntakeOnly, stampTrusted } from "../lib/trust.js";
  * DM parked on an approval card that Slack cannot deliver an answer to.
  */
 
-// Task injected into a mention from an intake-only channel. The hard gate is
-// intakeOnlyPolicy on the push tools, which denies delivery for these
-// sessions; this text tells the model what to do instead.
-const INTAKE_ONLY_TASK = [
-  "This message came from a Slack channel that is intake-only: nobody there can authorize shipping code, so treat it as a request to be routed, not as a work order to execute here.",
-  "Answer questions and investigate as deeply as the thread needs, reading the repository included. Do not deliver a change: no pushed branch and no pull request, on either path. Pushing is denied for this session, so there is no way around it and no reason to try.",
-  "If the message is a work item (a fix, a build, or a change request), create a Linear issue that captures it along with anything you found, leave it unassigned for triage, and tell the requester it has been filed and will be picked up from the tracker.",
-].join("\n\n");
-
 const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
   const auth = defaultSlackAuth(message, ctx);
   if (auth === null) {
@@ -68,7 +60,10 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
       ? stampRepository(trusted, repository.slug, "explicit")
       : trusted;
   return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
-    ? { auth: stampIntakeOnly(stamped), context: [INTAKE_ONLY_TASK] }
+    ? {
+        auth: stampIntakeOnly(stamped),
+        context: [slackIntakeContext(message.channelId)],
+      }
     : { auth: stamped };
 };
 

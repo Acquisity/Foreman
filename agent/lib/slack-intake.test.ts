@@ -7,7 +7,11 @@ import {
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
-import { parseIntakeOnlyChannels } from "./slack-intake.js";
+import {
+  parseIntakeOnlyChannels,
+  resolveSlackIntakeWorkflow,
+  slackIntakeContext,
+} from "./slack-intake.js";
 import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
 import {
   INTAKE_ONLY_SIGN_IN_REASON,
@@ -37,6 +41,61 @@ describe("intake-only channels", () => {
     assert.equal(parseIntakeOnlyChannels("#product-requests").size, 0);
     assert.equal(
       parseIntakeOnlyChannels("c0bbpvc3n2x").has("C0BBPVC3N2X"),
+      true
+    );
+  });
+
+  it("maps product triage and its sandbox to the same existing-issue workflow", () => {
+    const production = resolveSlackIntakeWorkflow("C0BBPVC3N2X");
+    const sandbox = resolveSlackIntakeWorkflow("C0BLFDUN6Q7");
+    assert.deepEqual(production, sandbox);
+    assert.equal(production?.mode, "existing-linear-issue");
+    assert.deepEqual(production?.skills, [
+      "triage-investigate",
+      "clarify-with-requester",
+      "slack-wording",
+    ]);
+  });
+
+  it("maps billing triage to its existing-issue workflow", () => {
+    const workflow = resolveSlackIntakeWorkflow("C0BC011NAQL");
+    assert.equal(workflow?.mode, "existing-linear-issue");
+    assert.deepEqual(workflow?.skills, [
+      "billing-triage",
+      "clarify-with-requester",
+      "slack-wording",
+    ]);
+  });
+
+  it("maps Intercom and its sandbox to the generic new-issue workflow", () => {
+    const production = resolveSlackIntakeWorkflow("C0BCV1WBR42");
+    const sandbox = resolveSlackIntakeWorkflow("C0BNCL031AQ");
+    assert.deepEqual(production, sandbox);
+    assert.equal(production?.mode, "new-linear-issue");
+    assert.deepEqual(production?.skills, []);
+  });
+
+  it("instructs existing-issue channels not to create duplicates", () => {
+    const context = slackIntakeContext("C0BBPVC3N2X");
+    assert.equal(
+      context.includes("Never create a duplicate Linear issue"),
+      true
+    );
+    assert.equal(context.includes("exactly one existing Linear issue"), true);
+    assert.equal(context.includes("Linear link or identifier"), true);
+    assert.equal(context.includes("triage-investigate"), true);
+  });
+
+  it("instructs new-issue channels to file once and stop", () => {
+    const context = slackIntakeContext("C0BCV1WBR42");
+    assert.equal(
+      context.includes("Create exactly one unassigned Linear issue"),
+      true
+    );
+    assert.equal(context.includes("stop before implementation"), true);
+    assert.equal(context.includes("no dedicated channel skill yet"), true);
+    assert.equal(
+      context.includes("start the factory implementation pipeline"),
       true
     );
   });
