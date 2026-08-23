@@ -1,5 +1,6 @@
 import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import {
+  canUseInvestigationMemory,
   isIntakeOnly,
   isScheduleAppAuth,
   isTrusted,
@@ -193,3 +194,36 @@ export const userPreferencesDeletionPolicy = (
         type: "denied",
       }
     : "not-applicable";
+
+/**
+ * Writing a completed investigation into shared memory.
+ *
+ * @remarks
+ * Denied rather than parked, like every other gate here: Slack and Linear
+ * cannot answer an approval card, and an unattended run has nobody to answer
+ * one at all. The gate is the memory stamp plus an attended session, both
+ * fail-closed. The stamp is the trust decision for this capability, taken at
+ * dispatch on a signed webhook and deliberately narrower than
+ * {@link isTrusted}: a trusted GitHub collaborator never carries it. The tools
+ * check the same authority in `execute`, so the boundary does not depend on
+ * this policy being wired.
+ */
+export const investigationMemoryWritePolicy = (
+  ctx: ApprovalContext
+): ApprovalStatus => {
+  const auth = ctx.session.auth.current;
+  if (isUnattended(auth)) {
+    return {
+      reason: "Unattended runs may not write investigation memory.",
+      type: "denied",
+    };
+  }
+  if (!canUseInvestigationMemory(auth)) {
+    return {
+      reason:
+        "This session is not authorized for investigation memory. Complete the investigation on the ticket and leave memory to an authorized triage session.",
+      type: "denied",
+    };
+  }
+  return "not-applicable";
+};

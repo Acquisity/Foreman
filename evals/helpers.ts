@@ -34,11 +34,14 @@ export const GITHUB_WRITE_TOOLS = [
  * {@link GITHUB_WRITE_TOOLS}, so a read-only turn that reaches for the shared
  * repository knowledge fails. Read-only knowledge and artifact tools are
  * deliberately absent because reading them is always
- * allowed. The station-side `save_artifact` never mounts on the root, so it
- * does not belong here either.
+ * allowed, and so is `search_investigation_memory`, which only reads. The
+ * station-side `save_artifact` never mounts on the root, so it does not belong
+ * here either.
  */
 export const ROOT_WRITE_TOOLS = [
+  "correct_investigation_case",
   "push_branch",
+  "record_investigation_case",
   "record_pipeline_run",
   "set_agent_models",
   "update_repository_knowledge",

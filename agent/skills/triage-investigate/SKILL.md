@@ -89,6 +89,20 @@ Work the lanes in order. Every lane is recorded in the Triage investigation docu
 
 Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
 
+### 4.1A Search investigation memory
+
+Only now, with the claim written and the ticket's Linear project read in Step 1, call `search_investigation_memory`. Pass the project id from the ticket, the claim or the visible error text, and the component, provider, and dependency keys you already know. The project is what picks the product area; never pass one inferred from the symptom, the title, or the repository.
+
+What comes back is past Foreman investigations, sanitized: no customer identity, no production rows. Treat each one as a candidate analogy and nothing more. For every plausible match, write into the report why it matches this claim and what evidence would disconfirm it, then go and check that evidence. A historical `User Error` verdict does not settle this ticket, and a historical root cause is not this ticket's root cause until the current code and current data say so.
+
+The affected counts on a case are the figures from that investigation on the date they were counted. They are never this ticket's blast radius. Count it again in 4.3.
+
+`possibleWiderIncident` means several independent tickets recently landed in this scope. That is a reason to look at current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident. It is not an incident, and it does not create a master ticket, set a priority, or declare an outage on its own.
+
+`available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the project may not be mapped to a product area. Note it and investigate from scratch, exactly as the rest of this skill describes.
+
+Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided by Step 3 against current Linear.
+
 ### 4.2 Locate it in the code
 
 `prepare_repository` with `Acquisity/Acquisity`, which refreshes the checkout to the remote HEAD and returns the `worktree` path. Then `grep` and `read_file` under that path to find the code path the claim runs through. Answer what the code is supposed to do before deciding whether it did it.
@@ -101,7 +115,7 @@ A claim you cannot place in the code is not ready for a Bug verdict.
 
 `planetscale_execute_read_query`, scoped to the organization pinned in Step 1A. Read the rows the claim is about and say whether production state matches the claim, contradicts it, or is silent on it. Prefer a bounded `COUNT` or a narrow `SELECT`.
 
-PlanetScale is the production database and the only database this skill reads. Customer data is never in Neon; a triage investigation has no reason to open that connection.
+PlanetScale is the production database and the only source of current production truth. Customer data is never in Neon; a triage investigation has no reason to open the `neon__*` connection. Foreman's investigation memory is a different thing again: an internal, sanitized index of its own past investigations, holding no customer data and no production evidence. It never substitutes for this lane.
 
 Then count the blast radius, unscoped from this customer: how many distinct orgs and users are in the same state, each counted once however many times they reported it. Always attempt it, and aim for an exact figure from a query, not an estimate and not an adjective. Record the query and the date counted alongside the number, because the count ages.
 
@@ -253,6 +267,18 @@ Internal notes go in the Triage investigation document, never in the ticket comm
 
 Load the slack-wording skill before writing. Give a concrete finding, hand the next steps to the opener, check whose lane it is, and keep it to one to three sentences at the floor.
 
+## Step 11 — Record the investigation in memory
+
+Last, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. Not before: a case written from a half-finished investigation is a wrong answer that the next ticket inherits.
+
+Send the pattern, not the customer. The claim, the root cause, the symptoms in the product's own words, the error signatures with identifiers stripped, the code path and commit from 4.2, the conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), the counts with the date they were counted, and the links back to the ticket. Never an email address, an organization or user id, a production row, a log, or anything credential-shaped. Those live in the document, under the ticket's own visibility, and the tool refuses them.
+
+The product area comes from the ticket's Linear project. Affected features go in only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
+
+A failure here changes nothing about the ticket. Say so internally and move on. Do not retry into a second case, do not hold the comment, and do not revisit the verdict.
+
+If later evidence overturns a conclusion you already recorded, use `correct_investigation_case` with the case id and what the new evidence showed. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
+
 ## Follow-ups
 
 Answer follow-ups with the gathered evidence, keep the internal detail in the document, cap the back-and-forth, and on the third reply give a clear close.
@@ -356,6 +382,12 @@ The cause, not the mechanism.
 ## Evidence
 Every lane from 4.2 through 4.4: the queries run and what they returned,
 or `Not applicable: <reason>`, or `Could not run: <reason>`.
+
+## Prior cases
+Each match from 4.1A: the ticket it came from, why it looked like this
+claim, and what current evidence confirmed or disconfirmed it. `None`
+when memory returned nothing, `Unavailable: <reason>` when it could not
+be searched.
 
 ## Blast radius
 N orgs and N users as an exact figure, or the tightest bound with what

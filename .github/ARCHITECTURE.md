@@ -37,6 +37,8 @@ Readiness requires all of: internal approval for the current head, passing requi
 
 `agent/lib/trust.ts` is the sole caller-trust authority. Autonomous runs are denied writes to shared repository knowledge, global model configuration, and write-capable non-GitHub connections. Trusted attended callers write directly; other callers receive approval prompts.
 
+Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, the routed Slack intake channels, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
+
 ## Storage
 
 All Blob namespaces are registered in `agent/lib/blob.ts`.
@@ -47,7 +49,9 @@ All Blob namespaces are registered in `agent/lib/blob.ts`.
 - `user-preferences/<principal-hash>.md`: private principal preferences.
 - `artifacts/<validated-id>.md`: write-once station handoffs.
 
-Supermemory is available for broader attended-session recall, never as repository authority or autonomous shared memory.
+Supermemory is available for broader attended-session recall, never as repository authority or autonomous shared memory, and never the backing store for investigation memory.
+
+Investigation memory is a private Foreman-owned Postgres database, separate from Blob, from Acquisity production data, and from the read-only `neon__*` MCP connection. `FOREMAN_MEMORY_DATABASE_URL` is server-side only. `migrations/` holds the schema, applied explicitly with `pnpm db:migrate`, never at agent startup. One row per completed triage investigation, scoped by the tenant key plus one primary feature derived from the ticket's Linear project, with evidence-backed affected features and dependency keys alongside it. Corrections insert a new revision and supersede the old one in the same transaction; nothing is deleted. Rows carry sanitized patterns only, with customer identity, production rows, and credentials rejected at the tool boundary and left in the ticket's `Triage investigation` document. `agent/lib/investigation-memory/` owns the taxonomy, the schemas, and the store.
 
 ## Verification
 

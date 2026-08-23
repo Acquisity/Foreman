@@ -14,6 +14,9 @@ importers:
       '@github-tools/eve-extension':
         specifier: ^0.3.2
         version: 0.3.2(@vercel/connect@0.8.0(ai@7.0.63(zod@4.4.3))(eve@0.44.0(@vercel/blob@2.8.0)(ai@7.0.63(zod@4.4.3))(chokidar@4.0.3)(lru-cache@11.5.2)))(ai@7.0.63(zod@4.4.3))(eve@0.44.0(@vercel/blob@2.8.0)(ai@7.0.63(zod@4.4.3))(chokidar@4.0.3)(lru-cache@11.5.2))
+      '@neondatabase/serverless':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@vercel/blob':
         specifier: ^2.8.0
         version: 2.8.0
@@ -333,6 +336,10 @@ packages:
         optional: true
       workflow:
         optional: true
+
+  '@neondatabase/serverless@1.1.0':
+    resolution: {integrity: sha512-r3ZZhRjEcfEdKIZnoB1RusNgvHuaBRqfCzV4Gi+5A9yUX0S4HTws/ASWqt13wL4y4I+0rqsWGdA2w7EQXHi3+Q==}
+    engines: {node: '>=19.0.0'}
 
   '@octokit/app@16.1.4':
     resolution: {integrity: sha512-g70WONQyGoBgqIJtv4O0MUEfOF1iJpTfFt3qAW7HaiwiJ6k607xg/gBezCa4tuq6BpO6qXn7qvq8v9tjWtgGQg==}
@@ -1448,6 +1455,8 @@ snapshots:
     optionalDependencies:
       '@vercel/connect': 0.8.0(ai@7.0.63(zod@4.4.3))(eve@0.44.0(@vercel/blob@2.8.0)(ai@7.0.63(zod@4.4.3))(chokidar@4.0.3)(lru-cache@11.5.2))
       eve: 0.44.0(@vercel/blob@2.8.0)(ai@7.0.63(zod@4.4.3))(chokidar@4.0.3)(lru-cache@11.5.2)
+
+  '@neondatabase/serverless@1.1.0': {}
 
   '@octokit/app@16.1.4':
     dependencies:
