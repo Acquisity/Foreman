@@ -85,6 +85,14 @@ Load the clarify-with-requester skill and run Gate 1 before investigating furthe
 
 Work the lanes in order. Every lane is recorded in the Triage investigation document, including the ones that did not apply. A lane with no entry reads as skipped, and a verdict standing on skipped lanes is not a verdict.
 
+Keep the three database surfaces separate:
+
+- PlanetScale is the read-only production and customer-data database. Reach it only through `planetscale_execute_read_query` for current production evidence.
+- Investigation memory is Foreman's own private Postgres store of sanitized past-investigation patterns. Reach it only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`. It holds no customer data and is never current production evidence.
+- The `neon__*` connection is for investigating other Neon databases. It is unrelated to investigation memory.
+
+Never locate, inspect, or verify a database in order to use investigation memory. Do not list projects, inspect schemas or roles, count its rows, test SQL, look for credentials, or use `neon__*` on memory's behalf. The three memory tools are the whole interface. If a memory tool answers, its wiring is working. If it returns `available: false` or a write fails, record that only in the investigation document when relevant and carry on. Memory availability never changes the verdict or delays the Slack reply.
+
 ### 4.1 State the claim
 
 Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
@@ -101,7 +109,7 @@ The affected counts on a case are the figures from that investigation on the dat
 
 `possibleWiderIncident` means several independent tickets recently landed in this scope. That is a reason to look at current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident. It is not an incident, and it does not create a master ticket, set a priority, or declare an outage on its own.
 
-`available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the project may not be mapped to a product area. Note it and investigate from scratch, exactly as the rest of this skill describes.
+`available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the project may not be mapped to a product area. Note it in the investigation document and investigate from scratch, exactly as the rest of this skill describes. Never go looking for the backing database or try another database connection to diagnose it.
 
 Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided by Step 3 against current Linear.
 
@@ -117,7 +125,7 @@ A claim you cannot place in the code is not ready for a Bug verdict.
 
 `planetscale_execute_read_query`, scoped to the organization pinned in Step 1A. Read the rows the claim is about and say whether production state matches the claim, contradicts it, or is silent on it. Prefer a bounded `COUNT` or a narrow `SELECT`.
 
-PlanetScale is the production database and the only source of current production truth. Customer data is never in Neon; a triage investigation has no reason to open the `neon__*` connection. Foreman's investigation memory is a different thing again: an internal, sanitized index of its own past investigations, holding no customer data and no production evidence. It never substitutes for this lane.
+PlanetScale is the production database and the only source of current production truth. Use the root `planetscale_execute_read_query` tool for this lane. Customer data is never in Neon, and neither the `neon__*` connection nor investigation memory substitutes for this lane.
 
 Then count the blast radius, unscoped from this customer: how many distinct orgs and users are in the same state, each counted once however many times they reported it. Always attempt it, and aim for an exact figure from a query, not an estimate and not an adjective. Record the query and the date counted alongside the number, because the count ages.
 
@@ -277,7 +285,7 @@ Send the pattern, not the customer. The claim, the root cause, the symptoms in t
 
 The product area comes from the ticket's Linear project. Affected features go in only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
 
-A failure here changes nothing about the ticket. Say so internally and move on. Do not retry into a second case, do not hold the comment, and do not revisit the verdict.
+A failure here changes nothing about the ticket. Record it internally when useful and move on. Do not retry into a second case, do not hold the comment, and do not revisit the verdict. Never announce a memory read or write, promise to save something to memory, or mention memory availability in the Slack thread.
 
 If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. A plain search is ranked, capped, and bounded by a time window, so a ticket's own case can fall outside it; adding the ticket identifier drops the relevance filters and the time window and returns the case however old it is. Still pass the project id, which the call always requires. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 

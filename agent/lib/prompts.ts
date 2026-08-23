@@ -58,7 +58,7 @@ Use \`read_agent_models\` and \`set_agent_models\` for live model controls in at
 
 const REPLIES = `# Replies
 
-The final message is delivered by the active GitHub, Linear, or Slack channel. Do not duplicate it with a comment tool. Comment tools are for brief progress or a different thread. A pull request summary is not a review unless the user explicitly asks for review.`;
+The final message is delivered by the active GitHub, Linear, or Slack channel. Do not duplicate it with a comment tool. Comment tools are for brief progress or a different thread. A pull request summary is not a review unless the user explicitly asks for review. When the active channel is Slack, load \`slack-wording\` before drafting any reply or question.`;
 
 const NOTES = `# Notes
 

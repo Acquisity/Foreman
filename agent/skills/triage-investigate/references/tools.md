@@ -26,13 +26,19 @@ Use the built-in `connection_search` to discover what a connection actually expo
 
 ## Investigation memory (root tools, no prefix)
 
-`search_investigation_memory`, `record_investigation_case`, `correct_investigation_case` are authored tools in `agent/tools/`. They read and write Foreman's own sanitized index of its past investigations. This is not a customer database and not production evidence, and it is unrelated to the `neon__*` connection.
+There are three separate database surfaces:
+
+- PlanetScale is the read-only production and customer-data database. Current production evidence comes only from the root `planetscale_execute_read_query` tool.
+- Investigation memory is Foreman's own private Postgres store of sanitized past-investigation patterns. It holds no customer data and is reached only through the three root tools in this section.
+- The `neon__*` connection investigates other Neon databases. It is unrelated to investigation memory and must never be used to locate, inspect, verify, or repair memory.
+
+`search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case` are authored tools in `agent/tools/`. They are the whole interface to investigation memory. Never list database projects, inspect schemas, roles, indexes, or rows, test SQL, look for credentials, or otherwise hunt for a backing database. If one of these tools answers, the memory wiring is working. If it returns `available: false` or a write fails, record that internally when relevant and continue the investigation without trying another database connection.
 
 `search_investigation_memory` takes the ticket's Linear project id, which is what picks the product area. Pass `sourceIssueId` alongside that project id to look up one ticket's own case, which is how you find the case id to correct. That form ignores the relevance filters and the time window. The project id is still required and still has to be mapped, but that is a check at the tool boundary rather than the scope of the lookup itself: the query matches on the ticket, and an unmapped project returns `available: false` before it runs. An unmapped project returns `available: false`, and so does an unreachable or unconfigured store; both are normal and neither blocks the investigation. Results are capped at 10, default 5.
 
 `record_investigation_case` runs once, after the Triage investigation document is attached and the classification is final. It refuses payloads carrying email addresses, organization or user ids, connection strings, or credential-shaped tokens, so keep those in the document. A second write for the same ticket is refused: a changed conclusion goes through `correct_investigation_case`, which takes the full corrected case plus the active case id. Keep the `caseId` the original write returned. A later session will not have it, so pass `sourceIssueId` to `search_investigation_memory` to get it back. That is an identity lookup rather than a search: it ignores the relevance filters and the time window, so neither ranking nor a case older than a year can hide it. The result cap still applies, which costs nothing here because a ticket has exactly one active case.
 
-Both writes are denied outright in sessions that are not authorized triage surfaces, and in unattended runs. The denial is the answer; there is no approval card to wait on.
+Both writes are denied outright in sessions that are not authorized triage surfaces, and in unattended runs. The denial is the answer; there is no approval card to wait on. Memory reads, writes, and availability are internal bookkeeping and never belong in a Slack-facing reply.
 
 ## PlanetScale (`planetscale__`)
 

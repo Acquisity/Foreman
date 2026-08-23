@@ -6,7 +6,7 @@ description: "Mandatory wording rules for any message posted to a Slack thread â
 
 The audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it.
 
-Scope: replies in a ticket thread, where the reader may forward the message onward. Internal engineering reports that exist to route work, such as the daily SLA report, are not in scope and carry their own format; they need ticket links, assignee tags, and root cause, all of which the rules below forbid.
+Scope: every conversational Slack reply or question, including ticket threads, where the reader may forward the message onward. Internal engineering reports that exist to route work, such as the daily SLA report, are not in scope and carry their own format; they need ticket links, assignee tags, and root cause, all of which the rules below forbid.
 
 ## Never in a Slack-facing message
 
@@ -14,7 +14,11 @@ Scope: replies in a ticket thread, where the reader may forward the message onwa
 - Internal dev names, assignees, project owners â€” say "the team" or "our team" or "our devs".
 - Code, SQL, stack traces, raw logs, raw IDs, technical implementation detail.
 - Your own tooling/access/capability limits.
+- Internal storage or memory bookkeeping: database or connection health, access levels, schemas, row counts, whether a tool reached a store, and whether a memory read or write succeeded.
+- Promises or narration about internal operations, including "I'll write this to memory", "I'll save this for later", or "I couldn't reach the database". Do the internal operation silently when the procedure calls for it.
 - Instructions to follow updates elsewhere.
+
+If missing evidence materially limits the answer, name the product fact that remains unconfirmed, not the failed tool, connection, or database. If it does not change the answer or next step, omit it. Never claim evidence was checked when it was not.
 
 ## Verdict phrasing per classification
 

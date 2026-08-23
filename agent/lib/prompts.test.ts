@@ -41,4 +41,14 @@ describe("selectPrompt", () => {
   it("does not name any channel in general-mode routing", () => {
     assert.ok(!CHANNEL_NAME.test(GENERAL_MODE));
   });
+
+  it("requires the Slack wording skill on both root paths", () => {
+    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
+      assert.ok(
+        prompt.includes(
+          "When the active channel is Slack, load `slack-wording` before drafting any reply or question."
+        )
+      );
+    }
+  });
 });
