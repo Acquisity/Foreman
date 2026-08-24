@@ -100,6 +100,7 @@ test("Intercom skills own their tool references", () => {
     "## Intercom (`intercom__`)",
     "search_investigation_memory",
     "omit `linearProjectId`",
+    "known conversation id",
   ]) {
     assert.ok(productTools.includes(phrase), phrase);
   }
