@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { type NeonQueryFunction, neon } from "@neondatabase/serverless";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type {
   CasePayload,
   CaseProjection,
@@ -8,6 +8,11 @@ import type {
   Confidence,
 } from "./case.js";
 import { searchText } from "./case.js";
+import {
+  isMemoryDatabaseConfigured,
+  MemoryUnavailableError,
+  memoryDatabase,
+} from "./database.js";
 import {
   type FeatureKey,
   isFeatureKey,
@@ -51,34 +56,8 @@ export const DEFAULT_SEARCH_WINDOW_DAYS = 365;
 export const CLUSTER_WINDOW_DAYS = 14;
 export const CLUSTER_MIN_REPORTS = 3;
 
-/** The store could not be reached. Never a reason to hold a ticket. */
-export class MemoryUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MemoryUnavailableError";
-  }
-}
-
-let client: NeonQueryFunction<false, false> | null = null;
-
-function db(): NeonQueryFunction<false, false> {
-  if (client !== null) {
-    return client;
-  }
-  const url = process.env.FOREMAN_MEMORY_DATABASE_URL;
-  if (!url) {
-    throw new MemoryUnavailableError(
-      "FOREMAN_MEMORY_DATABASE_URL is not set, so investigation memory is unavailable."
-    );
-  }
-  client = neon(url);
-  return client;
-}
-
 /** Whether the deployment has an investigation-memory database configured. */
-export const isConfigured = (): boolean =>
-  typeof process.env.FOREMAN_MEMORY_DATABASE_URL === "string" &&
-  process.env.FOREMAN_MEMORY_DATABASE_URL !== "";
+export const isConfigured = isMemoryDatabaseConfigured;
 
 /**
  * The deterministic key that makes a write replay-safe.
@@ -356,7 +335,7 @@ export const GLOBAL_CLUSTER_SQL = `SELECT
  * dependency matches.
  */
 export async function searchCases(params: SearchParams): Promise<SearchResult> {
-  const sql = db();
+  const sql = memoryDatabase();
   const limit = Math.min(
     Math.max(params.limit ?? DEFAULT_SEARCH_LIMIT, 1),
     MAX_SEARCH_LIMIT
@@ -427,7 +406,7 @@ interface ClusterRow {
 export async function searchCasesAcrossLiveFeatures(
   params: GlobalSearchParams
 ): Promise<GlobalSearchResult> {
-  const sql = db();
+  const sql = memoryDatabase();
   const featureKeys = [...LIVE_FEATURE_KEYS];
 
   const limit = Math.min(
@@ -584,7 +563,13 @@ function insertParams(
 export type WriteResult =
   | { caseId: string; created: true; revision: number }
   | { caseId: string; created: false; reason: "already_recorded" }
-  | { created: false; existingCaseId: string; reason: "active_case_exists" };
+  | { created: false; existingCaseId: string; reason: "active_case_exists" }
+  | { created: false; reason: "authorization_failed" };
+
+export interface CaseWriteOptions {
+  readonly authorizeWrite?: () => Promise<boolean>;
+  readonly database?: NeonQueryFunction<false, false>;
+}
 
 /** Names of the constraints that mean "this ticket already has a live case". */
 const ACTIVE_CASE_CONSTRAINTS = [
@@ -646,9 +631,10 @@ async function activeCase(
 export async function recordCase(
   feature: FeatureKey,
   payload: CasePayload,
-  classification: Classification
+  classification: Classification,
+  options: CaseWriteOptions = {}
 ): Promise<WriteResult> {
-  const sql = db();
+  const sql = options.database ?? memoryDatabase();
   const key = idempotencyKey(
     payload.sourceIssueId,
     classification,
@@ -667,6 +653,10 @@ export async function recordCase(
       existingCaseId: existing.id,
       reason: "active_case_exists",
     };
+  }
+
+  if (options.authorizeWrite && !(await options.authorizeWrite())) {
+    return { created: false, reason: "authorization_failed" };
   }
 
   const id = randomUUID();
@@ -724,6 +714,7 @@ export type CorrectionResult =
       supersededCaseId: string;
     }
   | { caseId: string; created: false; reason: "already_recorded" }
+  | { created: false; reason: "authorization_failed" }
   | { created: false; reason: "prior_case_not_active" }
   | { created: false; reason: "prior_case_other_ticket" };
 
@@ -742,9 +733,10 @@ export async function correctCase(
   payload: CasePayload,
   classification: Classification,
   supersedesCaseId: string,
-  correctionReason: string
+  correctionReason: string,
+  options: CaseWriteOptions = {}
 ): Promise<CorrectionResult> {
-  const sql = db();
+  const sql = options.database ?? memoryDatabase();
   // Read the prior case whatever its status. A correction that already
   // succeeded leaves it superseded, and filtering on `active` here would make
   // a replay of that completed write look like a failure before the
@@ -805,6 +797,10 @@ export async function correctCase(
   // the case it names has to still be the live one.
   if (prior.status !== "active") {
     return { created: false, reason: "prior_case_not_active" };
+  }
+
+  if (options.authorizeWrite && !(await options.authorizeWrite())) {
+    return { created: false, reason: "authorization_failed" };
   }
 
   const id = randomUUID();

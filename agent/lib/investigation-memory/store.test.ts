@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { caseProjectionSchema } from "./case.js";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { casePayloadSchema, caseProjectionSchema } from "./case.js";
 import {
   type CaseRow,
   CLUSTER_MIN_REPORTS,
+  correctCase,
   DEFAULT_SEARCH_LIMIT,
   featureClusterSignalsFromCounts,
   GLOBAL_CLUSTER_SQL,
@@ -11,7 +13,22 @@ import {
   isConfigured,
   MAX_SEARCH_LIMIT,
   projectCase,
+  recordCase,
 } from "./store.js";
+
+const writePayload = casePayloadSchema.parse({
+  claim: "Campaign sends stopped.",
+  confidence: "high",
+  linearProjectId: "1ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+  rootCause: "The scheduler dropped the dispatch transition.",
+  sourceIssueId: "ENG-123",
+  sourceIssueUrl: "https://linear.app/acquisity/issue/ENG-123/example",
+});
+
+const fakeDatabase = (
+  query: (statement: string, params?: unknown[]) => Promise<unknown>
+): NeonQueryFunction<false, false> =>
+  ({ query }) as unknown as NeonQueryFunction<false, false>;
 
 test("case projection converts Neon Date values to plain JSON", () => {
   const row: CaseRow = {
@@ -185,4 +202,124 @@ test("isConfigured reports the store as unavailable when unset", () => {
   } else {
     process.env.FOREMAN_MEMORY_DATABASE_URL = previous;
   }
+});
+
+test("record authorization is claimed only after replay and active-case checks", async () => {
+  let claims = 0;
+  const authorizeWrite = () => {
+    claims += 1;
+    return Promise.resolve(false);
+  };
+  const replay = await recordCase("cold_email", writePayload, "bug", {
+    authorizeWrite,
+    database: fakeDatabase(() => Promise.resolve([{ id: "case-replay" }])),
+  });
+  assert.equal(replay.created, false);
+  if (replay.created) {
+    assert.fail("A replay must not create a case.");
+  }
+  assert.equal(replay.reason, "already_recorded");
+  assert.equal(claims, 0);
+
+  const active = await recordCase("cold_email", writePayload, "bug", {
+    authorizeWrite,
+    database: fakeDatabase((statement) =>
+      Promise.resolve(
+        statement.includes("status = 'active'")
+          ? [{ id: "case-active", revision: 1 }]
+          : []
+      )
+    ),
+  });
+  assert.equal(active.created, false);
+  if (active.created) {
+    assert.fail("An existing active case must prevent a write.");
+  }
+  assert.equal(active.reason, "active_case_exists");
+  assert.equal(claims, 0);
+
+  const statements: string[] = [];
+  const denied = await recordCase("cold_email", writePayload, "bug", {
+    authorizeWrite,
+    database: fakeDatabase((statement) => {
+      statements.push(statement);
+      return Promise.resolve([]);
+    }),
+  });
+  assert.equal(denied.created, false);
+  if (denied.created) {
+    assert.fail("Denied authorization must prevent a write.");
+  }
+  assert.equal(denied.reason, "authorization_failed");
+  assert.equal(claims, 1);
+  assert.equal(
+    statements.some((statement) => statement.includes("INSERT")),
+    false
+  );
+});
+
+test("correction authorization is claimed only after predecessor validation", async () => {
+  let claims = 0;
+  const authorizeWrite = () => {
+    claims += 1;
+    return Promise.resolve(false);
+  };
+  const missing = await correctCase(
+    "cold_email",
+    writePayload,
+    "bug",
+    "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+    "New evidence changed the conclusion.",
+    {
+      authorizeWrite,
+      database: fakeDatabase(() => Promise.resolve([])),
+    }
+  );
+  assert.equal(missing.created, false);
+  if (missing.created) {
+    assert.fail("A missing predecessor must prevent a correction.");
+  }
+  assert.equal(missing.reason, "prior_case_not_active");
+  assert.equal(claims, 0);
+
+  const statements: string[] = [];
+  const denied = await correctCase(
+    "cold_email",
+    writePayload,
+    "bug",
+    "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+    "New evidence changed the conclusion.",
+    {
+      authorizeWrite,
+      database: fakeDatabase((statement) => {
+        statements.push(statement);
+        return Promise.resolve(
+          statement.startsWith("SELECT id, revision, source_issue_id, status")
+            ? [
+                {
+                  id: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+                  revision: 1,
+                  source_issue_id: "ENG-123",
+                  status: "active",
+                },
+              ]
+            : []
+        );
+      }),
+    }
+  );
+  assert.equal(denied.created, false);
+  if (denied.created) {
+    assert.fail("Denied authorization must prevent a correction.");
+  }
+  assert.equal(denied.reason, "authorization_failed");
+  assert.equal(claims, 1);
+  assert.equal(
+    statements.some((statement) => statement.includes("UPDATE")),
+    false
+  );
+  assert.equal(
+    statements.some((statement) => statement.includes("INSERT")),
+    false
+  );
 });

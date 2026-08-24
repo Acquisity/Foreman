@@ -16,6 +16,27 @@ const WRITE_TOOLS = [
   "add_toolbar_reaction",
 ] as const;
 
+export const VERCEL_READ_TOOLS = [
+  "search_vercel_documentation",
+  "list_teams",
+  "list_projects",
+  "get_project",
+  "list_deployments",
+  "get_deployment",
+  "get_deployment_build_logs",
+  "get_runtime_logs",
+  "get_runtime_errors",
+  "get_web_analytics",
+  "list_agent_run_projects",
+  "list_agent_runs",
+  "get_agent_run",
+  "get_agent_run_trace",
+  "get_access_to_vercel_url",
+  "web_fetch_vercel_url",
+  "list_toolbar_threads",
+  "get_toolbar_thread",
+] as const;
+
 /**
  * Vercel MCP connection for deployment observability and attended deploys.
  *
@@ -45,27 +66,7 @@ export default defineMcpClientConnection({
   description:
     "Vercel platform: projects, deployments, build and runtime logs, runtime errors, web analytics, toolbar threads, deploys, and Vercel documentation search.",
   tools: {
-    allow: [
-      "search_vercel_documentation",
-      "list_teams",
-      "list_projects",
-      "get_project",
-      "list_deployments",
-      "get_deployment",
-      "get_deployment_build_logs",
-      "get_runtime_logs",
-      "get_runtime_errors",
-      "get_web_analytics",
-      "list_agent_run_projects",
-      "list_agent_runs",
-      "get_agent_run",
-      "get_agent_run_trace",
-      "get_access_to_vercel_url",
-      "web_fetch_vercel_url",
-      "list_toolbar_threads",
-      "get_toolbar_thread",
-      ...WRITE_TOOLS,
-    ],
+    allow: [...VERCEL_READ_TOOLS, ...WRITE_TOOLS],
   },
   url: "https://mcp.vercel.com",
 });

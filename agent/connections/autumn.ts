@@ -30,6 +30,19 @@ const READ_SCOPES = [
 
 const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
 
+export const AUTUMN_READ_TOOLS = [
+  "dateToEpochMilliseconds",
+  "epochMillisecondsToDate",
+  "getCurrentOrganization",
+  "getCustomer",
+  "getEntity",
+  "getPlan",
+  "listCustomers",
+  "listEntities",
+  "listFeatures",
+  "listPlans",
+] as const;
+
 /**
  * Autumn MCP connection for what a customer was actually provisioned.
  *
@@ -83,18 +96,7 @@ export default defineMcpClientConnection({
   description:
     "Autumn billing provisioning, read-only: customers, their plans, add-ons, subscriptions and feature balances, the plan and feature catalog, and entities.",
   tools: {
-    allow: [
-      "dateToEpochMilliseconds",
-      "epochMillisecondsToDate",
-      "getCurrentOrganization",
-      "getCustomer",
-      "getEntity",
-      "getPlan",
-      "listCustomers",
-      "listEntities",
-      "listFeatures",
-      "listPlans",
-    ],
+    allow: [...AUTUMN_READ_TOOLS],
   },
   url: AUTUMN_MCP_URL,
 });
