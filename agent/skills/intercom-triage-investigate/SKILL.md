@@ -94,6 +94,8 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 ## Step 7: Decide whether Linear work is warranted
 
+Whenever this step creates a customer-report or Support/Product follow-up, pass `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]` in the `linear__save_issue` call. This attaches the conversation to the Linear ticket as a resource so the Intercom and Linear integration can show the ticket's progress. Keeping the URL only in the issue description or investigation document does not create that relationship. Attach it to the customer ticket, never the shared root-cause master.
+
 For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record; label and route it as support or feedback, never as a Bug or engineering master.
 
 For a confirmed Bug, complete all of the following before the final Slack reply:

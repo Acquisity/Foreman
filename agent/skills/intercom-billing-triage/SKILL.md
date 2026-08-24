@@ -125,6 +125,9 @@ Use `linear__save_issue` to create one Support/Financial ticket with:
 - priority High for an active billing or refund blocker, Medium otherwise
 - the Intercom conversation URL and bounded context
 - the taxonomy bucket, current finding, exposure, and proposed human action
+- `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`
+
+The `links` field attaches the conversation to the Linear ticket as a resource so the Intercom and Linear integration can show the ticket's progress. Keeping the URL only in the description or investigation document does not create that relationship.
 
 Then create one issue-scoped document with `linear__save_document`, `issue` set to the new ticket, and title `Billing investigation`. Never create a second document on revisit; patch the existing one.
 
