@@ -1,0 +1,346 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
+import { z } from "zod";
+import completeReservation from "../../tools/complete_triage_master_reservation.js";
+import reserveMaster from "../../tools/reserve_triage_master.js";
+import {
+  causalFingerprint,
+  completeMasterReservation,
+  type ReservationDatabase,
+  reserveMaster as reserveMasterRecord,
+} from "./master-reservation.js";
+
+const causalIdentity = {
+  causalPathKeys: ["scheduler#dispatch-campaign", "provider#send"],
+  failingInvariantKey: "campaign.dispatch.exactly-once",
+  preventionOutcomeKey: "provider.request.exactly-one",
+  repositoryKey: "acquisity/acquisity",
+  triggerConditionKeys: ["campaign.due", "sending-window.open"],
+};
+
+const reservationInput = {
+  approvalId: `trv_${"a".repeat(64)}_0ae59086-e924-42d1-b7ff-f9c750a2a7c9`,
+  causalIdentity,
+  eligibilityEvaluatedAt: "2026-08-24T12:00:00.000Z",
+  evidenceRevision: "a".repeat(64),
+  generationKey: "initial",
+  masterRecencyPolicy: "UNBOUNDED" as const,
+  reviewAttempt: 1 as const,
+  reviewerModel: "openai/gpt-5.6-sol",
+  sourceIssueId: "ENG-123",
+};
+
+const fakeReservationDatabase = (): ReservationDatabase => {
+  let row:
+    | {
+        causal_fingerprint: string;
+        evidence_revision: string;
+        generation_key: string;
+        id: string;
+        master_created_at: string | null;
+        master_issue_id: string | null;
+        source_issue_id: string;
+        status: "reserved" | "complete";
+      }
+    | undefined;
+  return {
+    async query(statement, params = []) {
+      await Promise.resolve();
+      if (statement.includes("INSERT INTO triage_master_reservations")) {
+        if (row) {
+          return [];
+        }
+        row = {
+          causal_fingerprint: String(params[2]),
+          evidence_revision: String(params[5]),
+          generation_key: String(params[8]),
+          id: String(params[0]),
+          master_created_at: null,
+          master_issue_id: null,
+          source_issue_id: String(params[3]),
+          status: "reserved" as const,
+        };
+        return [{ id: row.id }];
+      }
+      if (statement.includes("SELECT id, causal_fingerprint")) {
+        return row ? [row] : [];
+      }
+      if (statement.includes("SET id = $1")) {
+        if (
+          row?.status !== "complete" ||
+          row.master_issue_id !== params[8] ||
+          row.master_created_at === null ||
+          Date.parse(row.master_created_at) >=
+            Date.parse(String(params[10])) - 30 * 24 * 60 * 60 * 1000
+        ) {
+          return [];
+        }
+        row = {
+          causal_fingerprint: String(params[2]),
+          evidence_revision: String(params[5]),
+          generation_key: String(params[8]),
+          id: String(params[0]),
+          master_created_at: null,
+          master_issue_id: null,
+          source_issue_id: String(params[3]),
+          status: "reserved",
+        };
+        return [{ id: row.id }];
+      }
+      if (statement.includes("SET master_issue_id = $1")) {
+        const current = row;
+        if (current === undefined) {
+          return [];
+        }
+        if (current.id !== params[3] || current.status !== "reserved") {
+          return [];
+        }
+        current.master_issue_id = String(params[0]);
+        current.master_created_at = String(params[1]);
+        current.status = "complete";
+        return [{ id: current.id }];
+      }
+      throw new Error("Unexpected reservation query in test.");
+    },
+  };
+};
+
+describe("causalFingerprint", () => {
+  it("canonicalizes key order but not causal identity", () => {
+    const base = causalIdentity;
+    assert.equal(
+      causalFingerprint(base),
+      causalFingerprint({
+        ...base,
+        causalPathKeys: [...base.causalPathKeys].reverse(),
+        triggerConditionKeys: [...base.triggerConditionKeys].reverse(),
+      })
+    );
+    assert.notEqual(
+      causalFingerprint(base),
+      causalFingerprint({
+        ...base,
+        causalPathKeys: ["provider-webhook#ingest-reply"],
+      })
+    );
+  });
+});
+
+describe("causal master reservation concurrency", () => {
+  it("authorizes only the insert winner and fails retries closed", async () => {
+    const database = fakeReservationDatabase();
+    const [first, concurrent] = await Promise.all([
+      reserveMasterRecord(reservationInput, database),
+      reserveMasterRecord(reservationInput, database),
+    ]);
+    const results = [first, concurrent];
+    assert.equal(results.filter(({ acquired }) => acquired).length, 1);
+    assert.equal(
+      results.filter(
+        (result) =>
+          !result.acquired && result.reason === "reservation_in_progress"
+      ).length,
+      1
+    );
+
+    const retry = await reserveMasterRecord(reservationInput, database);
+    assert.deepEqual(retry, {
+      acquired: false,
+      causalFingerprint: causalFingerprint(causalIdentity),
+      reason: "reservation_in_progress",
+    });
+  });
+
+  it("never reopens the external-create crash gap", async () => {
+    const database = fakeReservationDatabase();
+    const reserved = await reserveMasterRecord(reservationInput, database);
+    assert.equal(reserved.acquired, true);
+
+    const afterUnconfirmedCreate = await reserveMasterRecord(
+      reservationInput,
+      database
+    );
+    assert.equal(afterUnconfirmedCreate.acquired, false);
+    assert.equal(afterUnconfirmedCreate.reason, "reservation_in_progress");
+  });
+
+  it("returns the completed master after binding", async () => {
+    const database = fakeReservationDatabase();
+    const reserved = await reserveMasterRecord(reservationInput, database);
+    assert.equal(reserved.acquired, true);
+    if (!reserved.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        reserved.reservationId,
+        "ENG-999",
+        "2026-08-24T12:00:00.000Z",
+        database
+      ),
+      true
+    );
+    assert.deepEqual(await reserveMasterRecord(reservationInput, database), {
+      acquired: false,
+      causalFingerprint: causalFingerprint(causalIdentity),
+      existingMasterCreatedAt: "2026-08-24T12:00:00.000Z",
+      existingMasterIssueId: "ENG-999",
+      reason: "existing_master",
+    });
+  });
+
+  it("permits one reviewed new generation after a stale master", async () => {
+    const database = fakeReservationDatabase();
+    const first = await reserveMasterRecord(reservationInput, database);
+    assert.equal(first.acquired, true);
+    if (!first.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        first.reservationId,
+        "ENG-999",
+        "2026-07-01T00:00:00.000Z",
+        database
+      ),
+      true
+    );
+    const nextInput = {
+      ...reservationInput,
+      generationKey: "ENG-999",
+      masterRecencyPolicy: "THIRTY_DAY" as const,
+      predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+    };
+    const [next, concurrent] = await Promise.all([
+      reserveMasterRecord(nextInput, database),
+      reserveMasterRecord(nextInput, database),
+    ]);
+    assert.equal(
+      [next, concurrent].filter(({ acquired }) => acquired).length,
+      1
+    );
+  });
+
+  it("cannot advance from an uncompleted or different predecessor", async () => {
+    const database = fakeReservationDatabase();
+    assert.equal(
+      (await reserveMasterRecord(reservationInput, database)).acquired,
+      true
+    );
+    const attempted = await reserveMasterRecord(
+      {
+        ...reservationInput,
+        generationKey: "ENG-888",
+        masterRecencyPolicy: "THIRTY_DAY",
+        predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      database
+    );
+    assert.equal(attempted.acquired, false);
+    assert.equal(attempted.reason, "reservation_in_progress");
+  });
+
+  it("serializes different stale predecessor claims through one causal head", async () => {
+    const database = fakeReservationDatabase();
+    const first = await reserveMasterRecord(reservationInput, database);
+    assert.equal(first.acquired, true);
+    if (!first.acquired) {
+      return;
+    }
+    await completeMasterReservation(
+      first.reservationId,
+      "ENG-999",
+      "2026-07-01T00:00:00.000Z",
+      database
+    );
+    const results = await Promise.all([
+      reserveMasterRecord(
+        {
+          ...reservationInput,
+          generationKey: "ENG-999",
+          masterRecencyPolicy: "THIRTY_DAY",
+          predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        database
+      ),
+      reserveMasterRecord(
+        {
+          ...reservationInput,
+          generationKey: "ENG-888",
+          masterRecencyPolicy: "THIRTY_DAY",
+          predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        database
+      ),
+    ]);
+    assert.equal(results.filter(({ acquired }) => acquired).length, 1);
+  });
+
+  it("bootstraps one head from a reviewed stale master predating the table", async () => {
+    const database = fakeReservationDatabase();
+    const staleBootstrap = {
+      ...reservationInput,
+      generationKey: "ENG-777",
+      masterRecencyPolicy: "THIRTY_DAY" as const,
+      predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+    };
+    const [first, concurrent] = await Promise.all([
+      reserveMasterRecord(staleBootstrap, database),
+      reserveMasterRecord(staleBootstrap, database),
+    ]);
+    assert.equal(
+      [first, concurrent].filter(({ acquired }) => acquired).length,
+      1
+    );
+  });
+});
+
+describe("causal master reservation tools", () => {
+  it("stores opaque critic approvals as constrained text", () => {
+    const migration = readFileSync(
+      new URL(
+        "../../../migrations/0002_triage_master_reservations.sql",
+        import.meta.url
+      ),
+      "utf8"
+    );
+    assert.ok(migration.includes("critic_approval_id text NOT NULL"));
+    assert.ok(migration.includes("critic_approval_id ~ '^trv_"));
+  });
+
+  it("requires an exact critic approval before reservation", () => {
+    assert.ok(reserveMaster.inputSchema instanceof z.ZodType);
+    const payload = {
+      sourceIssueId: "ENG-123",
+    };
+    assert.equal(reserveMaster.inputSchema.safeParse(payload).success, false);
+    assert.equal(
+      reserveMaster.inputSchema.safeParse({
+        ...payload,
+        criticApprovalId: reservationInput.approvalId,
+      }).success,
+      true
+    );
+  });
+
+  it("accepts only bounded Linear and reservation identifiers on completion", () => {
+    assert.ok(completeReservation.inputSchema instanceof z.ZodType);
+    assert.equal(
+      completeReservation.inputSchema.safeParse({
+        masterCreatedAt: "2026-08-24T12:00:00.000Z",
+        masterIssueId: "ENG-123",
+        reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+      }).success,
+      true
+    );
+    assert.equal(
+      completeReservation.inputSchema.safeParse({
+        masterCreatedAt: "2026-08-24T12:00:00.000Z",
+        masterIssueId: "not-linear",
+        reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+      }).success,
+      false
+    );
+  });
+});

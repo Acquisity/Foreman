@@ -63,6 +63,8 @@ Load `clarify-with-requester` and run its first gate before the deeper lanes.
 
 Read [references/tools.md](references/tools.md) before composing tool calls. It contains the exact qualified tool names and known traps, including the Intercom read path and both investigation-memory search modes. Never invent a tool name.
 
+Load `customer-bug-diagnosis` now, after the claim, memory search, pinned workspace identity, and duplicate search are established. Use it to drive the reproduce-or-production-forensics loop, competing hypotheses, evidence ledger, causal conclusion, impact attempt, regression seam, and customer unblock below. This shared discipline replaces a single-pass diagnosis, not this Intercom intake router.
+
 Work every applicable lane and record `Not applicable: <reason>` or `Could not run: <reason>` for the rest:
 
 1. Code: `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file`. Record the files, functions, expected behavior, and `git -C <worktree> rev-parse HEAD`.
@@ -84,13 +86,17 @@ Use exactly one settled classification:
 
 When a deciding confirmation is still missing, report an unproven claim with the reopen condition. Do not force a classification.
 
-A confirmed `Bug` requires all three:
+A candidate `Bug` requires a causal code, job, state-transition, or provider path when code is relevant; a matching safe reproduction or complete production-forensics case; relevant configuration and limitation alternatives ruled out; and an attempted current blast-radius measurement. Record an exact count, the tightest supported bound, or honest `Unknown` with the attempted method, window, and missing telemetry. A directly reproduced or forensically proved defect remains a candidate Bug when exact population telemetry is unavailable. Plausibility without reproduction or a complete forensics chain is `Unproven`.
 
-1. A named file and function.
-2. Direct current production or runtime evidence.
-3. A blast radius counted from a current query.
+### Step 6A: Gate a candidate Bug through triage-critic
 
-Missing any item means the claim is not a confirmed Bug yet.
+Do not call the critic for `User Error`, `Platform Limitation`, ordinary feedback, or an unproven claim.
+
+For a candidate `Bug`, load `incident-hotlane`, prepare the master candidates and exact proposed source-report, master, priority, routing, notification, and memory writes, then create an immutable packet with `create_triage_review_packet`. Include the canonical Intercom conversation id and URL, target Linear project id, original bounded context, pinned workspace identity, diagnosis, evidence ledger and stable handles, memory results and how they were used, current repository SHA and exact code paths, structured impact counts and count date when known, impact method, unblock, proposed decisions, and each candidate's verified `createdAt`. The tool overwrites the requested recency fields with authenticated `THIRTY_DAY` policy and the current server evaluation time; use the returned values as authoritative. Put an otherwise causal but more-than-30-day-old master in `staleMasterCandidateIssueId`; never put it in `masterCandidateIssueId`.
+
+Preflight every user-scoped evidence connection the critic may need by completing its read in this attended root session. Then call the declared `triage-critic` with the returned evidence revision. It has the same read-only investigation sources as this workflow and may independently verify current evidence and search investigation memory; it cannot mutate Linear, Intercom, production, Slack, repositories, or memory.
+
+After the critic completes, call `read_triage_review_verdict` with the exact current evidence revision. Proceed only when the server-attested result is `APPROVE` and returns an opaque `approvalId`; never construct an approval object from model output. Foreman adjudicates every finding. Allow one full review and one targeted attempt-2 recheck after material reinvestigation, using the same critic identity and model. The server accepts only one attested attempt at each position in the source's review chain. A changed model or unresolved material disagreement becomes `needs-human`. Any material evidence or decision change invalidates the prior approval. Until approval, do not create the customer report or master, parent issues, apply hotlane or materially escalate priority, publish a settled cause, notify an incident, or record memory.
 
 ## Step 7: Decide whether Linear work is warranted
 
@@ -100,17 +106,18 @@ For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do
 
 For a confirmed Bug, complete all of the following before the final Slack reply:
 
+Load `engineering-handoff` before writing and follow its causal grouping, privacy, idempotency, and readback contract. Revalidate the opaque critic approval against the unchanged evidence revision immediately before the first write.
+
 1. Determine the product project from the live conversation plus verified current code and data. Never select it from a memory analogy. If the area is missing or unmapped, create the customer report without a project, assign Aaron Fraga, state that routing needs a human, and skip final memory recording.
 2. Search current Linear masters no further than 30 days back. Run every root-cause, code-path, provider-failure, and symptom query through `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id), `createdAt: "-P30D"`, and `limit: 250`; do not filter by a presumed master label. While `hasNextPage` is true, repeat the identical filtered query with the returned `cursor`, accumulating candidates from every page until `hasNextPage` is false. Apply this cutoff before selecting a candidate as the current master or setting it as the new report's parent: a master created exactly 30 days ago is eligible, while one more than 30 days old, even by one second, is stale and cannot parent the new report. Reject stale candidates for current-master selection and parent attachment even when another issue relation, investigation memory, an unbounded search, or prior knowledge surfaces them. Among the eligible candidates, match on root cause, not merely the visible outcome.
 3. Create one customer-report issue on the Engineering Team. Include the Intercom conversation URL, bounded conversation context, testable claim, classification, explicit project when known, priority, and the union of valid labels returned by Linear. Use `intercom-sourced` and `Customer reported` when those labels exist.
 4. Attach one issue-scoped document with `linear__save_document`, `issue` set to the report, and title `Triage investigation`. Keep raw customer identity, production rows, queries, and conversation evidence only on this report document.
-5. If a master owns the root cause, parent the report to it and inherit its assignee. Link the new report from the master, add only aggregate new evidence there, recount its blast radius, and reweigh its priority. The report link is the route to the Intercom URL and bounded context; do not copy customer-specific conversation details onto the root-cause master.
-6. If no qualifying master created within the last 30 days owns the cause, create one root-cause master, parent the report to it, link the report from the master, and give both the area owner. An older matching master may be related for history, but never reused as the parent. Keep the Intercom URL and bounded context on the customer report and its document. One root cause gets one current master, regardless of the number of reports or implementation steps.
-7. Add the short report comment with the unblock first, the plain-language cause, the affected-workspace count, and the investigation-document link.
+5. Pass the complete eligible candidate set, new source report, 30-day recency decision, area owner, and opaque approval id to `engineering-handoff`. That shared skill exclusively owns matching, reserving when no master exists, creating or updating one master, parenting, aggregate updates, and readback. Do not restate or bypass its write sequence here. Keep the Intercom URL and customer-specific context on the source report.
+6. Add the short report comment with the unblock first, the plain-language cause, the affected-workspace count, and the investigation-document link.
 
-Priority is evidence-based: Urgent for outage, security, or data-loss risk; High for multiple organizations blocked, repeated core failure, or active money impact; Medium for a real single-organization defect; Low for limitations, cosmetic cases, or resolved triage. A workaround does not lower the defect's priority.
+Priority is evidence-based: Urgent for outage, security, data-loss risk, or a confirmed core workflow blocked or materially impaired even for one workspace; High for other material multi-organization, repeat-production, enterprise-blocking, or active-money defects; Medium for a real single-organization defect that is not a core blocker; Low for limitations, cosmetic cases, or resolved triage. A workaround does not lower the defect's priority.
 
-The 30-day window keeps a master representative of a current report cluster and preserves real-time blast-radius visibility. Recency only narrows the candidate set; every similarity, evidence, product-area, and duplicate safeguard still applies.
+The 30-day window keeps a master representative of a current report cluster and preserves real-time blast-radius visibility. An older matching master may be related for history but never reused as the parent. Include the closest same-cause stale master and its verified creation time in the review packet. The reservation uses that reviewed stale master as the next generation key, so concurrent reports can authorize only one replacement. Recency only narrows the candidate set; every similarity, evidence, product-area, and duplicate safeguard still applies.
 
 Use the existing area-routing roster:
 
@@ -123,7 +130,7 @@ Use the existing area-routing roster:
 
 ## Step 8: Record a confirmed case
 
-Only after a confirmed Bug has a customer-report ticket, an attached final document, and an explicit mapped Linear project, call `record_investigation_case` exactly once. The ticket's project is now the authority for the product area.
+Only after a confirmed Bug has a server-attested approval for the exact current evidence revision, a customer-report ticket, an attached final document, completed structural writes and readback, and an explicit mapped Linear project, call `record_investigation_case` exactly once with the opaque `criticApprovalId`. The ticket's project is now the authority for the product area. Memory stores the settled result, never the working draft.
 
 Store only the sanitized pattern: claim, root cause, stripped error signatures, code path and commit, ruled-out conclusions, stable evidence handles, counted impact with its date, and ticket/document links. Never store emails, organization or user ids, production rows, raw logs, attachments, or credentials.
 

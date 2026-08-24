@@ -8,6 +8,13 @@ import { isAutonomous } from "../lib/trust.js";
  * connection stays denied for it, so the list never has to keep up with the
  * writes the hosted server grows.
  */
+export const LINEAR_TRIAGE_READ_TOOLS = [
+  "get_issue",
+  "list_comments",
+  "list_issue_labels",
+  "list_issues",
+] as const;
+
 const SCHEDULED_READ_TOOLS = ["list_issues", "get_issue"] as const;
 
 const denyWrites = denyUnattendedWrites("Linear");

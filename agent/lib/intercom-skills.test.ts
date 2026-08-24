@@ -6,6 +6,10 @@ const productSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const engineeringHandoffSkill = readFileSync(
+  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
+  "utf8"
+);
 const billingSkill = readFileSync(
   new URL("../skills/intercom-billing-triage/SKILL.md", import.meta.url),
   "utf8"
@@ -61,11 +65,17 @@ test("Intercom product skill creates engineering work only for a confirmed bug",
     "canonical conversation URL",
     "explicit mapped Linear project",
     "subscription behavior with no financial remedy",
-    "Link the new report from the master",
-    "do not copy customer-specific conversation details",
   ]) {
     assert.ok(productSkill.includes(phrase), phrase);
   }
+  assert.ok(
+    engineeringHandoffSkill.includes("link the source report from the master")
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "customer-specific evidence remains bounded to the source report"
+    )
+  );
 });
 
 test("Intercom billing skill preserves evidence order and human-only action", () => {

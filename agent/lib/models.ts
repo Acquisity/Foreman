@@ -14,6 +14,7 @@ export const MODELS = {
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   researcher: "deepseek/deepseek-v4-pro-0813",
   reviewer: "anthropic/claude-opus-4.8",
+  triageCritic: "openai/gpt-5.6-sol",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
 } as const;

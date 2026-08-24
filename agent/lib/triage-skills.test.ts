@@ -14,6 +14,22 @@ const slackWordingSkill = readFileSync(
   new URL("../skills/slack-wording/SKILL.md", import.meta.url),
   "utf8"
 );
+const customerBugDiagnosisSkill = readFileSync(
+  new URL("../skills/customer-bug-diagnosis/SKILL.md", import.meta.url),
+  "utf8"
+);
+const triageCriticSkill = readFileSync(
+  new URL("../skills/triage-critic/SKILL.md", import.meta.url),
+  "utf8"
+);
+const incidentHotlaneSkill = readFileSync(
+  new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
+  "utf8"
+);
+const engineeringHandoffSkill = readFileSync(
+  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
+  "utf8"
+);
 
 const extractInstruction = (skill: string, start: string, end: string) => {
   const startIndex = skill.indexOf(start);
@@ -99,5 +115,63 @@ test("Slack replies exclude internal investigation summaries", () => {
   assert.ok(slackWordingSkill.includes("Linear update report"));
   assert.ok(
     slackWordingSkill.includes("progress updates may be conversational")
+  );
+});
+
+test("both intake routers share diagnosis and the bounded critic gate", () => {
+  for (const skill of [triageSkill, intercomTriageSkill]) {
+    const memorySearch = skill.indexOf("search_investigation_memory");
+    const diagnosis = skill.indexOf("customer-bug-diagnosis");
+    const packet = skill.indexOf("create_triage_review_packet");
+    const critic = skill.indexOf("declared `triage-critic`");
+    const memoryWrite = skill.lastIndexOf("record_investigation_case");
+
+    assert.ok(memorySearch >= 0);
+    assert.ok(diagnosis > memorySearch);
+    assert.ok(packet > diagnosis);
+    assert.ok(critic > packet);
+    assert.ok(memoryWrite > critic);
+    assert.ok(skill.includes("one targeted"));
+    assert.ok(skill.includes("exact current evidence revision"));
+    assert.ok(skill.includes("read_triage_review_verdict"));
+    assert.ok(skill.includes("opaque"));
+  }
+});
+
+test("shared triage skills preserve the causal and impact contracts", () => {
+  assert.ok(customerBugDiagnosisSkill.includes("PRODUCTION_FORENSICS"));
+  assert.ok(customerBugDiagnosisSkill.includes("COULD_NOT_RUN"));
+  assert.ok(customerBugDiagnosisSkill.includes("regression_seam"));
+  assert.ok(triageCriticSkill.includes("same investigation reach"));
+  assert.ok(triageCriticSkill.includes("one targeted recheck"));
+  assert.ok(incidentHotlaneSkill.includes("even for one workspace"));
+  assert.ok(engineeringHandoffSkill.includes("Match by cause, not symptom"));
+  assert.ok(engineeringHandoffSkill.includes("Read back"));
+  assert.ok(engineeringHandoffSkill.includes("reserve_triage_master"));
+  assert.ok(
+    engineeringHandoffSkill.includes("complete_triage_master_reservation")
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes("Only the transaction that inserts")
+  );
+  assert.ok(
+    customerBugDiagnosisSkill.includes(
+      "Independent investigations of the same cause"
+    )
+  );
+});
+
+test("engineering-handoff exclusively owns the structural write state machine", () => {
+  for (const skill of [triageSkill, intercomTriageSkill]) {
+    assert.ok(skill.includes("exclusively owns"));
+    assert.ok(skill.includes("Do not restate or bypass"));
+  }
+  assert.ok(
+    engineeringHandoffSkill.includes("If an existing master owns the cause")
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "If no eligible existing master owns the cause"
+    )
   );
 });

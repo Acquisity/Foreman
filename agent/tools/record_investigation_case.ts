@@ -7,18 +7,51 @@ import {
 } from "#lib/investigation-memory/case.js";
 import { featureForProject } from "#lib/investigation-memory/scope.js";
 import { recordCase } from "#lib/investigation-memory/store.js";
+import {
+  approvalMatchesBugCase,
+  claimApprovalForMemory,
+  type VerifiedTriageApproval,
+  verifyTriageApproval,
+} from "#lib/triage-review-approval.js";
+import { triageReviewApprovalIdSchema } from "#lib/triage-review-attestation.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
   approval: investigationMemoryWritePolicy,
   description:
-    "Record one completed triage investigation as a sanitized case, after the Triage investigation document is attached and the classification is final. The product area comes from the ticket's Linear project, never from the symptom. Store the pattern, not the customer: no email addresses, organization or user ids, raw production rows, logs, or credentials. If a case already exists for this ticket and the conclusion has changed, use `correct_investigation_case` instead. A failure here never changes the verdict or holds the ticket.",
+    "Record one settled triage investigation as a sanitized case after the Triage investigation document and final external writes are complete. A Bug is final only when an actual completed triage-critic review was server-attested for the exact current evidence revision. Pass the opaque criticApprovalId returned by read_triage_review_verdict; this tool verifies the source issue, project, claim, cause, confidence, repository commit, code paths, and dated impact against the reviewed packet, then binds the approval to this exact memory payload. The product area comes from the ticket's Linear project, never from the symptom. Store the pattern, not the customer: no email addresses, organization or user ids, raw production rows, logs, or credentials. If a case already exists for this ticket and the conclusion has changed, use `correct_investigation_case` instead. A failure here never changes the verdict or holds the ticket.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
         reason: "This session is not authorized to write investigation memory.",
         recorded: false as const,
       };
+    }
+
+    let verifiedBug: VerifiedTriageApproval | null = null;
+    if (input.classification === "bug") {
+      if (input.criticApprovalId === undefined) {
+        return {
+          reason: "A Bug case requires an opaque critic approval ID.",
+          recorded: false as const,
+        };
+      }
+      const verified = await verifyTriageApproval(
+        await ctx.getSandbox(),
+        ctx.session.id,
+        input.criticApprovalId
+      ).catch(() => null);
+      if (
+        verified === null ||
+        !(await approvalMatchesBugCase(verified, input))
+      ) {
+        return {
+          reason:
+            "The opaque critic approval is absent, not APPROVE, or does not match this exact Bug claim, root cause, confidence, packet, model, and repository revision.",
+          recorded: false as const,
+        };
+      }
+      verifiedBug = verified;
     }
 
     const feature = featureForProject(input.linearProjectId);
@@ -31,6 +64,16 @@ export default defineTool({
     }
 
     try {
+      if (
+        verifiedBug !== null &&
+        !(await claimApprovalForMemory(verifiedBug, input, "record"))
+      ) {
+        return {
+          reason:
+            "This critic approval is already bound to different memory content.",
+          recorded: false as const,
+        };
+      }
       const result = await recordCase(feature, input, input.classification);
       if (result.created) {
         return {
@@ -56,13 +99,28 @@ export default defineTool({
       };
     }
   },
-  inputSchema: casePayloadSchema.extend({
-    classification: z
-      .enum(CLASSIFICATIONS)
-      .describe(
-        "The final Step 4.6 verdict. Use `unproven` only when the evidence genuinely left the claim open."
-      ),
-  }),
+  inputSchema: casePayloadSchema
+    .extend({
+      classification: z
+        .enum(CLASSIFICATIONS)
+        .describe(
+          "The final verdict. Use `unproven` only when the evidence genuinely left the claim open."
+        ),
+      criticApprovalId: triageReviewApprovalIdSchema.optional(),
+    })
+    .superRefine((input, ctx) => {
+      if (
+        input.classification === "bug" &&
+        input.criticApprovalId === undefined
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "A Bug case requires triage-critic APPROVE for the exact current evidence revision.",
+          path: ["criticApprovalId"],
+        });
+      }
+    }),
   outputSchema: z.object({
     caseId: z.string().optional(),
     primaryFeatureKey: z.string().optional(),
