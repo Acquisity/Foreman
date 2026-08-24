@@ -202,12 +202,8 @@ export const findTriageReviewVerdict = async (
       parseAttestation(await storage.read(attemptKey(chainKey, attempt)))
     )
   );
-  for (const result of results) {
-    if (result?.evidenceRevision === evidenceRevision) {
-      return result;
-    }
-  }
-  return null;
+  const current = results[0] ?? results[1];
+  return current?.evidenceRevision === evidenceRevision ? current : null;
 };
 
 export const readAttestedApproval = async (
@@ -229,16 +225,12 @@ export const readAttestedApproval = async (
       parseAttestation(await storage.read(attemptKey(chainKey, attempt)))
     )
   );
-  for (const result of results) {
-    if (
-      result?.approvalId === approvalId &&
-      result.sessionKey === sessionKey &&
-      result.verdict === "APPROVE"
-    ) {
-      return result;
-    }
-  }
-  return null;
+  const current = results[0] ?? results[1];
+  return current?.approvalId === approvalId &&
+    current.sessionKey === sessionKey &&
+    current.verdict === "APPROVE"
+    ? current
+    : null;
 };
 
 export const bindTriageReviewSource = async (

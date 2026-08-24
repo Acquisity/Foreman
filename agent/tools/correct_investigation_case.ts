@@ -100,7 +100,7 @@ export default defineTool({
         already_recorded:
           "This correction is already recorded. Nothing changed.",
         authorization_failed:
-          "This critic approval is already bound to different memory content.",
+          "This critic approval could not authorize this memory correction.",
         prior_case_not_active:
           "That case is not the active revision for its ticket, so there is nothing to supersede. Search memory again and correct the current case.",
         prior_case_other_ticket:

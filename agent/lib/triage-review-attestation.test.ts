@@ -33,6 +33,25 @@ const memoryStorage = (): TriageReviewStorage => {
   };
 };
 
+const delayedAtomicStorage = (): TriageReviewStorage => {
+  const values = new Map<string, string>();
+  return {
+    async read(key) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      return values.get(key) ?? null;
+    },
+    async writeOnce(key, value) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const existing = values.get(key);
+      if (existing !== undefined) {
+        return existing === value;
+      }
+      values.set(key, value);
+      return true;
+    },
+  };
+};
+
 const validApprovalId = `trv_${"a".repeat(
   64
 )}_123e4567-e89b-42d3-a456-426614174000`;
@@ -193,6 +212,32 @@ describe("triage review operational attestation", () => {
     );
   });
 
+  it("permits exactly one concurrent attestation for an attempt", async () => {
+    const storage = delayedAtomicStorage();
+    const revision = "9".repeat(64);
+    const results = await Promise.all([
+      attestTriageReviewVerdict(
+        {
+          eventId: "event-concurrent-1",
+          packet: packet(),
+          sessionId: "session-1",
+          verdict: verdict(revision),
+        },
+        storage
+      ),
+      attestTriageReviewVerdict(
+        {
+          eventId: "event-concurrent-2",
+          packet: packet(),
+          sessionId: "session-1",
+          verdict: verdict(revision),
+        },
+        storage
+      ),
+    ]);
+    assert.equal(results.filter(Boolean).length, 1);
+  });
+
   it("allows attempt two only for the same reviewer and exact failed criteria", async () => {
     const storage = memoryStorage();
     const firstRevision = "c".repeat(64);
@@ -209,6 +254,13 @@ describe("triage review operational attestation", () => {
       ),
       true
     );
+    const firstApproval = await findTriageReviewVerdict(
+      "session-1",
+      packet(),
+      firstRevision,
+      storage
+    );
+    assert.ok(firstApproval);
     const secondPacket = packet({
       previousEvidenceRevision: firstRevision,
       reviewAttempt: 2,
@@ -255,6 +307,34 @@ describe("triage review operational attestation", () => {
         storage
       ),
       true
+    );
+    assert.equal(
+      await findTriageReviewVerdict(
+        "session-1",
+        packet(),
+        firstRevision,
+        storage
+      ),
+      null
+    );
+    assert.equal(
+      await readAttestedApproval(
+        "session-1",
+        firstApproval.approvalId,
+        storage
+      ),
+      null
+    );
+    assert.equal(
+      (
+        await findTriageReviewVerdict(
+          "session-1",
+          secondPacket,
+          secondRevision,
+          storage
+        )
+      )?.verdict,
+      "APPROVE"
     );
   });
 
@@ -328,6 +408,13 @@ describe("triage review operational attestation", () => {
       ),
       true
     );
+    const firstApproval = await findTriageReviewVerdict(
+      "session-1",
+      packet(),
+      firstRevision,
+      storage
+    );
+    assert.ok(firstApproval);
     const revised = packet({
       previousEvidenceRevision: firstRevision,
       reviewAttempt: 2,
@@ -359,6 +446,95 @@ describe("triage review operational attestation", () => {
         storage
       ),
       true
+    );
+    assert.equal(
+      await findTriageReviewVerdict(
+        "session-1",
+        packet(),
+        firstRevision,
+        storage
+      ),
+      null
+    );
+    assert.equal(
+      await readAttestedApproval(
+        "session-1",
+        firstApproval.approvalId,
+        storage
+      ),
+      null
+    );
+    assert.equal(
+      (
+        await findTriageReviewVerdict(
+          "session-1",
+          revised,
+          secondRevision,
+          storage
+        )
+      )?.verdict,
+      "APPROVE"
+    );
+  });
+
+  it("revokes an earlier approval when attempt two challenges the revision", async () => {
+    const storage = memoryStorage();
+    const firstRevision = "6".repeat(64);
+    const secondRevision = "7".repeat(64);
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-first-approval",
+          packet: packet(),
+          sessionId: "session-1",
+          verdict: verdict(firstRevision),
+        },
+        storage
+      ),
+      true
+    );
+    const firstApproval = await findTriageReviewVerdict(
+      "session-1",
+      packet(),
+      firstRevision,
+      storage
+    );
+    assert.ok(firstApproval);
+    const revised = packet({
+      previousEvidenceRevision: firstRevision,
+      reviewAttempt: 2,
+      targetedRecheckCriteria: [...TRIAGE_CRITIC_CRITERIA],
+    });
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-second-challenge",
+          packet: revised,
+          sessionId: "session-1",
+          verdict: verdict(secondRevision, "FAIL"),
+        },
+        storage
+      ),
+      true
+    );
+    assert.equal(
+      await readAttestedApproval(
+        "session-1",
+        firstApproval.approvalId,
+        storage
+      ),
+      null
+    );
+    assert.equal(
+      (
+        await findTriageReviewVerdict(
+          "session-1",
+          revised,
+          secondRevision,
+          storage
+        )
+      )?.verdict,
+      "CHALLENGE"
     );
   });
 

@@ -280,6 +280,39 @@ describe("triage review packets", () => {
       }).success,
       false
     );
+    assert.equal(
+      triageCriticVerdictSchema.safeParse({
+        ...verdict,
+        criteria_results: verdict.criteria_results.map((result) => ({
+          ...result,
+          result: "NOT_APPLICABLE" as const,
+        })),
+      }).success,
+      false
+    );
+    assert.equal(
+      triageCriticVerdictSchema.safeParse({
+        ...verdict,
+        criteria_results: verdict.criteria_results.map((result, index) => ({
+          ...result,
+          result: index === 0 ? ("PASS" as const) : ("NOT_APPLICABLE" as const),
+        })),
+      }).success,
+      true
+    );
+  });
+
+  it("requires one reachable code, job, state-transition, or provider path", () => {
+    assert.equal(
+      triageReviewPacketInputSchema.safeParse({
+        ...input(),
+        diagnosis: {
+          ...input().diagnosis,
+          codeAnchor: { ...input().diagnosis.codeAnchor, paths: [] },
+        },
+      }).success,
+      false
+    );
   });
 
   it("requires selected masters to be unique reviewed causal candidates", () => {

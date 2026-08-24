@@ -91,7 +91,7 @@ export default defineTool({
         caseId = result.existingCaseId;
       }
       let reason =
-        "This critic approval is already bound to different memory content.";
+        "This critic approval could not authorize this memory write.";
       if (result.reason === "already_recorded") {
         reason = "This exact conclusion is already recorded. Nothing changed.";
       } else if (result.reason === "active_case_exists") {
