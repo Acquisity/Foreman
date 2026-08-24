@@ -149,12 +149,15 @@ export const attestTriageReviewVerdict = async (
       await storage.read(attemptKey(chainKey, 1))
     );
     const targets = packet.targetedRecheckCriteria ?? [];
+    const expectedTargets =
+      previous?.verdict === "APPROVE"
+        ? TRIAGE_CRITIC_CRITERIA
+        : (previous?.failedCriteria ?? []);
     if (
       previous === null ||
-      previous.verdict === "APPROVE" ||
       previous.evidenceRevision !== packet.previousEvidenceRevision ||
       previous.reviewerModel !== verdict.reviewer_model ||
-      !sameSet(previous.failedCriteria, targets)
+      !sameSet(expectedTargets, targets)
     ) {
       return false;
     }

@@ -153,7 +153,8 @@ test("shared triage skills preserve the causal and impact contracts", () => {
   assert.ok(customerBugDiagnosisSkill.includes("COULD_NOT_RUN"));
   assert.ok(customerBugDiagnosisSkill.includes("regression_seam"));
   assert.ok(triageCriticSkill.includes("same investigation reach"));
-  assert.ok(triageCriticSkill.includes("one targeted recheck"));
+  assert.ok(triageCriticSkill.includes("at most one attempt-2 review"));
+  assert.ok(triageCriticSkill.includes("all twelve criteria"));
   assert.ok(incidentHotlaneSkill.includes("even for one workspace"));
   assert.ok(engineeringHandoffSkill.includes("Match by cause, not symptom"));
   assert.ok(engineeringHandoffSkill.includes("Read back"));
@@ -196,7 +197,13 @@ test("engineering handoff binds the final candidate set and idempotent relations
   );
   assert.ok(
     engineeringHandoffSkill.includes(
-      "obtain approval for a new packet revision"
+      "use attempt two for a new packet revision"
+    )
+  );
+  assert.ok(engineeringHandoffSkill.includes("complete all-criteria review"));
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "If this happens after attempt two, route to a person"
     )
   );
   assert.ok(

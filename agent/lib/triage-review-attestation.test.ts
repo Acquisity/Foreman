@@ -312,6 +312,56 @@ describe("triage review operational attestation", () => {
     );
   });
 
+  it("uses the one remaining attempt for a full review after approval is invalidated", async () => {
+    const storage = memoryStorage();
+    const firstRevision = "4".repeat(64);
+    const secondRevision = "5".repeat(64);
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-1",
+          packet: packet(),
+          sessionId: "session-1",
+          verdict: verdict(firstRevision),
+        },
+        storage
+      ),
+      true
+    );
+    const revised = packet({
+      previousEvidenceRevision: firstRevision,
+      reviewAttempt: 2,
+      targetedRecheckCriteria: [...TRIAGE_CRITIC_CRITERIA],
+    });
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-partial-recheck",
+          packet: {
+            ...revised,
+            targetedRecheckCriteria: ["master_match"],
+          },
+          sessionId: "session-1",
+          verdict: verdict(secondRevision),
+        },
+        storage
+      ),
+      false
+    );
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-full-recheck",
+          packet: revised,
+          sessionId: "session-1",
+          verdict: verdict(secondRevision),
+        },
+        storage
+      ),
+      true
+    );
+  });
+
   it("binds source and downstream purposes once while permitting exact retries", async () => {
     const storage = memoryStorage();
     const source = {

@@ -76,9 +76,9 @@ Return:
 
 ## Bounded review loop
 
-Allow one complete review and, only after Foreman materially addresses the blocking findings, one targeted recheck by the same reviewer identity and model version. The recheck covers the challenged criteria and any criteria invalidated by changed evidence.
+Allow one complete review and at most one attempt-2 review by the same reviewer identity and model version. After a challenge, attempt two targets the exact failed criteria. When a material change invalidates a prior approval, attempt two must re-review all twelve criteria because no part of the approved decision can be assumed unchanged.
 
-After two attempts, unresolved material disagreement becomes `needs-human`. Do not start a fresh reviewer chain or keep revising until a model eventually approves.
+After two attempts, unresolved material disagreement or any further material invalidation becomes `needs-human`. Do not start a fresh reviewer chain or keep revising until a model eventually approves.
 
 Reviewer output is evidence, not an order. Foreman records a disposition for every finding:
 
