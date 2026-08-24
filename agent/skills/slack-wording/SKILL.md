@@ -8,6 +8,8 @@ The audience is the internal team member who opened the ticket, not the customer
 
 Scope: every conversational Slack reply or question, including ticket threads, where the reader may forward the message onward. Internal engineering reports that exist to route work, such as the daily SLA report, are not in scope and carry their own format; they need ticket links, assignee tags, and root cause, all of which the rules below forbid.
 
+The final post in the Slack thread is a single-audience message. It contains only the forwardable requester reply. Never combine it with an internal investigation summary, a Linear update report, proof of work, or a preamble such as `Here is my investigation summary and Slack reply`. Normal assistant progress updates may be conversational, but they do not change this final-post boundary.
+
 ## Never in a Slack-facing message
 
 - Linear issue IDs, ticket numbers, statuses, duplicate status, internal routing language.
