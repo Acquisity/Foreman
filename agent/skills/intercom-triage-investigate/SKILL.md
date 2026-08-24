@@ -59,7 +59,7 @@ Load `clarify-with-requester` and run its first gate before the deeper lanes.
 
 ## Step 5: Investigate current evidence
 
-Read `$HOME/.agents/skills/triage-investigate/references/tools.md` before composing tool calls. It contains the exact qualified tool names and known traps. Never invent a tool name.
+Read [references/tools.md](references/tools.md) before composing tool calls. It contains the exact qualified tool names and known traps, including the Intercom read path and both investigation-memory search modes. Never invent a tool name.
 
 Work every applicable lane and record `Not applicable: <reason>` or `Could not run: <reason>` for the rest:
 

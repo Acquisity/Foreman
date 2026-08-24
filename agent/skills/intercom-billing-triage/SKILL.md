@@ -51,7 +51,7 @@ Quote a real prior approval or promise verbatim in the eventual document. If non
 
 ## Step 5: Read every system of record in order
 
-Read `$HOME/.agents/skills/billing-triage/references/tools.md` before composing calls. It contains exact qualified names, result traps, amount units, and allowlists. Never invent a tool name.
+Read [references/tools.md](references/tools.md) before composing calls. It contains exact qualified names, the Intercom read path, result traps, amount units, and allowlists. Never invent a tool name.
 
 The order is mandatory:
 
