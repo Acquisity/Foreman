@@ -120,7 +120,9 @@ Query around the time the claim names. A deployment that landed just before the 
 
 ## Intercom (`intercom__`)
 
-`search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`, `search_articles`, `list_articles`, `get_article`.
+`search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies`.
+
+Intercom is app-scoped through the private Acquisity workspace app token. There is no caller OAuth or sign-in flow. If discovery or a tool reports an authorization failure, mark the lane `Could not run` and continue with other evidence. Do not ask the Slack requester to reconnect, do not wait for consent, and do not retry the same call. The failure is operator configuration.
 
 Two uses.
 

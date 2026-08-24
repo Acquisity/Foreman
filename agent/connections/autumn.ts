@@ -50,7 +50,7 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   prompting. Pinning the subject with `createSubject` was tried and reverted:
  *   consent completed and the callback landed, but Connect then reported the
  *   user unauthorized, because the issuer-prefixed subject it was handed is not
- *   where the grant had been stored. Stripe and Intercom have the same gap.
+ *   where the grant had been stored. Stripe has the same gap.
  *   Solve it against a verified mechanism rather than a reasoned-about one.
  * - Read-only twice over. {@link READ_SCOPES} narrows the grant itself, and
  *   the allowlist below narrows what the model can discover, built from the
