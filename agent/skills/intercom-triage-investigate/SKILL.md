@@ -22,6 +22,8 @@ Require exactly one conversation URL or reference in the supplied Slack context.
 
 Pass a conversation URL directly to `intercom__fetch`, or resolve a known id with `intercom__get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into the later customer-report issue and investigation document so another session can resume without the Slack transcript.
 
+When the conversation carries screenshots, route each to the `vision` subagent to read it. Intercom lists attachments but does not interpret images, so a screenshot left unread is an evidence lane skipped. Hand the image and a specific question, and take the answer back as evidence rather than the filename or alt text.
+
 ## Step 2: Classify the predominant ask
 
 Choose one lane:
