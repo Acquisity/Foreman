@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { readDocument, TRIAGE_REVIEW_PREFIX, writeDocument } from "./blob.js";
 import {
+  canonicalizeTriageReviewValue,
   evidenceRevisionSchema,
   TRIAGE_CRITIC_CRITERIA,
   type TriageCriticVerdict,
@@ -90,20 +91,6 @@ const blobStorage: TriageReviewStorage = {
 
 const digest = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
-
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(canonicalize);
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, canonicalize(entry)])
-    );
-  }
-  return value;
-};
 
 export const triageReviewSessionKey = (sessionId: string): string =>
   digest(sessionId);
@@ -294,4 +281,4 @@ export const claimTriageReviewUse = (
 };
 
 export const triageReviewPayloadDigest = (value: unknown): string =>
-  digest(JSON.stringify(canonicalize(value)));
+  digest(JSON.stringify(canonicalizeTriageReviewValue(value)));

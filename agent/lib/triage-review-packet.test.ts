@@ -4,6 +4,7 @@ import { z } from "zod";
 import correctInvestigationCase from "../tools/correct_investigation_case.js";
 import recordInvestigationCase from "../tools/record_investigation_case.js";
 import {
+  canonicalizeTriageReviewValue,
   hashTriageReviewPacket,
   serializeTriageReviewPacket,
   stampTriageReviewPolicy,
@@ -86,6 +87,21 @@ const input = (): TriageReviewPacketInput => ({
     kind: "Linear",
     workspaceIdentity: "Pinned workspace from the source investigation.",
   },
+});
+
+describe("triage review canonical JSON", () => {
+  it("uses locale-independent code-unit key ordering recursively", () => {
+    const canonical = canonicalizeTriageReviewValue({
+      _: 2,
+      a: { _: 2, a: 3, Z: 1, ä: 4 },
+      Z: 1,
+      ä: 4,
+    });
+    assert.equal(
+      JSON.stringify(canonical),
+      '{"Z":1,"_":2,"a":{"Z":1,"_":2,"a":3,"\u00e4":4},"\u00e4":4}'
+    );
+  });
 });
 
 const casePayload = {

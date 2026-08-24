@@ -434,15 +434,22 @@ export const triageCriticVerdictSchema = z
 
 export type TriageCriticVerdict = z.infer<typeof triageCriticVerdictSchema>;
 
-const canonicalize = (value: unknown): unknown => {
+const compareCodeUnits = (left: string, right: string): number => {
+  if (left < right) {
+    return -1;
+  }
+  return left > right ? 1 : 0;
+};
+
+export const canonicalizeTriageReviewValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
-    return value.map(canonicalize);
+    return value.map(canonicalizeTriageReviewValue);
   }
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, canonicalize(entry)])
+        .sort(([left], [right]) => compareCodeUnits(left, right))
+        .map(([key, entry]) => [key, canonicalizeTriageReviewValue(entry)])
     );
   }
   return value;
@@ -450,7 +457,7 @@ const canonicalize = (value: unknown): unknown => {
 
 export const serializeTriageReviewPacket = (
   packet: TriageReviewPacket
-): string => JSON.stringify(canonicalize(packet), null, 2);
+): string => JSON.stringify(canonicalizeTriageReviewValue(packet), null, 2);
 
 export const hashTriageReviewPacket = (serialized: string): string =>
   createHash("sha256").update(serialized).digest("hex");
