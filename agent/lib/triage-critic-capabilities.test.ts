@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
@@ -33,6 +33,48 @@ const toolSource = (name: string): string =>
   );
 
 describe("triage-critic capabilities", () => {
+  it("requires explicit review for every mounted connection and tool", () => {
+    const filenames = (directory: string): string[] =>
+      readdirSync(new URL(directory, import.meta.url))
+        .filter((name) => name.endsWith(".ts"))
+        .sort();
+    assert.deepEqual(filenames("../subagents/triage-critic/connections/"), [
+      "autumn.ts",
+      "axiom.ts",
+      "inngest.ts",
+      "intercom.ts",
+      "jam.ts",
+      "linear.ts",
+      "lucent.ts",
+      "modem.ts",
+      "neon.ts",
+      "planetscale.ts",
+      "posthog.ts",
+      "resend.ts",
+      "sentry.ts",
+      "stripe.ts",
+      "vercel.ts",
+    ]);
+    assert.deepEqual(filenames("../subagents/triage-critic/tools/"), [
+      "ask_question.ts",
+      "bash.ts",
+      "glob.ts",
+      "grep.ts",
+      "list_instantly_subworkspaces.ts",
+      "planetscale_execute_read_query.ts",
+      "read_autumn_billing.ts",
+      "read_image.ts",
+      "read_instantly_subworkspace.ts",
+      "read_stripe_billing.ts",
+      "read_triage_review_packet.ts",
+      "search_investigation_memory.ts",
+      "todo.ts",
+      "web_fetch.ts",
+      "web_search.ts",
+      "write_file.ts",
+    ]);
+  });
+
   it("has the product-triage evidence connections", () => {
     for (const name of [
       "axiom",

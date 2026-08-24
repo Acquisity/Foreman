@@ -41,6 +41,7 @@ export const GITHUB_WRITE_TOOLS = [
 export const ROOT_WRITE_TOOLS = [
   "complete_triage_master_reservation",
   "correct_investigation_case",
+  "create_triage_review_packet",
   "push_branch",
   "record_investigation_case",
   "record_pipeline_run",

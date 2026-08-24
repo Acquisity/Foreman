@@ -30,6 +30,7 @@ For each, state classification or critic verdict where applicable, hotlane or pr
     t.loadedSkill("triage-critic");
     t.loadedSkill("incident-hotlane");
     t.loadedSkill("engineering-handoff");
+    t.maxToolCalls(4);
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }
