@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { caseProjectionSchema } from "./case.js";
 import {
+  type CaseRow,
   CLUSTER_MIN_REPORTS,
   DEFAULT_SEARCH_LIMIT,
   featureClusterSignalsFromCounts,
@@ -8,7 +10,41 @@ import {
   idempotencyKey,
   isConfigured,
   MAX_SEARCH_LIMIT,
+  projectCase,
 } from "./store.js";
+
+test("case projection converts Neon Date values to plain JSON", () => {
+  const row: CaseRow = {
+    affected_feature_keys: [],
+    affected_org_count: 3,
+    affected_user_count: null,
+    claim: "Campaign analytics stopped updating.",
+    classification: "bug",
+    component: "campaign analytics",
+    confidence: "high",
+    counted_at: new Date("2026-08-24T00:00:00.000Z"),
+    created_at: new Date("2026-08-24T14:49:12.000Z"),
+    dependency_keys: [],
+    evidence_refs: [],
+    id: "case-1",
+    observed_from: new Date("2026-08-20T12:00:00.000Z"),
+    observed_to: null,
+    primary_feature_key: "cold_email",
+    provider: null,
+    resolution: null,
+    root_cause: "The analytics projection stopped consuming events.",
+    source_document_url: null,
+    source_issue_id: "ENG-1",
+    source_issue_url: "https://linear.app/acquisity/issue/ENG-1/example",
+    supersedes_case_id: null,
+  };
+
+  const projection = projectCase(row, "cold_email");
+
+  assert.equal(projection.countedAt, "2026-08-24");
+  assert.equal(projection.recordedAt, "2026-08-24T14:49:12.000Z");
+  assert.deepEqual(caseProjectionSchema.parse(projection), projection);
+});
 
 test("idempotencyKey", async (t) => {
   await t.test(

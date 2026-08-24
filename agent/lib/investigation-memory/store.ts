@@ -112,8 +112,10 @@ export function idempotencyKey(
   return createHash("sha256").update(material).digest("hex");
 }
 
+type DatabaseDate = Date | string;
+
 /** A row as selected for the model projection. */
-interface CaseRow {
+export interface CaseRow {
   affected_feature_keys: string[];
   affected_org_count: number | null;
   affected_user_count: number | null;
@@ -121,13 +123,13 @@ interface CaseRow {
   classification: Classification;
   component: string | null;
   confidence: Confidence;
-  counted_at: string | null;
-  created_at: string;
+  counted_at: DatabaseDate | null;
+  created_at: DatabaseDate;
   dependency_keys: string[];
   evidence_refs: string[];
   id: string;
-  observed_from: string | null;
-  observed_to: string | null;
+  observed_from: DatabaseDate | null;
+  observed_to: DatabaseDate | null;
   primary_feature_key: string;
   provider: string | null;
   resolution: string | null;
@@ -145,8 +147,13 @@ const PROJECTION_COLUMNS = `id, primary_feature_key, affected_feature_keys, depe
   affected_org_count, affected_user_count, counted_at, confidence,
   supersedes_case_id, observed_from, observed_to, created_at`;
 
-const toIso = (value: string | null): string | null =>
+const toIso = (value: DatabaseDate | null): string | null =>
   value === null ? null : new Date(value).toISOString();
+
+const toDateOnly = (value: DatabaseDate | null): string | null =>
+  value === null
+    ? null
+    : (value instanceof Date ? value.toISOString() : value).slice(0, 10);
 
 function matchReason(
   row: CaseRow,
@@ -160,7 +167,7 @@ function matchReason(
     : "dependency";
 }
 
-function project(row: CaseRow, feature: FeatureKey): CaseProjection {
+export function projectCase(row: CaseRow, feature: FeatureKey): CaseProjection {
   const matchedOn = matchReason(row, feature);
   return {
     affectedFeatureKeys: row.affected_feature_keys,
@@ -172,7 +179,7 @@ function project(row: CaseRow, feature: FeatureKey): CaseProjection {
     component: row.component,
     confidence: row.confidence,
     correctsEarlierConclusion: row.supersedes_case_id !== null,
-    countedAt: row.counted_at,
+    countedAt: toDateOnly(row.counted_at),
     dependencyKeys: row.dependency_keys,
     evidenceRefs: row.evidence_refs,
     matchedOn,
@@ -387,7 +394,7 @@ export async function searchCases(params: SearchParams): Promise<SearchResult> {
     reports: 0,
   };
   return {
-    cases: rows.map((row) => project(row, params.primaryFeatureKey)),
+    cases: rows.map((row) => projectCase(row, params.primaryFeatureKey)),
     cluster: {
       distinctFeatures: counts.distinct_features,
       firstSeen: toIso(counts.first_seen),
@@ -401,8 +408,8 @@ export async function searchCases(params: SearchParams): Promise<SearchResult> {
 
 interface ClusterRow {
   distinct_features: number;
-  first_seen: string | null;
-  last_seen: string | null;
+  first_seen: DatabaseDate | null;
+  last_seen: DatabaseDate | null;
   primary_feature_key?: string;
   reports: number;
 }
@@ -469,7 +476,7 @@ export async function searchCasesAcrossLiveFeatures(
         "Investigation memory returned an unknown product area."
       );
     }
-    return project(row, row.primary_feature_key);
+    return projectCase(row, row.primary_feature_key);
   });
   const clusterCounts: FeatureClusterCounts[] = clusterRows.flatMap((row) => {
     if (!(row.primary_feature_key && isFeatureKey(row.primary_feature_key))) {
@@ -478,8 +485,8 @@ export async function searchCasesAcrossLiveFeatures(
     return [
       {
         distinctFeatures: row.distinct_features,
-        firstSeen: row.first_seen,
-        lastSeen: row.last_seen,
+        firstSeen: toIso(row.first_seen),
+        lastSeen: toIso(row.last_seen),
         primaryFeatureKey: row.primary_feature_key,
         reports: row.reports,
       },

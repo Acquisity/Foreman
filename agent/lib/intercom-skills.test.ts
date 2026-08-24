@@ -92,6 +92,15 @@ test("Intercom billing skill preserves evidence order and human-only action", ()
   }
 });
 
+test("Intercom skills attach the source conversation to customer tickets", () => {
+  const linkAttachment =
+    '`links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`';
+
+  assert.ok(productSkill.includes(linkAttachment));
+  assert.ok(productSkill.includes("never the shared root-cause master"));
+  assert.ok(billingSkill.includes(linkAttachment));
+});
+
 test("Intercom skills own their tool references", () => {
   assert.ok(
     productSkill.includes("[references/tools.md](references/tools.md)")
