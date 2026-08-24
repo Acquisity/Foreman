@@ -51,7 +51,11 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
     assert.ok(masterSearchInstruction.includes("until `hasNextPage` is false"));
     assert.ok(skill.includes("created exactly 30 days ago"));
     assert.ok(skill.includes("even by one second"));
-    assert.ok(skill.includes("before comparing or attaching"));
+    assert.ok(skill.includes("selecting a candidate as the current master"));
+    assert.ok(skill.includes("current-master selection and parent attachment"));
+    assert.ok(skill.includes("may be related for history"));
+    assert.ok(skill.includes("never reused as the parent"));
+    assert.ok(!skill.includes("before comparing or attaching anything"));
     assert.ok(skill.includes("current") && skill.includes("blast-radius"));
     assert.ok(skill.includes("similarity"));
     assert.ok(skill.includes("evidence"));
