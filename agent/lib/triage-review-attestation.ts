@@ -238,7 +238,7 @@ export const readAttestedApproval = async (
   return null;
 };
 
-export const bindTriageReviewSource = (
+export const bindTriageReviewSource = async (
   approvalId: string,
   binding: TriageReviewSourceBinding,
   storage: TriageReviewStorage = blobStorage
@@ -247,7 +247,7 @@ export const bindTriageReviewSource = (
   if (!parsedApprovalId.success) {
     return false;
   }
-  return storage.writeOnce(
+  return await storage.writeOnce(
     sourceKey(parsedApprovalId.data),
     JSON.stringify(sourceBindingSchema.parse(binding))
   );
@@ -265,7 +265,7 @@ export const readTriageReviewSource = async (
   return value === null ? null : sourceBindingSchema.parse(JSON.parse(value));
 };
 
-export const claimTriageReviewUse = (
+export const claimTriageReviewUse = async (
   approvalId: string,
   input: z.input<typeof useBindingSchema>,
   storage: TriageReviewStorage = blobStorage
@@ -274,7 +274,7 @@ export const claimTriageReviewUse = (
   if (!parsedApprovalId.success) {
     return false;
   }
-  return storage.writeOnce(
+  return await storage.writeOnce(
     useKey(parsedApprovalId.data, input.purpose),
     JSON.stringify(useBindingSchema.parse(input))
   );
