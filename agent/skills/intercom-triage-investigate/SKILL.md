@@ -20,7 +20,7 @@ The goal is to explain what happened, find an unblock, and create durable Linear
 
 Require exactly one conversation URL or reference in the supplied Slack context. If it is missing or more than one conversation could be the source, ask one focused question and stop.
 
-Pass a conversation URL directly to `intercom__fetch`, or resolve a known id with `intercom__get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into any later Linear issue and investigation document so another session can resume without the Slack transcript.
+Pass a conversation URL directly to `intercom__fetch`, or resolve a known id with `intercom__get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into the later customer-report issue and investigation document so another session can resume without the Slack transcript.
 
 ## Step 2: Classify the predominant ask
 
@@ -100,8 +100,8 @@ For a confirmed Bug, complete all of the following before the final Slack reply:
 2. Search current Linear masters on root cause, code path, provider failure, and symptom. Match on root cause, not merely the visible outcome. Do not filter by a presumed master label.
 3. Create one customer-report issue on the Engineering Team. Include the Intercom conversation URL, bounded conversation context, testable claim, classification, explicit project when known, priority, and the union of valid labels returned by Linear. Use `intercom-sourced` and `Customer reported` when those labels exist.
 4. Attach one issue-scoped document with `linear__save_document`, `issue` set to the report, and title `Triage investigation`. Keep raw customer identity, production rows, queries, and conversation evidence only on this report document.
-5. If a master owns the root cause, parent the report to it and inherit its assignee. Add only aggregate new evidence to the master, recount its blast radius, and reweigh its priority.
-6. Otherwise create one root-cause master, parent the report to it, and give both the area owner. One root cause gets one master, regardless of the number of reports or implementation steps.
+5. If a master owns the root cause, parent the report to it and inherit its assignee. Link the new report from the master, add only aggregate new evidence there, recount its blast radius, and reweigh its priority. The report link is the route to the Intercom URL and bounded context; do not copy customer-specific conversation details onto the root-cause master.
+6. Otherwise create one root-cause master, parent the report to it, link the report from the master, and give both the area owner. Keep the Intercom URL and bounded context on the customer report and its document. One root cause gets one master, regardless of the number of reports or implementation steps.
 7. Add the short report comment with the unblock first, the plain-language cause, the affected-workspace count, and the investigation-document link.
 
 Priority is evidence-based: Urgent for outage, security, or data-loss risk; High for multiple organizations blocked, repeated core failure, or active money impact; Medium for a real single-organization defect; Low for limitations, cosmetic cases, or resolved triage. A workaround does not lower the defect's priority.

@@ -216,7 +216,7 @@ export interface GlobalSearchResult {
   clusters: FeatureClusterSignal[];
 }
 
-/** Filters for authorized intake search before a Linear project exists. */
+/** Relevance inputs for authorized intake search before a project exists. */
 export interface GlobalSearchParams {
   classification?: Classification;
   component?: string;
@@ -316,7 +316,7 @@ const GLOBAL_SEARCH_SQL = `SELECT ${PROJECTION_COLUMNS},
     text_rank DESC, created_at DESC
   LIMIT $9`;
 
-const GLOBAL_CLUSTER_SQL = `SELECT
+export const GLOBAL_CLUSTER_SQL = `SELECT
     primary_feature_key,
     count(DISTINCT source_issue_id)::int AS reports,
     count(DISTINCT primary_feature_key)::int AS distinct_features,

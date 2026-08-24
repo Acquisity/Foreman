@@ -60,6 +60,8 @@ test("Intercom product skill creates engineering work only for a confirmed bug",
     "For a confirmed Bug",
     "canonical conversation URL",
     "explicit mapped Linear project",
+    "Link the new report from the master",
+    "do not copy customer-specific conversation details",
   ]) {
     assert.ok(productSkill.includes(phrase), phrase);
   }
@@ -79,6 +81,8 @@ test("Intercom billing skill preserves evidence order and human-only action", ()
     "one Support/Financial ticket",
     "project Support",
     "canonical conversation URL",
+    "Subscription and invoice are request subjects",
+    "expected future subscription or one-off invoice",
   ]) {
     assert.ok(billingSkill.includes(phrase), phrase);
   }

@@ -4,6 +4,7 @@ import {
   CLUSTER_MIN_REPORTS,
   DEFAULT_SEARCH_LIMIT,
   featureClusterSignalsFromCounts,
+  GLOBAL_CLUSTER_SQL,
   idempotencyKey,
   isConfigured,
   MAX_SEARCH_LIMIT,
@@ -61,6 +62,9 @@ test("retrieval bounds", async (t) => {
   });
 
   await t.test("keeps project-free incident signals isolated per area", () => {
+    assert.ok(GLOBAL_CLUSTER_SQL.includes("count(DISTINCT source_issue_id)"));
+    assert.ok(GLOBAL_CLUSTER_SQL.includes("GROUP BY primary_feature_key"));
+
     const signals = featureClusterSignalsFromCounts([
       {
         distinctFeatures: 1,

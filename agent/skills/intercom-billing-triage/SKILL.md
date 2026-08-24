@@ -33,7 +33,9 @@ Place a money ask in exactly one taxonomy bucket:
 - `credits`
 - `stripe_credit`
 
-`credits` is the single Autumn product-feature balance spent inside the app. Lead credits and website credits are two names for the same pool. `stripe_credit` is money placed on a Stripe customer balance for future invoices. Never substitute one for the other. A customer with no active subscription cannot use a Stripe credit, so a refund is the honest remedy when money must leave the account. Ask which outcome they want when both are viable.
+`credits` is the single Autumn product-feature balance spent inside the app. Lead credits and website credits are two names for the same pool. `stripe_credit` is money placed on a Stripe customer balance for future invoices. Never substitute one for the other. A Stripe credit needs an expected future subscription or one-off invoice to consume it; without either, it will sit unused and a refund is the honest remedy when money must leave the account. Ask which outcome they want when both are viable.
+
+Subscription and invoice are request subjects, not extra outcome buckets. Map them to the requested financial outcome: unwanted or disputed money back is `refund`; an amount or continued charge that is wrong is `overcharged`; a promised discount that failed is `coupon_code`; money intended for an expected future subscription or one-off invoice is `stripe_credit`. If the request concerns only subscription behavior and asks for no financial remedy, use the product lane instead.
 
 ## Step 3: Pin identity
 
@@ -85,7 +87,7 @@ Load `clarify-with-requester`. Ask one batched set before the verdict, capped at
 - `overcharged`: actual versus expected amount and the believed plan or add-on.
 - `coupon_code`: code, entry point, and visible error or silence.
 - `credits`: expected versus shown balance, believed consumption, and the action that should have changed it.
-- `stripe_credit`: the future charge to cover, amount, active subscription, and whether money back is preferred.
+- `stripe_credit`: the future subscription or one-off invoice to cover, amount, when it is expected, and whether money back is preferred.
 
 ## Step 7: Produce the proposal
 
