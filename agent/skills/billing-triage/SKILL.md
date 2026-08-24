@@ -56,7 +56,7 @@ Billing flows in one direction. A subscription starts in the customer's workspac
 
 Amounts always come from Stripe, never from the ticket text and never from the workspace alone. Everything else is read in flow order.
 
-When the ask involves an Instantly workspace, inbox provisioning, a sending account, or a campaign, also call the root `list_instantly_subworkspaces` and `read_instantly_subworkspace` tools after the three mandatory billing systems. Instantly is operational provider evidence only: it can prove that an accepted subworkspace or provider resource exists, but it cannot prove payment, entitlement, or refund amount and never replaces any of the three records above.
+When the financial ask turns on Instantly provisioning or live provider state, call the root `list_instantly_subworkspaces` tool after the three mandatory billing systems. Use its result alone for membership evidence. Only if it returns the relevant accepted subworkspace and the ask needs account, campaign, or email evidence, select that workspace and call `read_instantly_subworkspace` for one bounded page. Instantly is operational provider evidence only: it cannot prove payment, entitlement, or refund amount and never replaces any of the three records above.
 
 Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Connection tools use a qualified name such as `autumn__getCustomer`; root tools such as `read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, and `planetscale_execute_read_query` are called bare. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
 

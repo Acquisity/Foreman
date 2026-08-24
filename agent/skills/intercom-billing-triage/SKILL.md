@@ -65,7 +65,7 @@ These billing tools use shared app-scoped Connect credentials, so the Intercom r
 
 Amounts come from Stripe, in its smallest currency unit, never from the conversation or workspace alone. For product `credits`, the balance comes from Autumn and PlanetScale and no Stripe amount applies.
 
-When the ask involves an Instantly workspace, inbox provisioning, a sending account, or a campaign, also call the root `list_instantly_subworkspaces` and `read_instantly_subworkspace` tools after the three mandatory billing systems. Instantly is operational provider evidence only. It cannot prove payment, entitlement, or refund amount and never replaces PlanetScale, Autumn, or Stripe.
+When the financial ask turns on Instantly provisioning or live provider state, call the root `list_instantly_subworkspaces` tool after the three mandatory billing systems. Use its result alone for membership evidence. Only if it returns the relevant accepted subworkspace and the ask needs account, campaign, or email evidence, select that workspace and call `read_instantly_subworkspace` for one bounded page. Instantly is operational provider evidence only. It cannot prove payment, entitlement, or refund amount and never replaces PlanetScale, Autumn, or Stripe.
 
 Read all three even when the first appears decisive. Identify the first divergent hop:
 

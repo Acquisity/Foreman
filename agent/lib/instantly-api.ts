@@ -288,6 +288,55 @@ const callPage = async (
 const normalizeName = (name: string): string =>
   name.trim().replace(/\s+/gu, " ").toLocaleLowerCase("en-US");
 
+const SAFE_ITEM_FIELDS: Record<InstantlyResource, readonly string[]> = {
+  accounts: [
+    "autofix_failed",
+    "daily_limit",
+    "email",
+    "enable_slow_ramp",
+    "first_name",
+    "inbox_placement_test_limit",
+    "is_managed_account",
+    "last_name",
+    "provider_code",
+    "sending_gap",
+    "setup_pending",
+    "stat_warmup_score",
+    "status",
+    "timestamp_created",
+    "timestamp_last_used",
+    "timestamp_updated",
+    "timestamp_warmup_start",
+    "tracking_domain_name",
+    "tracking_domain_status",
+    "warmup_status",
+  ],
+  campaigns: [
+    "id",
+    "is_evergreen",
+    "name",
+    "pl_value",
+    "status",
+    "timestamp_created",
+    "timestamp_updated",
+  ],
+  emails: [
+    "campaign_id",
+    "content_preview",
+    "email_type",
+    "id",
+    "is_unread",
+    "lead_id",
+    "marked_as_done",
+    "message_id",
+    "subject",
+    "thread_id",
+    "timestamp_created",
+    "timestamp_email",
+    "timestamp_updated",
+  ],
+};
+
 const enforceOutputBudget = <T>(value: T): T => {
   if (Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_RESPONSE_BYTES) {
     throw tooMuchData();
@@ -295,7 +344,7 @@ const enforceOutputBudget = <T>(value: T): T => {
   return value;
 };
 
-/** Lists every accepted subworkspace, following all Workspace Group pages. */
+/** Lists accepted subworkspaces from a complete, safety-bounded group result. */
 export async function listInstantlySubworkspaces(
   token: string,
   options: InstantlyApiOptions = {}
@@ -412,27 +461,29 @@ const resolveWorkspace = async (
 const sanitizeItems = (
   resource: InstantlyResource,
   items: unknown[]
-): unknown[] => {
-  if (resource !== "emails") {
-    return items;
-  }
-  return items.map((item) => {
+): unknown[] =>
+  items.map((item) => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) {
-      return item;
+      throw new InstantlyApiError(
+        `Instantly returned invalid ${resource} data.`,
+        { kind: "invalid-response" }
+      );
     }
     const record = item as Record<string, unknown>;
-    const {
-      attachment_json: _attachmentJson,
-      bcc_address_json: _bccAddressJson,
-      body: _body,
-      cc_address_json: _ccAddressJson,
-      from_address_json: _fromAddressJson,
-      to_address_json: _toAddressJson,
-      ...safe
-    } = record;
+    const safe: Record<string, boolean | null | number | string> = {};
+    for (const field of SAFE_ITEM_FIELDS[resource]) {
+      const value = record[field];
+      if (
+        value === null ||
+        typeof value === "boolean" ||
+        typeof value === "number" ||
+        typeof value === "string"
+      ) {
+        safe[field] = value;
+      }
+    }
     return safe;
   });
-};
 
 const appendEmailQuery = (
   params: URLSearchParams,

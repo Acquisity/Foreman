@@ -14,7 +14,7 @@ const unavailableReason = (error: unknown): string =>
 
 export default defineTool({
   description:
-    "List every accepted Instantly subworkspace available to Acquisity's IBG admin workspace. This follows every Workspace Group page, excludes pending and rejected memberships, and returns the admin and subworkspace names and IDs. Available only on attended investigation surfaces. It never changes Instantly.",
+    "List accepted Instantly subworkspaces available to Acquisity's IBG admin workspace. This follows up to 100 Workspace Group pages, fails instead of returning a partial list at that safety cap, excludes pending and rejected memberships, and returns the admin and subworkspace names and IDs. Available only on attended investigation surfaces. It never changes Instantly.",
   async execute(_input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {

@@ -98,7 +98,7 @@ const unavailableReason = (error: unknown): string =>
 
 export default defineTool({
   description:
-    "Read one bounded page of accounts, campaigns, or Unibox email metadata from an accepted Instantly subworkspace. Select by workspace ID when possible. The tool validates the workspace against every Workspace Group page, sends x-as-workspace server-side, and returns workspace name and ID provenance with the next cursor. Email reads force preview-only mode and remove bodies, attachment payloads, and raw address arrays. Available only on attended investigation surfaces. It never creates, updates, deletes, sends, pauses, resumes, replies, or forwards anything.",
+    "Read one bounded page of accounts, campaigns, or Unibox email metadata from an accepted Instantly subworkspace. Select by workspace ID when possible. The tool validates the workspace against the complete bounded Workspace Group result, sends x-as-workspace server-side, and returns workspace name and ID provenance with the next cursor. Every resource uses an explicit investigative-field allowlist. Email reads force preview-only mode and remove bodies, attachment payloads, and all provider address representations. Available only on attended investigation surfaces. It never creates, updates, deletes, sends, pauses, resumes, replies, or forwards anything.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {

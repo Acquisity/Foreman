@@ -171,7 +171,14 @@ describe("Instantly subworkspace reads", () => {
         });
       }
       return json({
-        items: [{ id: "campaign-1", name: "Campaign" }],
+        items: [
+          {
+            id: "campaign-1",
+            name: "Campaign",
+            provider_credentials: { password: "private" },
+            smtp_password: "private",
+          },
+        ],
         next_starting_after: "next-resource",
       });
     };
@@ -242,21 +249,59 @@ describe("Instantly subworkspace reads", () => {
   });
 
   it("does not read a pending or rejected workspace", async () => {
-    await assert.rejects(
-      readInstantlySubworkspace(
-        "secret-key",
-        { id: WORKSPACE_ID },
-        "accounts",
-        {},
-        {
-          fetch: () => json({ items: [member({ status: "pending" })] }),
-        }
-      ),
-      NO_ACCEPTED_WORKSPACE
+    await Promise.all(
+      (["pending", "rejected"] as const).map(async (status) => {
+        let calls = 0;
+        await assert.rejects(
+          readInstantlySubworkspace(
+            "secret-key",
+            { id: WORKSPACE_ID },
+            "accounts",
+            {},
+            {
+              fetch: () => {
+                calls += 1;
+                return json({ items: [member({ status })] });
+              },
+            }
+          ),
+          NO_ACCEPTED_WORKSPACE
+        );
+        assert.equal(calls, 1);
+      })
     );
   });
 
-  it("forces email previews and strips bodies and attachment payloads", async () => {
+  it("allowlists account fields instead of returning provider credentials", async () => {
+    const result = await readInstantlySubworkspace(
+      "secret-key",
+      { id: WORKSPACE_ID },
+      "accounts",
+      {},
+      {
+        fetch: (url) =>
+          String(url).includes("workspace-group-members")
+            ? json({ items: [member()] })
+            : json({
+                items: [
+                  {
+                    email: "sender@example.com",
+                    provider_code: 2,
+                    provider_credentials: { password: "private" },
+                    smtp_password: "private",
+                    status: 1,
+                  },
+                ],
+              }),
+      }
+    );
+
+    assert.deepEqual(result.items, [
+      { email: "sender@example.com", provider_code: 2, status: 1 },
+    ]);
+  });
+
+  it("forces email previews and strips bodies, attachments, and addresses", async () => {
     const calls: Array<{ init?: RequestInit; url: string }> = [];
     const fetchStub: typeof fetch = (url, init) => {
       calls.push({ init, url: String(url) });
@@ -266,11 +311,19 @@ describe("Instantly subworkspace reads", () => {
             items: [
               {
                 attachment_json: { files: [{ url: "https://private" }] },
+                bcc_address_email_list: "bcc@example.com",
+                bcc_address_json: [{ address: "bcc@example.com" }],
                 body: { html: "<p>private</p>", text: "private" },
+                cc_address_email_list: "cc@example.com",
+                cc_address_json: [{ address: "cc@example.com" }],
                 content_preview: "A bounded preview",
+                from_address_email: "sender@example.com",
                 from_address_json: [{ address: "sender@example.com" }],
                 id: "email-1",
+                reply_to: "reply@example.com",
                 subject: "Question",
+                to_address_email_list: "recipient@example.com",
+                to_address_json: [{ address: "recipient@example.com" }],
               },
             ],
           });
