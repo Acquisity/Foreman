@@ -38,6 +38,25 @@ const json = (
     })
   );
 
+const cancelableError = (
+  status: number,
+  onCancel: () => void,
+  headers: Record<string, string> = {}
+): Promise<Response> =>
+  Promise.resolve(
+    new Response(
+      new ReadableStream({
+        cancel: onCancel,
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('{"detail":"private provider detail"}')
+          );
+        },
+      }),
+      { headers, status }
+    )
+  );
+
 describe("Instantly Workspace Group", () => {
   it("follows every page and returns accepted subworkspaces with admin provenance", async () => {
     const calls: Array<{ init?: RequestInit; url: string }> = [];
@@ -89,9 +108,13 @@ describe("Instantly Workspace Group", () => {
   });
 
   it("does not expose provider error bodies", async () => {
+    let canceled = 0;
     await assert.rejects(
       listInstantlySubworkspaces("secret-key", {
-        fetch: () => json({ detail: "secret provider detail" }, 401),
+        fetch: () =>
+          cancelableError(401, () => {
+            canceled += 1;
+          }),
       }),
       (error) => {
         assert.ok(error instanceof InstantlyApiError);
@@ -101,16 +124,24 @@ describe("Instantly Workspace Group", () => {
         return true;
       }
     );
+    assert.equal(canceled, 1);
   });
 
   it("retries a short rate limit and respects the retry hint", async () => {
     let calls = 0;
+    let canceled = 0;
     const delays: number[] = [];
     const result = await listInstantlySubworkspaces("secret-key", {
       fetch: () => {
         calls += 1;
         return calls === 1
-          ? json({}, 429, { "Retry-After": "1" })
+          ? cancelableError(
+              429,
+              () => {
+                canceled += 1;
+              },
+              { "Retry-After": "1" }
+            )
           : json({ items: [member()] });
       },
       sleep: (milliseconds) => {
@@ -120,6 +151,7 @@ describe("Instantly Workspace Group", () => {
     });
 
     assert.equal(calls, 2);
+    assert.equal(canceled, 1);
     assert.deepEqual(delays, [1000]);
     assert.equal(result.subworkspaces.length, 1);
   });

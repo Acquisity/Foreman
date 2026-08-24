@@ -171,6 +171,10 @@ const retryAfterSeconds = (response: Response): number | null => {
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
 };
 
+const discardResponseBody = async (response: Response): Promise<void> => {
+  await response.body?.cancel().catch(() => undefined);
+};
+
 const statusError = (response: Response): InstantlyApiError => {
   const { status } = response;
   if (status === 401) {
@@ -214,7 +218,9 @@ const parsePage = async (
   response: Response
 ): Promise<z.infer<typeof pageSchema>> => {
   if (!response.ok) {
-    throw statusError(response);
+    const error = statusError(response);
+    await discardResponseBody(response);
+    throw error;
   }
   const text = await readBoundedText(response);
   try {
@@ -274,9 +280,12 @@ const callPage = async (
     const retryAfter = retryAfterSeconds(response);
     const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
     if (delay > MAX_RETRY_DELAY_MS) {
-      throw statusError(response);
+      const error = statusError(response);
+      await discardResponseBody(response);
+      throw error;
     }
     attempt += 1;
+    await discardResponseBody(response);
     await sleep(delay, options.signal);
   }
 
