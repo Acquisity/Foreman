@@ -1,6 +1,6 @@
-# Investigation tools
+# Intercom product investigation tools
 
-Exact tool names for the Step 4 lanes. Every name below was read from this repository: the `tools.allow` list in `agent/connections/<name>.ts`, or the tool's own definition in `agent/tools/`. Names marked as verified externally were confirmed against the vendor's own documentation, linked inline.
+Exact tool names for the Intercom product investigation lanes. Every name below was read from this repository: the `tools.allow` list in `agent/connections/<name>.ts`, or the tool's own definition in `agent/tools/`. Names marked as verified externally were confirmed against the vendor's own documentation, linked inline.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and a call invented from the wrong one fails in a way that reads like the data is missing.
 
@@ -10,9 +10,9 @@ Two connections have no allowlist and expose their server's full surface, so thi
 
 Two kinds of tool appear below, and they are called differently.
 
-**Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
+Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -74,7 +74,7 @@ The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the n
 
 `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health`.
 
-Start from the function named in the code path found in 4.2, then `get_run_trace` on a failing run for the step that broke.
+Start from the function named in the Code lane under `Investigate current evidence`, then `get_run_trace` on a failing run for the step that broke.
 
 ## Sentry (`sentry__`)
 
@@ -100,7 +100,7 @@ No allowlist. The server exposes a single tool, `exec`, which runs a named PostH
 
 Commands relevant to an investigation include `persons`, `session-recording`, `error-tracking`, `query`, `execute-sql`, `insight`, `event-definition`, and `heatmaps`.
 
-There is no tool that finds a person by display name. Resolve the person first through `persons` using the email or distinct id pinned in Step 1A, then read their recordings. Composing a call like `posthog_get_session_recordings` will fail; that tool does not exist.
+There is no tool that finds a person by display name. Resolve the person first through `persons` using the email or distinct id established under `Pin identity and check existing evidence`, then read their recordings. Composing a call like `posthog_get_session_recordings` will fail; that tool does not exist.
 
 ## Lucent (`lucent__`)
 
@@ -128,7 +128,7 @@ Intercom is app-scoped through the private Acquisity workspace app token. There 
 
 Two uses.
 
-The conversation behind this report. If the ticket carries an Intercom link, pass it straight to `fetch`, which accepts a URL. Otherwise `search_contacts` with `email` set to the address pinned in Step 1A, then `search_conversations` with `contact_ids`, then `get_conversation` for the full thread. `get_contact` returns the profile only and holds no conversations, so it is not a step on this path.
+The conversation behind this report. Pass the intake URL straight to `fetch`, which accepts a URL. When the intake supplies a known conversation id instead, use `get_conversation`. Only when no conversation URL or id is available and the identity gate has established an exact email, use `search_contacts`, then `search_conversations` with `contact_ids`, then `get_conversation` for the full thread. `get_contact` returns the profile only and holds no conversations, so it is not a step on this path.
 
 Whether others hit the same thing, which is frequency evidence for severity weighting. Use `search`, not `search_conversations`: `search_conversations` filters structured fields and has no free-text, while `search` takes a DSL query such as `object_type:conversations q:"campaign stopped sending"`.
 

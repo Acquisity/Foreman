@@ -8,7 +8,12 @@ import type {
   Confidence,
 } from "./case.js";
 import { searchText } from "./case.js";
-import { type FeatureKey, TENANT_KEY } from "./scope.js";
+import {
+  type FeatureKey,
+  isFeatureKey,
+  LIVE_FEATURE_KEYS,
+  TENANT_KEY,
+} from "./scope.js";
 
 /**
  * The investigation-memory database: Foreman's own private Postgres, reached
@@ -80,19 +85,31 @@ export const isConfigured = (): boolean =>
  *
  * @remarks
  * A step that is interrupted after the insert and re-run must land on the same
- * key, so it is derived only from what identifies the conclusion: the source
- * ticket, the final classification, and the root cause. The same investigation
- * written twice is one row. A different conclusion is a correction, which goes
- * through `correctCase` and gets its own key.
+ * key, so it is derived from what identifies the write: the source ticket, the
+ * final classification, the root cause, and, for a correction, the exact case
+ * it supersedes. The predecessor keeps a correction replay-safe without
+ * preventing a later revision from returning to an earlier conclusion.
  */
 export function idempotencyKey(
   sourceIssueId: string,
   classification: Classification,
-  rootCause: string
+  rootCause: string,
+  supersedesCaseId?: string
 ): string {
-  return createHash("sha256")
-    .update(`${sourceIssueId}|${classification}|${rootCause}`)
-    .digest("hex");
+  // Keep the original record-key encoding so deployed first revisions remain
+  // replay-safe. Corrections use a separate structured namespace so their
+  // predecessor cannot be confused with text at the end of the root cause.
+  const material =
+    supersedesCaseId === undefined
+      ? `${sourceIssueId}|${classification}|${rootCause}`
+      : JSON.stringify([
+          "correction",
+          sourceIssueId,
+          classification,
+          rootCause,
+          supersedesCaseId,
+        ]);
+  return createHash("sha256").update(material).digest("hex");
 }
 
 /** A row as selected for the model projection. */
@@ -200,6 +217,54 @@ export interface SearchResult {
   cluster: ClusterSignal;
 }
 
+/** A wider-incident signal isolated to one product area. */
+export interface FeatureClusterSignal extends ClusterSignal {
+  primaryFeatureKey: FeatureKey;
+}
+
+/** Project-free retrieval across a server-selected set of live product areas. */
+export interface GlobalSearchResult {
+  cases: CaseProjection[];
+  clusters: FeatureClusterSignal[];
+}
+
+/** Relevance inputs for authorized intake search before a project exists. */
+export interface GlobalSearchParams {
+  classification?: Classification;
+  component?: string;
+  dependencyKeys?: readonly string[];
+  limit?: number;
+  provider?: string;
+  text?: string;
+  windowDays?: number;
+}
+
+/** Database-independent cluster counts, exposed so grouping stays testable. */
+export interface FeatureClusterCounts {
+  distinctFeatures: number;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  primaryFeatureKey: FeatureKey;
+  reports: number;
+}
+
+/**
+ * Turn per-product counts into signals without ever combining their reports.
+ */
+export function featureClusterSignalsFromCounts(
+  rows: readonly FeatureClusterCounts[]
+): FeatureClusterSignal[] {
+  return rows.map((counts) => ({
+    distinctFeatures: counts.distinctFeatures,
+    firstSeen: toIso(counts.firstSeen),
+    lastSeen: toIso(counts.lastSeen),
+    possibleWiderIncident: counts.reports >= CLUSTER_MIN_REPORTS,
+    primaryFeatureKey: counts.primaryFeatureKey,
+    reports: counts.reports,
+    windowDays: CLUSTER_WINDOW_DAYS,
+  }));
+}
+
 const SEARCH_SQL = `WITH scoped AS (
   SELECT *, CASE
       WHEN primary_feature_key = $2 THEN 3
@@ -245,6 +310,38 @@ const CLUSTER_SQL = `SELECT
       OR dependency_keys && $3::text[])
     AND ($4::text IS NULL OR component = $4)
     AND created_at >= now() - ($5::int * INTERVAL '1 day')`;
+
+const GLOBAL_SEARCH_SQL = `SELECT ${PROJECTION_COLUMNS},
+    CASE WHEN dependency_keys && $3::text[] THEN 1 ELSE 0 END AS dependency_rank,
+    CASE WHEN $4::text IS NOT NULL AND component = $4 THEN 1 ELSE 0 END AS component_rank,
+    CASE WHEN $5::text IS NOT NULL AND provider = $5 THEN 1 ELSE 0 END AS provider_rank,
+    CASE WHEN $7::text IS NULL THEN 0
+         ELSE ts_rank(search_document, websearch_to_tsquery('english', $7))
+    END AS text_rank
+  FROM investigation_cases
+  WHERE tenant_key = $1
+    AND status = 'active'
+    AND primary_feature_key = ANY ($2::text[])
+    AND ($6::text IS NULL OR classification = $6)
+    AND created_at >= now() - ($8::int * INTERVAL '1 day')
+  ORDER BY component_rank DESC, provider_rank DESC, dependency_rank DESC,
+    text_rank DESC, created_at DESC
+  LIMIT $9`;
+
+export const GLOBAL_CLUSTER_SQL = `SELECT
+    primary_feature_key,
+    count(DISTINCT source_issue_id)::int AS reports,
+    count(DISTINCT primary_feature_key)::int AS distinct_features,
+    min(created_at) AS first_seen,
+    max(created_at) AS last_seen
+  FROM investigation_cases
+  WHERE tenant_key = $1
+    AND status = 'active'
+    AND primary_feature_key = ANY ($2::text[])
+    AND ($3::text IS NULL OR component = $3)
+    AND (cardinality($4::text[]) = 0 OR dependency_keys && $4::text[])
+    AND created_at >= now() - ($5::int * INTERVAL '1 day')
+  GROUP BY primary_feature_key`;
 
 /**
  * Cases in the same scope, most relevant first, plus a cluster count over the
@@ -306,7 +403,93 @@ interface ClusterRow {
   distinct_features: number;
   first_seen: string | null;
   last_seen: string | null;
+  primary_feature_key?: string;
   reports: number;
+}
+
+/**
+ * Search every live product area before intake has a Linear project.
+ *
+ * @remarks
+ * The feature list comes directly from the server-owned live lifecycle table.
+ * Search results may span areas, but cluster counts are grouped before they
+ * leave Postgres. When intake has not identified a component or dependency
+ * yet, cluster signaling is suppressed rather than treating all recent cases
+ * in an area as one incident.
+ */
+export async function searchCasesAcrossLiveFeatures(
+  params: GlobalSearchParams
+): Promise<GlobalSearchResult> {
+  const sql = db();
+  const featureKeys = [...LIVE_FEATURE_KEYS];
+
+  const limit = Math.min(
+    Math.max(params.limit ?? DEFAULT_SEARCH_LIMIT, 1),
+    MAX_SEARCH_LIMIT
+  );
+  const dependencies = [...(params.dependencyKeys ?? [])];
+  const component = params.component ?? null;
+  const provider = params.provider ?? null;
+  const text = params.text?.trim() ? params.text.trim() : null;
+  const windowDays = params.windowDays ?? DEFAULT_SEARCH_WINDOW_DAYS;
+  const canGroupIncident = component !== null || dependencies.length > 0;
+
+  const queries = [
+    sql.query(GLOBAL_SEARCH_SQL, [
+      TENANT_KEY,
+      featureKeys,
+      dependencies,
+      component,
+      provider,
+      params.classification ?? null,
+      text,
+      windowDays,
+      limit,
+    ]),
+  ];
+  if (canGroupIncident) {
+    queries.push(
+      sql.query(GLOBAL_CLUSTER_SQL, [
+        TENANT_KEY,
+        featureKeys,
+        component,
+        dependencies,
+        CLUSTER_WINDOW_DAYS,
+      ])
+    );
+  }
+
+  const [rows, clusterRows = []] = (await sql.transaction(queries)) as [
+    CaseRow[],
+    ClusterRow[]?,
+  ];
+  const cases = rows.map((row) => {
+    if (!isFeatureKey(row.primary_feature_key)) {
+      throw new MemoryUnavailableError(
+        "Investigation memory returned an unknown product area."
+      );
+    }
+    return project(row, row.primary_feature_key);
+  });
+  const clusterCounts: FeatureClusterCounts[] = clusterRows.flatMap((row) => {
+    if (!(row.primary_feature_key && isFeatureKey(row.primary_feature_key))) {
+      return [];
+    }
+    return [
+      {
+        distinctFeatures: row.distinct_features,
+        firstSeen: row.first_seen,
+        lastSeen: row.last_seen,
+        primaryFeatureKey: row.primary_feature_key,
+        reports: row.reports,
+      },
+    ];
+  });
+
+  return {
+    cases,
+    clusters: featureClusterSignalsFromCounts(clusterCounts),
+  };
 }
 
 const INSERT_BODY = `INSERT INTO investigation_cases (
@@ -380,7 +563,12 @@ function insertParams(
     options.correctionReason,
     payload.observedFrom ?? null,
     payload.observedTo ?? null,
-    idempotencyKey(payload.sourceIssueId, classification, payload.rootCause),
+    idempotencyKey(
+      payload.sourceIssueId,
+      classification,
+      payload.rootCause,
+      options.supersedesCaseId ?? undefined
+    ),
     searchText(payload),
   ];
 }
@@ -412,6 +600,18 @@ async function caseIdFor(
   const rows = (await sql.query(
     "SELECT id FROM investigation_cases WHERE tenant_key = $1 AND idempotency_key = $2",
     [TENANT_KEY, key]
+  )) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
+async function legacyCorrectionIdFor(
+  sql: NeonQueryFunction<false, false>,
+  key: string,
+  supersedesCaseId: string
+): Promise<string | null> {
+  const rows = (await sql.query(
+    "SELECT id FROM investigation_cases WHERE tenant_key = $1 AND idempotency_key = $2 AND supersedes_case_id = $3",
+    [TENANT_KEY, key, supersedesCaseId]
   )) as { id: string }[];
   return rows[0]?.id ?? null;
 }
@@ -565,14 +765,33 @@ export async function correctCase(
     return { created: false, reason: "prior_case_other_ticket" };
   }
 
+  const predecessorId = prior.id;
   const key = idempotencyKey(
     payload.sourceIssueId,
     classification,
-    payload.rootCause
+    payload.rootCause,
+    predecessorId
   );
   const replay = await caseIdFor(sql, key);
   if (replay !== null) {
     return { caseId: replay, created: false, reason: "already_recorded" };
+  }
+
+  // Corrections written before predecessor-aware keys were deployed used the
+  // same key shape as a first revision. Match one only when it explicitly
+  // supersedes this predecessor; otherwise A -> B -> A would mistake the
+  // original A row for a replay of the later correction.
+  const legacyReplay = await legacyCorrectionIdFor(
+    sql,
+    idempotencyKey(payload.sourceIssueId, classification, payload.rootCause),
+    predecessorId
+  );
+  if (legacyReplay !== null) {
+    return {
+      caseId: legacyReplay,
+      created: false,
+      reason: "already_recorded",
+    };
   }
 
   // Only now does the status matter: this is a genuinely new correction, so
@@ -604,7 +823,7 @@ export async function correctCase(
       insertParams(id, feature, payload, classification, {
         correctionReason,
         revision,
-        supersedesCaseId: prior.id,
+        supersedesCaseId: predecessorId,
       })
     ),
   ])) as [unknown, { id: string }[]];
@@ -617,6 +836,6 @@ export async function correctCase(
     caseId: row.id,
     created: true,
     revision,
-    supersededCaseId: prior.id,
+    supersededCaseId: predecessorId,
   };
 }

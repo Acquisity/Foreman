@@ -39,6 +39,8 @@ Readiness requires all of: internal approval for the current head, passing requi
 
 Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
 
+Billing API access is another independent stamp. Slack applies it only to configured intake-only channels mapped to billing or Intercom workflows, and clears any stale stamp when routing another channel. The fixed Autumn and Stripe read tools use app-scoped credentials brokered by Vercel Connect, then recheck that the session is attended, intake-only, and stamped when each call executes. They expose fixed provider routes and no billing writes; other attended surfaces retain the broader user-scoped MCP connections.
+
 ## Storage
 
 All Blob namespaces are registered in `agent/lib/blob.ts`.

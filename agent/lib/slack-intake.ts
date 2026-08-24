@@ -1,3 +1,10 @@
+import type { SessionAuthContext } from "eve/context";
+import {
+  clearBillingApiRead,
+  stampBillingApiRead,
+  stampIntakeOnly,
+} from "./trust.js";
+
 // Slack channel IDs: an uppercase letter class then base-32-ish characters.
 // Anything else in the env list is a typo (a channel name, a quoted value),
 // and silently keeping it would leave the gate off for the channel it was
@@ -21,7 +28,12 @@ const BILLING_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
 
 const INTERCOM_INTAKE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "new-linear-issue",
-  skills: [],
+  skills: [
+    "intercom-triage-investigate",
+    "intercom-billing-triage",
+    "clarify-with-requester",
+    "slack-wording",
+  ],
 };
 
 export const SLACK_INTAKE_WORKFLOWS: Readonly<
@@ -31,6 +43,7 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
   C0BC011NAQL: BILLING_TRIAGE_WORKFLOW,
   C0BCV1WBR42: INTERCOM_INTAKE_WORKFLOW,
   C0BLFDUN6Q7: PRODUCT_TRIAGE_WORKFLOW,
+  C0BMXPV6EGJ: BILLING_TRIAGE_WORKFLOW,
   C0BNCL031AQ: INTERCOM_INTAKE_WORKFLOW,
 };
 
@@ -40,9 +53,18 @@ const INTAKE_ONLY_BOUNDARY = [
 ].join("\n\n");
 
 const GENERIC_NEW_ISSUE_TASK = [
-  "Use the generic new-issue workflow. This channel has no dedicated channel skill yet. Do not substitute triage-investigate; Intercom investigation needs its own future procedure.",
+  "Use the generic new-issue workflow. This intake-only channel is not mapped to a dedicated procedure.",
   "Investigate the request using the available evidence. Create exactly one unassigned Linear issue containing the request and your findings. Answer in the Slack thread, then stop before implementation.",
 ].join("\n\n");
+
+const intercomIssueTask = (skills: readonly string[]): string =>
+  [
+    `Use the Intercom-native investigation workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
+    "Require exactly one live Intercom conversation URL or reference from the Slack request and treat that conversation as the source. No Linear issue is expected at the start. If the conversation reference is missing or ambiguous, ask for it, then stop.",
+    "Classify the predominant ask as product/feedback or billing. Both lanes are valid in this channel: follow the matching Intercom skill without redirecting the requester to another Slack channel.",
+    "Investigate before creating Linear work. Non-bug product findings do not create engineering work. Confirmed bugs and actionable billing findings create the records and investigation documents required by their loaded procedures, retaining the Intercom conversation URL and bounded context.",
+    "Answer in the Slack thread using slack-wording only after the required Linear operations, then stop before implementation.",
+  ].join("\n\n");
 
 const existingIssueTask = (skills: readonly string[]): string =>
   [
@@ -58,12 +80,29 @@ export function resolveSlackIntakeWorkflow(
   return SLACK_INTAKE_WORKFLOWS[channelId];
 }
 
+/**
+ * Applies the hard intake boundary and any workflow-specific service access.
+ */
+export function stampSlackIntakeAuth(
+  auth: SessionAuthContext,
+  channelId: string
+): SessionAuthContext {
+  const intake = stampIntakeOnly(clearBillingApiRead(auth));
+  const workflow = resolveSlackIntakeWorkflow(channelId);
+  return workflow === BILLING_TRIAGE_WORKFLOW ||
+    workflow === INTERCOM_INTAKE_WORKFLOW
+    ? stampBillingApiRead(intake)
+    : intake;
+}
+
 export function slackIntakeContext(channelId: string): string {
   const workflow = resolveSlackIntakeWorkflow(channelId);
-  const task =
-    workflow?.mode === "existing-linear-issue"
-      ? existingIssueTask(workflow.skills)
-      : GENERIC_NEW_ISSUE_TASK;
+  let task = GENERIC_NEW_ISSUE_TASK;
+  if (workflow?.mode === "existing-linear-issue") {
+    task = existingIssueTask(workflow.skills);
+  } else if (workflow?.mode === "new-linear-issue") {
+    task = intercomIssueTask(workflow.skills);
+  }
   return [INTAKE_ONLY_BOUNDARY, task].join("\n\n");
 }
 

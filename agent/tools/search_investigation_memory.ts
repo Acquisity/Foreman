@@ -8,6 +8,7 @@ import {
   FEATURE_KEYS,
   featureForProject,
   isDependencyKey,
+  LIVE_FEATURE_KEYS,
   MAX_SCOPE_ENTRIES,
 } from "#lib/investigation-memory/scope.js";
 import {
@@ -15,12 +16,13 @@ import {
   DEFAULT_SEARCH_WINDOW_DAYS,
   MAX_SEARCH_LIMIT,
   searchCases,
+  searchCasesAcrossLiveFeatures,
 } from "#lib/investigation-memory/store.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Search past Foreman triage investigations for cases in the same product scope. Call it only after the current claim and the ticket's Linear project are pinned. Results are historical analogies, never current truth: every match still has to be verified against current code, production data, and runtime evidence, and a historical affected count is never the current blast radius. `possibleWiderIncident` means several independent recent tickets share this scope, which is a prompt to check current telemetry, not an outage. When `available` is false, continue the investigation from scratch.",
+    "Search past Foreman triage investigations after the current claim is stated. With a Linear project id, search its mapped product scope. Without one, an authorized attended Intercom intake searches all six live core-product areas and excludes planned products. Results are historical analogies, never current truth: verify every match against current code, production data, and runtime evidence. Project-free incident signals are grouped per product area and never combine unrelated products. When `available` is false, continue from current evidence.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
@@ -30,16 +32,41 @@ export default defineTool({
       };
     }
 
-    const primaryFeatureKey = featureForProject(input.linearProjectId);
-    if (primaryFeatureKey === null) {
-      return {
-        available: false as const,
-        reason:
-          "That Linear project is not mapped to a product area, so there is no scope to search. Investigate from current evidence and route the ticket to Aaron Fraga as the triage skill already requires.",
-      };
-    }
-
     try {
+      if (input.linearProjectId === undefined) {
+        if (input.sourceIssueId !== undefined) {
+          return {
+            available: false as const,
+            reason:
+              "A ticket identity lookup still needs its Linear project. Use project-free search only for a live Intercom claim before a ticket exists.",
+          };
+        }
+        const { cases, clusters } = await searchCasesAcrossLiveFeatures({
+          classification: input.classification,
+          component: input.component,
+          dependencyKeys: input.dependencyKeys,
+          limit: input.limit,
+          provider: input.provider,
+          text: input.text,
+          windowDays: input.windowDays,
+        });
+        return {
+          available: true as const,
+          cases,
+          clusters,
+          searchedFeatureKeys: [...LIVE_FEATURE_KEYS],
+        };
+      }
+
+      const primaryFeatureKey = featureForProject(input.linearProjectId);
+      if (primaryFeatureKey === null) {
+        return {
+          available: false as const,
+          reason:
+            "That Linear project is not mapped to a product area, so there is no scope to search. Investigate from current evidence and route the ticket to Aaron Fraga as the triage skill already requires.",
+        };
+      }
+
       const { cases, cluster } = await searchCases({
         classification: input.classification,
         component: input.component,
@@ -73,8 +100,9 @@ export default defineTool({
     limit: z.int().min(1).max(MAX_SEARCH_LIMIT).default(DEFAULT_SEARCH_LIMIT),
     linearProjectId: z
       .uuid()
+      .optional()
       .describe(
-        "The Linear project id read off the current issue. It picks the product scope; nothing else may."
+        "The Linear project id read off the current issue. Omit only for an authorized live Intercom intake before a Linear issue exists; that searches the server-owned list of live product areas."
       ),
     provider: z.string().trim().min(1).max(60).optional(),
     sourceIssueId: z
@@ -113,7 +141,21 @@ export default defineTool({
         windowDays: z.number(),
       })
       .optional(),
+    clusters: z
+      .array(
+        z.object({
+          distinctFeatures: z.number(),
+          firstSeen: z.string().nullable(),
+          lastSeen: z.string().nullable(),
+          possibleWiderIncident: z.boolean(),
+          primaryFeatureKey: z.enum(FEATURE_KEYS),
+          reports: z.number(),
+          windowDays: z.number(),
+        })
+      )
+      .optional(),
     primaryFeatureKey: z.enum(FEATURE_KEYS).optional(),
     reason: z.string().optional(),
+    searchedFeatureKeys: z.array(z.enum(FEATURE_KEYS)).optional(),
   }),
 });
