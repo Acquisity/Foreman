@@ -80,18 +80,21 @@ export const isConfigured = (): boolean =>
  *
  * @remarks
  * A step that is interrupted after the insert and re-run must land on the same
- * key, so it is derived only from what identifies the conclusion: the source
- * ticket, the final classification, and the root cause. The same investigation
- * written twice is one row. A different conclusion is a correction, which goes
- * through `correctCase` and gets its own key.
+ * key, so it is derived from what identifies the write: the source ticket, the
+ * final classification, the root cause, and, for a correction, the exact case
+ * it supersedes. The predecessor keeps a correction replay-safe without
+ * preventing a later revision from returning to an earlier conclusion.
  */
 export function idempotencyKey(
   sourceIssueId: string,
   classification: Classification,
-  rootCause: string
+  rootCause: string,
+  supersedesCaseId?: string
 ): string {
+  const predecessor =
+    supersedesCaseId === undefined ? "" : `|supersedes:${supersedesCaseId}`;
   return createHash("sha256")
-    .update(`${sourceIssueId}|${classification}|${rootCause}`)
+    .update(`${sourceIssueId}|${classification}|${rootCause}${predecessor}`)
     .digest("hex");
 }
 
@@ -380,7 +383,12 @@ function insertParams(
     options.correctionReason,
     payload.observedFrom ?? null,
     payload.observedTo ?? null,
-    idempotencyKey(payload.sourceIssueId, classification, payload.rootCause),
+    idempotencyKey(
+      payload.sourceIssueId,
+      classification,
+      payload.rootCause,
+      options.supersedesCaseId ?? undefined
+    ),
     searchText(payload),
   ];
 }
@@ -568,7 +576,8 @@ export async function correctCase(
   const key = idempotencyKey(
     payload.sourceIssueId,
     classification,
-    payload.rootCause
+    payload.rootCause,
+    supersedesCaseId
   );
   const replay = await caseIdFor(sql, key);
   if (replay !== null) {
