@@ -27,9 +27,9 @@ const extractInstruction = (skill: string, start: string, end: string) => {
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
     {
-      end: "\n2. Apply the 30-day cutoff",
+      end: "\n   Do not filter this search by label.",
       skill: triageSkill,
-      start: "1. Search for an existing master no further than 30 days back.",
+      start: "1. Search for an existing master on four axes:",
     },
     {
       end: "\n3. Create one customer-report issue",
@@ -54,6 +54,27 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
     assert.ok(skill.includes("product-area"));
     assert.ok(skill.includes("duplicate"));
   }
+});
+
+test("shared triage preserves unbounded master lookup outside Slack intake", () => {
+  const masterSelection = extractInstruction(
+    triageSkill,
+    "### When the root cause warrants action",
+    "### Area-routing roster"
+  );
+
+  assert.ok(masterSelection.includes("intake-only Slack workflow"));
+  assert.ok(masterSelection.includes("including a Linear Agent Session"));
+  assert.ok(masterSelection.includes("do not pass a `createdAt` filter"));
+  assert.ok(
+    masterSelection.includes(
+      "consider matching masters regardless of creation date"
+    )
+  );
+  assert.ok(masterSelection.includes("Outside that Slack workflow"));
+  assert.ok(masterSelection.includes("do not apply the recency cutoff"));
+  assert.ok(masterSelection.includes("In other contexts"));
+  assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
 });
 
 test("Slack replies exclude internal investigation summaries", () => {
