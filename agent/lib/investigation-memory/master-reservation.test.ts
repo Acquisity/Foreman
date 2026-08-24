@@ -43,7 +43,14 @@ const reservationInput = {
   sourceIssueId: "ENG-123",
 };
 
-const fakeReservationDatabase = (): ReservationDatabase => {
+interface FakeReservationDatabase extends ReservationDatabase {
+  setNow: (value: string) => void;
+}
+
+const fakeReservationDatabase = (
+  initialNow = reservationInput.eligibilityEvaluatedAt
+): FakeReservationDatabase => {
+  let now = Date.parse(initialNow);
   let row:
     | {
         causal_fingerprint: string;
@@ -73,7 +80,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
           master_issue_id: null,
           source_issue_id: String(params[3]),
           status: "reserved" as const,
-          updated_at: String(params[10]),
+          updated_at: new Date(now).toISOString(),
         };
         return [{ id: row.id }];
       }
@@ -99,7 +106,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
           master_issue_id: null,
           source_issue_id: String(params[3]),
           status: "reserved",
-          updated_at: String(params[10]),
+          updated_at: new Date(now).toISOString(),
         };
         return [{ id: row.id }];
       }
@@ -115,8 +122,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
           !Number.isFinite(Date.parse(String(params[1]))) ||
           Date.parse(String(params[1])) <
             Date.parse(current.updated_at) - 5 * 60 * 1000 ||
-          Date.parse(String(params[1])) >
-            Date.parse(current.updated_at) + 60 * 1000
+          Date.parse(String(params[1])) > now + 60 * 1000
         ) {
           return [];
         }
@@ -126,6 +132,9 @@ const fakeReservationDatabase = (): ReservationDatabase => {
         return [{ id: current.id }];
       }
       throw new Error("Unexpected reservation query in test.");
+    },
+    setNow(value) {
+      now = Date.parse(value);
     },
   };
 };
@@ -251,20 +260,21 @@ describe("causal master reservation concurrency", () => {
       ),
       false
     );
+    database.setNow("2026-08-24T12:03:00.000Z");
     assert.equal(
       await completeMasterReservation(
         reserved.reservationId,
         "ENG-123",
         "ENG-999",
-        "2026-08-24T12:01:01.000Z",
+        "2026-08-24T12:02:00.000Z",
         database
       ),
-      false
+      true
     );
   });
 
   it("permits one reviewed new generation after a stale master", async () => {
-    const database = fakeReservationDatabase();
+    const database = fakeReservationDatabase("2026-07-01T00:00:00.000Z");
     const first = await reserveMasterRecord(
       {
         ...reservationInput,
@@ -286,6 +296,7 @@ describe("causal master reservation concurrency", () => {
       ),
       true
     );
+    database.setNow("2026-08-24T12:00:00.000Z");
     const nextInput = {
       ...reservationInput,
       generationKey: "ENG-999",
@@ -322,7 +333,7 @@ describe("causal master reservation concurrency", () => {
   });
 
   it("serializes different stale predecessor claims through one causal head", async () => {
-    const database = fakeReservationDatabase();
+    const database = fakeReservationDatabase("2026-07-01T00:00:00.000Z");
     const first = await reserveMasterRecord(
       {
         ...reservationInput,
@@ -341,6 +352,7 @@ describe("causal master reservation concurrency", () => {
       "2026-07-01T00:00:00.000Z",
       database
     );
+    database.setNow("2026-08-24T12:00:00.000Z");
     const results = await Promise.all([
       reserveMasterRecord(
         {
@@ -403,7 +415,7 @@ describe("causal master reservation concurrency", () => {
   });
 
   it("fails closed when the persisted head belongs to another reviewed generation", async () => {
-    const database = fakeReservationDatabase();
+    const database = fakeReservationDatabase("2026-07-01T00:00:00.000Z");
     const first = await reserveMasterRecord(
       {
         ...reservationInput,
@@ -425,6 +437,7 @@ describe("causal master reservation concurrency", () => {
       ),
       true
     );
+    database.setNow("2026-08-24T12:00:00.000Z");
     const advanced = await reserveMasterRecord(
       {
         ...reservationInput,
