@@ -29,7 +29,7 @@ Use the built-in `connection_search` to discover what a connection actually expo
 There are three separate database surfaces:
 
 - PlanetScale is the read-only production and customer-data database. Current production evidence comes only from the root `planetscale_execute_read_query` tool.
-- Investigation memory is Foreman's own private Postgres store of sanitized past-investigation patterns. It holds no customer data and is reached only through the three root tools in this section.
+- Investigation memory is Foreman's own private Postgres store of sanitized past-investigation patterns. It holds no customer data and is reached only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`.
 - The `neon__*` connection investigates other Neon databases. It is unrelated to investigation memory and must never be used to locate, inspect, verify, or repair memory.
 
 `search_investigation_memory`, `read_triage_review_verdict`, `record_investigation_case`, `correct_investigation_case`, `reserve_triage_master`, and `complete_triage_master_reservation` are authored tools in `agent/tools/`. They are the whole interface to investigation memory, critic attestation metadata, and the causal master reservation. Never list database projects, inspect schemas, roles, indexes, or rows, test SQL, look for credentials, or otherwise hunt for a backing database. If one of these tools answers, the wiring is working. If it returns `available: false` or a write fails, record that internally when relevant and continue the investigation without trying another database connection. A missing critic attestation blocks Bug finalization, and a reservation failure blocks new-master creation.
