@@ -67,12 +67,17 @@ describe("intake-only channels", () => {
     ]);
   });
 
-  it("maps Intercom and its sandbox to the generic new-issue workflow", () => {
+  it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {
     const production = resolveSlackIntakeWorkflow("C0BCV1WBR42");
     const sandbox = resolveSlackIntakeWorkflow("C0BNCL031AQ");
     assert.deepEqual(production, sandbox);
     assert.equal(production?.mode, "new-linear-issue");
-    assert.deepEqual(production?.skills, []);
+    assert.deepEqual(production?.skills, [
+      "intercom-triage-investigate",
+      "intercom-billing-triage",
+      "clarify-with-requester",
+      "slack-wording",
+    ]);
   });
 
   it("instructs existing-issue channels not to create duplicates", () => {
@@ -86,14 +91,29 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("triage-investigate"), true);
   });
 
-  it("instructs new-issue channels to file once and stop", () => {
+  it("starts Intercom intake from one conversation without an issue", () => {
     const context = slackIntakeContext("C0BCV1WBR42");
     assert.equal(
-      context.includes("Create exactly one unassigned Linear issue"),
+      context.includes("No Linear issue is expected at the start"),
       true
     );
+    assert.equal(
+      context.includes("exactly one live Intercom conversation"),
+      true
+    );
+    assert.equal(context.includes("product/feedback or billing"), true);
+    assert.equal(
+      context.includes("Both lanes are valid in this channel"),
+      true
+    );
+    assert.equal(context.includes("intercom-triage-investigate"), true);
+    assert.equal(context.includes("intercom-billing-triage"), true);
+    assert.equal(
+      context.includes("Create exactly one unassigned Linear issue"),
+      false
+    );
+    assert.equal(context.includes("no dedicated channel skill yet"), false);
     assert.equal(context.includes("stop before implementation"), true);
-    assert.equal(context.includes("no dedicated channel skill yet"), true);
     assert.equal(
       context.includes("start the factory implementation pipeline"),
       true

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   CLUSTER_MIN_REPORTS,
   DEFAULT_SEARCH_LIMIT,
+  featureClusterSignalsFromCounts,
   idempotencyKey,
   isConfigured,
   MAX_SEARCH_LIMIT,
@@ -57,6 +58,42 @@ test("retrieval bounds", async (t) => {
     // is the point: a weaker threshold would quietly turn coincidences into
     // possible-incident signals.
     assert.equal(CLUSTER_MIN_REPORTS, 3);
+  });
+
+  await t.test("keeps project-free incident signals isolated per area", () => {
+    const signals = featureClusterSignalsFromCounts([
+      {
+        distinctFeatures: 1,
+        firstSeen: "2026-08-20T00:00:00.000Z",
+        lastSeen: "2026-08-22T00:00:00.000Z",
+        primaryFeatureKey: "cold_email",
+        reports: 3,
+      },
+      {
+        distinctFeatures: 1,
+        firstSeen: "2026-08-21T00:00:00.000Z",
+        lastSeen: "2026-08-22T00:00:00.000Z",
+        primaryFeatureKey: "crm",
+        reports: 2,
+      },
+    ]);
+
+    assert.equal(signals.length, 2);
+    assert.deepEqual(
+      signals.map((signal) => ({
+        area: signal.primaryFeatureKey,
+        possibleWiderIncident: signal.possibleWiderIncident,
+        reports: signal.reports,
+      })),
+      [
+        {
+          area: "cold_email",
+          possibleWiderIncident: true,
+          reports: 3,
+        },
+        { area: "crm", possibleWiderIncident: false, reports: 2 },
+      ]
+    );
   });
 });
 
