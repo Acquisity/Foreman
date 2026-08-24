@@ -15,7 +15,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Configured intake-only channels mapped to billing or Intercom workflows use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
+Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Configured intake-only channels mapped to billing or Intercom workflows use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Intercom itself is app-scoped: its private Acquisity workspace token lives in an API-key connector, and Slack callers are never asked to authorize it. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
 
 ## Skills
 
