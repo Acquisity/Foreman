@@ -66,11 +66,13 @@ Docs: <https://docs.stripe.com/mcp>.
 
 ## Linear (`linear__`)
 
-`get_issue`, `list_comments`, `save_comment`, `save_issue`, `save_document`.
+`get_issue`, `list_comments`, `list_issue_labels`, `save_comment`, `save_issue`, `save_document`.
 
 `save_document` takes exactly one parent; pass `issue` for the issue-scoped `Billing investigation` document. Use `patch` to update an existing one rather than creating a second.
 
 `save_issue` traps: `labels` replaces the entire label set, so read current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low.
+
+Call `list_issue_labels` before creating the Support/Financial record so routing uses only labels that actually exist.
 
 ## Repository (root tools, no prefix)
 

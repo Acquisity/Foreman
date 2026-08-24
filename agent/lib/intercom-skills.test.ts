@@ -60,6 +60,7 @@ test("Intercom product skill creates engineering work only for a confirmed bug",
     "For a confirmed Bug",
     "canonical conversation URL",
     "explicit mapped Linear project",
+    "subscription behavior with no financial remedy",
     "Link the new report from the master",
     "do not copy customer-specific conversation details",
   ]) {
@@ -111,6 +112,7 @@ test("Intercom skills own their tool references", () => {
     "planetscale_execute_read_query",
     "## Autumn (`autumn__`)",
     "## Stripe (`stripe__`)",
+    "`list_issue_labels`",
   ]) {
     assert.ok(billingTools.includes(phrase), phrase);
   }

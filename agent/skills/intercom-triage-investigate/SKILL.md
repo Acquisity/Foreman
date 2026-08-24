@@ -26,8 +26,8 @@ Pass a conversation URL directly to `intercom__fetch`, or resolve a known id wit
 
 Choose one lane:
 
-- Money: refund, charge, coupon, subscription, invoice, financial credit, or product-credit balance. Follow `intercom-billing-triage` in this same channel.
-- Product or feedback: behavior, setup, limitation, feature request, failure, or defect claim. Continue here.
+- Money: refund, charge, coupon, invoice, financial credit, product-credit balance, or a subscription request that asks for a financial remedy. Follow `intercom-billing-triage` in this same channel.
+- Product or feedback: behavior, setup, limitation, feature request, failure, defect claim, or subscription behavior with no financial remedy. Continue here.
 
 Both lanes are valid in this channel. Never redirect between separate Slack channels. If the lane is ambiguous, load `clarify-with-requester`, ask one batched question that distinguishes them, and wait.
 
