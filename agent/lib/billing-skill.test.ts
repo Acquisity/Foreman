@@ -13,4 +13,10 @@ test("billing triage reads the complete Linear issue contract", () => {
       "title, description, attachments, links, comments, labels, priority, project, assignee, requester, and relations"
     )
   );
+
+  const issueRead = billingSkill.indexOf("2. Step 1 issue read:");
+  const identityGate = billingSkill.indexOf("3. Identity gate:");
+
+  assert.ok(issueRead >= 0);
+  assert.ok(identityGate > issueRead);
 });
