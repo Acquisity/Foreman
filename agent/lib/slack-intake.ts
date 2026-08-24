@@ -50,6 +50,7 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
 const INTAKE_ONLY_BOUNDARY = [
   "This message came from a Slack channel that is intake-only. You may answer questions, investigate, clarify with the requester, and create or update Linear records.",
   "Do not implement a fix or make local code changes. Do not commit, push a branch, open a pull request, or start the factory implementation pipeline. Push and pull-request creation are denied independently of these instructions.",
+  "The final post in the Slack thread must contain only the requester-facing reply. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Normal conversational progress updates are allowed; this boundary applies to the closing post.",
 ].join("\n\n");
 
 const GENERIC_NEW_ISSUE_TASK = [
@@ -63,7 +64,7 @@ const intercomIssueTask = (skills: readonly string[]): string =>
     "Require exactly one live Intercom conversation URL or reference from the Slack request and treat that conversation as the source. No Linear issue is expected at the start. If the conversation reference is missing or ambiguous, ask for it, then stop.",
     "Classify the predominant ask as product/feedback or billing. Both lanes are valid in this channel: follow the matching Intercom skill without redirecting the requester to another Slack channel.",
     "Investigate before creating Linear work. Non-bug product findings do not create engineering work. Confirmed bugs and actionable billing findings create the records and investigation documents required by their loaded procedures, retaining the Intercom conversation URL and bounded context.",
-    "Answer in the Slack thread using slack-wording only after the required Linear operations, then stop before implementation.",
+    "Answer in the Slack thread using slack-wording only after the required Linear operations. Put only the requester-facing answer in the final post, with no internal summary or action log, then stop before implementation.",
   ].join("\n\n");
 
 const existingIssueTask = (skills: readonly string[]): string =>
@@ -71,7 +72,7 @@ const existingIssueTask = (skills: readonly string[]): string =>
     `Use the existing-issue Linear workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
     "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures.",
     "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, ask the requester for its Linear link or identifier, then stop.",
-    "Answer in the Slack thread using slack-wording, then stop.",
+    "Answer in the Slack thread using slack-wording. Put only the requester-facing answer in the final post, with no internal summary or action log, then stop.",
   ].join("\n\n");
 
 export function resolveSlackIntakeWorkflow(

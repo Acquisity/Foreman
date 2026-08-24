@@ -119,6 +119,10 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("exactly one existing Linear issue"), true);
     assert.equal(context.includes("Linear link or identifier"), true);
     assert.equal(context.includes("triage-investigate"), true);
+    assert.equal(context.includes("The final post in the Slack thread"), true);
+    assert.equal(context.includes("progress updates are allowed"), true);
+    assert.equal(context.includes("only the requester-facing answer"), true);
+    assert.equal(context.includes("no internal summary or action log"), true);
   });
 
   it("starts Intercom intake from one conversation without an issue", () => {

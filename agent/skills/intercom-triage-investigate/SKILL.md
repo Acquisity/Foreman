@@ -101,14 +101,16 @@ For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do
 For a confirmed Bug, complete all of the following before the final Slack reply:
 
 1. Determine the product project from the live conversation plus verified current code and data. Never select it from a memory analogy. If the area is missing or unmapped, create the customer report without a project, assign Aaron Fraga, state that routing needs a human, and skip final memory recording.
-2. Search current Linear masters on root cause, code path, provider failure, and symptom. Match on root cause, not merely the visible outcome. Do not filter by a presumed master label.
+2. Search current Linear masters no further than 30 days back. Run every root-cause, code-path, provider-failure, and symptom query through `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id) and `createdAt: "-P30D"`; do not filter by a presumed master label. Apply this cutoff before comparing or attaching anything: a master created exactly 30 days ago is eligible, while one more than 30 days old, even by one second, is stale and cannot parent the new report. Reject stale candidates even when another issue relation, investigation memory, an unbounded search, or prior knowledge surfaces them. Among the remaining candidates, match on root cause, not merely the visible outcome.
 3. Create one customer-report issue on the Engineering Team. Include the Intercom conversation URL, bounded conversation context, testable claim, classification, explicit project when known, priority, and the union of valid labels returned by Linear. Use `intercom-sourced` and `Customer reported` when those labels exist.
 4. Attach one issue-scoped document with `linear__save_document`, `issue` set to the report, and title `Triage investigation`. Keep raw customer identity, production rows, queries, and conversation evidence only on this report document.
 5. If a master owns the root cause, parent the report to it and inherit its assignee. Link the new report from the master, add only aggregate new evidence there, recount its blast radius, and reweigh its priority. The report link is the route to the Intercom URL and bounded context; do not copy customer-specific conversation details onto the root-cause master.
-6. Otherwise create one root-cause master, parent the report to it, link the report from the master, and give both the area owner. Keep the Intercom URL and bounded context on the customer report and its document. One root cause gets one master, regardless of the number of reports or implementation steps.
+6. If no qualifying master created within the last 30 days owns the cause, create one root-cause master, parent the report to it, link the report from the master, and give both the area owner. An older matching master may be related for history, but never reused as the parent. Keep the Intercom URL and bounded context on the customer report and its document. One root cause gets one current master, regardless of the number of reports or implementation steps.
 7. Add the short report comment with the unblock first, the plain-language cause, the affected-workspace count, and the investigation-document link.
 
 Priority is evidence-based: Urgent for outage, security, or data-loss risk; High for multiple organizations blocked, repeated core failure, or active money impact; Medium for a real single-organization defect; Low for limitations, cosmetic cases, or resolved triage. A workaround does not lower the defect's priority.
+
+The 30-day window keeps a master representative of a current report cluster and preserves real-time blast-radius visibility. Recency only narrows the candidate set; every similarity, evidence, product-area, and duplicate safeguard still applies.
 
 Use the existing area-routing roster:
 
@@ -129,7 +131,7 @@ Non-bug Intercom investigations without a ticket are not recorded in this scope.
 
 ## Step 9: Reply in Slack
 
-Load `slack-wording`. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences.
+Load `slack-wording`. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences. The assistant message contains only this requester-facing copy, with no investigation summary preamble or internal action report.
 
 Do not include Linear identifiers, assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status. Linear remains the internal handoff; Slack tells the requester what was found and what happens next.
 
