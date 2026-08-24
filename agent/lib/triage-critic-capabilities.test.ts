@@ -5,10 +5,25 @@ import { describe, it } from "node:test";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planetscale/test";
 process.env.VERCEL_MCP_CONNECTOR ??= "vercel/test";
+process.env.AUTUMN_MCP_CONNECTOR ??= "autumn/test";
+process.env.STRIPE_MCP_CONNECTOR ??= "stripe/test";
 
-const [{ default: linear }, { default: vercel }] = await Promise.all([
+const [
+  { default: autumn },
+  { AUTUMN_READ_TOOLS },
+  { default: linear },
+  { default: stripe },
+  { STRIPE_READ_TOOLS },
+  { default: vercel },
+  { VERCEL_READ_TOOLS },
+] = await Promise.all([
+  import("../subagents/triage-critic/connections/autumn.js"),
+  import("../connections/autumn.js"),
   import("../subagents/triage-critic/connections/linear.js"),
+  import("../subagents/triage-critic/connections/stripe.js"),
+  import("../connections/stripe.js"),
   import("../subagents/triage-critic/connections/vercel.js"),
+  import("../connections/vercel.js"),
 ]);
 
 const toolSource = (name: string): string =>
@@ -21,6 +36,7 @@ describe("triage-critic capabilities", () => {
   it("has the product-triage evidence connections", () => {
     for (const name of [
       "axiom",
+      "autumn",
       "inngest",
       "intercom",
       "jam",
@@ -32,6 +48,7 @@ describe("triage-critic capabilities", () => {
       "posthog",
       "resend",
       "sentry",
+      "stripe",
       "vercel",
     ]) {
       const path = new URL(
@@ -53,13 +70,17 @@ describe("triage-critic capabilities", () => {
       "list_issue_labels",
       "list_issues",
     ]);
-    assert.ok(vercelTools.includes("get_runtime_errors"));
+    assert.deepEqual(vercelTools, [...VERCEL_READ_TOOLS]);
     for (const write of [
       "deploy_to_vercel",
       "reply_to_toolbar_thread",
       "edit_toolbar_message",
     ]) {
-      assert.equal(vercelTools.includes(write), false, write);
+      assert.equal(
+        (vercelTools as readonly string[]).includes(write),
+        false,
+        write
+      );
     }
   });
 
@@ -80,8 +101,10 @@ describe("triage-critic capabilities", () => {
     for (const name of [
       "list_instantly_subworkspaces",
       "planetscale_execute_read_query",
+      "read_autumn_billing",
       "read_image",
       "read_instantly_subworkspace",
+      "read_stripe_billing",
       "read_triage_review_packet",
       "search_investigation_memory",
     ]) {
@@ -99,6 +122,29 @@ describe("triage-critic capabilities", () => {
     }
   });
 
+  it("keeps both billing evidence surfaces read-only", () => {
+    assert.ok(autumn.tools && "allow" in autumn.tools);
+    assert.ok(stripe.tools && "allow" in stripe.tools);
+    assert.deepEqual(autumn.tools.allow, [...AUTUMN_READ_TOOLS]);
+    assert.deepEqual(stripe.tools.allow, [...STRIPE_READ_TOOLS]);
+    for (const write of [
+      "getOrCreateCustomer",
+      "stripe_api_write",
+      "create_refund",
+    ]) {
+      assert.equal(
+        (autumn.tools.allow as readonly string[]).includes(write),
+        false,
+        write
+      );
+      assert.equal(
+        (stripe.tools.allow as readonly string[]).includes(write),
+        false,
+        write
+      );
+    }
+  });
+
   it("attests completed critic output from the parent event stream", () => {
     const hook = readFileSync(
       new URL("../hooks/triage-review-verdict.ts", import.meta.url),
@@ -110,5 +156,13 @@ describe("triage-critic capabilities", () => {
     assert.ok(hook.includes("ctx.session.id"));
     assert.ok(hook.includes("readVerifiedTriageReviewPacket"));
     assert.ok(hook.includes("attestTriageReviewVerdict"));
+  });
+
+  it("uses the shared strict verdict schema at the child boundary", () => {
+    const source = readFileSync(
+      new URL("../subagents/triage-critic/agent.ts", import.meta.url),
+      "utf8"
+    );
+    assert.ok(source.includes("outputSchema: triageCriticVerdictSchema"));
   });
 });

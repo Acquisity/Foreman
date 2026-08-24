@@ -66,7 +66,22 @@ const packet = (
     customerUnblock: "Retry after correction.",
     disprovingObservation: "A provider request would disprove the cause.",
     evidenceLedger: [
-      { lane: "production", status: "VERIFIED", summary: "No request exists." },
+      {
+        handle: "planetscale-query:dispatch-state",
+        lane: "production",
+        observedAt: "2026-08-24T11:45:00.000Z",
+        status: "VERIFIED",
+        summary: "No request exists.",
+      },
+    ],
+    hypotheses: [
+      {
+        disprovingObservation: "A provider request exists.",
+        hypothesis: "The scheduler exits before dispatch.",
+        rank: 1,
+        status: "CONFIRMED",
+        supportingObservation: "No provider request exists.",
+      },
     ],
     inference: [],
     mode: "PRODUCTION_FORENSICS",
@@ -76,6 +91,7 @@ const packet = (
     unknowns: [],
     verifiedFacts: ["No provider request exists."],
   },
+  duplicateCandidates: [],
   masterCandidates: [],
   memoryResults: {
     available: true,

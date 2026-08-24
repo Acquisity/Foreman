@@ -31,7 +31,7 @@ const attestationSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/u)
     .nullable(),
-  linearProjectId: z.uuid(),
+  linearProjectId: z.uuid().nullable(),
   previousEvidenceRevision: evidenceRevisionSchema.nullable(),
   reviewerModel: z.string().min(1).max(128),
   sessionKey: z.string().regex(/^[a-f0-9]{64}$/u),
@@ -45,7 +45,7 @@ const attestationSchema = z.object({
 export type TriageReviewAttestation = z.infer<typeof attestationSchema>;
 
 const sourceBindingSchema = z.object({
-  linearProjectId: z.uuid(),
+  linearProjectId: z.uuid().nullable(),
   sourceIssueId: z.string().regex(/^[A-Z]{2,10}-\d{1,9}$/u),
 });
 export type TriageReviewSourceBinding = z.infer<typeof sourceBindingSchema>;

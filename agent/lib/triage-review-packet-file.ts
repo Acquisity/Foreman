@@ -1,8 +1,8 @@
 import type { RuntimeSandboxSession } from "eve/sandbox";
 import { readPreparedRepository } from "./repository.js";
 import {
+  canonicalizeTriageReviewValue,
   hashTriageReviewPacket,
-  serializeTriageReviewPacket,
   type TriageReviewPacket,
   triageReviewPacketPath,
   triageReviewPacketSchema,
@@ -26,8 +26,13 @@ export const readVerifiedTriageReviewPacket = async (
         verified: false,
       };
     }
-    const packet = triageReviewPacketSchema.parse(JSON.parse(serialized));
-    const canonical = serializeTriageReviewPacket(packet);
+    const rawPacket: unknown = JSON.parse(serialized);
+    const packet = triageReviewPacketSchema.parse(rawPacket);
+    const canonical = JSON.stringify(
+      canonicalizeTriageReviewValue(rawPacket),
+      null,
+      2
+    );
     if (hashTriageReviewPacket(canonical) !== evidenceRevision) {
       return {
         reason: "The packet content does not match the evidence revision.",

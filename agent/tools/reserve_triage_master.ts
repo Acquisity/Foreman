@@ -26,7 +26,7 @@ export const publicReservationErrorMessage = (error: unknown): string =>
 export default defineTool({
   approval: investigationMemoryWritePolicy,
   description:
-    "Acquire the server-side causal reservation immediately before creating a new root-cause Linear master. Call only after the final Linear re-search, using the opaque approval ID returned by read_triage_review_verdict. The fingerprint is derived from the approved packet's stable invariant, causal-path, trigger, and prevention keys, never symptom prose or the source ticket. The packet's reviewed stale master supplies a new generation for 30-day intake; otherwise the initial generation remains permanent. Only the transaction that inserts that causal generation receives acquired: true. Conflicts and retries fail closed, and unresolved reservations never expire into permission for another create.",
+    "Acquire the server-side causal reservation immediately before creating a new root-cause Linear master. Call only after the final Linear re-search, using the opaque approval ID returned by read_triage_review_verdict. The fingerprint is derived from the approved packet's stable invariant, causal-path, trigger, and prevention keys, never symptom prose or the source ticket. The packet's reviewed stale master supplies a new generation for 30-day intake; otherwise the initial generation remains permanent. Only the transaction that atomically reserves that causal generation receives acquired: true. Conflicts and retries fail closed, and unresolved reservations never expire into permission for another create.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
@@ -50,11 +50,19 @@ export default defineTool({
             "The opaque critic approval is absent, not APPROVE, or no longer matches its packet, model, and repository revision.",
         };
       }
+      const { linearProjectId } = verified.packet.proposal;
+      if (linearProjectId === null) {
+        return {
+          acquired: false as const,
+          reason:
+            "A pre-ticket Intercom packet cannot reserve a master until Foreman assigns a Linear project and obtains approval for a new packet revision.",
+        };
+      }
       if (
         !(await approvalMatchesSource(
           verified,
           input.sourceIssueId,
-          verified.packet.proposal.linearProjectId
+          linearProjectId
         ))
       ) {
         return {

@@ -26,18 +26,34 @@ const boundedText = (max: number) => z.string().trim().min(1).max(max);
 const boundedTextList = (maxItems: number, maxLength: number) =>
   z.array(boundedText(maxLength)).max(maxItems);
 
-const evidenceEntrySchema = z.object({
-  handle: boundedText(500).optional(),
+export const linearIssueIdentifierSchema = z
+  .string()
+  .regex(/^[A-Z]{2,10}-\d{1,9}$/u);
+
+const observedEvidenceEntrySchema = z.object({
+  handle: boundedText(500),
   lane: boundedText(80),
-  observedAt: z.iso.datetime().optional(),
-  status: z.enum([
-    "VERIFIED",
-    "CONTRADICTED",
-    "NOT_APPLICABLE",
-    "COULD_NOT_RUN",
-  ]),
+  observedAt: z.iso.datetime(),
+  status: z.enum(["VERIFIED", "CONTRADICTED"]),
   summary: boundedText(2000),
 });
+
+const evidenceEntrySchema = z.discriminatedUnion("status", [
+  observedEvidenceEntrySchema,
+  z.object({
+    lane: boundedText(80),
+    observedAt: z.iso.datetime(),
+    status: z.literal("NOT_APPLICABLE"),
+    summary: boundedText(2000),
+  }),
+  z.object({
+    blockerReason: boundedText(1000),
+    lane: boundedText(80),
+    observedAt: z.iso.datetime(),
+    status: z.literal("COULD_NOT_RUN"),
+    summary: boundedText(2000),
+  }),
+]);
 
 const causalKey = z
   .string()
@@ -102,10 +118,22 @@ const diagnosisSchema = z.object({
   customerUnblock: boundedText(2000),
   disprovingObservation: boundedText(2000),
   evidenceLedger: z.array(evidenceEntrySchema).min(1).max(100),
+  hypotheses: z
+    .array(
+      z.object({
+        disprovingObservation: boundedText(1000),
+        hypothesis: boundedText(1000),
+        rank: z.int().min(1).max(5),
+        status: z.enum(["ACTIVE", "RULED_OUT", "CONFIRMED"]),
+        supportingObservation: boundedText(1000),
+      })
+    )
+    .min(1)
+    .max(5),
   inference: boundedTextList(50, 2000),
   mode: z.enum(["REPRODUCTION", "PRODUCTION_FORENSICS", "UNPROVEN"]),
   regressionSeam: boundedText(2000),
-  rootCause: boundedText(4000),
+  rootCause: boundedText(1000),
   ruledOut: boundedTextList(50, 1000),
   unknowns: boundedTextList(50, 1000),
   verifiedFacts: boundedTextList(100, 2000),
@@ -139,25 +167,35 @@ const proposalSchema = z.object({
     "NOT_ENGINEERING",
     "NEEDS_HUMAN_URGENT",
   ]),
-  linearProjectId: z.uuid(),
-  masterCandidateIssueId: boundedText(40).optional(),
+  linearProjectId: z.uuid().nullable(),
+  masterCandidateIssueId: linearIssueIdentifierSchema.optional(),
   masterEligibilityEvaluatedAt: z.iso.datetime(),
   masterRecencyPolicy: z.enum(["UNBOUNDED", "THIRTY_DAY"]),
   priority: z.enum(["Urgent", "High", "Medium", "Low", "None"]),
-  staleMasterCandidateIssueId: boundedText(40).optional(),
+  staleMasterCandidateIssueId: linearIssueIdentifierSchema.optional(),
   structuralWrites: boundedTextList(50, 2000),
 });
 
 export const triageReviewPacketInputSchema = z
   .object({
-    claim: boundedText(4000),
+    claim: boundedText(400),
     diagnosis: diagnosisSchema,
+    duplicateCandidates: z
+      .array(
+        z.object({
+          causalMatch: z.boolean(),
+          issueId: linearIssueIdentifierSchema,
+          outcomeMatch: z.boolean(),
+          rationale: boundedText(2000),
+        })
+      )
+      .max(25),
     masterCandidates: z
       .array(
         z.object({
           causalMatch: z.boolean(),
           createdAt: z.iso.datetime(),
-          issueId: boundedText(40),
+          issueId: linearIssueIdentifierSchema,
           rationale: boundedText(2000),
         })
       )
@@ -169,7 +207,7 @@ export const triageReviewPacketInputSchema = z
     source: z.discriminatedUnion("kind", [
       z.object({
         boundedContext: boundedText(10_000),
-        issueId: z.string().regex(/^[A-Z]{2,10}-\d{1,9}$/u),
+        issueId: linearIssueIdentifierSchema,
         kind: z.literal("Linear"),
         workspaceIdentity: boundedText(1000),
       }),
@@ -187,6 +225,16 @@ export const triageReviewPacketInputSchema = z
       .optional(),
   })
   .superRefine((input, ctx) => {
+    if (
+      input.source.kind === "Linear" &&
+      input.proposal.linearProjectId === null
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Linear triage requires the source issue's project id.",
+        path: ["proposal", "linearProjectId"],
+      });
+    }
     if (
       input.diagnosis.causalIdentity.repositoryKey !==
       input.diagnosis.codeAnchor.repository.toLowerCase()

@@ -33,6 +33,16 @@ For each, state classification or critic verdict where applicable, hotlane or pr
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }
+    t.eventsSatisfy("does not call a live connection", (events) =>
+      events.every(
+        (event) =>
+          event.type !== "actions.requested" ||
+          event.data.actions.every(
+            (action) =>
+              action.kind !== "tool-call" || !action.toolName.includes("__")
+          )
+      )
+    );
     t.judge.autoevals
       .closedQA(
         "Does the numbered table reach all required outcomes: 1 reuse; 2 separate; 3 reuse; 4 hotlane even for one workspace; 5 no hotlane solely from volume; 6 Bug with honest unknown impact and an observability follow-up; 7 Platform Limitation; 8 User Error; 9 CHALLENGE; 10 CHALLENGE; 11 CHALLENGE for privacy; 12 needs-human with no structural write; 13 exactly one insert winner and no retry reacquisition; 14 invalidate the old approval and require a new revision; and 15 do not lower defect priority merely because the workaround completed?",

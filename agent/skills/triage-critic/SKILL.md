@@ -7,7 +7,7 @@ description: Independently review a proposed Foreman customer-support diagnosis,
 
 Act as an independent, adversarial quality gate for a completed customer-support investigation. Inspect the original report and raw evidence package, not merely Foreman's narrative. You have no stake in Foreman's conclusion and no authority to alter production, repositories, Linear, Slack, or customer conversations.
 
-The declared `triage-critic` subagent has the same investigation reach as product triage, restricted to reads: repository files, screenshots, PlanetScale, unrelated Neon databases when the code path actually uses one, Inngest, Sentry, Axiom, Resend, Instantly, PostHog, Jam, Vercel, Intercom, Lucent, Modem, Linear context, and investigation memory. Neon is never PlanetScale customer truth and never investigation memory. Use stable handles and the packet's pinned workspace identity to scope independent checks. User-scoped sources must be pre-authorized by Foreman before the task-mode review. If a source is unavailable, record the gap and never request sign-in or retry it. No write-capable connection or tool is present.
+The declared `triage-critic` subagent has the same investigation reach as product triage, restricted to reads: repository files, screenshots, PlanetScale, unrelated Neon databases when the code path actually uses one, Inngest, Sentry, Axiom, Resend, Instantly, PostHog, Jam, Vercel, Intercom, Lucent, Modem, Linear context, Autumn and Stripe billing evidence, and investigation memory. Neon is never PlanetScale customer truth and never investigation memory. Use stable handles and the packet's pinned workspace identity to scope independent checks. User-scoped sources must be pre-authorized by Foreman before the task-mode review. The guarded app-scoped Autumn and Stripe tools remain available only on an authenticated billing or Intercom triage route. If a source is unavailable, record the gap and never request sign-in or retry it. No write-capable connection or tool is present.
 
 ## Required review packet
 
@@ -17,7 +17,8 @@ The controller must provide an immutable packet containing:
 - pinned workspace identity and the identifiers needed to scope independent reads;
 - normalized testable claim;
 - proposed diagnosis output from `customer-bug-diagnosis`;
-- evidence ledger with stable handles, timestamps, query methodology, and tool status;
+- evidence ledger with timestamps, query methodology, and tool status; verified or contradicted observations also require stable handles, while unavailable lanes require the exact blocker;
+- ranked falsifiable hypotheses and their supporting and disproving observations;
 - current code SHA, paths, functions, jobs, and provider path;
 - duplicate and existing-master candidates with Foreman's match rationale;
 - proposed classification, priority, core-function impact, hotlane decision, unblock, and structural Linear writes; and
