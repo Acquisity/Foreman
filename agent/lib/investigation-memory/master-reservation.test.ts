@@ -2,18 +2,23 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { z } from "zod";
-import completeReservation, {
-  readLinearMasterCreatedAt,
-} from "../../tools/complete_triage_master_reservation.js";
-import reserveMaster, {
-  publicReservationErrorMessage,
-} from "../../tools/reserve_triage_master.js";
 import {
   causalFingerprint,
   completeMasterReservation,
   type ReservationDatabase,
   reserveMaster as reserveMasterRecord,
 } from "./master-reservation.js";
+
+process.env.LINEAR_CONNECTOR ??= "linear/test";
+process.env.PLANETSCALE_MCP_CONNECTOR ??= "planetscale/test";
+
+const [
+  { default: completeReservation, readLinearMasterCreatedAt },
+  { default: reserveMaster, publicReservationErrorMessage },
+] = await Promise.all([
+  import("../../tools/complete_triage_master_reservation.js"),
+  import("../../tools/reserve_triage_master.js"),
+]);
 
 const causalIdentity = {
   causalPathKeys: ["scheduler#dispatch-campaign", "provider#send"],
