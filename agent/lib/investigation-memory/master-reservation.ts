@@ -31,8 +31,14 @@ export interface ReservationDatabase {
   query: (statement: string, params?: unknown[]) => Promise<unknown[]>;
 }
 
-const reservationDatabase = (): ReservationDatabase =>
-  memoryDatabase() as unknown as ReservationDatabase;
+const reservationDatabase = (): ReservationDatabase => {
+  const database = memoryDatabase();
+  return {
+    query(statement, params = []) {
+      return database.query(statement, params);
+    },
+  };
+};
 
 export interface ReserveMasterInput {
   readonly approvalId: string;
