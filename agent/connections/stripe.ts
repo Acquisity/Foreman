@@ -9,8 +9,9 @@ import { userConnect } from "../lib/user-connect.js";
  * User-scoped via Vercel Connect (MCP automatic registration); uses the
  * authorization-code grant: a one-time consent stores a refresh token,
  * after which calls are non-interactive and auto-refreshing, and tokens are
- * never exposed to the model. Available to every
- * session, unattended runs included. Read-only by tool allowlist, built
+ * never exposed to the model. Mapped billing intake channels use the separate
+ * restricted-key root tool so they do not depend on the requester's OAuth
+ * grant. Read-only by tool allowlist, built
  * from the server's live tool list: `stripe_api_read` / `stripe_api_search`
  * cover the read API surface; `stripe_api_write` and account management are
  * excluded so money-moving operations are unreachable.

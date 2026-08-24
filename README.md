@@ -15,7 +15,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman also connects to mostly read-only services through MCP: Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
+Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Billing intake channels use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
 
 ## Skills
 
@@ -80,6 +80,8 @@ Completed triage investigations are indexed in a private Foreman-owned Postgres 
 | `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
+| `AUTUMN_API_CONNECTOR` | unset | App-scoped API-key connector for fixed Autumn reads in billing intake channels |
+| `STRIPE_API_CONNECTOR` | unset | App-scoped restricted-key connector for fixed Stripe reads in billing intake channels |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 

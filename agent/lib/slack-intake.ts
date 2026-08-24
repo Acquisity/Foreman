@@ -1,3 +1,6 @@
+import type { SessionAuthContext } from "eve/context";
+import { stampBillingApiRead, stampIntakeOnly } from "./trust.js";
+
 // Slack channel IDs: an uppercase letter class then base-32-ish characters.
 // Anything else in the env list is a typo (a channel name, a quoted value),
 // and silently keeping it would leave the gate off for the channel it was
@@ -31,6 +34,7 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
   C0BC011NAQL: BILLING_TRIAGE_WORKFLOW,
   C0BCV1WBR42: INTERCOM_INTAKE_WORKFLOW,
   C0BLFDUN6Q7: PRODUCT_TRIAGE_WORKFLOW,
+  C0BMXPV6EGJ: BILLING_TRIAGE_WORKFLOW,
   C0BNCL031AQ: INTERCOM_INTAKE_WORKFLOW,
 };
 
@@ -56,6 +60,19 @@ export function resolveSlackIntakeWorkflow(
   channelId: string
 ): SlackIntakeWorkflow | undefined {
   return SLACK_INTAKE_WORKFLOWS[channelId];
+}
+
+/**
+ * Applies the hard intake boundary and any workflow-specific service access.
+ */
+export function stampSlackIntakeAuth(
+  auth: SessionAuthContext,
+  channelId: string
+): SessionAuthContext {
+  const intake = stampIntakeOnly(auth);
+  return resolveSlackIntakeWorkflow(channelId) === BILLING_TRIAGE_WORKFLOW
+    ? stampBillingApiRead(intake)
+    : intake;
 }
 
 export function slackIntakeContext(channelId: string): string {

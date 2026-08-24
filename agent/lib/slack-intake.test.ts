@@ -11,8 +11,14 @@ import {
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
   slackIntakeContext,
+  stampSlackIntakeAuth,
 } from "./slack-intake.js";
-import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
+import {
+  canUseBillingApiRead,
+  isIntakeOnly,
+  stampIntakeOnly,
+  stampTrusted,
+} from "./trust.js";
 import {
   INTAKE_ONLY_SIGN_IN_REASON,
   intakeOnlySignInDenial,
@@ -57,14 +63,27 @@ describe("intake-only channels", () => {
     ]);
   });
 
-  it("maps billing triage to its existing-issue workflow", () => {
-    const workflow = resolveSlackIntakeWorkflow("C0BC011NAQL");
-    assert.equal(workflow?.mode, "existing-linear-issue");
-    assert.deepEqual(workflow?.skills, [
+  it("maps billing triage and its sandbox to the same workflow", () => {
+    const production = resolveSlackIntakeWorkflow("C0BC011NAQL");
+    const sandbox = resolveSlackIntakeWorkflow("C0BMXPV6EGJ");
+    assert.deepEqual(production, sandbox);
+    assert.equal(production?.mode, "existing-linear-issue");
+    assert.deepEqual(production?.skills, [
       "billing-triage",
       "clarify-with-requester",
       "slack-wording",
     ]);
+  });
+
+  it("grants billing API reads only to mapped billing intake channels", () => {
+    const billing = stampSlackIntakeAuth(auth, "C0BMXPV6EGJ");
+    const product = stampSlackIntakeAuth(auth, "C0BLFDUN6Q7");
+    const generic = stampSlackIntakeAuth(auth, "C0BNCL031AQ");
+
+    assert.equal(canUseBillingApiRead(billing), true);
+    assert.equal(canUseBillingApiRead(product), false);
+    assert.equal(canUseBillingApiRead(generic), false);
+    assert.equal(canUseBillingApiRead(auth), false);
   });
 
   it("maps Intercom and its sandbox to the generic new-issue workflow", () => {

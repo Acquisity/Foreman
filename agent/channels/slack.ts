@@ -7,12 +7,11 @@ import {
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
-import { slackIntakeContext } from "../lib/slack-intake.js";
 import {
-  stampIntakeOnly,
-  stampInvestigationMemory,
-  stampTrusted,
-} from "../lib/trust.js";
+  slackIntakeContext,
+  stampSlackIntakeAuth,
+} from "../lib/slack-intake.js";
+import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -71,7 +70,7 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
   const stamped = stampInvestigationMemory(withRepository);
   return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
     ? {
-        auth: stampIntakeOnly(stamped),
+        auth: stampSlackIntakeAuth(stamped, message.channelId),
         context: [slackIntakeContext(message.channelId)],
       }
     : { auth: stamped };

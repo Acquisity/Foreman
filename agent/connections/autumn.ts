@@ -44,14 +44,11 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   and the CLI, so cross-surface consent coverage is untested here. Do not
  *   assume it without checking.
  *
- *   This is a real gap on the Asks path, not a settled design: a ticket filed
- *   from Slack runs under the AIA requester, who has no Autumn account and
- *   whose channel is intake-only, where {@link userConnect} denies rather than
- *   prompting. Pinning the subject with `createSubject` was tried and reverted:
- *   consent completed and the callback landed, but Connect then reported the
- *   user unauthorized, because the issuer-prefixed subject it was handed is not
- *   where the grant had been stored. Stripe and Intercom have the same gap.
- *   Solve it against a verified mechanism rather than a reasoned-about one.
+ *   Mapped billing intake channels do not use this user grant. Their fixed
+ *   read-only root tool uses the app-scoped API-key connector instead, so the
+ *   Slack requester's identity cannot strand the investigation on consent.
+ *   This MCP connection remains the broader read surface for attended users
+ *   who have connected Autumn themselves.
  * - Read-only twice over. {@link READ_SCOPES} narrows the grant itself, and
  *   the allowlist below narrows what the model can discover, built from the
  *   server's live tool list. That bound is what makes a borrowed grant safe.
