@@ -7,6 +7,7 @@ const SENSITIVE_RESPONSE_KEYS = new Set([
   "billing_details",
   "client_secret",
   "customer_email",
+  "customer_email_address",
   "customer_name",
   "customer_purchase_ip",
   "default_payment_method",
@@ -20,6 +21,7 @@ const SENSITIVE_RESPONSE_KEYS = new Set([
   "receipt_url",
   "shipping",
   "shipping_address",
+  "source",
   "sources",
 ]);
 

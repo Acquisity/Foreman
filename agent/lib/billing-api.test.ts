@@ -93,8 +93,10 @@ describe("Stripe billing API", () => {
           ? "Customer Name"
           : undefined,
         nested: {
+          customer_email_address: "dispute@example.com",
           payment_method_details: { card: { last4: "4242" } },
           receipt_url: "https://pay.example/receipt",
+          source: { address_line1: "123 Main", last4: "4242" },
         },
         object: "list",
       });
@@ -127,9 +129,11 @@ describe("Stripe billing API", () => {
     }
     const serialized = JSON.stringify(result);
     assert.equal(serialized.includes("customer@example.com"), false);
+    assert.equal(serialized.includes("dispute@example.com"), false);
     assert.equal(serialized.includes("Customer Name"), false);
     assert.equal(serialized.includes("payment_method_details"), false);
     assert.equal(serialized.includes("receipt_url"), false);
+    assert.equal(serialized.includes("source"), false);
   });
 
   it("keeps an unauthorized section from hiding the other evidence", async () => {
