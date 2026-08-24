@@ -102,7 +102,11 @@ const fakeReservationDatabase = (): ReservationDatabase => {
         if (current === undefined) {
           return [];
         }
-        if (current.id !== params[3] || current.status !== "reserved") {
+        if (
+          current.id !== params[3] ||
+          current.source_issue_id !== params[4] ||
+          current.status !== "reserved"
+        ) {
           return [];
         }
         current.master_issue_id = String(params[0]);
@@ -184,6 +188,7 @@ describe("causal master reservation concurrency", () => {
     assert.equal(
       await completeMasterReservation(
         reserved.reservationId,
+        "ENG-123",
         "ENG-999",
         "2026-08-24T12:00:00.000Z",
         database
@@ -199,6 +204,25 @@ describe("causal master reservation concurrency", () => {
     });
   });
 
+  it("binds completion only to the source stored on the reservation", async () => {
+    const database = fakeReservationDatabase();
+    const reserved = await reserveMasterRecord(reservationInput, database);
+    assert.equal(reserved.acquired, true);
+    if (!reserved.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        reserved.reservationId,
+        "ENG-124",
+        "ENG-999",
+        "2026-08-24T12:00:00.000Z",
+        database
+      ),
+      false
+    );
+  });
+
   it("permits one reviewed new generation after a stale master", async () => {
     const database = fakeReservationDatabase();
     const first = await reserveMasterRecord(reservationInput, database);
@@ -209,6 +233,7 @@ describe("causal master reservation concurrency", () => {
     assert.equal(
       await completeMasterReservation(
         first.reservationId,
+        "ENG-123",
         "ENG-999",
         "2026-07-01T00:00:00.000Z",
         database
@@ -259,6 +284,7 @@ describe("causal master reservation concurrency", () => {
     }
     await completeMasterReservation(
       first.reservationId,
+      "ENG-123",
       "ENG-999",
       "2026-07-01T00:00:00.000Z",
       database
@@ -301,6 +327,64 @@ describe("causal master reservation concurrency", () => {
     assert.equal(
       [first, concurrent].filter(({ acquired }) => acquired).length,
       1
+    );
+  });
+
+  it("fails closed when the persisted head belongs to another reviewed generation", async () => {
+    const database = fakeReservationDatabase();
+    const first = await reserveMasterRecord(reservationInput, database);
+    assert.equal(first.acquired, true);
+    if (!first.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        first.reservationId,
+        "ENG-123",
+        "ENG-999",
+        "2026-07-01T00:00:00.000Z",
+        database
+      ),
+      true
+    );
+    const advanced = await reserveMasterRecord(
+      {
+        ...reservationInput,
+        generationKey: "ENG-999",
+        masterRecencyPolicy: "THIRTY_DAY",
+        predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      database
+    );
+    assert.equal(advanced.acquired, true);
+    if (!advanced.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        advanced.reservationId,
+        "ENG-123",
+        "ENG-1000",
+        "2026-08-24T12:00:00.000Z",
+        database
+      ),
+      true
+    );
+    assert.deepEqual(
+      await reserveMasterRecord(
+        {
+          ...reservationInput,
+          generationKey: "ENG-888",
+          masterRecencyPolicy: "THIRTY_DAY",
+          predecessorCreatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        database
+      ),
+      {
+        acquired: false,
+        causalFingerprint: causalFingerprint(causalIdentity),
+        reason: "reviewed_generation_changed",
+      }
     );
   });
 });
@@ -367,6 +451,7 @@ describe("causal master reservation tools", () => {
       completeReservation.inputSchema.safeParse({
         masterIssueId: "ENG-123",
         reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+        sourceIssueId: "ENG-124",
       }).success,
       true
     );
@@ -374,6 +459,7 @@ describe("causal master reservation tools", () => {
       completeReservation.inputSchema.safeParse({
         masterIssueId: "not-linear",
         reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+        sourceIssueId: "ENG-124",
       }).success,
       false
     );
@@ -384,23 +470,31 @@ describe("causal master reservation tools", () => {
     const createdAt = await readLinearMasterCreatedAt(
       "linear-token",
       "ENG-123",
-      (_input, init) => {
-        authorization = String(
-          (init?.headers as Record<string, string> | undefined)?.Authorization
-        );
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              data: {
-                issue: {
-                  createdAt: "2026-08-24T12:00:00.000Z",
-                  identifier: "ENG-123",
+      "ENG-124",
+      {
+        fetcher: (_input, init) => {
+          authorization = String(
+            (init?.headers as Record<string, string> | undefined)?.Authorization
+          );
+          assert.ok(init?.signal);
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                data: {
+                  master: {
+                    createdAt: "2026-08-24T12:00:00.000Z",
+                    identifier: "ENG-123",
+                  },
+                  source: {
+                    identifier: "ENG-124",
+                    parent: { identifier: "ENG-123" },
+                  },
                 },
-              },
-            }),
-            { status: 200 }
-          )
-        );
+              }),
+              { status: 200 }
+            )
+          );
+        },
       }
     );
     assert.equal(createdAt, "2026-08-24T12:00:00.000Z");
@@ -411,26 +505,59 @@ describe("causal master reservation tools", () => {
     const response = (body: unknown): Response =>
       new Response(JSON.stringify(body), { status: 200 });
     assert.equal(
-      await readLinearMasterCreatedAt("token", "ENG-123", () =>
-        Promise.resolve(
-          response({
-            data: {
-              issue: {
-                createdAt: "2026-08-24T12:00:00.000Z",
-                identifier: "ENG-999",
+      await readLinearMasterCreatedAt("token", "ENG-123", "ENG-124", {
+        fetcher: () =>
+          Promise.resolve(
+            response({
+              data: {
+                master: {
+                  createdAt: "2026-08-24T12:00:00.000Z",
+                  identifier: "ENG-999",
+                },
+                source: {
+                  identifier: "ENG-124",
+                  parent: { identifier: "ENG-123" },
+                },
               },
-            },
-          })
-        )
-      ),
+            })
+          ),
+      }),
       null
     );
     assert.equal(
-      await readLinearMasterCreatedAt("token", "ENG-123", () =>
-        Promise.resolve(
-          response({ data: { issue: null }, errors: [{ message: "private" }] })
-        )
-      ),
+      await readLinearMasterCreatedAt("token", "ENG-123", "ENG-124", {
+        fetcher: () =>
+          Promise.resolve(
+            response({
+              data: { master: null, source: null },
+              errors: [{ message: "private" }],
+            })
+          ),
+      }),
+      null
+    );
+    assert.equal(
+      await readLinearMasterCreatedAt("token", "ENG-123", "ENG-124", {
+        fetcher: () =>
+          Promise.resolve(
+            response({
+              data: {
+                master: {
+                  createdAt: "2026-08-24T12:00:00.000Z",
+                  identifier: "ENG-123",
+                },
+                source: { identifier: "ENG-124", parent: null },
+              },
+            })
+          ),
+      }),
+      null
+    );
+    assert.equal(
+      await readLinearMasterCreatedAt("token", "ENG-123", "ENG-124", {
+        fetcher: () =>
+          Promise.reject(new DOMException("Timed out", "AbortError")),
+      }),
       null
     );
   });
@@ -445,11 +572,13 @@ describe("causal master reservation tools", () => {
     };
     await completeMasterReservation(
       "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+      "ENG-124",
       "ENG-123",
       "2026-08-24T12:00:00.000Z",
       database
     );
     assert.ok(statement.includes("updated_at - interval '5 minutes'"));
     assert.ok(statement.includes("now() + interval '1 minute'"));
+    assert.ok(statement.includes("source_issue_id = $5"));
   });
 });

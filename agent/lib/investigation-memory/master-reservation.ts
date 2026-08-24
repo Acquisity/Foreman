@@ -64,7 +64,10 @@ export type MasterReservation =
       readonly causalFingerprint: string;
       readonly existingMasterIssueId?: string;
       readonly existingMasterCreatedAt?: string;
-      readonly reason: "existing_master" | "reservation_in_progress";
+      readonly reason:
+        | "existing_master"
+        | "reservation_in_progress"
+        | "reviewed_generation_changed";
     };
 
 const readReservation = async (
@@ -190,6 +193,13 @@ export const reserveMaster = async (
 
   const row = await readReservation(fingerprint, sql);
   if (row.status === "complete" && row.master_issue_id) {
+    if (row.generation_key !== input.generationKey) {
+      return {
+        acquired: false,
+        causalFingerprint: fingerprint,
+        reason: "reviewed_generation_changed",
+      };
+    }
     return {
       acquired: false,
       causalFingerprint: fingerprint,
@@ -208,6 +218,7 @@ export const reserveMaster = async (
 
 export const completeMasterReservation = async (
   reservationId: string,
+  sourceIssueId: string,
   masterIssueId: string,
   masterCreatedAt: string,
   sql: ReservationDatabase = reservationDatabase()
@@ -216,10 +227,11 @@ export const completeMasterReservation = async (
     `UPDATE triage_master_reservations
      SET master_issue_id = $1, master_created_at = $2, status = 'complete', updated_at = now()
      WHERE tenant_key = $3 AND id = $4 AND status = 'reserved'
+       AND source_issue_id = $5
        AND $2::timestamptz >= updated_at - interval '5 minutes'
        AND $2::timestamptz <= now() + interval '1 minute'
      RETURNING id`,
-    [masterIssueId, masterCreatedAt, TENANT_KEY, reservationId]
+    [masterIssueId, masterCreatedAt, TENANT_KEY, reservationId, sourceIssueId]
   )) as Array<{ id: string }>;
   return rows.length === 1;
 };
