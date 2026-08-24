@@ -6,7 +6,7 @@ import { canUseBillingApiRead } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Read one existing Autumn billing customer by the customer or organization id already verified in PlanetScale. Available only in mapped billing intake channels. This never creates a customer or changes billing. When available is false, record Autumn as unverified rather than treating it as empty.",
+    "Read one existing Autumn billing customer by the customer or organization id already verified in PlanetScale. Available only in configured intake-only channels mapped to billing or Intercom workflows. This never creates a customer or changes billing. When available is false, record Autumn as unverified rather than treating it as empty.",
   async execute({ customerId }, ctx) {
     if (!canUseBillingApiRead(ctx.session.auth.current)) {
       return {
@@ -23,6 +23,9 @@ export default defineTool({
         }),
       };
     } catch (error) {
+      if (ctx.abortSignal.aborted) {
+        throw error;
+      }
       console.error("Autumn billing read failed.", error);
       return {
         available: false as const,

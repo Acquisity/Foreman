@@ -50,7 +50,7 @@ Line items for domains and inboxes are both named generically. The identifier is
 
 ## Stripe (root tool)
 
-Call `read_stripe_billing`. Use `customer` for at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer; `promotion_code` for an exact customer-facing code; or `coupon` for a known coupon id. It uses the shared restricted key and fixed GET routes, so it cannot write. A per-section error means that section is unverified; keep the successful sections and name the gap.
+Call `read_stripe_billing`. Use `customer` for at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer; `charge` to read a known charge and its attached refund history; `refund` or `dispute` for a known object id; `promotion_code` for an exact customer-facing code; or `coupon` for a known coupon id. It uses the shared restricted key and fixed GET routes, so it cannot write. A per-section error means that section is unverified; keep the successful sections and name the gap without asserting why it failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read.
 
 Amounts are in the smallest currency unit. A charge of `7200` is $72.00. Read `amount_refunded` on each charge rather than assuming a charge is unrefunded, and read the customer balance and any credit notes before proposing a credit, since a prior ticket may already have covered the same charge.
 

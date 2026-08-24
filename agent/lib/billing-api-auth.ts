@@ -1,7 +1,7 @@
 import { connect } from "@vercel/connect/eve";
 import { requireEnv } from "./constants.js";
 
-/** App-scoped API-key credentials for billing intake reads. */
+/** Required app-scoped API-key credentials for billing and Intercom intake reads. */
 export const autumnApiAuth = connect({
   connector: requireEnv(
     "AUTUMN_API_CONNECTOR",
@@ -10,7 +10,7 @@ export const autumnApiAuth = connect({
   principalType: "app",
 });
 
-/** App-scoped restricted-key credentials for billing intake reads. */
+/** Required app-scoped restricted-key credentials for billing and Intercom intake reads. */
 export const stripeApiAuth = connect({
   connector: requireEnv(
     "STRIPE_API_CONNECTOR",

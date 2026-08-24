@@ -71,6 +71,16 @@ test("idempotencyKey", async (t) => {
       );
     }
   );
+
+  await t.test(
+    "keeps correction metadata separate from root-cause text",
+    () => {
+      assert.notEqual(
+        idempotencyKey("ENG-1", "bug", "Conclusion A|supersedes:case-b-1"),
+        idempotencyKey("ENG-1", "bug", "Conclusion A", "case-b-1")
+      );
+    }
+  );
 });
 
 test("retrieval bounds", async (t) => {

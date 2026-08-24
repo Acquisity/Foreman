@@ -3,31 +3,94 @@ const STRIPE_API_URL = "https://api.stripe.com/v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const SENSITIVE_RESPONSE_KEYS = new Set([
   "address",
+  "billing_address",
   "billing_details",
   "client_secret",
+  "customer_email",
+  "customer_name",
+  "customer_purchase_ip",
   "default_payment_method",
   "default_source",
+  "destination_details",
+  "email",
   "payment_method",
+  "payment_method_details",
   "phone",
   "receipt_email",
+  "receipt_url",
   "shipping",
+  "shipping_address",
   "sources",
 ]);
 
 type Fetcher = typeof fetch;
 
-const sanitize = (value: unknown): unknown => {
+const sanitize = (
+  value: unknown,
+  rootSensitiveKeys: ReadonlySet<string>,
+  atRoot = true
+): unknown => {
   if (Array.isArray(value)) {
-    return value.map(sanitize);
+    return value.map((entry) => sanitize(entry, rootSensitiveKeys, false));
   }
   if (value === null || typeof value !== "object") {
     return value;
   }
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => !SENSITIVE_RESPONSE_KEYS.has(key))
-      .map(([key, entry]) => [key, sanitize(entry)])
+      .filter(
+        ([key]) =>
+          !(
+            SENSITIVE_RESPONSE_KEYS.has(key) ||
+            (atRoot && rootSensitiveKeys.has(key))
+          )
+      )
+      .map(([key, entry]) => [key, sanitize(entry, rootSensitiveKeys, false)])
   );
+};
+
+const tooMuchData = (provider: "Autumn" | "Stripe"): Error =>
+  new Error(
+    `${provider} returned too much data. Narrow the lookup before concluding.`
+  );
+
+const readBoundedText = async (
+  provider: "Autumn" | "Stripe",
+  response: Response
+): Promise<string> => {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    throw tooMuchData(provider);
+  }
+  if (response.body === null) {
+    return "";
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: the stream's done flag terminates the loop.
+  while (true) {
+    // biome-ignore lint/performance/noAwaitInLoops: stream chunks must be read sequentially to enforce the byte cap.
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_RESPONSE_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw tooMuchData(provider);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, totalBytes).toString("utf8");
+};
+
+const enforceOutputBudget = <T>(provider: "Autumn" | "Stripe", value: T): T => {
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_RESPONSE_BYTES) {
+    throw tooMuchData(provider);
+  }
+  return value;
 };
 
 /** A safe billing-provider error. Response bodies never reach the model. */
@@ -52,19 +115,15 @@ export class BillingApiError extends Error {
 
 const parseResponse = async (
   provider: "Autumn" | "Stripe",
-  response: Response
+  response: Response,
+  rootSensitiveKeys: ReadonlySet<string>
 ): Promise<unknown> => {
   if (!response.ok) {
     throw new BillingApiError(provider, response.status);
   }
-  const text = await response.text();
-  if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
-    throw new Error(
-      `${provider} returned too much data. Narrow the lookup before concluding.`
-    );
-  }
+  const text = await readBoundedText(provider, response);
   try {
-    return sanitize(JSON.parse(text) as unknown);
+    return sanitize(JSON.parse(text) as unknown, rootSensitiveKeys);
   } catch (error) {
     throw new Error(`${provider} returned an unreadable response.`, {
       cause: error,
@@ -76,11 +135,22 @@ const call = async (
   provider: "Autumn" | "Stripe",
   url: string,
   init: RequestInit,
-  fetchImpl: Fetcher
+  fetchImpl: Fetcher,
+  rootSensitiveKeys: ReadonlySet<string> = new Set()
 ): Promise<unknown> => {
   try {
-    return await parseResponse(provider, await fetchImpl(url, init));
+    return await parseResponse(
+      provider,
+      await fetchImpl(url, init),
+      rootSensitiveKeys
+    );
   } catch (error) {
+    if (
+      init.signal?.aborted ||
+      (error instanceof Error && error.name === "AbortError")
+    ) {
+      throw error;
+    }
     if (error instanceof BillingApiError || error instanceof SyntaxError) {
       throw error;
     }
@@ -118,13 +188,18 @@ export const readAutumnCustomer = (
       method: "POST",
       signal: options.signal,
     },
-    options.fetch ?? fetch
+    options.fetch ?? fetch,
+    new Set(["name"])
   );
 
 const stripeGet = (
   token: string,
   path: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal }
+  options: {
+    fetch?: Fetcher;
+    rootSensitiveKeys?: ReadonlySet<string>;
+    signal?: AbortSignal;
+  }
 ): Promise<unknown> =>
   call(
     "Stripe",
@@ -134,17 +209,28 @@ const stripeGet = (
       method: "GET",
       signal: options.signal,
     },
-    options.fetch ?? fetch
+    options.fetch ?? fetch,
+    options.rootSensitiveKeys
   );
 
 const safeStripeGet = async (
   token: string,
   path: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal }
+  options: {
+    fetch?: Fetcher;
+    rootSensitiveKeys?: ReadonlySet<string>;
+    signal?: AbortSignal;
+  }
 ): Promise<{ data?: unknown; error?: string }> => {
   try {
     return { data: await stripeGet(token, path, options) };
   } catch (error) {
+    if (
+      options.signal?.aborted ||
+      (error instanceof Error && error.name === "AbortError")
+    ) {
+      throw error;
+    }
     return {
       error:
         error instanceof Error ? error.message : "Stripe read could not run.",
@@ -171,11 +257,45 @@ export async function readStripeCustomerBilling(
   const entries = await Promise.all(
     Object.entries(lookups).map(async ([name, path]) => [
       name,
-      await safeStripeGet(token, path, options),
+      await safeStripeGet(
+        token,
+        path,
+        name === "customer"
+          ? { ...options, rootSensitiveKeys: new Set(["name"]) }
+          : options
+      ),
     ])
   );
-  return Object.fromEntries(entries);
+  return enforceOutputBudget("Stripe", Object.fromEntries(entries));
 }
+
+/** Reads one known Stripe charge, including its attached refund history. */
+export const readStripeCharge = (
+  token: string,
+  chargeId: string,
+  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+): Promise<unknown> =>
+  stripeGet(
+    token,
+    `/charges/${encodeURIComponent(chargeId)}?expand[]=refunds`,
+    options
+  );
+
+/** Reads one known Stripe refund. */
+export const readStripeRefund = (
+  token: string,
+  refundId: string,
+  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+): Promise<unknown> =>
+  stripeGet(token, `/refunds/${encodeURIComponent(refundId)}`, options);
+
+/** Reads one known Stripe dispute. */
+export const readStripeDispute = (
+  token: string,
+  disputeId: string,
+  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+): Promise<unknown> =>
+  stripeGet(token, `/disputes/${encodeURIComponent(disputeId)}`, options);
 
 /** Finds Stripe promotion codes by the exact customer-facing code. */
 export const readStripePromotionCode = (

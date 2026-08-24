@@ -59,7 +59,7 @@ The order is mandatory:
 
 1. PlanetScale with `planetscale_execute_read_query`: current workspace, billing account, plan state, credit balances, prior credits, and `organization.partner_id`.
 2. Autumn with the root tool `read_autumn_billing`, using the existing customer or organization id verified in PlanetScale: provisioned subscriptions, expanded plans and add-ons, line-item metadata, and the single feature-credit balance.
-3. Stripe with the root tool `read_stripe_billing`: use `customer` for bounded customer, subscription, invoice, charge, credit-note, and balance history; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id.
+3. Stripe with the root tool `read_stripe_billing`: use `customer` for bounded customer, subscription, invoice, charge, credit-note, and balance history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, withhold the amount or refund verdict until the exact relevant object is identified and read.
 
 These billing tools use shared app-scoped Connect credentials, so the Intercom requester never has to begin a separate investigation or complete personal OAuth first. Their provider routes and methods are fixed reads. They cannot move money or change billing.
 

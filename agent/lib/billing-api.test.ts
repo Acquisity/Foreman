@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 import {
   BillingApiError,
   readAutumnCustomer,
+  readStripeCharge,
   readStripeCustomerBilling,
+  readStripeDispute,
   readStripePromotionCode,
+  readStripeRefund,
 } from "./billing-api.js";
 
 const json = (body: unknown, status = 200): Promise<Response> =>
@@ -15,6 +18,9 @@ const json = (body: unknown, status = 200): Promise<Response> =>
     })
   );
 
+const AUTUMN_TOO_MUCH_DATA = /Autumn returned too much data/u;
+const STRIPE_TOO_MUCH_DATA = /Stripe returned too much data/u;
+
 describe("Autumn billing API", () => {
   it("uses the fixed read endpoint and expands billing evidence", async () => {
     let calledUrl = "";
@@ -23,7 +29,9 @@ describe("Autumn billing API", () => {
       calledUrl = String(url);
       calledInit = init;
       return json({
+        email: "customer@example.com",
         id: "org_123",
+        name: "Customer Name",
         payment_method: { card: { last4: "4242" } },
         subscriptions: [{ plan: { name: "Inbox add-on" } }],
       });
@@ -79,7 +87,17 @@ describe("Stripe billing API", () => {
     const calls: Array<{ init?: RequestInit; url: string }> = [];
     const fetchStub: typeof fetch = (url, init) => {
       calls.push({ init, url: String(url) });
-      return json({ object: "list" });
+      return json({
+        email: "customer@example.com",
+        name: String(url).endsWith("/customers/cus_123")
+          ? "Customer Name"
+          : undefined,
+        nested: {
+          payment_method_details: { card: { last4: "4242" } },
+          receipt_url: "https://pay.example/receipt",
+        },
+        object: "list",
+      });
     };
 
     const result = await readStripeCustomerBilling(
@@ -107,6 +125,11 @@ describe("Stripe billing API", () => {
         "Bearer restricted-key"
       );
     }
+    const serialized = JSON.stringify(result);
+    assert.equal(serialized.includes("customer@example.com"), false);
+    assert.equal(serialized.includes("Customer Name"), false);
+    assert.equal(serialized.includes("payment_method_details"), false);
+    assert.equal(serialized.includes("receipt_url"), false);
   });
 
   it("keeps an unauthorized section from hiding the other evidence", async () => {
@@ -139,6 +162,79 @@ describe("Stripe billing API", () => {
     assert.equal(
       calledUrl,
       "https://api.stripe.com/v1/promotion_codes?code=SAVE%20%26%20WIN&limit=20"
+    );
+  });
+
+  it("reads only known charge, refund, and dispute objects", async () => {
+    const calls: string[] = [];
+    const fetchStub: typeof fetch = (url) => {
+      calls.push(String(url));
+      return json({ id: "known" });
+    };
+
+    await readStripeCharge("restricted-key", "ch_123", {
+      fetch: fetchStub,
+    });
+    await readStripeRefund("restricted-key", "re_123", {
+      fetch: fetchStub,
+    });
+    await readStripeDispute("restricted-key", "du_123", {
+      fetch: fetchStub,
+    });
+
+    assert.deepEqual(calls, [
+      "https://api.stripe.com/v1/charges/ch_123?expand[]=refunds",
+      "https://api.stripe.com/v1/refunds/re_123",
+      "https://api.stripe.com/v1/disputes/du_123",
+    ]);
+  });
+
+  it("propagates cancellation instead of returning partial evidence", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchStub: typeof fetch = () =>
+      Promise.reject(new DOMException("Canceled", "AbortError"));
+
+    await assert.rejects(
+      readStripeCustomerBilling("restricted-key", "cus_123", {
+        fetch: fetchStub,
+        signal: controller.signal,
+      }),
+      (error) => error instanceof Error && error.name === "AbortError"
+    );
+  });
+
+  it("rejects a customer bundle that exceeds the aggregate output budget", async () => {
+    const fetchStub: typeof fetch = () =>
+      json({ data: [{ description: "x".repeat(50 * 1024) }] });
+
+    await assert.rejects(
+      readStripeCustomerBilling("restricted-key", "cus_123", {
+        fetch: fetchStub,
+      }),
+      STRIPE_TOO_MUCH_DATA
+    );
+  });
+});
+
+describe("billing response bounds", () => {
+  const oversized = { data: "x".repeat(256 * 1024 + 1) };
+
+  it("rejects an oversized Autumn response while streaming", async () => {
+    await assert.rejects(
+      readAutumnCustomer("secret-key", "org_123", {
+        fetch: () => json(oversized),
+      }),
+      AUTUMN_TOO_MUCH_DATA
+    );
+  });
+
+  it("rejects an oversized Stripe response while streaming", async () => {
+    await assert.rejects(
+      readStripePromotionCode("restricted-key", "SAVE", {
+        fetch: () => json(oversized),
+      }),
+      STRIPE_TOO_MUCH_DATA
     );
   });
 });

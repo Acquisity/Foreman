@@ -75,17 +75,26 @@ describe("intake-only channels", () => {
     ]);
   });
 
-  it("grants billing API reads only to mapped billing intake channels", () => {
-    const billing = stampSlackIntakeAuth(auth, "C0BMXPV6EGJ");
+  it("grants billing API reads only to mapped billing or Intercom intake channels", () => {
+    const billing = stampSlackIntakeAuth(auth, "C0BC011NAQL");
+    const billingSandbox = stampSlackIntakeAuth(auth, "C0BMXPV6EGJ");
     const intercom = stampSlackIntakeAuth(auth, "C0BCV1WBR42");
     const intercomSandbox = stampSlackIntakeAuth(auth, "C0BNCL031AQ");
     const product = stampSlackIntakeAuth(auth, "C0BLFDUN6Q7");
 
     assert.equal(canUseBillingApiRead(billing), true);
+    assert.equal(canUseBillingApiRead(billingSandbox), true);
     assert.equal(canUseBillingApiRead(intercom), true);
     assert.equal(canUseBillingApiRead(intercomSandbox), true);
     assert.equal(canUseBillingApiRead(product), false);
     assert.equal(canUseBillingApiRead(auth), false);
+  });
+
+  it("clears a stale billing stamp when the next Slack route is not billing", () => {
+    const billing = stampSlackIntakeAuth(auth, "C0BC011NAQL");
+    const product = stampSlackIntakeAuth(billing, "C0BLFDUN6Q7");
+
+    assert.equal(canUseBillingApiRead(product), false);
   });
 
   it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {

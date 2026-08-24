@@ -96,11 +96,20 @@ export function idempotencyKey(
   rootCause: string,
   supersedesCaseId?: string
 ): string {
-  const predecessor =
-    supersedesCaseId === undefined ? "" : `|supersedes:${supersedesCaseId}`;
-  return createHash("sha256")
-    .update(`${sourceIssueId}|${classification}|${rootCause}${predecessor}`)
-    .digest("hex");
+  // Keep the original record-key encoding so deployed first revisions remain
+  // replay-safe. Corrections use a separate structured namespace so their
+  // predecessor cannot be confused with text at the end of the root cause.
+  const material =
+    supersedesCaseId === undefined
+      ? `${sourceIssueId}|${classification}|${rootCause}`
+      : JSON.stringify([
+          "correction",
+          sourceIssueId,
+          classification,
+          rootCause,
+          supersedesCaseId,
+        ]);
+  return createHash("sha256").update(material).digest("hex");
 }
 
 /** A row as selected for the model projection. */
@@ -595,6 +604,18 @@ async function caseIdFor(
   return rows[0]?.id ?? null;
 }
 
+async function legacyCorrectionIdFor(
+  sql: NeonQueryFunction<false, false>,
+  key: string,
+  supersedesCaseId: string
+): Promise<string | null> {
+  const rows = (await sql.query(
+    "SELECT id FROM investigation_cases WHERE tenant_key = $1 AND idempotency_key = $2 AND supersedes_case_id = $3",
+    [TENANT_KEY, key, supersedesCaseId]
+  )) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
 async function activeCase(
   sql: NeonQueryFunction<false, false>,
   sourceIssueId: string
@@ -744,15 +765,33 @@ export async function correctCase(
     return { created: false, reason: "prior_case_other_ticket" };
   }
 
+  const predecessorId = prior.id;
   const key = idempotencyKey(
     payload.sourceIssueId,
     classification,
     payload.rootCause,
-    supersedesCaseId
+    predecessorId
   );
   const replay = await caseIdFor(sql, key);
   if (replay !== null) {
     return { caseId: replay, created: false, reason: "already_recorded" };
+  }
+
+  // Corrections written before predecessor-aware keys were deployed used the
+  // same key shape as a first revision. Match one only when it explicitly
+  // supersedes this predecessor; otherwise A -> B -> A would mistake the
+  // original A row for a replay of the later correction.
+  const legacyReplay = await legacyCorrectionIdFor(
+    sql,
+    idempotencyKey(payload.sourceIssueId, classification, payload.rootCause),
+    predecessorId
+  );
+  if (legacyReplay !== null) {
+    return {
+      caseId: legacyReplay,
+      created: false,
+      reason: "already_recorded",
+    };
   }
 
   // Only now does the status matter: this is a genuinely new correction, so
@@ -784,7 +823,7 @@ export async function correctCase(
       insertParams(id, feature, payload, classification, {
         correctionReason,
         revision,
-        supersedesCaseId: prior.id,
+        supersedesCaseId: predecessorId,
       })
     ),
   ])) as [unknown, { id: string }[]];
@@ -797,6 +836,6 @@ export async function correctCase(
     caseId: row.id,
     created: true,
     revision,
-    supersededCaseId: prior.id,
+    supersededCaseId: predecessorId,
   };
 }

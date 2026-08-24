@@ -44,9 +44,10 @@ const AUTUMN_MCP_URL = "https://mcp.useautumn.com/mcp";
  *   and the CLI, so cross-surface consent coverage is untested here. Do not
  *   assume it without checking.
  *
- *   Mapped billing intake channels do not use this user grant. Their fixed
- *   read-only root tool uses the app-scoped API-key connector instead, so the
- *   Slack requester's identity cannot strand the investigation on consent.
+ *   Configured intake-only channels mapped to billing or Intercom workflows
+ *   do not use this user grant. Their fixed read-only root tool uses the
+ *   app-scoped API-key connector instead, so the Slack requester's identity
+ *   cannot strand the investigation on consent.
  *   This MCP connection remains the broader read surface for attended users
  *   who have connected Autumn themselves.
  * - Read-only twice over. {@link READ_SCOPES} narrows the grant itself, and

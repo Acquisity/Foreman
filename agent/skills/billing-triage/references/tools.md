@@ -16,7 +16,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. Mapped billing intake channels use the app-scoped root tools described below. Other attended surfaces keep the broader user-scoped MCP tools.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. Configured intake-only channels mapped to billing or Intercom workflows use the app-scoped root tools described below. Other attended surfaces keep the broader user-scoped MCP tools.
 
 ## PlanetScale (`planetscale__`)
 
@@ -32,7 +32,7 @@ Connection coordinates, confirmed live: organization `acquisity`, database `acqu
 
 ## Autumn (`autumn__`)
 
-In a mapped billing intake channel, use the root tool `read_autumn_billing` instead. Pass only the existing customer or organization id already verified in PlanetScale. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
+In a configured intake-only channel mapped to a billing or Intercom workflow, use the root tool `read_autumn_billing` instead. Pass only the existing customer or organization id already verified in PlanetScale. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
 
 The `autumn__` connection below is for attended users who have personally connected Autumn.
 
@@ -50,7 +50,7 @@ Line items for domains and inboxes are both named generically. The identifier is
 
 ## Stripe (`stripe__`)
 
-In a mapped billing intake channel, use the root tool `read_stripe_billing` instead. Its `customer` lookup reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means the restricted key could not read that section; record it as unverified and keep the successful sections. The tool has fixed GET routes and cannot write.
+In a configured intake-only channel mapped to a billing or Intercom workflow, use the root tool `read_stripe_billing` instead. Its `customer` lookup reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
 
 The `stripe__` connection below is for attended users who have personally connected Stripe.
 
