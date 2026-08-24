@@ -201,6 +201,36 @@ describe("triage review operational attestation", () => {
     assert.equal(
       await attestTriageReviewVerdict(
         {
+          eventId: "event-wrong-model",
+          packet: secondPacket,
+          sessionId: "session-1",
+          verdict: {
+            ...verdict(secondRevision),
+            reviewer_model: "openai/gpt-5.6-terra",
+          },
+        },
+        storage
+      ),
+      false
+    );
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
+          eventId: "event-wrong-criteria",
+          packet: {
+            ...secondPacket,
+            targetedRecheckCriteria: ["reachability"],
+          },
+          sessionId: "session-1",
+          verdict: verdict(secondRevision),
+        },
+        storage
+      ),
+      false
+    );
+    assert.equal(
+      await attestTriageReviewVerdict(
+        {
           eventId: "event-2",
           packet: secondPacket,
           sessionId: "session-1",
