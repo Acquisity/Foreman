@@ -40,6 +40,14 @@ Also allowlisted, from the connection: `planetscale_list_organizations`, `planet
 
 Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`.
 
+## Instantly (root tools, no prefix)
+
+`list_instantly_subworkspaces`, `read_instantly_subworkspace`.
+
+Use these only when the financial ask also turns on Instantly provisioning or live provider state. Call `list_instantly_subworkspaces` first and use its result alone for membership evidence. It follows up to 100 Workspace Group pages; treat a cap error as `Could not run` and incomplete evidence. Only when an accepted selection exists and resource evidence is relevant, prefer its ID and call `read_instantly_subworkspace` for one bounded `accounts`, `campaigns`, or `emails` page. Pass each returned `nextStartingAfter` value back as `startingAfter` until it is null. Every page identifies the source workspace name and ID. Every resource uses an explicit investigative-field allowlist; email reads are preview-only and omit bodies, attachment payloads, and all provider address representations.
+
+The tools use an app-scoped IBG credential, require no requester OAuth, and expose only fixed GET routes. They can prove provider state but cannot prove payment, entitlement, or refund amount. `available: false` is `Could not run`, never an empty account and never a prompt for the Slack requester to sign in. No tool can invite or remove a workspace, change an account or campaign, send an email, reply, forward, pause, resume, or call an arbitrary path.
+
 ## Autumn (root tool)
 
 Call `read_autumn_billing` with the existing customer or organization id already verified in PlanetScale. It uses the shared app-scoped API key, so it is available before any requester-specific consent. Its only provider operation is Autumn's `customers.get` read with plans and balances expanded. It cannot create a missing customer or call a write route.

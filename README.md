@@ -15,7 +15,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Configured intake-only channels mapped to billing or Intercom workflows use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Intercom itself is app-scoped: its private Acquisity workspace token lives in an API-key connector, and Slack callers are never asked to authorize it. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
+Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Configured intake-only channels mapped to billing or Intercom workflows use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Instantly investigation uses fixed GET-only API tools backed by the IBG admin workspace, and Intercom uses its private Acquisity workspace app. Both credentials live in app-scoped API-key connectors, so Slack callers are never asked to authorize them. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
 
 ## Skills
 
@@ -82,10 +82,21 @@ Completed triage investigations are indexed in a private Foreman-owned Postgres 
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
 | `AUTUMN_API_CONNECTOR` | `api.useautumn.com/acquisity-foreman-autumn-api` (required) | App-scoped API-key connector for fixed Autumn reads in configured billing and Intercom intake workflows |
 | `STRIPE_API_CONNECTOR` | `api.stripe.com/acquisity-foreman-stripe-api` (required) | App-scoped restricted-key connector for fixed Stripe reads in configured billing and Intercom intake workflows |
+| `INSTANTLY_API_CONNECTOR` | `api.instantly.ai/acquisity-foreman` (required) | App-scoped API-key connector for fixed Instantly Workspace Group, account, campaign, and email-preview reads |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 
 See [.env.example](.env.example) for all MCP connection UIDs. No repository or setup command is configured through the environment.
+
+### Instantly admin workspace
+
+Foreman reads Instantly through the Acquisity admin workspace `IBG` (`24f5c554-bf6c-4f51-a909-d25d9617cff9`). The runtime lists Workspace Group pages up to a 100-page safety cap, keeps only accepted memberships, and applies `x-as-workspace` only after resolving the selected subworkspace against that complete bounded result. Reaching the cap fails closed instead of returning a partial list. Every resource page returns the selected workspace name and ID.
+
+Create an API Key connector in Vercel Connect with UID `api.instantly.ai/acquisity-foreman`, link it to the Foreman project environments that need the integration, and store a fresh IBG admin-workspace API key inside it. Prefer the narrow scopes `workspace_group_members:read`, `accounts:read`, `campaigns:read`, and `emails:read`; `all:read` is acceptable when operationally simpler. Never grant create, update, delete, send, or any `*:all` scope. Set `INSTANTLY_API_CONNECTOR` to the connector UID, never to the API key.
+
+To rotate the credential, create a replacement key with the same read-only scopes, replace the credential in the existing connector, verify that `list_instantly_subworkspaces` and one bounded resource read succeed, then revoke the old key. The key must not enter source control, app environment variables, browser responses, logs, tickets, or tool results.
+
+New customer workspaces need no Foreman configuration. Invite the workspace to IBG's Workspace Group and wait for its owner to accept. `list_instantly_subworkspaces` excludes pending and rejected invitations and discovers the accepted workspace on its next call. Resource reads expose one bounded page at a time and return `nextStartingAfter`; callers pass it back as `startingAfter`. The tools retry short transient/rate-limit responses with bounded backoff and return a safe error for long `Retry-After` windows, inaccessible workspaces, or revoked credentials. Every resource result uses an explicit investigative-field allowlist. Email reads always request preview-only data and remove message bodies, attachments, and all provider address representations from the tool result.
 
 ## Development
 
@@ -98,4 +109,4 @@ pnpm eval --tag fast
 
 `pnpm validate` runs Ultracite formatting and lint, TypeScript, unit tests, and `eve info` discovery. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
 
-Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Autumn and Stripe billing API credentials; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.
+Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Autumn, Stripe, Instantly, and Intercom credentials; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.
