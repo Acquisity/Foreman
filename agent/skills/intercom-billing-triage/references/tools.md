@@ -16,7 +16,7 @@ Root tools are authored in `agent/tools/` or provided by the eve framework. They
 
 Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
-Read them in flow order: Intercom, then PlanetScale, then Autumn, then Stripe.
+Read them in flow order: Intercom, then PlanetScale, then Autumn, then Stripe. Autumn and Stripe use app-scoped root tools in this intake workflow, not the requester's personal MCP grants.
 
 ## Intercom (`intercom__`)
 
@@ -40,29 +40,19 @@ Also allowlisted, from the connection: `planetscale_list_organizations`, `planet
 
 Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`.
 
-## Autumn (`autumn__`)
+## Autumn (root tool)
 
-`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
+Call `read_autumn_billing` with the existing customer or organization id already verified in PlanetScale. It uses the shared app-scoped API key, so it is available before any requester-specific consent. Its only provider operation is Autumn's `customers.get` read with plans and balances expanded. It cannot create a missing customer or call a write route.
 
-Also allowlisted: `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
-
-Autumn is user-scoped, so a teammate who has never consented gets a sign-in failure rather than data. That is `Could not run`, not an empty result: never read it as the customer having no Autumn account.
-
-The server also exposes write tools that attach a plan, create a balance, grant a reward, or update a subscription. None are allowlisted, and the connection's OAuth grant carries no write scope, so none can move money or grant entitlement from here regardless of what a ticket asks for. This skill proposes; a human executes.
-
-`getOrCreateCustomer` reads like a getter and creates on a miss, so it is excluded as a write. The `preview*` tools are excluded too: they compute without applying, but each one stages an attach, a balance grant, a catalog change, or a subscription update.
+When `available` is false, record Autumn as `Could not run`; never read it as the customer having no Autumn account.
 
 Line items for domains and inboxes are both named generically. The identifier is in the metadata, shaped `xxxxxxxxx{domain.co}`. Read metadata on every line item before counting or matching.
 
-## Stripe (`stripe__`)
+## Stripe (root tool)
 
-`stripe_api_read` for a known object, `stripe_api_search` to find one, `stripe_api_details` when a call shape is unclear. `search_stripe_documentation` for API semantics. `get_stripe_account_info` and `list_available_accounts_or_orgs` for account context.
-
-`stripe_api_write` and `create_refund` exist on the server and are excluded from this connection's allowlist, so no tool reachable here can move money regardless of what a ticket asks for.
+Call `read_stripe_billing`. Use `customer` for at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer; `charge` to read a known charge and its attached refund history; `refund` or `dispute` for a known object id; `promotion_code` for an exact customer-facing code; or `coupon` for a known coupon id. It uses the shared restricted key and fixed GET routes, so it cannot write. A per-section error means that section is unverified; keep the successful sections and name the gap without asserting why it failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read.
 
 Amounts are in the smallest currency unit. A charge of `7200` is $72.00. Read `amount_refunded` on each charge rather than assuming a charge is unrefunded, and read the customer balance and any credit notes before proposing a credit, since a prior ticket may already have covered the same charge.
-
-Docs: <https://docs.stripe.com/mcp>.
 
 ## Linear (`linear__`)
 

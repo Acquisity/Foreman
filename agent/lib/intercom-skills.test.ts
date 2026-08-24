@@ -84,6 +84,9 @@ test("Intercom billing skill preserves evidence order and human-only action", ()
     "canonical conversation URL",
     "Subscription and invoice are request subjects",
     "expected future subscription or one-off invoice",
+    "read_autumn_billing",
+    "read_stripe_billing",
+    "shared app-scoped Connect credentials",
   ]) {
     assert.ok(billingSkill.includes(phrase), phrase);
   }
@@ -110,8 +113,10 @@ test("Intercom skills own their tool references", () => {
     "## Intercom (`intercom__`)",
     "`fetch`, `get_conversation`",
     "planetscale_execute_read_query",
-    "## Autumn (`autumn__`)",
-    "## Stripe (`stripe__`)",
+    "## Autumn (root tool)",
+    "`read_autumn_billing`",
+    "## Stripe (root tool)",
+    "`read_stripe_billing`",
     "`list_issue_labels`",
   ]) {
     assert.ok(billingTools.includes(phrase), phrase);

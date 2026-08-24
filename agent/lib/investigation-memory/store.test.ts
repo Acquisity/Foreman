@@ -45,6 +45,42 @@ test("idempotencyKey", async (t) => {
       idempotencyKey("ENG-2", "bug", "Same cause.")
     );
   });
+
+  await t.test(
+    "allows a corrected conclusion to return to an earlier answer",
+    () => {
+      const firstA = idempotencyKey("ENG-1", "bug", "Conclusion A");
+      const correctionB = idempotencyKey(
+        "ENG-1",
+        "platform_limitation",
+        "Conclusion B",
+        "case-a-1"
+      );
+      const secondA = idempotencyKey(
+        "ENG-1",
+        "bug",
+        "Conclusion A",
+        "case-b-1"
+      );
+
+      assert.notEqual(firstA, secondA);
+      assert.notEqual(correctionB, secondA);
+      assert.equal(
+        secondA,
+        idempotencyKey("ENG-1", "bug", "Conclusion A", "case-b-1")
+      );
+    }
+  );
+
+  await t.test(
+    "keeps correction metadata separate from root-cause text",
+    () => {
+      assert.notEqual(
+        idempotencyKey("ENG-1", "bug", "Conclusion A|supersedes:case-b-1"),
+        idempotencyKey("ENG-1", "bug", "Conclusion A", "case-b-1")
+      );
+    }
+  );
 });
 
 test("retrieval bounds", async (t) => {

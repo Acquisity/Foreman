@@ -195,6 +195,52 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[INTAKE_ONLY_ATTRIBUTE] === "true";
 }
 
+/** Auth attribute granting the app-scoped billing API read tools. */
+export const BILLING_API_READ_ATTRIBUTE = "billingApiRead";
+
+/**
+ * Grants access to the fixed, read-only Autumn and Stripe API lookups.
+ *
+ * @remarks
+ * Slack stamps this only for a configured intake-only channel mapped to a
+ * billing or Intercom workflow. The tools check the stamp again at execution,
+ * so merely discovering or loading a billing skill never grants access.
+ */
+export function stampBillingApiRead(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: {
+      ...auth.attributes,
+      [BILLING_API_READ_ATTRIBUTE]: "true",
+    },
+  };
+}
+
+/** Removes billing API access before Slack applies a channel-specific route. */
+export function clearBillingApiRead(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: {
+      ...auth.attributes,
+      [BILLING_API_READ_ATTRIBUTE]: "false",
+    },
+  };
+}
+
+/** Whether this attended session may use app-scoped billing API reads. */
+export function canUseBillingApiRead(auth: SessionAuthContext | null): boolean {
+  return (
+    auth !== null &&
+    auth.attributes[BILLING_API_READ_ATTRIBUTE] === "true" &&
+    isIntakeOnly(auth) &&
+    !isUnattended(auth)
+  );
+}
+
 /**
  * Auth attribute marking a session authorized to read and write investigation
  * memory.
