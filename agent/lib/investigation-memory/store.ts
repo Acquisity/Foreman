@@ -563,7 +563,13 @@ function insertParams(
 export type WriteResult =
   | { caseId: string; created: true; revision: number }
   | { caseId: string; created: false; reason: "already_recorded" }
-  | { created: false; existingCaseId: string; reason: "active_case_exists" };
+  | { created: false; existingCaseId: string; reason: "active_case_exists" }
+  | { created: false; reason: "authorization_failed" };
+
+export interface CaseWriteOptions {
+  readonly authorizeWrite?: () => Promise<boolean>;
+  readonly database?: NeonQueryFunction<false, false>;
+}
 
 /** Names of the constraints that mean "this ticket already has a live case". */
 const ACTIVE_CASE_CONSTRAINTS = [
@@ -625,9 +631,10 @@ async function activeCase(
 export async function recordCase(
   feature: FeatureKey,
   payload: CasePayload,
-  classification: Classification
+  classification: Classification,
+  options: CaseWriteOptions = {}
 ): Promise<WriteResult> {
-  const sql = memoryDatabase();
+  const sql = options.database ?? memoryDatabase();
   const key = idempotencyKey(
     payload.sourceIssueId,
     classification,
@@ -646,6 +653,10 @@ export async function recordCase(
       existingCaseId: existing.id,
       reason: "active_case_exists",
     };
+  }
+
+  if (options.authorizeWrite && !(await options.authorizeWrite())) {
+    return { created: false, reason: "authorization_failed" };
   }
 
   const id = randomUUID();
@@ -703,6 +714,7 @@ export type CorrectionResult =
       supersededCaseId: string;
     }
   | { caseId: string; created: false; reason: "already_recorded" }
+  | { created: false; reason: "authorization_failed" }
   | { created: false; reason: "prior_case_not_active" }
   | { created: false; reason: "prior_case_other_ticket" };
 
@@ -721,9 +733,10 @@ export async function correctCase(
   payload: CasePayload,
   classification: Classification,
   supersedesCaseId: string,
-  correctionReason: string
+  correctionReason: string,
+  options: CaseWriteOptions = {}
 ): Promise<CorrectionResult> {
-  const sql = memoryDatabase();
+  const sql = options.database ?? memoryDatabase();
   // Read the prior case whatever its status. A correction that already
   // succeeded leaves it superseded, and filtering on `active` here would make
   // a replay of that completed write look like a failure before the
@@ -784,6 +797,10 @@ export async function correctCase(
   // the case it names has to still be the live one.
   if (prior.status !== "active") {
     return { created: false, reason: "prior_case_not_active" };
+  }
+
+  if (options.authorizeWrite && !(await options.authorizeWrite())) {
+    return { created: false, reason: "authorization_failed" };
   }
 
   const id = randomUUID();

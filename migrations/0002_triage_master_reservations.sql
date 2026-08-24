@@ -22,6 +22,12 @@ CREATE TABLE IF NOT EXISTS triage_master_reservations (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT triage_master_reservations_status_check
     CHECK (status IN ('reserved', 'complete')),
+  CONSTRAINT triage_master_reservations_state_fields_check
+    CHECK (
+      (status = 'reserved' AND master_issue_id IS NULL AND master_created_at IS NULL)
+      OR
+      (status = 'complete' AND master_issue_id IS NOT NULL AND master_created_at IS NOT NULL)
+    ),
   CONSTRAINT triage_master_reservations_review_attempt_check
     CHECK (review_attempt IN (1, 2)),
   CONSTRAINT triage_master_reservations_approval_check

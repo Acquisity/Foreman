@@ -9,7 +9,8 @@ import {
 import { featureForProject } from "#lib/investigation-memory/scope.js";
 import { correctCase } from "#lib/investigation-memory/store.js";
 import {
-  approvalMatchesBugCase,
+  approvalMatchesBugCaseContent,
+  approvalMatchesSource,
   claimApprovalForMemory,
   type VerifiedTriageApproval,
   verifyTriageApproval,
@@ -29,52 +30,39 @@ export default defineTool({
       };
     }
 
-    let verifiedBug: VerifiedTriageApproval | null = null;
-    if (input.classification === "bug") {
-      if (input.criticApprovalId === undefined) {
-        return {
-          reason: "A corrected Bug case requires an opaque critic approval ID.",
-          recorded: false as const,
-        };
-      }
-      const verified = await verifyTriageApproval(
-        await ctx.getSandbox(),
-        ctx.session.id,
-        input.criticApprovalId
-      ).catch(() => null);
-      if (
-        verified === null ||
-        !(await approvalMatchesBugCase(verified, input))
-      ) {
-        return {
-          reason:
-            "The opaque critic approval is absent, not APPROVE, or does not match this exact corrected Bug claim, root cause, confidence, packet, model, and repository revision.",
-          recorded: false as const,
-        };
-      }
-      verifiedBug = verified;
-    }
-
-    const feature = featureForProject(input.linearProjectId);
-    if (feature === null) {
-      return {
-        reason:
-          "That Linear project is not mapped to a product area, so there is no scope to file the correction under.",
-        recorded: false as const,
-      };
-    }
-
     try {
-      if (
-        verifiedBug !== null &&
-        !(await claimApprovalForMemory(verifiedBug, input, "correct", {
-          correctionReason: input.correctionReason,
-          supersedesCaseId: input.supersedesCaseId,
-        }))
-      ) {
+      let verifiedBug: VerifiedTriageApproval | null = null;
+      if (input.classification === "bug") {
+        if (input.criticApprovalId === undefined) {
+          return {
+            reason:
+              "A corrected Bug case requires an opaque critic approval ID.",
+            recorded: false as const,
+          };
+        }
+        const verified = await verifyTriageApproval(
+          await ctx.getSandbox(),
+          ctx.session.id,
+          input.criticApprovalId
+        );
+        if (
+          verified === null ||
+          !approvalMatchesBugCaseContent(verified, input)
+        ) {
+          return {
+            reason:
+              "The opaque critic approval is absent, not APPROVE, or does not match this exact corrected Bug claim, root cause, confidence, packet, model, and repository revision.",
+            recorded: false as const,
+          };
+        }
+        verifiedBug = verified;
+      }
+
+      const feature = featureForProject(input.linearProjectId);
+      if (feature === null) {
         return {
           reason:
-            "This critic approval is already bound to different memory content.",
+            "That Linear project is not mapped to a product area, so there is no scope to file the correction under.",
           recorded: false as const,
         };
       }
@@ -83,7 +71,22 @@ export default defineTool({
         input,
         input.classification,
         input.supersedesCaseId,
-        input.correctionReason
+        input.correctionReason,
+        {
+          authorizeWrite:
+            verifiedBug === null
+              ? undefined
+              : async () =>
+                  (await approvalMatchesSource(
+                    verifiedBug,
+                    input.sourceIssueId,
+                    input.linearProjectId
+                  )) &&
+                  (await claimApprovalForMemory(verifiedBug, input, "correct", {
+                    correctionReason: input.correctionReason,
+                    supersedesCaseId: input.supersedesCaseId,
+                  })),
+        }
       );
       if (result.created) {
         return {
@@ -96,6 +99,8 @@ export default defineTool({
       const reasons = {
         already_recorded:
           "This correction is already recorded. Nothing changed.",
+        authorization_failed:
+          "This critic approval is already bound to different memory content.",
         prior_case_not_active:
           "That case is not the active revision for its ticket, so there is nothing to supersede. Search memory again and correct the current case.",
         prior_case_other_ticket:

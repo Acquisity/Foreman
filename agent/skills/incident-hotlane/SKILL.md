@@ -39,6 +39,8 @@ Set `STANDARD_ENGINEERING` for a confirmed defect that does not meet those condi
 
 When evidence suggests a high-risk condition but cannot confirm it because a critical lane is unavailable, return `NEEDS_HUMAN_URGENT`; do not downgrade it to routine work.
 
+`NEEDS_HUMAN_URGENT` is terminal for automated finalization. Send only the provisional escalation described below, route the case to a person, and stop before settled classification comments, priority or hotlane writes, master creation or relationships, incident announcements, and investigation-memory writes. It cannot fall through as an approved `Bug`, `HOTLANE`, or `STANDARD_ENGINEERING` result.
+
 ## Separate the four workstreams
 
 For hotlane or incident handling, keep these distinct:
@@ -85,7 +87,6 @@ Return:
 - `customer_recovery`
 - `permanent_prevention`
 - `observability_gap`
-- `confirmed_affected`
-- `potentially_exposed`
+- `blast_radius`: one object containing `confirmed_affected`, `potentially_exposed`, optional `affected_org_count` and `affected_user_count`, `method_or_source`, `window`, `measured_at`, and `limitations`
 - `notification_recommendation`
 - `unknowns`

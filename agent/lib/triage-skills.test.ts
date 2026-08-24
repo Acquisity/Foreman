@@ -120,17 +120,27 @@ test("Slack replies exclude internal investigation summaries", () => {
 
 test("both intake routers share diagnosis and the bounded critic gate", () => {
   for (const skill of [triageSkill, intercomTriageSkill]) {
-    const memorySearch = skill.indexOf("search_investigation_memory");
-    const diagnosis = skill.indexOf("customer-bug-diagnosis");
-    const packet = skill.indexOf("create_triage_review_packet");
-    const critic = skill.indexOf("declared `triage-critic`");
-    const memoryWrite = skill.lastIndexOf("record_investigation_case");
+    const memorySearch = skill.indexOf("call `search_investigation_memory`");
+    const diagnosis = skill.indexOf("Load `customer-bug-diagnosis`");
+    const packet = skill.indexOf("create_triage_review_packet", diagnosis);
+    const critic = skill.indexOf("call the declared `triage-critic`");
+    const attestation = skill.indexOf(
+      "call `read_triage_review_verdict`",
+      critic
+    );
+    const finalWrites = Math.max(
+      skill.indexOf("completed structural writes"),
+      skill.indexOf("all applicable Linear writes and readback")
+    );
+    const memoryWrite = skill.lastIndexOf("call `record_investigation_case`");
 
     assert.ok(memorySearch >= 0);
     assert.ok(diagnosis > memorySearch);
     assert.ok(packet > diagnosis);
     assert.ok(critic > packet);
-    assert.ok(memoryWrite > critic);
+    assert.ok(attestation > critic);
+    assert.ok(finalWrites > attestation);
+    assert.ok(memoryWrite > finalWrites);
     assert.ok(skill.includes("one targeted"));
     assert.ok(skill.includes("exact current evidence revision"));
     assert.ok(skill.includes("read_triage_review_verdict"));
@@ -152,13 +162,47 @@ test("shared triage skills preserve the causal and impact contracts", () => {
     engineeringHandoffSkill.includes("complete_triage_master_reservation")
   );
   assert.ok(
-    engineeringHandoffSkill.includes("Only the transaction that inserts")
+    engineeringHandoffSkill.includes(
+      "Only the transaction that atomically reserves"
+    )
   );
   assert.ok(
     customerBugDiagnosisSkill.includes(
       "Independent investigations of the same cause"
     )
   );
+});
+
+test("unproven and urgent-human outcomes cannot enter structural Bug writes", () => {
+  assert.ok(
+    triageSkill.includes(
+      "Never label, route, parent, prioritize, announce, or record it as a settled Bug"
+    )
+  );
+  assert.ok(
+    incidentHotlaneSkill.includes("terminal for automated finalization")
+  );
+  for (const skill of [triageSkill, intercomTriageSkill]) {
+    assert.ok(skill.includes("NEEDS_HUMAN_URGENT"));
+    assert.ok(
+      skill.includes("provisional confirmation-in-progress escalation")
+    );
+  }
+});
+
+test("engineering handoff binds the final candidate set and idempotent relations", () => {
+  assert.ok(
+    engineeringHandoffSkill.includes("exact eligible candidate identifiers")
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "obtain approval for a new packet revision"
+    )
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes("when that exact relation is absent")
+  );
+  assert.ok(engineeringHandoffSkill.includes("successful idempotent state"));
 });
 
 test("engineering-handoff exclusively owns the structural write state machine", () => {

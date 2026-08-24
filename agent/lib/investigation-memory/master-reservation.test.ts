@@ -326,6 +326,19 @@ describe("causal master reservation tools", () => {
     );
     assert.ok(migration.includes("critic_approval_id text NOT NULL"));
     assert.ok(migration.includes("critic_approval_id ~ '^trv_"));
+    assert.ok(
+      migration.includes("triage_master_reservations_state_fields_check")
+    );
+    assert.ok(
+      migration.includes(
+        "status = 'reserved' AND master_issue_id IS NULL AND master_created_at IS NULL"
+      )
+    );
+    assert.ok(
+      migration.includes(
+        "status = 'complete' AND master_issue_id IS NOT NULL AND master_created_at IS NOT NULL"
+      )
+    );
   });
 
   it("requires an exact critic approval before reservation", () => {

@@ -8,7 +8,8 @@ import {
 import { featureForProject } from "#lib/investigation-memory/scope.js";
 import { recordCase } from "#lib/investigation-memory/store.js";
 import {
-  approvalMatchesBugCase,
+  approvalMatchesBugCaseContent,
+  approvalMatchesSource,
   claimApprovalForMemory,
   type VerifiedTriageApproval,
   verifyTriageApproval,
@@ -28,53 +29,53 @@ export default defineTool({
       };
     }
 
-    let verifiedBug: VerifiedTriageApproval | null = null;
-    if (input.classification === "bug") {
-      if (input.criticApprovalId === undefined) {
-        return {
-          reason: "A Bug case requires an opaque critic approval ID.",
-          recorded: false as const,
-        };
-      }
-      const verified = await verifyTriageApproval(
-        await ctx.getSandbox(),
-        ctx.session.id,
-        input.criticApprovalId
-      ).catch(() => null);
-      if (
-        verified === null ||
-        !(await approvalMatchesBugCase(verified, input))
-      ) {
-        return {
-          reason:
-            "The opaque critic approval is absent, not APPROVE, or does not match this exact Bug claim, root cause, confidence, packet, model, and repository revision.",
-          recorded: false as const,
-        };
-      }
-      verifiedBug = verified;
-    }
-
-    const feature = featureForProject(input.linearProjectId);
-    if (feature === null) {
-      return {
-        reason:
-          "That Linear project is not mapped to a product area, so the case has no owning feature and is not recorded. The investigation itself stands.",
-        recorded: false as const,
-      };
-    }
-
     try {
-      if (
-        verifiedBug !== null &&
-        !(await claimApprovalForMemory(verifiedBug, input, "record"))
-      ) {
+      let verifiedBug: VerifiedTriageApproval | null = null;
+      if (input.classification === "bug") {
+        if (input.criticApprovalId === undefined) {
+          return {
+            reason: "A Bug case requires an opaque critic approval ID.",
+            recorded: false as const,
+          };
+        }
+        const verified = await verifyTriageApproval(
+          await ctx.getSandbox(),
+          ctx.session.id,
+          input.criticApprovalId
+        );
+        if (
+          verified === null ||
+          !approvalMatchesBugCaseContent(verified, input)
+        ) {
+          return {
+            reason:
+              "The opaque critic approval is absent, not APPROVE, or does not match this exact Bug claim, root cause, confidence, packet, model, and repository revision.",
+            recorded: false as const,
+          };
+        }
+        verifiedBug = verified;
+      }
+
+      const feature = featureForProject(input.linearProjectId);
+      if (feature === null) {
         return {
           reason:
-            "This critic approval is already bound to different memory content.",
+            "That Linear project is not mapped to a product area, so the case has no owning feature and is not recorded. The investigation itself stands.",
           recorded: false as const,
         };
       }
-      const result = await recordCase(feature, input, input.classification);
+      const result = await recordCase(feature, input, input.classification, {
+        authorizeWrite:
+          verifiedBug === null
+            ? undefined
+            : async () =>
+                (await approvalMatchesSource(
+                  verifiedBug,
+                  input.sourceIssueId,
+                  input.linearProjectId
+                )) &&
+                (await claimApprovalForMemory(verifiedBug, input, "record")),
+      });
       if (result.created) {
         return {
           caseId: result.caseId,
@@ -83,12 +84,23 @@ export default defineTool({
           revision: result.revision,
         };
       }
+      let caseId: string | undefined;
+      if ("caseId" in result) {
+        ({ caseId } = result);
+      } else if ("existingCaseId" in result) {
+        caseId = result.existingCaseId;
+      }
+      let reason =
+        "This critic approval is already bound to different memory content.";
+      if (result.reason === "already_recorded") {
+        reason = "This exact conclusion is already recorded. Nothing changed.";
+      } else if (result.reason === "active_case_exists") {
+        reason =
+          "This ticket already has an active case with a different conclusion. Use correct_investigation_case to supersede it.";
+      }
       return {
-        caseId: "caseId" in result ? result.caseId : result.existingCaseId,
-        reason:
-          result.reason === "already_recorded"
-            ? "This exact conclusion is already recorded. Nothing changed."
-            : "This ticket already has an active case with a different conclusion. Use correct_investigation_case to supersede it.",
+        caseId,
+        reason,
         recorded: false as const,
       };
     } catch (error) {

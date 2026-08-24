@@ -112,9 +112,10 @@ Return:
 - `root_cause`
 - `verified_facts`
 - `inferences`
+- `hypotheses`: one to five ranked falsifiable hypotheses with status, supporting observation, and disproving observation
 - `evidence_ledger`
 - `ruled_out`
-- `blast_radius`: confirmed, potentially exposed, window, method, and limitations
+- `blast_radius`: one structured object with distinct confirmed and potentially exposed populations, optional affected organization and user counts, source or method, window, measurement timestamp, and limitations
 - `code_anchor`: repository, commit SHA, files, functions, jobs, or provider path
 - `causal_identity`: lowercase `repositoryKey` matching the code anchor, plus `failingInvariantKey`, `causalPathKeys`, `triggerConditionKeys`, and `preventionOutcomeKey`
 - `confidence`

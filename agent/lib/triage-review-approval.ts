@@ -77,18 +77,13 @@ export const approvalMatchesSource = async (
   );
 };
 
-export const approvalMatchesBugCase = async (
+export const approvalMatchesBugCaseContent = (
   verified: VerifiedTriageApproval,
   payload: CasePayload
-): Promise<boolean> => {
+): boolean => {
   const { blastRadius } = verified.packet.diagnosis;
   return (
     verified.packet.proposal.classification === "Bug" &&
-    (await approvalMatchesSource(
-      verified,
-      payload.sourceIssueId,
-      payload.linearProjectId
-    )) &&
     normalize(verified.packet.claim) === normalize(payload.claim) &&
     normalize(verified.packet.diagnosis.rootCause) ===
       normalize(payload.rootCause) &&

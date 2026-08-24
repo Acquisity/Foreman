@@ -44,7 +44,7 @@ Pass `sourceIssueId` alongside a Linear project id to look up one ticket's own c
 
 These writes are denied outright in sessions that are not authorized triage surfaces, and in unattended runs. The denial is the answer; there is no approval card to wait on. Memory reads, writes, and availability are internal bookkeeping and never belong in a Slack-facing reply.
 
-`reserve_triage_master` runs after the final Linear re-search and only when no eligible existing master owns the cause. It accepts the opaque `criticApprovalId` and source issue id, then reads the stable causal identity keys and reviewed current-or-stale master decision from the attested packet. Only the transaction that inserts the exact causal generation returns `acquired: true`. Conflicts and retries fail closed. An unresolved reservation never expires into permission for another create. After the one master and its relationships pass readback, `complete_triage_master_reservation` binds its Linear identifier and verified creation timestamp to the reservation. An ambiguous reservation or completion is never recovered by creating another master.
+`reserve_triage_master` runs after the final Linear re-search and only when no eligible existing master owns the cause. It accepts the opaque `criticApprovalId` and source issue id, then reads the stable causal identity keys and reviewed current-or-stale master decision from the attested packet. Only the transaction that atomically reserves the exact causal generation returns `acquired: true`. Conflicts and retries fail closed. An unresolved reservation never expires into permission for another create. After the one master and its relationships pass readback, `complete_triage_master_reservation` binds its Linear identifier and verified creation timestamp to the reservation. An ambiguous reservation or completion is never recovered by creating another master.
 
 ## PlanetScale (`planetscale__`)
 
@@ -78,7 +78,7 @@ Call `list_instantly_subworkspaces` first. It follows Workspace Group pages up t
 
 `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment`.
 
-`save_issue` traps: `labels` replaces the entire label set, so read the current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low. `relatedTo`, `blockedBy`, and `blocks` are append-only. Pass `assignee`, not `assigneeId`.
+`save_issue` traps: `labels` replaces the entire label set, so read the current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low. `relatedTo`, `blockedBy`, and `blocks` append relations rather than replacing them, so read the current relations and omit an exact relation that already exists before calling. Pass `assignee`, not `assigneeId`.
 
 `save_document` takes exactly one parent; pass `issue` for an issue-scoped document. Use `patch` to edit an existing one rather than rewriting it whole.
 
