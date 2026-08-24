@@ -21,7 +21,6 @@ const SENSITIVE_RESPONSE_KEYS = new Set([
   "receipt_url",
   "shipping",
   "shipping_address",
-  "source",
   "sources",
 ]);
 
@@ -38,12 +37,14 @@ const sanitize = (
   if (value === null || typeof value !== "object") {
     return value;
   }
+  const isStripeCharge = "object" in value && value.object === "charge";
   return Object.fromEntries(
     Object.entries(value)
       .filter(
         ([key]) =>
           !(
             SENSITIVE_RESPONSE_KEYS.has(key) ||
+            (key === "source" && isStripeCharge) ||
             (atRoot && rootSensitiveKeys.has(key))
           )
       )

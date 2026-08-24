@@ -88,6 +88,13 @@ describe("Stripe billing API", () => {
     const fetchStub: typeof fetch = (url, init) => {
       calls.push({ init, url: String(url) });
       return json({
+        data: [
+          {
+            metadata: { source: "campaign" },
+            object: "charge",
+            source: { address_line1: "123 Main", last4: "4242" },
+          },
+        ],
         email: "customer@example.com",
         name: String(url).endsWith("/customers/cus_123")
           ? "Customer Name"
@@ -96,7 +103,6 @@ describe("Stripe billing API", () => {
           customer_email_address: "dispute@example.com",
           payment_method_details: { card: { last4: "4242" } },
           receipt_url: "https://pay.example/receipt",
-          source: { address_line1: "123 Main", last4: "4242" },
         },
         object: "list",
       });
@@ -133,7 +139,8 @@ describe("Stripe billing API", () => {
     assert.equal(serialized.includes("Customer Name"), false);
     assert.equal(serialized.includes("payment_method_details"), false);
     assert.equal(serialized.includes("receipt_url"), false);
-    assert.equal(serialized.includes("source"), false);
+    assert.equal(serialized.includes("address_line1"), false);
+    assert.equal(serialized.includes('"source":"campaign"'), true);
   });
 
   it("keeps an unauthorized section from hiding the other evidence", async () => {
