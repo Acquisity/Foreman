@@ -6,6 +6,7 @@ import {
   claimTriageReviewUse,
   findTriageReviewVerdict,
   readAttestedApproval,
+  readTriageReviewSource,
   type TriageReviewStorage,
 } from "./triage-review-attestation.js";
 import {
@@ -31,6 +32,10 @@ const memoryStorage = (): TriageReviewStorage => {
     },
   };
 };
+
+const validApprovalId = `trv_${"a".repeat(
+  64
+)}_123e4567-e89b-42d3-a456-426614174000`;
 
 const packet = (
   overrides: Partial<TriageReviewPacket> = {}
@@ -268,16 +273,16 @@ describe("triage review operational attestation", () => {
       sourceIssueId: "ENG-123",
     };
     assert.equal(
-      await bindTriageReviewSource("approval", source, storage),
+      await bindTriageReviewSource(validApprovalId, source, storage),
       true
     );
     assert.equal(
-      await bindTriageReviewSource("approval", source, storage),
+      await bindTriageReviewSource(validApprovalId, source, storage),
       true
     );
     assert.equal(
       await bindTriageReviewSource(
-        "approval",
+        validApprovalId,
         { ...source, sourceIssueId: "ENG-124" },
         storage
       ),
@@ -288,15 +293,53 @@ describe("triage review operational attestation", () => {
       purpose: "memory" as const,
       sourceIssueId: "ENG-123",
     };
-    assert.equal(await claimTriageReviewUse("approval", use, storage), true);
-    assert.equal(await claimTriageReviewUse("approval", use, storage), true);
+    assert.equal(
+      await claimTriageReviewUse(validApprovalId, use, storage),
+      true
+    );
+    assert.equal(
+      await claimTriageReviewUse(validApprovalId, use, storage),
+      true
+    );
     assert.equal(
       await claimTriageReviewUse(
-        "approval",
+        validApprovalId,
         { ...use, payloadDigest: "f".repeat(64) },
         storage
       ),
       false
     );
+  });
+
+  it("rejects malformed approval ids before reading or writing storage", async () => {
+    const storage: TriageReviewStorage = {
+      read() {
+        throw new Error("storage read must not run");
+      },
+      writeOnce() {
+        throw new Error("storage write must not run");
+      },
+    };
+    const malformed = "trv_../../user-preferences/x_y";
+    const source = {
+      linearProjectId: "1ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+      sourceIssueId: "ENG-123",
+    };
+    const use = {
+      payloadDigest: "e".repeat(64),
+      purpose: "memory" as const,
+      sourceIssueId: "ENG-123",
+    };
+
+    assert.equal(
+      await readAttestedApproval("session-1", malformed, storage),
+      null
+    );
+    assert.equal(await readTriageReviewSource(malformed, storage), null);
+    assert.equal(
+      await bindTriageReviewSource(malformed, source, storage),
+      false
+    );
+    assert.equal(await claimTriageReviewUse(malformed, use, storage), false);
   });
 });

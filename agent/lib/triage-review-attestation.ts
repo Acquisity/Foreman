@@ -225,8 +225,12 @@ export const readAttestedApproval = async (
   approvalId: string,
   storage: TriageReviewStorage = blobStorage
 ): Promise<TriageReviewAttestation | null> => {
+  const parsedApprovalId = triageReviewApprovalIdSchema.safeParse(approvalId);
+  if (!parsedApprovalId.success) {
+    return null;
+  }
   const sessionKey = triageReviewSessionKey(sessionId);
-  const [, chainKey] = approvalId.split("_");
+  const [, chainKey] = parsedApprovalId.data.split("_");
   if (chainKey === undefined) {
     return null;
   }
@@ -247,33 +251,47 @@ export const readAttestedApproval = async (
   return null;
 };
 
-export const bindTriageReviewSource = async (
+export const bindTriageReviewSource = (
   approvalId: string,
   binding: TriageReviewSourceBinding,
   storage: TriageReviewStorage = blobStorage
-): Promise<boolean> =>
-  storage.writeOnce(
-    sourceKey(approvalId),
+): Promise<boolean> => {
+  const parsedApprovalId = triageReviewApprovalIdSchema.safeParse(approvalId);
+  if (!parsedApprovalId.success) {
+    return false;
+  }
+  return storage.writeOnce(
+    sourceKey(parsedApprovalId.data),
     JSON.stringify(sourceBindingSchema.parse(binding))
   );
+};
 
 export const readTriageReviewSource = async (
   approvalId: string,
   storage: TriageReviewStorage = blobStorage
 ): Promise<TriageReviewSourceBinding | null> => {
-  const value = await storage.read(sourceKey(approvalId));
+  const parsedApprovalId = triageReviewApprovalIdSchema.safeParse(approvalId);
+  if (!parsedApprovalId.success) {
+    return null;
+  }
+  const value = await storage.read(sourceKey(parsedApprovalId.data));
   return value === null ? null : sourceBindingSchema.parse(JSON.parse(value));
 };
 
-export const claimTriageReviewUse = async (
+export const claimTriageReviewUse = (
   approvalId: string,
   input: z.input<typeof useBindingSchema>,
   storage: TriageReviewStorage = blobStorage
-): Promise<boolean> =>
-  storage.writeOnce(
-    useKey(approvalId, input.purpose),
+): Promise<boolean> => {
+  const parsedApprovalId = triageReviewApprovalIdSchema.safeParse(approvalId);
+  if (!parsedApprovalId.success) {
+    return false;
+  }
+  return storage.writeOnce(
+    useKey(parsedApprovalId.data, input.purpose),
     JSON.stringify(useBindingSchema.parse(input))
   );
+};
 
 export const triageReviewPayloadDigest = (value: unknown): string =>
   digest(JSON.stringify(canonicalize(value)));
