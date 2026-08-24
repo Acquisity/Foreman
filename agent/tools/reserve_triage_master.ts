@@ -13,6 +13,16 @@ import {
 import { triageReviewApprovalIdSchema } from "#lib/triage-review-attestation.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
+const PUBLIC_RESERVATION_ERRORS = new Set([
+  "Only 30-day intake may advance a stale master generation.",
+  "The reviewed predecessor is not more than 30 days old.",
+]);
+
+export const publicReservationErrorMessage = (error: unknown): string =>
+  error instanceof Error && PUBLIC_RESERVATION_ERRORS.has(error.message)
+    ? error.message
+    : "The causal reservation is unavailable.";
+
 export default defineTool({
   approval: investigationMemoryWritePolicy,
   description:
@@ -102,10 +112,7 @@ export default defineTool({
     } catch (error) {
       return {
         acquired: false as const,
-        reason:
-          error instanceof Error
-            ? error.message
-            : "The causal reservation is unavailable.",
+        reason: publicReservationErrorMessage(error),
       };
     }
   },

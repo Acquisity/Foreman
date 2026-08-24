@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { z } from "zod";
 import completeReservation from "../../tools/complete_triage_master_reservation.js";
-import reserveMaster from "../../tools/reserve_triage_master.js";
+import reserveMaster, {
+  publicReservationErrorMessage,
+} from "../../tools/reserve_triage_master.js";
 import {
   causalFingerprint,
   completeMasterReservation,
@@ -297,6 +299,21 @@ describe("causal master reservation concurrency", () => {
 });
 
 describe("causal master reservation tools", () => {
+  it("returns only deliberate policy errors to the agent", () => {
+    assert.equal(
+      publicReservationErrorMessage(
+        new Error("Only 30-day intake may advance a stale master generation.")
+      ),
+      "Only 30-day intake may advance a stale master generation."
+    );
+    assert.equal(
+      publicReservationErrorMessage(
+        new Error("postgres://user:secret@private-host/database")
+      ),
+      "The causal reservation is unavailable."
+    );
+  });
+
   it("stores opaque critic approvals as constrained text", () => {
     const migration = readFileSync(
       new URL(
