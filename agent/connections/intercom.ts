@@ -1,38 +1,37 @@
+import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
-import { userConnect } from "../lib/user-connect.js";
 
 /**
  * Intercom MCP connection for customer conversation context.
  *
  * @remarks
- * User-scoped via Vercel Connect (BYO OAuth app from the Intercom Developer
- * Hub); uses the authorization-code grant: a one-time consent stores a
- * refresh token, after which calls are non-interactive and auto-refreshing,
- * and tokens are never exposed to the model.
- * Available to every session, unattended runs included. Read-only by tool
- * allowlist, built from the server's live tool list; article writes and
- * feedback submission are excluded, and no reply-to-customer surface is
- * admitted.
+ * App-scoped through Vercel Connect using the access token from Foreman's
+ * private Intercom app. The app belongs to Acquisity's own workspace, so it
+ * needs no per-user OAuth flow or public-app review. The token is never
+ * exposed to the model.
+ * Available to every session, unattended runs included. Read-only by both the
+ * private app's permissions and this tool allowlist; article tools, feedback
+ * submission, and every reply-to-customer surface are excluded.
  */
 export default defineMcpClientConnection({
-  auth: userConnect({
-    connector: requireEnv("INTERCOM_MCP_CONNECTOR", "intercom/foreman"),
-    principalType: "user",
+  auth: connect({
+    connector: requireEnv(
+      "INTERCOM_MCP_CONNECTOR",
+      "api.intercom.com/acquisity-foreman-intercom-api"
+    ),
+    principalType: "app",
   }),
   description:
-    "Intercom customer support, read-only: conversations, contacts, companies, and help center articles.",
+    "Intercom customer support, read-only: conversations, contacts, and companies.",
   tools: {
     allow: [
       "fetch",
-      "get_article",
       "get_company",
       "get_contact",
       "get_conversation",
-      "list_articles",
       "list_companies",
       "search",
-      "search_articles",
       "search_contacts",
       "search_conversations",
     ],
