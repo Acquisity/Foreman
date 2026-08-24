@@ -17,6 +17,8 @@ const slackWordingSkill = readFileSync(
 
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
   for (const skill of [triageSkill, intercomTriageSkill]) {
+    assert.ok(skill.includes("linear__list_issues"));
+    assert.ok(skill.includes("8eaf95ab-56ac-4490-8253-f6a96793dc40"));
     assert.ok(skill.includes('createdAt: "-P30D"'));
     assert.ok(skill.includes("created exactly 30 days ago"));
     assert.ok(skill.includes("even by one second"));
