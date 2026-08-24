@@ -66,6 +66,21 @@ export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
 };
 
 /**
+ * Product areas that an authorized Intercom intake may search before a Linear
+ * issue exists.
+ *
+ * @remarks
+ * This list is server-owned rather than model input. It deliberately includes
+ * every live area and excludes planned areas such as Acquisity Agent. Keeping
+ * the list derived from the lifecycle table makes a product launch the only
+ * change needed to make its historical cases eligible for global intake
+ * recall.
+ */
+export const LIVE_FEATURE_KEYS: readonly FeatureKey[] = Object.freeze(
+  FEATURE_KEYS.filter((key) => FEATURES[key].lifecycle === "live")
+);
+
+/**
  * Linear project id to owning feature.
  *
  * @remarks

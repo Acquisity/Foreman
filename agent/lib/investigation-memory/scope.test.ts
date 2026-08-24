@@ -6,6 +6,7 @@ import {
   isDependencyKey,
   isFeatureKey,
   LINEAR_PROJECT_FEATURES,
+  LIVE_FEATURE_KEYS,
 } from "./scope.js";
 
 test("featureForProject", async (t) => {
@@ -67,6 +68,21 @@ test("scope taxonomy", async (t) => {
     assert.equal(FEATURES.acquisity_agent.lifecycle, "planned");
     assert.equal(FEATURES.cold_email.lifecycle, "live");
   });
+
+  await t.test(
+    "exposes exactly the six live areas for project-free intake",
+    () => {
+      assert.deepEqual([...LIVE_FEATURE_KEYS].sort(), [
+        "ai_sdr",
+        "cold_email",
+        "core_platform",
+        "crm",
+        "domains_inboxes",
+        "website_builder",
+      ]);
+      assert.equal(LIVE_FEATURE_KEYS.includes("acquisity_agent"), false);
+    }
+  );
 
   await t.test("has no generic shared scope", () => {
     assert.ok(!isFeatureKey("shared"));
