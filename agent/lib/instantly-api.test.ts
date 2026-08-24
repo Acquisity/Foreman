@@ -10,9 +10,11 @@ const ADMIN_ID = "24f5c554-bf6c-4f51-a909-d25d9617cff9";
 const MEMBER_ID = "019e050a-b40f-7d29-ba21-67bfd9d99788";
 const WORKSPACE_ID = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
 const SECOND_WORKSPACE_ID = "019e050a-b40f-7d29-ba21-67c1bc8062b2";
+const MAX_TEST_RESPONSE_BYTES = 256 * 1024;
 const AMBIGUOUS_WORKSPACE = /More than one accepted Instantly subworkspace/u;
 const NO_ACCEPTED_WORKSPACE = /No accepted Instantly subworkspace/u;
 const REPEATED_CURSOR = /repeated a Workspace Group pagination cursor/u;
+const TOO_MANY_GROUP_PAGES = /too many Workspace Group pages/u;
 
 const member = (
   overrides: Partial<Record<string, unknown>> = {}
@@ -56,6 +58,9 @@ const cancelableError = (
       { headers, status }
     )
   );
+
+const uuidFor = (value: number): string =>
+  `00000000-0000-4000-8000-${value.toString(16).padStart(12, "0")}`;
 
 describe("Instantly Workspace Group", () => {
   it("follows every page and returns accepted subworkspaces with admin provenance", async () => {
@@ -120,7 +125,7 @@ describe("Instantly Workspace Group", () => {
         assert.ok(error instanceof InstantlyApiError);
         assert.equal(error.status, 401);
         assert.equal(error.kind, "authorization");
-        assert.equal(error.message.includes("secret provider detail"), false);
+        assert.equal(error.message.includes("private provider detail"), false);
         return true;
       }
     );
@@ -170,6 +175,27 @@ describe("Instantly Workspace Group", () => {
     );
   });
 
+  it("retries transient network failures with bounded backoff", async () => {
+    let calls = 0;
+    const delays: number[] = [];
+    const result = await listInstantlySubworkspaces("secret-key", {
+      fetch: () => {
+        calls += 1;
+        return calls < 3
+          ? Promise.reject(new TypeError("temporary network failure"))
+          : json({ items: [member()] });
+      },
+      sleep: (milliseconds) => {
+        delays.push(milliseconds);
+        return Promise.resolve();
+      },
+    });
+
+    assert.equal(calls, 3);
+    assert.deepEqual(delays, [500, 1000]);
+    assert.equal(result.subworkspaces.length, 1);
+  });
+
   it("rejects a repeated cursor instead of looping", async () => {
     await assert.rejects(
       listInstantlySubworkspaces("secret-key", {
@@ -177,6 +203,44 @@ describe("Instantly Workspace Group", () => {
           json({ items: [member()], next_starting_after: "same-cursor" }),
       }),
       REPEATED_CURSOR
+    );
+  });
+
+  it("fails closed when the Workspace Group exceeds 100 pages", async () => {
+    let calls = 0;
+    await assert.rejects(
+      listInstantlySubworkspaces("secret-key", {
+        fetch: () => {
+          calls += 1;
+          return json({
+            items: [
+              member({
+                id: uuidFor(calls),
+                sub_workspace_id: uuidFor(calls + 1000),
+              }),
+            ],
+            next_starting_after: `cursor-${calls}`,
+          });
+        },
+      }),
+      TOO_MANY_GROUP_PAGES
+    );
+    assert.equal(calls, 100);
+  });
+
+  it("rejects an oversized streamed provider response", async () => {
+    await assert.rejects(
+      listInstantlySubworkspaces("secret-key", {
+        fetch: () =>
+          Promise.resolve(
+            new Response("x".repeat(MAX_TEST_RESPONSE_BYTES + 1))
+          ),
+      }),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "too-much-data");
+        return true;
+      }
     );
   });
 });
@@ -331,6 +395,29 @@ describe("Instantly subworkspace reads", () => {
     assert.deepEqual(result.items, [
       { email: "sender@example.com", provider_code: 2, status: 1 },
     ]);
+  });
+
+  it("rejects a sanitized resource page that exceeds the output budget", async () => {
+    const preview = "x".repeat(MAX_TEST_RESPONSE_BYTES - 150);
+    await assert.rejects(
+      readInstantlySubworkspace(
+        "secret-key",
+        { id: WORKSPACE_ID },
+        "emails",
+        {},
+        {
+          fetch: (url) =>
+            String(url).includes("workspace-group-members")
+              ? json({ items: [member()] })
+              : json({ items: [{ content_preview: preview, id: "email-1" }] }),
+        }
+      ),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "too-much-data");
+        return true;
+      }
+    );
   });
 
   it("forces email previews and strips bodies, attachments, and addresses", async () => {

@@ -175,6 +175,10 @@ const discardResponseBody = async (response: Response): Promise<void> => {
   await response.body?.cancel().catch(() => undefined);
 };
 
+const isAbortError = (error: unknown, signal?: AbortSignal): boolean =>
+  signal?.aborted === true ||
+  (error instanceof Error && error.name === "AbortError");
+
 const statusError = (response: Response): InstantlyApiError => {
   const { status } = response;
   if (status === 401) {
@@ -261,11 +265,14 @@ const callPage = async (
         signal: options.signal,
       });
     } catch (error) {
-      if (
-        options.signal?.aborted ||
-        (error instanceof Error && error.name === "AbortError")
-      ) {
+      if (isAbortError(error, options.signal)) {
         throw error;
+      }
+      if (attempt < 2) {
+        const delay = 500 * 2 ** attempt;
+        attempt += 1;
+        await sleep(delay, options.signal);
+        continue;
       }
       throw new InstantlyApiError("Instantly could not be reached.", {
         cause: error,
