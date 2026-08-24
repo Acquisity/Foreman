@@ -298,7 +298,7 @@ describe("triage review packets", () => {
           result: index === 0 ? ("PASS" as const) : ("NOT_APPLICABLE" as const),
         })),
       }).success,
-      true
+      false
     );
   });
 

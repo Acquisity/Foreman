@@ -124,10 +124,14 @@ export const reserveMaster = async (
         "Only 30-day intake may advance a stale master generation."
       );
     }
+    const predecessorCreatedAt = Date.parse(input.predecessorCreatedAt ?? "");
+    const eligibilityEvaluatedAt = Date.parse(input.eligibilityEvaluatedAt);
     if (
-      input.predecessorCreatedAt === undefined ||
-      Date.parse(input.predecessorCreatedAt) >=
-        Date.parse(input.eligibilityEvaluatedAt) - 30 * 24 * 60 * 60 * 1000
+      !(
+        Number.isFinite(predecessorCreatedAt) &&
+        Number.isFinite(eligibilityEvaluatedAt)
+      ) ||
+      predecessorCreatedAt >= eligibilityEvaluatedAt - 30 * 24 * 60 * 60 * 1000
     ) {
       throw new Error("The reviewed predecessor is not more than 30 days old.");
     }

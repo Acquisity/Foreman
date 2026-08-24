@@ -56,7 +56,7 @@ Do not block on wording, style, speculative architecture, or an unproved concern
 
 ## Verdicts
 
-- `APPROVE`: every material criterion passes for the proposed writes. Advisory notes may remain.
+- `APPROVE`: all twelve criteria pass for the proposed Bug writes. Advisory notes may remain. `NOT_APPLICABLE` cannot authorize approval; explain why a criterion does not support approval and challenge the packet instead.
 - `CHALLENGE`: one or more specific, testable problems can be reinvestigated or corrected.
 - `INSUFFICIENT_EVIDENCE`: the packet cannot support the proposed classification, grouping, hotlane decision, or structural write.
 

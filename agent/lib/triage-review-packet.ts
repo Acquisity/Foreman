@@ -456,19 +456,16 @@ export const triageCriticVerdictSchema = z
     const failures = input.criteria_results.filter(
       ({ result }) => result === "FAIL"
     );
-    const passes = input.criteria_results.filter(
-      ({ result }) => result === "PASS"
-    );
     if (
       input.verdict === "APPROVE" &&
       (input.blocking_findings.length > 0 ||
         failures.length > 0 ||
-        passes.length === 0)
+        input.criteria_results.some(({ result }) => result !== "PASS"))
     ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "An approved review requires supported criteria and cannot contain blocking findings or failures.",
+          "An approved review requires all twelve criteria to pass and cannot contain blocking findings.",
         path: ["verdict"],
       });
     }

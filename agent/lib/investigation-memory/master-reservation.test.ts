@@ -28,6 +28,9 @@ const causalIdentity = {
   triggerConditionKeys: ["campaign.due", "sending-window.open"],
 };
 
+const STALE_PREDECESSOR_ERROR =
+  /reviewed predecessor is not more than 30 days old/u;
+
 const reservationInput = {
   approvalId: `trv_${"a".repeat(64)}_0ae59086-e924-42d1-b7ff-f9c750a2a7c9`,
   causalIdentity,
@@ -51,6 +54,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
         master_issue_id: string | null;
         source_issue_id: string;
         status: "reserved" | "complete";
+        updated_at: string;
       }
     | undefined;
   return {
@@ -69,6 +73,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
           master_issue_id: null,
           source_issue_id: String(params[3]),
           status: "reserved" as const,
+          updated_at: String(params[10]),
         };
         return [{ id: row.id }];
       }
@@ -94,6 +99,7 @@ const fakeReservationDatabase = (): ReservationDatabase => {
           master_issue_id: null,
           source_issue_id: String(params[3]),
           status: "reserved",
+          updated_at: String(params[10]),
         };
         return [{ id: row.id }];
       }
@@ -105,7 +111,12 @@ const fakeReservationDatabase = (): ReservationDatabase => {
         if (
           current.id !== params[3] ||
           current.source_issue_id !== params[4] ||
-          current.status !== "reserved"
+          current.status !== "reserved" ||
+          !Number.isFinite(Date.parse(String(params[1]))) ||
+          Date.parse(String(params[1])) <
+            Date.parse(current.updated_at) - 5 * 60 * 1000 ||
+          Date.parse(String(params[1])) >
+            Date.parse(current.updated_at) + 60 * 1000
         ) {
           return [];
         }
@@ -223,9 +234,44 @@ describe("causal master reservation concurrency", () => {
     );
   });
 
+  it("mirrors the database completion timestamp window", async () => {
+    const database = fakeReservationDatabase();
+    const reserved = await reserveMasterRecord(reservationInput, database);
+    assert.equal(reserved.acquired, true);
+    if (!reserved.acquired) {
+      return;
+    }
+    assert.equal(
+      await completeMasterReservation(
+        reserved.reservationId,
+        "ENG-123",
+        "ENG-999",
+        "2026-08-24T11:54:59.000Z",
+        database
+      ),
+      false
+    );
+    assert.equal(
+      await completeMasterReservation(
+        reserved.reservationId,
+        "ENG-123",
+        "ENG-999",
+        "2026-08-24T12:01:01.000Z",
+        database
+      ),
+      false
+    );
+  });
+
   it("permits one reviewed new generation after a stale master", async () => {
     const database = fakeReservationDatabase();
-    const first = await reserveMasterRecord(reservationInput, database);
+    const first = await reserveMasterRecord(
+      {
+        ...reservationInput,
+        eligibilityEvaluatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      database
+    );
     assert.equal(first.acquired, true);
     if (!first.acquired) {
       return;
@@ -277,7 +323,13 @@ describe("causal master reservation concurrency", () => {
 
   it("serializes different stale predecessor claims through one causal head", async () => {
     const database = fakeReservationDatabase();
-    const first = await reserveMasterRecord(reservationInput, database);
+    const first = await reserveMasterRecord(
+      {
+        ...reservationInput,
+        eligibilityEvaluatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      database
+    );
     assert.equal(first.acquired, true);
     if (!first.acquired) {
       return;
@@ -330,9 +382,35 @@ describe("causal master reservation concurrency", () => {
     );
   });
 
+  it("rejects invalid predecessor timestamps before querying storage", async () => {
+    const database: ReservationDatabase = {
+      query() {
+        assert.fail("invalid timestamps must not reach storage");
+      },
+    };
+    await assert.rejects(
+      reserveMasterRecord(
+        {
+          ...reservationInput,
+          generationKey: "ENG-777",
+          masterRecencyPolicy: "THIRTY_DAY",
+          predecessorCreatedAt: "not-a-timestamp",
+        },
+        database
+      ),
+      STALE_PREDECESSOR_ERROR
+    );
+  });
+
   it("fails closed when the persisted head belongs to another reviewed generation", async () => {
     const database = fakeReservationDatabase();
-    const first = await reserveMasterRecord(reservationInput, database);
+    const first = await reserveMasterRecord(
+      {
+        ...reservationInput,
+        eligibilityEvaluatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      database
+    );
     assert.equal(first.acquired, true);
     if (!first.acquired) {
       return;
