@@ -15,6 +15,7 @@ const AMBIGUOUS_WORKSPACE = /More than one accepted Instantly subworkspace/u;
 const NO_ACCEPTED_WORKSPACE = /No accepted Instantly subworkspace/u;
 const REPEATED_CURSOR = /repeated a Workspace Group pagination cursor/u;
 const TOO_MANY_GROUP_PAGES = /too many Workspace Group pages/u;
+const WRONG_ADMIN_WORKSPACE = /configured IBG admin workspace/u;
 
 const member = (
   overrides: Partial<Record<string, unknown>> = {}
@@ -132,6 +133,31 @@ describe("Instantly Workspace Group", () => {
     assert.equal(canceled, 1);
   });
 
+  it("rejects a credential for a different admin workspace", async () => {
+    let calls = 0;
+    await assert.rejects(
+      listInstantlySubworkspaces("secret-key", {
+        fetch: () => {
+          calls += 1;
+          return json({
+            items: [
+              member({
+                admin_workspace_id: "fba27324-a0fb-4630-8986-80b4ff1f879a",
+              }),
+            ],
+          });
+        },
+      }),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "authorization");
+        assert.match(error.message, WRONG_ADMIN_WORKSPACE);
+        return true;
+      }
+    );
+    assert.equal(calls, 1);
+  });
+
   it("retries a short rate limit and respects the retry hint", async () => {
     let calls = 0;
     let canceled = 0;
@@ -243,9 +269,59 @@ describe("Instantly Workspace Group", () => {
       }
     );
   });
+
+  it("cancels a response whose declared length exceeds the limit", async () => {
+    let canceled = 0;
+    await assert.rejects(
+      listInstantlySubworkspaces("secret-key", {
+        fetch: () =>
+          cancelableError(
+            200,
+            () => {
+              canceled += 1;
+            },
+            { "Content-Length": String(MAX_TEST_RESPONSE_BYTES + 1) }
+          ),
+      }),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "too-much-data");
+        return true;
+      }
+    );
+    assert.equal(canceled, 1);
+  });
 });
 
 describe("Instantly subworkspace reads", () => {
+  it("rejects invalid direct-call limits before contacting Instantly", async () => {
+    await Promise.all(
+      [0, 101, Number.NaN, 1.5].map(async (limit) => {
+        let calls = 0;
+        await assert.rejects(
+          readInstantlySubworkspace(
+            "secret-key",
+            { id: WORKSPACE_ID },
+            "campaigns",
+            { limit },
+            {
+              fetch: () => {
+                calls += 1;
+                return json({ items: [member()] });
+              },
+            }
+          ),
+          (error) => {
+            assert.ok(error instanceof InstantlyApiError);
+            assert.equal(error.kind, "invalid-input");
+            return true;
+          }
+        );
+        assert.equal(calls, 0);
+      })
+    );
+  });
+
   it("finds an authoritative ID beyond page one and propagates the resource cursor", async () => {
     const calls: Array<{ init?: RequestInit; url: string }> = [];
     const fetchStub: typeof fetch = (url, init) => {

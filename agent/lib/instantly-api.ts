@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const INSTANTLY_API_URL = "https://api.instantly.ai/api/v2";
+const IBG_ADMIN_WORKSPACE_ID = "24f5c554-bf6c-4f51-a909-d25d9617cff9";
 const PAGE_LIMIT = 100;
 const MAX_GROUP_PAGES = 100;
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -75,6 +76,7 @@ export interface InstantlyResourcePage {
 type ErrorKind =
   | "authorization"
   | "inaccessible"
+  | "invalid-input"
   | "invalid-response"
   | "not-found"
   | "rate-limited"
@@ -115,20 +117,26 @@ const defaultSleep: Sleeper = (milliseconds, signal) =>
       reject(signal.reason);
       return;
     }
-    const timeout = setTimeout(resolve, milliseconds);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timeout);
-        reject(signal.reason);
-      },
-      { once: true }
-    );
+    const onAbort = (): void => {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
+      reject(signal?.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
+
+const discardResponseBody = async (response: Response): Promise<void> => {
+  await response.body?.cancel().catch(() => undefined);
+};
 
 const readBoundedText = async (response: Response): Promise<string> => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    await discardResponseBody(response);
     throw tooMuchData();
   }
   if (response.body === null) {
@@ -169,10 +177,6 @@ const retryAfterSeconds = (response: Response): number | null => {
     return null;
   }
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
-};
-
-const discardResponseBody = async (response: Response): Promise<void> => {
-  await response.body?.cancel().catch(() => undefined);
 };
 
 const isAbortError = (error: unknown, signal?: AbortSignal): boolean =>
@@ -418,6 +422,12 @@ export async function listInstantlySubworkspaces(
       { kind: "not-found" }
     );
   }
+  if (first.admin_workspace_id !== IBG_ADMIN_WORKSPACE_ID) {
+    throw new InstantlyApiError(
+      "Instantly credential is not bound to the configured IBG admin workspace.",
+      { kind: "authorization" }
+    );
+  }
   if (
     members.some(
       (member) => member.admin_workspace_id !== first.admin_workspace_id
@@ -529,7 +539,14 @@ const resourcePath = (
   resource: InstantlyResource,
   query: InstantlyResourceQuery
 ): string => {
-  const params = new URLSearchParams({ limit: String(query.limit ?? 20) });
+  const limit = query.limit ?? 20;
+  if (!Number.isInteger(limit) || limit < 1 || limit > PAGE_LIMIT) {
+    throw new InstantlyApiError(
+      "Instantly resource limit must be an integer from 1 to 100.",
+      { kind: "invalid-input" }
+    );
+  }
+  const params = new URLSearchParams({ limit: String(limit) });
   if (query.startingAfter !== undefined) {
     params.set("starting_after", query.startingAfter);
   }
@@ -556,13 +573,9 @@ export async function readInstantlySubworkspace(
   query: InstantlyResourceQuery = {},
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyResourcePage> {
+  const path = resourcePath(resource, query);
   const workspace = await resolveWorkspace(token, selector, options);
-  const page = await callPage(
-    token,
-    resourcePath(resource, query),
-    workspace.id,
-    options
-  );
+  const page = await callPage(token, path, workspace.id, options);
   return enforceOutputBudget({
     items: sanitizeItems(resource, page.items),
     nextStartingAfter: page.next_starting_after ?? null,
