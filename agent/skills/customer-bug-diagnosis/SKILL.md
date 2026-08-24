@@ -108,20 +108,14 @@ Separately identify the safest current unblock, who can perform it, whether it h
 Return:
 
 - `claim`
-- `mode`: `REPRODUCTION | PRODUCTION_FORENSICS | UNPROVEN`
-- `root_cause`
-- `verified_facts`
-- `inferences`
-- `hypotheses`: one to five ranked falsifiable hypotheses with status, supporting observation, and disproving observation
-- `evidence_ledger`
-- `ruled_out`
-- `blast_radius`: one structured object with distinct confirmed and potentially exposed populations, optional affected organization and user counts, source or method, window, measurement timestamp, and limitations
-- `code_anchor`: repository, commit SHA, files, functions, jobs, or provider path
-- `causal_identity`: lowercase `repositoryKey` matching the code anchor, plus `failingInvariantKey`, `causalPathKeys`, `triggerConditionKeys`, and `preventionOutcomeKey`
-- `confidence`
-- `disproving_observation`
-- `regression_seam`
-- `customer_unblock`
-- `unknowns`
+- `diagnosis`, using the exact packet field names:
+  - `mode`: `REPRODUCTION | PRODUCTION_FORENSICS | UNPROVEN`
+  - `rootCause`, `verifiedFacts`, `inference`, `ruledOut`, and `unknowns`
+  - `hypotheses`: one to five objects with `rank`, `hypothesis`, `status`, `supportingObservation`, and `disprovingObservation`
+  - `evidenceLedger`: entries with `lane`, `status`, `summary`, and `observedAt`; a verified or contradicted entry also has `handle`, while `COULD_NOT_RUN` has `blockerReason`
+  - `blastRadius`: `confirmedAffected`, `potentiallyExposed`, optional `affectedOrgCount` and `affectedUserCount`, optional `countedAt` date, `method`, `window`, and `limitations`
+  - `codeAnchor`: `repository`, `commitSha`, and one or more exact code, function, job, state-transition, or provider `paths`
+  - `causalIdentity`: lowercase `repositoryKey` matching the code anchor, plus `failingInvariantKey`, `causalPathKeys`, `triggerConditionKeys`, and `preventionOutcomeKey`
+  - `confidence`, `disprovingObservation`, `regressionSeam`, and `customerUnblock`
 
-Do not classify, group, hotlane, notify, or create engineering work until the intake skill and the independent critic have evaluated this output.
+This skill returns diagnosis, not a final classification or write decision. The intake router evaluates the diagnosis and classifies it. Only a remaining candidate `Bug` proceeds to the independent critic before structural decisions.

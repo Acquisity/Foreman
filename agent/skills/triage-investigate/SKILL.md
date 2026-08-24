@@ -29,8 +29,9 @@ Exactly one classification per finding:
 - `User Error`: settings, configuration, operator-solvable, or needs-human-review cases support can explain or follow up on without a platform limitation or bug.
 - `Platform Limitation`: expected limitation, provider limitation, billing, entitlement, or plan limit, or known unsupported behavior.
 - `Bug`: direct evidence of internal failure that settings, configuration, and platform limits do not explain.
+- `Unproven`: current evidence cannot settle the claim. Name the exact missing evidence and reopen condition, and do not route or record it as a settled Bug.
 
-A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, do not force one of the three: hand back what is known with the missing confirmation named, no ticket, and nothing that reads as settled.
+A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, use `Unproven`: hand back what is known with the missing confirmation named and nothing that reads as settled.
 
 ## Step 0 — Is this a money ask?
 
@@ -182,11 +183,13 @@ The unblock never replaces the root cause, never substitutes for the master tick
 
 ### 4.8 Gate a candidate Bug through triage-critic
 
+Load `incident-hotlane` for every candidate `Bug` and for any plausible high-risk claim whose critical evidence lane is unavailable. Evaluate impact before packet creation. If it returns `NEEDS_HUMAN_URGENT`, send only its provisional confirmation-in-progress escalation, route to a person, and stop before evidence preflight, packet creation, critic execution, Step 5 finalization, and every settled or structural write, including memory.
+
 Do not call the critic for `User Error`, `Platform Limitation`, ordinary feedback, or `Unproven`. Those paths continue to Step 5 after the diagnosis is complete.
 
 An `Unproven` result must carry the exact missing evidence and reopen condition into the investigation document and ticket comment. In Step 5 choose `Support/Product follow-up` only when a named person must obtain that evidence; otherwise choose `Resolved by triage` and close with the reopen condition. Never label, route, parent, prioritize, announce, or record it as a settled Bug.
 
-For a candidate `Bug`, load `incident-hotlane` and produce the proposed classification, priority, core-function impact, hotlane route, master candidate, and exact structural Linear writes. Preflight every user-scoped evidence connection the critic may need by completing its read in this attended root session. The task-mode critic cannot pause for sign-in; an unavailable optional source becomes an explicit evidence gap, never a retry loop.
+For a remaining candidate `Bug`, produce the proposed classification, priority, core-function impact, hotlane route, master candidate, and exact structural Linear writes. Preflight every user-scoped evidence connection the critic may need by completing its read in this attended root session. The task-mode critic cannot pause for sign-in; an unavailable optional source becomes an explicit evidence gap, never a retry loop.
 
 Call `create_triage_review_packet` with the canonical Linear issue id, target Linear project id, original source context, pinned workspace identity, diagnosis, ranked hypotheses, evidence ledger and stable handles, memory results and how they were used, current repository SHA and exact code paths, structured impact counts and count date when known, the complete duplicate-candidate and master-candidate sets with verified timestamps where required, impact method, unblock, and every proposed write. The tool overwrites the requested recency fields with an authenticated server stamp: `THIRTY_DAY` for intake-only Slack, `UNBOUNDED` for Linear Agent Sessions, and the current server evaluation time. Use the returned values as authoritative. In a 30-day workflow, put an otherwise causal but more-than-30-day-old master in `staleMasterCandidateIssueId`; never put it in `masterCandidateIssueId`. Then call the declared `triage-critic` subagent with only the returned evidence revision and instructions to review it. The critic has the same read-only investigation sources as this workflow, plus the prepared repository and investigation memory. It has no mutation surface.
 
@@ -195,8 +198,6 @@ Approval is valid only when the critic returns `APPROVE` and echoes the exact ev
 After each critic completion, call `read_triage_review_verdict` for that exact evidence revision. Only its server-attested verdict and opaque approval id control the gate; the child's returned object alone never does.
 
 Allow one full review. After materially addressing blocking findings, Foreman may create one new packet with `reviewAttempt: 2`, the first packet's exact `previousEvidenceRevision`, and `targetedRecheckCriteria` equal to the first attested verdict's complete failed-criterion set, then run one targeted recheck through the same `triage-critic` identity and reviewer model. If new evidence, a changed code SHA, changed blast-radius method, different master candidate, assigned project, or another material decision change invalidates a prior attempt-1 approval, use that same one remaining attempt with `targetedRecheckCriteria` set to all twelve critic criteria and perform a complete review. If the reviewer model changed, material disagreement remains, or approval is invalidated after attempt two, route to `needs-human`. Do not create a third attempt or fresh reviewer chain.
-
-If `incident-hotlane` returns `NEEDS_HUMAN_URGENT`, send only its provisional confirmation-in-progress escalation and route to a person. Stop before Step 5 finalization and every settled or structural write, including memory.
 
 Until the current revision is approved, do not publish a settled Bug conclusion, create or change a root-cause master, parent or re-parent the report, apply hotlane or materially escalate priority, send a confirmed incident notification, or write investigation memory. A private draft, an explicit unproven status, a request for evidence, or a human escalation remains allowed.
 
@@ -413,7 +414,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 # Triage investigation
 
 **Ticket**: <ENG-XXXX>
-**Classification**: <User Error | Platform Limitation | Bug>
+**Classification**: <User Error | Platform Limitation | Bug | Unproven>
 **Organization**: <organization_id> (<org name>)
 
 ## Claim

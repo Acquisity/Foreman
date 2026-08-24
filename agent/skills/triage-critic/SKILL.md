@@ -95,10 +95,12 @@ The runtime attests a completed `triage-critic` event server-side only when its 
 
 Without approval on the current evidence revision, do not:
 
+- create or structurally finalize a customer report as a Bug;
 - create a root-cause master;
 - parent or re-parent a customer report;
 - mark a hotlane fix or materially escalate priority;
 - send a confirmed multi-workspace or incident notification; or
+- record or correct the settled investigation in memory; or
 - publish a settled root-cause conclusion.
 
 Foreman may still save a private draft, record that the claim is unproven, ask for missing evidence, or route the case to a person.

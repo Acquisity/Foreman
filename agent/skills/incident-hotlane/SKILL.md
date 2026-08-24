@@ -32,6 +32,7 @@ Set `HOTLANE` immediately when current evidence confirms any of:
 - permissions, authentication, security, or privacy controls fail;
 - paid work is silently skipped or the product reports false success;
 - customers are actively charged or materially financially harmed incorrectly;
+- confirmed material revenue loss, uncontrolled provider-cost burn, or customer-trust harm requires immediate containment;
 - a high-frequency failure affects a core path; or
 - no safe workaround exists for a material customer outcome.
 
@@ -79,7 +80,7 @@ If immediate human attention is required before the critic can complete, send on
 Return:
 
 - `core_function`
-- `impact`: `BLOCKED | MATERIALLY_IMPAIRED | INCORRECT_RESULT | SILENTLY_SKIPPED | DATA_OR_SECURITY_RISK | MONEY_IMPACT | NON_CORE`
+- `impact`: `BLOCKED | MATERIALLY_IMPAIRED | INCORRECT_RESULT | SILENTLY_SKIPPED | DATA_OR_SECURITY_RISK | MONEY_IMPACT | MATERIAL_BUSINESS_HARM | NON_CORE`
 - `route`: `HOTLANE | STANDARD_ENGINEERING | NOT_ENGINEERING | NEEDS_HUMAN_URGENT`
 - `rationale`
 - `workaround_available`

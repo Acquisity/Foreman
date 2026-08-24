@@ -151,11 +151,14 @@ test("both intake routers share diagnosis and the bounded critic gate", () => {
 test("shared triage skills preserve the causal and impact contracts", () => {
   assert.ok(customerBugDiagnosisSkill.includes("PRODUCTION_FORENSICS"));
   assert.ok(customerBugDiagnosisSkill.includes("COULD_NOT_RUN"));
-  assert.ok(customerBugDiagnosisSkill.includes("regression_seam"));
+  assert.ok(customerBugDiagnosisSkill.includes("regressionSeam"));
+  assert.ok(customerBugDiagnosisSkill.includes("evidenceLedger"));
+  assert.ok(customerBugDiagnosisSkill.includes("inference"));
   assert.ok(triageCriticSkill.includes("same investigation reach"));
   assert.ok(triageCriticSkill.includes("at most one attempt-2 review"));
   assert.ok(triageCriticSkill.includes("all twelve criteria"));
   assert.ok(incidentHotlaneSkill.includes("even for one workspace"));
+  assert.ok(incidentHotlaneSkill.includes("MATERIAL_BUSINESS_HARM"));
   assert.ok(engineeringHandoffSkill.includes("Match by cause, not symptom"));
   assert.ok(engineeringHandoffSkill.includes("Read back"));
   assert.ok(engineeringHandoffSkill.includes("reserve_triage_master"));
@@ -188,6 +191,10 @@ test("unproven and urgent-human outcomes cannot enter structural Bug writes", ()
     assert.ok(
       skill.includes("provisional confirmation-in-progress escalation")
     );
+    assert.ok(
+      skill.indexOf("If it returns `NEEDS_HUMAN_URGENT`") <
+        skill.indexOf("create_triage_review_packet")
+    );
   }
 });
 
@@ -210,6 +217,16 @@ test("engineering handoff binds the final candidate set and idempotent relations
     engineeringHandoffSkill.includes("when that exact relation is absent")
   );
   assert.ok(engineeringHandoffSkill.includes("successful idempotent state"));
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "verifies that the exact source is parented to it"
+    )
+  );
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "apply the exact critic-approved priority and hotlane state"
+    )
+  );
 });
 
 test("engineering-handoff exclusively owns the structural write state machine", () => {
