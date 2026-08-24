@@ -37,7 +37,7 @@ Judge each criterion separately and cite the evidence used:
 5. Evidence integrity: no conclusion relies on truncated, incomplete, failed, unparsed, stale, cross-workspace, or customer-mismatched data.
 6. Impact measurement: confirmed impact is separate from potential exposure; the query or telemetry method actually measures the claimed population and includes a window and timestamp.
 7. Classification: `User Error`, `Platform Limitation`, `Bug`, or `Unproven` follows from current evidence.
-8. Core-function and hotlane decision: blocking or materially impairing a core workflow, data loss, security/privacy exposure, silently skipped paid work, or active money impact is hotlane even for one workspace. Report count alone never decides hotlane.
+8. Core-function and hotlane decision: blocking or materially impairing a core workflow, data loss, security/privacy exposure, silently skipped paid work, active money impact, or confirmed `MATERIAL_BUSINESS_HARM` from material revenue loss, uncontrolled provider-cost burn, or customer-trust harm is hotlane even for one workspace. Report count alone never decides hotlane.
 9. Master match: a proposed existing master owns the same causal root cause, not merely the same symptom, component, provider, or error string.
 10. Unblock safety: the proposed workaround is causally relevant and does not silently risk customer data, money, provider resources, or compliance.
 11. Privacy boundary: customer-specific evidence remains on the source ticket; the shared master receives aggregate and sanitized evidence only.
@@ -100,7 +100,7 @@ Without approval on the current evidence revision, do not:
 - parent or re-parent a customer report;
 - mark a hotlane fix or materially escalate priority;
 - send a confirmed multi-workspace or incident notification; or
-- record or correct the settled investigation in memory; or
+- record or correct a settled Bug investigation in memory; or
 - publish a settled root-cause conclusion.
 
 Foreman may still save a private draft, record that the claim is unproven, ask for missing evidence, or route the case to a person.

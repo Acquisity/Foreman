@@ -157,6 +157,10 @@ test("shared triage skills preserve the causal and impact contracts", () => {
   assert.ok(triageCriticSkill.includes("same investigation reach"));
   assert.ok(triageCriticSkill.includes("at most one attempt-2 review"));
   assert.ok(triageCriticSkill.includes("all twelve criteria"));
+  assert.ok(triageCriticSkill.includes("MATERIAL_BUSINESS_HARM"));
+  assert.ok(
+    triageCriticSkill.includes("a settled Bug investigation in memory")
+  );
   assert.ok(incidentHotlaneSkill.includes("even for one workspace"));
   assert.ok(incidentHotlaneSkill.includes("MATERIAL_BUSINESS_HARM"));
   assert.ok(engineeringHandoffSkill.includes("Match by cause, not symptom"));
@@ -227,6 +231,12 @@ test("engineering handoff binds the final candidate set and idempotent relations
       "apply the exact critic-approved priority and hotlane state"
     )
   );
+  assert.ok(
+    engineeringHandoffSkill.includes(
+      "Create it with the exact critic-approved priority and hotlane state"
+    )
+  );
+  assert.ok(engineeringHandoffSkill.includes("priority, hotlane state"));
 });
 
 test("engineering-handoff exclusively owns the structural write state machine", () => {
