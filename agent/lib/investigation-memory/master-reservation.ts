@@ -216,6 +216,8 @@ export const completeMasterReservation = async (
     `UPDATE triage_master_reservations
      SET master_issue_id = $1, master_created_at = $2, status = 'complete', updated_at = now()
      WHERE tenant_key = $3 AND id = $4 AND status = 'reserved'
+       AND $2::timestamptz >= updated_at - interval '5 minutes'
+       AND $2::timestamptz <= now() + interval '1 minute'
      RETURNING id`,
     [masterIssueId, masterCreatedAt, TENANT_KEY, reservationId]
   )) as Array<{ id: string }>;

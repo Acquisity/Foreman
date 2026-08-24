@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { z } from "zod";
-import completeReservation from "../../tools/complete_triage_master_reservation.js";
+import completeReservation, {
+  readLinearMasterCreatedAt,
+} from "../../tools/complete_triage_master_reservation.js";
 import reserveMaster, {
   publicReservationErrorMessage,
 } from "../../tools/reserve_triage_master.js";
@@ -345,7 +347,6 @@ describe("causal master reservation tools", () => {
     assert.ok(completeReservation.inputSchema instanceof z.ZodType);
     assert.equal(
       completeReservation.inputSchema.safeParse({
-        masterCreatedAt: "2026-08-24T12:00:00.000Z",
         masterIssueId: "ENG-123",
         reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
       }).success,
@@ -353,11 +354,84 @@ describe("causal master reservation tools", () => {
     );
     assert.equal(
       completeReservation.inputSchema.safeParse({
-        masterCreatedAt: "2026-08-24T12:00:00.000Z",
         masterIssueId: "not-linear",
         reservationId: "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
       }).success,
       false
     );
+  });
+
+  it("reads the master creation time from the exact Linear issue", async () => {
+    let authorization = "";
+    const createdAt = await readLinearMasterCreatedAt(
+      "linear-token",
+      "ENG-123",
+      (_input, init) => {
+        authorization = String(
+          (init?.headers as Record<string, string> | undefined)?.Authorization
+        );
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                issue: {
+                  createdAt: "2026-08-24T12:00:00.000Z",
+                  identifier: "ENG-123",
+                },
+              },
+            }),
+            { status: 200 }
+          )
+        );
+      }
+    );
+    assert.equal(createdAt, "2026-08-24T12:00:00.000Z");
+    assert.equal(authorization, "Bearer linear-token");
+  });
+
+  it("fails closed when Linear returns a different issue or an error", async () => {
+    const response = (body: unknown): Response =>
+      new Response(JSON.stringify(body), { status: 200 });
+    assert.equal(
+      await readLinearMasterCreatedAt("token", "ENG-123", () =>
+        Promise.resolve(
+          response({
+            data: {
+              issue: {
+                createdAt: "2026-08-24T12:00:00.000Z",
+                identifier: "ENG-999",
+              },
+            },
+          })
+        )
+      ),
+      null
+    );
+    assert.equal(
+      await readLinearMasterCreatedAt("token", "ENG-123", () =>
+        Promise.resolve(
+          response({ data: { issue: null }, errors: [{ message: "private" }] })
+        )
+      ),
+      null
+    );
+  });
+
+  it("anchors completion time to the active reservation generation", async () => {
+    let statement = "";
+    const database: ReservationDatabase = {
+      query(sql) {
+        statement = sql;
+        return Promise.resolve([]);
+      },
+    };
+    await completeMasterReservation(
+      "0ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+      "ENG-123",
+      "2026-08-24T12:00:00.000Z",
+      database
+    );
+    assert.ok(statement.includes("updated_at - interval '5 minutes'"));
+    assert.ok(statement.includes("now() + interval '1 minute'"));
   });
 });

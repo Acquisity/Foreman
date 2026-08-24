@@ -114,7 +114,7 @@ Immediately before writing:
 5. Only the caller that receives `acquired: true` may create exactly one master. Keep its `reservationId`.
 6. Parent the source report once and preserve existing valid labels as a union when the API replaces labels.
 7. Read back the master, source report, parent relation, labels, assignee, project, priority, and links.
-8. After a newly created master passes readback, call `complete_triage_master_reservation` with the reservation id, master issue id, and the master issue's verified `createdAt` timestamp. If completion is ambiguous, retain the created issue identifier and route the mismatch to a person. Never create another master.
+8. After a newly created master passes readback, call `complete_triage_master_reservation` with the reservation id and master issue id. The tool independently reads the issue's `createdAt` from Linear and binds it only when it is consistent with the active reservation. If completion is ambiguous, retain the created issue identifier and route the mismatch to a person. Never create another master.
 
 If readback disagrees with the intended write, stop and report the mismatch. Never create a second master as a recovery strategy.
 
