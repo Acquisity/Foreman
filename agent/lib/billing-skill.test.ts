@@ -8,15 +8,20 @@ const billingSkill = readFileSync(
 );
 
 test("billing triage reads the complete Linear issue contract", () => {
-  assert.ok(
-    billingSkill.includes(
-      "title, description, attachments, links, comments, labels, priority, project, assignee, requester, and relations"
-    )
-  );
-
   const issueRead = billingSkill.indexOf("2. Step 1 issue read:");
   const identityGate = billingSkill.indexOf("3. Identity gate:");
+  const stepOne = billingSkill.indexOf("## Step 1: Read the Linear issue");
+  const stepTwo = billingSkill.indexOf("## Never move money", stepOne);
 
   assert.ok(issueRead >= 0);
   assert.ok(identityGate > issueRead);
+  assert.ok(stepOne >= 0);
+  assert.ok(stepTwo > stepOne);
+
+  const issueReadSection = billingSkill.slice(stepOne, stepTwo);
+  assert.ok(
+    issueReadSection.includes(
+      "title, description, attachments, links, comments, labels, priority, project, assignee, requester, and relations"
+    )
+  );
 });
