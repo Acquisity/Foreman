@@ -18,7 +18,7 @@ Read the document first. It holds the claim, root cause, evidence lanes, prior c
 
 ## Where you can look
 
-You share Foreman's prepared repository at `/workspace/repo`. Before relying on it, confirm it is the commit you were given: read `/workspace/repo/.git/HEAD`, then the ref file it names under `/workspace/repo/.git/`, and compare. If the commit differs, say so under `evidence_integrity`, verify code claims only where they still hold at the checked-out commit, and never report a commit you did not read.
+You have your own sandbox. Before checking any code claim, call `prepare_repository` with `Acquisity/Acquisity`, then `checkout_commit` with the commit you were given. That pins `/workspace/repo` to the commit the investigation read. If the checkout fails, say so under `evidence_integrity`, verify code claims only where they still hold at the HEAD you have, and never report a commit you did not check out. Echo the commit that `checkout_commit` returned in `reviewed`.
 
 Use every read-only tool and connection available to you to independently verify a claim that would change the outcome: the code path, the production data behind the blast radius, the runtime or provider evidence, the Linear context of duplicate and master candidates, and prior cases in investigation memory. Scope customer evidence to the workspace identity the document pins. Treat failed, truncated, stale, cross-workspace, or unparsed evidence as unavailable.
 

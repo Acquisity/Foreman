@@ -1,12 +1,8 @@
-import { defineSandbox } from "eve/sandbox";
-
-// The critic reads the same prepared repository the investigation read, so it
-// shares the parent's live sandbox exactly like the reviewer does. A sharing
-// child may not declare its own skills/, which is why the whole procedure
-// lives in instructions.md.
-export default defineSandbox(({ parent }) => {
-  if (parent === null) {
-    throw new Error("critic must run as a child");
-  }
-  return parent.sandbox;
-});
+// The critic declares its own skill, and eve's sandbox registry refuses a
+// child that selects parent.sandbox while carrying managed workspace resources
+// (skills are one). So the critic gets its own sandbox instance from the same
+// definition as the root: same Vercel backend, same warm repository snapshot,
+// same safe.directory session hook. It prepares and pins the repository itself
+// with prepare_repository and checkout_commit.
+// biome-ignore lint/performance/noBarrelFile: eve discovers a child sandbox by path, so the root definition is mounted here rather than duplicated.
+export { default } from "../../sandbox.js";

@@ -72,6 +72,16 @@ describe("critic subagent", () => {
     }
   });
 
+  it("owns its sandbox because it declares a skill", () => {
+    // eve's sandbox registry refuses a child that selects parent.sandbox while
+    // carrying managed workspace resources, and a skill is one. Discovery and
+    // eve build both accept that combination; only the runtime graph rejects
+    // it, so the rule is checked here.
+    const sandbox = readFileSync(new URL("sandbox.ts", criticRoot), "utf8");
+    assert.ok(!sandbox.includes("parent.sandbox"));
+    assert.ok(sandbox.includes('from "../../sandbox.js"'));
+  });
+
   it("keeps the whole procedure in the child-local skill and loads it first", () => {
     assert.ok(
       !existsSync(new URL("../skills/triage-critic/", import.meta.url))
@@ -79,6 +89,7 @@ describe("critic subagent", () => {
     assert.ok(instructions.includes("Load the `triage-critic` skill before"));
     assert.ok(instructions.includes("If the skill fails to load"));
     assert.ok(skill.includes("There is no attempt 3"));
+    assert.ok(skill.includes("`checkout_commit`"));
   });
 
   it("disables every write-capable default tool", () => {
@@ -100,7 +111,7 @@ describe("critic subagent", () => {
     }
   });
 
-  it("is discovered by eve as a sharing child with its own skill", () => {
+  it("is discovered by eve with its own skill and sandbox", () => {
     // Real discovery, not a source-string check: PR #53 shipped a child whose
     // skill eve could not find because the test only looked at filenames.
     const info = JSON.parse(
