@@ -44,7 +44,7 @@ const stubEnv = (): NodeJS.ProcessEnv => {
 
 interface DiscoveredSubagent {
   manifest: {
-    connections: unknown[];
+    connections: { logicalPath: string }[];
     diagnosticsSummary: { errors: number };
     instructions: { definition: { content: string } }[];
     sandbox: { logicalPath: string } | null;
@@ -146,6 +146,12 @@ describe("critic subagent", () => {
       critic.manifest.instructions.some((entry) =>
         entry.definition.content.startsWith("# Critic")
       )
+    );
+    assert.deepEqual(
+      critic.manifest.connections.map((c) => c.logicalPath).sort(),
+      readdirSync(new URL("connections/", criticRoot))
+        .map((name) => `connections/${name}`)
+        .sort()
     );
     assert.deepEqual(
       critic.manifest.tools.map((tool) => tool.logicalPath).sort(),
