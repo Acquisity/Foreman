@@ -200,13 +200,21 @@ test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback
   );
   assert.ok(
     triageSkill.includes(
-      "When the request is explicitly read-only validation, still search memory"
+      "When Aaron explicitly requests read-only validation during an attended manual test"
     )
   );
   assert.ok(
     triageSkill.includes(
       "apply no Linear mutation and do not record investigation memory"
     )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "This is an operator instruction for that test, not a runtime authorization mode"
+    )
+  );
+  assert.ok(
+    triageSkill.includes("Do not require or invent a session marker for it")
   );
 });
 

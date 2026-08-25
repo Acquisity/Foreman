@@ -294,7 +294,7 @@ Now, and not before now, determine the owning product project from the confirmed
 
 If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the investigation document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
 
-When the request is explicitly read-only validation, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory.
+When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
 
 ### When the ticket is not engineering actionable
 
