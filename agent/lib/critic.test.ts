@@ -92,6 +92,7 @@ describe("critic subagent", () => {
     assert.ok(instructions.includes("If the skill fails to load"));
     assert.ok(skill.includes("There is no attempt 3"));
     assert.ok(skill.includes("`checkout_commit`"));
+    assert.ok(skill.includes("as the literal marker `read-only`"));
   });
 
   it("disables every write-capable default tool", () => {

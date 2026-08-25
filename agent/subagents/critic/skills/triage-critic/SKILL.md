@@ -14,7 +14,7 @@ The caller's message names:
 - Foreman's proposed decisions: classification, unblock, handling path, final state, priority, labels, the hotlane proposal, and any existing master candidate with the match rationale;
 - the attempt number, 1 or 2. On attempt 2, either the list of criteria that failed on attempt 1 or a note that a prior approval was invalidated by a material change.
 
-Read the document first. It holds the claim, root cause, evidence lanes, prior cases, blast radius, code path, unblock, and what was ruled out. Judge the original evidence recorded there, not Foreman's summary of it. If the document, its `updatedAt`, or any decision-changing section is missing, return `INSUFFICIENT_EVIDENCE` and name what is missing. Never fill a gap by trusting the proposal.
+Read the document first. It holds the claim, root cause, evidence lanes, prior cases, blast radius, code path, unblock, and what was ruled out. When the caller passes the document id and `updatedAt` as the literal marker `read-only`, the caller could not write to Linear: review the document text carried in the message as the document, do not look for a Linear document, and echo `read-only` for both fields in `reviewed`. Judge the original evidence recorded there, not Foreman's summary of it. If the document, its `updatedAt`, or any decision-changing section is missing, return `INSUFFICIENT_EVIDENCE` and name what is missing. Never fill a gap by trusting the proposal.
 
 ## Where you can look
 

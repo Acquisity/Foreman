@@ -435,9 +435,16 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "`Stopped: <verdict or failure>`",
     "Assign Aaron Fraga as the explicit human-routing fallback",
     "There is no attempt 3 and no fresh reviewer chain",
+    "as the literal marker `read-only`",
+    "Do not touch the document",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
+  assert.ok(
+    triageSkill.includes(
+      "After the handoff has read its writes back (or, for a non-actionable outcome, after the comment is posted), make one `patch`"
+    )
+  );
   assert.ok(
     triageSkill.includes(
       "Every decision above is provisional until the review below has approved the document"
