@@ -12,7 +12,7 @@ import { canUseInvestigationMemory } from "#lib/trust.js";
 export default defineTool({
   approval: investigationMemoryWritePolicy,
   description:
-    "Record one completed triage investigation as a sanitized case, after the Triage investigation document is attached and the classification is final. The product area comes from the ticket's Linear project, never from the symptom. Store the pattern, not the customer: no email addresses, organization or user ids, raw production rows, logs, or credentials. If a case already exists for this ticket and the conclusion has changed, use `correct_investigation_case` instead. A failure here never changes the verdict or holds the ticket.",
+    "Record one completed triage investigation as a sanitized case, after the Triage investigation document is attached, the classification is final, and final Linear handling has saved the evidence-backed product project. Re-read the issue and pass that resulting project id. Store the pattern, not the customer: no email addresses, organization or user ids, raw production rows, logs, or credentials. If a case already exists for this ticket and the conclusion has changed, use `correct_investigation_case` instead. A failure here never changes the verdict or holds the ticket.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {

@@ -3,12 +3,12 @@
  * filed under, and the Linear projects that resolve to them.
  *
  * @remarks
- * The ticket's Linear project is the only primary-feature authority. Nothing
- * here reads a symptom, a title, a repository, or an environment variable, and
- * the model never supplies a feature key that is not validated against this
- * table. A project that is not listed stays unscoped and fails closed, which
- * routes the ticket to Aaron Fraga under the existing triage policy rather
- * than guessing it into a bucket.
+ * The evidence-backed Linear project saved during final triage handling is the
+ * only primary-feature authority for a write. Nothing here reads a symptom, a
+ * title, a repository, or an environment variable, and the model never
+ * supplies a feature key that is not validated against this table. A project
+ * that is not listed stays unscoped and the case is not recorded. Retrieval
+ * never consults this mapping.
  *
  * Keys are stable identifiers, not display names. Renaming a product is a
  * change to `label` here, never to the key stored in a case row.
@@ -66,14 +66,13 @@ export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
 };
 
 /**
- * Product areas that an authorized Intercom intake may search before a Linear
- * issue exists.
+ * Product areas that every authorized attended triage surface searches.
  *
  * @remarks
  * This list is server-owned rather than model input. It deliberately includes
  * every live area and excludes planned areas such as Acquisity Agent. Keeping
  * the list derived from the lifecycle table makes a product launch the only
- * change needed to make its historical cases eligible for global intake
+ * change needed to make its historical cases eligible for global
  * recall.
  */
 export const LIVE_FEATURE_KEYS: readonly FeatureKey[] = Object.freeze(
@@ -88,8 +87,9 @@ export const LIVE_FEATURE_KEYS: readonly FeatureKey[] = Object.freeze(
  * projects (Onboarding Flow, Workflows, Public API, Acquisity Ingress, the AI
  * Ads projects, Whitelabel Partners) plausibly sit under one of these areas,
  * but assigning them would be the inference this design exists to prevent, so
- * they stay unmapped until someone decides where they belong. An unmapped project is not an error: the case is simply not
- * recorded, and triage proceeds exactly as it does today.
+ * they stay unmapped until someone decides where they belong. An unmapped final
+ * project is not an error: the case is simply not recorded, and the completed
+ * investigation stands.
  *
  * Ids are Linear project ids, which are stable across renames.
  */

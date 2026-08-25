@@ -2,7 +2,7 @@ import { defineEval } from "eve/evals";
 
 export default defineEval({
   description:
-    "Ordinary work never reaches investigation memory: it belongs to the triage path, after the claim and the ticket's Linear project are pinned.",
+    "Ordinary work never reaches investigation memory: it belongs to an authorized attended triage path after the claim is stated.",
   tags: ["fast", "needs-connect"],
   async test(t) {
     await t.send(

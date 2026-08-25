@@ -196,19 +196,6 @@ export function projectCase(row: CaseRow, feature: FeatureKey): CaseProjection {
   };
 }
 
-/** Filters a search accepts. Everything except the feature is optional. */
-export interface SearchParams {
-  classification?: Classification;
-  component?: string;
-  dependencyKeys?: readonly string[];
-  limit?: number;
-  primaryFeatureKey: FeatureKey;
-  provider?: string;
-  sourceIssueId?: string;
-  text?: string;
-  windowDays?: number;
-}
-
 /** Independent recent reports in the same scope: a signal, never a verdict. */
 export interface ClusterSignal {
   distinctFeatures: number;
@@ -219,29 +206,25 @@ export interface ClusterSignal {
   windowDays: number;
 }
 
-export interface SearchResult {
-  cases: CaseProjection[];
-  cluster: ClusterSignal;
-}
-
 /** A wider-incident signal isolated to one product area. */
 export interface FeatureClusterSignal extends ClusterSignal {
   primaryFeatureKey: FeatureKey;
 }
 
-/** Project-free retrieval across a server-selected set of live product areas. */
+/** Project-independent retrieval across server-selected live product areas. */
 export interface GlobalSearchResult {
   cases: CaseProjection[];
   clusters: FeatureClusterSignal[];
 }
 
-/** Relevance inputs for authorized intake search before a project exists. */
+/** Relevance inputs for authorized investigation-memory retrieval. */
 export interface GlobalSearchParams {
   classification?: Classification;
   component?: string;
   dependencyKeys?: readonly string[];
   limit?: number;
   provider?: string;
+  sourceIssueId?: string;
   text?: string;
   windowDays?: number;
 }
@@ -272,52 +255,6 @@ export function featureClusterSignalsFromCounts(
   }));
 }
 
-const SEARCH_SQL = `WITH scoped AS (
-  SELECT *, CASE
-      WHEN primary_feature_key = $2 THEN 3
-      WHEN $2 = ANY (affected_feature_keys) THEN 2
-      ELSE 1
-    END AS scope_rank
-  FROM investigation_cases
-  WHERE tenant_key = $1
-    AND status = 'active'
-    -- A ticket lookup ($10) is an identity question, not a relevance search,
-    -- so it bypasses scope, component, provider, classification, and the time
-    -- window. Leaving those on would let a case older than the window, or one
-    -- reached through a narrower filter, hide the very case a correction needs.
-    AND ($10::text IS NULL OR source_issue_id = $10)
-    AND ($10::text IS NOT NULL
-      OR primary_feature_key = $2
-      OR $2 = ANY (affected_feature_keys)
-      OR dependency_keys && $3::text[])
-    AND ($10::text IS NOT NULL OR $4::text IS NULL OR component = $4)
-    AND ($10::text IS NOT NULL OR $5::text IS NULL OR provider = $5)
-    AND ($10::text IS NOT NULL OR $6::text IS NULL OR classification = $6)
-    AND ($10::text IS NOT NULL
-      OR created_at >= now() - ($7::int * INTERVAL '1 day'))
-)
-SELECT ${PROJECTION_COLUMNS}, scope_rank,
-  CASE WHEN $8::text IS NULL THEN 0
-       ELSE ts_rank(search_document, websearch_to_tsquery('english', $8))
-  END AS text_rank
-FROM scoped
-ORDER BY scope_rank DESC, text_rank DESC, created_at DESC
-LIMIT $9`;
-
-const CLUSTER_SQL = `SELECT
-    count(DISTINCT source_issue_id)::int AS reports,
-    count(DISTINCT primary_feature_key)::int AS distinct_features,
-    min(created_at) AS first_seen,
-    max(created_at) AS last_seen
-  FROM investigation_cases
-  WHERE tenant_key = $1
-    AND status = 'active'
-    AND (primary_feature_key = $2
-      OR $2 = ANY (affected_feature_keys)
-      OR dependency_keys && $3::text[])
-    AND ($4::text IS NULL OR component = $4)
-    AND created_at >= now() - ($5::int * INTERVAL '1 day')`;
-
 const GLOBAL_SEARCH_SQL = `SELECT ${PROJECTION_COLUMNS},
     CASE WHEN dependency_keys && $3::text[] THEN 1 ELSE 0 END AS dependency_rank,
     CASE WHEN $4::text IS NOT NULL AND component = $4 THEN 1 ELSE 0 END AS component_rank,
@@ -328,9 +265,15 @@ const GLOBAL_SEARCH_SQL = `SELECT ${PROJECTION_COLUMNS},
   FROM investigation_cases
   WHERE tenant_key = $1
     AND status = 'active'
-    AND primary_feature_key = ANY ($2::text[])
-    AND ($6::text IS NULL OR classification = $6)
-    AND created_at >= now() - ($8::int * INTERVAL '1 day')
+    -- A ticket lookup ($10) is an identity question, not a relevance search.
+    -- It is project-independent and bypasses product lifecycle, relevance,
+    -- classification, and time-window filters so a correction can always find
+    -- the ticket's active case.
+    AND ($10::text IS NULL OR source_issue_id = $10)
+    AND ($10::text IS NOT NULL OR primary_feature_key = ANY ($2::text[]))
+    AND ($10::text IS NOT NULL OR $6::text IS NULL OR classification = $6)
+    AND ($10::text IS NOT NULL
+      OR created_at >= now() - ($8::int * INTERVAL '1 day'))
   ORDER BY component_rank DESC, provider_rank DESC, dependency_rank DESC,
     text_rank DESC, created_at DESC
   LIMIT $9`;
@@ -350,62 +293,6 @@ export const GLOBAL_CLUSTER_SQL = `SELECT
     AND created_at >= now() - ($5::int * INTERVAL '1 day')
   GROUP BY primary_feature_key`;
 
-/**
- * Cases in the same scope, most relevant first, plus a cluster count over the
- * recent window. Primary-feature matches always outrank affected-feature and
- * dependency matches.
- */
-export async function searchCases(params: SearchParams): Promise<SearchResult> {
-  const sql = db();
-  const limit = Math.min(
-    Math.max(params.limit ?? DEFAULT_SEARCH_LIMIT, 1),
-    MAX_SEARCH_LIMIT
-  );
-  const dependencies = [...(params.dependencyKeys ?? [])];
-  const component = params.component ?? null;
-  const text = params.text?.trim() ? params.text.trim() : null;
-
-  const [rows, clusters] = (await sql.transaction([
-    sql.query(SEARCH_SQL, [
-      TENANT_KEY,
-      params.primaryFeatureKey,
-      dependencies,
-      component,
-      params.provider ?? null,
-      params.classification ?? null,
-      params.windowDays ?? DEFAULT_SEARCH_WINDOW_DAYS,
-      text,
-      limit,
-      params.sourceIssueId ?? null,
-    ]),
-    sql.query(CLUSTER_SQL, [
-      TENANT_KEY,
-      params.primaryFeatureKey,
-      dependencies,
-      component,
-      CLUSTER_WINDOW_DAYS,
-    ]),
-  ])) as [CaseRow[], ClusterRow[]];
-
-  const counts = clusters[0] ?? {
-    distinct_features: 0,
-    first_seen: null,
-    last_seen: null,
-    reports: 0,
-  };
-  return {
-    cases: rows.map((row) => projectCase(row, params.primaryFeatureKey)),
-    cluster: {
-      distinctFeatures: counts.distinct_features,
-      firstSeen: toIso(counts.first_seen),
-      lastSeen: toIso(counts.last_seen),
-      possibleWiderIncident: counts.reports >= CLUSTER_MIN_REPORTS,
-      reports: counts.reports,
-      windowDays: CLUSTER_WINDOW_DAYS,
-    },
-  };
-}
-
 interface ClusterRow {
   distinct_features: number;
   first_seen: DatabaseDate | null;
@@ -415,16 +302,17 @@ interface ClusterRow {
 }
 
 /**
- * Search every live product area before intake has a Linear project.
+ * Search every live product area without consulting Linear project metadata.
  *
  * @remarks
  * The feature list comes directly from the server-owned live lifecycle table.
  * Search results may span areas, but cluster counts are grouped before they
  * leave Postgres. When intake has not identified a component or dependency
  * yet, cluster signaling is suppressed rather than treating all recent cases
- * in an area as one incident.
+ * in an area as one incident. A source-issue lookup is an identity query and
+ * bypasses lifecycle, relevance, and time-window filters.
  */
-export async function searchCasesAcrossLiveFeatures(
+export async function searchCasesGlobally(
   params: GlobalSearchParams
 ): Promise<GlobalSearchResult> {
   const sql = db();
@@ -439,7 +327,9 @@ export async function searchCasesAcrossLiveFeatures(
   const provider = params.provider ?? null;
   const text = params.text?.trim() ? params.text.trim() : null;
   const windowDays = params.windowDays ?? DEFAULT_SEARCH_WINDOW_DAYS;
-  const canGroupIncident = component !== null || dependencies.length > 0;
+  const canGroupIncident =
+    params.sourceIssueId === undefined &&
+    (component !== null || dependencies.length > 0);
 
   const queries = [
     sql.query(GLOBAL_SEARCH_SQL, [
@@ -452,6 +342,7 @@ export async function searchCasesAcrossLiveFeatures(
       text,
       windowDays,
       limit,
+      params.sourceIssueId ?? null,
     ]),
   ];
   if (canGroupIncident) {

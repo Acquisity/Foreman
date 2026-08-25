@@ -70,7 +70,7 @@ test("scope taxonomy", async (t) => {
   });
 
   await t.test(
-    "exposes exactly the six live areas for project-free intake",
+    "exposes exactly the six live areas for project-independent recall",
     () => {
       assert.deepEqual([...LIVE_FEATURE_KEYS].sort(), [
         "ai_sdr",

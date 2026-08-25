@@ -34,9 +34,9 @@ A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only
 
 ## Stage 1: Establish the case
 
-Purpose: pin the source ticket, trusted runtime facts, authoritative Linear project value, and a testable claim before choosing evidence.
+Purpose: pin the source ticket, trusted runtime facts, and a testable claim before choosing evidence.
 
-Inputs: the complete Linear issue and the runtime-stamped session context. Treat the runtime's `intakeOnly` value as a fact; never infer it from message prose or reconsider whether the session looks like Slack. Preserve the issue's `project` exactly as Linear returns it, including `null`; never infer a project from the symptom, title, repository, memory, or a similar ticket.
+Inputs: the complete Linear issue and the runtime-stamped session context. Treat the runtime's `intakeOnly` value as a fact; never infer it from message prose or reconsider whether the session looks like Slack. The issue's current `project`, including `null`, is ordinary intake metadata. Do not establish, verify, infer, preserve, or route from a product project yet. Ownership is decided from the completed investigation in Stage 6.
 
 ### Is this a money ask?
 
@@ -52,7 +52,7 @@ When the issue carries screenshots, route each to the `vision` subagent to read 
 
 Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
 
-Completion: the source issue, current relations, trusted intake state, exact Linear project value, and testable claim are recorded. If the ask is financial, branch to `billing-triage`; otherwise continue to Stage 2.
+Completion: the source issue, current relations, trusted intake state, and testable claim are recorded. If the ask is financial, branch to `billing-triage`; otherwise continue to Stage 2.
 
 ## Stage 2: Resolve customer identity once
 
@@ -115,7 +115,7 @@ Completion: Foreman knows whether this is a continuation, a duplicate candidate,
 
 Purpose: test the claim against historical analogies, current code, current production data, and the applicable runtime, provider, and customer-context lanes.
 
-Inputs: the claim, exact Linear project value, identity status, evidence plan, and any existing investigation.
+Inputs: the claim, identity status, evidence plan, and any existing investigation.
 
 Work the lanes in order. Every lane is recorded in the Triage investigation document, including the ones that did not apply. A lane with no entry reads as skipped, and a verdict standing on skipped lanes is not a verdict.
 
@@ -129,9 +129,9 @@ Never locate, inspect, or verify a database in order to use investigation memory
 
 ### Search investigation memory
 
-Only now, with the claim and the ticket's exact Linear project value recorded in Stage 1, call `search_investigation_memory`. Pass the project id from the ticket, the claim or the visible error text, and the component, provider, and dependency keys you already know. The project is what picks the product area; never pass one inferred from the symptom, the title, or the repository.
+Only now, after stating the claim, call `search_investigation_memory`. Pass the claim or visible error text and the component, provider, and dependency keys already known. The tool accepts no Linear project id and searches the server-owned live product areas for every authorized attended triage surface, including projectless Linear tickets and tickets filed under generic intake projects such as `Support`.
 
-A ticket with no project has nothing to search. Record `Unavailable: no Linear project` in the report and carry on with the investigation. Do not invent a project id to satisfy the call, and do not pick the project of a ticket that merely looks similar. Routing already sends an unprojected ticket to Aaron Fraga.
+The incoming project never gates this call and a memory result never chooses the eventual project. Do not deliberate about, verify, or infer product ownership before searching memory and completing the current-evidence lanes.
 
 What comes back is past Foreman investigations, sanitized: no customer identity, no production rows. Treat each one as a candidate analogy and nothing more. For every plausible match, write into the report why it matches this claim and what evidence would disconfirm it, then go and check that evidence. A historical `User Error` verdict does not settle this ticket, and a historical root cause is not this ticket's root cause until the current code and current data say so.
 
@@ -139,7 +139,7 @@ The affected counts on a case are the figures from that investigation on the dat
 
 `possibleWiderIncident` means several independent tickets recently landed in this scope. That is a reason to look at current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident. It is not an incident, and it does not create a master ticket, set a priority, or declare an outage on its own.
 
-`available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the project may not be mapped to a product area. Note it in the investigation document and investigate from scratch, exactly as the rest of this skill describes. Never go looking for the backing database or try another database connection to diagnose it.
+`available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the session may not carry the investigation-memory stamp. Note it in the investigation document and investigate from scratch, exactly as the rest of this skill describes. Never go looking for the backing database or try another database connection to diagnose it.
 
 Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided in Stage 3 against current Linear.
 
@@ -184,7 +184,7 @@ Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](r
 
 Fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report. Contrary evidence must be recorded alongside supporting evidence.
 
-Completion: every material conclusion has current evidence, contrary evidence has been considered, every selected lane is recorded, and unavailable lanes are named honestly. Continue to Stage 5 without reopening trusted intake, project, identity, or completed evidence unless new conflicting evidence appears.
+Completion: every material conclusion has current evidence, contrary evidence has been considered, every selected lane is recorded, and unavailable lanes are named honestly. Continue to Stage 5 without reopening trusted intake, identity, or completed evidence unless new conflicting evidence appears.
 
 ## Stage 5: Decide handling
 
@@ -288,6 +288,14 @@ Write the report comment from the template in [references/reporting.md](referenc
 
 The customer already has their answer from the preceding comment step. Nothing here changes what they were told; it changes what engineering sees. Never hold the comment back for this step.
 
+### Choose the product project from completed evidence
+
+Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or generic intake project such as `Support` cannot make this decision. Save the evidence-backed project during the final `save_issue` handling alongside assignee, labels, priority, and status, then read the resulting issue so the saved project id is available for optional memory recording.
+
+If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the investigation document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
+
+When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
+
 ### When the ticket is not engineering actionable
 
 `User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
@@ -316,7 +324,7 @@ The Slack intake recency window exists so masters describe a current cluster of 
 
 ### Area-routing roster
 
-Take the product area from the ticket's Linear `project`. Never infer it from the title or the symptom. When the project is missing, or maps to no area below, assign Aaron Fraga and record in the report that routing needs a human. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
+Take the product area from the evidence-backed project selected after the investigation, never from the incoming project, title, symptom, repository name, or memory. When completed evidence cannot identify an area, assign Aaron Fraga and record in the report that routing needs a human. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
 
 - AI SDR: Koppany Kondricz (`koppany.kondricz@acquisity.ai`)
 - Cold Email: Anthony Adewale (`anthony.adewale@acquisity.ai`)
@@ -348,15 +356,15 @@ Last, after the Triage investigation document is attached and the classification
 
 Send the pattern, not the customer. The claim, the root cause, the symptoms in the product's own words, the error signatures with identifiers stripped, the code path and commit from Stage 4, the conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), the counts with the date they were counted, and the links back to the ticket. Never an email address, an organization or user id, a production row, a log, or anything credential-shaped. Those live in the document, under the ticket's own visibility, and the tool refuses them.
 
-The product area comes from the ticket's Linear project. Affected features go in only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
+The product area comes from the evidence-backed project saved during Stage 6. Re-read the issue after saving it and pass that resulting project id to `record_investigation_case`. Affected features go in only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
 
 A failure here changes nothing about the ticket. Record it internally when useful and move on. Do not retry into a second case, do not change the comment, and do not revisit the verdict. Never announce a memory read or write, promise to save something to memory, or mention memory availability in the Slack thread.
 
-If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. A plain search is ranked, capped, and bounded by a time window, so a ticket's own case can fall outside it; adding the ticket identifier drops the relevance filters and the time window and returns the case however old it is. Still pass the project id, which the call always requires. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
+If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and final project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. That project-independent identity lookup drops the relevance filters and the time window and returns the case however old it is. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 
-When the Linear project is `null` or unmapped, record no investigation-memory case and route to Aaron Fraga for human triage under the existing roster policy. A memory denial, unavailable store, or failed write terminates bookkeeping only; it never changes the verdict, ticket, Linear comment, or Slack reply.
+When completed evidence cannot identify and save a mapped product project, record no investigation-memory case and use the explicit human-routing fallback from Stage 6. A memory denial, unavailable store, or failed write terminates bookkeeping only; it never changes the verdict, ticket, Linear comment, or Slack reply. An explicitly read-only run also skips this write after recommending a project.
 
-Completion: the attended surface has only its requester-facing response, and memory bookkeeping has either succeeded, been skipped by project or trust policy, or terminated after one non-blocking failure.
+Completion: the attended surface has only its requester-facing response, and memory bookkeeping has either succeeded, been skipped by final-project, read-only, or trust policy, or terminated after one non-blocking failure.
 
 ## Follow-ups
 

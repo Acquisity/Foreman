@@ -133,7 +133,7 @@ test("retrieval bounds", async (t) => {
     assert.equal(CLUSTER_MIN_REPORTS, 3);
   });
 
-  await t.test("keeps project-free incident signals isolated per area", () => {
+  await t.test("keeps global incident signals isolated per area", () => {
     assert.ok(GLOBAL_CLUSTER_SQL.includes("count(DISTINCT source_issue_id)"));
     assert.ok(GLOBAL_CLUSTER_SQL.includes("GROUP BY primary_feature_key"));
 
