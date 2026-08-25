@@ -2,8 +2,9 @@ import { defineAgent, defineDynamic } from "eve";
 import { resolveModel } from "../../lib/models.js";
 
 /**
- * The twelve review criteria, in the order the critic judges them. Every
- * verdict carries exactly one result per slug.
+ * The twelve review criteria, in the order the critic judges them. A review
+ * that ran carries exactly one result per slug; a review that could not start
+ * carries none and is always INSUFFICIENT_EVIDENCE.
  */
 export const CRITIC_CRITERIA = [
   "claim_fidelity",
