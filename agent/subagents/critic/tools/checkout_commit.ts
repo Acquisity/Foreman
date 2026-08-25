@@ -33,6 +33,17 @@ export default defineTool({
     const sha = commit.toLowerCase();
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
+    // Already pinned: a repeated call must not fight git's index.lock.
+    const current = await sandbox.run({
+      command: `git -C '${prepared.worktree}' rev-parse HEAD`,
+    });
+    if (current.exitCode === 0 && String(current.stdout).trim() === sha) {
+      return {
+        commit: sha,
+        success: true as const,
+        worktree: prepared.worktree,
+      };
+    }
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
