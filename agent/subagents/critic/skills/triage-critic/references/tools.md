@@ -10,7 +10,7 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 
 ## Production data (root tool)
 
-`planetscale_execute_read_query`, bare. Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. The `planetscale__` connection also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
+`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` does not exist. The `planetscale__` connection also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
 
 ## Investigation memory (root tool)
 
@@ -35,9 +35,22 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 | Autumn provisioning | `autumn__` | user | root allowlist, reads only |
 | Stripe billing | `stripe__` | user | root allowlist, reads only |
 
+## Call notes for the connections
+
+- Linear: the Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`; passing the name `"Engineering"` to `list_issues` returns nothing silently. Page with `limit: 250` and the cursor until exhausted.
+- Intercom: pass an Intercom URL straight to `fetch`. Free-text search is `search` with a DSL query such as `object_type:conversations q:"campaign stopped sending"`; `search_conversations` filters structured fields only. `search` returns prefixed ids (`contact_<uuid>`) and `contact_ids` wants them raw.
+- Inngest: start from the function named in the code path, then `get_run_trace` on a failing run.
+- Sentry: `get_issue_details` returns the stacktrace for one issue id; the natural-language search tools can be unavailable while the rest works.
+- Axiom: `queryDataset` takes APL (`Dataset | where ... | summarize ...`); call `listDatasets` and `getDatasetFields` first for real names. Metrics go through `queryMetrics`, not APL.
+- PostHog: one `exec` tool; the `command` parameter's own description carries the syntax. Resolve a person through `persons` before reading recordings.
+- Resend: tool names are kebab-case (`list-emails`, not `list_emails`).
+- Jam: only useful when the ticket carries a Jam link; `getConsoleLogs` and `getNetworkRequests` beat the video.
+- Vercel: query around the time the claim names; check `list_deployments` for a deployment just before the reported window.
+- Neon: only when the code path actually uses a Neon database. Never customer data, never memory.
+
 ## Billing and Instantly (root tools)
 
-`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. They keep their root authorization: available on attended triage surfaces, and the billing pair only on a billing or Intercom route. `available: false` is an evidence gap, not a reason to retry.
+`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They keep their root authorization: available on attended triage surfaces, and the billing pair only on a billing or Intercom route. `available: false` is an evidence gap, not a reason to retry.
 
 ## Screenshots (root tool)
 
