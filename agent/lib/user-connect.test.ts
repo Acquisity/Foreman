@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { userConnect } from "./user-connect.js";
+import {
+  ConnectionAuthorizationRequiredError,
+  isConnectionAuthorizationFailedError,
+} from "eve/connections";
+import {
+  TASK_MODE_SIGN_IN_REASON,
+  userConnect,
+  withoutConsent,
+} from "./user-connect.js";
 
 test("userConnect uses an existing connector without managed reprovisioning", async () => {
   const originalFetch = globalThis.fetch;
@@ -31,4 +39,45 @@ test("userConnect uses an existing connector without managed reprovisioning", as
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("withoutConsent turns a sign-in prompt into a terminal failure", async () => {
+  const inner = userConnect({
+    connectOptions: { vercelToken: "test-oidc-token" },
+    connector: "sentry/test",
+  });
+  const auth = withoutConsent({
+    ...inner,
+    getToken: () =>
+      Promise.reject(new ConnectionAuthorizationRequiredError("sentry")),
+  });
+  assert.equal((auth as { evict?: unknown }).evict, inner.evict);
+  assert.equal(auth.principalType, inner.principalType);
+  await assert.rejects(
+    auth.getToken({
+      connection: { url: "https://mcp.sentry.dev/mcp" },
+      principal: { id: "slack:workspace:user", type: "user" },
+    } as Parameters<typeof auth.getToken>[0]),
+    (error: unknown) =>
+      isConnectionAuthorizationFailedError(error) &&
+      error.reason === TASK_MODE_SIGN_IN_REASON &&
+      error.retryable === false
+  );
+});
+
+test("withoutConsent passes a resolved token through untouched", async () => {
+  const inner = userConnect({
+    connectOptions: { vercelToken: "test-oidc-token" },
+    connector: "sentry/test",
+  });
+  const auth = withoutConsent({
+    ...inner,
+    getToken: () =>
+      Promise.resolve({ expiresAt: Date.now() + 60_000, token: "t" }),
+  });
+  const result = await auth.getToken({
+    connection: { url: "https://mcp.sentry.dev/mcp" },
+    principal: { id: "slack:workspace:user", type: "user" },
+  } as Parameters<typeof auth.getToken>[0]);
+  assert.equal(result.token, "t");
 });

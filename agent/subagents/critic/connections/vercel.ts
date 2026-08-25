@@ -1,5 +1,6 @@
 import { defineMcpClientConnection } from "eve/connections";
 import vercel from "../../../connections/vercel.js";
+import { withoutConsent } from "../../../lib/user-connect.js";
 
 /**
  * Tools on the root Vercel allowlist that mutate state. The critic gets the
@@ -19,6 +20,7 @@ const rootAllow =
 
 export default defineMcpClientConnection({
   ...vercel,
+  auth: withoutConsent(vercel.auth),
   description:
     "Vercel, read-only: deployments, build and runtime logs, runtime errors, analytics, and toolbar threads. No deploys or replies.",
   tools: {

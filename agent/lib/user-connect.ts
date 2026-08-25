@@ -1,5 +1,6 @@
 import type { EveAuthorizationOptions } from "@vercel/connect/eve";
 import {
+  type ConnectionAuthDefinition,
   ConnectionAuthorizationFailedError,
   type ConnectionPrincipal,
   type InteractiveAuthorizationDefinition,
@@ -14,6 +15,12 @@ import { INTAKE_ONLY_ATTRIBUTE } from "./trust.js";
  * `authorization.completed`, so it is the string to grep for in logs.
  */
 export const INTAKE_ONLY_SIGN_IN_REASON = "intake_only_sign_in_unavailable";
+
+/**
+ * Reason code carried by the denial a task-mode child gets instead of a
+ * sign-in prompt, whatever session it runs under.
+ */
+export const TASK_MODE_SIGN_IN_REASON = "task_mode_sign_in_unavailable";
 
 /**
  * Translates a user-scoped connection's "authorization required" signal into a
@@ -87,4 +94,65 @@ export function userConnect(
     },
   };
   return wrapped;
+}
+
+/**
+ * The same authorization, with every sign-in prompt turned into a terminal
+ * failure.
+ *
+ * @remarks
+ * For a user-scoped connection mounted in a task-mode child such as the
+ * critic. A child cannot park on a consent flow: nothing can answer it, so
+ * the runtime waits until the parent cancels. The grant either already exists
+ * for the session's principal, or the source is unavailable for this review.
+ * The wrapped definition keeps the root's `evict`, `principalType`, and
+ * Connect configuration, so the credential path is unchanged; only the
+ * "authorization required" signal is translated, and it is stamped
+ * `retryable: false` so the runtime does not re-prompt.
+ */
+export function withoutConsent(
+  auth: ConnectionAuthDefinition | undefined
+): InteractiveAuthorizationDefinition {
+  if (
+    typeof auth !== "object" ||
+    auth === null ||
+    !("getToken" in auth) ||
+    typeof auth.getToken !== "function" ||
+    auth.principalType !== "user"
+  ) {
+    throw new Error(
+      "withoutConsent wraps a user-scoped interactive Connect authorization; nothing else needs it."
+    );
+  }
+  const inner = auth as InteractiveAuthorizationDefinition;
+  return {
+    ...inner,
+    getToken: async (
+      opts: Parameters<InteractiveAuthorizationDefinition["getToken"]>[0]
+    ) => {
+      try {
+        return await inner.getToken(opts);
+      } catch (error) {
+        throw taskModeSignInDenial(error) ?? error;
+      }
+    },
+  };
+}
+
+/**
+ * Translates "authorization required" into the task-mode denial, or returns
+ * undefined so the caller rethrows anything else unchanged.
+ */
+function taskModeSignInDenial(
+  error: unknown
+): ConnectionAuthorizationFailedError | undefined {
+  if (!isConnectionAuthorizationRequiredError(error)) {
+    return;
+  }
+  return new ConnectionAuthorizationFailedError(error.connectionName, {
+    message:
+      "This evidence source is not authorized for this review. Record it as unavailable once, decide whether the missing evidence is material, and continue without retrying it.",
+    reason: TASK_MODE_SIGN_IN_REASON,
+    retryable: false,
+  });
 }

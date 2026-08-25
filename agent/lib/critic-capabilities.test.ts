@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 // here is contacted; the values only have to exist.
 const ENV_ASSIGNMENT = /^([A-Z][A-Z0-9_]*)=/u;
 const TS_EXTENSION = /\.ts$/u;
+const WITHOUT_CONSENT = /withoutConsent\(/u;
 for (const line of readFileSync(
   new URL("../../.env.example", import.meta.url),
   "utf8"
@@ -153,11 +154,21 @@ describe("critic evidence surface", () => {
     // same managedConnect / userConnect, same autoProvision: false.
     for (const { child, name, root } of pairs) {
       assert.ok(root.auth?.getToken, `${name}: root has auth`);
-      assert.equal(
-        child.auth?.getToken,
-        root.auth.getToken,
-        `${name}: getToken`
-      );
+      if (root.auth.principalType === "app") {
+        assert.equal(
+          child.auth?.getToken,
+          root.auth.getToken,
+          `${name}: getToken`
+        );
+      } else {
+        // A task-mode child never parks on consent: user-scoped getToken is
+        // wrapped by withoutConsent, and that wrapper is the only difference.
+        const source = readFileSync(
+          new URL(`connections/${name}.ts`, criticRoot),
+          "utf8"
+        );
+        assert.match(source, WITHOUT_CONSENT, `${name}: must never park`);
+      }
       assert.equal(child.auth?.evict, root.auth.evict, `${name}: evict`);
       assert.equal(child.auth?.principalType, root.auth.principalType, name);
       assert.deepEqual(

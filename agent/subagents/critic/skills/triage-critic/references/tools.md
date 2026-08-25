@@ -45,4 +45,4 @@ Connection tools are called as `<connection>__<tool>`. Root tools are called by 
 
 ## Unavailable sources
 
-A user-scoped connection can fail with `principal_required` when the session runs under a service principal, which is normal for Slack intake. A managed connection can fail on operator configuration. Either way: record the lane as unavailable once, decide whether the missing evidence is material, and never ask for authorization, retry the same source, or substitute another for it.
+A user-scoped connection fails with `principal_required` under a service principal, which is normal for Slack intake, and with `task_mode_sign_in_unavailable` when the session's user has not authorized it. You are never shown a sign-in link and never wait for one. A managed connection can fail on operator configuration. Either way: record the lane as unavailable once, decide whether the missing evidence is material, and never ask for authorization, retry the same source, or substitute another for it.

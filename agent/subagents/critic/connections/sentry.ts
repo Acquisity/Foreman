@@ -1,5 +1,6 @@
 import { defineMcpClientConnection } from "eve/connections";
 import sentry from "../../../connections/sentry.js";
+import { withoutConsent } from "../../../lib/user-connect.js";
 
 /**
  * The critic's Sentry surface: reads only.
@@ -22,6 +23,7 @@ export const SENTRY_CRITIC_READ_TOOLS = [
 
 export default defineMcpClientConnection({
   ...sentry,
+  auth: withoutConsent(sentry.auth),
   description:
     "Sentry, read-only: organizations, projects, issues, issue details, and event search. No issue or project writes.",
   tools: { allow: [...SENTRY_CRITIC_READ_TOOLS] },
