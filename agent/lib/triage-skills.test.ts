@@ -162,7 +162,9 @@ test("shared triage stops unproven claims before classification or routing", () 
     )
   );
   assert.ok(
-    triageSkill.includes("Before stopping, run `Find the unblock` below")
+    triageSkill.includes(
+      "Before stopping, record any safe unblock supported by the completed evidence"
+    )
   );
   assert.ok(
     triageSkill.includes(
