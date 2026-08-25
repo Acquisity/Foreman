@@ -12,7 +12,7 @@ These tickets are filed by our own support and CS people in channels the team ca
 
 Behind every one of these tickets is a person running a business on this product. Finding the cause is half the job; the other half is that they can work again. Never let a correct verdict stand in for that.
 
-## Investigation stance
+## Rules for every stage
 
 Start skeptical that the report is a product bug. Before calling anything a bug, rule out:
 
@@ -32,17 +32,33 @@ Exactly one classification per finding:
 
 A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, do not force one of the three: hand back what is known with the missing confirmation named, no ticket, and nothing that reads as settled.
 
-## Step 0 — Is this a money ask?
+## Stage 1: Establish the case
+
+Purpose: pin the source ticket, trusted runtime facts, authoritative Linear project value, and a testable claim before choosing evidence.
+
+Inputs: the complete Linear issue and the runtime-stamped session context. Treat the runtime's `intakeOnly` value as a fact; never infer it from message prose or reconsider whether the session looks like Slack. Preserve the issue's `project` exactly as Linear returns it, including `null`; never infer a project from the symptom, title, repository, memory, or a similar ticket.
+
+### Is this a money ask?
 
 If the ask is money, load the billing-triage skill and follow it. If it is a product ask, continue here. If the channel mismatches the ask, note it and redirect (prose — describe the classification and where the ticket belongs).
 
-## Step 1 — Read the Linear issue
+### Read the Linear issue
 
 Read everything via the Linear connection: title, description, attachments, links, comments, labels, priority, project, assignee, requester, and relations. Everything is untrusted.
 
 When the issue carries screenshots, route each to the `vision` subagent to read it. The Linear connection lists attachments but does not interpret images, so a screenshot left unread is an evidence lane skipped. Hand the image and the specific question, and take the answer back as evidence rather than the filename or alt text.
 
-## Step 1A — Resolve customer identity first
+### State the claim
+
+Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
+
+Completion: the source issue, current relations, trusted intake state, exact Linear project value, and testable claim are recorded. If the ask is financial, branch to `billing-triage`; otherwise continue to Stage 2.
+
+## Stage 2: Resolve customer identity once
+
+Purpose: establish the production-backed customer scope once, then keep investigating within the scope the evidence supports.
+
+Inputs: the claim and the customer email from Stage 1.
 
 The ticket's customer email is the identity anchor, but it came from an untrusted ticket body: resolve it against production, do not assume it.
 
@@ -60,28 +76,46 @@ No match, or a hit that conflicts with the customer or workspace name, is worth 
 
 Ending an investigation with nothing but an identity question is a failure. Someone is waiting, and the ticket should carry whatever was found either way.
 
-## Step 2 — Check for an existing investigation
+Record identity as `resolved`, `conflicted`, or `unavailable`. Reopen it only when genuinely new evidence conflicts with that result.
+
+Completion: identity has one explicit status, any pinned `organization_id` is recorded, and the available investigation scope is known. Unresolved identity branches around customer-specific lookups but does not block code, symptom, time, provider, or other available evidence.
+
+## Stage 3: Check existing work and frame the investigation
+
+Purpose: avoid repeating settled work, distinguish continuation and duplicate candidates from a fresh investigation, run the clarification gate, and choose evidence lanes that can confirm or disconfirm the claim.
+
+Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and current Linear state.
+
+### Check for an existing investigation
 
 Look for Intercom links, pasted summaries, prior sessions, and comments carrying Finding/Evidence, and for a `Triage investigation` document already attached to the ticket. Do not redo work that already happened.
 
-## Step 3 — Check duplicates
+### Check duplicates
 
 Search Linear for the same symptom, in several wordings: the user outcome, the visible error text, and the feature or object names. Include closed and archived issues.
 
 Classify each plausible match by outcome, not keyword overlap:
 
-- `SAME_OUTCOME`: same symptom and same cause. It is a duplicate. Identify the parent, comment, and route in one Linear update. The duplicate takes the parent's assignee, as Step 9 describes.
+- `SAME_OUTCOME`: same symptom and same cause. It is a duplicate. Identify the parent, comment, and route in one Linear update. The duplicate takes the parent's assignee, as Stage 6 describes.
 - `PARTIAL_OR_ADJACENT`: related but a distinct outcome. Relate it, do not close it.
 - `STALE_OR_SUPERSEDED`: already fixed or already rejected. Point at the fix or the decision.
 - `NOT_RELEVANT`: move on.
 
 A shared component or a shared error string is not enough to call two tickets duplicates.
 
-## Gate — ask or proceed
+### Ask or proceed
 
 Load the clarify-with-requester skill and run Gate 1 before investigating further.
 
-## Step 4 — Investigate
+Select the repository, production-data, runtime, provider, and customer-context lanes warranted by the claim. A clarification request runs in parallel and returns to this progression; it does not erase the evidence plan or park all useful investigation.
+
+Completion: Foreman knows whether this is a continuation, a duplicate candidate, or a fresh investigation, and has an explicit evidence plan.
+
+## Stage 4: Investigate
+
+Purpose: test the claim against historical analogies, current code, current production data, and the applicable runtime, provider, and customer-context lanes.
+
+Inputs: the claim, exact Linear project value, identity status, evidence plan, and any existing investigation.
 
 Work the lanes in order. Every lane is recorded in the Triage investigation document, including the ones that did not apply. A lane with no entry reads as skipped, and a verdict standing on skipped lanes is not a verdict.
 
@@ -93,27 +127,23 @@ Keep the three database surfaces separate:
 
 Never locate, inspect, or verify a database in order to use investigation memory. Do not list projects, inspect schemas or roles, count its rows, test SQL, look for credentials, or use `neon__*` on memory's behalf. The three memory tools are the whole interface. If a memory tool answers, its wiring is working. If it returns `available: false` or a write fails, record that only in the investigation document when relevant and carry on. Memory availability never changes the verdict or appears in the Slack reply.
 
-### 4.1 State the claim
+### Search investigation memory
 
-Reduce the ticket to one testable sentence: what the user says happened, what they expected instead, when, and on which org, campaign, or record. If the ticket cannot produce that sentence, take the most likely reading, write the assumption into the report, and investigate that. Ask the requester in parallel through Gate 1. Do not sit on the ticket waiting for an answer, and do not guess silently.
-
-### 4.1A Search investigation memory
-
-Only now, with the claim written and the ticket's Linear project read in Step 1, call `search_investigation_memory`. Pass the project id from the ticket, the claim or the visible error text, and the component, provider, and dependency keys you already know. The project is what picks the product area; never pass one inferred from the symptom, the title, or the repository.
+Only now, with the claim and the ticket's exact Linear project value recorded in Stage 1, call `search_investigation_memory`. Pass the project id from the ticket, the claim or the visible error text, and the component, provider, and dependency keys you already know. The project is what picks the product area; never pass one inferred from the symptom, the title, or the repository.
 
 A ticket with no project has nothing to search. Record `Unavailable: no Linear project` in the report and carry on with the investigation. Do not invent a project id to satisfy the call, and do not pick the project of a ticket that merely looks similar. Routing already sends an unprojected ticket to Aaron Fraga.
 
 What comes back is past Foreman investigations, sanitized: no customer identity, no production rows. Treat each one as a candidate analogy and nothing more. For every plausible match, write into the report why it matches this claim and what evidence would disconfirm it, then go and check that evidence. A historical `User Error` verdict does not settle this ticket, and a historical root cause is not this ticket's root cause until the current code and current data say so.
 
-The affected counts on a case are the figures from that investigation on the date they were counted. They are never this ticket's blast radius. Count it again in 4.3.
+The affected counts on a case are the figures from that investigation on the date they were counted. They are never this ticket's blast radius. Count it again in the current production-data lane.
 
 `possibleWiderIncident` means several independent tickets recently landed in this scope. That is a reason to look at current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident. It is not an incident, and it does not create a master ticket, set a priority, or declare an outage on its own.
 
 `available: false` is normal and never blocks anything: the store may be unconfigured, unreachable, or the project may not be mapped to a product area. Note it in the investigation document and investigate from scratch, exactly as the rest of this skill describes. Never go looking for the backing database or try another database connection to diagnose it.
 
-Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided by Step 3 against current Linear.
+Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided in Stage 3 against current Linear.
 
-### 4.2 Locate it in the code
+### Locate it in the code
 
 `prepare_repository` with `Acquisity/Acquisity`, which refreshes the checkout to the remote HEAD and returns the `worktree` path. Then `grep` and `read_file` under that path to find the code path the claim runs through. Answer what the code is supposed to do before deciding whether it did it.
 
@@ -121,9 +151,9 @@ Record the files and functions, and the commit they were read at: `prepare_repos
 
 A claim you cannot place in the code is not ready for a Bug verdict.
 
-### 4.3 Check the data
+### Check the data
 
-`planetscale_execute_read_query`, scoped to the organization pinned in Step 1A. Read the rows the claim is about and say whether production state matches the claim, contradicts it, or is silent on it. Prefer a bounded `COUNT` or a narrow `SELECT`.
+`planetscale_execute_read_query`, scoped to the organization pinned in Stage 2. Read the rows the claim is about and say whether production state matches the claim, contradicts it, or is silent on it. Prefer a bounded `COUNT` or a narrow `SELECT`.
 
 PlanetScale is the production database and the only source of current production truth. Use the root `planetscale_execute_read_query` tool for this lane. Customer data is never in Neon, and neither the `neon__*` connection nor investigation memory substitutes for this lane.
 
@@ -131,11 +161,11 @@ Then count the blast radius, unscoped from this customer: how many distinct orgs
 
 When an exact count is genuinely not reachable, say so with the tightest bound the data supports and name what blocks the exact figure. A bounded count with its reason is usable; a vague one is not.
 
-### 4.4 Check the runtime
+### Check the runtime and provider systems
 
 Pick the lanes the symptom points at. Not every lane applies; naming one as not applicable is an answer, guessing is not.
 
-These systems are indexed on different axes, and most of them are not indexed on the customer. Search each on the axis it actually uses: identity (the org id, user id, or email pinned in Step 1A, never the display name), symptom (the behavior in the product's own words, not the customer's), or time (the window the claim names). One search returning nothing closes nothing. Vary the axis before concluding anything, and if the tool wants an identifier you do not have, resolve it first rather than substituting a name.
+These systems are indexed on different axes, and most of them are not indexed on the customer. Search each on the axis it actually uses: identity (the org id, user id, or email pinned in Stage 2, never the display name), symptom (the behavior in the product's own words, not the customer's), or time (the window the claim names). One search returning nothing closes nothing. Vary the axis before concluding anything, and if the tool wants an identifier you do not have, resolve it first rather than substituting a name.
 
 A lane you could not figure out how to search is `Could not run`, not evidence of absence. Never report a failed search strategy as a clean result.
 
@@ -146,27 +176,39 @@ Exact tool names, per-lane traps, and vendor docs are in [references/tools.md](r
 - Anything the other lanes do not carry: Axiom `queryDataset` with APL over production logs. Call `listDatasets` and `getDatasetFields` first for real names. APL cannot query metrics; those go through `queryMetrics`.
 - Email delivery, bounces, spam placement: Resend `list-emails`, `get-email`, `list-logs`, `list-suppressions`. These names are kebab-case, not snake_case.
 - Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: call the root `list_instantly_subworkspaces` tool first, select an accepted subworkspace by ID when possible, then call `read_instantly_subworkspace`. Pass each returned `nextStartingAfter` value back as `startingAfter` until it is null. This provider lane does not replace PlanetScale as current Acquisity production truth.
-- What the user actually did: the Jam link on the ticket when there is one, though usually there is not. PostHog runs through a single `exec` tool taking a named command; resolve the person with `persons` on the email or distinct id from Step 1A, then read `session-recording`. It cannot find anyone by display name. Lucent (`list_issues`, `get_issue`) is indexed by symptom, not by customer, so search it for the behavior (`responses not displaying`) and never for who reported it.
+- What the user actually did: the Jam link on the ticket when there is one, though usually there is not. PostHog runs through a single `exec` tool taking a named command; resolve the person with `persons` on the email or distinct id from Stage 2, then read `session-recording`. It cannot find anyone by display name. Lucent (`list_issues`, `get_issue`) is indexed by symptom, not by customer, so search it for the behavior (`responses not displaying`) and never for who reported it.
 - Deployment or edge failures: Vercel `get_runtime_errors` and `get_runtime_logs` around the reported time.
-- The conversation behind the report, and whether others hit it: Intercom, via the link on the ticket or the email pinned in Step 1A. Modem `search_modem` for feedback beyond support threads.
+- The conversation behind the report, and whether others hit it: Intercom, via the link on the ticket or the email pinned in Stage 2. Modem `search_modem` for feedback beyond support threads.
 
-### 4.5 Record the lanes
+### Record the lanes
 
-Fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report.
+Fill the Triage investigation document's Evidence and Ruled out sections with every lane: what it returned, or `Not applicable: <reason>`, or `Could not run: <reason>`. A lane that could not run lowers the verdict's confidence and is named in the report. Contrary evidence must be recorded alongside supporting evidence.
 
-### 4.6 Rehash the claim against the evidence
+Completion: every material conclusion has current evidence, contrary evidence has been considered, every selected lane is recorded, and unavailable lanes are named honestly. Continue to Stage 5 without reopening trusted intake, project, identity, or completed evidence unless new conflicting evidence appears.
 
-The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the investigation stance above. Run Gate 2 (the stop-gate) before any verdict.
+## Stage 5: Decide handling
 
-A `Bug` verdict requires all three: a named file and function, direct evidence from 4.3 or 4.4, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
+Purpose: either stop with the missing confirmation explicit when the claim remains unproven, or turn the completed evidence record into one classification, unblock, handling path, final state, priority, and label set.
+
+Inputs: the completed Stage 4 evidence record. Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius.
+
+### Rehash the claim against the evidence
+
+The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
+
+When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
+
+Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the rules above.
+
+A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
 
 Verdict quality bar: name the cause, not the mechanism.
 
-### 4.7 Find the unblock
+### Find the unblock
 
 The verdict says what is wrong. It does not say what the customer does tomorrow morning. Answer that separately, and answer it even when the verdict is `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix.
 
-Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in 4.6 is what tells you which of these would actually work, which is why this comes after the verdict and not before.
+Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in this stage is what tells you which of these would actually work, which is why this comes after the verdict and not before.
 
 When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
 
@@ -174,24 +216,24 @@ When there is not one, say so explicitly. An unblock section that is silently ab
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
 
-## Step 5 — Decide the handling path
+### Decide the handling path
 
 Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`.
 
 The handling path classifies the root cause, not the remedy. A ticket can be `Engineering Todo` and have had the customer unblocked in the same pass; the two are recorded separately and neither cancels the other.
 
-## Step 5A — Decide the final Linear state
+### Decide the final Linear state
 
 Set the state that matches the handling path.
 
-## Step 6 — Set Linear priority
+### Set Linear priority
 
 Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `save_issue` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
 
 Weigh these in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
-2. Blast radius, quantified from primary data in 4.3, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
+2. Blast radius, quantified from primary data in Stage 4, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
 3. Frequency. A small failure that hits every send or sync outweighs a severe one that fires rarely.
 4. Customer tier. Enterprise or partner exposure breaks ties only. Never a reason to inflate a band.
 5. Money. An active billing or refund blocker is at least `High`.
@@ -207,7 +249,7 @@ A workaround does not enter the weighting. It makes the customer's day survivabl
 
 Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review. This is not licence to inflate: the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority and the parent's assignee.
 
-## Step 6A — Label the ticket
+### Label the ticket
 
 Read the team's labels with `list_issue_labels` and work only from what comes back. Never invent a label, and never apply a name you assume exists.
 
@@ -215,42 +257,50 @@ Apply the fewest labels that place the ticket:
 
 - One type label from the verdict: `Bug` for a Bug, `Feature Request` for a Platform Limitation the customer wants lifted, and no type label for User Error.
 - The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
-- One `Root Cause` label when the team has one that matches the cause found in Step 4.
+- One `Root Cause` label when the team has one that matches the cause found in Stage 4.
 
 `save_issue` replaces the whole label set: labels already on the ticket and not included in the call are removed. Read the current labels first and pass the union, never just the new ones.
 
-## Step 7 — Attach the Triage investigation document
+Completion: either the unproven branch has made the unblock explicit, preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, and the final Linear state, numeric priority, and complete label union are decided.
+
+## Stage 6: Persist and route
+
+Purpose: leave the durable investigation on the customer ticket, give the requester the short human-facing result, and route engineering work without exposing customer data.
+
+Inputs: the Stage 5 decisions and the completed investigation record. Read [references/reporting.md](references/reporting.md) before composing the document, comment, or a new master ticket.
+
+### Attach the Triage investigation document
 
 Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Triage investigation"`. Passing `issue` is what attaches it, so it appears as a resource on the ticket itself rather than a document filed somewhere else, and anyone reading the ticket can open it in one click. It is the handoff to whoever acts next, and it holds everything the ticket comment leaves out. Where this skill says to record or say something in the report, it means this document, unless it names the comment.
 
-No file upload is involved. `save_document` takes the Markdown directly and an issue is a valid parent, so the attachment route (`prepare_attachment_upload`, a raw PUT, then `create_attachment_from_upload`) is neither needed nor wanted here. Keep the URL it returns: Step 8's comment links it.
+No file upload is involved. `save_document` takes the Markdown directly and an issue is a valid parent, so the attachment route (`prepare_attachment_upload`, a raw PUT, then `create_attachment_from_upload`) is neither needed nor wanted here. Keep the URL it returns for the comment.
 
 - One document per ticket. A later revisit updates it with `patch`, never creates a second.
 - Keep it under roughly 20 KB. It is a handoff, not a transcript. Counts and the specific rows that prove the finding, not raw dumps.
 - Never paste credential-shaped columns into it.
 - The full document stays on the customer ticket. A Linear document inherits the visibility of the issue it hangs from, so attaching this one to a shared master would expose one customer's identity and production rows to everyone who can see that master. Put only the aggregate evidence on the master: the root cause, the blast radius figure, and the code path, with no organization id, email, or customer rows.
 
-## Step 8 — Comment on the ticket
+### Comment on the ticket
 
-Write the report comment from the template below via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The template's four blocks are a ceiling, not a starting point. The evidence lives in the document, not here.
+Write the report comment from the template in [references/reporting.md](references/reporting.md) via the Linear connection. It is the human surface: the root cause in plain language and what happens next. The template's four blocks are a ceiling, not a starting point. The evidence lives in the document, not here.
 
-## Step 9 — Route
+### Route
 
-The customer already has their answer from Step 8. Nothing here changes what they were told; it changes what engineering sees. Never hold the comment back for this step.
+The customer already has their answer from the preceding comment step. Nothing here changes what they were told; it changes what engineering sees. Never hold the comment back for this step.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Step 5A state. Nothing goes to engineering.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
 
 Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
 
-A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Step 5A state in the same pass, so it never sits open in anyone's queue.
+A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Stage 5 state in the same pass, so it never sits open in anyone's queue.
 
 ### When the root cause warrants action
 
 The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it.
 
-1. Search for an existing master on four axes: the cause, the code path from 4.2, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug. For every query, call `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `limit: 250`.
+1. Search for an existing master on four axes: the cause, the Stage 4 code path, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug. For every query, call `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `limit: 250`.
 
    When the active context says this is an intake-only Slack workflow, search no further than 30 days back by also passing `createdAt: "-P30D"` on every query. Outside an intake-only Slack workflow, including a Linear Agent Session, preserve the general triage behavior: do not pass a `createdAt` filter, and consider matching masters regardless of creation date.
 
@@ -259,7 +309,7 @@ The customer ticket does not become the engineering ticket. A master ticket owns
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
 2. In an intake-only Slack workflow, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Outside that Slack workflow, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
 3. If a master already owns the cause: read the master's assignee, then set this ticket's `parentId` to that master and its `assignee` to the master's assignee in the same `save_issue` call (the field is `assignee`, not `assigneeId`), so the child never sits under a master owned by someone else. Where the master has no assignee, fall back to the area-routing roster below and say in the document that the master was unassigned. Then comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
-4. If no eligible master owns the cause, create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
+4. If no eligible master owns the cause, create one with the master template in [references/reporting.md](references/reporting.md), on the ENG team, labelled with the type, priority per Stage 5, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
 5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
 The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. It narrows the candidate set only in that workflow. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
@@ -280,15 +330,23 @@ The roster exists on the production ENG team only. Tickets on the SAN sandbox te
 
 Internal notes go in the Triage investigation document, never in the ticket comment. Identity resolution, routing rationale, customer email addresses, queries, and anything else engineering needs and the requester does not, belong in the document's Evidence, Code path, and Next steps sections. A customer-facing comment carries no `## Internal` section.
 
-## Step 10 — Slack-facing reply
+Completion: the ticket has one durable investigation document, the short requester-facing Linear comment, the accurate final state, and the applicable duplicate, master, parent, assignee, and human-routing updates. Non-engineering outcomes end without engineering routing; actionable root causes return here after reusing or creating exactly one eligible master.
+
+## Stage 7: Finish the attended response and memory bookkeeping
+
+Purpose: finish the attended surface cleanly, then attempt optional sanitized memory bookkeeping without reopening the case.
+
+Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
+
+### Slack-facing reply
 
 Load the slack-wording skill before writing. Give a concrete finding, hand the next steps to the opener, check whose lane it is, and keep it to one to three sentences at the floor. The assistant message contains only that requester-facing reply. Never prefix it with an investigation summary or append internal actions, ticket updates, routing, or proof of work.
 
-## Step 11 — Record the investigation in memory
+### Record the investigation in memory
 
 Last, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. Not before: a case written from a half-finished investigation is a wrong answer that the next ticket inherits.
 
-Send the pattern, not the customer. The claim, the root cause, the symptoms in the product's own words, the error signatures with identifiers stripped, the code path and commit from 4.2, the conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), the counts with the date they were counted, and the links back to the ticket. Never an email address, an organization or user id, a production row, a log, or anything credential-shaped. Those live in the document, under the ticket's own visibility, and the tool refuses them.
+Send the pattern, not the customer. The claim, the root cause, the symptoms in the product's own words, the error signatures with identifiers stripped, the code path and commit from Stage 4, the conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), the counts with the date they were counted, and the links back to the ticket. Never an email address, an organization or user id, a production row, a log, or anything credential-shaped. Those live in the document, under the ticket's own visibility, and the tool refuses them.
 
 The product area comes from the ticket's Linear project. Affected features go in only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
 
@@ -296,175 +354,14 @@ A failure here changes nothing about the ticket. Record it internally when usefu
 
 If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. A plain search is ranked, capped, and bounded by a time window, so a ticket's own case can fall outside it; adding the ticket identifier drops the relevance filters and the time window and returns the case however old it is. Still pass the project id, which the call always requires. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 
+When the Linear project is `null` or unmapped, record no investigation-memory case and route to Aaron Fraga for human triage under the existing roster policy. A memory denial, unavailable store, or failed write terminates bookkeeping only; it never changes the verdict, ticket, Linear comment, or Slack reply.
+
+Completion: the attended surface has only its requester-facing response, and memory bookkeeping has either succeeded, been skipped by project or trust policy, or terminated after one non-blocking failure.
+
 ## Follow-ups
 
 Answer follow-ups with the gathered evidence, keep the internal detail in the document, cap the back-and-forth, and on the third reply give a clear close.
 
-## Linear report template
+## Reporting reference
 
-Prose, not a field list. The classification, priority, and handling path are already set on the ticket as state, priority, and labels; repeating them in the comment is noise.
-
-```markdown
-## Triage investigation
-
-<What gets them working now, and who does it. `None found: <reason>`
-when there is nothing that would.>
-
-<The root cause in one or two plain sentences, in the customer's terms.>
-
-<How many workspaces are affected, or "only yours" when it is one.>
-
-[Triage investigation](<document link>)
-```
-
-The unblock leads. Someone stuck cares about working again before they care about the cause. Never silently drop it: a missing unblock line and one nobody looked for read the same. The engineering ticket is not named here: once Step 9 makes this report a child, Linear shows the parent on the issue itself.
-
-Those blocks are the whole comment. Each is at most two short paragraphs, and no heading appears beyond the title. These never appear in a comment, whatever the investigation turned up:
-
-- per-month or per-week breakdowns
-- corrections to the figures the reporter gave
-- cohort-wide counts beyond the one line saying how many workspaces are affected
-- code paths, files, functions, commits
-- queries and their raw output
-- identity resolution: how the email resolved, which organization ids matched, which was picked
-- routing rationale: which master was chosen, which area owner it went to, why
-- a `## Internal` section of any kind
-
-All of it goes in the Triage investigation document that the last line links. The reader of the comment should reach the sentence telling them what to do without scrolling.
-
-### Good comment
-
-Two short paragraphs, the tickets linked inline, the document attached below.
-
-```markdown
-Duplicate of [ENG-12820](<link>) Michael Simon - AI SDR not answering emails: same
-customer and same ask, filed 17 Aug. That ticket now carries the full investigation
-and is attached to the active incident [ENG-12983](<link>) Restore and bulletproof
-Instantly webhook reply delivery, the 13 August Instantly webhook outage.
-
-Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage.
-Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR
-had nothing to answer. The webhook is restored and the AI SDR is answering again
-(5 replies today, 10 yesterday). Missed replies are being recovered by
-[ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Asking
-the requester to confirm which specific emails Michael expected answered, to catch
-anything still broken today.
-
-[Triage investigation](<link>)
-```
-
-This one is a duplicate, so the pointer to the ticket that now owns it leads and the unblock rides in the bottom line. On a ticket that is not a duplicate, the unblock is the first block.
-
-### Bad comment
-
-Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment.
-
-```markdown
-## Summary
-...
-
-## What we found
-Reply counts by month, Jun through Aug, with the figure in the ticket corrected
-from 40 to 12.
-
-## Blast radius
-The whole cohort, org by org, with the query.
-
-## Open question
-...
-
-## Internal
-Resolved identity: user_id, organization_id, the customer's email addresses, and
-which of the three matching workspaces was picked and why. Routed to the AI SDR
-area owner because the project is AI SDR.
-```
-
-Nothing in the bad comment is wrong. It is all in the wrong place. The headings, the month-by-month breakdown, the corrected figure, the cohort count, the identity resolution, and the `## Internal` block all belong in the document, and the one sentence the reader needed is buried under them.
-
-## Triage investigation document template
-
-```markdown
-# Triage investigation
-
-**Ticket**: <ENG-XXXX>
-**Classification**: <User Error | Platform Limitation | Bug>
-**Organization**: <organization_id> (<org name>)
-
-## Claim
-The one testable sentence from 4.1.
-
-## Root cause
-The cause, not the mechanism.
-
-## Evidence
-Every lane from 4.2 through 4.4: the queries run and what they returned,
-or `Not applicable: <reason>`, or `Could not run: <reason>`.
-
-## Prior cases
-Each match from 4.1A: the ticket it came from, why it looked like this
-claim, and what current evidence confirmed or disconfirmed it. `None`
-when memory returned nothing, `Unavailable: <reason>` when it could not
-be searched.
-
-## Blast radius
-N orgs and N users as an exact figure, or the tightest bound with what
-blocks the exact count. Always with the query that produced it and the
-date counted.
-
-## Code path
-Files and functions in Acquisity/Acquisity that the cause runs through,
-with the commit the investigation read.
-
-## Unblock
-What gets the customer working now, who performs it, whether it has been
-done, and confirmation that it costs the customer neither data nor money.
-`None found: <reason>` when there is nothing.
-
-## Ruled out
-What was checked and eliminated, so the next agent does not redo it.
-
-## Next steps
-What action the root cause warrants.
-```
-
-## Master ticket template
-
-```markdown
-## Overview
-
-One to three plain-language sentences: what is broken and why it matters.
-
-## Problem
-
-The problem from the user's or operator's perspective.
-
-## Root cause
-
-The cause, with the file and function it lives in.
-
-## Blast radius
-
-How many orgs and users are affected, as an exact figure where one is
-reachable, with the query that counted it and the date counted. Where
-exact is not reachable, the tightest bound and what blocks the exact
-figure. Never an adjective.
-
-## Proposed fix
-
-The end-to-end behavior that should change, without a layer-by-layer plan.
-
-## What's included
-
-Decided scope, important exclusions, and dependencies.
-
-## Done when
-
-- Checkable observable outcome.
-- Checkable observable outcome.
-
-## Reports
-
-The customer tickets this master owns, as Linear links.
-```
-
-Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.
+The exact Linear comment shape, good and bad examples, Triage investigation document template, master ticket template, and unknown/not-applicable wording are in [references/reporting.md](references/reporting.md). Stage 6 requires reading that reference before composing any of those outputs.
