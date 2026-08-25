@@ -196,7 +196,7 @@ Inputs: the completed Stage 4 evidence record. Historical memory is analogy only
 
 The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
 
-When the deciding confirmation is still missing, take the unproven branch and stop before classification. Preserve the source ticket's current state, priority, and labels; attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
+When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, run `Find the unblock` below and record the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
 Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the rules above.
 
@@ -261,7 +261,7 @@ Apply the fewest labels that place the ticket:
 
 `save_issue` replaces the whole label set: labels already on the ticket and not included in the call are removed. Read the current labels first and pass the union, never just the new ones.
 
-Completion: either the unproven branch has preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, and the final Linear state, numeric priority, and complete label union are decided.
+Completion: either the unproven branch has made the unblock explicit, preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, and the final Linear state, numeric priority, and complete label union are decided.
 
 ## Stage 6: Persist and route
 

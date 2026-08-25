@@ -162,8 +162,25 @@ test("shared triage stops unproven claims before classification or routing", () 
     )
   );
   assert.ok(
+    triageSkill.includes("Before stopping, run `Find the unblock` below")
+  );
+  assert.ok(
     triageSkill.includes(
-      "either the unproven branch has preserved the current ticket state"
+      "action, owner, current status, and confirmation that it costs the customer neither data nor money"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "either the unproven branch has made the unblock explicit"
+    )
+  );
+  assert.ok(triageReportingReference.includes("## Unproven branch reporting"));
+  assert.ok(
+    triageReportingReference.includes("`**Classification**: Not settled`")
+  );
+  assert.ok(
+    triageReportingReference.includes(
+      "Never use the master ticket template or create or attach a master for this branch"
     )
   );
 });

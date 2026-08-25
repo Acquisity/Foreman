@@ -147,3 +147,9 @@ The customer tickets this master owns, as Linear links.
 ```
 
 Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.
+
+## Unproven branch reporting
+
+When Stage 5 takes the unproven terminal branch, do not force the ordinary templates to claim a classification or root cause. Keep the `## Triage investigation` title and document link in the short comment, lead with the unblock or `None found: <reason>`, then state the known facts, the missing confirmation and who can supply it, and the condition that will reopen the investigation. Do not present a classification, root cause, or blast radius as settled.
+
+Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never use the master ticket template or create or attach a master for this branch.
