@@ -66,7 +66,7 @@ Include the measurement window, source, date counted, and limitations. `Unknown`
 Return:
 
 - `core_function`
-- `impact`: `BLOCKED | MATERIALLY_IMPAIRED | INCORRECT_RESULT | SILENTLY_SKIPPED | DATA_OR_SECURITY_RISK | MONEY_IMPACT | MATERIAL_BUSINESS_HARM | NON_CORE`
+- `impact`: `BLOCKED | MATERIALLY_IMPAIRED | INCORRECT_RESULT | SILENTLY_SKIPPED | DATA_OR_SECURITY_RISK | MONEY_IMPACT | MATERIAL_BUSINESS_HARM | NON_CORE | UNCONFIRMED`. `UNCONFIRMED` is for `NEEDS_HUMAN_URGENT` only: name the suspected condition in `rationale` rather than asserting a confirmed state.
 - `route`: `HOTLANE | STANDARD_ENGINEERING | NOT_ENGINEERING | NEEDS_HUMAN_URGENT`
 - `proposed_label`: `fast-lane` for `HOTLANE`, otherwise `none`
 - `rationale`

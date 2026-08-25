@@ -6,7 +6,7 @@ description: "Turn an approved, engineering-actionable triage investigation into
 
 Create durable engineering work from an approved diagnosis without turning every customer report into its own investigation. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps.
 
-`triage-investigate` still owns investigation, classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, the area-routing roster, and the final `save_issue` on the customer ticket. This skill owns finding or creating the master, the content boundary between report and master, and proving the writes landed.
+`triage-investigate` still owns investigation, classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, the area-routing roster, and the customer ticket's final state, labels, priority, and project. This skill owns finding or creating the master, the customer ticket's `parentId` and `assignee` that link it to the master, the content boundary between report and master, and proving the writes landed.
 
 ## Preconditions
 
@@ -15,7 +15,7 @@ All of these hold before anything is written:
 - Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`.
 - The `Triage investigation` document is attached to the customer ticket and current.
 - When the workflow ran the critic, its verdict was `APPROVE` for this exact document version: the document id and `updatedAt` the critic echoed in `reviewed` still match what Linear returns now. A changed document needs a new review before any structural write.
-- The `incident-hotlane` route is known: `HOTLANE` or `STANDARD_ENGINEERING`. `NEEDS_HUMAN_URGENT` never reaches this skill.
+- When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
 - The master search below has been run in this pass, not carried over from an earlier one.
 
 If any precondition fails, write nothing structural. Record the blocker in the investigation document and leave the report where Stage 5 put it.

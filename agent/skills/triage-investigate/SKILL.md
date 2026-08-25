@@ -360,4 +360,4 @@ Answer follow-ups with the gathered evidence, keep the internal detail in the do
 
 ## Reporting reference
 
-The exact Linear comment shape, good and bad examples, Triage investigation document template, master ticket template, and unknown/not-applicable wording are in [references/reporting.md](references/reporting.md). Stage 6 requires reading that reference before composing any of those outputs.
+The exact Linear comment shape, good and bad examples, Triage investigation document template, and unproven-branch wording are in [references/reporting.md](references/reporting.md). Stage 6 requires reading that reference before composing the document or comment. The master ticket template and its not-applicable and not-settled wording live in the `engineering-handoff` skill.
