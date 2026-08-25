@@ -27,6 +27,7 @@ Connection tools are called as `<connection>__<tool>`. Root tools are called by 
 | Sentry issues and events | `sentry__` | user | child allowlist: the seven confirmed read tools |
 | Axiom datasets, metrics, monitors | `axiom__` | user | root allowlist, reads only |
 | Vercel deployments, logs, errors, analytics | `vercel__` | user | root allowlist minus the five write tools |
+| PostHog persons, recordings, errors, queries | `posthog__` | user | one `exec` tool; read-only by OAuth scope, so any write command fails at the API |
 | Resend emails, logs, domains | `resend__` | user | root allowlist, reads only |
 | Jam recordings, console, network | `jam__` | user | root allowlist, reads only |
 | Modem customer feedback search | `modem__` | user | root allowlist: `search_modem` |
@@ -41,10 +42,6 @@ Connection tools are called as `<connection>__<tool>`. Root tools are called by 
 ## Screenshots (root tool)
 
 `read_image`, bare. Loads a PNG, JPEG, GIF, or WebP from the sandbox into your context, 3 MiB limit.
-
-## Not available to the critic
-
-PostHog. Its server exposes one `exec` tool that runs any named command, including writes, so it cannot be made read-only at the connection. Treat a PostHog-backed claim as unverifiable by you and say so under `evidence_integrity`.
 
 ## Unavailable sources
 

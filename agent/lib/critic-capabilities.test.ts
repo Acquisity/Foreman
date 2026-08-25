@@ -65,6 +65,13 @@ const WRITE_TOOL_NAMES = new Set([
   "write_file",
 ]);
 
+/**
+ * Connections whose read-only boundary is the OAuth grant itself rather than
+ * a tool allowlist: PostHog exposes one `exec` tool and requests only `:read`
+ * scopes, so writes fail at the API.
+ */
+const READ_ONLY_BY_SCOPE = new Set(["posthog"]);
+
 /** Connection tools that mutate provider state, by connection. */
 const WRITE_CONNECTION_TOOLS: Record<string, readonly string[]> = {
   lucent: ["update_issue"],
@@ -95,7 +102,7 @@ const FORBIDDEN_SOURCE = [
 ];
 
 describe("critic evidence surface", () => {
-  it("mounts every triage evidence connection except PostHog", () => {
+  it("mounts every triage evidence connection", () => {
     assert.deepEqual(list("connections/"), [
       "autumn.ts",
       "axiom.ts",
@@ -107,6 +114,7 @@ describe("critic evidence surface", () => {
       "modem.ts",
       "neon.ts",
       "planetscale.ts",
+      "posthog.ts",
       "resend.ts",
       "sentry.ts",
       "stripe.ts",
@@ -164,6 +172,10 @@ describe("critic evidence surface", () => {
 
   it("only narrows tool allowlists and excludes every write", () => {
     for (const { child, name, root } of pairs) {
+      if (READ_ONLY_BY_SCOPE.has(name)) {
+        assert.equal(child.tools, root.tools, `${name}: tools unchanged`);
+        continue;
+      }
       const childAllow = child.tools?.allow;
       assert.ok(childAllow, `${name}: the critic must have an allowlist`);
       const rootAllow = root.tools?.allow;
