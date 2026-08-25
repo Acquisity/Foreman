@@ -9,6 +9,11 @@ import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
+// The only repository a triage investigation can cite. A marker naming
+// anything else means the critic prepared the wrong checkout, and code read
+// there must never pass as commit-verified evidence.
+const REVIEWED_REPOSITORY = "acquisity/acquisity";
+
 /**
  * Pin the critic's own checkout to the exact commit the investigation read.
  *
@@ -33,6 +38,12 @@ export default defineTool({
     const sha = commit.toLowerCase();
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
+    if (prepared.slug.toLowerCase() !== REVIEWED_REPOSITORY) {
+      return {
+        error: `The critic can only verify code in ${REVIEWED_REPOSITORY}; the prepared repository is ${prepared.slug}.`,
+        success: false as const,
+      };
+    }
     // Already pinned: a repeated call must not fight git's index.lock.
     const current = await sandbox.run({
       command: `git -C '${prepared.worktree}' rev-parse HEAD`,
@@ -62,11 +73,13 @@ export default defineTool({
     const head = await sandbox.run({
       command: `git -C '${prepared.worktree}' rev-parse HEAD`,
     });
-    return {
-      commit: String(head.stdout).trim(),
-      success: true as const,
-      worktree: prepared.worktree,
-    };
+    if (head.exitCode !== 0 || String(head.stdout).trim() !== sha) {
+      return {
+        error: `git checkout did not leave HEAD at ${sha}.`,
+        success: false as const,
+      };
+    }
+    return { commit: sha, success: true as const, worktree: prepared.worktree };
   },
   inputSchema: z.object({
     commit: z
