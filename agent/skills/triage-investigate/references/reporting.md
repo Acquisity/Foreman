@@ -80,6 +80,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 **Ticket**: <ENG-XXXX>
 **Classification**: <User Error | Platform Limitation | Bug>
 **Organization**: <organization_id> (<org name>)
+**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Stopped: <reason> | Not required>
 
 ## Claim
 The one testable sentence from Stage 1.
@@ -117,4 +118,4 @@ The master ticket template and the rules for filling it live in the `engineering
 
 When Stage 5 takes the unproven terminal branch, do not force the ordinary templates to claim a classification or root cause. Keep the `## Triage investigation` title and document link in the short comment, lead with the unblock or `None found: <reason>`, then state the known facts, the missing confirmation and who can supply it, and the condition that will reopen the investigation. Do not present a classification, root cause, or blast radius as settled.
 
-Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.
+Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and `**Review**: Not required` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.
