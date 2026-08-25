@@ -1,4 +1,4 @@
-import { connect } from "@vercel/connect/eve";
+import { managedConnect } from "./managed-connect.js";
 import { parseIntakeOnlyChannels } from "./slack-intake.js";
 
 /**
@@ -101,7 +101,7 @@ export const OWNER_USER_ID = "U0BBHB86PUY";
  * const { token } = await ctx.getToken(linearAuth);
  * ```
  */
-export const linearAuth = connect({
+export const linearAuth = managedConnect({
   connector: requireEnv("LINEAR_CONNECTOR", "linear/foreman-agent"),
   principalType: "app",
   tokenParams: {
@@ -131,7 +131,7 @@ export const linearAuth = connect({
  * const { token } = await ctx.getToken(planetscaleAuth);
  * ```
  */
-export const planetscaleAuth = connect({
+export const planetscaleAuth = managedConnect({
   connector: requireEnv(
     "PLANETSCALE_MCP_CONNECTOR",
     "planet-scale-read-only-foreman/acquisity-foreman-planet-scale"

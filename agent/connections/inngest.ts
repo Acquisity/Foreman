@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { managedConnect } from "../lib/managed-connect.js";
 
 /**
  * Inngest Cloud MCP connection for background-job investigation.
@@ -20,7 +20,7 @@ import { requireEnv } from "../lib/constants.js";
  * the Inngest MCP docs; verify against the live list when touching this.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: managedConnect({
     connector: requireEnv(
       "INNGEST_MCP_CONNECTOR",
       "api.inngest.com/acquisity-foreman-inngest"
