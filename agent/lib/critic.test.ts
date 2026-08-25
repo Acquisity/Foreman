@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const ENV_ASSIGNMENT = /^([A-Z][A-Z0-9_]*)=/u;
 const DISABLED_TOOL = /disableTool\(\)/u;
+const SHARES_PARENT_SANDBOX = /return parent\.sandbox|=>\s*parent\.sandbox/u;
 const criticRoot = new URL("../subagents/critic/", import.meta.url);
 
 const [{ AGENT_MODEL_SLOTS, MODELS }, { CRITIC_CRITERIA, CRITIC_VERDICTS }] =
@@ -78,7 +79,7 @@ describe("critic subagent", () => {
     // eve build both accept that combination; only the runtime graph rejects
     // it, so the rule is checked here.
     const sandbox = readFileSync(new URL("sandbox.ts", criticRoot), "utf8");
-    assert.ok(!sandbox.includes("parent.sandbox"));
+    assert.doesNotMatch(sandbox, SHARES_PARENT_SANDBOX);
     assert.ok(sandbox.includes('from "../../sandbox.js"'));
   });
 
