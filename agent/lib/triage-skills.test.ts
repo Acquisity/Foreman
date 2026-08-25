@@ -145,6 +145,29 @@ test("shared triage preserves project-scoped memory and missing-project routing"
   );
 });
 
+test("shared triage stops unproven claims before classification or routing", () => {
+  assert.ok(
+    triageSkill.includes(
+      "When the deciding confirmation is still missing, take the unproven branch and stop before classification"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "Preserve the source ticket's current state, priority, and labels"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "Do not create or attach a master, route engineering work, or record investigation memory"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "either the unproven branch has preserved the current ticket state"
+    )
+  );
+});
+
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
     {

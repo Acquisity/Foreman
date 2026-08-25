@@ -9,8 +9,7 @@ Prose, not a field list. The classification, priority, and handling path are alr
 ```markdown
 ## Triage investigation
 
-<What gets them working now, and who does it. `None found: <reason>`
-when there is nothing that would.>
+<What gets them working now, and who does it. `None found: <reason>` when there is nothing that would.>
 
 <The root cause in one or two plain sentences, in the customer's terms.>
 
@@ -39,18 +38,11 @@ All of it goes in the Triage investigation document that the last line links. Th
 Two short paragraphs, the tickets linked inline, the document attached below.
 
 ```markdown
-Duplicate of [ENG-12820](<link>) Michael Simon - AI SDR not answering emails: same
-customer and same ask, filed 17 Aug. That ticket now carries the full investigation
-and is attached to the active incident [ENG-12983](<link>) Restore and bulletproof
-Instantly webhook reply delivery, the 13 August Instantly webhook outage.
+## Triage investigation
 
-Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage.
-Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR
-had nothing to answer. The webhook is restored and the AI SDR is answering again
-(5 replies today, 10 yesterday). Missed replies are being recovered by
-[ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Asking
-the requester to confirm which specific emails Michael expected answered, to catch
-anything still broken today.
+Duplicate of [ENG-12820](<link>) Michael Simon - AI SDR not answering emails: same customer and same ask, filed 17 Aug. That ticket now carries the full investigation and is attached to the active incident [ENG-12983](<link>) Restore and bulletproof Instantly webhook reply delivery, the 13 August Instantly webhook outage.
+
+Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage. Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR had nothing to answer. The webhook is restored and the AI SDR is answering again (5 replies today, 10 yesterday). Missed replies are being recovered by [ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Asking the requester to confirm which specific emails Michael expected answered, to catch anything still broken today.
 
 [Triage investigation](<link>)
 ```
@@ -66,8 +58,7 @@ Same shape of ticket, seven-plus paragraphs, everything the document was for pas
 ...
 
 ## What we found
-Reply counts by month, Jun through Aug, with the figure in the ticket corrected
-from 40 to 12.
+Reply counts by month, Jun through Aug, with the figure in the ticket corrected from 40 to 12.
 
 ## Blast radius
 The whole cohort, org by org, with the query.
@@ -76,9 +67,7 @@ The whole cohort, org by org, with the query.
 ...
 
 ## Internal
-Resolved identity: user_id, organization_id, the customer's email addresses, and
-which of the three matching workspaces was picked and why. Routed to the AI SDR
-area owner because the project is AI SDR.
+Resolved identity: user_id, organization_id, the customer's email addresses, and which of the three matching workspaces was picked and why. Routed to the AI SDR area owner because the project is AI SDR.
 ```
 
 Nothing in the bad comment is wrong. It is all in the wrong place. The headings, the month-by-month breakdown, the corrected figure, the cohort count, the identity resolution, and the `## Internal` block all belong in the document, and the one sentence the reader needed is buried under them.
@@ -99,28 +88,19 @@ The one testable sentence from Stage 1.
 The cause, not the mechanism.
 
 ## Evidence
-Every current code, production-data, runtime, provider, and customer-context lane from Stage 4: the queries run and what they returned,
-or `Not applicable: <reason>`, or `Could not run: <reason>`.
+Every current code, production-data, runtime, provider, and customer-context lane from Stage 4: the queries run and what they returned, or `Not applicable: <reason>`, or `Could not run: <reason>`.
 
 ## Prior cases
-Each investigation-memory match from Stage 4: the ticket it came from, why it looked like this
-claim, and what current evidence confirmed or disconfirmed it. `None`
-when memory returned nothing, `Unavailable: <reason>` when it could not
-be searched.
+Each investigation-memory match from Stage 4: the ticket it came from, why it looked like this claim, and what current evidence confirmed or disconfirmed it. `None` when memory returned nothing, `Unavailable: <reason>` when it could not be searched.
 
 ## Blast radius
-N orgs and N users as an exact figure, or the tightest bound with what
-blocks the exact count. Always with the query that produced it and the
-date counted.
+N orgs and N users as an exact figure, or the tightest bound with what blocks the exact count. Always with the query that produced it and the date counted.
 
 ## Code path
-Files and functions in Acquisity/Acquisity that the cause runs through,
-with the commit the investigation read.
+Files and functions in Acquisity/Acquisity that the cause runs through, with the commit the investigation read.
 
 ## Unblock
-What gets the customer working now, who performs it, whether it has been
-done, and confirmation that it costs the customer neither data nor money.
-`None found: <reason>` when there is nothing.
+What gets the customer working now, who performs it, whether it has been done, and confirmation that it costs the customer neither data nor money. `None found: <reason>` when there is nothing.
 
 ## Ruled out
 What was checked and eliminated, so the next agent does not redo it.
@@ -146,10 +126,7 @@ The cause, with the file and function it lives in.
 
 ## Blast radius
 
-How many orgs and users are affected, as an exact figure where one is
-reachable, with the query that counted it and the date counted. Where
-exact is not reachable, the tightest bound and what blocks the exact
-figure. Never an adjective.
+How many orgs and users are affected, as an exact figure where one is reachable, with the query that counted it and the date counted. Where exact is not reachable, the tightest bound and what blocks the exact figure. Never an adjective.
 
 ## Proposed fix
 

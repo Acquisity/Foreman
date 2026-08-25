@@ -188,13 +188,17 @@ Completion: every material conclusion has current evidence, contrary evidence ha
 
 ## Stage 5: Decide handling
 
-Purpose: turn the completed evidence record into one classification, unblock, handling path, final state, priority, and label set.
+Purpose: either stop with the missing confirmation explicit when the claim remains unproven, or turn the completed evidence record into one classification, unblock, handling path, final state, priority, and label set.
 
 Inputs: the completed Stage 4 evidence record. Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius.
 
 ### Rehash the claim against the evidence
 
-The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the rules above. Run Gate 2 (the stop-gate) before any verdict.
+The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
+
+When the deciding confirmation is still missing, take the unproven branch and stop before classification. Preserve the source ticket's current state, priority, and labels; attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
+
+Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the rules above.
 
 A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
 
@@ -257,7 +261,7 @@ Apply the fewest labels that place the ticket:
 
 `save_issue` replaces the whole label set: labels already on the ticket and not included in the call are removed. Read the current labels first and pass the union, never just the new ones.
 
-Completion: one evidence-backed classification and handling path exist, the unblock is explicit, and the final Linear state, numeric priority, and complete label union are decided.
+Completion: either the unproven branch has preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, and the final Linear state, numeric priority, and complete label union are decided.
 
 ## Stage 6: Persist and route
 
