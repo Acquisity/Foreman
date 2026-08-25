@@ -21,6 +21,14 @@ const intercomTriageSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const handoffSkill = readFileSync(
+  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
+  "utf8"
+);
+const hotlaneSkill = readFileSync(
+  new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
+  "utf8"
+);
 const slackWordingSkill = readFileSync(
   new URL("../skills/slack-wording/SKILL.md", import.meta.url),
   "utf8"
@@ -120,6 +128,10 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     )
   );
   assert.ok(triageReportingReference.includes("## Master ticket template"));
+  assert.ok(
+    triageReportingReference.includes("live in the `engineering-handoff` skill")
+  );
+  assert.ok(handoffSkill.includes("## Master ticket template"));
 });
 
 test("shared triage makes retrieval project-independent", () => {
@@ -255,7 +267,7 @@ test("shared triage stops unproven claims before classification or routing", () 
   );
   assert.ok(
     triageReportingReference.includes(
-      "Never use the master ticket template or create or attach a master for this branch"
+      "Never load `engineering-handoff` or create or attach a master for this branch"
     )
   );
 });
@@ -264,8 +276,8 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
     {
       end: "\n   Do not filter this search by label.",
-      skill: triageSkill,
-      start: "1. Search for an existing master on four axes:",
+      skill: handoffSkill,
+      start: "1. For every query, call `linear__list_issues`",
     },
     {
       end: "\n3. Create one customer-report issue",
@@ -304,9 +316,9 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
 
 test("shared triage preserves unbounded master lookup outside Slack intake", () => {
   const masterSelection = extractInstruction(
-    triageSkill,
-    "### When the root cause warrants action",
-    "### Area-routing roster"
+    handoffSkill,
+    "## Search for the current master",
+    "## Content boundary"
   );
 
   assert.ok(masterSelection.includes("intake-only Slack workflow"));
@@ -336,4 +348,68 @@ test("Slack replies exclude internal investigation summaries", () => {
   assert.ok(
     slackWordingSkill.includes("progress updates may be conversational")
   );
+});
+
+test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {
+  const branch = extractInstruction(
+    triageSkill,
+    "### When the root cause warrants action",
+    "### Area-routing roster"
+  );
+  assert.ok(branch.includes("Load `engineering-handoff`"));
+  assert.ok(!branch.includes("linear__list_issues"));
+  assert.ok(!triageSkill.includes("## Master ticket template"));
+  for (const moved of [
+    "## Preconditions",
+    "## Match by cause, not symptom",
+    "## Search for the current master",
+    "## Reuse an existing master",
+    "## Create one master",
+    "## Read back before finishing",
+    "One master per root cause",
+    "`fast-lane`",
+    "area-routing roster in `triage-investigate` Stage 6",
+  ]) {
+    assert.ok(handoffSkill.includes(moved), moved);
+  }
+  for (const excluded of [
+    "reserve_triage_master",
+    "complete_triage_master_reservation",
+    "read_triage_review_verdict",
+    "approvalId",
+    "Final communication",
+  ]) {
+    assert.ok(!handoffSkill.includes(excluded), excluded);
+  }
+});
+
+test("incident-hotlane assesses and never writes", () => {
+  for (const kept of [
+    "Propose `HOTLANE`",
+    "`STANDARD_ENGINEERING`",
+    "`NOT_ENGINEERING`",
+    "`NEEDS_HUMAN_URGENT`",
+    "`fast-lane`",
+    "`confirmed_affected`",
+    "`potentially_exposed`",
+    "Containment",
+    "Customer recovery",
+    "Permanent prevention",
+    "Observability",
+    "This skill performs no writes",
+  ]) {
+    assert.ok(hotlaneSkill.includes(kept), kept);
+  }
+  for (const excluded of [
+    "save_issue",
+    "save_comment",
+    "save_document",
+    "Set `HOTLANE`",
+    "triage-critic",
+    "After approval:",
+    "incident channel",
+  ]) {
+    assert.ok(!hotlaneSkill.includes(excluded), excluded);
+  }
+  assert.ok(hotlaneSkill.includes("This skill does not set priority"));
 });
