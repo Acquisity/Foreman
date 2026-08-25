@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { MODELS, parseModelOverrides } = await import("./models.js");
-
-it("keeps triage critic independent from factory review", () => {
-  assert.equal(MODELS.triageCritic, "openai/gpt-5.6-sol");
-  assert.equal(MODELS.reviewer, "anthropic/claude-opus-4.8");
-});
+const { parseModelOverrides } = await import("./models.js");
 
 describe("parseModelOverrides", () => {
   it("strips a stale chat key", () => {

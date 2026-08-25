@@ -2,16 +2,6 @@ import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
 import { userConnect } from "../lib/user-connect.js";
 
-export const STRIPE_READ_TOOLS = [
-  "get_stripe_account_info",
-  "list_available_accounts_or_orgs",
-  "search_stripe_documentation",
-  "stripe_api_details",
-  "stripe_api_read",
-  "stripe_api_search",
-  "stripe_implementation_planner",
-] as const;
-
 /**
  * Stripe MCP connection for billing investigation.
  *
@@ -37,7 +27,15 @@ export default defineMcpClientConnection({
   description:
     "Stripe billing, read-only: customers, subscriptions, invoices, payments, refunds, disputes, products, and Stripe documentation search.",
   tools: {
-    allow: [...STRIPE_READ_TOOLS],
+    allow: [
+      "get_stripe_account_info",
+      "list_available_accounts_or_orgs",
+      "search_stripe_documentation",
+      "stripe_api_details",
+      "stripe_api_read",
+      "stripe_api_search",
+      "stripe_implementation_planner",
+    ],
   },
   url: "https://mcp.stripe.com",
 });

@@ -29,9 +29,8 @@ Exactly one classification per finding:
 - `User Error`: settings, configuration, operator-solvable, or needs-human-review cases support can explain or follow up on without a platform limitation or bug.
 - `Platform Limitation`: expected limitation, provider limitation, billing, entitlement, or plan limit, or known unsupported behavior.
 - `Bug`: direct evidence of internal failure that settings, configuration, and platform limits do not explain.
-- `Unproven`: current evidence cannot settle the claim. Name the exact missing evidence and reopen condition, and do not route or record it as a settled Bug.
 
-A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, use `Unproven`: hand back what is known with the missing confirmation named and nothing that reads as settled.
+A suspicion is never a confirmed `Bug`. When the cause needs a confirmation only a person can supply and it has not landed, do not force one of the three: hand back what is known with the missing confirmation named, no ticket, and nothing that reads as settled.
 
 ## Step 0 — Is this a money ask?
 
@@ -114,12 +113,6 @@ The affected counts on a case are the figures from that investigation on the dat
 
 Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided by Step 3 against current Linear.
 
-### 4.1B Apply the shared diagnosis discipline
-
-Load `customer-bug-diagnosis` now, after the claim, pinned workspace identity, duplicate search, and investigation-memory search are established. Use it to drive the code, production, runtime, alternatives, impact, regression-seam, and unblock work in 4.2 through 4.7. This shared skill replaces a single-pass diagnosis, not this intake router. This skill still owns the Linear issue, evidence-source mechanics, privacy boundary, and requester communication.
-
-The diagnosis must end in a safe reproduction, a complete production-forensics case, or `UNPROVEN`. Preserve its evidence ledger, competing hypotheses, verified facts, inference, unknowns, confidence, disproving observation, regression seam, impact-measurement attempt, and customer unblock in the investigation document.
-
 ### 4.2 Locate it in the code
 
 `prepare_repository` with `Acquisity/Acquisity`, which refreshes the checkout to the remote HEAD and returns the `worktree` path. Then `grep` and `read_file` under that path to find the code path the claim runs through. Answer what the code is supposed to do before deciding whether it did it.
@@ -163,9 +156,9 @@ Fill the Triage investigation document's Evidence and Ruled out sections with ev
 
 ### 4.6 Rehash the claim against the evidence
 
-The lanes are recorded, so apply the `customer-bug-diagnosis` output. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then propose `User Error`, `Platform Limitation`, `Bug`, or `Unproven` per the investigation stance above. Run Gate 2 (the stop-gate) before the proposed verdict.
+The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven, then classify as `User Error`, `Platform Limitation`, or `Bug` per the investigation stance above. Run Gate 2 (the stop-gate) before any verdict.
 
-A candidate `Bug` requires a causal code, job, state-transition, or provider path when code is relevant; a matching safe reproduction or complete production-forensics case; relevant configuration and limitation alternatives ruled out; and an attempted current blast-radius measurement. Record an exact count, the tightest supported bound, or honest `Unknown` with the attempted method, window, and missing telemetry. A directly reproduced or forensically proved defect remains a candidate Bug when exact population telemetry is unavailable. Plausibility without reproduction or a complete forensics chain is `Unproven`.
+A `Bug` verdict requires all three: a named file and function, direct evidence from 4.3 or 4.4, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
 
 Verdict quality bar: name the cause, not the mechanism.
 
@@ -180,26 +173,6 @@ When there is one, name it, say who performs it and whether it has already been 
 When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
-
-### 4.8 Gate a candidate Bug through triage-critic
-
-Load `incident-hotlane` for every candidate `Bug` and for any plausible high-risk claim whose critical evidence lane is unavailable. Evaluate impact before packet creation. If it returns `NEEDS_HUMAN_URGENT`, send only its provisional confirmation-in-progress escalation, route to a person, and stop before evidence preflight, packet creation, critic execution, Step 5 finalization, and every settled or structural write, including memory.
-
-Do not call the critic for `User Error`, `Platform Limitation`, ordinary feedback, or `Unproven`. Those paths continue to Step 5 after the diagnosis is complete.
-
-An `Unproven` result must carry the exact missing evidence and reopen condition into the investigation document and ticket comment. In Step 5 choose `Support/Product follow-up` only when a named person must obtain that evidence; otherwise choose `Resolved by triage` and close with the reopen condition. Never label, route, parent, prioritize, announce, or record it as a settled Bug.
-
-For a remaining candidate `Bug`, produce the proposed classification, priority, core-function impact, hotlane route, master candidate, and exact structural Linear writes. Preflight every user-scoped evidence connection the critic may need by completing its read in this attended root session. The task-mode critic cannot pause for sign-in; an unavailable optional source becomes an explicit evidence gap, never a retry loop.
-
-Call `create_triage_review_packet` with the canonical Linear issue id, target Linear project id, original source context, pinned workspace identity, diagnosis, ranked hypotheses, evidence ledger and stable handles, memory results and how they were used, current repository SHA and exact code paths, structured impact counts and count date when known, the complete duplicate-candidate and master-candidate sets with verified timestamps where required, impact method, unblock, and every proposed write. The tool overwrites the requested recency fields with an authenticated server stamp: `THIRTY_DAY` for intake-only Slack, `UNBOUNDED` for Linear Agent Sessions, and the current server evaluation time. Use the returned values as authoritative. In a 30-day workflow, put an otherwise causal but more-than-30-day-old master in `staleMasterCandidateIssueId`; never put it in `masterCandidateIssueId`. Then call the declared `triage-critic` subagent with only the returned evidence revision and instructions to review it. The critic has the same read-only investigation sources as this workflow, plus the prepared repository and investigation memory. It has no mutation surface.
-
-Approval is valid only when the critic returns `APPROVE` and echoes the exact evidence revision and reviewer model returned by the packet tool. Foreman adjudicates every finding and records `MUST_REINVESTIGATE`, `FOLLOW_UP`, `DISMISS_WITH_EVIDENCE`, or `NEEDS_HUMAN`. A credible security, privacy, billing, destructive-action, material-data, core-function, or significant user-impact finding cannot be dismissed without a person.
-
-After each critic completion, call `read_triage_review_verdict` for that exact evidence revision. Only its server-attested verdict and opaque approval id control the gate; the child's returned object alone never does.
-
-Allow one full review. After materially addressing blocking findings, Foreman may create one new packet with `reviewAttempt: 2`, the first packet's exact `previousEvidenceRevision`, and `targetedRecheckCriteria` equal to the first attested verdict's complete failed-criterion set, then run one targeted recheck through the same `triage-critic` identity and reviewer model. If new evidence, a changed code SHA, changed blast-radius method, different master candidate, assigned project, or another material decision change invalidates a prior attempt-1 approval, use that same one remaining attempt with `targetedRecheckCriteria` set to all twelve critic criteria and perform a complete review. If the reviewer model changed, material disagreement remains, or approval is invalidated after attempt two, route to `needs-human`. Do not create a third attempt or fresh reviewer chain.
-
-Until the current revision is approved, do not publish a settled Bug conclusion, create or change a root-cause master, parent or re-parent the report, apply hotlane or materially escalate priority, send a confirmed incident notification, or write investigation memory. A private draft, an explicit unproven status, a request for evidence, or a human escalation remains allowed.
 
 ## Step 5 — Decide the handling path
 
@@ -218,15 +191,15 @@ Priority comes from impact, never from the reporter's requested priority or how 
 Weigh these in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
-2. Core-function impact. A confirmed core workflow blocked or materially impaired is hotlane even for one workspace. Blast radius changes the incident scope, not whether one proved core blocker deserves immediate handling.
+2. Blast radius, quantified from primary data in 4.3, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
 3. Frequency. A small failure that hits every send or sync outweighs a severe one that fires rarely.
 4. Customer tier. Enterprise or partner exposure breaks ties only. Never a reason to inflate a band.
 5. Money. An active billing or refund blocker is at least `High`.
 
 Bands:
 
-- `Urgent`: production outage, security or data-loss risk, major revenue or customer-trust incident, or a confirmed core workflow blocked or materially impaired even for one workspace.
-- `High`: a material defect that does not qualify as hotlane, multiple orgs affected on a non-core path, money issue requiring action, repeat production failure, or an enterprise customer blocked.
+- `Urgent`: production outage, security or data-loss risk, major revenue or customer-trust incident, or a core workflow blocked for many orgs.
+- `High`: multiple orgs blocked on a core workflow, money issue requiring action, repeat production failure, or an enterprise customer blocked.
 - `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
 - `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
 
@@ -263,7 +236,7 @@ Write the report comment from the template below via the Linear connection. It i
 
 ## Step 9 — Route
 
-For non-bugs, the customer already has their answer from Step 8. For a candidate Bug, Steps 5 through 8 run only after 4.8 approved the current evidence revision, so the comment cannot publish a settled conclusion before the critic gate. Routing changes what engineering sees.
+The customer already has their answer from Step 8. Nothing here changes what they were told; it changes what engineering sees. Never hold the comment back for this step.
 
 ### When the ticket is not engineering actionable
 
@@ -277,8 +250,6 @@ A `Duplicate` still inherits. When you mark a ticket a duplicate of another, rea
 
 The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it.
 
-Load `engineering-handoff` and follow its causal grouping, source/master privacy boundary, complete safe-write sequence, and readback contract. After the critic completes, call `read_triage_review_verdict` with the exact current evidence revision. Proceed only with the opaque `approvalId` returned for `APPROVE`; a model-authored approval object is not evidence. Revalidate that attestation immediately before the first structural write.
-
 1. Search for an existing master on four axes: the cause, the code path from 4.2, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug. For every query, call `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `limit: 250`.
 
    When the active context says this is an intake-only Slack workflow, search no further than 30 days back by also passing `createdAt: "-P30D"` on every query. Outside an intake-only Slack workflow, including a Linear Agent Session, preserve the general triage behavior: do not pass a `createdAt` filter, and consider matching masters regardless of creation date.
@@ -286,10 +257,12 @@ Load `engineering-handoff` and follow its causal grouping, source/master privacy
    In every context, while `hasNextPage` is true, repeat the identical filtered query with the returned `cursor`, accumulating candidates from every page until `hasNextPage` is false.
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
-2. In an intake-only Slack workflow, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge, but include the closest same-cause stale master and its verified creation time in the review packet. The reservation uses that reviewed stale master as the next generation key, so concurrent reports can authorize only one replacement. Outside that Slack workflow, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
-3. Pass the complete eligible candidate set, this source ticket, the intake-only recency decision, the area owner, and the opaque approval id to `engineering-handoff`. That shared skill exclusively owns matching an existing master, reserving a new causal identity when needed, creating or updating one master, parenting, aggregate updates, and readback. Do not restate or bypass its write sequence here. Several acceptance criteria or implementation steps never justify multiple masters.
+2. In an intake-only Slack workflow, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Outside that Slack workflow, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master.
+3. If a master already owns the cause: read the master's assignee, then set this ticket's `parentId` to that master and its `assignee` to the master's assignee in the same `save_issue` call (the field is `assignee`, not `assigneeId`), so the child never sits under a master owned by someone else. Where the master has no assignee, fall back to the area-routing roster below and say in the document that the master was unassigned. Then comment the new evidence on the master, re-count the blast radius and update the master's section with the new figure and date, and re-weigh the master's priority. A second independent report is frequency evidence, which is severity weighting item 3. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
+4. If no eligible master owns the cause, create one with the master template below, on the ENG team, labelled with the type, priority per Step 6, and assigned to the area owner from the roster below. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
+5. Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
-The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. An older matching master may be related for history but never reused as the parent. It narrows the candidate set only in that workflow. In other contexts, master eligibility has no recency cutoff. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
+The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. It narrows the candidate set only in that workflow. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
 
 ### Area-routing roster
 
@@ -313,7 +286,7 @@ Load the slack-wording skill before writing. Give a concrete finding, hand the n
 
 ## Step 11 — Record the investigation in memory
 
-Last, after the Triage investigation document is attached and all applicable Linear writes and readback are complete, call `record_investigation_case`. For a Bug, pass the opaque `criticApprovalId` returned by `read_triage_review_verdict`; the tool verifies the actual completed review, packet, model, repository revision, claim, root cause, and confidence server-side. Without it the classification is not final and the tool rejects the record. Non-bug classifications keep their existing final-classification timing. Investigation memory stores the settled result, never a working draft.
+Last, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. Not before: a case written from a half-finished investigation is a wrong answer that the next ticket inherits.
 
 Send the pattern, not the customer. The claim, the root cause, the symptoms in the product's own words, the error signatures with identifiers stripped, the code path and commit from 4.2, the conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), the counts with the date they were counted, and the links back to the ticket. Never an email address, an organization or user id, a production row, a log, or anything credential-shaped. Those live in the document, under the ticket's own visibility, and the tool refuses them.
 
@@ -321,7 +294,7 @@ The product area comes from the ticket's Linear project. Affected features go in
 
 A failure here changes nothing about the ticket. Record it internally when useful and move on. Do not retry into a second case, do not change the comment, and do not revisit the verdict. Never announce a memory read or write, promise to save something to memory, or mention memory availability in the Slack thread.
 
-If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. Foreman, not the critic, owns the correction. Complete the applicable diagnosis and review again, and pass the new opaque `criticApprovalId` when the corrected conclusion is a Bug. The tool supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. A plain search is ranked, capped, and bounded by a time window, so a ticket's own case can fall outside it; adding the ticket identifier drops the relevance filters and the time window and returns the case however old it is. Still pass the project id, which the call always requires. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
+If later evidence overturns a conclusion you already recorded, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case, not just the change: the active case id, the correction reason, and the full payload again, on the same ticket and project. The case id comes from the write that recorded it. In a later session you will not have it, so search with the ticket identifier to get it back. A plain search is ranked, capped, and bounded by a time window, so a ticket's own case can fall outside it; adding the ticket identifier drops the relevance filters and the time window and returns the case however old it is. Still pass the project id, which the call always requires. The old conclusion stays readable and stops being used. Never record a second case for the same ticket.
 
 ## Follow-ups
 
@@ -414,7 +387,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 # Triage investigation
 
 **Ticket**: <ENG-XXXX>
-**Classification**: <User Error | Platform Limitation | Bug | Unproven>
+**Classification**: <User Error | Platform Limitation | Bug>
 **Organization**: <organization_id> (<org name>)
 
 ## Claim

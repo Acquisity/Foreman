@@ -43,9 +43,6 @@ export const SLA_REPORT_PREFIX = "sla-report/";
 /** Blob path prefix holding durable repository and pull-request pipeline runs. */
 export const PIPELINE_RUNS_PREFIX = "pipeline-runs/";
 
-/** Blob path prefix holding critic attestations and their single-use bindings. */
-export const TRIAGE_REVIEW_PREFIX = "triage-review/";
-
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
  *
@@ -94,11 +91,6 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the daily SLA report dispatch marker",
     readTool: "no tool; the sla-report schedule owns this namespace",
     writeTool: "no tool; the sla-report schedule owns this namespace",
-  },
-  [TRIAGE_REVIEW_PREFIX]: {
-    label: "triage critic attestations",
-    readTool: "read_triage_review_verdict",
-    writeTool: "no model tool; the triage review gate owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",
