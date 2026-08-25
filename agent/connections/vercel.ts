@@ -8,7 +8,7 @@ import { userConnect } from "../lib/user-connect.js";
  * unattended factory runs so a prompt-injected labeled issue can never
  * deploy or post to toolbar threads.
  */
-const WRITE_TOOLS = [
+export const WRITE_TOOLS = [
   "deploy_to_vercel",
   "change_toolbar_thread_resolve_status",
   "reply_to_toolbar_thread",
