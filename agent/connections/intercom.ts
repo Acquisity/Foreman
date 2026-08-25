@@ -1,7 +1,7 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import type { ApprovalContext, ApprovalStatus } from "eve/tools";
 import { requireEnv } from "../lib/constants.js";
+import { managedConnect } from "../lib/managed-connect.js";
 import {
   canUseInvestigationMemory,
   isAutonomous,
@@ -38,7 +38,7 @@ const intercomReadPolicy = (ctx: ApprovalContext): ApprovalStatus => {
  */
 export default defineMcpClientConnection({
   approval: intercomReadPolicy,
-  auth: connect({
+  auth: managedConnect({
     connector: requireEnv(
       "INTERCOM_MCP_CONNECTOR",
       "api.intercom.com/acquisity-foreman-intercom-api"

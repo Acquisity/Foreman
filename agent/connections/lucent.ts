@@ -1,6 +1,6 @@
-import { connect } from "@vercel/connect/eve";
 import { defineMcpClientConnection } from "eve/connections";
 import { requireEnv } from "../lib/constants.js";
+import { managedConnect } from "../lib/managed-connect.js";
 
 /**
  * Lucent MCP connection for session-replay bug evidence.
@@ -17,7 +17,7 @@ import { requireEnv } from "../lib/constants.js";
  * the one write tool, `update_issue`.
  */
 export default defineMcpClientConnection({
-  auth: connect({
+  auth: managedConnect({
     connector: requireEnv(
       "LUCENT_MCP_CONNECTOR",
       "app.lucenthq.com/acquisity-foreman-lucent"

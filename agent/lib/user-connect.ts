@@ -1,10 +1,11 @@
-import { connect, type EveAuthorizationOptions } from "@vercel/connect/eve";
+import type { EveAuthorizationOptions } from "@vercel/connect/eve";
 import {
   ConnectionAuthorizationFailedError,
   type ConnectionPrincipal,
   type InteractiveAuthorizationDefinition,
   isConnectionAuthorizationRequiredError,
 } from "eve/connections";
+import { managedConnect } from "./managed-connect.js";
 import { INTAKE_ONLY_ATTRIBUTE } from "./trust.js";
 
 /**
@@ -72,7 +73,7 @@ export function intakeOnlySignInDenial(
 export function userConnect(
   options: EveAuthorizationOptions & { readonly principalType?: "user" }
 ) {
-  const auth = connect({ ...options, principalType: "user" });
+  const auth = managedConnect({ ...options, principalType: "user" });
   const wrapped: typeof auth = {
     ...auth,
     getToken: async (
