@@ -97,7 +97,7 @@ export default defineAgent({
       },
       criteria_results: {
         description:
-          "Exactly one entry per criterion slug, in order. FAIL needs the blocking evidence so a recheck has an exact target. NOT_APPLICABLE never appears in an APPROVE.",
+          "Exactly one entry per criterion slug, in order, for any review that ran. Empty only when the review could not start, which is always INSUFFICIENT_EVIDENCE. FAIL needs the blocking evidence so a recheck has an exact target. NOT_APPLICABLE only for a criterion the proposal does not rely on.",
         items: {
           additionalProperties: false,
           properties: {
@@ -117,7 +117,6 @@ export default defineAgent({
           type: "object",
         },
         maxItems: CRITIC_CRITERIA.length,
-        minItems: CRITIC_CRITERIA.length,
         type: "array",
       },
       reviewed: {
@@ -127,7 +126,7 @@ export default defineAgent({
         properties: {
           commit: {
             description:
-              "The repository commit the review verified code against, as found in the shared checkout.",
+              "The commit checkout_commit returned, or the word unpinned when the checkout could not be made.",
             type: "string",
           },
           document_id: { type: "string" },

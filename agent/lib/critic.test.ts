@@ -45,6 +45,7 @@ const stubEnv = (): NodeJS.ProcessEnv => {
 interface DiscoveredSubagent {
   manifest: {
     connections: unknown[];
+    diagnosticsSummary: { errors: number };
     instructions: { definition: { content: string } }[];
     sandbox: { logicalPath: string } | null;
     skills: { name: string }[];
@@ -124,10 +125,8 @@ describe("critic subagent", () => {
       })
     ) as {
       artifacts: { discoveryManifest: string };
-      diagnostics: { errors: number };
       subagents: string[];
     };
-    assert.equal(info.diagnostics.errors, 0);
     assert.ok(info.subagents.includes("critic"));
 
     const manifest = JSON.parse(
@@ -137,6 +136,7 @@ describe("critic subagent", () => {
       (entry) => entry.subagentId === "critic"
     );
     assert.ok(critic, "critic must appear in the discovery manifest");
+    assert.equal(critic.manifest.diagnosticsSummary.errors, 0);
     assert.deepEqual(
       critic.manifest.skills.map((entry) => entry.name),
       ["triage-critic"]
