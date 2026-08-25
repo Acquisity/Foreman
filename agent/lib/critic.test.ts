@@ -19,6 +19,10 @@ const instructions = readFileSync(
   new URL("instructions.md", criticRoot),
   "utf8"
 );
+const skill = readFileSync(
+  new URL("skills/triage-critic/SKILL.md", criticRoot),
+  "utf8"
+);
 
 // Connector variables the authored modules require at evaluation time. Any
 // value satisfies discovery; nothing here is ever contacted.
@@ -42,7 +46,7 @@ interface DiscoveredSubagent {
     connections: unknown[];
     instructions: { definition: { content: string } }[];
     sandbox: { logicalPath: string } | null;
-    skills: unknown[];
+    skills: { name: string }[];
     tools: { logicalPath: string }[];
   };
   subagentId: string;
@@ -62,17 +66,19 @@ describe("critic subagent", () => {
     );
     for (const criterion of CRITIC_CRITERIA) {
       assert.ok(
-        instructions.includes(`\`${criterion}\``),
-        `instructions must define ${criterion}`
+        skill.includes(`\`${criterion}\``),
+        `skill must define ${criterion}`
       );
     }
   });
 
-  it("keeps the whole procedure in instructions, with nothing to load", () => {
-    assert.ok(!existsSync(new URL("skills/", criticRoot)));
-    assert.ok(!instructions.includes("load_skill"));
-    assert.ok(instructions.includes("There is no attempt 3"));
-    assert.ok(instructions.includes("Return only the structured result"));
+  it("keeps the whole procedure in the child-local skill and loads it first", () => {
+    assert.ok(
+      !existsSync(new URL("../skills/triage-critic/", import.meta.url))
+    );
+    assert.ok(instructions.includes("Load the `triage-critic` skill before"));
+    assert.ok(instructions.includes("If the skill fails to load"));
+    assert.ok(skill.includes("There is no attempt 3"));
   });
 
   it("disables every write-capable default tool", () => {
@@ -94,7 +100,7 @@ describe("critic subagent", () => {
     }
   });
 
-  it("is discovered by eve as a sharing child with no skills", () => {
+  it("is discovered by eve as a sharing child with its own skill", () => {
     // Real discovery, not a source-string check: PR #53 shipped a child whose
     // skill eve could not find because the test only looked at filenames.
     const info = JSON.parse(
@@ -119,7 +125,10 @@ describe("critic subagent", () => {
       (entry) => entry.subagentId === "critic"
     );
     assert.ok(critic, "critic must appear in the discovery manifest");
-    assert.deepEqual(critic.manifest.skills, []);
+    assert.deepEqual(
+      critic.manifest.skills.map((entry) => entry.name),
+      ["triage-critic"]
+    );
     assert.equal(critic.manifest.sandbox?.logicalPath, "sandbox.ts");
     assert.ok(
       critic.manifest.instructions.some((entry) =>
