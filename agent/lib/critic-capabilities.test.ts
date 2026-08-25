@@ -6,7 +6,6 @@ import { describe, it } from "node:test";
 // here is contacted; the values only have to exist.
 const ENV_ASSIGNMENT = /^([A-Z][A-Z0-9_]*)=/u;
 const TS_EXTENSION = /\.ts$/u;
-const WITHOUT_CONSENT = /withoutConsent\(/u;
 for (const line of readFileSync(
   new URL("../../.env.example", import.meta.url),
   "utf8"
@@ -162,12 +161,14 @@ describe("critic evidence surface", () => {
         );
       } else {
         // A task-mode child never parks on consent: user-scoped getToken is
-        // wrapped by withoutConsent, and that wrapper is the only difference.
-        const source = readFileSync(
-          new URL(`connections/${name}.ts`, criticRoot),
-          "utf8"
+        // the withoutConsent wrapper (behavior covered in user-connect.test),
+        // and the delegated credential beneath it is the root's, checked by
+        // the evict / principalType / Connect config assertions below.
+        assert.notEqual(
+          child.auth?.getToken,
+          root.auth.getToken,
+          `${name}: getToken must be wrapped`
         );
-        assert.match(source, WITHOUT_CONSENT, `${name}: must never park`);
       }
       assert.equal(child.auth?.evict, root.auth.evict, `${name}: evict`);
       assert.equal(child.auth?.principalType, root.auth.principalType, name);
