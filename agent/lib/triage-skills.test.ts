@@ -6,6 +6,17 @@ const triageSkill = readFileSync(
   new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const triageReportingReference = readFileSync(
+  new URL(
+    "../skills/triage-investigate/references/reporting.md",
+    import.meta.url
+  ),
+  "utf8"
+);
+const triageToolsReference = readFileSync(
+  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
+  "utf8"
+);
 const intercomTriageSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
@@ -23,6 +34,116 @@ const extractInstruction = (skill: string, start: string, end: string) => {
   assert.ok(endIndex > startIndex);
   return skill.slice(startIndex, endIndex);
 };
+
+test("shared triage exposes one seven-stage workflow with settled fact boundaries", () => {
+  const stages = [
+    "Stage 1: Establish the case",
+    "Stage 2: Resolve customer identity once",
+    "Stage 3: Check existing work and frame the investigation",
+    "Stage 4: Investigate",
+    "Stage 5: Decide handling",
+    "Stage 6: Persist and route",
+    "Stage 7: Finish the attended response and memory bookkeeping",
+  ];
+
+  let previousIndex = -1;
+  for (const stage of stages) {
+    const stageIndex = triageSkill.indexOf(`## ${stage}`);
+    assert.ok(stageIndex > previousIndex);
+    previousIndex = stageIndex;
+  }
+
+  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 7);
+  assert.ok(triageSkill.includes("runtime's `intakeOnly` value as a fact"));
+  assert.ok(triageSkill.includes("including `null`"));
+  assert.ok(
+    triageSkill.includes(
+      "Reopen it only when genuinely new evidence conflicts with that result"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "without reopening trusted intake, project, identity, or completed evidence unless new conflicting evidence appears"
+    )
+  );
+});
+
+test("shared triage preserves every evidence lane and exact tool catalog", () => {
+  const evidenceLanes = [
+    "Search investigation memory",
+    "Locate it in the code",
+    "Check the data",
+    "Background work",
+    "Errors, crashes, stack traces",
+    "Anything the other lanes do not carry",
+    "Email delivery, bounces, spam placement",
+    "Instantly workspace membership",
+    "What the user actually did",
+    "Deployment or edge failures",
+    "The conversation behind the report",
+  ];
+  const toolCatalogs = [
+    "Repository (root tools, no prefix)",
+    "Investigation memory (root tools, no prefix)",
+    "PlanetScale (`planetscale__`)",
+    "Instantly (root tools, no prefix)",
+    "Linear (`linear__`)",
+    "Inngest (`inngest__`)",
+    "Sentry (`sentry__`)",
+    "Axiom (`axiom__`)",
+    "PostHog (`posthog__`)",
+    "Lucent (`lucent__`)",
+    "Jam (`jam__`)",
+    "Vercel (`vercel__`)",
+    "Intercom (`intercom__`)",
+    "Resend (`resend__`)",
+    "Modem (`modem__`)",
+  ];
+
+  for (const lane of evidenceLanes) {
+    assert.ok(triageSkill.includes(lane), lane);
+  }
+  for (const catalog of toolCatalogs) {
+    assert.ok(triageToolsReference.includes(`## ${catalog}`), catalog);
+  }
+  assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
+  assert.ok(
+    triageSkill.includes("[references/reporting.md](references/reporting.md)")
+  );
+  assert.ok(triageReportingReference.includes("## Linear report template"));
+  assert.ok(
+    triageReportingReference.includes(
+      "## Triage investigation document template"
+    )
+  );
+  assert.ok(triageReportingReference.includes("## Master ticket template"));
+});
+
+test("shared triage preserves project-scoped memory and missing-project routing", () => {
+  assert.ok(
+    triageSkill.includes(
+      "A ticket with no project has nothing to search. Record `Unavailable: no Linear project`"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "When the Linear project is `null` or unmapped, record no investigation-memory case and route to Aaron Fraga"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "PlanetScale is the production database and the only source of current production truth"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius"
+    )
+  );
+});
 
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
