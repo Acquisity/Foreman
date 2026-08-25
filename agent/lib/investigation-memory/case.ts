@@ -137,8 +137,8 @@ const featureKey = z.enum(FEATURE_KEYS);
 
 /**
  * The write payload. `primaryFeatureKey` is absent on purpose: the executor
- * derives it from `linearProjectId`, so the model cannot choose the bucket a
- * case lands in.
+ * derives it from the evidence-backed project id saved during final handling,
+ * so the model cannot directly choose the bucket a case lands in.
  */
 export const casePayloadSchema = z
   .object({
@@ -195,7 +195,9 @@ export const casePayloadSchema = z
     ),
     linearProjectId: z
       .uuid()
-      .describe("The source issue's Linear project id. It picks the feature."),
+      .describe(
+        "The evidence-backed project id read from the issue after final Linear handling. It scopes this completed-case write only."
+      ),
     observedFrom: z.iso.datetime().optional(),
     observedTo: z.iso.datetime().optional(),
     provider: cleanText(60).optional(),

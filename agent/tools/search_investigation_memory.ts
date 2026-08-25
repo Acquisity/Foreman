@@ -6,7 +6,6 @@ import {
 } from "#lib/investigation-memory/case.js";
 import {
   FEATURE_KEYS,
-  featureForProject,
   isDependencyKey,
   LIVE_FEATURE_KEYS,
   MAX_SCOPE_ENTRIES,
@@ -15,14 +14,13 @@ import {
   DEFAULT_SEARCH_LIMIT,
   DEFAULT_SEARCH_WINDOW_DAYS,
   MAX_SEARCH_LIMIT,
-  searchCases,
-  searchCasesAcrossLiveFeatures,
+  searchCasesGlobally,
 } from "#lib/investigation-memory/store.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Search past Foreman triage investigations after the current claim is stated. With a Linear project id, search its mapped product scope. Without one, an authorized attended Intercom intake searches all six live core-product areas and excludes planned products. Results are historical analogies, never current truth: verify every match against current code, production data, and runtime evidence. Project-free incident signals are grouped per product area and never combine unrelated products. When `available` is false, continue from current evidence.",
+    "Search past Foreman triage investigations after the current claim is stated. Every authorized attended triage surface searches the server-owned live product areas; Linear project metadata is neither accepted nor required. Results are historical analogies, never current truth: verify every match against current code, production data, and runtime evidence. Incident signals are grouped per product area and never combine unrelated products. When `available` is false, continue from current evidence.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
@@ -33,52 +31,24 @@ export default defineTool({
     }
 
     try {
-      if (input.linearProjectId === undefined) {
-        if (input.sourceIssueId !== undefined) {
-          return {
-            available: false as const,
-            reason:
-              "A ticket identity lookup still needs its Linear project. Use project-free search only for a live Intercom claim before a ticket exists.",
-          };
-        }
-        const { cases, clusters } = await searchCasesAcrossLiveFeatures({
-          classification: input.classification,
-          component: input.component,
-          dependencyKeys: input.dependencyKeys,
-          limit: input.limit,
-          provider: input.provider,
-          text: input.text,
-          windowDays: input.windowDays,
-        });
-        return {
-          available: true as const,
-          cases,
-          clusters,
-          searchedFeatureKeys: [...LIVE_FEATURE_KEYS],
-        };
-      }
-
-      const primaryFeatureKey = featureForProject(input.linearProjectId);
-      if (primaryFeatureKey === null) {
-        return {
-          available: false as const,
-          reason:
-            "That Linear project is not mapped to a product area, so there is no scope to search. Investigate from current evidence and route the ticket to Aaron Fraga as the triage skill already requires.",
-        };
-      }
-
-      const { cases, cluster } = await searchCases({
+      const { cases, clusters } = await searchCasesGlobally({
         classification: input.classification,
         component: input.component,
         dependencyKeys: input.dependencyKeys,
         limit: input.limit,
-        primaryFeatureKey,
         provider: input.provider,
         sourceIssueId: input.sourceIssueId,
         text: input.text,
         windowDays: input.windowDays,
       });
-      return { available: true as const, cases, cluster, primaryFeatureKey };
+      return {
+        available: true as const,
+        cases,
+        clusters,
+        ...(input.sourceIssueId === undefined
+          ? { searchedFeatureKeys: [...LIVE_FEATURE_KEYS] }
+          : {}),
+      };
     } catch (error) {
       console.error("Investigation memory search failed.", error);
       return {
@@ -98,12 +68,6 @@ export default defineTool({
         "Shared systems the claim runs through, when they are known: instantly, webhooks, inngest."
       ),
     limit: z.int().min(1).max(MAX_SEARCH_LIMIT).default(DEFAULT_SEARCH_LIMIT),
-    linearProjectId: z
-      .uuid()
-      .optional()
-      .describe(
-        "The Linear project id read off the current issue. Omit only for an authorized live Intercom intake before a Linear issue exists; that searches the server-owned list of live product areas."
-      ),
     provider: z.string().trim().min(1).max(60).optional(),
     sourceIssueId: z
       .string()
@@ -131,16 +95,6 @@ export default defineTool({
   outputSchema: z.object({
     available: z.boolean(),
     cases: z.array(caseProjectionSchema).optional(),
-    cluster: z
-      .object({
-        distinctFeatures: z.number(),
-        firstSeen: z.string().nullable(),
-        lastSeen: z.string().nullable(),
-        possibleWiderIncident: z.boolean(),
-        reports: z.number(),
-        windowDays: z.number(),
-      })
-      .optional(),
     clusters: z
       .array(
         z.object({
@@ -154,7 +108,6 @@ export default defineTool({
         })
       )
       .optional(),
-    primaryFeatureKey: z.enum(FEATURE_KEYS).optional(),
     reason: z.string().optional(),
     searchedFeatureKeys: z.array(z.enum(FEATURE_KEYS)).optional(),
   }),

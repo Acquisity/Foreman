@@ -39,9 +39,9 @@ Write one testable sentence: what the customer says happened, what they expected
 
 ## Step 3A: Search investigation memory
 
-Immediately after the claim is written, call `search_investigation_memory`. Do not read or create a Linear issue first, and omit `linearProjectId`.
+Immediately after the claim is written, call `search_investigation_memory`. Do not read or create a Linear issue first. The tool accepts no Linear project metadata.
 
-Pass the claim and visible error in `text`, plus the component, provider, and known dependency keys. This authorized project-free call searches the server-owned live areas: Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, and Core Platform. It excludes the planned Acquisity Agent area.
+Pass the claim and visible error in `text`, plus the component, provider, and known dependency keys. This is the same project-independent retrieval used by every authorized attended triage surface. It searches the server-owned live areas: Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, and Core Platform. It excludes the planned Acquisity Agent area.
 
 Every returned case identifies its `primaryFeatureKey`. Treat it as a historical analogy, never current truth and never proof of the current product area. For each plausible case, record why it resembles the claim and what current evidence would disconfirm it, then check that evidence. Historical affected counts are dated figures, never the current blast radius.
 

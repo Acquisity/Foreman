@@ -5,36 +5,34 @@ import { LIVE_FEATURE_KEYS } from "#lib/investigation-memory/scope.js";
 import searchInvestigationMemory from "../tools/search_investigation_memory.js";
 
 const { inputSchema, outputSchema } = searchInvestigationMemory;
-assert.ok(inputSchema instanceof z.ZodType);
+assert.ok(inputSchema instanceof z.ZodObject);
 assert.ok(outputSchema instanceof z.ZodType);
 
 interface ParsedInput {
   dependencyKeys?: string[];
   limit: number;
-  linearProjectId?: string;
   sourceIssueId?: string;
 }
 
 interface ParsedOutput {
   clusters?: Array<{ primaryFeatureKey: string }>;
-  primaryFeatureKey?: string;
   searchedFeatureKeys?: string[];
 }
 
-test("search_investigation_memory accepts project-free Intercom claims", () => {
+test("search_investigation_memory exposes one project-independent input", () => {
   const input = inputSchema.parse({
     component: "campaign scheduler",
     dependencyKeys: ["inngest"],
     provider: "instantly",
     text: "Campaigns remain queued after the visible scheduling error.",
-  }) as ParsedInput;
+  }) as unknown as ParsedInput;
 
-  assert.equal(input.linearProjectId, undefined);
+  assert.equal("linearProjectId" in inputSchema.shape, false);
   assert.deepEqual(input.dependencyKeys, ["inngest"]);
   assert.equal(input.limit, 5);
 });
 
-test("project-free output identifies live areas and per-area clusters", () => {
+test("global output identifies live areas and per-area clusters", () => {
   const output = outputSchema.parse({
     available: true,
     cases: [],
@@ -54,20 +52,17 @@ test("project-free output identifies live areas and per-area clusters", () => {
 
   assert.deepEqual(output.searchedFeatureKeys, LIVE_FEATURE_KEYS);
   assert.equal(output.clusters?.[0]?.primaryFeatureKey, "cold_email");
-  assert.equal(output.primaryFeatureKey, undefined);
 });
 
-test("existing project-scoped input remains supported", () => {
+test("ticket identity lookup is project-independent", () => {
   const input = inputSchema.parse({
-    linearProjectId: "1ae59086-e924-42d1-b7ff-f9c750a2a7c9",
     sourceIssueId: "ENG-123",
-  }) as ParsedInput;
+  }) as unknown as ParsedInput;
 
-  assert.equal(input.linearProjectId, "1ae59086-e924-42d1-b7ff-f9c750a2a7c9");
   assert.equal(input.sourceIssueId, "ENG-123");
 });
 
-test("project-free search remains denied to an unstamped session", async () => {
+test("global search remains denied to an unstamped session", async () => {
   const pending = searchInvestigationMemory.execute(
     {
       limit: 5,

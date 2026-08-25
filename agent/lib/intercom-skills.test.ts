@@ -25,7 +25,7 @@ const billingTools = readFileSync(
   "utf8"
 );
 
-test("Intercom product skill searches project-free memory after the claim", () => {
+test("Intercom product skill uses global memory retrieval after the claim", () => {
   const claim = productSkill.indexOf("## Step 3: State the claim");
   const memory = productSkill.indexOf(
     "## Step 3A: Search investigation memory"
@@ -37,7 +37,7 @@ test("Intercom product skill searches project-free memory after the claim", () =
   assert.ok(claim >= 0);
   assert.ok(memory > claim);
   assert.ok(identity > memory);
-  assert.ok(productSkill.includes("omit `linearProjectId`"));
+  assert.ok(productSkill.includes("accepts no Linear project metadata"));
   for (const area of [
     "Cold Email",
     "Domains & Inboxes",
@@ -112,7 +112,7 @@ test("Intercom skills own their tool references", () => {
   for (const phrase of [
     "## Intercom (`intercom__`)",
     "search_investigation_memory",
-    "omit `linearProjectId`",
+    "accepts no Linear project metadata",
     "known conversation id",
   ]) {
     assert.ok(productTools.includes(phrase), phrase);

@@ -66,7 +66,7 @@ test("shared triage exposes one seven-stage workflow with settled fact boundarie
   );
   assert.ok(
     triageSkill.includes(
-      "without reopening trusted intake, project, identity, or completed evidence unless new conflicting evidence appears"
+      "without reopening trusted intake, identity, or completed evidence unless new conflicting evidence appears"
     )
   );
 });
@@ -122,17 +122,37 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
   assert.ok(triageReportingReference.includes("## Master ticket template"));
 });
 
-test("shared triage preserves project-scoped memory and missing-project routing", () => {
+test("shared triage makes retrieval project-independent", () => {
+  const establish = extractInstruction(
+    triageSkill,
+    "## Stage 1: Establish the case",
+    "## Stage 2: Resolve customer identity once"
+  );
+  const investigate = extractInstruction(
+    triageSkill,
+    "### Search investigation memory",
+    "### Locate it in the code"
+  );
+
+  for (const oldInstruction of [
+    "A ticket with no project has nothing to search",
+    "Unavailable: no Linear project",
+    "Pass the project id from the ticket",
+    "The project is what picks the product area",
+    "route to Aaron Fraga as the triage skill already requires",
+  ]) {
+    assert.equal(triageSkill.includes(oldInstruction), false, oldInstruction);
+  }
+  assert.ok(establish.includes("ordinary intake metadata"));
   assert.ok(
-    triageSkill.includes(
-      "A ticket with no project has nothing to search. Record `Unavailable: no Linear project`"
+    establish.includes(
+      "Do not establish, verify, infer, preserve, or route from a product project yet"
     )
   );
-  assert.ok(
-    triageSkill.includes(
-      "When the Linear project is `null` or unmapped, record no investigation-memory case and route to Aaron Fraga"
-    )
-  );
+  assert.ok(investigate.includes("accepts no Linear project id"));
+  assert.ok(investigate.includes("every authorized attended triage surface"));
+  assert.ok(investigate.includes("projectless Linear tickets"));
+  assert.ok(investigate.includes("generic intake projects such as `Support`"));
   assert.ok(
     triageSkill.includes(
       "PlanetScale is the production database and the only source of current production truth"
@@ -141,6 +161,51 @@ test("shared triage preserves project-scoped memory and missing-project routing"
   assert.ok(
     triageSkill.includes(
       "Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius"
+    )
+  );
+});
+
+test("ENG-12880-shaped projectless intake searches memory before choosing a project", () => {
+  const memorySearch = triageSkill.indexOf(
+    "including projectless Linear tickets"
+  );
+  const projectChoice = triageSkill.indexOf(
+    "### Choose the product project from completed evidence"
+  );
+
+  assert.ok(memorySearch >= 0);
+  assert.ok(projectChoice > memorySearch);
+  assert.ok(
+    triageSkill.includes(
+      "Save the evidence-backed project during the final `save_issue` handling"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "pass that resulting project id to `record_investigation_case`"
+    )
+  );
+});
+
+test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback", () => {
+  assert.ok(
+    triageSkill.includes(
+      "generic intake project such as `Support` cannot make this decision"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "When the request is explicitly read-only validation, still search memory"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "apply no Linear mutation and do not record investigation memory"
     )
   );
 });
