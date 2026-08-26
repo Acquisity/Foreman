@@ -164,7 +164,7 @@ test("shared triage makes retrieval project-independent", () => {
   assert.ok(investigate.includes("accepts no Linear project id"));
   assert.ok(investigate.includes("every authorized attended triage surface"));
   assert.ok(investigate.includes("projectless Linear tickets"));
-  assert.ok(investigate.includes("generic intake projects such as `Support`"));
+  assert.ok(investigate.includes("tickets that arrive under `Support`"));
   assert.ok(
     triageSkill.includes(
       "PlanetScale is the production database and the only source of current production truth"
@@ -211,9 +211,7 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
 
 test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback", () => {
   assert.ok(
-    triageSkill.includes(
-      "generic intake project such as `Support` cannot make this decision"
-    )
+    triageSkill.includes("incoming `Support` project cannot make this decision")
   );
   assert.ok(
     triageSkill.includes(

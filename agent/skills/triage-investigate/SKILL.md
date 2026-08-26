@@ -129,7 +129,7 @@ Never locate, inspect, or verify a database in order to use investigation memory
 
 ### Search investigation memory
 
-Only now, after stating the claim, call `search_investigation_memory`. Pass the claim or visible error text and the component, provider, and dependency keys already known. The tool accepts no Linear project id and searches the server-owned live product areas for every authorized attended triage surface, including projectless Linear tickets and tickets filed under generic intake projects such as `Support`.
+Only now, after stating the claim, call `search_investigation_memory`. Pass the claim or visible error text and the component, provider, and dependency keys already known. The tool accepts no Linear project id and searches the server-owned live product areas for every authorized attended triage surface, including projectless Linear tickets and tickets that arrive under `Support`.
 
 The incoming project never gates this call and a memory result never chooses the eventual project. Do not deliberate about, verify, or infer product ownership before searching memory and completing the current-evidence lanes.
 
@@ -307,7 +307,7 @@ The customer already has their answer from the preceding comment step. Nothing h
 
 ### Choose the product project from completed evidence
 
-Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or generic intake project such as `Support` cannot make this decision. Save the evidence-backed project during the final `save_issue` handling alongside assignee, labels, priority, and status, then read the resulting issue so the saved project id is available for optional memory recording.
+Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when the case is one support closes without engineering (a config mismatch, workspace setup, an account or billing follow-up), and it records to memory like any other area. Save the evidence-backed project during the final `save_issue` handling alongside assignee, labels, priority, and status, then read the resulting issue so the saved project id is available for optional memory recording.
 
 If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the investigation document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
 
@@ -337,6 +337,7 @@ Take the product area from the evidence-backed project selected after the invest
 - Core Platform: Anuj Bhatt (`anuj.bhatt@acquisity.ai`), fallback James Keeble
 - CRM: Ebubeker Rexha (`ebubeker.rexha@acquisity.ai`)
 - Acquisity Agent (AI Consultant): Jil Patel (`jil.patel@acquisity.ai`)
+- Support: Aaron Fraga (`aaron.fraga@acquisity.ai`), never an engineer
 - Anything else: Aaron Fraga (`aaron.fraga@acquisity.ai`)
 
 The roster exists on the production ENG team only. Tickets on the SAN sandbox team always route to Aaron Fraga, whatever the area. If you cannot tell which area an issue belongs to, assign Aaron Fraga and say why the area was ambiguous. If a project has no lead set or the roster is unavailable on a run, assign Aaron Fraga and say in the report that routing needs a human. A guessed owner is worse than an explicit hand-off. Never route to retired or legacy projects.

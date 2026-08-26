@@ -27,6 +27,7 @@ export const FEATURE_KEYS = [
   "website_builder",
   "core_platform",
   "acquisity_agent",
+  "support",
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -48,6 +49,12 @@ export interface Feature {
  * Shopify Store Builder is deliberately absent. It is not live and is no
  * longer part of Acquisity.
  *
+ * `support` is the ENG `Support` project as an evidence-backed final project:
+ * config mismatches, workspace setup, account and billing follow-ups, and
+ * cases support closes without engineering. It is live so those cases record
+ * and recall like any other area. The incoming `Support` project still gates
+ * nothing; only the project saved after the investigation scopes a write.
+ *
  * `domains_inboxes` is its own area rather than part of `cold_email`. The
  * tickets there are provisioning and purchase failures (orders that never
  * provision, domains stuck in error, orphaned inboxes, checkout and refund
@@ -63,6 +70,7 @@ export const FEATURES: Readonly<Record<FeatureKey, Feature>> = {
   core_platform: { label: "Core Platform", lifecycle: "live" },
   crm: { label: "CRM", lifecycle: "live" },
   domains_inboxes: { label: "Domains & Inboxes", lifecycle: "live" },
+  support: { label: "Support", lifecycle: "live" },
   website_builder: { label: "Website Builder", lifecycle: "live" },
 };
 
@@ -90,7 +98,9 @@ export const LIVE_FEATURE_KEYS: readonly FeatureKey[] = Object.freeze(
  * but assigning them would be the inference this design exists to prevent, so
  * they stay unmapped until someone decides where they belong. An unmapped final
  * project is not an error: the case is simply not recorded, and the completed
- * investigation stands.
+ * investigation stands. The SAN sandbox `Support` project
+ * (`e3479f03-e840-4f72-864e-fc956c7934d6`) stays unmapped on purpose: sandbox
+ * tickets are test traffic, and a case from one is not a customer analogy.
  *
  * Ids are Linear project ids, which are stable across renames.
  */
@@ -105,6 +115,7 @@ export const LINEAR_PROJECT_FEATURES: Readonly<Record<string, FeatureKey>> = {
   "52fa1548-6f61-4732-8afc-20891168f91c": "cold_email", // Cold Email Core
   "313fb32a-67a4-4e03-a08d-5d264971486b": "ai_sdr", // AI SDR v1 (completed)
   "2484b203-9b4e-46f6-9848-9a059501280e": "core_platform", // Core Platform
+  "4534deb2-6bbc-4e30-ad38-48963f414d14": "support", // Support (ENG)
   "8201ed14-2417-48bc-9f53-d84fb3ad81cd": "website_builder", // AI Website Builder
   "331512fc-5734-4fa0-92a5-a9b5a85d965b": "ai_sdr", // AI SDR Inbox & UI
   "a69b5b38-19bf-4596-8e1f-d1dafb9fe1e2": "ai_sdr", // AI SDR Scheduling

@@ -135,13 +135,28 @@ test("scope taxonomy", async (t) => {
     assert.equal(FEATURES.domains_inboxes.lifecycle, "live");
   });
 
+  await t.test(
+    "records the ENG Support project, not the SAN sandbox one",
+    () => {
+      assert.equal(
+        featureForProject("4534deb2-6bbc-4e30-ad38-48963f414d14"),
+        "support"
+      );
+      assert.equal(
+        featureForProject("e3479f03-e840-4f72-864e-fc956c7934d6"),
+        null
+      );
+      assert.equal(FEATURES.support.lifecycle, "live");
+    }
+  );
+
   await t.test("carries Acquisity Agent as planned, not live", () => {
     assert.equal(FEATURES.acquisity_agent.lifecycle, "planned");
     assert.equal(FEATURES.cold_email.lifecycle, "live");
   });
 
   await t.test(
-    "exposes exactly the six live areas for project-independent recall",
+    "exposes exactly the seven live areas for project-independent recall",
     () => {
       assert.deepEqual([...LIVE_FEATURE_KEYS].sort(), [
         "ai_sdr",
@@ -149,6 +164,7 @@ test("scope taxonomy", async (t) => {
         "core_platform",
         "crm",
         "domains_inboxes",
+        "support",
         "website_builder",
       ]);
       assert.equal(LIVE_FEATURE_KEYS.includes("acquisity_agent"), false);

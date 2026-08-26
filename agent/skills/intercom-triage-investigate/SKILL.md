@@ -100,7 +100,7 @@ For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do
 
 For a confirmed Bug, complete all of the following before the final Slack reply:
 
-1. Determine the product project from the live conversation plus verified current code and data. Never select it from a memory analogy. If the area is missing or unmapped, create the customer report without a project, assign Aaron Fraga, state that routing needs a human, and skip final memory recording.
+1. Determine the product project from the live conversation plus verified current code and data. Never select it from a memory analogy. If the area is missing or unmapped, create the customer report without a project, assign Aaron Fraga, state that routing needs a human, and skip final memory recording. `Support` is a recordable area for cases support closes without engineering, not a home for a confirmed Bug.
 2. Search current Linear masters no further than 30 days back. Run every root-cause, code-path, provider-failure, and symptom query through `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id), `createdAt: "-P30D"`, and `limit: 250`; do not filter by a presumed master label. While `hasNextPage` is true, repeat the identical filtered query with the returned `cursor`, accumulating candidates from every page until `hasNextPage` is false. Apply this cutoff before selecting a candidate as the current master or setting it as the new report's parent: a master created exactly 30 days ago is eligible, while one more than 30 days old, even by one second, is stale and cannot parent the new report. Reject stale candidates for current-master selection and parent attachment even when another issue relation, investigation memory, an unbounded search, or prior knowledge surfaces them. Among the eligible candidates, match on root cause, not merely the visible outcome.
 3. Create one customer-report issue on the Engineering Team. Include the Intercom conversation URL, bounded conversation context, testable claim, classification, explicit project when known, priority, and the union of valid labels returned by Linear. Use `intercom-sourced` and `Customer reported` when those labels exist.
 4. Attach one issue-scoped document with `linear__save_document`, `issue` set to the report, and title `Triage investigation`. Keep raw customer identity, production rows, queries, and conversation evidence only on this report document.
@@ -119,6 +119,7 @@ Use the existing area-routing roster:
 - Website Builder: James Keeble (`james.keeble@aiacquisition.com`)
 - Core Platform: Anuj Bhatt (`anuj.bhatt@acquisity.ai`), fallback James Keeble
 - CRM: Ebubeker Rexha (`ebubeker.rexha@acquisity.ai`)
+- Support: Aaron Fraga (`aaron.fraga@acquisity.ai`), never an engineer
 - Anything missing, ambiguous, unmapped, or sandboxed: Aaron Fraga (`aaron.fraga@acquisity.ai`)
 
 ## Step 8: Record the case
