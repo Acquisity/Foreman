@@ -436,6 +436,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "re-delegate once with the same attempt number and the same inputs, and if it happens again it is a stop",
     "In a read-only run, describe those writes instead of making them",
     "once a version is approved, nothing may change it until routing is done",
+    "The Stage 7 reply after a stop states only what is known, says a person is settling it before anything is final, and promises no action",
     "is a stop, not a retry",
     "delegate again with `attempt 2`",
     "On a second `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on any stop",
