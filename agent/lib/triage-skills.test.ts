@@ -429,7 +429,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "`attempt 1`",
     "Do not pass an `outputSchema`",
     "Check the echo before reading the verdict",
-    "If `reviewed.commit` is `unpinned`, or `reviewed` does not echo exactly the issue id, document id, and `updatedAt` you supplied",
+    "If `reviewed.commit` is `unpinned` or is not exactly the full 40-character commit you supplied, or `reviewed` does not echo exactly the issue id, document id, and `updatedAt` you supplied",
     "Whatever the verdict says, do not count that result as an attempt: re-delegate once with the same attempt number and the same inputs",
     "If the second result is also `unpinned` or mis-echoed, it is a stop",
     "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
@@ -449,6 +449,11 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ]) {
     assert.ok(review.includes(rule), rule);
   }
+  assert.ok(
+    review.indexOf("Check the echo before reading the verdict") <
+      review.indexOf("Read the result as a whole before acting on `verdict`"),
+    "the echo check precedes the verdict read"
+  );
   assert.ok(
     triageSkill.includes(
       "After the handoff has read its writes back (or, for a non-actionable outcome, after the comment is posted), make one `patch`"
