@@ -212,6 +212,8 @@ Ask what gets them working today. A setting they or support can change, a re-run
 
 When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
 
+An unblock that someone at Acquisity would perform is only real once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it. Without all four there is no unblock to offer: record that none was confirmed and what evidence is missing. Naming Support or engineering does not make an unverified action real.
+
 When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
