@@ -4,6 +4,7 @@ import {
   ConnectionAuthorizationFailedError,
   type ConnectionPrincipal,
   type InteractiveAuthorizationDefinition,
+  isConnectionAuthorizationFailedError,
   isConnectionAuthorizationRequiredError,
 } from "eve/connections";
 import { managedConnect } from "./managed-connect.js";
@@ -140,13 +141,23 @@ export function withoutConsent(
 }
 
 /**
- * Translates "authorization required" into the task-mode denial, or returns
- * undefined so the caller rethrows anything else unchanged.
+ * Translates a missing grant into the task-mode denial, or returns undefined
+ * so the caller rethrows anything else unchanged.
+ *
+ * @remarks
+ * The wrapped definition is usually `userConnect`, whose intake-only gate runs
+ * first and has already turned the same missing grant into its own denial by
+ * the time this sees it. Both forms are the same condition for a child, so
+ * both get the task-mode reason and wording.
  */
 function taskModeSignInDenial(
   error: unknown
 ): ConnectionAuthorizationFailedError | undefined {
-  if (!isConnectionAuthorizationRequiredError(error)) {
+  const missingGrant =
+    isConnectionAuthorizationRequiredError(error) ||
+    (isConnectionAuthorizationFailedError(error) &&
+      error.reason === INTAKE_ONLY_SIGN_IN_REASON);
+  if (!missingGrant) {
     return;
   }
   return new ConnectionAuthorizationFailedError(error.connectionName, {
