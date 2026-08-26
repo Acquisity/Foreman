@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FEATURES,
+  featureForCase,
   featureForProject,
   isDependencyKey,
   isFeatureKey,
@@ -38,6 +39,44 @@ test("featureForProject", async (t) => {
   await t.test("never guesses from a symptom or a name", () => {
     assert.equal(featureForProject("Cold Email Agent"), null);
     assert.equal(featureForProject("cold_email"), null);
+  });
+});
+
+test("featureForCase", async (t) => {
+  await t.test("lets a mapped project override the model's key", () => {
+    assert.equal(
+      featureForCase({
+        linearProjectId: "1ae59086-e924-42d1-b7ff-f9c750a2a7c9",
+        primaryFeatureKey: "crm",
+      }),
+      "cold_email"
+    );
+  });
+
+  await t.test("fails closed on an unmapped project, key or no key", () => {
+    assert.equal(
+      featureForCase({
+        linearProjectId: "00000000-0000-0000-0000-000000000000",
+        primaryFeatureKey: "crm",
+      }),
+      null
+    );
+  });
+
+  await t.test("takes the model's live area only without a project", () => {
+    assert.equal(featureForCase({ primaryFeatureKey: "crm" }), "crm");
+    assert.equal(
+      featureForCase({ linearProjectId: null, primaryFeatureKey: "crm" }),
+      "crm"
+    );
+  });
+
+  await t.test("refuses a planned area and an absent key", () => {
+    assert.equal(
+      featureForCase({ primaryFeatureKey: "acquisity_agent" }),
+      null
+    );
+    assert.equal(featureForCase({}), null);
   });
 });
 

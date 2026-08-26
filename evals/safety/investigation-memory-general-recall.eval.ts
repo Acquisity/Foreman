@@ -2,7 +2,7 @@ import { defineEval } from "eve/evals";
 
 export default defineEval({
   description:
-    "Ordinary work never reaches investigation memory: it belongs to an authorized attended triage path after the claim is stated.",
+    "An attended product-behavior question searches investigation memory after restating it, and a question alone never writes to it.",
   tags: ["fast", "needs-connect"],
   async test(t) {
     await t.send(
@@ -11,7 +11,7 @@ export default defineEval({
     // Without this the eval would also pass on a run that parked or failed
     // before answering, which proves nothing about the boundary.
     t.succeeded();
-    t.notCalledTool("search_investigation_memory");
+    t.calledTool("search_investigation_memory");
     t.notCalledTool("record_investigation_case");
     t.notCalledTool("correct_investigation_case");
   },

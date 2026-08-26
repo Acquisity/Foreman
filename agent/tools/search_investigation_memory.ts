@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   CLASSIFICATIONS,
   caseProjectionSchema,
+  SOURCE_ISSUE_ID_HINT,
+  SOURCE_ISSUE_ID_PATTERN,
 } from "#lib/investigation-memory/case.js";
 import {
   FEATURE_KEYS,
@@ -20,7 +22,7 @@ import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Search past Foreman triage investigations after the current claim is stated. Every authorized attended triage surface searches the server-owned live product areas; Linear project metadata is neither accepted nor required. Results are historical analogies, never current truth: verify every match against current code, production data, and runtime evidence. Incident signals are grouped per product area and never combine unrelated products. When `available` is false, continue from current evidence.",
+    "Search past Foreman investigations after the current claim or question is stated: Linear triage cases, ticketless Intercom and Slack investigations, and conclusions a human corrected in a thread. Every authorized attended surface searches the server-owned live product areas; Linear project metadata is neither accepted nor required. Results are historical analogies, never current truth: verify every match against current code, production data, and runtime evidence, and lead with a recorded resolution only as the thing to check first. Incident signals are grouped per product area and never combine unrelated products. When `available` is false, continue from current evidence.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
@@ -72,10 +74,10 @@ export default defineTool({
     sourceIssueId: z
       .string()
       .trim()
-      .regex(/^[A-Z]{2,10}-\d{1,9}$/)
+      .regex(SOURCE_ISSUE_ID_PATTERN, SOURCE_ISSUE_ID_HINT)
       .optional()
       .describe(
-        "Look up one ticket's own case, for example before correcting it. This is an identity lookup: it ignores the other filters and the time window, so ranking, the result limit, and an old case cannot hide it."
+        `Look up one source's own case, for example before correcting it. ${SOURCE_ISSUE_ID_HINT} This is an identity lookup: it ignores the other filters and the time window, so ranking, the result limit, and an old case cannot hide it.`
       ),
     text: z
       .string()

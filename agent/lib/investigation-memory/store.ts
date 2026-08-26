@@ -436,7 +436,7 @@ function insertParams(
     feature,
     payload.affectedFeatureKeys,
     payload.dependencyKeys,
-    payload.linearProjectId,
+    payload.linearProjectId ?? null,
     payload.component ?? null,
     payload.provider ?? null,
     payload.sourceIssueId,

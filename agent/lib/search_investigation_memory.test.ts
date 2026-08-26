@@ -62,6 +62,22 @@ test("ticket identity lookup is project-independent", () => {
   assert.equal(input.sourceIssueId, "ENG-123");
 });
 
+test("identity lookup accepts ticketless Intercom and Slack sources", () => {
+  for (const sourceIssueId of [
+    "intercom:215475639279561",
+    "slack:C0BCV1WBR42/1787771700.647079",
+  ]) {
+    const input = inputSchema.parse({
+      sourceIssueId,
+    }) as unknown as ParsedInput;
+    assert.equal(input.sourceIssueId, sourceIssueId);
+  }
+  assert.equal(
+    inputSchema.safeParse({ sourceIssueId: "intercom:not-an-id" }).success,
+    false
+  );
+});
+
 test("global search remains denied to an unstamped session", async () => {
   const pending = searchInvestigationMemory.execute(
     {

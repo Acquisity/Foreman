@@ -177,6 +177,16 @@ test("shared triage makes retrieval project-independent", () => {
   );
 });
 
+test("ENG-13175-shaped thread correction is recorded, not argued", () => {
+  for (const phrase of [
+    "A colleague correcting you in the thread or on the ticket is later evidence",
+    "put your overturned conclusion in `ruledOut`",
+    "handle it as a correction under Stage 7",
+  ]) {
+    assert.ok(triageSkill.includes(phrase), phrase);
+  }
+});
+
 test("ENG-12880-shaped projectless intake searches memory before choosing a project", () => {
   const memorySearch = triageSkill.indexOf(
     "including projectless Linear tickets"

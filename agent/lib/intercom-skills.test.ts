@@ -52,6 +52,22 @@ test("Intercom product skill uses global memory retrieval after the claim", () =
   assert.ok(productSkill.includes("returned per product area"));
 });
 
+test("Intercom product skill records ticketless verdicts and thread corrections", () => {
+  for (const phrase of [
+    "## Step 8: Record the case",
+    "with or without a Linear issue",
+    "`intercom:<conversation id>`",
+    "no project id",
+    "`primaryFeatureKey`",
+    "### Corrections from the thread",
+    "put your overturned conclusion in `ruledOut`",
+  ]) {
+    assert.ok(productSkill.includes(phrase), phrase);
+  }
+  assert.ok(!productSkill.includes("are not recorded in this scope"));
+  assert.ok(productTools.includes("`slack:<channel id>/<thread ts>`"));
+});
+
 test("Intercom product skill creates engineering work only for a confirmed bug", () => {
   for (const phrase of [
     "There is no Linear issue at the start",
