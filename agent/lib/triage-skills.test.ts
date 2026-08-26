@@ -421,7 +421,8 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "## Stage 6: Persist and route"
   );
   for (const rule of [
-    "This review runs only when the classification is `Bug`",
+    "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
+    "a duplicate routes nothing new to engineering",
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "Delegate to the `critic` subagent",
