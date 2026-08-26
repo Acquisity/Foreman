@@ -221,6 +221,21 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, true);
   });
 
+  await t.test("rejects a source link that is not plain https", () => {
+    for (const sourceIssueUrl of [
+      "http://linear.app/acquisity/issue/ENG-12345/sends-stopped",
+      "https://user:token@linear.app/acquisity/issue/ENG-12345",
+      "ftp://linear.app/acquisity/issue/ENG-12345",
+      "javascript:alert(1)",
+    ]) {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, sourceIssueUrl }).success,
+        false,
+        sourceIssueUrl
+      );
+    }
+  });
+
   await t.test("rejects a malformed Linear identifier", () => {
     assert.equal(
       casePayloadSchema.safeParse({ ...payload, sourceIssueId: "12345" })

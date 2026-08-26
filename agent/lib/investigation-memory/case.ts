@@ -151,11 +151,20 @@ const MAX_URL_LENGTH = 500;
  * A link back to the source ticket, conversation, thread, or document.
  *
  * @remarks
- * Bounded and shaped, nothing more. These are links to our own Linear, Slack,
- * and Intercom, written by an authorized attended session for an internal
- * team to click, so there is no adversary here to defend the field against.
+ * Bounded, https, and free of credentials. These are links to our own Linear,
+ * Slack, and Intercom, written by an authorized attended session for an
+ * internal team to click, so there is no adversary to defend the field
+ * against; the scheme and userinfo rules exist because a credential must never
+ * reach shared memory by any field, a pasted `https://user:token@host` link
+ * included.
  */
-const sourceUrl = () => z.url().max(MAX_URL_LENGTH);
+const sourceUrl = () =>
+  z
+    .url({ protocol: /^https$/ })
+    .max(MAX_URL_LENGTH)
+    .refine((value) => new URL(value).username === "", {
+      error: "A source link must not carry credentials.",
+    });
 
 const featureKey = z.enum(FEATURE_KEYS);
 
