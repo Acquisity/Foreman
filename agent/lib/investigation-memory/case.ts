@@ -147,6 +147,9 @@ const cleanList = (items: number, max: number, allowIdentifiers = false) =>
 /** Longest URL accepted for a link back to the source ticket or document. */
 const MAX_URL_LENGTH = 500;
 
+/** The only scheme a source link may use. */
+const HTTPS = /^https$/;
+
 /**
  * A link back to the source ticket, conversation, thread, or document.
  *
@@ -160,7 +163,7 @@ const MAX_URL_LENGTH = 500;
  */
 const sourceUrl = () =>
   z
-    .url({ protocol: /^https$/ })
+    .url({ protocol: HTTPS })
     .max(MAX_URL_LENGTH)
     .refine((value) => new URL(value).username === "", {
       error: "A source link must not carry credentials.",
