@@ -58,8 +58,11 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
+      // The clean drops untracked leftovers so nothing outside the pinned
+      // commit can be read as part of it; ignored files (node_modules) stay,
+      // and the repository marker is excluded for a `/workspace` worktree.
       const result = await sandbox.run({
-        command: `git -C '${prepared.worktree}' fetch --depth 1 ${remoteUrl(prepared.slug)} '${sha}' && git -C '${prepared.worktree}' checkout --detach '${sha}'`,
+        command: `git -C '${prepared.worktree}' fetch --depth 1 ${remoteUrl(prepared.slug)} '${sha}' && git -C '${prepared.worktree}' checkout --detach '${sha}' && git -C '${prepared.worktree}' clean -fd -e .foreman`,
       });
       if (result.exitCode !== 0) {
         return {
