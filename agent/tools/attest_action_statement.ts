@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
   type ActionAttestation,
+  type AttestationRejection,
   attestationProblem,
   findActionStatements,
   gateForTurn,
@@ -21,7 +22,7 @@ const sentence = z
 const evidence = (what: string) =>
   z.string().trim().min(20).max(2000).describe(what);
 
-const REASONS: Record<string, string> = {
+const REASONS: Record<AttestationRejection, string> = {
   "owner-not-named":
     "The sentence must name the owner exactly as given, and the owner cannot be Foreman, I, or we.",
   "unproven-completion":

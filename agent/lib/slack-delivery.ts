@@ -91,6 +91,15 @@ const STATEMENT_PATTERNS: readonly RegExp[] = [
 
 const SENTENCE_BOUNDARY = /(?<=[.!?])\s+|\n+/u;
 
+// Detection input only. The patterns carry ASCII apostrophes, and Slack
+// markup between a contraction and its verb ("I'll *rebook*") would otherwise
+// split a pattern apart. The raw sentence is what gets returned, so
+// attestation matching stays aligned with `normalize`.
+const SMART_APOSTROPHE = /[‘’`]/gu;
+const DETECTION_MARKUP = /[*_~“”]/gu;
+const forDetection = (sentence: string): string =>
+  sentence.replace(SMART_APOSTROPHE, "'").replace(DETECTION_MARKUP, "");
+
 /**
  * Sentences of `message` that commit an actor to an operation.
  *
@@ -104,9 +113,10 @@ export function findActionStatements(message: string): string[] {
   const found: string[] = [];
   for (const raw of text.split(SENTENCE_BOUNDARY)) {
     const sentence = raw.trim().slice(0, MAX_SENTENCE_LENGTH);
+    const candidate = forDetection(sentence);
     if (
       sentence.length > 0 &&
-      STATEMENT_PATTERNS.some((pattern) => pattern.test(sentence))
+      STATEMENT_PATTERNS.some((pattern) => pattern.test(candidate))
     ) {
       found.push(sentence);
     }
@@ -136,10 +146,9 @@ export interface SlackDeliveryGate {
   turnId: string;
 }
 
-export type SlackDeliveryRejection =
-  | "unattested-action"
-  | "unproven-completion"
-  | "owner-not-named";
+export type AttestationRejection = "unproven-completion" | "owner-not-named";
+
+export type SlackDeliveryRejection = "unattested-action" | AttestationRejection;
 
 export type SlackDeliveryDecision =
   | { allowed: true; message: string }
@@ -169,7 +178,7 @@ const PRONOUN_OWNER = /^(?:i|we|me|us|myself|ourselves)$/u;
 export function attestationProblem(
   attestation: ActionAttestation,
   succeededTools: readonly string[]
-): SlackDeliveryRejection | null {
+): AttestationRejection | null {
   if (attestation.state === "completed") {
     return succeededTools.includes(attestation.toolName)
       ? null

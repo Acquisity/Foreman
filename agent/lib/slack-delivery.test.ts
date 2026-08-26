@@ -53,6 +53,16 @@ describe("findActionStatements", () => {
     assert.equal(findActionStatements("I've updated the ticket.").length, 1);
   });
 
+  it("sees through curly apostrophes and Slack markup", () => {
+    const curly = "I’ll rebook the affected calls.";
+    const marked = "I'll *rebook* them once you share the ids.";
+    const bold = "*We can fix those for you.*";
+    for (const sentence of [curly, marked, bold]) {
+      assert.deepEqual(findActionStatements(sentence), [sentence]);
+      assert.equal(decideSlackDelivery(sentence, noGate).allowed, false);
+    }
+  });
+
   it("leaves factual findings, customer steps, negations, and safe wording alone", () => {
     for (const text of [FACTUAL, NEGATED, SAFE_WORDING]) {
       assert.deepEqual(findActionStatements(text), [], text);
