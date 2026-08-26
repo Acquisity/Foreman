@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   FEATURES,
+  featureForCase,
   featureForProject,
   isDependencyKey,
   isFeatureKey,
@@ -39,6 +40,76 @@ test("featureForProject", async (t) => {
     assert.equal(featureForProject("Cold Email Agent"), null);
     assert.equal(featureForProject("cold_email"), null);
   });
+});
+
+test("featureForCase", async (t) => {
+  const project = "1ae59086-e924-42d1-b7ff-f9c750a2a7c9";
+
+  await t.test("resolves a Linear source only through its project", () => {
+    assert.equal(
+      featureForCase({
+        linearProjectId: project,
+        primaryFeatureKey: "crm",
+        sourceIssueId: "ENG-1",
+      }),
+      "cold_email"
+    );
+  });
+
+  await t.test("never lets a Linear source pick its own bucket", () => {
+    // No project, a live key: the key must not stand in for the project.
+    assert.equal(
+      featureForCase({ primaryFeatureKey: "crm", sourceIssueId: "ENG-1" }),
+      null
+    );
+    assert.equal(
+      featureForCase({
+        linearProjectId: "00000000-0000-0000-0000-000000000000",
+        primaryFeatureKey: "crm",
+        sourceIssueId: "ENG-1",
+      }),
+      null
+    );
+  });
+
+  await t.test(
+    "takes a ticketless source's live key and ignores any project",
+    () => {
+      for (const sourceIssueId of [
+        "intercom:215475639279561",
+        "slack:C0BCV1WBR42/1787771700.647079",
+      ]) {
+        assert.equal(
+          featureForCase({ primaryFeatureKey: "crm", sourceIssueId }),
+          "crm",
+          sourceIssueId
+        );
+        assert.equal(
+          featureForCase({
+            linearProjectId: project,
+            primaryFeatureKey: "crm",
+            sourceIssueId,
+          }),
+          "crm",
+          sourceIssueId
+        );
+      }
+    }
+  );
+
+  await t.test(
+    "refuses a planned area and an absent key on a ticketless source",
+    () => {
+      assert.equal(
+        featureForCase({
+          primaryFeatureKey: "acquisity_agent",
+          sourceIssueId: "intercom:1",
+        }),
+        null
+      );
+      assert.equal(featureForCase({ sourceIssueId: "intercom:1" }), null);
+    }
+  );
 });
 
 test("scope taxonomy", async (t) => {

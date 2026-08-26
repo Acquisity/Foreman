@@ -3,12 +3,13 @@
  * filed under, and the Linear projects that resolve to them.
  *
  * @remarks
- * The evidence-backed Linear project saved during final triage handling is the
- * only primary-feature authority for a write. Nothing here reads a symptom, a
- * title, a repository, or an environment variable, and the model never
- * supplies a feature key that is not validated against this table. A project
- * that is not listed stays unscoped and the case is not recorded. Retrieval
- * never consults this mapping.
+ * For a ticketed case, the evidence-backed Linear project saved during final
+ * triage handling is the only primary-feature authority. Nothing here reads a
+ * symptom, a title, a repository, or an environment variable, and a project
+ * that is not listed stays unscoped and the case is not recorded. A ticketless
+ * Intercom or Slack case has no project, so the model names a live area
+ * directly; the enum is the bound, and a memory row's bucket routes nothing.
+ * Retrieval never consults this mapping.
  *
  * Keys are stable identifiers, not display names. Renaming a product is a
  * change to `label` here, never to the key stored in a case row.
@@ -133,6 +134,43 @@ export function featureForProject(
 /** Whether a model-supplied string is one of the known feature keys. */
 export function isFeatureKey(value: string): value is FeatureKey {
   return FEATURE_KEY_SET.has(value);
+}
+
+/** A Linear issue identifier such as `ENG-12345`. */
+export const LINEAR_ISSUE_ID_PATTERN = /^[A-Z]{2,10}-\d{1,9}$/;
+
+/** Whether a source id names a Linear ticket rather than a ticketless source. */
+export const isLinearSource = (sourceIssueId: string): boolean =>
+  LINEAR_ISSUE_ID_PATTERN.test(sourceIssueId);
+
+/**
+ * Why a write had no product area to file under. Shared by the record and
+ * correct tools; it lives here so neither tool module imports the other.
+ */
+export const NO_FEATURE_REASON =
+  "The case has no owning product area, so it is not recorded and the investigation itself stands. A Linear-sourced case takes its area only from a mapped Linear project. A ticketless Intercom or Slack case needs a live product area in primaryFeatureKey and ignores any project id.";
+
+/**
+ * The primary feature a case write files under, or null when it has none.
+ *
+ * @remarks
+ * The shape of the source id decides the authority, not which fields the
+ * model chose to send. A Linear ticket resolves only through its mapped
+ * project, so it cannot pick its own bucket by omitting the project id. A
+ * ticketless Intercom or Slack source has no project, so the model's key
+ * stands, bounded to the live areas: a planned area has no customer-impact
+ * analogies to file, and a case there would be found by nothing.
+ */
+export function featureForCase(source: {
+  linearProjectId?: string | null;
+  primaryFeatureKey?: FeatureKey | null;
+  sourceIssueId: string;
+}): FeatureKey | null {
+  if (isLinearSource(source.sourceIssueId)) {
+    return featureForProject(source.linearProjectId);
+  }
+  const key = source.primaryFeatureKey ?? null;
+  return key !== null && LIVE_FEATURE_KEYS.includes(key) ? key : null;
 }
 
 /** Maximum dependency or affected-feature entries on one case. */

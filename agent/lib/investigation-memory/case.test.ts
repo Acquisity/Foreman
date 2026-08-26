@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { casePayloadSchema, forbiddenReason, searchText } from "./case.js";
+import {
+  casePayloadSchema,
+  forbiddenReason,
+  SOURCE_ISSUE_ID_PATTERN,
+  searchText,
+} from "./case.js";
 
 const EMAIL_REASON = /email address/;
 const UUID_REASON = /UUID/;
 const RATE_LIMIT = /rate limit/;
 const CODE_PATH = /sendCampaignBatch/;
 const PROVIDER = /instantly/;
+const SELF_SERVICE = /Sequences/;
+const RULED_OUT = /Domain reputation/;
 
 const payload = {
   affectedFeatureKeys: ["ai_sdr"],
@@ -102,13 +109,27 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, false);
   });
 
-  await t.test("takes no primary feature from model input", () => {
-    const parsed = casePayloadSchema.parse({
-      ...payload,
-      primaryFeatureKey: "core_platform",
-    });
-    assert.ok(!("primaryFeatureKey" in parsed));
-  });
+  await t.test(
+    "bounds a model-supplied primary feature to the taxonomy",
+    () => {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, primaryFeatureKey: "shared" })
+          .success,
+        false
+      );
+      assert.equal(
+        casePayloadSchema.safeParse({
+          ...payload,
+          linearProjectId: undefined,
+          primaryFeatureKey: "cold_email",
+          sourceIssueId: "intercom:215475639279561",
+          sourceIssueUrl:
+            "https://app.intercom.com/a/inbox/ls8uffkp/inbox/admin/10774253/conversation/215475639279561",
+        }).success,
+        true
+      );
+    }
+  );
 
   await t.test("defaults every optional list to empty", () => {
     const parsed = casePayloadSchema.parse({
@@ -200,12 +221,57 @@ test("casePayloadSchema", async (t) => {
     assert.equal(result.success, true);
   });
 
+  await t.test("rejects a source link that is not plain https", () => {
+    for (const sourceIssueUrl of [
+      "http://linear.app/acquisity/issue/ENG-12345/sends-stopped",
+      "https://user:token@linear.app/acquisity/issue/ENG-12345",
+      "https://:token@linear.app/acquisity/issue/ENG-12345",
+      "ftp://linear.app/acquisity/issue/ENG-12345",
+      "javascript:alert(1)",
+    ]) {
+      assert.equal(
+        casePayloadSchema.safeParse({ ...payload, sourceIssueUrl }).success,
+        false,
+        sourceIssueUrl
+      );
+    }
+  });
+
   await t.test("rejects a malformed Linear identifier", () => {
     assert.equal(
       casePayloadSchema.safeParse({ ...payload, sourceIssueId: "12345" })
         .success,
       false
     );
+  });
+});
+
+test("SOURCE_ISSUE_ID_PATTERN", async (t) => {
+  await t.test(
+    "accepts a Linear ticket, an Intercom conversation, or a Slack thread",
+    () => {
+      for (const id of [
+        "ENG-12345",
+        "intercom:215475639279561",
+        "slack:C0BCV1WBR42/1787771700.647079",
+      ]) {
+        assert.ok(SOURCE_ISSUE_ID_PATTERN.test(id), id);
+      }
+    }
+  );
+
+  await t.test("rejects anything that is not a stable source identity", () => {
+    for (const id of [
+      "intercom:",
+      "intercom:abc",
+      "slack:C0BCV1WBR42",
+      "slack:general/1787771700.647079",
+      "slack:C0BCV1WBR42/1787771700",
+      "https://app.intercom.com/a/inbox/x/conversation/1",
+      "eng-12345",
+    ]) {
+      assert.equal(SOURCE_ISSUE_ID_PATTERN.test(id), false, id);
+    }
   });
 });
 
@@ -216,10 +282,16 @@ test("searchText covers the fields retrieval matches on", () => {
     component: "sending",
     errorSignatures: payload.errorSignatures,
     provider: "instantly",
+    resolution: "Campaign > Sequences > edit name > save.",
     rootCause: payload.rootCause,
+    ruledOut: payload.ruledOut,
     symptoms: payload.symptoms,
   });
   assert.match(text, RATE_LIMIT);
   assert.match(text, CODE_PATH);
   assert.match(text, PROVIDER);
+  // The fix path and the overturned theory are what a corrected case is
+  // recalled for, so both must be searchable.
+  assert.match(text, SELF_SERVICE);
+  assert.match(text, RULED_OUT);
 });

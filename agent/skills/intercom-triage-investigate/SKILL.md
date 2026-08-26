@@ -121,13 +121,21 @@ Use the existing area-routing roster:
 - CRM: Ebubeker Rexha (`ebubeker.rexha@acquisity.ai`)
 - Anything missing, ambiguous, unmapped, or sandboxed: Aaron Fraga (`aaron.fraga@acquisity.ai`)
 
-## Step 8: Record a confirmed case
+## Step 8: Record the case
 
-Only after a confirmed Bug has a customer-report ticket, an attached final document, and an explicit mapped Linear project, call `record_investigation_case` exactly once. The ticket's project is now the authority for the product area.
+Every settled verdict is recorded exactly once, with or without a Linear issue. Support repeats the User Error and Platform Limitation answers most, so those are the cases worth remembering.
 
-Store only the sanitized pattern: claim, root cause, stripped error signatures, code path and commit, ruled-out conclusions, stable evidence handles, counted impact with its date, and ticket/document links. Never store emails, organization or user ids, production rows, raw logs, attachments, or credentials.
+For a confirmed Bug with a customer-report ticket, an attached final document, and an explicit mapped Linear project, call `record_investigation_case` with the ticket identifier as `sourceIssueId` and that ticket's project id. The ticket's project is the authority for the product area.
 
-Non-bug Intercom investigations without a ticket are not recorded in this scope. A failed write changes nothing about the ticket or verdict and is never announced in Slack.
+For a User Error, Platform Limitation, or unproven verdict with no ticket, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. Put the unblock in `resolution` in the product's own words, because that is what the next similar question needs. Ordinary feedback with no finding is not recorded.
+
+Store only the sanitized pattern: claim, root cause, resolution, stripped error signatures, code path and commit, ruled-out conclusions, stable evidence handles, counted impact with its date, and conversation, ticket, and document links. Never store emails, organization or user ids, production rows, raw logs, attachments, or credentials.
+
+A failed write changes nothing about the ticket or verdict and is never announced in Slack.
+
+### Corrections from the thread
+
+When a trusted colleague replies in the thread contradicting your conclusion, treat the correction as the final verdict, reply with the corrected guidance, and record it. Look up the existing case first by passing the same `sourceIssueId` the original write used to `search_investigation_memory`: the ticket identifier when the verdict was a ticketed Bug, `intercom:<conversation id>` otherwise. When you cannot tell which, look up both. If the lookup answers `available: false`, memory is down: skip the bookkeeping, the corrected reply still goes out. If an active case exists, call `correct_investigation_case` with the full corrected case under that same source id, what the colleague said as `correctionReason`, and the Slack thread permalink in `evidenceRefs`. If the lookup answered and found nothing, call `record_investigation_case` with the corrected conclusion and put your overturned conclusion in `ruledOut`, so the next search surfaces both the wrong theory and the right answer. Never soften the correction into the record.
 
 ## Step 9: Reply in Slack
 

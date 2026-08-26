@@ -1,17 +1,41 @@
 import { z } from "zod";
-import { FEATURE_KEYS, isDependencyKey, MAX_SCOPE_ENTRIES } from "./scope.js";
+import {
+  FEATURE_KEYS,
+  isDependencyKey,
+  LINEAR_ISSUE_ID_PATTERN,
+  MAX_SCOPE_ENTRIES,
+} from "./scope.js";
 
 /**
- * The case payload a completed triage investigation writes, and the guards
- * that keep customer identity and credentials out of shared memory.
+ * The case payload a completed investigation writes, and the guards that keep
+ * customer identity and credentials out of shared memory.
  *
  * @remarks
- * The issue-scoped `Triage investigation` document already holds the customer,
- * the exact queries, and the raw evidence, under that ticket's visibility.
- * This record is the sanitized pattern needed to recognize a recurrence, plus
- * links back to the source for anyone authorized to read it. Everything here
- * is bounded: a case is a projection, not a transcript.
+ * The issue-scoped `Triage investigation` document, when there is one, already
+ * holds the customer, the exact queries, and the raw evidence, under that
+ * ticket's visibility. This record is the sanitized pattern needed to
+ * recognize a recurrence, plus links back to the source for anyone authorized
+ * to read it. Everything here is bounded: a case is a projection, not a
+ * transcript.
+ *
+ * A source is a Linear ticket, an Intercom conversation, or a Slack thread.
+ * The Intercom conversation id is the preferred key when one exists: two
+ * Slack threads about one conversation are one case, and the one-active-case
+ * index enforces that. A Slack thread is the key of last resort, for an
+ * investigation that started from a thread and nothing else.
  */
+
+/**
+ * The stable identity of what an investigation was about: a Linear identifier
+ * such as `ENG-12345`, `intercom:<conversation id>`, or
+ * `slack:<channel id>/<thread ts>`.
+ */
+export const SOURCE_ISSUE_ID_PATTERN = new RegExp(
+  `^(?:${LINEAR_ISSUE_ID_PATTERN.source.slice(1, -1)}|intercom:\\d{1,20}|slack:[CGD][A-Z0-9]{7,}/\\d{10}\\.\\d{6})$`
+);
+
+export const SOURCE_ISSUE_ID_HINT =
+  "A Linear identifier such as ENG-12345, `intercom:<conversation id>`, or `slack:<channel id>/<thread ts>`.";
 
 /** How the investigation ended. */
 export const CLASSIFICATIONS = [
@@ -123,22 +147,41 @@ const cleanList = (items: number, max: number, allowIdentifiers = false) =>
 /** Longest URL accepted for a link back to the source ticket or document. */
 const MAX_URL_LENGTH = 500;
 
+/** The only scheme a source link may use. */
+const HTTPS = /^https$/;
+
 /**
- * A link back to the source ticket or document.
+ * A link back to the source ticket, conversation, thread, or document.
  *
  * @remarks
- * Bounded and shaped, nothing more. These are links to our own Linear,
- * written by an authorized triage session for an internal team to click, so
- * there is no adversary here to defend the field against.
+ * Bounded, https, and free of credentials. These are links to our own Linear,
+ * Slack, and Intercom, written by an authorized attended session for an
+ * internal team to click, so there is no adversary to defend the field
+ * against; the scheme and userinfo rules exist because a credential must never
+ * reach shared memory by any field, a pasted `https://user:token@host` link
+ * included.
  */
-const sourceUrl = () => z.url().max(MAX_URL_LENGTH);
+const sourceUrl = () =>
+  z
+    .url({ protocol: HTTPS })
+    .max(MAX_URL_LENGTH)
+    .refine(
+      (value) => {
+        const url = new URL(value);
+        return url.username === "" && url.password === "";
+      },
+      { error: "A source link must not carry credentials." }
+    );
 
 const featureKey = z.enum(FEATURE_KEYS);
 
 /**
- * The write payload. `primaryFeatureKey` is absent on purpose: the executor
- * derives it from the evidence-backed project id saved during final handling,
- * so the model cannot directly choose the bucket a case lands in.
+ * The write payload. The source id's shape decides which field names the
+ * product area: a Linear source resolves only through `linearProjectId`, so a
+ * ticketed case cannot choose its own bucket, and a ticketless Intercom or
+ * Slack source names a live area in `primaryFeatureKey`. The enum bound is the
+ * safety property there, and a memory row's bucket routes nothing. That rule
+ * lives in `featureForCase`, where the executor applies it.
  */
 export const casePayloadSchema = z
   .object({
@@ -195,11 +238,17 @@ export const casePayloadSchema = z
     ),
     linearProjectId: z
       .uuid()
+      .optional()
       .describe(
-        "The evidence-backed project id read from the issue after final Linear handling. It scopes this completed-case write only."
+        "The evidence-backed project id read from the issue after final Linear handling. Required for a Linear source, where it alone decides the product area; ignored for a ticketless Intercom or Slack source."
       ),
     observedFrom: z.iso.datetime().optional(),
     observedTo: z.iso.datetime().optional(),
+    primaryFeatureKey: featureKey
+      .optional()
+      .describe(
+        "Only for a ticketless Intercom or Slack source: the live product area the evidence points at. Ignored for a Linear source."
+      ),
     provider: cleanText(60).optional(),
     resolution: cleanText(1000)
       .optional()
@@ -212,8 +261,11 @@ export const casePayloadSchema = z
     sourceIssueId: z
       .string()
       .trim()
-      .regex(/^[A-Z]{2,10}-\d{1,9}$/, "A Linear identifier such as ENG-12345."),
-    sourceIssueUrl: sourceUrl(),
+      .regex(SOURCE_ISSUE_ID_PATTERN, SOURCE_ISSUE_ID_HINT)
+      .describe(SOURCE_ISSUE_ID_HINT),
+    sourceIssueUrl: sourceUrl().describe(
+      "The Linear issue URL, the Intercom conversation URL, or the Slack thread permalink."
+    ),
     symptoms: cleanList(8, 200, true).describe(
       "What the user saw, in the product's own words."
     ),
@@ -274,6 +326,12 @@ export type CaseProjection = z.infer<typeof caseProjectionSchema>;
  * The text a case is searched on. Built here rather than in a generated
  * column so the tsvector expression stays a plain immutable `to_tsvector` call
  * on one parameter.
+ *
+ * @remarks
+ * The resolution and the ruled-out conclusions are part of it. The thing worth
+ * recalling from a corrected case is usually the fix path, and the wrong
+ * theory it replaced is what the next similar question will match on.
+ * `migrations/0002` backfills rows written before they were included.
  */
 export function searchText(
   payload: Pick<
@@ -283,18 +341,22 @@ export function searchText(
     | "component"
     | "errorSignatures"
     | "provider"
+    | "resolution"
     | "rootCause"
+    | "ruledOut"
     | "symptoms"
   >
 ): string {
   return [
     payload.claim,
     payload.rootCause,
+    payload.resolution ?? "",
     payload.component ?? "",
     payload.provider ?? "",
     ...payload.symptoms,
     ...payload.errorSignatures,
     ...payload.codePaths,
+    ...payload.ruledOut,
   ]
     .filter((part) => part !== "")
     .join(" \n");

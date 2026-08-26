@@ -6,14 +6,17 @@ import {
   casePayloadSchema,
   cleanText,
 } from "#lib/investigation-memory/case.js";
-import { featureForProject } from "#lib/investigation-memory/scope.js";
+import {
+  featureForCase,
+  NO_FEATURE_REASON,
+} from "#lib/investigation-memory/scope.js";
 import { correctCase } from "#lib/investigation-memory/store.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
   approval: investigationMemoryWritePolicy,
   description:
-    "Supersede an earlier investigation case with a corrected conclusion, when later evidence overturns it. The earlier case is kept and marked superseded, so the history stays readable; it stops appearing in searches and stops counting toward incident signals. Pass the full corrected case, not a patch. Same sanitization rules as recording: the pattern, never the customer.",
+    "Supersede an earlier investigation case with a corrected conclusion, when later evidence or a trusted human in the thread overturns it. The earlier case is kept and marked superseded, so the history stays readable; it stops appearing in searches and stops counting toward incident signals. Pass the full corrected case, not a patch, with the same source id as the case it replaces; for a ticketless source, name the live product area in `primaryFeatureKey`. Same sanitization rules as recording: the pattern, never the customer.",
   async execute(input, ctx) {
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
@@ -22,11 +25,10 @@ export default defineTool({
       };
     }
 
-    const feature = featureForProject(input.linearProjectId);
+    const feature = featureForCase(input);
     if (feature === null) {
       return {
-        reason:
-          "That Linear project is not mapped to a product area, so there is no scope to file the correction under.",
+        reason: NO_FEATURE_REASON,
         recorded: false as const,
       };
     }
@@ -51,9 +53,9 @@ export default defineTool({
         already_recorded:
           "This correction is already recorded. Nothing changed.",
         prior_case_not_active:
-          "That case is not the active revision for its ticket, so there is nothing to supersede. Search memory again and correct the current case.",
+          "That case is not the active revision for its source, so there is nothing to supersede. Search memory again and correct the current case.",
         prior_case_other_ticket:
-          "That case belongs to a different ticket. A correction replaces the active case for this ticket only. Search memory for this ticket's own case id and use that.",
+          "That case belongs to a different source. A correction replaces the active case for this source only. Search memory with this source id to get its own case id and use that.",
       } as const;
       return {
         caseId: "caseId" in result ? result.caseId : undefined,
@@ -72,7 +74,7 @@ export default defineTool({
   inputSchema: casePayloadSchema.extend({
     classification: z.enum(CLASSIFICATIONS),
     correctionReason: cleanText(500).describe(
-      "What the new evidence showed that the old conclusion missed."
+      "What the new evidence, or the human correcting you, showed that the old conclusion missed."
     ),
     supersedesCaseId: z
       .uuid()
