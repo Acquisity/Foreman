@@ -14,6 +14,7 @@ import {
 } from "#lib/repository.js";
 import {
   findWarmRepository,
+  type WarmRepository,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -57,10 +58,6 @@ const cloneExplicitRepository = async (
   sandbox: SandboxSession,
   repository: string
 ): Promise<string | null> => {
-  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
-  if (occupied.exitCode === 0) {
-    return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
-  }
   const token = await mintInstallationToken(githubCredentials);
   await sandbox.setNetworkPolicy(brokerPolicy(token));
   try {
@@ -75,45 +72,34 @@ const cloneExplicitRepository = async (
   }
 };
 
-/**
- * Prepares a warmed repository by moving its pre-warmed checkout into
- * `/workspace/repo`, refreshing it to the remote HEAD, and running a warm
- * install. Falls back to a cold clone for any repository that was not
- * pre-warmed (or whose warmed checkout is missing).
- */
-const prepareWarmedOrClone = async (
-  sandbox: SandboxSession,
-  repository: string
-): Promise<string | null> => {
-  const warmed = findWarmRepository(repository);
-  // Derive the path from the matched config's canonical slug, not the caller's
-  // casing: `findWarmRepository` matches case-insensitively, so a lowercase
-  // "acquisity/foreman" would otherwise compute a path that never exists and
-  // silently fall back to a cold clone.
-  const path = warmed ? warmRepositoryPath(warmed.slug) : null;
-  const checkout = path
-    ? await sandbox.run({ command: `test -d ${path}` })
+// Reads the checkout's origin from its config file directly: repository
+// discovery would refuse the builder-owned checkout as dubious ownership
+// before `safe.directory` is registered.
+const originUrl = async (sandbox: SandboxSession): Promise<string | null> => {
+  const origin = await sandbox.run({
+    command:
+      "git config --file /workspace/repo/.git/config --get remote.origin.url",
+  });
+  return origin.exitCode === 0
+    ? String(origin.stdout).trim().toLowerCase()
     : null;
-  if (!(warmed && checkout) || checkout.exitCode !== 0) {
-    return cloneExplicitRepository(sandbox, repository);
-  }
+};
 
-  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
-  if (occupied.exitCode === 0) {
-    return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
-  }
-
+/**
+ * Refreshes `/workspace/repo` to the remote HEAD and runs the warm install
+ * when HEAD moved, or unconditionally when the checkout's install state is
+ * unknown. Any failure removes the checkout so a retry can start over.
+ */
+const refreshCheckout = async (
+  sandbox: SandboxSession,
+  repository: string,
+  warmed: WarmRepository | null,
+  installAnyway: boolean
+): Promise<string | null> => {
   const token = await mintInstallationToken(githubCredentials);
   await sandbox.setNetworkPolicy(brokerPolicy(token));
   let moved = true;
   try {
-    const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
-    if (move.exitCode !== 0) {
-      return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
-    }
-
-    // From here `/workspace/repo` is populated, so any failure must roll it
-    // back or a retry in this session wedges on "already exists".
     // The moved checkout is owned by the builder uid, not the session user, so
     // git would abort with "detected dubious ownership" unless it is trusted
     // first. The `safe.directory` for `/workspace` configured in `onSession`
@@ -147,7 +133,7 @@ const prepareWarmedOrClone = async (
 
   // If the refresh did not move HEAD, the snapshot is already at the remote
   // HEAD and its install is current, so there is nothing to warm.
-  if (!moved) {
+  if (!(warmed && (moved || installAnyway))) {
     return null;
   }
 
@@ -163,6 +149,49 @@ const prepareWarmedOrClone = async (
     return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
   }
   return null;
+};
+
+/**
+ * Prepares a warmed repository by moving its pre-warmed checkout into
+ * `/workspace/repo`, refreshing it to the remote HEAD, and running a warm
+ * install. Falls back to a cold clone for any repository that was not
+ * pre-warmed (or whose warmed checkout is missing).
+ */
+const prepareWarmedOrClone = async (
+  sandbox: SandboxSession,
+  repository: string
+): Promise<string | null> => {
+  const warmed = findWarmRepository(repository);
+  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
+  if (occupied.exitCode === 0) {
+    // A durable step retry or dev queue redelivery reruns this tool after an
+    // earlier execution placed the checkout but never wrote the marker. Adopt
+    // that checkout when it is this repository; anything else stays untouched.
+    if ((await originUrl(sandbox)) !== remoteUrl(repository).toLowerCase()) {
+      return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
+    }
+    return refreshCheckout(sandbox, repository, warmed, true);
+  }
+
+  // Derive the path from the matched config's canonical slug, not the caller's
+  // casing: `findWarmRepository` matches case-insensitively, so a lowercase
+  // "acquisity/foreman" would otherwise compute a path that never exists and
+  // silently fall back to a cold clone.
+  const path = warmed ? warmRepositoryPath(warmed.slug) : null;
+  const checkout = path
+    ? await sandbox.run({ command: `test -d ${path}` })
+    : null;
+  if (!(warmed && checkout) || checkout.exitCode !== 0) {
+    return cloneExplicitRepository(sandbox, repository);
+  }
+
+  const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
+  if (move.exitCode !== 0) {
+    return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
+  }
+  // From here `/workspace/repo` is populated, so any failure must roll it
+  // back or a retry in this session wedges on "already exists".
+  return refreshCheckout(sandbox, repository, warmed, false);
 };
 
 export default defineTool({

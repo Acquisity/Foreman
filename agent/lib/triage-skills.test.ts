@@ -421,19 +421,21 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "## Stage 6: Persist and route"
   );
   for (const rule of [
-    "This review runs only when the classification is `Bug`",
+    "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
+    "a duplicate routes nothing new to engineering",
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "Delegate to the `critic` subagent",
     "the full 40-character SHA",
     "`attempt 1`",
     "Do not pass an `outputSchema`",
-    "An `APPROVE` counts only when `reviewed` echoes exactly the issue id, document id, `updatedAt`, and commit you supplied",
-    "the commit is not `unpinned`",
+    "Check the echo before reading the verdict",
+    "If `reviewed.commit` is `unpinned` or is not exactly the full 40-character commit you supplied, or `reviewed` does not echo exactly the issue id, document id, and `updatedAt` you supplied",
+    "Whatever the verdict says, do not count that result as an attempt: re-delegate once with the same attempt number and the same inputs",
+    "If the second result is also `unpinned` or mis-echoed, it is a stop",
     "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
     "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",
-    "re-delegate once with the same attempt number and the same inputs, and if it happens again it is a stop",
     "In a read-only run, describe those writes instead of making them",
     "once a version is approved, nothing may change it until routing is done",
     "The Stage 7 reply after a stop states only what is known, says a person is settling it before anything is final, and promises no action",
@@ -449,10 +451,21 @@ test("triage reviews a Bug with the critic before routing it", () => {
     assert.ok(review.includes(rule), rule);
   }
   assert.ok(
+    review.indexOf("Check the echo before reading the verdict") <
+      review.indexOf("Read the result as a whole before acting on `verdict`"),
+    "the echo check precedes the verdict read"
+  );
+  assert.ok(
     triageSkill.includes(
-      "After the handoff has read its writes back (or, for a non-actionable outcome, after the comment is posted), make one `patch`"
+      "After the handoff has read its writes back, make one `patch`"
     )
   );
+  assert.ok(
+    triageSkill.includes(
+      "A document created here for an unreviewed outcome is written once with `**Review**: Not required` and needs no later patch"
+    )
+  );
+  assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
   assert.ok(
     triageSkill.includes(
       "Every decision above is provisional until the review below has approved the document"
@@ -463,7 +476,12 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "A `Bug` is final only when its review was approved; a stopped review records nothing"
+      "A reviewed `Bug` is final only when its review was approved; a stopped review records nothing. A `Duplicate` is final once its master link is saved"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "For a `Bug` other than a `Duplicate`, the review in Stage 5 approved the document version"
     )
   );
   assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
