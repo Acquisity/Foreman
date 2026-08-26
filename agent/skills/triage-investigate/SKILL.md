@@ -212,6 +212,8 @@ Ask what gets them working today. A setting they or support can change, a re-run
 
 When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
 
+An unblock that someone at Acquisity would perform is only real once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it. Without all four, there is no unblock to offer: record that none was confirmed and what evidence is missing. Naming Support or engineering does not make an unverified action real.
+
 When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
@@ -353,7 +355,7 @@ Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
 
 ### Slack-facing reply
 
-Load the slack-wording skill before writing. Give a concrete finding, hand the next steps to the opener, check whose lane it is, and keep it to one to three sentences at the floor. The assistant message contains only that requester-facing reply. Never prefix it with an investigation summary or append internal actions, ticket updates, routing, or proof of work.
+Load the slack-wording skill before writing. Give a concrete finding, hand the next steps to the opener, check whose lane it is, and keep it to one to three sentences at the floor. Any sentence that reports a completed action or offers a verified available one is attested with `attest_action_statement` first, as slack-wording describes; an unverified action is not offered at all. The assistant message contains only that requester-facing reply. Never prefix it with an investigation summary or append internal actions, ticket updates, routing, or proof of work.
 
 ### Record the investigation in memory
 

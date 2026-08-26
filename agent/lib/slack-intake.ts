@@ -51,6 +51,7 @@ const INTAKE_ONLY_BOUNDARY = [
   "This message came from a Slack channel that is intake-only. You may answer questions, investigate, clarify with the requester, and create or update Linear records.",
   "Do not implement a fix or make local code changes. Do not commit, push a branch, open a pull request, or start the factory implementation pipeline. Push and pull-request creation are denied independently of these instructions.",
   "The final post in the Slack thread must contain only the requester-facing reply. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Normal conversational progress updates are allowed; this boundary applies to the closing post.",
+  "The closing post is checked before it is posted: a sentence that promises, offers, recommends, or reports an operation posts only if it was attested this turn with attest_action_statement and the evidence that state requires. Do not offer or assign an action the investigation did not verify; say that no safe action was confirmed instead.",
 ].join("\n\n");
 
 const GENERIC_NEW_ISSUE_TASK = [

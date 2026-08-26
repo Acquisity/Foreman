@@ -8,10 +8,18 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import {
+  slackDeliveryEvents,
+  slackDeliveryGate,
+} from "../lib/slack-delivery.js";
+import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
-import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
+import {
+  isIntakeOnly,
+  stampInvestigationMemory,
+  stampTrusted,
+} from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -48,6 +56,13 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * default stamps nothing: a DM dispatched through it carries no trust, no
  * repository selection, and no intake-only marker, so every delivery from a
  * DM parked on an approval card that Slack cannot deliver an answer to.
+ *
+ * Outbound, `events` replaces eve's `action.result` and `message.completed`
+ * defaults with the final-delivery action gate in `lib/slack-delivery.ts`:
+ * in an intake-only session a terminal reply that promises, offers,
+ * recommends, or reports an operation posts only when the turn attested it
+ * with evidence, and a fixed fallback posts otherwise. Every other default
+ * event handler is untouched.
  */
 
 const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
@@ -80,6 +95,7 @@ export default slackChannel({
   credentials: connectSlackCredentials(
     process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
   ),
+  events: slackDeliveryEvents(slackDeliveryGate, isIntakeOnly),
   onAppMention: dispatch,
   onDirectMessage: dispatch,
   threadContext: { since: "last-agent-reply" },
