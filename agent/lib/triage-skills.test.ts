@@ -413,3 +413,70 @@ test("incident-hotlane assesses and never writes", () => {
   }
   assert.ok(hotlaneSkill.includes("This skill does not set priority"));
 });
+
+test("triage reviews a Bug with the critic before routing it", () => {
+  const review = extractInstruction(
+    triageSkill,
+    "### Review a Bug before routing it",
+    "## Stage 6: Persist and route"
+  );
+  for (const rule of [
+    "This review runs only when the classification is `Bug`",
+    "`**Review**: Pending critic`",
+    "Load `incident-hotlane`",
+    "Delegate to the `critic` subagent",
+    "the full 40-character SHA",
+    "`attempt 1`",
+    "Do not pass an `outputSchema`",
+    "An `APPROVE` counts only when `reviewed` echoes exactly the issue id, document id, `updatedAt`, and commit you supplied",
+    "the commit is not `unpinned`",
+    "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
+    "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
+    "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",
+    "re-delegate once with the same attempt number and the same inputs, and if it happens again it is a stop",
+    "In a read-only run, describe those writes instead of making them",
+    "once a version is approved, nothing may change it until routing is done",
+    "The Stage 7 reply after a stop states only what is known, says a person is settling it before anything is final, and promises no action",
+    "is a stop, not a retry",
+    "delegate again with `attempt 2`",
+    "On a second `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on any stop",
+    "`Stopped: <verdict or failure>`",
+    "Assign Aaron Fraga as the explicit human-routing fallback",
+    "There is no attempt 3 and no fresh reviewer chain",
+    "as the literal marker `read-only`",
+    "Do not touch the document",
+  ]) {
+    assert.ok(review.includes(rule), rule);
+  }
+  assert.ok(
+    triageSkill.includes(
+      "After the handoff has read its writes back (or, for a non-actionable outcome, after the comment is posted), make one `patch`"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "Every decision above is provisional until the review below has approved the document"
+    )
+  );
+  assert.ok(
+    triageSkill.includes("a stopped review never reaches this stage's writes")
+  );
+  assert.ok(
+    triageSkill.includes(
+      "A `Bug` is final only when its review was approved; a stopped review records nothing"
+    )
+  );
+  assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
+  assert.ok(
+    triageToolsReference.includes("## Critic (subagent) and the review skills")
+  );
+  assert.ok(triageToolsReference.includes("never pass an `outputSchema`"));
+  for (const excluded of [
+    "create_triage_review_packet",
+    "read_triage_review_verdict",
+    "approvalId",
+    "linearProjectId",
+  ]) {
+    assert.ok(!triageSkill.includes(excluded), excluded);
+  }
+});
