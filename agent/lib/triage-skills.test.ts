@@ -21,6 +21,14 @@ const intercomTriageSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const handoffSkill = readFileSync(
+  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
+  "utf8"
+);
+const hotlaneSkill = readFileSync(
+  new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
+  "utf8"
+);
 const slackWordingSkill = readFileSync(
   new URL("../skills/slack-wording/SKILL.md", import.meta.url),
   "utf8"
@@ -120,6 +128,10 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     )
   );
   assert.ok(triageReportingReference.includes("## Master ticket template"));
+  assert.ok(
+    triageReportingReference.includes("live in the `engineering-handoff` skill")
+  );
+  assert.ok(handoffSkill.includes("## Master ticket template"));
 });
 
 test("shared triage makes retrieval project-independent", () => {
@@ -255,7 +267,7 @@ test("shared triage stops unproven claims before classification or routing", () 
   );
   assert.ok(
     triageReportingReference.includes(
-      "Never use the master ticket template or create or attach a master for this branch"
+      "Never load `engineering-handoff` or create or attach a master for this branch"
     )
   );
 });
@@ -264,8 +276,8 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
     {
       end: "\n   Do not filter this search by label.",
-      skill: triageSkill,
-      start: "1. Search for an existing master on four axes:",
+      skill: handoffSkill,
+      start: "1. For every query, call `linear__list_issues`",
     },
     {
       end: "\n3. Create one customer-report issue",
@@ -304,9 +316,9 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
 
 test("shared triage preserves unbounded master lookup outside Slack intake", () => {
   const masterSelection = extractInstruction(
-    triageSkill,
-    "### When the root cause warrants action",
-    "### Area-routing roster"
+    handoffSkill,
+    "## Search for the current master",
+    "## Content boundary"
   );
 
   assert.ok(masterSelection.includes("intake-only Slack workflow"));
@@ -336,4 +348,156 @@ test("Slack replies exclude internal investigation summaries", () => {
   assert.ok(
     slackWordingSkill.includes("progress updates may be conversational")
   );
+});
+
+test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {
+  const branch = extractInstruction(
+    triageSkill,
+    "### When the root cause warrants action",
+    "### Area-routing roster"
+  );
+  assert.ok(branch.includes("Load `engineering-handoff`"));
+  assert.ok(!branch.includes("linear__list_issues"));
+  assert.ok(!triageSkill.includes("## Master ticket template"));
+  for (const moved of [
+    "## Preconditions",
+    "## Match by cause, not symptom",
+    "## Search for the current master",
+    "## Reuse an existing master",
+    "## Create one master",
+    "## Read back before finishing",
+    "One master per root cause",
+    "`fast-lane`",
+    "area-routing roster in `triage-investigate` Stage 6",
+    "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
+  ]) {
+    assert.ok(handoffSkill.includes(moved), moved);
+  }
+  for (const excluded of [
+    "reserve_triage_master",
+    "complete_triage_master_reservation",
+    "read_triage_review_verdict",
+    "approvalId",
+    "Final communication",
+  ]) {
+    assert.ok(!handoffSkill.includes(excluded), excluded);
+  }
+});
+
+test("incident-hotlane assesses and never writes", () => {
+  for (const kept of [
+    "Propose `HOTLANE`",
+    "`STANDARD_ENGINEERING`",
+    "`NOT_ENGINEERING`",
+    "`NEEDS_HUMAN_URGENT`",
+    "`fast-lane`",
+    "`confirmed_affected`",
+    "`potentially_exposed`",
+    "Containment",
+    "Customer recovery",
+    "Permanent prevention",
+    "Observability",
+    "This skill performs no writes",
+  ]) {
+    assert.ok(hotlaneSkill.includes(kept), kept);
+  }
+  for (const excluded of [
+    "save_issue",
+    "save_comment",
+    "save_document",
+    "Set `HOTLANE`",
+    "triage-critic",
+    "After approval:",
+    "incident channel",
+  ]) {
+    assert.ok(!hotlaneSkill.includes(excluded), excluded);
+  }
+  assert.ok(hotlaneSkill.includes("This skill does not set priority"));
+});
+
+test("triage reviews a Bug with the critic before routing it", () => {
+  const review = extractInstruction(
+    triageSkill,
+    "### Review a Bug before routing it",
+    "## Stage 6: Persist and route"
+  );
+  for (const rule of [
+    "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
+    "a duplicate routes nothing new to engineering",
+    "`**Review**: Pending critic`",
+    "Load `incident-hotlane`",
+    "Delegate to the `critic` subagent",
+    "the full 40-character SHA",
+    "`attempt 1`",
+    "Do not pass an `outputSchema`",
+    "Check the echo before reading the verdict",
+    "A result with an empty `criteria_results` is a review that could not start",
+    "that is a stop under step 5, not an echo defect, whatever `reviewed.commit` says",
+    "Otherwise, if `reviewed.commit` is `unpinned` or is not exactly the full 40-character commit you supplied, or `reviewed` does not echo exactly the issue id, document id, and `updatedAt` you supplied",
+    "Whatever the verdict says, do not count that result as an attempt: re-delegate once with the same attempt number and the same inputs",
+    "If the second result is also `unpinned` or mis-echoed, it is a stop",
+    "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
+    "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
+    "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",
+    "In a read-only run, describe those writes instead of making them",
+    "once a version is approved, nothing may change it until routing is done",
+    "The Stage 7 reply after a stop states only what is known, says a person is settling it before anything is final, and promises no action",
+    "is a stop, not a retry",
+    "delegate again with `attempt 2`",
+    "On a second `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on any stop",
+    "`Stopped: <verdict or failure>`",
+    "Assign Aaron Fraga as the explicit human-routing fallback",
+    "There is no attempt 3 and no fresh reviewer chain",
+    "as the literal marker `read-only`",
+    "Do not touch the document",
+  ]) {
+    assert.ok(review.includes(rule), rule);
+  }
+  assert.ok(
+    review.indexOf("Check the echo before reading the verdict") <
+      review.indexOf("Read the result as a whole before acting on `verdict`"),
+    "the echo check precedes the verdict read"
+  );
+  assert.ok(
+    triageSkill.includes(
+      "After the handoff has read its writes back, make one `patch`"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "A document created here for an unreviewed outcome is written once with `**Review**: Not required` and needs no later patch"
+    )
+  );
+  assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
+  assert.ok(
+    triageSkill.includes(
+      "Every decision above is provisional until the review below has approved the document"
+    )
+  );
+  assert.ok(
+    triageSkill.includes("a stopped review never reaches this stage's writes")
+  );
+  assert.ok(
+    triageSkill.includes(
+      "A reviewed `Bug` is final only when its review was approved; a stopped review records nothing. A `Duplicate` is final once its master link is saved"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "For a `Bug` other than a `Duplicate`, the review in Stage 5 approved the document version"
+    )
+  );
+  assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
+  assert.ok(
+    triageToolsReference.includes("## Critic (subagent) and the review skills")
+  );
+  assert.ok(triageToolsReference.includes("never pass an `outputSchema`"));
+  for (const excluded of [
+    "create_triage_review_packet",
+    "read_triage_review_verdict",
+    "approvalId",
+    "linearProjectId",
+  ]) {
+    assert.ok(!triageSkill.includes(excluded), excluded);
+  }
 });

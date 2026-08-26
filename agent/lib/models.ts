@@ -9,6 +9,8 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 export const MODELS = {
   analyst: "deepseek/deepseek-v4-pro-0813",
   classifier: "deepseek/deepseek-v4-pro-0813",
+  // Independent triage reviewer: a different vendor from the orchestrator on purpose.
+  critic: "openai/gpt-5.6-sol",
   implementer: "deepseek/deepseek-v4-pro-0813",
   investigator: "deepseek/deepseek-v4-pro-0813",
   orchestrator: "deepseek/deepseek-v4-pro-0813",

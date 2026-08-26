@@ -18,6 +18,12 @@ Two kinds of tool appear below, and they are called differently.
 
 Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
+## Critic (subagent) and the review skills
+
+`critic` is a declared subagent, called through the subagent tool by name. It owns its output contract; never pass an `outputSchema`. The message carries the source issue id, the `Triage investigation` document id and `updatedAt`, the full 40-character commit Stage 4 read, the proposed decisions, the hotlane route, and `attempt 1` or `attempt 2`. It returns `verdict` (`APPROVE`, `CHALLENGE`, `INSUFFICIENT_EVIDENCE`), `reviewed` (the identifiers it actually reviewed), twelve `criteria_results`, `blocking_findings`, `advisory_notes`, and `summary`. It has its own sandbox and read-only copies of the evidence connections; it can take a few minutes and cannot write anywhere.
+
+`incident-hotlane` and `engineering-handoff` are root skills loaded with `load_skill`. The first assesses and returns a structured proposal; the second owns the master search and writes for the engineering-actionable branch.
+
 ## Repository (root tools, no prefix)
 
 `prepare_repository`, `grep`, `glob` are authored tools in `agent/tools/`. `read_file` and `bash` are eve framework tools, registered automatically.

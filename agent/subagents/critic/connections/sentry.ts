@@ -1,0 +1,31 @@
+import { defineMcpClientConnection } from "eve/connections";
+import sentry from "../../../connections/sentry.js";
+import { withoutConsent } from "../../../lib/user-connect.js";
+
+/**
+ * The critic's Sentry surface: reads only.
+ *
+ * @remarks
+ * The root connection is already read-only by OAuth consent (only "Inspect
+ * Issues & Events" was granted) and exposes the server's meta-tools over
+ * that surface. The critic narrows further, to the confirmed read tools from
+ * the triage tool catalog, as defense in depth against a wider re-consent.
+ * `auth` (user-scoped `userConnect`) and `url` are the root's own objects.
+ */
+export const SENTRY_CRITIC_READ_TOOLS = [
+  "find_organizations",
+  "find_projects",
+  "find_issues",
+  "search_issues",
+  "get_issue_details",
+  "search_events",
+  "search_issue_events",
+] as const;
+
+export default defineMcpClientConnection({
+  ...sentry,
+  auth: withoutConsent(sentry.auth),
+  description:
+    "Sentry, read-only: organizations, projects, issues, issue details, and event search. No issue or project writes.",
+  tools: { allow: [...SENTRY_CRITIC_READ_TOOLS] },
+});

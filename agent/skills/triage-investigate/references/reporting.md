@@ -80,6 +80,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 **Ticket**: <ENG-XXXX>
 **Classification**: <User Error | Platform Limitation | Bug>
 **Organization**: <organization_id> (<org name>)
+**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Stopped: <reason> | Not required>
 
 ## Claim
 The one testable sentence from Stage 1.
@@ -111,45 +112,10 @@ What action the root cause warrants.
 
 ## Master ticket template
 
-```markdown
-## Overview
-
-One to three plain-language sentences: what is broken and why it matters.
-
-## Problem
-
-The problem from the user's or operator's perspective.
-
-## Root cause
-
-The cause, with the file and function it lives in.
-
-## Blast radius
-
-How many orgs and users are affected, as an exact figure where one is reachable, with the query that counted it and the date counted. Where exact is not reachable, the tightest bound and what blocks the exact figure. Never an adjective.
-
-## Proposed fix
-
-The end-to-end behavior that should change, without a layer-by-layer plan.
-
-## What's included
-
-Decided scope, important exclusions, and dependencies.
-
-## Done when
-
-- Checkable observable outcome.
-- Checkable observable outcome.
-
-## Reports
-
-The customer tickets this master owns, as Linear links.
-```
-
-Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.
+The master ticket template and the rules for filling it live in the `engineering-handoff` skill, which Stage 6 loads for the engineering-actionable branch. Nothing in this reference creates or edits a master.
 
 ## Unproven branch reporting
 
 When Stage 5 takes the unproven terminal branch, do not force the ordinary templates to claim a classification or root cause. Keep the `## Triage investigation` title and document link in the short comment, lead with the unblock or `None found: <reason>`, then state the known facts, the missing confirmation and who can supply it, and the condition that will reopen the investigation. Do not present a classification, root cause, or blast radius as settled.
 
-Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never use the master ticket template or create or attach a master for this branch.
+Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and `**Review**: Not required` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.
