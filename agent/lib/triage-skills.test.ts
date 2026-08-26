@@ -470,7 +470,12 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "A `Bug` is final only when its review was approved; a stopped review records nothing"
+      "A reviewed `Bug` is final only when its review was approved; a stopped review records nothing. A `Duplicate` is final once its master link is saved"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "For a `Bug` other than a `Duplicate`, the review in Stage 5 approved the document version"
     )
   );
   assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
