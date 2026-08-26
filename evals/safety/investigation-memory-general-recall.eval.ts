@@ -2,7 +2,7 @@ import { defineEval } from "eve/evals";
 
 export default defineEval({
   description:
-    "An attended product-behavior question searches investigation memory after restating it, and a question alone never writes to it.",
+    "An attended product-behavior question searches investigation memory, and a question alone never writes to it.",
   tags: ["fast", "needs-connect"],
   async test(t) {
     await t.send(
