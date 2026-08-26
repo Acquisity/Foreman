@@ -165,9 +165,13 @@ const sourceUrl = () =>
   z
     .url({ protocol: HTTPS })
     .max(MAX_URL_LENGTH)
-    .refine((value) => new URL(value).username === "", {
-      error: "A source link must not carry credentials.",
-    });
+    .refine(
+      (value) => {
+        const url = new URL(value);
+        return url.username === "" && url.password === "";
+      },
+      { error: "A source link must not carry credentials." }
+    );
 
 const featureKey = z.enum(FEATURE_KEYS);
 

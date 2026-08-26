@@ -225,6 +225,7 @@ test("casePayloadSchema", async (t) => {
     for (const sourceIssueUrl of [
       "http://linear.app/acquisity/issue/ENG-12345/sends-stopped",
       "https://user:token@linear.app/acquisity/issue/ENG-12345",
+      "https://:token@linear.app/acquisity/issue/ENG-12345",
       "ftp://linear.app/acquisity/issue/ENG-12345",
       "javascript:alert(1)",
     ]) {
