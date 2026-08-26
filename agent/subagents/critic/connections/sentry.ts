@@ -6,10 +6,11 @@ import { withoutConsent } from "../../../lib/user-connect.js";
  * The critic's Sentry surface: reads only.
  *
  * @remarks
- * The root connection exposes Sentry's full server surface, which includes
- * issue and project writes. The critic gets the confirmed read tools from
- * the triage tool catalog and nothing else. `auth` (user-scoped
- * `userConnect`) and `url` are the root's own objects.
+ * The root connection is already read-only by OAuth consent (only "Inspect
+ * Issues & Events" was granted) and exposes the server's meta-tools over
+ * that surface. The critic narrows further, to the confirmed read tools from
+ * the triage tool catalog, as defense in depth against a wider re-consent.
+ * `auth` (user-scoped `userConnect`) and `url` are the root's own objects.
  */
 export const SENTRY_CRITIC_READ_TOOLS = [
   "find_organizations",
