@@ -369,6 +369,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "One master per root cause",
     "`fast-lane`",
     "area-routing roster in `triage-investigate` Stage 6",
+    "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
   }

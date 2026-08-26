@@ -57,7 +57,7 @@ If an eligible master already owns the cause:
 
 ## Create one master
 
-If no eligible master owns the cause, create one with the template below, on the ENG team, labelled with the type, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to the area owner from the roster in `triage-investigate` Stage 6. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
+If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project Stage 6 selected from completed evidence (never the report's incoming intake project; when Stage 6 could not determine one, leave the master unprojected and say so in the document), labelled with the type, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to the area owner from the roster in `triage-investigate` Stage 6. Then set this ticket's `parentId` to it and its assignee to that same area owner, in one `save_issue` call. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
 
 Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
