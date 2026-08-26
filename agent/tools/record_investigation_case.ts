@@ -5,16 +5,12 @@ import {
   CLASSIFICATIONS,
   casePayloadSchema,
 } from "#lib/investigation-memory/case.js";
-import { featureForCase } from "#lib/investigation-memory/scope.js";
+import {
+  featureForCase,
+  NO_FEATURE_REASON,
+} from "#lib/investigation-memory/scope.js";
 import { recordCase } from "#lib/investigation-memory/store.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
-
-/**
- * Why a write had no product area to file under. A ticketed case needs a
- * mapped project; a ticketless one needs a live area named directly.
- */
-export const NO_FEATURE_REASON =
-  "The case has no owning product area, so it is not recorded and the investigation itself stands. A Linear-sourced case needs a project mapped to a product area. A ticketless Intercom or Slack case needs a live product area in primaryFeatureKey.";
 
 export default defineTool({
   approval: investigationMemoryWritePolicy,

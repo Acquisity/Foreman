@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { FEATURE_KEYS, isDependencyKey, MAX_SCOPE_ENTRIES } from "./scope.js";
+import {
+  FEATURE_KEYS,
+  isDependencyKey,
+  LINEAR_ISSUE_ID_PATTERN,
+  MAX_SCOPE_ENTRIES,
+} from "./scope.js";
 
 /**
  * The case payload a completed investigation writes, and the guards that keep
@@ -25,8 +30,9 @@ import { FEATURE_KEYS, isDependencyKey, MAX_SCOPE_ENTRIES } from "./scope.js";
  * such as `ENG-12345`, `intercom:<conversation id>`, or
  * `slack:<channel id>/<thread ts>`.
  */
-export const SOURCE_ISSUE_ID_PATTERN =
-  /^(?:[A-Z]{2,10}-\d{1,9}|intercom:\d{1,20}|slack:[CGD][A-Z0-9]{7,}\/\d{10}\.\d{6})$/;
+export const SOURCE_ISSUE_ID_PATTERN = new RegExp(
+  `^(?:${LINEAR_ISSUE_ID_PATTERN.source.slice(1, -1)}|intercom:\\d{1,20}|slack:[CGD][A-Z0-9]{7,}/\\d{10}\\.\\d{6})$`
+);
 
 export const SOURCE_ISSUE_ID_HINT =
   "A Linear identifier such as ENG-12345, `intercom:<conversation id>`, or `slack:<channel id>/<thread ts>`.";
@@ -154,11 +160,12 @@ const sourceUrl = () => z.url().max(MAX_URL_LENGTH);
 const featureKey = z.enum(FEATURE_KEYS);
 
 /**
- * The write payload. When a Linear project id is given, the executor derives
- * the primary feature from it and `primaryFeatureKey` is ignored, so a
- * ticketed case still cannot choose its own bucket. A ticketless Intercom or
- * Slack case has no project, so it names a live area directly; the enum bound
- * is the safety property there, and a memory row's bucket routes nothing.
+ * The write payload. The source id's shape decides which field names the
+ * product area: a Linear source resolves only through `linearProjectId`, so a
+ * ticketed case cannot choose its own bucket, and a ticketless Intercom or
+ * Slack source names a live area in `primaryFeatureKey`. The enum bound is the
+ * safety property there, and a memory row's bucket routes nothing. That rule
+ * lives in `featureForCase`, where the executor applies it.
  */
 export const casePayloadSchema = z
   .object({
@@ -217,14 +224,14 @@ export const casePayloadSchema = z
       .uuid()
       .optional()
       .describe(
-        "The evidence-backed project id read from the issue after final Linear handling, whenever the source is a Linear ticket. It decides the product area; omit it only for a ticketless Intercom or Slack investigation."
+        "The evidence-backed project id read from the issue after final Linear handling. Required for a Linear source, where it alone decides the product area; ignored for a ticketless Intercom or Slack source."
       ),
     observedFrom: z.iso.datetime().optional(),
     observedTo: z.iso.datetime().optional(),
     primaryFeatureKey: featureKey
       .optional()
       .describe(
-        "Only for a ticketless Intercom or Slack investigation: the live product area the evidence points at. Ignored whenever linearProjectId is given."
+        "Only for a ticketless Intercom or Slack source: the live product area the evidence points at. Ignored for a Linear source."
       ),
     provider: cleanText(60).optional(),
     resolution: cleanText(1000)

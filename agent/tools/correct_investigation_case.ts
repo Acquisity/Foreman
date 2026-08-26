@@ -6,10 +6,12 @@ import {
   casePayloadSchema,
   cleanText,
 } from "#lib/investigation-memory/case.js";
-import { featureForCase } from "#lib/investigation-memory/scope.js";
+import {
+  featureForCase,
+  NO_FEATURE_REASON,
+} from "#lib/investigation-memory/scope.js";
 import { correctCase } from "#lib/investigation-memory/store.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
-import { NO_FEATURE_REASON } from "./record_investigation_case.js";
 
 export default defineTool({
   approval: investigationMemoryWritePolicy,

@@ -136,21 +136,37 @@ export function isFeatureKey(value: string): value is FeatureKey {
   return FEATURE_KEY_SET.has(value);
 }
 
+/** A Linear issue identifier such as `ENG-12345`. */
+export const LINEAR_ISSUE_ID_PATTERN = /^[A-Z]{2,10}-\d{1,9}$/;
+
+/** Whether a source id names a Linear ticket rather than a ticketless source. */
+export const isLinearSource = (sourceIssueId: string): boolean =>
+  LINEAR_ISSUE_ID_PATTERN.test(sourceIssueId);
+
+/**
+ * Why a write had no product area to file under. Shared by the record and
+ * correct tools; it lives here so neither tool module imports the other.
+ */
+export const NO_FEATURE_REASON =
+  "The case has no owning product area, so it is not recorded and the investigation itself stands. A Linear-sourced case takes its area only from a mapped Linear project. A ticketless Intercom or Slack case needs a live product area in primaryFeatureKey and ignores any project id.";
+
 /**
  * The primary feature a case write files under, or null when it has none.
  *
  * @remarks
- * A Linear project id, when given, is the only authority and the model's key
- * is ignored, so a ticketed case cannot pick its own bucket. Without one, the
- * model's key stands, bounded to the live areas: a planned area has no
- * customer-impact analogies to file, and a case there would be found by
- * nothing.
+ * The shape of the source id decides the authority, not which fields the
+ * model chose to send. A Linear ticket resolves only through its mapped
+ * project, so it cannot pick its own bucket by omitting the project id. A
+ * ticketless Intercom or Slack source has no project, so the model's key
+ * stands, bounded to the live areas: a planned area has no customer-impact
+ * analogies to file, and a case there would be found by nothing.
  */
 export function featureForCase(source: {
   linearProjectId?: string | null;
   primaryFeatureKey?: FeatureKey | null;
+  sourceIssueId: string;
 }): FeatureKey | null {
-  if (typeof source.linearProjectId === "string") {
+  if (isLinearSource(source.sourceIssueId)) {
     return featureForProject(source.linearProjectId);
   }
   const key = source.primaryFeatureKey ?? null;
