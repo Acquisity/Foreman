@@ -91,6 +91,7 @@ export default defineTool({
   outputSchema: z.object({
     created: z.boolean().optional(),
     documentId: z.string().optional(),
+    /** With saved true: the write landed but updatedAt could not be read back. With saved false: nothing was written. */
     error: z.string().optional(),
     saved: z.boolean(),
     updatedAt: z.string().optional(),

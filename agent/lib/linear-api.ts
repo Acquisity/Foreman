@@ -268,7 +268,10 @@ interface DocumentPayload {
 export interface SaveInvestigationDocumentResult {
   created: boolean;
   documentId: string;
-  updatedAt: string;
+  /** Set when the write succeeded but the version pin could not be read back. */
+  error?: string;
+  /** The post-write version pin; absent only when `error` is set. */
+  updatedAt?: string;
   url: string;
 }
 
@@ -328,12 +331,22 @@ async function readBack(
   if (!payload.success) {
     throw new Error("Linear did not confirm the document write.");
   }
-  const { document } = await linearGraphql<{
-    document: { id: string; updatedAt: string; url: string };
-  }>(token, DOCUMENT_QUERY, { id: payload.document.id }, opts);
-  return {
-    documentId: document.id,
-    updatedAt: document.updatedAt,
-    url: document.url,
-  };
+  try {
+    const { document } = await linearGraphql<{
+      document: { id: string; updatedAt: string; url: string };
+    }>(token, DOCUMENT_QUERY, { id: payload.document.id }, opts);
+    return {
+      documentId: document.id,
+      updatedAt: document.updatedAt,
+      url: document.url,
+    };
+  } catch (error) {
+    // The write is in Linear; only the pin is missing. A repeat call with the
+    // same content rewrites it and returns the pin.
+    return {
+      documentId: payload.document.id,
+      error: `The document was written, but its version pin could not be read back (${error instanceof Error ? error.message : "read failed"}). Call again with the same content to get updatedAt.`,
+      url: payload.document.url,
+    };
+  }
 }

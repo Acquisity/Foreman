@@ -7,6 +7,8 @@ import {
   saveInvestigationDocument,
 } from "./linear-api.js";
 
+const WAS_WRITTEN = /was written/u;
+
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
     new Response(JSON.stringify(body), {
@@ -268,6 +270,31 @@ describe("saveInvestigationDocument", () => {
       ),
       (error: Error) => error.message.includes("already carries 2 documents")
     );
+  });
+
+  it("reports a written document with no pin when the read-back fails", async () => {
+    let calls = 0;
+    const fetchStub: typeof fetch = (_url, init) => {
+      calls += 1;
+      const { query } = JSON.parse(String(init?.body)) as { query: string };
+      if (query.startsWith("query IssueDocuments")) {
+        return json({ data: { issue: { documents: { nodes: [] }, id: "i" } } });
+      }
+      if (query.startsWith("mutation CreateDocument")) {
+        return json({ data: { documentCreate: { document, success: true } } });
+      }
+      return json({ message: "down" }, 503);
+    };
+    const result = await saveInvestigationDocument(
+      "t",
+      { content: "x", issue: "ENG-1", lane: "triage" },
+      { fetch: fetchStub }
+    );
+    assert.equal(calls, 3);
+    assert.equal(result.created, true);
+    assert.equal(result.documentId, "doc1");
+    assert.equal(result.updatedAt, undefined);
+    assert.match(result.error ?? "", WAS_WRITTEN);
   });
 
   it("rewrites the existing document instead of creating a second", async () => {
