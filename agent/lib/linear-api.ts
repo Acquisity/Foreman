@@ -1,0 +1,231 @@
+/**
+ * Direct Linear GraphQL access for authored tools, sharing the app-scoped
+ * `linearAuth` installation with the MCP connection. The token is sent only
+ * as a bearer header and never appears in errors or results.
+ */
+
+const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export interface LinearGraphqlOptions {
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
+}
+
+/**
+ * Runs one GraphQL operation. A non-2xx response or a GraphQL `errors` array
+ * throws an Error carrying the messages and nothing else.
+ */
+export async function linearGraphql<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  opts?: LinearGraphqlOptions
+): Promise<T> {
+  const fetchImpl = opts?.fetch ?? fetch;
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const response = await fetchImpl(LINEAR_GRAPHQL_URL, {
+    body: JSON.stringify({ query, variables }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+  });
+  if (!response.ok) {
+    throw new Error(`Linear GraphQL request failed: HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as {
+    data?: T;
+    errors?: Array<{ message?: string }>;
+  };
+  if (body.errors?.length) {
+    const messages = body.errors
+      .map((error) => error.message ?? "unknown error")
+      .join("; ");
+    throw new Error(`Linear GraphQL error: ${messages}`);
+  }
+  if (body.data === undefined) {
+    throw new Error("Linear GraphQL response carried no data.");
+  }
+  return body.data;
+}
+
+/** Engineering Team id. The name alone silently returns nothing. */
+export const ENGINEERING_TEAM_ID = "8eaf95ab-56ac-4490-8253-f6a96793dc40";
+
+/** Recency window for eligible masters in intake-only Slack sessions. */
+export const MASTER_WINDOW_DAYS = 30;
+
+const DUPLICATES_PAGE_SIZE = 50;
+const MASTERS_PAGE_SIZE = 250;
+const MAX_PAGES = 20;
+const MAX_ISSUES = 100;
+
+const ISSUES_QUERY = `query RelatedIssues($filter: IssueFilter!, $first: Int!, $after: String, $includeArchived: Boolean!) {
+  issues(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived, orderBy: createdAt) {
+    nodes {
+      id identifier title url createdAt
+      state { name type }
+      assignee { name }
+      parent { identifier }
+      labels { nodes { name } }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+
+interface IssueNode {
+  assignee: { name: string } | null;
+  createdAt: string;
+  id: string;
+  identifier: string;
+  labels: { nodes: Array<{ name: string }> };
+  parent: { identifier: string } | null;
+  state: { name: string; type: string };
+  title: string;
+  url: string;
+}
+
+interface IssuesData {
+  issues: {
+    nodes: IssueNode[];
+    pageInfo: { endCursor: string | null; hasNextPage: boolean };
+  };
+}
+
+export interface RelatedIssue {
+  assignee: string | null;
+  createdAt: string;
+  identifier: string;
+  labels: string[];
+  matchedPhrases: string[];
+  parentIdentifier: string | null;
+  state: string;
+  stateType: string;
+  title: string;
+  url: string;
+}
+
+export interface FindRelatedIssuesResult {
+  /** ISO timestamp masters must be created at or after; null when unbounded. */
+  createdAfter: string | null;
+  issues: RelatedIssue[];
+  /** A page cap or the result cap dropped candidates. */
+  truncated: boolean;
+}
+
+export interface FindRelatedIssuesInput {
+  phrases: string[];
+  scope: "duplicates" | "masters";
+  /** Apply the {@link MASTER_WINDOW_DAYS} window to `masters`; decided by the tool from the session stamp. */
+  windowed: boolean;
+}
+
+const phraseFilter = (phrase: string) => ({
+  or: [
+    { title: { containsIgnoreCase: phrase } },
+    { description: { containsIgnoreCase: phrase } },
+  ],
+});
+
+const toRelatedIssue = (node: IssueNode, phrase: string): RelatedIssue => ({
+  assignee: node.assignee?.name ?? null,
+  createdAt: node.createdAt,
+  identifier: node.identifier,
+  labels: node.labels.nodes.map((label) => label.name),
+  matchedPhrases: [phrase],
+  parentIdentifier: node.parent?.identifier ?? null,
+  state: node.state.name,
+  stateType: node.state.type,
+  title: node.title,
+  url: node.url,
+});
+
+/** Runs one phrase's query, following cursors, merging into `byId`. Returns whether pages were dropped. */
+async function searchPhrase(
+  token: string,
+  phrase: string,
+  filter: Record<string, unknown>,
+  masters: boolean,
+  byId: Map<string, RelatedIssue>,
+  opts?: LinearGraphqlOptions
+): Promise<boolean> {
+  let after: string | null = null;
+  let pages = 0;
+  do {
+    // biome-ignore lint/performance/noAwaitInLoops: cursors are sequential.
+    const data: IssuesData = await linearGraphql<IssuesData>(
+      token,
+      ISSUES_QUERY,
+      {
+        after,
+        filter,
+        first: masters ? MASTERS_PAGE_SIZE : DUPLICATES_PAGE_SIZE,
+        includeArchived: !masters,
+      },
+      opts
+    );
+    for (const node of data.issues.nodes) {
+      const existing = byId.get(node.id);
+      if (existing) {
+        existing.matchedPhrases.push(phrase);
+      } else {
+        byId.set(node.id, toRelatedIssue(node, phrase));
+      }
+    }
+    pages += 1;
+    after = data.issues.pageInfo.hasNextPage
+      ? data.issues.pageInfo.endCursor
+      : null;
+    if (after && (!masters || pages >= MAX_PAGES)) {
+      return true;
+    }
+  } while (after);
+  return false;
+}
+
+/**
+ * The two fixed searches. `duplicates` runs one page per phrase across every
+ * team, archived included. `masters` runs the Engineering Team, fully
+ * paginated, optionally within the recency window. Results are merged and
+ * deduped by id, each carrying the phrases that matched it.
+ */
+export async function findRelatedIssues(
+  token: string,
+  input: FindRelatedIssuesInput,
+  opts?: LinearGraphqlOptions & { now?: Date }
+): Promise<FindRelatedIssuesResult> {
+  const masters = input.scope === "masters";
+  const createdAfter =
+    masters && input.windowed
+      ? new Date(
+          (opts?.now ?? new Date()).getTime() -
+            MASTER_WINDOW_DAYS * 24 * 60 * 60 * 1000
+        ).toISOString()
+      : null;
+
+  const byId = new Map<string, RelatedIssue>();
+  let truncated = false;
+  for (const phrase of input.phrases) {
+    const filter: Record<string, unknown> = masters
+      ? {
+          ...phraseFilter(phrase),
+          team: { id: { eq: ENGINEERING_TEAM_ID } },
+          ...(createdAfter ? { createdAt: { gte: createdAfter } } : {}),
+        }
+      : phraseFilter(phrase);
+    // biome-ignore lint/performance/noAwaitInLoops: phrases run one at a time to keep Linear rate limits and result order predictable.
+    if (await searchPhrase(token, phrase, filter, masters, byId, opts)) {
+      truncated = true;
+    }
+  }
+
+  const issues = [...byId.values()];
+  return {
+    createdAfter,
+    issues: issues.slice(0, MAX_ISSUES),
+    truncated: truncated || issues.length > MAX_ISSUES,
+  };
+}

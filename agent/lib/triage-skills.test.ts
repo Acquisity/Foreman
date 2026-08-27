@@ -283,9 +283,9 @@ test("shared triage stops unproven claims before classification or routing", () 
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
   const skills = [
     {
-      end: "\n   Do not filter this search by label.",
+      end: "\n2. In an intake-only Slack workflow",
       skill: handoffSkill,
-      start: "1. For every query, call `linear__list_issues`",
+      start: "1. Call `find_related_issues`",
     },
     {
       end: "\n3. Create one customer-report issue",
@@ -296,17 +296,14 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
 
   for (const { end, skill, start } of skills) {
     const masterSearchInstruction = extractInstruction(skill, start, end);
-    assert.ok(masterSearchInstruction.includes("linear__list_issues"));
-    assert.ok(
-      masterSearchInstruction.includes("8eaf95ab-56ac-4490-8253-f6a96793dc40")
-    );
-    assert.ok(masterSearchInstruction.includes('createdAt: "-P30D"'));
-    assert.ok(masterSearchInstruction.includes("limit: 250"));
-    assert.ok(
-      masterSearchInstruction.includes(
-        "repeat the identical filtered query with the returned `cursor`, accumulating candidates from every page until `hasNextPage` is false"
-      )
-    );
+    assert.ok(masterSearchInstruction.includes("`find_related_issues`"));
+    assert.ok(masterSearchInstruction.includes('`scope: "masters"`'));
+    assert.ok(masterSearchInstruction.includes("30 days"));
+    assert.ok(masterSearchInstruction.includes("`createdAfter`"));
+    assert.ok(!masterSearchInstruction.includes("linear__list_issues"));
+    assert.ok(!masterSearchInstruction.includes("8eaf95ab"));
+    assert.ok(!masterSearchInstruction.includes("-P30D"));
+    assert.ok(!masterSearchInstruction.includes("hasNextPage"));
     assert.ok(skill.includes("created exactly 30 days ago"));
     assert.ok(skill.includes("even by one second"));
     assert.ok(skill.includes("selecting a candidate as the current master"));
@@ -331,10 +328,11 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
 
   assert.ok(masterSelection.includes("intake-only Slack workflow"));
   assert.ok(masterSelection.includes("including a Linear Agent Session"));
-  assert.ok(masterSelection.includes("do not pass a `createdAt` filter"));
+  assert.ok(masterSelection.includes("`createdAfter` is null"));
+  assert.ok(masterSelection.includes("no recency filter is applied"));
   assert.ok(
     masterSelection.includes(
-      "consider matching masters regardless of creation date"
+      "matching masters are considered regardless of creation date"
     )
   );
   assert.ok(masterSelection.includes("Outside that Slack workflow"));

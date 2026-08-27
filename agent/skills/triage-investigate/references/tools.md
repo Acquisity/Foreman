@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 **Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `find_related_issues`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -79,6 +79,8 @@ Call `list_instantly_subworkspaces` first. It follows Workspace Group pages up t
 ## Linear (`linear__`)
 
 `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment`.
+
+`find_related_issues` is a root tool, called bare: fixed duplicate and master searches through the same Linear installation, phrases in, deduped hits out with the phrases that matched each. Use it for the Stage 3 duplicate search and the master search instead of composing `list_issues` filters; `list_issues` stays for everything else.
 
 `save_issue` traps: `labels` replaces the entire label set, so read the current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low. `relatedTo`, `blockedBy`, and `blocks` are append-only. Pass `assignee`, not `assigneeId`.
 

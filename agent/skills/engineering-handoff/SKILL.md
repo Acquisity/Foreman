@@ -35,11 +35,9 @@ A shared symptom, error string, component, provider, or customer outcome is not 
 
 Search on four axes: the cause, the Stage 4 code path, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug.
 
-1. For every query, call `linear__list_issues` with `team: "8eaf95ab-56ac-4490-8253-f6a96793dc40"` (the Engineering Team id; the name `"Engineering"` silently returns nothing, so pass the id) and `limit: 250`.
+1. Call `find_related_issues` with `scope: "masters"` and one phrasing per axis. The Engineering Team and full pagination are fixed inside the tool; `truncated` true means candidates were dropped, so narrow the phrasings.
 
-   When the active context says this is an intake-only Slack workflow, search no further than 30 days back by also passing `createdAt: "-P30D"` on every query. Outside an intake-only Slack workflow, including a Linear Agent Session, preserve the general triage behavior: do not pass a `createdAt` filter, and consider matching masters regardless of creation date.
-
-   In every context, while `hasNextPage` is true, repeat the identical filtered query with the returned `cursor`, accumulating candidates from every page until `hasNextPage` is false.
+   In an intake-only Slack workflow the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied. Outside an intake-only Slack workflow, including a Linear Agent Session, it preserves the general triage behavior: `createdAfter` is null, no recency filter is applied, and matching masters are considered regardless of creation date.
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
 2. In an intake-only Slack workflow, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Outside that Slack workflow, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom.
