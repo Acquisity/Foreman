@@ -12,38 +12,42 @@ export const HISTORY_LIMIT = 20;
  * `packages/db/src/schema/{organization,billing,credit,manual-credit}.ts`.
  * No card, token, or key column exists on these tables; none is selected.
  */
-export const billingAccountQueries = (organizationId: string) => ({
-  balances: [
-    "select balance, lifetime_purchased, lifetime_granted, lifetime_used, updated_at",
-    "from credit_balance",
-    `where organization_id = '${organizationId}'`,
-  ].join("\n"),
-  manualCredits: [
-    "select credits_amount, target_wallet, reason, status, previous_balance, new_balance, failure_reason, created_at, completed_at",
-    "from manual_credit",
-    `where organization_id = '${organizationId}'`,
-    "order by created_at desc",
-    `limit ${HISTORY_LIMIT}`,
-  ].join("\n"),
-  organization: [
-    "select o.id, o.name, o.partner_id, o.created_at, o.billing_account_id,",
-    "       b.provider, b.subscription_status, b.subscription_plan, b.trial_ends_at, b.first_trial_observed_at, b.first_paid_observed_at,",
-    "       b.credit_balance, b.lifetime_purchased, b.lifetime_granted, b.lifetime_used,",
-    "       b.domain_balance, b.lifetime_domains_purchased, b.lifetime_domains_used,",
-    "       b.inbox_balance, b.lifetime_inboxes_purchased, b.lifetime_inboxes_used,",
-    "       b.website_credit_balance, b.lifetime_website_purchased, b.lifetime_website_granted, b.lifetime_website_used",
-    "from organization o",
-    "left join billing_account b on b.id = o.billing_account_id",
-    `where o.id = '${organizationId}'`,
-  ].join("\n"),
-  transactions: [
-    "select type, amount, balance_after, resource, description, reference_type, reference_id, created_at",
-    "from credit_transaction",
-    `where organization_id = '${organizationId}'`,
-    "order by created_at desc",
-    `limit ${HISTORY_LIMIT}`,
-  ].join("\n"),
-});
+export const billingAccountQueries = (rawOrganizationId: string) => {
+  // Re-checked here so no caller can hand the literals anything but a uuid.
+  const organizationId = organizationIdSchema.parse(rawOrganizationId);
+  return {
+    balances: [
+      "select balance, lifetime_purchased, lifetime_granted, lifetime_used, updated_at",
+      "from credit_balance",
+      `where organization_id = '${organizationId}'`,
+    ].join("\n"),
+    manualCredits: [
+      "select credits_amount, target_wallet, reason, status, previous_balance, new_balance, failure_reason, created_at, completed_at",
+      "from manual_credit",
+      `where organization_id = '${organizationId}'`,
+      "order by created_at desc",
+      `limit ${HISTORY_LIMIT}`,
+    ].join("\n"),
+    organization: [
+      "select o.id, o.name, o.partner_id, o.created_at, o.billing_account_id,",
+      "       b.provider, b.subscription_status, b.subscription_plan, b.trial_ends_at, b.first_trial_observed_at, b.first_paid_observed_at,",
+      "       b.credit_balance, b.lifetime_purchased, b.lifetime_granted, b.lifetime_used,",
+      "       b.domain_balance, b.lifetime_domains_purchased, b.lifetime_domains_used,",
+      "       b.inbox_balance, b.lifetime_inboxes_purchased, b.lifetime_inboxes_used,",
+      "       b.website_credit_balance, b.lifetime_website_purchased, b.lifetime_website_granted, b.lifetime_website_used",
+      "from organization o",
+      "left join billing_account b on b.id = o.billing_account_id",
+      `where o.id = '${organizationId}'`,
+    ].join("\n"),
+    transactions: [
+      "select type, amount, balance_after, resource, description, reference_type, reference_id, created_at",
+      "from credit_transaction",
+      `where organization_id = '${organizationId}'`,
+      "order by created_at desc",
+      `limit ${HISTORY_LIMIT}`,
+    ].join("\n"),
+  };
+};
 
 const text = z.union([z.string(), z.number()]).transform(String);
 const num = z.union([z.number(), z.string()]).transform(Number);
