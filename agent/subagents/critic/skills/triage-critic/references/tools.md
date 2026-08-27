@@ -39,7 +39,7 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 
 - Linear: the Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`; passing the name `"Engineering"` to `list_issues` returns nothing silently. Page with `limit: 250` and the cursor until exhausted.
 - Intercom: pass an Intercom URL straight to `fetch`. Free-text search is `search` with a DSL query such as `object_type:conversations q:"campaign stopped sending"`; `search_conversations` filters structured fields only. `search` returns prefixed ids (`contact_<uuid>`) and `contact_ids` wants them raw.
-- Inngest: start from the function named in the code path, then `get_run_trace` on a failing run.
+- Inngest: `find_function_runs` with the function id from the code path covers the runs and the newest trace; the connection tools stay for a specific event's runs or an older run's trace.
 - Sentry: `get_issue_details` returns the stacktrace for one issue id; the natural-language search tools can be unavailable while the rest works.
 - Axiom: `queryDataset` takes APL (`Dataset | where ... | summarize ...`); call `listDatasets` and `getDatasetFields` first for real names. Metrics go through `queryMetrics`, not APL.
 - PostHog: one `exec` tool; the `command` parameter's own description carries the syntax. Resolve a person through `persons` before reading recordings.
@@ -51,6 +51,17 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 ## Billing and Instantly (root tools)
 
 `read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They keep their root authorization: available on attended intake-only triage surfaces. `available: false` is an evidence gap, not a reason to retry.
+
+## Fixed evidence reads (root tools)
+
+The same fixed reads Foreman used to produce the evidence, all bare, so a claim is re-checked the way it was made rather than through a hand-written query or filter:
+
+- `lookup_customer`: customer email to the user, live memberships, and `pinnedOrganizationId`; `ambiguous` means several workspaces, `error` means the lookup could not run.
+- `describe_table`: a production table's columns from `information_schema`; call it before writing any `planetscale_execute_read_query` against a table you have not seen.
+- `read_billing_account`: the organization with `partnerId`, the billing account, wallets, credit balances, and recent credit history; `unavailable` names a list that could not be read.
+- `find_related_issues`: `scope: "duplicates"` across every team including closed and archived, or `scope: "masters"` on the Engineering Team; hits carry the phrases that matched.
+- `find_help_article`: help-center articles for feature words, with the repository path of each article under `apps/web/content/docs` to read from the pinned checkout.
+- `find_function_runs`: an Inngest function's newest runs with the given status and the newest run's trace steps; `traceError` means the runs were listed but the trace could not be read. Omit the function id to see matching runs across every function.
 
 ## Screenshots (root tool)
 
