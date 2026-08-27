@@ -9,6 +9,7 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 const { default: tool } = await import("../tools/route_ticket.js");
 
 const UNABLE_TO_FETCH = /Unable to fetch url information/u;
+const NO_ISSUE = /No issue ENG-999999/u;
 const UNKNOWN_LABEL =
   /Unknown label "Nope"\. Valid labels: Bug, Customer reported/u;
 
@@ -33,6 +34,9 @@ const fakeLinear = () => {
     calls.push(body);
     const q = body.query;
     if (q.startsWith("query RouteIssue")) {
+      if (body.variables.id === "ENG-999999") {
+        return json({ data: { issue: null } });
+      }
       const master = body.variables.id === "ENG-9";
       return json({
         data: {
@@ -197,6 +201,19 @@ describe("routeTicket", () => {
     );
     const [update] = fallback.updates();
     assert.deepEqual(update?.variables.input, { assigneeId: "u-grace" });
+  });
+
+  it("fails before any write when the duplicate target does not exist", async () => {
+    const linear = fakeLinear();
+    await assert.rejects(
+      routeTicket(
+        "t",
+        { duplicateOf: "ENG-999999", issue: "ENG-1", state: "Done" },
+        { fetch: linear.fetchStub }
+      ),
+      NO_ISSUE
+    );
+    assert.equal(linear.updates().length, 0);
   });
 
   it("rejects an unknown label before any write and lists the valid names", async () => {
