@@ -95,6 +95,9 @@ const FORBIDDEN = [
 const CONNECTION_STRING_WHOLE =
   /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/\S+/gi;
 
+/** All three segments of a JSON web token. */
+const JWT_WHOLE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
+
 /** A customer organization or user id, which identifies a customer. */
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
@@ -105,8 +108,10 @@ const UUID =
  * provider's error text can be handed to the model.
  */
 export function redact(text: string): string {
-  // A connection string is replaced whole, credentials and host included.
-  let out = text.replace(CONNECTION_STRING_WHOLE, "[redacted]");
+  // A connection string and a JWT are replaced whole, signature and all.
+  let out = text
+    .replace(CONNECTION_STRING_WHOLE, "[redacted]")
+    .replace(JWT_WHOLE, "[redacted]");
   for (const { pattern } of FORBIDDEN) {
     out = out.replace(
       new RegExp(pattern.source, `${pattern.flags}g`),

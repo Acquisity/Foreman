@@ -13,7 +13,20 @@ export default defineTool({
     "Omit functionId to list matching runs across every function, then narrow to the slug the code path names. Default: failed runs in the last 24 hours. " +
     "Read latestTrace.steps for the step that broke; error text is bounded and redacted. truncated true means more runs matched than the 20 returned. error means the read could not run.",
   async execute(input, ctx) {
-    const { token } = await ctx.getToken(inngestAuth);
+    let token: string;
+    try {
+      ({ token } = await ctx.getToken(inngestAuth));
+    } catch (error) {
+      if (ctx.abortSignal.aborted) {
+        throw error;
+      }
+      return {
+        error: `Inngest credential unavailable: ${error instanceof Error ? error.message : "token request failed"}`,
+        latestTrace: null,
+        runs: [],
+        truncated: false,
+      };
+    }
     return findFunctionRuns(
       token,
       {

@@ -4,6 +4,7 @@ import { errorText, findFunctionRuns } from "./inngest-api.js";
 
 const NOW = new Date("2026-08-27T18:00:00.000Z");
 const FN = "ads.google.sync-workspace-insights";
+const MORE_THAN = /more than/u;
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
@@ -172,6 +173,12 @@ describe("find_function_runs", () => {
       "dsn [redacted] failed"
     );
     assert.equal(
+      errorText(
+        "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c end"
+      ),
+      "jwt [redacted] end"
+    );
+    assert.equal(
       errorText({ message: "org 4939211d-158a-48ae-8f9a-4b94a48ca221 failed" }),
       "org [id] failed"
     );
@@ -182,5 +189,23 @@ describe("find_function_runs", () => {
     );
     assert.equal(result.error, "Inngest API /runs failed: HTTP 401.");
     assert.equal(result.latestTrace, null);
+  });
+
+  it("refuses a response larger than the byte cap", async () => {
+    const result = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      {
+        fetch: () =>
+          Promise.resolve(
+            new Response("x".repeat(10), {
+              headers: { "content-length": String(3 * 1024 * 1024) },
+              status: 200,
+            })
+          ),
+        now: NOW,
+      }
+    );
+    assert.match(result.error ?? "", MORE_THAN);
   });
 });

@@ -4,6 +4,8 @@ import { redact } from "./investigation-memory/case.js";
 /** Inngest REST v2. The same API key the MCP connector holds authenticates it. */
 export const INNGEST_API_BASE = "https://api.inngest.com/v2";
 const REQUEST_TIMEOUT_MS = 15_000;
+/** A trace with output can be large; anything past this is refused, not buffered. */
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const RUN_LIMIT = 20;
 const ERROR_CHARS = 500;
 const MAX_STEPS = 200;
@@ -117,7 +119,45 @@ async function getJson(
       `Inngest API ${path.split("?")[0]} failed: HTTP ${response.status}.`
     );
   }
-  return response.json();
+  return JSON.parse(
+    await readBoundedText(response, path.split("?")[0] ?? path)
+  );
+}
+
+/** Reads a body up to {@link MAX_RESPONSE_BYTES}, cancelling the stream past it. */
+async function readBoundedText(
+  response: Response,
+  what: string
+): Promise<string> {
+  const tooBig = () =>
+    new Error(
+      `Inngest API ${what} returned more than ${MAX_RESPONSE_BYTES} bytes.`
+    );
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    throw tooBig();
+  }
+  if (response.body === null) {
+    return "";
+  }
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: the stream's done flag terminates the loop.
+  while (true) {
+    // biome-ignore lint/performance/noAwaitInLoops: chunks are read sequentially to enforce the cap.
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw tooBig();
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total).toString("utf8");
 }
 
 const MAX_APP_PAGES = 5;
