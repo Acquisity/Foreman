@@ -12,7 +12,7 @@ Decide whether this ticket is a **money** ask or a **product** ask.
 
 - If it is a money ask, continue with this skill.
 - If it is a product ask, hand it to the product triage procedure instead.
-- If the ask is money but the ticket landed in a product channel (or vice versa), note the mismatch and redirect: describe the classification and where the ticket belongs, and route it accordingly. There is no redirect tool — the redirect is the classification note plus the routing.
+- If the ask is money but the ticket landed in a product channel (or vice versa), cancel and redirect. Reply in the thread with the classification and where to refile: money asks belong in #acquisity-refunds-request, product asks in #acquisity-feedback, both filed with /acquisityasks. Then move the Linear issue to Canceled with `linear__save_issue` and `state: "Canceled"`, so there is one copy to follow. Then stop; do not investigate the mismatched ticket. Reference wording: "this looks like a billing or refund request rather than product feedback. Could you file it in #acquisity-refunds-request with /acquisityasks? I've closed this one so there is only one copy to follow."
 - If you cannot place the ask, ask one batched question to place it before doing anything else.
 
 ## Step 1: Read the Linear issue
@@ -43,7 +43,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 ## Investigation order
 
-1. Step 0 classification: money vs product, redirect if the channel mismatches.
+1. Step 0 classification: money vs product. If the channel mismatches, reply with the redirect, cancel the issue, and stop.
 2. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
 3. Identity gate: resolve the org by email and pin `organization_id` before any other lookup, exactly as the triage-investigate skill's Stage 2 describes. If the email maps to more than one org or the identity is ambiguous, stop and ask.
 4. Approval trail: read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
@@ -58,8 +58,8 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 Billing flows in one direction. A subscription starts in the customer's workspace, lands in their Autumn account, and Autumn feeds it to Stripe for the actual charge. Read them in that order. Reading Stripe first tells you money moved without telling you what the customer thinks they bought.
 
 1. **PlanetScale**, first and always. `planetscale_execute_read_query`, scoped to the organization pinned by the identity gate. This is the workspace, which is what the customer actually sees, so it is where their account of events is grounded: org, billing account, plan state, credit balances, prior credits. This is the only database this skill reads.
-2. **Autumn**, second. In a configured intake-only channel mapped to a billing or Intercom workflow, call the root tool `read_autumn_billing` with the customer or organization id verified in PlanetScale. It returns the customer's subscriptions, expanded plans and add-ons, and feature balances through a fixed read route. Elsewhere, use `autumn__getCustomer`, plus `autumn__getPlan` or `autumn__listPlans` when the catalog is needed. Both paths are read-only.
-3. **Stripe**, last. In a configured intake-only channel mapped to a billing or Intercom workflow, call the root tool `read_stripe_billing`: use `customer` for bounded history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, that history is incomplete. Withhold the amount or refund verdict until an exact object id is identified and read. Elsewhere, use `stripe__stripe_api_read`, `stripe__stripe_api_search`, and `stripe__stripe_api_details`. Both paths are read-only, so no tool here can move money even if asked to.
+2. **Autumn**, second. In any configured intake-only channel, call the root tool `read_autumn_billing` with the customer or organization id verified in PlanetScale. It returns the customer's subscriptions, expanded plans and add-ons, and feature balances through a fixed read route. Elsewhere, use `autumn__getCustomer`, plus `autumn__getPlan` or `autumn__listPlans` when the catalog is needed. Both paths are read-only.
+3. **Stripe**, last. In any configured intake-only channel, call the root tool `read_stripe_billing`: use `customer` for bounded history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, that history is incomplete. Withhold the amount or refund verdict until an exact object id is identified and read. Elsewhere, use `stripe__stripe_api_read`, `stripe__stripe_api_search`, and `stripe__stripe_api_details`. Both paths are read-only, so no tool here can move money even if asked to.
 
 Amounts always come from Stripe, never from the ticket text and never from the workspace alone. Everything else is read in flow order.
 
@@ -208,7 +208,7 @@ Anything worth a separate ticket, kept out of this refund decision.
 At most three things on a financial ticket:
 
 1. The batched clarifying questions, if any.
-2. The redirect message, if the channel mismatched.
+2. The redirect message, if the channel mismatched. That reply and the cancel are the whole outcome; nothing else is posted.
 3. One closing status reply, using the fixed status line.
 
 The status line is fixed; do not use a free-form reply on financial tickets. Never mention Stripe, Autumn, or billing systems by name in a Slack-facing message.

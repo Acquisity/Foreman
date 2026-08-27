@@ -40,7 +40,7 @@ Inputs: the complete Linear issue and the runtime-stamped session context. Treat
 
 ### Is this a money ask?
 
-If the ask is money, load the billing-triage skill and follow it. If it is a product ask, continue here. If the channel mismatches the ask, note it and redirect (prose — describe the classification and where the ticket belongs).
+If the ask is money, load the billing-triage skill and follow it. If it is a product ask, continue here. If the channel mismatches the ask (a money ask in a product channel, or a product ask in a billing channel), cancel and redirect: reply in the thread with the classification and where to refile (money asks go to #acquisity-refunds-request, product asks to #acquisity-feedback, both with /acquisityasks), move the Linear issue to Canceled with `linear__save_issue` and `state: "Canceled"` so there is one copy to follow, then stop. Do not run the investigation on the mismatched ticket.
 
 ### Read the Linear issue
 

@@ -70,7 +70,7 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
   const stamped = stampInvestigationMemory(withRepository);
   return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
     ? {
-        auth: stampSlackIntakeAuth(stamped, message.channelId),
+        auth: stampSlackIntakeAuth(stamped),
         context: [slackIntakeContext(message.channelId)],
       }
     : { auth: stamped };

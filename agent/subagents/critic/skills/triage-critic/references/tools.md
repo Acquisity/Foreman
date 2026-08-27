@@ -50,7 +50,7 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 
 ## Billing and Instantly (root tools)
 
-`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They keep their root authorization: available on attended triage surfaces, and the billing pair only on a billing or Intercom route. `available: false` is an evidence gap, not a reason to retry.
+`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They keep their root authorization: available on attended intake-only triage surfaces. `available: false` is an evidence gap, not a reason to retry.
 
 ## Screenshots (root tool)
 
