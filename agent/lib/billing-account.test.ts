@@ -108,6 +108,15 @@ describe("read_billing_account", () => {
     const missing = await readBillingAccount(ORG, () => Promise.resolve("[]"));
     assert.equal(missing.found, false);
     assert.equal(missing.error, undefined);
+    const missingWithFailure = await readBillingAccount(ORG, (query) =>
+      query.includes("from manual_credit")
+        ? Promise.reject(new Error("timeout"))
+        : Promise.resolve("[]")
+    );
+    assert.equal(missingWithFailure.found, false);
+    assert.deepEqual(missingWithFailure.unavailable, [
+      "manualCredits: timeout",
+    ]);
     const failed = await readBillingAccount(ORG, () =>
       Promise.reject(new Error("HTTP 500"))
     );

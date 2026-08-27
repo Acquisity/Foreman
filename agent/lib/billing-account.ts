@@ -175,7 +175,7 @@ export async function readBillingAccount(
     const manualCredits = await list("manualCredits", queries.manualCredits);
     const [first] = orgRows;
     if (!first) {
-      return EMPTY;
+      return { ...EMPTY, unavailable };
     }
     const row = organizationRow.parse(first);
     const walletOf = (
