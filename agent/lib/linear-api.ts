@@ -370,6 +370,11 @@ const TEAM_LABELS_QUERY = `query TeamLabels($teamId: ID!, $after: String) {
 }`;
 const MAX_LABEL_PAGES = 8;
 
+interface LabelPage {
+  nodes: Named[];
+  pageInfo: { endCursor: string | null; hasNextPage: boolean };
+}
+
 const WORKFLOW_STATES_QUERY = `query WorkflowStates($teamId: ID!, $name: String!) {
   workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {
     nodes { id name }
@@ -476,11 +481,8 @@ async function resolveLabelIds(
   let after: string | null = null;
   for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
     // biome-ignore lint/performance/noAwaitInLoops: label pages are sequential cursors.
-    const { issueLabels } = await gql<{
-      issueLabels: {
-        nodes: Named[];
-        pageInfo: { endCursor: string | null; hasNextPage: boolean };
-      };
+    const { issueLabels }: { issueLabels: LabelPage } = await gql<{
+      issueLabels: LabelPage;
     }>(TEAM_LABELS_QUERY, { after, teamId: issue.team.id });
     labels.push(...issueLabels.nodes);
     after = issueLabels.pageInfo.hasNextPage
