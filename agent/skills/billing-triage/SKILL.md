@@ -45,7 +45,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 1. Step 0 classification: money vs product. If the channel mismatches, reply with the redirect, cancel the issue, and stop.
 2. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
-3. Identity gate: resolve the org by email and pin `organization_id` before any other lookup, exactly as the triage-investigate skill's Stage 2 describes. If the email maps to more than one org or the identity is ambiguous, stop and ask.
+3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. If `ambiguous` is true, stop and ask which workspace. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: say so and stop rather than reading billing for a null organization.
 4. Approval trail: read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
 5. Systems of record: read each one named below. Read-only everywhere.
 6. Clarifying questions: batched, before any verdict, capped at three rounds.
