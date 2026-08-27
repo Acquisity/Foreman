@@ -160,9 +160,8 @@ async function listRuns(
       params.set("cursor", cursor);
     }
     // biome-ignore lint/performance/noAwaitInLoops: app pages are sequential cursors.
-    const apps: z.infer<typeof appPage> = appPage.parse(
-      await getJson(token, `/apps?${params.toString()}`, opts)
-    );
+    const body = await getJson(token, `/apps?${params.toString()}`, opts);
+    const apps: z.infer<typeof appPage> = appPage.parse(body);
     appIds.push(...apps.data.map((app) => app.id));
     cursor = apps.page?.hasMore ? (apps.page.cursor ?? null) : null;
     if (!cursor) {

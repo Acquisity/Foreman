@@ -92,7 +92,7 @@ The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the n
 
 `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health`.
 
-Call `find_function_runs` with the function slug from the code path. It is a root tool, called bare: the newest runs with the given status in the window, and `latestTrace.steps` for the failing step of the newest one, error text bounded and redacted. Omit the slug to see matching runs across every function first. The connection tools above stay for anything else, such as a specific event's runs.
+Call `find_function_runs` with the function slug from the code path. It is a root tool, called bare: the newest runs with the given status in the window, and `latestTrace.steps`, the trace steps of the newest matching run, with any step error bounded and redacted. Omit the slug to see matching runs across every function first. The connection tools above stay for anything else, such as a specific event's runs.
 
 ## Sentry (`sentry__`)
 

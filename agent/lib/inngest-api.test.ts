@@ -63,7 +63,13 @@ describe("find_function_runs", () => {
       const u = String(url);
       urls.push(u);
       if (u.endsWith("/apps?limit=20")) {
-        return json({ data: [{ id: "other-app" }, { id: "ai-clients" }] });
+        return json({
+          data: [{ id: "other-app" }],
+          page: { cursor: "c1", hasMore: true },
+        });
+      }
+      if (u.endsWith("/apps?limit=20&cursor=c1")) {
+        return json({ data: [{ id: "ai-clients" }], page: { hasMore: false } });
       }
       if (u.includes("/apps/other-app/")) {
         return json({ message: "not found" }, 404);
@@ -81,12 +87,12 @@ describe("find_function_runs", () => {
       { functionId: FN, sinceHours: 24, status: "Failed" },
       { fetch: fetchStub, now: NOW }
     );
-    const list = new URL(urls[2] ?? "");
+    const list = new URL(urls[3] ?? "");
     assert.equal(list.pathname, `/v2/apps/ai-clients/functions/${FN}/runs`);
     assert.equal(list.searchParams.get("status"), "FAILED");
     assert.equal(list.searchParams.get("from"), "2026-08-26T18:00:00.000Z");
     assert.equal(
-      urls[3],
+      urls[4],
       "https://api.inngest.com/v2/runs/run-2/trace?includeOutput=true"
     );
     assert.equal(result.truncated, true);
@@ -131,8 +137,40 @@ describe("find_function_runs", () => {
     assert.deepEqual(result, { latestTrace: null, runs: [], truncated: false });
   });
 
+  it("reports trace truncation only when steps were dropped", async () => {
+    const spans = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `s${i}`,
+        status: "COMPLETED",
+      }));
+    const stub =
+      (n: number): typeof fetch =>
+      (url) =>
+        String(url).includes("/trace")
+          ? json({ data: { rootSpan: { children: spans(n), name: "Run" } } })
+          : json({ data: [run("run-2", "evt-2")] });
+    const exact = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: stub(200), now: NOW }
+    );
+    assert.equal(exact.latestTrace?.steps.length, 200);
+    assert.equal(exact.latestTrace?.truncated, false);
+    const over = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: stub(201), now: NOW }
+    );
+    assert.equal(over.latestTrace?.steps.length, 200);
+    assert.equal(over.latestTrace?.truncated, true);
+  });
+
   it("bounds and redacts error text and reports a failed read", async () => {
     assert.equal(errorText("x".repeat(600))?.length, 500);
+    assert.equal(
+      errorText("dsn postgres://user:password@db.example.com:5432/app failed"),
+      "dsn [redacted] failed"
+    );
     assert.equal(
       errorText({ message: "org 4939211d-158a-48ae-8f9a-4b94a48ca221 failed" }),
       "org [id] failed"

@@ -91,6 +91,10 @@ const FORBIDDEN = [
   },
 ] as const;
 
+/** The whole URI of a connection string, for redaction rather than detection. */
+const CONNECTION_STRING_WHOLE =
+  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/\S+/gi;
+
 /** A customer organization or user id, which identifies a customer. */
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
@@ -101,7 +105,8 @@ const UUID =
  * provider's error text can be handed to the model.
  */
 export function redact(text: string): string {
-  let out = text;
+  // A connection string is replaced whole, credentials and host included.
+  let out = text.replace(CONNECTION_STRING_WHOLE, "[redacted]");
   for (const { pattern } of FORBIDDEN) {
     out = out.replace(
       new RegExp(pattern.source, `${pattern.flags}g`),
