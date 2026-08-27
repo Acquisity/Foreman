@@ -206,6 +206,13 @@ describe("saveInvestigationDocument", () => {
           },
         });
       }
+      if (body.query.startsWith("query Document")) {
+        return json({
+          data: {
+            document: { ...document, updatedAt: "2026-08-27T10:00:05.000Z" },
+          },
+        });
+      }
       if (body.query.startsWith("mutation CreateDocument")) {
         return json({ data: { documentCreate: { document, success: true } } });
       }
@@ -222,8 +229,14 @@ describe("saveInvestigationDocument", () => {
       { fetch: fetchStub }
     );
     assert.equal(result.created, true);
-    assert.equal(result.updatedAt, document.updatedAt);
-    assert.equal(calls[0]?.variables.id, "ENG-1");
+    // The mutation payload reports the pre-write timestamp; the pin comes from the read-back.
+    assert.equal(result.updatedAt, "2026-08-27T10:00:05.000Z");
+    assert.ok(calls[2]?.query.startsWith("query Document"));
+    assert.equal(calls[2]?.variables.id, "doc1");
+    assert.deepEqual(calls[0]?.variables, {
+      id: "ENG-1",
+      title: "Triage investigation",
+    });
     assert.ok(calls[1]?.query.startsWith("mutation CreateDocument"));
     assert.deepEqual(calls[1]?.variables.input, {
       content: "# Triage investigation",

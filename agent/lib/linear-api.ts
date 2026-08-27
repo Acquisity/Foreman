@@ -241,8 +241,11 @@ export type InvestigationLane = keyof typeof DOCUMENT_TITLES;
 /** Upper bound on document content, matching the skills' 20 KB handoff rule. */
 export const DOCUMENT_MAX_CHARS = 20_000;
 
-const ISSUE_DOCUMENTS_QUERY = `query IssueDocuments($id: String!) {
-  issue(id: $id) { id identifier documents { nodes { id title } } }
+const ISSUE_DOCUMENTS_QUERY = `query IssueDocuments($id: String!, $title: String!) {
+  issue(id: $id) {
+    id identifier
+    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }
+  }
 }`;
 
 const DOCUMENT_CREATE = `mutation CreateDocument($input: DocumentCreateInput!) {
@@ -251,6 +254,10 @@ const DOCUMENT_CREATE = `mutation CreateDocument($input: DocumentCreateInput!) {
 
 const DOCUMENT_UPDATE = `mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {
   documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }
+}`;
+
+const DOCUMENT_QUERY = `query Document($id: String!) {
+  document(id: $id) { id updatedAt url }
 }`;
 
 interface DocumentPayload {
@@ -267,8 +274,9 @@ export interface SaveInvestigationDocumentResult {
 
 /**
  * Creates the lane's issue-scoped document on first call and rewrites it on
- * later calls, so a ticket never carries two. The mutation response is the
- * read-back: `updatedAt` is the version pin the critic packet needs.
+ * later calls, so a ticket never carries two. The document is read back after
+ * the write because the mutation response reports the pre-write `updatedAt`;
+ * the read-back value is the version pin the critic packet needs.
  */
 export async function saveInvestigationDocument(
   token: string,
@@ -281,7 +289,7 @@ export async function saveInvestigationDocument(
       documents: { nodes: Array<{ id: string; title: string }> };
       id: string;
     };
-  }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue }, opts);
+  }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue, title }, opts);
 
   const matches = issue.documents.nodes.filter((node) => node.title === title);
   if (matches.length > 1) {
@@ -299,7 +307,7 @@ export async function saveInvestigationDocument(
       { id: existing.id, input: { content: input.content, title } },
       opts
     );
-    return { created: false, ...pin(documentUpdate) };
+    return { created: false, ...(await readBack(token, documentUpdate, opts)) };
   }
   const { documentCreate } = await linearGraphql<{
     documentCreate: DocumentPayload;
@@ -309,16 +317,23 @@ export async function saveInvestigationDocument(
     { input: { content: input.content, issueId: issue.id, title } },
     opts
   );
-  return { created: true, ...pin(documentCreate) };
+  return { created: true, ...(await readBack(token, documentCreate, opts)) };
 }
 
-const pin = (payload: DocumentPayload) => {
+async function readBack(
+  token: string,
+  payload: DocumentPayload,
+  opts?: LinearGraphqlOptions
+) {
   if (!payload.success) {
     throw new Error("Linear did not confirm the document write.");
   }
+  const { document } = await linearGraphql<{
+    document: { id: string; updatedAt: string; url: string };
+  }>(token, DOCUMENT_QUERY, { id: payload.document.id }, opts);
   return {
-    documentId: payload.document.id,
-    updatedAt: payload.document.updatedAt,
-    url: payload.document.url,
+    documentId: document.id,
+    updatedAt: document.updatedAt,
+    url: document.url,
   };
-};
+}

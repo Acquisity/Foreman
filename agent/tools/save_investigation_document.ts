@@ -2,13 +2,41 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
 import { denyUnattendedWrites } from "#lib/github/approval.js";
+import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
   DOCUMENT_MAX_CHARS,
   saveInvestigationDocument,
 } from "#lib/linear-api.js";
 
-/** 13 to 19 digits with optional separators: a card number. Input is bounded, so the scan is too. */
-const CARD_NUMBER = /\b(?:\d[ -]?){12,18}\d\b/u;
+/** 13 to 19 digits with optional separators; only a Luhn-valid run counts as a card number. */
+const DIGIT_RUN = /\b(?:\d[ -]?){12,18}\d\b/gu;
+const SEPARATORS = /[ -]/gu;
+
+const luhnValid = (digits: string) => {
+  let sum = 0;
+  let double = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let digit = Number(digits[i]);
+    if (double) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    sum += digit;
+    double = !double;
+  }
+  return sum % 10 === 0;
+};
+
+/**
+ * Whether `text` carries a Luhn-valid 13 to 19 digit run. Input is bounded, so the scan is too.
+ * ponytail: Luhn still passes about one random digit run in ten; add issuer prefixes if a real id keeps tripping it.
+ */
+export const hasCardNumber = (text: string) =>
+  (text.match(DIGIT_RUN) ?? []).some((run) =>
+    luhnValid(run.replace(SEPARATORS, ""))
+  );
 /** Two letters, two check digits, 11 to 30 alphanumerics, any case, spaces or dashes allowed: an IBAN. */
 const IBAN = /\b[A-Za-z]{2}\d{2}(?:[ -]?[A-Za-z0-9]){11,30}\b/u;
 
@@ -22,7 +50,7 @@ export default defineTool({
   async execute(input, ctx) {
     if (
       input.lane === "billing" &&
-      (CARD_NUMBER.test(input.content) || IBAN.test(input.content))
+      (hasCardNumber(input.content) || IBAN.test(input.content))
     ) {
       return {
         error:
@@ -56,7 +84,7 @@ export default defineTool({
     issue: z
       .string()
       .trim()
-      .regex(/^[A-Z][A-Z0-9]{1,9}-\d{1,7}$/u)
+      .regex(LINEAR_ISSUE_ID_PATTERN)
       .describe("Issue identifier, such as ENG-123."),
     lane: z.enum(["triage", "billing"]),
   }),

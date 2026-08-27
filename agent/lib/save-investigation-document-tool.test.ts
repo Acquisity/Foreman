@@ -8,7 +8,7 @@ const CARD_OR_BANK = /card or bank/u;
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
-const { default: tool } = await import(
+const { default: tool, hasCardNumber } = await import(
   "../tools/save_investigation_document.js"
 );
 
@@ -20,6 +20,10 @@ describe("save_investigation_document tool", () => {
     const ok = { content: "x", issue: "ENG-13195", lane: "triage" };
     assert.equal(tool.inputSchema.safeParse(ok).success, true);
     assert.equal(
+      tool.inputSchema.safeParse({ ...ok, issue: "ENG-123456789" }).success,
+      true
+    );
+    assert.equal(
       tool.inputSchema.safeParse({ ...ok, content: "x".repeat(20_001) })
         .success,
       false
@@ -28,6 +32,20 @@ describe("save_investigation_document tool", () => {
       tool.inputSchema.safeParse({ ...ok, issue: "not an id" }).success,
       false
     );
+  });
+
+  it("flags Luhn-valid card numbers and leaves ordinary long ids alone", () => {
+    assert.equal(hasCardNumber("4242 4242 4242 4242"), true);
+    assert.equal(hasCardNumber("4242-4242-4242-4242"), true);
+    for (const id of [
+      "Order 20430201049901",
+      "subscription 2210123456789",
+      "customer 1234567890123",
+      "SKU-935-2026-0812-4478",
+      "Invoice 10203040506070809",
+    ]) {
+      assert.equal(hasCardNumber(id), false, id);
+    }
   });
 
   it("denies an autonomous run before any request", async () => {
