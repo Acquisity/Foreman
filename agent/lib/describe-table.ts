@@ -17,12 +17,15 @@ export const columnsQuery = (table: string) =>
     "order by ordinal_position",
   ].join("\n");
 
+/** `_` is a LIKE wildcard, so snake_case names are escaped and the pattern says so. */
+const likePattern = (table: string) => `%${table.replace(/_/gu, "\\_")}%`;
+
 export const similarTablesQuery = (table: string) =>
   [
     "select table_name",
     "from information_schema.tables",
     // Contains the name, or is contained in it (members -> member, member_preferences).
-    `where table_schema = 'public' and (table_name like '%${table}%' or '${table}' like '%' || table_name || '%')`,
+    `where table_schema = 'public' and (table_name like '${likePattern(table)}' escape '\\' or '${table}' like '%' || replace(table_name, '_', '\\_') || '%' escape '\\')`,
     "order by table_name",
     "limit 10",
   ].join("\n");
@@ -58,9 +61,22 @@ export type DescribeTableResult = z.infer<typeof describeTableResultSchema>;
  * carries similar names so the caller corrects the name instead of guessing.
  */
 export async function describeTable(
-  table: string,
+  rawTable: string,
   run: (query: string) => Promise<string>
 ): Promise<DescribeTableResult> {
+  // The tool schema already enforces this; the library enforces it again so
+  // no caller can hand the query builders anything but a bare identifier.
+  const parsed = tableNameSchema.safeParse(rawTable);
+  if (!parsed.success) {
+    return {
+      columns: [],
+      error: "Expected a snake_case table name.",
+      found: false,
+      similar: [],
+      table: rawTable,
+    };
+  }
+  const table = parsed.data;
   try {
     const { rows } = parseReadQueryResult(await run(columnsQuery(table)));
     const columns = rows.map((row) => columnRow.parse(row));

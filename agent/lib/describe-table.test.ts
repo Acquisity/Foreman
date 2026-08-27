@@ -75,7 +75,25 @@ describe("describe_table", () => {
     assert.equal(result.found, false);
     assert.deepEqual(result.similar, ["member", "member_preferences"]);
     assert.ok(queries[1]?.includes("information_schema.tables"));
-    assert.ok(queries[1]?.includes("'members' like '%' || table_name || '%'"));
+    assert.ok(queries[1]?.includes("escape '\\'"));
+  });
+
+  it("escapes underscores in the similar-name pattern and refuses an unsafe name in the library", async () => {
+    const queries: string[] = [];
+    await describeTable("member_pref", (query) => {
+      queries.push(query);
+      return Promise.resolve("[]");
+    });
+    assert.ok(queries[1]?.includes("like '%member\\_pref%' escape '\\'"));
+
+    let ran = false;
+    const result = await describeTable("member' or '1'='1", () => {
+      ran = true;
+      return Promise.resolve("[]");
+    });
+    assert.equal(ran, false);
+    assert.equal(result.found, false);
+    assert.ok(result.error);
   });
 
   it("returns error instead of throwing when the query fails", async () => {
