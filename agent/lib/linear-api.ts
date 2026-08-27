@@ -589,8 +589,9 @@ async function buildUpdate(
 
 /**
  * One routing write. Reads the ticket, resolves every name to an id, unions
- * the labels to add with the labels already on the ticket, inherits the
- * assignee from `inheritAssigneeFrom` unless `assignee` was given, runs one
+ * the labels to add with the labels already on the ticket, takes the assignee
+ * from `inheritAssigneeFrom` when that issue has one and from `assignee`
+ * otherwise, runs one
  * `issueUpdate`, then the optional duplicate relation and link attachments,
  * and reads the ticket back. Unknown label names fail before any write and
  * list the team's labels.
