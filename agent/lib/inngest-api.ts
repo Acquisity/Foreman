@@ -155,12 +155,12 @@ async function listRuns(
   const appIds: string[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < MAX_APP_PAGES; page += 1) {
-    const params = new URLSearchParams({ limit: "20" });
+    const appParams = new URLSearchParams({ limit: "20" });
     if (cursor) {
-      params.set("cursor", cursor);
+      appParams.set("cursor", cursor);
     }
     // biome-ignore lint/performance/noAwaitInLoops: app pages are sequential cursors.
-    const body = await getJson(token, `/apps?${params.toString()}`, opts);
+    const body = await getJson(token, `/apps?${appParams.toString()}`, opts);
     const apps: z.infer<typeof appPage> = appPage.parse(body);
     appIds.push(...apps.data.map((app) => app.id));
     cursor = apps.page?.hasMore ? (apps.page.cursor ?? null) : null;
