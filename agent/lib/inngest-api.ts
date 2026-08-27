@@ -219,6 +219,11 @@ async function listRuns(
       break;
     }
   }
+  if (cursor) {
+    throw new Error(
+      `Inngest API /apps has more than ${MAX_APP_PAGES * 20} apps; the function could not be located.`
+    );
+  }
   const data: Record<string, unknown>[] = [];
   let hasMore = false;
   for (const appId of appIds) {

@@ -179,6 +179,14 @@ describe("find_function_runs", () => {
       "jwt [redacted] end"
     );
     assert.equal(
+      errorText("empty eyJhbGciOiJIUzI1NiJ9.e30.abc end"),
+      "empty [redacted] end"
+    );
+    assert.equal(
+      errorText('{"dsn":"postgres://u:p@host/db","step":2}'),
+      '{"dsn":"[redacted]","step":2}'
+    );
+    assert.equal(
       errorText({ message: "org 4939211d-158a-48ae-8f9a-4b94a48ca221 failed" }),
       "org [id] failed"
     );
@@ -207,5 +215,22 @@ describe("find_function_runs", () => {
       }
     );
     assert.match(result.error ?? "", MORE_THAN);
+  });
+
+  it("fails closed when the app list exceeds the page cap", async () => {
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: FN, sinceHours: 1, status: "Failed" },
+      {
+        fetch: () =>
+          json({
+            data: [{ id: "a" }],
+            page: { cursor: "next", hasMore: true },
+          }),
+        now: NOW,
+      }
+    );
+    assert.match(result.error ?? "", MORE_THAN);
+    assert.deepEqual(result.runs, []);
   });
 });

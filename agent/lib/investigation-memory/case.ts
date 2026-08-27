@@ -93,10 +93,10 @@ const FORBIDDEN = [
 
 /** The whole URI of a connection string, for redaction rather than detection. */
 const CONNECTION_STRING_WHOLE =
-  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/\S+/gi;
+  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/[^\s"'(),;\]}]+/gi;
 
 /** All three segments of a JSON web token. */
-const JWT_WHOLE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
+const JWT_WHOLE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
 
 /** A customer organization or user id, which identifies a customer. */
 const UUID =
