@@ -123,7 +123,7 @@ async function fetchLinearUpload(
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
-    const body = (await response.text()).slice(0, 160).replace(/\s+/gu, " ");
+    const body = await readPrefix(response.body, 160);
     throw new Error(
       `Linear returned HTTP ${response.status} for ${url} (${body}); the upload may have been deleted or Foreman's Linear access does not cover it. This request carried Foreman's own token, so the link's signature age is not the cause.`
     );
@@ -139,6 +139,28 @@ async function fetchLinearUpload(
 }
 
 export { fetchLinearUpload };
+
+/** The first `chars` of a body, reading one chunk and cancelling the rest. */
+async function readPrefix(
+  body: ReadableStream<Uint8Array> | null,
+  chars: number
+): Promise<string> {
+  if (body === null) {
+    return "";
+  }
+  const reader = body.getReader();
+  try {
+    const { value } = await reader.read();
+    return Buffer.from(value ?? new Uint8Array())
+      .toString("utf8")
+      .slice(0, chars)
+      .replace(WHITESPACE, " ");
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+const WHITESPACE = /\s+/gu;
 
 /**
  * Streamed and checked chunk by chunk rather than read whole and measured
