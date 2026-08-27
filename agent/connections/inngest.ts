@@ -1,6 +1,5 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
-import { managedConnect } from "../lib/managed-connect.js";
+import { inngestAuth } from "../lib/inngest-api-auth.js";
 
 /**
  * Inngest Cloud MCP connection for background-job investigation.
@@ -20,13 +19,7 @@ import { managedConnect } from "../lib/managed-connect.js";
  * the Inngest MCP docs; verify against the live list when touching this.
  */
 export default defineMcpClientConnection({
-  auth: managedConnect({
-    connector: requireEnv(
-      "INNGEST_MCP_CONNECTOR",
-      "api.inngest.com/acquisity-foreman-inngest"
-    ),
-    principalType: "app",
-  }),
+  auth: inngestAuth,
   description:
     "Inngest background jobs, read-only: environments, functions, events, runs, traces, failure history, and Insights queries.",
   tools: {

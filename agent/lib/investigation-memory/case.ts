@@ -91,9 +91,35 @@ const FORBIDDEN = [
   },
 ] as const;
 
+/** The whole URI of a connection string, for redaction rather than detection. */
+const CONNECTION_STRING_WHOLE =
+  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/[^\s"'(),;\]}]+/gi;
+
+/** All three segments of a JSON web token. */
+const JWT_WHOLE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
+
 /** A customer organization or user id, which identifies a customer. */
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+
+/**
+ * `text` with every forbidden shape (email, connection string, credential,
+ * bearer token, JWT, inline secret) and every customer uuid replaced, so a
+ * provider's error text can be handed to the model.
+ */
+export function redact(text: string): string {
+  // A connection string and a JWT are replaced whole, signature and all.
+  let out = text
+    .replace(CONNECTION_STRING_WHOLE, "[redacted]")
+    .replace(JWT_WHOLE, "[redacted]");
+  for (const { pattern } of FORBIDDEN) {
+    out = out.replace(
+      new RegExp(pattern.source, `${pattern.flags}g`),
+      "[redacted]"
+    );
+  }
+  return out.replace(new RegExp(UUID.source, "gi"), "[id]");
+}
 
 /**
  * The first reason `value` may not be stored, or null when it is clean.
