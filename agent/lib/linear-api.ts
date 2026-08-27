@@ -448,6 +448,17 @@ export interface RouteTicketResult {
   warnings: string[];
 }
 
+/** Reads one issue by identifier, throwing when Linear has no such issue. */
+async function requireIssue(gql: Gql, identifier: string): Promise<RouteIssue> {
+  const { issue } = await gql<{ issue: RouteIssue | null }>(ROUTE_ISSUE_QUERY, {
+    id: identifier,
+  });
+  if (!issue) {
+    throw new Error(`No issue ${identifier}.`);
+  }
+  return issue;
+}
+
 /** Resolves one name to exactly one id, or throws naming what was found. */
 function exactlyOne(kind: string, name: string, nodes: Named[]): string {
   if (nodes.length === 1 && nodes[0]) {
@@ -522,10 +533,7 @@ async function resolveAssigneeId(
   input: RouteTicketInput
 ): Promise<string | undefined> {
   if (input.inheritAssigneeFrom !== undefined) {
-    const { issue: source } = await gql<{ issue: RouteIssue }>(
-      ROUTE_ISSUE_QUERY,
-      { id: input.inheritAssigneeFrom }
-    );
+    const source = await requireIssue(gql, input.inheritAssigneeFrom);
     if (source.assignee) {
       return source.assignee.id;
     }
@@ -574,11 +582,7 @@ async function buildUpdate(
     update.assigneeId = assigneeId;
   }
   if (input.parent !== undefined) {
-    const { issue: parent } = await gql<{ issue: RouteIssue }>(
-      ROUTE_ISSUE_QUERY,
-      { id: input.parent }
-    );
-    update.parentId = parent.id;
+    update.parentId = (await requireIssue(gql, input.parent)).id;
   }
   return update;
 }
@@ -599,9 +603,7 @@ export async function routeTicket(
   const gql: Gql = (query, variables) =>
     linearGraphql(token, query, variables, opts);
 
-  const { issue } = await gql<{ issue: RouteIssue }>(ROUTE_ISSUE_QUERY, {
-    id: input.issue,
-  });
+  const issue = await requireIssue(gql, input.issue);
 
   const update = await buildUpdate(gql, issue, input);
   // Resolve the duplicate target before the first write, so a bad identifier
@@ -609,11 +611,7 @@ export async function routeTicket(
   const master =
     input.duplicateOf === undefined
       ? null
-      : (
-          await gql<{ issue: RouteIssue }>(ROUTE_ISSUE_QUERY, {
-            id: input.duplicateOf,
-          })
-        ).issue;
+      : await requireIssue(gql, input.duplicateOf);
   if (Object.keys(update).length > 0) {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
       ISSUE_UPDATE,
