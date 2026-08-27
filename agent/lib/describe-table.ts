@@ -21,7 +21,8 @@ export const similarTablesQuery = (table: string) =>
   [
     "select table_name",
     "from information_schema.tables",
-    `where table_schema = 'public' and table_name like '%${table}%'`,
+    // Contains the name, or is contained in it (members -> member, member_preferences).
+    `where table_schema = 'public' and (table_name like '%${table}%' or '${table}' like '%' || table_name || '%')`,
     "order by table_name",
     "limit 10",
   ].join("\n");

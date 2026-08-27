@@ -75,6 +75,7 @@ describe("describe_table", () => {
     assert.equal(result.found, false);
     assert.deepEqual(result.similar, ["member", "member_preferences"]);
     assert.ok(queries[1]?.includes("information_schema.tables"));
+    assert.ok(queries[1]?.includes("'members' like '%' || table_name || '%'"));
   });
 
   it("returns error instead of throwing when the query fails", async () => {
