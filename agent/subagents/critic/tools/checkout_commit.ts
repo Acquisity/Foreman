@@ -61,8 +61,12 @@ export default defineTool({
       // The clean drops untracked leftovers so nothing outside the pinned
       // commit can be read as part of it; ignored files (node_modules) stay,
       // and the repository marker is excluded for a `/workspace` worktree.
+      // A stale index.lock (a git killed mid-write, or two prepares racing
+      // in the shared sandbox) blocks every later git command; clear it only
+      // when no git process is alive to own it.
+      const clearStaleLock = `if [ -f '${prepared.worktree}/.git/index.lock' ] && ! pgrep -x git >/dev/null 2>&1; then rm -f '${prepared.worktree}/.git/index.lock'; fi`;
       const result = await sandbox.run({
-        command: `git -C '${prepared.worktree}' fetch --depth 1 ${remoteUrl(prepared.slug)} '${sha}' && git -C '${prepared.worktree}' checkout --detach '${sha}' && git -C '${prepared.worktree}' clean -fd -e .foreman`,
+        command: `${clearStaleLock} && git -C '${prepared.worktree}' fetch --depth 1 ${remoteUrl(prepared.slug)} '${sha}' && git -C '${prepared.worktree}' checkout --detach '${sha}' && git -C '${prepared.worktree}' clean -fd -e .foreman`,
       });
       if (result.exitCode !== 0) {
         return {
