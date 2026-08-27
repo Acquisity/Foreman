@@ -96,6 +96,22 @@ const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 
 /**
+ * `text` with every forbidden shape (email, connection string, credential,
+ * bearer token, JWT, inline secret) and every customer uuid replaced, so a
+ * provider's error text can be handed to the model.
+ */
+export function redact(text: string): string {
+  let out = text;
+  for (const { pattern } of FORBIDDEN) {
+    out = out.replace(
+      new RegExp(pattern.source, `${pattern.flags}g`),
+      "[redacted]"
+    );
+  }
+  return out.replace(new RegExp(UUID.source, "gi"), "[id]");
+}
+
+/**
  * The first reason `value` may not be stored, or null when it is clean.
  *
  * @param allowIdentifiers - Set on fields that legitimately carry opaque

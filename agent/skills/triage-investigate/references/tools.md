@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 **Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_function_runs`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -92,7 +92,7 @@ The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the n
 
 `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health`.
 
-Start from the function named in the Stage 4 code path, then `get_run_trace` on a failing run for the step that broke.
+Call `find_function_runs` with the function slug from the code path. It is a root tool, called bare: the newest runs with the given status in the window, and `latestTrace.steps` for the failing step of the newest one, error text bounded and redacted. Omit the slug to see matching runs across every function first. The connection tools above stay for anything else, such as a specific event's runs.
 
 ## Sentry (`sentry__`)
 
