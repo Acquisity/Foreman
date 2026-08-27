@@ -229,3 +229,124 @@ export async function findRelatedIssues(
     truncated: truncated || issues.length > MAX_ISSUES,
   };
 }
+
+/** Fixed document titles per investigation lane. */
+export const DOCUMENT_TITLES = {
+  billing: "Billing investigation",
+  triage: "Triage investigation",
+} as const;
+
+export type InvestigationLane = keyof typeof DOCUMENT_TITLES;
+
+/** Upper bound on document content, matching the skills' 20 KB handoff rule. */
+export const DOCUMENT_MAX_CHARS = 20_000;
+
+const ISSUE_DOCUMENTS_QUERY = `query IssueDocuments($id: String!, $title: String!) {
+  issue(id: $id) {
+    id identifier
+    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }
+  }
+}`;
+
+const DOCUMENT_CREATE = `mutation CreateDocument($input: DocumentCreateInput!) {
+  documentCreate(input: $input) { success document { id updatedAt url } }
+}`;
+
+const DOCUMENT_UPDATE = `mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {
+  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }
+}`;
+
+const DOCUMENT_QUERY = `query Document($id: String!) {
+  document(id: $id) { id updatedAt url }
+}`;
+
+interface DocumentPayload {
+  document: { id: string; updatedAt: string; url: string };
+  success: boolean;
+}
+
+export interface SaveInvestigationDocumentResult {
+  created: boolean;
+  documentId: string;
+  /** Set when the write succeeded but the version pin could not be read back. */
+  error?: string;
+  /** The post-write version pin; absent only when `error` is set. */
+  updatedAt?: string;
+  url: string;
+}
+
+/**
+ * Creates the lane's issue-scoped document on first call and rewrites it on
+ * later calls, so a ticket never carries two. The document is read back after
+ * the write because the mutation response reports the pre-write `updatedAt`;
+ * the read-back value is the version pin the critic packet needs.
+ */
+export async function saveInvestigationDocument(
+  token: string,
+  input: { content: string; issue: string; lane: InvestigationLane },
+  opts?: LinearGraphqlOptions
+): Promise<SaveInvestigationDocumentResult> {
+  const title = DOCUMENT_TITLES[input.lane];
+  const { issue } = await linearGraphql<{
+    issue: {
+      documents: { nodes: Array<{ id: string; title: string }> };
+      id: string;
+    };
+  }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue, title }, opts);
+
+  const matches = issue.documents.nodes.filter((node) => node.title === title);
+  if (matches.length > 1) {
+    throw new Error(
+      `${input.issue} already carries ${matches.length} documents titled "${title}"; consolidate them by hand before saving.`
+    );
+  }
+  const [existing] = matches;
+  if (existing) {
+    const { documentUpdate } = await linearGraphql<{
+      documentUpdate: DocumentPayload;
+    }>(
+      token,
+      DOCUMENT_UPDATE,
+      { id: existing.id, input: { content: input.content, title } },
+      opts
+    );
+    return { created: false, ...(await readBack(token, documentUpdate, opts)) };
+  }
+  const { documentCreate } = await linearGraphql<{
+    documentCreate: DocumentPayload;
+  }>(
+    token,
+    DOCUMENT_CREATE,
+    { input: { content: input.content, issueId: issue.id, title } },
+    opts
+  );
+  return { created: true, ...(await readBack(token, documentCreate, opts)) };
+}
+
+async function readBack(
+  token: string,
+  payload: DocumentPayload,
+  opts?: LinearGraphqlOptions
+) {
+  if (!payload.success) {
+    throw new Error("Linear did not confirm the document write.");
+  }
+  try {
+    const { document } = await linearGraphql<{
+      document: { id: string; updatedAt: string; url: string };
+    }>(token, DOCUMENT_QUERY, { id: payload.document.id }, opts);
+    return {
+      documentId: document.id,
+      updatedAt: document.updatedAt,
+      url: document.url,
+    };
+  } catch (error) {
+    // The write is in Linear; only the pin is missing. A repeat call with the
+    // same content rewrites it and returns the pin.
+    return {
+      documentId: payload.document.id,
+      error: `The document was written, but its version pin could not be read back (${error instanceof Error ? error.message : "read failed"}). Call again with the same content to get updatedAt.`,
+      url: payload.document.url,
+    };
+  }
+}

@@ -134,11 +134,10 @@ Every verdict carries one of:
 
 ## Attach the Billing investigation document
 
-Create one issue-scoped Linear document per ticket: `save_document` with `issue` set to the ticket and `title: "Billing investigation"`. Everything a human needs to check the work before moving money lives here, not in the ticket comment.
+Call `save_investigation_document` with `lane: "billing"`, the ticket identifier, and the full document. It creates the ticket's one `Billing investigation` document on the first call and rewrites it on later calls, and returns the `url` for the comment. Everything a human needs to check the work before moving money lives here, not in the ticket comment.
 
-- One document per ticket. A later revisit updates it with `patch`, never creates a second.
-- Keep it under roughly 20 KB. Charge ids, amounts, and dates are the point; raw API payloads are not.
-- Never paste card numbers, bank details, or any credential-shaped value into it.
+- Charge ids, amounts, and dates are the point; raw API payloads are not. Keep it under 20,000 characters; the tool rejects longer content.
+- Never paste card numbers, bank details, or any credential-shaped value into it; the tool refuses a document carrying a card or bank account number.
 
 ## Comment on the ticket
 

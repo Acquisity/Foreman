@@ -4,7 +4,10 @@ import {
   ENGINEERING_TEAM_ID,
   findRelatedIssues,
   linearGraphql,
+  saveInvestigationDocument,
 } from "./linear-api.js";
+
+const WAS_WRITTEN = /was written/u;
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
@@ -176,5 +179,134 @@ describe("findRelatedIssues", () => {
       ]
     );
     assert.equal(result.truncated, true);
+  });
+});
+
+describe("saveInvestigationDocument", () => {
+  const document = {
+    id: "doc1",
+    updatedAt: "2026-08-27T10:00:00.000Z",
+    url: "https://linear.app/d/doc1",
+  };
+  const respond = (existingTitle: string | null) => {
+    const calls: Array<{ query: string; variables: Record<string, unknown> }> =
+      [];
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as (typeof calls)[number];
+      calls.push(body);
+      if (body.query.startsWith("query IssueDocuments")) {
+        return json({
+          data: {
+            issue: {
+              documents: {
+                nodes: existingTitle
+                  ? [{ id: "doc1", title: existingTitle }]
+                  : [],
+              },
+              id: "issue-uuid",
+            },
+          },
+        });
+      }
+      if (body.query.startsWith("query Document")) {
+        return json({
+          data: {
+            document: { ...document, updatedAt: "2026-08-27T10:00:05.000Z" },
+          },
+        });
+      }
+      if (body.query.startsWith("mutation CreateDocument")) {
+        return json({ data: { documentCreate: { document, success: true } } });
+      }
+      return json({ data: { documentUpdate: { document, success: true } } });
+    };
+    return { calls, fetchStub };
+  };
+
+  it("creates the lane's document when the issue has none with that title", async () => {
+    const { calls, fetchStub } = respond("Some other doc");
+    const result = await saveInvestigationDocument(
+      "t",
+      { content: "# Triage investigation", issue: "ENG-1", lane: "triage" },
+      { fetch: fetchStub }
+    );
+    assert.equal(result.created, true);
+    // The mutation payload reports the pre-write timestamp; the pin comes from the read-back.
+    assert.equal(result.updatedAt, "2026-08-27T10:00:05.000Z");
+    assert.ok(calls[2]?.query.startsWith("query Document"));
+    assert.equal(calls[2]?.variables.id, "doc1");
+    assert.deepEqual(calls[0]?.variables, {
+      id: "ENG-1",
+      title: "Triage investigation",
+    });
+    assert.ok(calls[1]?.query.startsWith("mutation CreateDocument"));
+    assert.deepEqual(calls[1]?.variables.input, {
+      content: "# Triage investigation",
+      issueId: "issue-uuid",
+      title: "Triage investigation",
+    });
+  });
+
+  it("refuses to write when the issue already carries two documents with the title", async () => {
+    const fetchStub: typeof fetch = () =>
+      json({
+        data: {
+          issue: {
+            documents: {
+              nodes: [
+                { id: "a", title: "Triage investigation" },
+                { id: "b", title: "Triage investigation" },
+              ],
+            },
+            id: "issue-uuid",
+          },
+        },
+      });
+    await assert.rejects(
+      saveInvestigationDocument(
+        "t",
+        { content: "x", issue: "ENG-1", lane: "triage" },
+        { fetch: fetchStub }
+      ),
+      (error: Error) => error.message.includes("already carries 2 documents")
+    );
+  });
+
+  it("reports a written document with no pin when the read-back fails", async () => {
+    let calls = 0;
+    const fetchStub: typeof fetch = (_url, init) => {
+      calls += 1;
+      const { query } = JSON.parse(String(init?.body)) as { query: string };
+      if (query.startsWith("query IssueDocuments")) {
+        return json({ data: { issue: { documents: { nodes: [] }, id: "i" } } });
+      }
+      if (query.startsWith("mutation CreateDocument")) {
+        return json({ data: { documentCreate: { document, success: true } } });
+      }
+      return json({ message: "down" }, 503);
+    };
+    const result = await saveInvestigationDocument(
+      "t",
+      { content: "x", issue: "ENG-1", lane: "triage" },
+      { fetch: fetchStub }
+    );
+    assert.equal(calls, 3);
+    assert.equal(result.created, true);
+    assert.equal(result.documentId, "doc1");
+    assert.equal(result.updatedAt, undefined);
+    assert.match(result.error ?? "", WAS_WRITTEN);
+  });
+
+  it("rewrites the existing document instead of creating a second", async () => {
+    const { calls, fetchStub } = respond("Billing investigation");
+    const result = await saveInvestigationDocument(
+      "t",
+      { content: "# Billing investigation", issue: "ENG-1", lane: "billing" },
+      { fetch: fetchStub }
+    );
+    assert.equal(result.created, false);
+    assert.equal(result.documentId, "doc1");
+    assert.ok(calls[1]?.query.startsWith("mutation UpdateDocument"));
+    assert.equal(calls[1]?.variables.id, "doc1");
   });
 });

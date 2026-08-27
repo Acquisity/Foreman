@@ -466,12 +466,12 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "After the handoff has read its writes back, make one `patch`"
+      "After the handoff has read its writes back, save it once more with `**Review**: Approved"
     )
   );
   assert.ok(
     triageSkill.includes(
-      "A document created here for an unreviewed outcome is written once with `**Review**: Not required` and needs no later patch"
+      "A document created here for an unreviewed outcome is written once with `**Review**: Not required`"
     )
   );
   assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
