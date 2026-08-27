@@ -80,8 +80,8 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
-| `AUTUMN_API_CONNECTOR` | `api.useautumn.com/acquisity-foreman-autumn-api` (required) | App-scoped API-key connector for fixed Autumn reads in configured billing and Intercom intake workflows |
-| `STRIPE_API_CONNECTOR` | `api.stripe.com/acquisity-foreman-stripe-api` (required) | App-scoped restricted-key connector for fixed Stripe reads in configured billing and Intercom intake workflows |
+| `AUTUMN_API_CONNECTOR` | `api.useautumn.com/acquisity-foreman-autumn-api` (required) | App-scoped API-key connector for fixed Autumn reads in every configured intake-only channel |
+| `STRIPE_API_CONNECTOR` | `api.stripe.com/acquisity-foreman-stripe-api` (required) | App-scoped restricted-key connector for fixed Stripe reads in every configured intake-only channel |
 | `INSTANTLY_API_CONNECTOR` | `api.instantly.ai/acquisity-foreman` (required) | App-scoped API-key connector for fixed Instantly Workspace Group, account, campaign, and email-preview reads |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
