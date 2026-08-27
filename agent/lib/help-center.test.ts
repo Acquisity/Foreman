@@ -26,7 +26,10 @@ describe("find_help_article", () => {
       baseUrl: "https://example.test",
       fetch: (url) => {
         calledUrl = String(url);
-        return json([1, 2, 3, 4, 5, 6].map(hit));
+        return json([
+          { ...hit(0), type: "heading" },
+          ...[1, 2, 3, 4, 5, 6].map(hit),
+        ]);
       },
     });
     assert.equal(
@@ -35,6 +38,9 @@ describe("find_help_article", () => {
     );
     assert.equal(result.error, undefined);
     assert.equal(result.articles.length, 5);
+    assert.ok(
+      result.articles.every((article) => !article.path.endsWith("inbox-0.mdx"))
+    );
     assert.deepEqual(result.articles[0], {
       path: "apps/web/content/docs/ai-sdr/inbox-1.mdx",
       title: "Inbox 1",
