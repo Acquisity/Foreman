@@ -452,7 +452,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "delegate again with `attempt 2`",
     "On a second `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on any stop",
     "`Stopped: <verdict or failure>`",
-    "Assign Aaron Fraga as the explicit human-routing fallback",
+    'Call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"` as the explicit human-routing fallback',
     "There is no attempt 3 and no fresh reviewer chain",
     "as the literal marker `read-only`",
     "Do not touch the document",
