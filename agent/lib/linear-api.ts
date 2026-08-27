@@ -362,11 +362,13 @@ const ROUTE_ISSUE_QUERY = `query RouteIssue($id: String!) {
   }
 }`;
 
-const TEAM_LABELS_QUERY = `query TeamLabels($teamId: ID!) {
-  issueLabels(first: 250, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
+const TEAM_LABELS_QUERY = `query TeamLabels($teamId: ID!, $after: String) {
+  issueLabels(first: 250, after: $after, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
     nodes { id name }
+    pageInfo { hasNextPage endCursor }
   }
 }`;
+const MAX_LABEL_PAGES = 8;
 
 const WORKFLOW_STATES_QUERY = `query WorkflowStates($teamId: ID!, $name: String!) {
   workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {
@@ -470,17 +472,31 @@ async function resolveLabelIds(
   issue: RouteIssue,
   addLabels: string[]
 ): Promise<string[]> {
-  const { issueLabels } = await gql<{ issueLabels: { nodes: Named[] } }>(
-    TEAM_LABELS_QUERY,
-    { teamId: issue.team.id }
-  );
+  const labels: Named[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: label pages are sequential cursors.
+    const { issueLabels } = await gql<{
+      issueLabels: {
+        nodes: Named[];
+        pageInfo: { endCursor: string | null; hasNextPage: boolean };
+      };
+    }>(TEAM_LABELS_QUERY, { after, teamId: issue.team.id });
+    labels.push(...issueLabels.nodes);
+    after = issueLabels.pageInfo.hasNextPage
+      ? issueLabels.pageInfo.endCursor
+      : null;
+    if (!after) {
+      break;
+    }
+  }
   const byName = new Map(
-    issueLabels.nodes.map((label) => [label.name.toLowerCase(), label.id])
+    labels.map((label) => [label.name.toLowerCase(), label.id])
   );
   const unknown = addLabels.filter((name) => !byName.has(name.toLowerCase()));
   if (unknown.length > 0) {
     throw new Error(
-      `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${issueLabels.nodes
+      `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${labels
         .map((label) => label.name)
         .sort()
         .join(", ")}.`

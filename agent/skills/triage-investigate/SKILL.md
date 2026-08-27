@@ -304,7 +304,7 @@ The customer already has their answer from the preceding comment step. Nothing h
 
 ### Choose the product project from completed evidence
 
-Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when the case is one support closes without engineering (a config mismatch, workspace setup, an account or billing follow-up), and it records to memory like any other area. Pass the evidence-backed project to the final `route_ticket` call alongside assignee, labels, priority, and state; its returned `projectId` is what optional memory recording uses.
+Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when the case is one support closes without engineering (a config mismatch, workspace setup, an account or billing follow-up), and it records to memory like any other area. Pass the evidence-backed project to the ticket's one `route_ticket` call alongside assignee, labels, priority, and state, whichever branch below makes that call; its returned `projectId` is what optional memory recording uses.
 
 If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the investigation document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
 
@@ -312,7 +312,7 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. Call `route_ticket` once with the Stage 5 state, priority, `addLabels`, and project. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. Call `route_ticket` once with the Stage 5 state, priority, `addLabels`, and project; a `Duplicate` makes that one call with the extra fields in the paragraph below instead. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
 
 Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
 
@@ -320,7 +320,7 @@ A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `i
 
 ### When the root cause warrants action
 
-The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it. Load `engineering-handoff` and follow it: it searches for the current master on four axes with the intake-only Slack recency rule, matches on cause rather than symptom, reuses or creates exactly one master, applies the approved priority and `fast-lane` state, files separately deliverable work, and reads every write back. It hands back the master id, the parent and assignee it set, and the label state; the requester comment above and the Stage 7 reply stay here.
+The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it. Load `engineering-handoff` and follow it: it searches for the current master on four axes with the intake-only Slack recency rule, matches on cause rather than symptom, reuses or creates exactly one master, makes this ticket's one `route_ticket` call (the Stage 5 state, priority, and labels, the Stage 6 project, the parent, and the inherited assignee together), applies the approved priority and `fast-lane` state to the master, files separately deliverable work, and reads every write back. It hands back the master id, the parent and assignee it set, and the label state; the requester comment above and the Stage 7 reply stay here.
 
 The area-routing roster below is the owner source `engineering-handoff` uses when a master has no assignee or a new one is created.
 

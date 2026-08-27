@@ -47,16 +47,24 @@ const fakeLinear = () => {
       });
     }
     if (q.startsWith("query TeamLabels")) {
-      return json({
-        data: {
-          issueLabels: {
-            nodes: [
-              { id: "l-bug", name: "Bug" },
-              { id: "l-cr", name: "Customer reported" },
-            ],
-          },
-        },
-      });
+      // Two pages: the second carries the label the union needs.
+      return body.variables.after === null
+        ? json({
+            data: {
+              issueLabels: {
+                nodes: [{ id: "l-bug", name: "Bug" }],
+                pageInfo: { endCursor: "lc1", hasNextPage: true },
+              },
+            },
+          })
+        : json({
+            data: {
+              issueLabels: {
+                nodes: [{ id: "l-cr", name: "Customer reported" }],
+                pageInfo: { endCursor: null, hasNextPage: false },
+              },
+            },
+          });
     }
     if (q.startsWith("query WorkflowStates")) {
       return json({
