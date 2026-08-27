@@ -10,7 +10,7 @@ Two kinds of tool appear below, and they are called differently.
 
 **Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `save_investigation_document`, `planetscale_execute_read_query`.
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -78,7 +78,7 @@ Docs: <https://docs.stripe.com/mcp>.
 
 `save_investigation_document` is a root tool, called bare: it owns the ticket's `Billing investigation` document, creating it once and rewriting it after, and refuses card or bank account numbers. Do not write that document through `save_document`.
 
-`save_issue` traps: `labels` replaces the entire label set, so read current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low.
+`route_ticket` is a root tool, called bare: the final routing write. It adds labels to the ticket's existing set (unknown names fail and list the valid ones), resolves state, project, and assignee by name, inherits an assignee from a master or parent, records a duplicate relation, attaches links, and reads the ticket back with the saved `projectId`. Use it for every routing write in these skills; `save_issue` stays for creating issues and for description edits. `save_issue`'s `labels` field replaces the whole set, which is why routing does not go through it.
 
 ## Repository (root tools, no prefix)
 

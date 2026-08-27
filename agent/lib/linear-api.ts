@@ -350,3 +350,347 @@ async function readBack(
     };
   }
 }
+
+/* ----------------------------- route_ticket ----------------------------- */
+
+const ROUTE_ISSUE_QUERY = `query RouteIssue($id: String!) {
+  issue(id: $id) {
+    id identifier
+    team { id }
+    labels { nodes { id name } }
+    assignee { id name }
+  }
+}`;
+
+const TEAM_LABELS_QUERY = `query TeamLabels($teamId: ID!, $after: String) {
+  issueLabels(first: 250, after: $after, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
+    nodes { id name }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+const MAX_LABEL_PAGES = 8;
+
+interface LabelPage {
+  nodes: Named[];
+  pageInfo: { endCursor: string | null; hasNextPage: boolean };
+}
+
+const WORKFLOW_STATES_QUERY = `query WorkflowStates($teamId: ID!, $name: String!) {
+  workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {
+    nodes { id name }
+  }
+}`;
+
+const PROJECTS_QUERY = `query Projects($name: String!, $teamId: ID!) {
+  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {
+    nodes { id name }
+  }
+}`;
+
+const USERS_QUERY = `query Users($name: String!) {
+  users(first: 5, filter: { or: [{ email: { eq: $name } }, { name: { eqIgnoreCase: $name } }, { displayName: { eqIgnoreCase: $name } }] }) {
+    nodes { id name }
+  }
+}`;
+
+const ISSUE_UPDATE = `mutation RouteIssueUpdate($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) { success }
+}`;
+
+const RELATION_CREATE = `mutation RouteRelation($input: IssueRelationCreateInput!) {
+  issueRelationCreate(input: $input) { success }
+}`;
+
+const ATTACHMENT_LINK = `mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {
+  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
+}`;
+
+const ROUTE_READ_BACK = `query RouteReadBack($id: String!) {
+  issue(id: $id) {
+    identifier url priority
+    state { name }
+    labels { nodes { name } }
+    project { id name }
+    assignee { name }
+    parent { identifier }
+  }
+}`;
+
+interface Named {
+  id: string;
+  name: string;
+}
+
+export interface RouteTicketInput {
+  addLabels?: string[];
+  assignee?: string;
+  duplicateOf?: string;
+  inheritAssigneeFrom?: string;
+  issue: string;
+  links?: Array<{ title: string; url: string }>;
+  parent?: string;
+  priority?: number;
+  project?: string;
+  state?: string;
+}
+
+export interface RouteTicketResult {
+  assignee: string | null;
+  identifier: string;
+  labels: string[];
+  parentIdentifier: string | null;
+  priority: number;
+  projectId: string | null;
+  projectName: string | null;
+  state: string;
+  url: string;
+  /** Steps after the issue update that failed; the update itself landed. */
+  warnings: string[];
+}
+
+/** Reads one issue by identifier, throwing when Linear has no such issue. */
+async function requireIssue(gql: Gql, identifier: string): Promise<RouteIssue> {
+  const { issue } = await gql<{ issue: RouteIssue | null }>(ROUTE_ISSUE_QUERY, {
+    id: identifier,
+  });
+  if (!issue) {
+    throw new Error(`No issue ${identifier}.`);
+  }
+  return issue;
+}
+
+/** Resolves one name to exactly one id, or throws naming what was found. */
+function exactlyOne(kind: string, name: string, nodes: Named[]): string {
+  if (nodes.length === 1 && nodes[0]) {
+    return nodes[0].id;
+  }
+  if (nodes.length === 0) {
+    throw new Error(`No ${kind} named "${name}".`);
+  }
+  throw new Error(
+    `${nodes.length} ${kind}s match "${name}": ${nodes.map((node) => node.name).join(", ")}.`
+  );
+}
+
+type Gql = <T>(query: string, variables: Record<string, unknown>) => Promise<T>;
+
+interface RouteIssue {
+  assignee: Named | null;
+  id: string;
+  identifier: string;
+  labels: { nodes: Named[] };
+  team: { id: string };
+}
+
+/** Unions the labels to add with the ticket's current labels; unknown names throw before any write. */
+async function resolveLabelIds(
+  gql: Gql,
+  issue: RouteIssue,
+  addLabels: string[]
+): Promise<string[]> {
+  const labels: Named[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: label pages are sequential cursors.
+    const { issueLabels }: { issueLabels: LabelPage } = await gql<{
+      issueLabels: LabelPage;
+    }>(TEAM_LABELS_QUERY, { after, teamId: issue.team.id });
+    labels.push(...issueLabels.nodes);
+    after = issueLabels.pageInfo.hasNextPage
+      ? issueLabels.pageInfo.endCursor
+      : null;
+    if (!after) {
+      break;
+    }
+  }
+  const byName = new Map(
+    labels.map((label) => [label.name.toLowerCase(), label.id])
+  );
+  const unknown = addLabels.filter((name) => !byName.has(name.toLowerCase()));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${labels
+        .map((label) => label.name)
+        .sort((a, b) => a.localeCompare(b))
+        .join(", ")}.`
+    );
+  }
+  return [
+    ...new Set([
+      ...issue.labels.nodes.map((label) => label.id),
+      ...addLabels.map((name) => byName.get(name.toLowerCase()) ?? ""),
+    ]),
+  ].filter(Boolean);
+}
+
+/**
+ * The assignee id: the source issue's assignee when `inheritAssigneeFrom` is
+ * given and that issue has one; otherwise `assignee` by name or email, which
+ * therefore acts as the fallback for an unassigned master.
+ */
+async function resolveAssigneeId(
+  gql: Gql,
+  input: RouteTicketInput
+): Promise<string | undefined> {
+  if (input.inheritAssigneeFrom !== undefined) {
+    const source = await requireIssue(gql, input.inheritAssigneeFrom);
+    if (source.assignee) {
+      return source.assignee.id;
+    }
+  }
+  if (input.assignee !== undefined) {
+    const { users } = await gql<{ users: { nodes: Named[] } }>(USERS_QUERY, {
+      name: input.assignee,
+    });
+    return exactlyOne("user", input.assignee, users.nodes);
+  }
+  return undefined;
+}
+
+/** Builds the single issueUpdate input from the decisions given. */
+async function buildUpdate(
+  gql: Gql,
+  issue: RouteIssue,
+  input: RouteTicketInput
+): Promise<Record<string, unknown>> {
+  const update: Record<string, unknown> = {};
+  if (input.addLabels?.length) {
+    update.labelIds = await resolveLabelIds(gql, issue, input.addLabels);
+  }
+  if (input.state !== undefined) {
+    const { workflowStates } = await gql<{
+      workflowStates: { nodes: Named[] };
+    }>(WORKFLOW_STATES_QUERY, { name: input.state, teamId: issue.team.id });
+    update.stateId = exactlyOne("state", input.state, workflowStates.nodes);
+  }
+  if (input.priority !== undefined) {
+    update.priority = input.priority;
+  }
+  if (input.project !== undefined) {
+    const { projects } = await gql<{ projects: { nodes: Named[] } }>(
+      PROJECTS_QUERY,
+      { name: input.project, teamId: issue.team.id }
+    );
+    update.projectId = exactlyOne(
+      "project on the ticket's team",
+      input.project,
+      projects.nodes
+    );
+  }
+  const assigneeId = await resolveAssigneeId(gql, input);
+  if (assigneeId !== undefined) {
+    update.assigneeId = assigneeId;
+  }
+  if (input.parent !== undefined) {
+    update.parentId = (await requireIssue(gql, input.parent)).id;
+  }
+  return update;
+}
+
+/**
+ * One routing write. Reads the ticket, resolves every name to an id, unions
+ * the labels to add with the labels already on the ticket, takes the assignee
+ * from `inheritAssigneeFrom` when that issue has one and from `assignee`
+ * otherwise, runs one
+ * `issueUpdate`, then the optional duplicate relation and link attachments,
+ * and reads the ticket back. Unknown label names fail before any write and
+ * list the team's labels.
+ */
+export async function routeTicket(
+  token: string,
+  input: RouteTicketInput,
+  opts?: LinearGraphqlOptions
+): Promise<RouteTicketResult> {
+  const gql: Gql = (query, variables) =>
+    linearGraphql(token, query, variables, opts);
+
+  const issue = await requireIssue(gql, input.issue);
+
+  const update = await buildUpdate(gql, issue, input);
+  // Resolve the duplicate target before the first write, so a bad identifier
+  // fails the whole call rather than leaving a routed ticket with no relation.
+  const master =
+    input.duplicateOf === undefined
+      ? null
+      : await requireIssue(gql, input.duplicateOf);
+  if (Object.keys(update).length > 0) {
+    const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
+      ISSUE_UPDATE,
+      { id: issue.id, input: update }
+    );
+    if (!issueUpdate.success) {
+      throw new Error("Linear did not confirm the issue update.");
+    }
+  }
+
+  // The update above is the write. Anything after it that fails is reported
+  // as a warning on a routed result, never as an unrouted ticket.
+  const warnings: string[] = [];
+  const reason = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+
+  if (master) {
+    try {
+      const { issueRelationCreate } = await gql<{
+        issueRelationCreate: { success: boolean };
+      }>(RELATION_CREATE, {
+        input: {
+          issueId: issue.id,
+          relatedIssueId: master.id,
+          type: "duplicate",
+        },
+      });
+      if (!issueRelationCreate.success) {
+        throw new Error("Linear did not confirm the relation.");
+      }
+    } catch (error) {
+      warnings.push(
+        `Duplicate relation to ${input.duplicateOf} was not recorded: ${reason(error)}`
+      );
+    }
+  }
+
+  for (const link of input.links ?? []) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
+      const { attachmentLinkURL } = await gql<{
+        attachmentLinkURL: { success: boolean };
+      }>(ATTACHMENT_LINK, {
+        issueId: issue.id,
+        title: link.title,
+        url: link.url,
+      });
+      if (!attachmentLinkURL.success) {
+        throw new Error("Linear did not confirm the attachment.");
+      }
+    } catch (error) {
+      warnings.push(`Link ${link.url} was not attached: ${reason(error)}`);
+    }
+  }
+
+  const { issue: saved } = await gql<{
+    issue: {
+      assignee: Named | null;
+      identifier: string;
+      labels: { nodes: Named[] };
+      parent: { identifier: string } | null;
+      priority: number;
+      project: Named | null;
+      state: { name: string };
+      url: string;
+    };
+  }>(ROUTE_READ_BACK, { id: issue.id });
+
+  return {
+    assignee: saved.assignee?.name ?? null,
+    identifier: saved.identifier,
+    labels: saved.labels.nodes.map((label) => label.name),
+    parentIdentifier: saved.parent?.identifier ?? null,
+    priority: saved.priority,
+    projectId: saved.project?.id ?? null,
+    projectName: saved.project?.name ?? null,
+    state: saved.state.name,
+    url: saved.url,
+    warnings,
+  };
+}

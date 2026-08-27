@@ -232,7 +232,7 @@ Set the state that matches the handling path.
 
 ### Set Linear priority
 
-Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `save_issue` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
+Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `route_ticket` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
 
 Weigh these in order:
 
@@ -255,15 +255,11 @@ Between two adjacent bands take the higher one and write the rationale where the
 
 ### Label the ticket
 
-Read the team's labels with `list_issue_labels` and work only from what comes back. Never invent a label, and never apply a name you assume exists.
-
-Apply the fewest labels that place the ticket:
+Apply the fewest labels that place the ticket, passing them as `addLabels` to `route_ticket` in Stage 6. It adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
 
 - One type label from the verdict: `Bug` for a Bug, `Feature Request` for a Platform Limitation the customer wants lifted, and no type label for User Error.
 - The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
 - One `Root Cause` label when the team has one that matches the cause found in Stage 4.
-
-`save_issue` replaces the whole label set: labels already on the ticket and not included in the call are removed. Read the current labels first and pass the union, never just the new ones.
 
 Every decision above is provisional until the review below has approved the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for an approved document version. Outcomes the review does not cover (`User Error`, `Platform Limitation`, a `Duplicate`, the unproven stop) are applied in Stage 6 without one.
 
@@ -308,7 +304,7 @@ The customer already has their answer from the preceding comment step. Nothing h
 
 ### Choose the product project from completed evidence
 
-Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when the case is one support closes without engineering (a config mismatch, workspace setup, an account or billing follow-up), and it records to memory like any other area. Save the evidence-backed project during the final `save_issue` handling alongside assignee, labels, priority, and status, then read the resulting issue so the saved project id is available for optional memory recording.
+Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when the case is one support closes without engineering (a config mismatch, workspace setup, an account or billing follow-up), and it records to memory like any other area. Pass the evidence-backed project to the ticket's one `route_ticket` call alongside assignee, labels, priority, and state, whichever branch below makes that call; its returned `projectId` is what optional memory recording uses.
 
 If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the investigation document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
 
@@ -316,15 +312,15 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here. Call `route_ticket` once with the Stage 5 state, priority, `addLabels`, and project; a `Duplicate` makes that one call with the extra fields in the paragraph below instead. The ticket carries the explanation and closes into the Stage 5 state. Nothing goes to engineering.
 
 Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
 
-A `Duplicate` still inherits. When you mark a ticket a duplicate of another, read that other ticket's assignee and set it on the duplicate in the same `save_issue` call that records the duplicate link, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Stage 5 state in the same pass, so it never sits open in anyone's queue.
+A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster below as the fallback, plus the Stage 5 state, priority, and labels, so whoever owns the root cause owns the reports of it. The tool inherits when that ticket has an assignee and uses the fallback when it does not; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Stage 5 state in the same pass, so it never sits open in anyone's queue.
 
 ### When the root cause warrants action
 
-The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it. Load `engineering-handoff` and follow it: it searches for the current master on four axes with the intake-only Slack recency rule, matches on cause rather than symptom, reuses or creates exactly one master, applies the approved priority and `fast-lane` state, files separately deliverable work, and reads every write back. It hands back the master id, the parent and assignee it set, and the label state; the requester comment above and the Stage 7 reply stay here.
+The customer ticket does not become the engineering ticket. A master ticket owns the root cause, and this ticket attaches to it. Load `engineering-handoff` and follow it: it searches for the current master on four axes with the intake-only Slack recency rule, matches on cause rather than symptom, reuses or creates exactly one master, makes this ticket's one `route_ticket` call (the Stage 5 state, priority, and labels, the Stage 6 project, the parent, and the inherited assignee together), applies the approved priority and `fast-lane` state to the master, files separately deliverable work, and reads every write back. It hands back the master id, the parent and assignee it set, and the label state; the requester comment above and the Stage 7 reply stay here.
 
 The area-routing roster below is the owner source `engineering-handoff` uses when a master has no assignee or a new one is created.
 
