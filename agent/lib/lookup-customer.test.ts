@@ -56,6 +56,16 @@ describe("lookup_customer", () => {
     assert.equal(result.memberships.length, 2);
   });
 
+  it("withholds the pin when two user rows share the email", async () => {
+    const other = { ...row(null), user_id: "u2" };
+    const result = await lookupCustomer("ada@example.com", () =>
+      Promise.resolve(JSON.stringify([other, row("org1")]))
+    );
+    assert.equal(result.ambiguous, true);
+    assert.equal(result.pinnedOrganizationId, null);
+    assert.equal(result.memberships.length, 1);
+  });
+
   it("reports a user with no live membership as found but unpinned", async () => {
     const result = await lookupCustomer("ada@example.com", () =>
       Promise.resolve(JSON.stringify([row(null)]))

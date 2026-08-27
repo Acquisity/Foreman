@@ -141,14 +141,17 @@ export async function lookupCustomer(
       : []
   );
 
+  // The same email can exist once per partner, so one user row per email is
+  // not guaranteed; a pin needs exactly one user and exactly one membership.
+  const userCount = new Set(parsed.map((row) => row.user_id)).size;
+  const single = userCount === 1 && memberships.length === 1;
   return {
-    ambiguous: memberships.length > 1,
+    ambiguous: userCount > 1 || memberships.length > 1,
     found: true,
     memberships,
-    pinnedOrganizationId:
-      memberships.length === 1
-        ? (memberships[0]?.organizationId ?? null)
-        : null,
+    pinnedOrganizationId: single
+      ? (memberships[0]?.organizationId ?? null)
+      : null,
     truncated: parsed.length >= MEMBERSHIP_LIMIT,
     user: {
       createdAt: first.user_created_at ?? null,
