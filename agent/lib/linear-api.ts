@@ -208,7 +208,7 @@ export async function findRelatedIssues(
 
   const byId = new Map<string, RelatedIssue>();
   let truncated = false;
-  for (const phrase of input.phrases) {
+  for (const phrase of new Set(input.phrases)) {
     const filter: Record<string, unknown> = masters
       ? {
           ...phraseFilter(phrase),
