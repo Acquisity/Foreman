@@ -120,6 +120,17 @@ async function getJson(
   return response.json();
 }
 
+const MAX_APP_PAGES = 5;
+const appPage = z.looseObject({
+  data: z.array(z.looseObject({ id: z.string() })),
+  page: z
+    .looseObject({
+      cursor: z.string().nullish(),
+      hasMore: z.boolean().optional(),
+    })
+    .optional(),
+});
+
 const runPage = z.looseObject({
   data: z.array(loose),
   page: z.looseObject({ hasMore: z.boolean().optional() }).optional(),
@@ -141,13 +152,27 @@ async function listRuns(
       await getJson(token, `/runs?${params.toString()}`, opts)
     );
   }
-  const apps = z
-    .looseObject({ data: z.array(z.looseObject({ id: z.string() })) })
-    .parse(await getJson(token, "/apps?limit=20", opts));
+  const appIds: string[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_APP_PAGES; page += 1) {
+    const params = new URLSearchParams({ limit: "20" });
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: app pages are sequential cursors.
+    const apps: z.infer<typeof appPage> = appPage.parse(
+      await getJson(token, `/apps?${params.toString()}`, opts)
+    );
+    appIds.push(...apps.data.map((app) => app.id));
+    cursor = apps.page?.hasMore ? (apps.page.cursor ?? null) : null;
+    if (!cursor) {
+      break;
+    }
+  }
   const data: Record<string, unknown>[] = [];
   let hasMore = false;
-  for (const app of apps.data) {
-    const path = `/apps/${encodeURIComponent(app.id)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
+  for (const appId of appIds) {
+    const path = `/apps/${encodeURIComponent(appId)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
     let page: z.infer<typeof runPage>;
     try {
       // biome-ignore lint/performance/noAwaitInLoops: one app at a time; there is one app today.
@@ -173,9 +198,9 @@ function flattenSteps(
   node: Record<string, unknown>,
   out: TraceStep[],
   isRoot: boolean
-): void {
+): boolean {
   if (out.length >= MAX_STEPS) {
-    return;
+    return true;
   }
   const span = spanRow.parse(node);
   if (!isRoot) {
@@ -193,9 +218,11 @@ function flattenSteps(
       status: span.status ?? "UNKNOWN",
     });
   }
+  let overflow = false;
   for (const child of span.children ?? []) {
-    flattenSteps(child, out, false);
+    overflow = flattenSteps(child, out, false) || overflow;
   }
+  return overflow;
 }
 
 /**
@@ -249,13 +276,9 @@ export async function findFunctionRuns(
         )
       );
     const steps: TraceStep[] = [];
-    flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
+    const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
     return {
-      latestTrace: {
-        runId: newest.runId,
-        steps,
-        truncated: steps.length >= MAX_STEPS,
-      },
+      latestTrace: { runId: newest.runId, steps, truncated: overflow },
       runs,
       truncated: listed.page?.hasMore === true,
     };
