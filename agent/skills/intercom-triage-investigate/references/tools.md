@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `find_help_article`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -23,6 +23,10 @@ Use the built-in `connection_search` to discover what a connection actually expo
 `prepare_repository`, `grep`, `glob` are authored tools in `agent/tools/`. `read_file` and `bash` are eve framework tools, registered automatically.
 
 `prepare_repository` takes `Acquisity/Acquisity`, refreshes the checkout to the remote HEAD, and returns `{ worktree, reused }`. It does not return a commit SHA; get it from `git -C <worktree> rev-parse HEAD`.
+
+## Help center (root tool, no prefix)
+
+`find_help_article` is one GET against the web app's public `/api/search` route over the 442 help-center articles. No token, every surface. It returns titles, public urls, and repository paths; page hits only, five at most, and `error` means the search could not run.
 
 ## Investigation memory (root tools, no prefix)
 

@@ -143,6 +143,10 @@ The affected counts on a case are the figures from that investigation on the dat
 
 Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are still decided in Stage 3 against current Linear.
 
+### Read the help center
+
+Call `find_help_article` with the feature and the action the customer took. Quote the article that states the expected setup or behavior in the evidence record, compare it with the customer's actual state, and treat a contradiction as a User Error candidate with the article link as the unblock. Read code after that, to confirm what the article says or to explain what it does not cover. The result carries each article's repository path under `apps/web/content/docs`, readable from the `prepare_repository` worktree.
+
 ### Locate it in the code
 
 `prepare_repository` with `Acquisity/Acquisity`, which refreshes the checkout to the remote HEAD and returns the `worktree` path. Then `grep` and `read_file` under that path to find the code path the claim runs through. Answer what the code is supposed to do before deciding whether it did it.
