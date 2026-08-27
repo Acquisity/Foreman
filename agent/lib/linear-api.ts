@@ -229,3 +229,90 @@ export async function findRelatedIssues(
     truncated: truncated || issues.length > MAX_ISSUES,
   };
 }
+
+/** Fixed document titles per investigation lane. */
+export const DOCUMENT_TITLES = {
+  billing: "Billing investigation",
+  triage: "Triage investigation",
+} as const;
+
+export type InvestigationLane = keyof typeof DOCUMENT_TITLES;
+
+/** Upper bound on document content, matching the skills' 20 KB handoff rule. */
+export const DOCUMENT_MAX_CHARS = 20_000;
+
+const ISSUE_DOCUMENTS_QUERY = `query IssueDocuments($id: String!) {
+  issue(id: $id) { id identifier documents { nodes { id title } } }
+}`;
+
+const DOCUMENT_CREATE = `mutation CreateDocument($input: DocumentCreateInput!) {
+  documentCreate(input: $input) { success document { id updatedAt url } }
+}`;
+
+const DOCUMENT_UPDATE = `mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {
+  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }
+}`;
+
+interface DocumentPayload {
+  document: { id: string; updatedAt: string; url: string };
+  success: boolean;
+}
+
+export interface SaveInvestigationDocumentResult {
+  created: boolean;
+  documentId: string;
+  updatedAt: string;
+  url: string;
+}
+
+/**
+ * Creates the lane's issue-scoped document on first call and rewrites it on
+ * later calls, so a ticket never carries two. The mutation response is the
+ * read-back: `updatedAt` is the version pin the critic packet needs.
+ */
+export async function saveInvestigationDocument(
+  token: string,
+  input: { content: string; issue: string; lane: InvestigationLane },
+  opts?: LinearGraphqlOptions
+): Promise<SaveInvestigationDocumentResult> {
+  const title = DOCUMENT_TITLES[input.lane];
+  const { issue } = await linearGraphql<{
+    issue: {
+      documents: { nodes: Array<{ id: string; title: string }> };
+      id: string;
+    };
+  }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue }, opts);
+
+  const existing = issue.documents.nodes.find((node) => node.title === title);
+  if (existing) {
+    const { documentUpdate } = await linearGraphql<{
+      documentUpdate: DocumentPayload;
+    }>(
+      token,
+      DOCUMENT_UPDATE,
+      { id: existing.id, input: { content: input.content, title } },
+      opts
+    );
+    return { created: false, ...pin(documentUpdate) };
+  }
+  const { documentCreate } = await linearGraphql<{
+    documentCreate: DocumentPayload;
+  }>(
+    token,
+    DOCUMENT_CREATE,
+    { input: { content: input.content, issueId: issue.id, title } },
+    opts
+  );
+  return { created: true, ...pin(documentCreate) };
+}
+
+const pin = (payload: DocumentPayload) => {
+  if (!payload.success) {
+    throw new Error("Linear did not confirm the document write.");
+  }
+  return {
+    documentId: payload.document.id,
+    updatedAt: payload.document.updatedAt,
+    url: payload.document.url,
+  };
+};

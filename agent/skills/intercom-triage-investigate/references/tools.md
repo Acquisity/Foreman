@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `find_related_issues`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `find_related_issues`, `save_investigation_document`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -78,7 +78,7 @@ Call `list_instantly_subworkspaces` first. It follows Workspace Group pages up t
 
 `save_issue` traps: `labels` replaces the entire label set, so read the current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low. `relatedTo`, `blockedBy`, and `blocks` are append-only. Pass `assignee`, not `assigneeId`.
 
-`save_document` takes exactly one parent; pass `issue` for an issue-scoped document. Use `patch` to edit an existing one rather than rewriting it whole.
+`save_investigation_document` is a root tool, called bare: it owns the ticket's `Triage investigation` (or `Billing investigation`) document, creating it once and rewriting it after, and returns the `documentId` and `updatedAt` version pin. Do not write that document through `save_document`.
 
 The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the name `"Engineering"` returns nothing silently.
 
