@@ -96,11 +96,12 @@ export default slackChannel({
         return;
       }
       channel.state.pendingToolCallMessage = null;
-      if (!data.message) {
+      const reply = data.message ? replyOf(data.message) : "";
+      if (!reply) {
         await channel.thread.startTyping();
         return;
       }
-      await channel.thread.post(replyOf(data.message));
+      await channel.thread.post(reply);
     },
   },
   onAppMention: dispatch,

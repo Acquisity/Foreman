@@ -23,6 +23,10 @@ describe("replyOf", () => {
     );
   });
 
+  it("returns an empty string when nothing follows the marker", () => {
+    assert.equal(replyOf(`Narration\n${REPLY_MARKER}\n  \n`), "");
+  });
+
   it("keeps a second marker inside the reply", () => {
     assert.equal(
       replyOf(
