@@ -6,6 +6,7 @@ const NOW = new Date("2026-08-27T18:00:00.000Z");
 const FN = "ads.google.sync-workspace-insights";
 const MORE_THAN = /more than/u;
 const HTTP_500 = /HTTP 500/u;
+const ABORTED = /aborted/u;
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
@@ -285,5 +286,27 @@ describe("find_function_runs", () => {
     assert.equal(malformed.runs.length, 1);
     assert.equal(malformed.error, undefined);
     assert.ok(malformed.traceError);
+  });
+
+  it("rethrows caller cancellation instead of retrying or reporting it", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const fetchStub: typeof fetch = (url) => {
+      calls += 1;
+      if (String(url).includes("/trace")) {
+        controller.abort();
+        return Promise.reject(new Error("aborted"));
+      }
+      return json({ data: [run("run-2", "evt-2")] });
+    };
+    await assert.rejects(
+      findFunctionRuns(
+        "t",
+        { sinceHours: 1, status: "Failed" },
+        { fetch: fetchStub, now: NOW, signal: controller.signal }
+      ),
+      ABORTED
+    );
+    assert.equal(calls, 2);
   });
 });

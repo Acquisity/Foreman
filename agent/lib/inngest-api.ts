@@ -260,6 +260,9 @@ async function getTrace(
   try {
     return await getJson(token, `${path}?includeOutput=true`, opts);
   } catch (withOutput) {
+    if (opts?.signal?.aborted) {
+      throw withOutput;
+    }
     try {
       return await getJson(token, path, opts);
     } catch (withoutOutput) {
@@ -360,6 +363,9 @@ export async function findFunctionRuns(
         truncated,
       };
     } catch (error) {
+      if (opts?.signal?.aborted) {
+        throw error;
+      }
       return {
         latestTrace: null,
         runs,
@@ -370,6 +376,9 @@ export async function findFunctionRuns(
       };
     }
   } catch (error) {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
     return {
       error: redact(
         error instanceof Error ? error.message : "Inngest read failed."
