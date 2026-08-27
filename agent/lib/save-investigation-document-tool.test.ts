@@ -61,16 +61,17 @@ describe("save_investigation_document tool", () => {
         throw new Error("no");
       },
     } as unknown as Context;
-    for (const content of [
-      "Card 4242 4242 4242 4242 charged",
-      "IBAN gb82west12345698765432",
-      "IBAN GB82 WEST 1234 5698 7654 32",
-    ]) {
-      const result = (await tool.execute(
-        { content, issue: "ENG-1", lane: "billing" },
-        context
-      )) as { error?: string; saved: boolean };
-      assert.equal(result.saved, false, content);
+    const results = (await Promise.all(
+      [
+        "Card 4242 4242 4242 4242 charged",
+        "IBAN gb82west12345698765432",
+        "IBAN GB82 WEST 1234 5698 7654 32",
+      ].map((content) =>
+        tool.execute({ content, issue: "ENG-1", lane: "billing" }, context)
+      )
+    )) as Array<{ error?: string; saved: boolean }>;
+    for (const result of results) {
+      assert.equal(result.saved, false);
       assert.match(result.error ?? "", CARD_OR_BANK);
     }
     assert.equal(requested, false);
