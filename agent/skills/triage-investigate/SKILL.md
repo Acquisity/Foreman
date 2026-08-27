@@ -90,7 +90,7 @@ Look for Intercom links, pasted summaries, prior sessions, and comments carrying
 
 ### Check duplicates
 
-Search Linear for the same symptom, in several wordings: the user outcome, the visible error text, and the feature or object names. Include closed and archived issues.
+Call `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings: the user outcome, the visible error text, and the feature or object names. It searches every team, closed and archived included. Read every hit before deciding.
 
 Classify each plausible match by outcome, not keyword overlap:
 
