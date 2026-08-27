@@ -270,5 +270,20 @@ describe("find_function_runs", () => {
     assert.equal(kept.latestTrace, null);
     assert.equal(kept.error, undefined);
     assert.match(kept.traceError ?? "", HTTP_500);
+
+    const malformed = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      {
+        fetch: (url) =>
+          String(url).includes("/trace")
+            ? json({ data: "invalid" })
+            : json({ data: [run("run-2", "evt-2")] }),
+        now: NOW,
+      }
+    );
+    assert.equal(malformed.runs.length, 1);
+    assert.equal(malformed.error, undefined);
+    assert.ok(malformed.traceError);
   });
 });

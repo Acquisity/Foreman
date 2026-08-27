@@ -343,36 +343,32 @@ export async function findFunctionRuns(
       return { latestTrace: null, runs, truncated: false };
     }
     // The list is the answer even when the trace is not: a trace failure
-    // (Inngest answers 500 on some traces with output) never blanks the runs.
-    let traceBody: unknown;
-    let traceError: string | undefined;
+    // (Inngest answers 500 on some traces with output, or returns a shape we
+    // do not know) never blanks the runs.
+    const truncated = listed.page?.hasMore === true;
     try {
-      traceBody = await getTrace(token, newest.runId, opts);
+      const trace = z
+        .looseObject({
+          data: z.looseObject({ rootSpan: loose.optional() }).optional(),
+        })
+        .parse(await getTrace(token, newest.runId, opts));
+      const steps: TraceStep[] = [];
+      const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
+      return {
+        latestTrace: { runId: newest.runId, steps, truncated: overflow },
+        runs,
+        truncated,
+      };
     } catch (error) {
-      traceError = redact(
-        error instanceof Error ? error.message : "Trace read failed."
-      );
-    }
-    if (traceBody === undefined) {
       return {
         latestTrace: null,
         runs,
-        traceError,
-        truncated: listed.page?.hasMore === true,
+        traceError: redact(
+          error instanceof Error ? error.message : "Trace read failed."
+        ),
+        truncated,
       };
     }
-    const trace = z
-      .looseObject({
-        data: z.looseObject({ rootSpan: loose.optional() }).optional(),
-      })
-      .parse(traceBody);
-    const steps: TraceStep[] = [];
-    const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
-    return {
-      latestTrace: { runId: newest.runId, steps, truncated: overflow },
-      runs,
-      truncated: listed.page?.hasMore === true,
-    };
   } catch (error) {
     return {
       error: redact(
