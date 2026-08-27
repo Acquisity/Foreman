@@ -49,6 +49,8 @@ export const findFunctionRunsResultSchema = z.object({
     })
     .nullable(),
   runs: z.array(functionRunSchema),
+  /** Set when the runs were listed but the newest run's trace could not be read. */
+  traceError: z.string().optional(),
   /** More runs matched than the 20 returned. */
   truncated: z.boolean(),
 });
@@ -248,6 +250,27 @@ async function listRuns(
   };
 }
 
+/** The trace with step output; when Inngest refuses that, the trace without it. */
+async function getTrace(
+  token: string,
+  runId: string,
+  opts?: InngestApiOptions
+): Promise<unknown> {
+  const path = `/runs/${encodeURIComponent(runId)}/trace`;
+  try {
+    return await getJson(token, `${path}?includeOutput=true`, opts);
+  } catch (withOutput) {
+    try {
+      return await getJson(token, path, opts);
+    } catch (withoutOutput) {
+      throw new Error(
+        `${withOutput instanceof Error ? withOutput.message : String(withOutput)} (and without output: ${withoutOutput instanceof Error ? withoutOutput.message : String(withoutOutput)})`,
+        { cause: withoutOutput }
+      );
+    }
+  }
+}
+
 /** Flattens the span tree depth-first into steps, the root excluded. */
 function flattenSteps(
   node: Record<string, unknown>,
@@ -319,17 +342,30 @@ export async function findFunctionRuns(
     if (!newest) {
       return { latestTrace: null, runs, truncated: false };
     }
+    // The list is the answer even when the trace is not: a trace failure
+    // (Inngest answers 500 on some traces with output) never blanks the runs.
+    let traceBody: unknown;
+    let traceError: string | undefined;
+    try {
+      traceBody = await getTrace(token, newest.runId, opts);
+    } catch (error) {
+      traceError = redact(
+        error instanceof Error ? error.message : "Trace read failed."
+      );
+    }
+    if (traceBody === undefined) {
+      return {
+        latestTrace: null,
+        runs,
+        traceError,
+        truncated: listed.page?.hasMore === true,
+      };
+    }
     const trace = z
       .looseObject({
         data: z.looseObject({ rootSpan: loose.optional() }).optional(),
       })
-      .parse(
-        await getJson(
-          token,
-          `/runs/${encodeURIComponent(newest.runId)}/trace?includeOutput=true`,
-          opts
-        )
-      );
+      .parse(traceBody);
     const steps: TraceStep[] = [];
     const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
     return {

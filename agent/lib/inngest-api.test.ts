@@ -5,6 +5,7 @@ import { errorText, findFunctionRuns } from "./inngest-api.js";
 const NOW = new Date("2026-08-27T18:00:00.000Z");
 const FN = "ads.google.sync-workspace-insights";
 const MORE_THAN = /more than/u;
+const HTTP_500 = /HTTP 500/u;
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
@@ -232,5 +233,42 @@ describe("find_function_runs", () => {
     );
     assert.match(result.error ?? "", MORE_THAN);
     assert.deepEqual(result.runs, []);
+  });
+
+  it("retries the trace without output, then keeps the runs with traceError", async () => {
+    const urls: string[] = [];
+    const withRetry: typeof fetch = (url) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes("/trace?includeOutput=true")) {
+        return json({ message: "boom" }, 500);
+      }
+      if (u.endsWith("/trace")) {
+        return json(trace);
+      }
+      return json({ data: [run("run-2", "evt-2")] });
+    };
+    const recovered = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: withRetry, now: NOW }
+    );
+    assert.equal(recovered.latestTrace?.steps.length, 3);
+    assert.equal(recovered.traceError, undefined);
+    assert.ok(urls.some((u) => u.endsWith("/runs/run-2/trace")));
+
+    const bothFail: typeof fetch = (url) =>
+      String(url).includes("/trace")
+        ? json({ message: "boom" }, 500)
+        : json({ data: [run("run-2", "evt-2")] });
+    const kept = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: bothFail, now: NOW }
+    );
+    assert.equal(kept.runs.length, 1);
+    assert.equal(kept.latestTrace, null);
+    assert.equal(kept.error, undefined);
+    assert.match(kept.traceError ?? "", HTTP_500);
   });
 });
