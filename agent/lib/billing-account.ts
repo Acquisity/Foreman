@@ -153,34 +153,27 @@ export async function readBillingAccount(
 ): Promise<BillingAccountResult> {
   const queries = billingAccountQueries(organizationId);
   try {
-    const [orgResult, ...lists] = await Promise.allSettled([
-      rowsOf(run, queries.organization),
-      rowsOf(run, queries.balances),
-      rowsOf(run, queries.transactions),
-      rowsOf(run, queries.manualCredits),
-    ]);
-    if (orgResult.status === "rejected") {
-      throw orgResult.reason;
-    }
+    // Sequential on purpose: each statement opens its own MCP session, and
+    // four concurrent handshakes drew a 422 from the PlanetScale server.
+    const orgRows = await rowsOf(run, queries.organization);
     const unavailable: string[] = [];
-    const settled = (
+    const list = async (
       name: "creditBalances" | "transactions" | "manualCredits",
-      result: PromiseSettledResult<Record<string, unknown>[]>
+      query: string
     ) => {
-      if (result.status === "fulfilled") {
-        return result.value;
+      try {
+        return await rowsOf(run, query);
+      } catch (error) {
+        unavailable.push(
+          `${name}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return [];
       }
-      const reason =
-        result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason);
-      unavailable.push(`${name}: ${reason}`);
-      return [];
     };
-    const creditBalances = settled("creditBalances", lists[0]);
-    const transactions = settled("transactions", lists[1]);
-    const manualCredits = settled("manualCredits", lists[2]);
-    const [first] = orgResult.value;
+    const creditBalances = await list("creditBalances", queries.balances);
+    const transactions = await list("transactions", queries.transactions);
+    const manualCredits = await list("manualCredits", queries.manualCredits);
+    const [first] = orgRows;
     if (!first) {
       return EMPTY;
     }
