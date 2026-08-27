@@ -27,6 +27,17 @@ describe("replyOf", () => {
     assert.equal(replyOf(`Narration\n${REPLY_MARKER}\n  \n`), "");
   });
 
+  it("ignores a marker mentioned mid-line in the narration", () => {
+    assert.equal(
+      replyOf(`Put ${REPLY_MARKER} on its own line.\n${REPLY_MARKER}\nReply`),
+      "Reply"
+    );
+    assert.equal(
+      replyOf(`Put ${REPLY_MARKER} on its own line.`),
+      `Put ${REPLY_MARKER} on its own line.`
+    );
+  });
+
   it("keeps a second marker inside the reply", () => {
     assert.equal(
       replyOf(
