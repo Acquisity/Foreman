@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `find_help_article`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -56,15 +56,9 @@ Read the result flags before trusting the rows: `truncated` means rows are missi
 
 Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
 
-`planetscale_get_branch_schema` does not exist on this connection. The allowlist excludes it for returning every table's schema unbounded, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Read schema through `information_schema` instead, which is verified working:
+`planetscale_get_branch_schema` does not exist on this connection, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Unsure of a table or column name: call `describe_table` first. It is a root tool, called bare, and returns the table's columns with types from `information_schema`, or `found` false with similar table names. Do not guess names into a query.
 
-```sql
-SELECT table_schema, table_name, column_name, data_type
-FROM information_schema.columns
-WHERE table_name = '<table>'
-```
-
-Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`. An `information_schema` query needs that last one passed explicitly.
+Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`. `describe_table` and `lookup_customer` carry them fixed; pass them yourself on `planetscale_execute_read_query`.
 
 ## Instantly (root tools, no prefix)
 
