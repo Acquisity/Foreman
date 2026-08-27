@@ -8,20 +8,26 @@ export const tableNameSchema = z
   .toLowerCase()
   .regex(/^[a-z_][a-z0-9_]{0,62}$/u, "Expected a snake_case table name.");
 
-/** The two fixed queries. The name is validated to the regex above, so it is safe to inline. */
-export const columnsQuery = (table: string) =>
-  [
+/** The builders re-check the name, so nothing but a bare identifier is ever inlined. */
+const safeName = (table: string) => tableNameSchema.parse(table);
+
+/** The two fixed queries. */
+export const columnsQuery = (rawTable: string) => {
+  const table = safeName(rawTable);
+  return [
     "select column_name, data_type, is_nullable, column_default",
     "from information_schema.columns",
     `where table_schema = 'public' and table_name = '${table}'`,
     "order by ordinal_position",
   ].join("\n");
+};
 
 /** `_` is a LIKE wildcard, so snake_case names are escaped and the pattern says so. */
 const likePattern = (table: string) => `%${table.replace(/_/gu, "\\_")}%`;
 
-export const similarTablesQuery = (table: string) =>
-  [
+export const similarTablesQuery = (rawTable: string) => {
+  const table = safeName(rawTable);
+  return [
     "select table_name",
     "from information_schema.tables",
     // Contains the name, or is contained in it (members -> member, member_preferences).
@@ -29,6 +35,7 @@ export const similarTablesQuery = (table: string) =>
     "order by table_name",
     "limit 10",
   ].join("\n");
+};
 
 const columnRow = z.looseObject({
   column_default: z.union([z.string(), z.null()]).optional(),

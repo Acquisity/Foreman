@@ -27,6 +27,8 @@ describe("describe_table", () => {
 
   it("always queries the public schema on the fixed production coordinates", () => {
     assert.ok(columnsQuery("member").includes("table_schema = 'public'"));
+    assert.ok(columnsQuery("member").includes("order by ordinal_position"));
+    assert.throws(() => columnsQuery("member' or '1'='1"));
     assert.equal(PRODUCTION_READ_QUERY_ARGS.postgres_database_name, "postgres");
     assert.equal(PRODUCTION_READ_QUERY_ARGS.branch, "main");
   });

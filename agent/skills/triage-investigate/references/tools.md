@@ -62,7 +62,7 @@ Read the result flags before trusting the rows: `truncated` means rows are missi
 
 Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
 
-`planetscale_get_branch_schema` does not exist on this connection, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Unsure of a table or column name: call `describe_table` first. It is a root tool, called bare, and returns the table's columns with types from `information_schema`, or `found` false with similar table names. Do not guess names into a query.
+`planetscale_get_branch_schema` does not exist on this connection, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Unsure of a table or column name: call `describe_table` first. It is a root tool, called bare, and returns the table's columns with types from `information_schema`, or `found` false with similar table names; `found` false with no `error` means no public table has that name, while `error` means the lookup could not run and the name is unverified. Do not guess names into a query.
 
 Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`. `describe_table` and `lookup_customer` carry them fixed; pass them yourself on `planetscale_execute_read_query`.
 
