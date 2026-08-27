@@ -8,6 +8,7 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const { default: tool } = await import("../tools/route_ticket.js");
 
+const UNABLE_TO_FETCH = /Unable to fetch url information/u;
 const UNKNOWN_LABEL =
   /Unknown label "Nope"\. Valid labels: Bug, Customer reported/u;
 
@@ -63,6 +64,7 @@ const fakeLinear = () => {
       });
     }
     if (q.startsWith("query Projects")) {
+      assert.equal(body.variables.teamId, "t-eng");
       return json({
         data: { projects: { nodes: [{ id: "p-support", name: "Support" }] } },
       });
@@ -79,7 +81,9 @@ const fakeLinear = () => {
       return json({ data: { issueRelationCreate: { success: true } } });
     }
     if (q.startsWith("mutation RouteAttachment")) {
-      return json({ data: { attachmentLinkURL: { success: true } } });
+      return String(body.variables.url).includes("broken")
+        ? json({ errors: [{ message: "Unable to fetch url information" }] })
+        : json({ data: { attachmentLinkURL: { success: true } } });
     }
     return json({
       data: {
@@ -146,6 +150,24 @@ describe("routeTicket", () => {
     assert.equal(attachment?.variables.url, "https://app.intercom.com/c/1");
     assert.equal(result.projectId, "p-support");
     assert.deepEqual(result.labels, ["Bug", "Customer reported"]);
+  });
+
+  it("reports a failed link as a warning on a routed ticket", async () => {
+    const linear = fakeLinear();
+    const result = await routeTicket(
+      "t",
+      {
+        addLabels: ["Customer reported"],
+        issue: "ENG-1",
+        links: [
+          { title: "Intercom conversation", url: "https://broken.example/1" },
+        ],
+      },
+      { fetch: linear.fetchStub }
+    );
+    assert.equal(linear.updates().length, 1);
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0] ?? "", UNABLE_TO_FETCH);
   });
 
   it("lets an explicit assignee beat an inherited one", async () => {

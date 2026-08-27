@@ -15,7 +15,8 @@ export default defineTool({
     "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
     "Names are resolved for you: state by name within the ticket's team, project by name, assignee by name or email. " +
     "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; an explicit assignee wins over an inherited one. " +
-    "links attach urls as resources on the ticket. Use the returned projectId for memory recording.",
+    "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
+    "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     try {
       const { token } = await ctx.getToken(linearAuth);
@@ -76,5 +77,6 @@ export default defineTool({
     routed: z.boolean(),
     state: z.string().optional(),
     url: z.string().optional(),
+    warnings: z.array(z.string()).optional(),
   }),
 });

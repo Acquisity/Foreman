@@ -374,8 +374,10 @@ const WORKFLOW_STATES_QUERY = `query WorkflowStates($teamId: ID!, $name: String!
   }
 }`;
 
-const PROJECTS_QUERY = `query Projects($name: String!) {
-  projects(first: 5, filter: { name: { eqIgnoreCase: $name } }) { nodes { id name } }
+const PROJECTS_QUERY = `query Projects($name: String!, $teamId: ID!) {
+  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {
+    nodes { id name }
+  }
 }`;
 
 const USERS_QUERY = `query Users($name: String!) {
@@ -435,6 +437,8 @@ export interface RouteTicketResult {
   projectName: string | null;
   state: string;
   url: string;
+  /** Steps after the issue update that failed; the update itself landed. */
+  warnings: string[];
 }
 
 /** Resolves one name to exactly one id, or throws naming what was found. */
@@ -533,9 +537,13 @@ async function buildUpdate(
   if (input.project !== undefined) {
     const { projects } = await gql<{ projects: { nodes: Named[] } }>(
       PROJECTS_QUERY,
-      { name: input.project }
+      { name: input.project, teamId: issue.team.id }
     );
-    update.projectId = exactlyOne("project", input.project, projects.nodes);
+    update.projectId = exactlyOne(
+      "project on the ticket's team",
+      input.project,
+      projects.nodes
+    );
   }
   const assigneeId = await resolveAssigneeId(gql, input);
   if (assigneeId !== undefined) {
@@ -582,27 +590,46 @@ export async function routeTicket(
     }
   }
 
+  // The update above is the write. Anything after it that fails is reported
+  // as a warning on a routed result, never as an unrouted ticket.
+  const warnings: string[] = [];
+  const reason = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+
   if (input.duplicateOf !== undefined) {
-    const { issue: master } = await gql<{ issue: RouteIssue }>(
-      ROUTE_ISSUE_QUERY,
-      { id: input.duplicateOf }
-    );
-    await gql<{ issueRelationCreate: { success: boolean } }>(RELATION_CREATE, {
-      input: {
-        issueId: issue.id,
-        relatedIssueId: master.id,
-        type: "duplicate",
-      },
-    });
+    try {
+      const { issue: master } = await gql<{ issue: RouteIssue }>(
+        ROUTE_ISSUE_QUERY,
+        { id: input.duplicateOf }
+      );
+      await gql<{ issueRelationCreate: { success: boolean } }>(
+        RELATION_CREATE,
+        {
+          input: {
+            issueId: issue.id,
+            relatedIssueId: master.id,
+            type: "duplicate",
+          },
+        }
+      );
+    } catch (error) {
+      warnings.push(
+        `Duplicate relation to ${input.duplicateOf} was not recorded: ${reason(error)}`
+      );
+    }
   }
 
   for (const link of input.links ?? []) {
-    // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
-    await gql<{ attachmentLinkURL: { success: boolean } }>(ATTACHMENT_LINK, {
-      issueId: issue.id,
-      title: link.title,
-      url: link.url,
-    });
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
+      await gql<{ attachmentLinkURL: { success: boolean } }>(ATTACHMENT_LINK, {
+        issueId: issue.id,
+        title: link.title,
+        url: link.url,
+      });
+    } catch (error) {
+      warnings.push(`Link ${link.url} was not attached: ${reason(error)}`);
+    }
   }
 
   const { issue: saved } = await gql<{
@@ -628,5 +655,6 @@ export async function routeTicket(
     projectName: saved.project?.name ?? null,
     state: saved.state.name,
     url: saved.url,
+    warnings,
   };
 }
