@@ -283,7 +283,13 @@ export async function saveInvestigationDocument(
     };
   }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue }, opts);
 
-  const existing = issue.documents.nodes.find((node) => node.title === title);
+  const matches = issue.documents.nodes.filter((node) => node.title === title);
+  if (matches.length > 1) {
+    throw new Error(
+      `${input.issue} already carries ${matches.length} documents titled "${title}"; consolidate them by hand before saving.`
+    );
+  }
+  const [existing] = matches;
   if (existing) {
     const { documentUpdate } = await linearGraphql<{
       documentUpdate: DocumentPayload;

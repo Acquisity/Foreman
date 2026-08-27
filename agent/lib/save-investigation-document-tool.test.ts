@@ -52,7 +52,7 @@ describe("save_investigation_document tool", () => {
     });
   });
 
-  it("refuses a billing document carrying a card number without a token", async () => {
+  it("refuses a billing document carrying a card or bank number without a token", async () => {
     let requested = false;
     const context = {
       abortSignal: new AbortController().signal,
@@ -61,16 +61,18 @@ describe("save_investigation_document tool", () => {
         throw new Error("no");
       },
     } as unknown as Context;
-    const result = (await tool.execute(
-      {
-        content: "Card 4242 4242 4242 4242 charged",
-        issue: "ENG-1",
-        lane: "billing",
-      },
-      context
-    )) as { error?: string; saved: boolean };
-    assert.equal(result.saved, false);
-    assert.match(result.error ?? "", CARD_OR_BANK);
+    for (const content of [
+      "Card 4242 4242 4242 4242 charged",
+      "IBAN gb82west12345698765432",
+      "IBAN GB82 WEST 1234 5698 7654 32",
+    ]) {
+      const result = (await tool.execute(
+        { content, issue: "ENG-1", lane: "billing" },
+        context
+      )) as { error?: string; saved: boolean };
+      assert.equal(result.saved, false, content);
+      assert.match(result.error ?? "", CARD_OR_BANK);
+    }
     assert.equal(requested, false);
   });
 });

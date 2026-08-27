@@ -232,6 +232,31 @@ describe("saveInvestigationDocument", () => {
     });
   });
 
+  it("refuses to write when the issue already carries two documents with the title", async () => {
+    const fetchStub: typeof fetch = () =>
+      json({
+        data: {
+          issue: {
+            documents: {
+              nodes: [
+                { id: "a", title: "Triage investigation" },
+                { id: "b", title: "Triage investigation" },
+              ],
+            },
+            id: "issue-uuid",
+          },
+        },
+      });
+    await assert.rejects(
+      saveInvestigationDocument(
+        "t",
+        { content: "x", issue: "ENG-1", lane: "triage" },
+        { fetch: fetchStub }
+      ),
+      (error: Error) => error.message.includes("already carries 2 documents")
+    );
+  });
+
   it("rewrites the existing document instead of creating a second", async () => {
     const { calls, fetchStub } = respond("Billing investigation");
     const result = await saveInvestigationDocument(

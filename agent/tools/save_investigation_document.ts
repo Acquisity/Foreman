@@ -9,8 +9,8 @@ import {
 
 /** 13 to 19 digits with optional separators: a card number. Input is bounded, so the scan is too. */
 const CARD_NUMBER = /\b(?:\d[ -]?){12,18}\d\b/u;
-/** Two letters, two check digits, 11 to 30 alphanumerics: an IBAN. */
-const IBAN = /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/u;
+/** Two letters, two check digits, 11 to 30 alphanumerics, any case, spaces or dashes allowed: an IBAN. */
+const IBAN = /\b[A-Za-z]{2}\d{2}(?:[ -]?[A-Za-z0-9]){11,30}\b/u;
 
 export default defineTool({
   approval: denyUnattendedWrites("Linear"),
