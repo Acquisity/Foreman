@@ -101,6 +101,49 @@ describe("findRelatedIssues", () => {
     assert.equal(result.createdAfter, null);
   });
 
+  it("runs a repeated phrase once", async () => {
+    let calls = 0;
+    const result = await findRelatedIssues(
+      "t",
+      { phrases: ["same", "same"], scope: "duplicates", windowed: false },
+      {
+        fetch: () => {
+          calls += 1;
+          return json(page(["1"], null));
+        },
+      }
+    );
+    assert.equal(calls, 1);
+    assert.deepEqual(result.issues[0]?.matchedPhrases, ["same"]);
+  });
+
+  it("stops masters at the page cap and flags it", async () => {
+    let calls = 0;
+    const result = await findRelatedIssues(
+      "t",
+      { phrases: ["x"], scope: "masters", windowed: false },
+      {
+        fetch: () => {
+          calls += 1;
+          return json(page([String(calls)], `c${calls}`));
+        },
+      }
+    );
+    assert.equal(calls, 20);
+    assert.equal(result.truncated, true);
+  });
+
+  it("caps the merged result at 100 issues and flags it", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => String(i));
+    const result = await findRelatedIssues(
+      "t",
+      { phrases: ["x"], scope: "masters", windowed: false },
+      { fetch: () => json(page(ids, null)) }
+    );
+    assert.equal(result.issues.length, 100);
+    assert.equal(result.truncated, true);
+  });
+
   it("dedupes duplicates across phrases, includes archived, and flags a second page", async () => {
     let calls = 0;
     const fetchStub: typeof fetch = (_url, init) => {
