@@ -51,9 +51,9 @@ When memory returns `available: false`, continue from current evidence. Do not i
 
 ## Step 4: Pin identity and check existing evidence
 
-Resolve the Intercom contact's exact email in PlanetScale before customer-specific lookups. Use `planetscale_execute_read_query` against production, join `user` through `member` to `organization`, and pin the relevant `organization_id`. Scope every later customer query yourself. Never select credential-shaped columns and never conclude from a truncated result.
+Call `lookup_customer` with the Intercom contact's exact email before customer-specific lookups. Pin `pinnedOrganizationId` and scope every later customer query yourself. `error` set means the lookup could not run, not that the customer is missing.
 
-One match is sufficient. When the email belongs to several workspaces, select the workspace established by the conversation and current data. Name the alternatives in the eventual document. Ask only if the choice would change the verdict and evidence cannot settle it. A missing identity does not end the investigation: state what failed, ask for the workspace, and keep working the code and runtime lanes.
+One match is sufficient. When `ambiguous` is true, select the workspace established by the conversation and current data. Name the alternatives in the eventual document. Ask only if the choice would change the verdict and evidence cannot settle it. A missing identity does not end the investigation: state what failed, ask for the workspace, and keep working the code and runtime lanes.
 
 Search the conversation for prior investigations, and call `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings: customer outcome, visible error, component, provider, and code path. Read every hit. Keyword overlap is not a duplicate. A duplicate needs the same outcome and root cause. Related symptoms with different causes remain separate.
 
@@ -65,10 +65,11 @@ Read [references/tools.md](references/tools.md) before composing tool calls. It 
 
 Work every applicable lane and record `Not applicable: <reason>` or `Could not run: <reason>` for the rest:
 
-1. Code: `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file`. Record the files, functions, expected behavior, and `git -C <worktree> rev-parse HEAD`.
-2. Production data: query PlanetScale for the pinned organization and the records in the claim. Then run a separate, unscoped query that counts distinct affected organizations and users. Record the query and count date. A stored memory count cannot replace this.
-3. Runtime: use the axes the system supports. Check Inngest for background work, Sentry and Axiom for errors, Resend for email delivery, Instantly for accepted subworkspace membership plus sending-account, campaign, and Unibox state, PostHog or Jam for user behavior, Vercel for deployment failures, Intercom for similar conversations, and Modem for related feedback when applicable. For Instantly, call the root `list_instantly_subworkspaces` tool first, select by workspace ID when possible, then page `read_instantly_subworkspace` by passing each returned `nextStartingAfter` value back as `startingAfter` until it is null.
-4. Unblock: find the safest action that gets the customer working now, who performs it, and whether it costs data or money. Propose production or billing mutations for a human; never perform them.
+1. Help center: Call `find_help_article` with the feature and the action the customer took. The result carries each article's repository path under `apps/web/content/docs`: run `prepare_repository` with `Acquisity/Acquisity` and `read_file` that path before quoting anything, since the search returns titles, not bodies. Then quote the article that states the expected setup or behavior in the evidence record, compare it with the customer's actual state, and treat a contradiction as a User Error candidate with the article link as the unblock. Read code after that, to confirm what the article says or to explain what it does not cover.
+2. Code: `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file`. Record the files, functions, expected behavior, and `git -C <worktree> rev-parse HEAD`.
+3. Production data: query PlanetScale for the pinned organization and the records in the claim. Then run a separate, unscoped query that counts distinct affected organizations and users. Record the query and count date. A stored memory count cannot replace this.
+4. Runtime: use the axes the system supports. Check Inngest for background work, Sentry and Axiom for errors, Resend for email delivery, Instantly for accepted subworkspace membership plus sending-account, campaign, and Unibox state, PostHog or Jam for user behavior, Vercel for deployment failures, Intercom for similar conversations, and Modem for related feedback when applicable. For Instantly, call the root `list_instantly_subworkspaces` tool first, select by workspace ID when possible, then page `read_instantly_subworkspace` by passing each returned `nextStartingAfter` value back as `startingAfter` until it is null.
+5. Unblock: find the safest action that gets the customer working now, who performs it, and whether it costs data or money. Propose production or billing mutations for a human; never perform them.
 
 Keep PlanetScale, investigation memory, and the unrelated `neon__*` connection separate. Current customer and production truth comes only from PlanetScale and current runtime evidence.
 
