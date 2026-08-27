@@ -51,9 +51,9 @@ When memory returns `available: false`, continue from current evidence. Do not i
 
 ## Step 4: Pin identity and check existing evidence
 
-Resolve the Intercom contact's exact email in PlanetScale before customer-specific lookups. Use `planetscale_execute_read_query` against production, join `user` through `member` to `organization`, and pin the relevant `organization_id`. Scope every later customer query yourself. Never select credential-shaped columns and never conclude from a truncated result.
+Call `lookup_customer` with the Intercom contact's exact email before customer-specific lookups. Pin `pinnedOrganizationId` and scope every later customer query yourself. `error` set means the lookup could not run, not that the customer is missing.
 
-One match is sufficient. When the email belongs to several workspaces, select the workspace established by the conversation and current data. Name the alternatives in the eventual document. Ask only if the choice would change the verdict and evidence cannot settle it. A missing identity does not end the investigation: state what failed, ask for the workspace, and keep working the code and runtime lanes.
+One match is sufficient. When `ambiguous` is true, select the workspace established by the conversation and current data. Name the alternatives in the eventual document. Ask only if the choice would change the verdict and evidence cannot settle it. A missing identity does not end the investigation: state what failed, ask for the workspace, and keep working the code and runtime lanes.
 
 Search the conversation and Linear for prior investigations and current issues using several formulations: customer outcome, visible error, component, provider, and code path. Keyword overlap is not a duplicate. A duplicate needs the same outcome and root cause. Related symptoms with different causes remain separate.
 

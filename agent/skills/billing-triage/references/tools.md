@@ -10,7 +10,7 @@ Two kinds of tool appear below, and they are called differently.
 
 **Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -19,6 +19,8 @@ Use the built-in `connection_search` to discover what a connection actually expo
 Read them in flow order: PlanetScale, then Autumn, then Stripe. Every configured intake-only channel uses the app-scoped root tools described below. Other attended surfaces keep the broader user-scoped MCP tools.
 
 ## PlanetScale (`planetscale__`)
+
+`lookup_customer` is the identity gate: one fixed production query from a customer email to the user, live memberships, and `pinnedOrganizationId`. It is a root tool, called bare. Use it instead of writing the identity join yourself.
 
 `planetscale_execute_read_query`, an authored tool in `agent/tools/`, not the MCP tool of the same name. The MCP original is excluded from the allowlist because it returns rows unbounded; the authored wrapper truncates.
 
