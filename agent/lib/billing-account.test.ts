@@ -88,6 +88,22 @@ describe("read_billing_account", () => {
     assert.equal(result.transactions.length, HISTORY_LIMIT);
   });
 
+  it("keeps the organization when one history list fails and names it", async () => {
+    const result = await readBillingAccount(ORG, (query) => {
+      if (query.includes("from organization")) {
+        return Promise.resolve(JSON.stringify([orgRow]));
+      }
+      if (query.includes("from manual_credit")) {
+        return Promise.reject(new Error("timeout"));
+      }
+      return Promise.resolve("[]");
+    });
+    assert.equal(result.found, true);
+    assert.equal(result.organization?.name, "bigE's Workspace");
+    assert.deepEqual(result.unavailable, ["manualCredits: timeout"]);
+    assert.equal(result.error, undefined);
+  });
+
   it("returns found false for an unknown organization and error for a failed read", async () => {
     const missing = await readBillingAccount(ORG, () => Promise.resolve("[]"));
     assert.equal(missing.found, false);

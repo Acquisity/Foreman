@@ -15,7 +15,7 @@ import {
 export default defineTool({
   description:
     "The production system-of-record read for a billing ticket, by the organization id pinned by lookup_customer: the organization with its partnerId, the billing account with provider, subscription status and plan, trial dates, and every wallet (credits, domains, inboxes, website credits, each with balance and lifetime purchased, granted, used), the credit_balance rows, and the last 20 credit transactions and manual credits. " +
-    "Read partnerId before routing on provider: a partner-governed organization follows the partner rule. Read-only, fixed queries; truncated flags say a history list hit its cap. error means the read could not run.",
+    "Read partnerId before routing on provider: a partner-governed organization follows the partner rule. Read-only, fixed queries; truncated flags say a history list hit its cap; unavailable names a list whose read failed, so treat it as unverified rather than empty. error means the organization read itself could not run.",
   async execute({ organizationId }, ctx) {
     const { token } = await ctx.getToken(planetscaleAuth);
     return readBillingAccount(organizationId, async (query) => {

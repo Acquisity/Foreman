@@ -120,6 +120,8 @@ export const billingAccountResultSchema = z.object({
     manualCredits: z.boolean(),
     transactions: z.boolean(),
   }),
+  /** Lists whose statement failed; their arrays are empty and unverified, not empty in production. */
+  unavailable: z.array(z.string()),
 });
 
 export type BillingAccountResult = z.infer<typeof billingAccountResultSchema>;
@@ -132,6 +134,7 @@ const EMPTY: BillingAccountResult = {
   organization: null,
   transactions: [],
   truncated: { manualCredits: false, transactions: false },
+  unavailable: [],
 };
 
 const rowsOf = async (run: (query: string) => Promise<string>, query: string) =>
@@ -150,14 +153,34 @@ export async function readBillingAccount(
 ): Promise<BillingAccountResult> {
   const queries = billingAccountQueries(organizationId);
   try {
-    const [orgRows, creditBalances, transactions, manualCredits] =
-      await Promise.all([
-        rowsOf(run, queries.organization),
-        rowsOf(run, queries.balances),
-        rowsOf(run, queries.transactions),
-        rowsOf(run, queries.manualCredits),
-      ]);
-    const [first] = orgRows;
+    const [orgResult, ...lists] = await Promise.allSettled([
+      rowsOf(run, queries.organization),
+      rowsOf(run, queries.balances),
+      rowsOf(run, queries.transactions),
+      rowsOf(run, queries.manualCredits),
+    ]);
+    if (orgResult.status === "rejected") {
+      throw orgResult.reason;
+    }
+    const unavailable: string[] = [];
+    const settled = (
+      name: "creditBalances" | "transactions" | "manualCredits",
+      result: PromiseSettledResult<Record<string, unknown>[]>
+    ) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      }
+      const reason =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      unavailable.push(`${name}: ${reason}`);
+      return [];
+    };
+    const creditBalances = settled("creditBalances", lists[0]);
+    const transactions = settled("transactions", lists[1]);
+    const manualCredits = settled("manualCredits", lists[2]);
+    const [first] = orgResult.value;
     if (!first) {
       return EMPTY;
     }
@@ -223,6 +246,7 @@ export async function readBillingAccount(
         manualCredits: manualCredits.length >= HISTORY_LIMIT,
         transactions: transactions.length >= HISTORY_LIMIT,
       },
+      unavailable,
     };
   } catch (error) {
     return {
