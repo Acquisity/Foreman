@@ -148,9 +148,7 @@ export async function readBillingAccount(
   organizationId: string,
   run: (query: string) => Promise<string>
 ): Promise<BillingAccountResult> {
-  const queries = billingAccountQueries(
-    organizationIdSchema.parse(organizationId)
-  );
+  const queries = billingAccountQueries(organizationId);
   try {
     const [orgRows, creditBalances, transactions, manualCredits] =
       await Promise.all([

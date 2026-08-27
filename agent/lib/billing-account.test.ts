@@ -99,6 +99,10 @@ describe("read_billing_account", () => {
     assert.equal(failed.error, "HTTP 500");
   });
 
+  it("refuses a non-uuid in the query factory itself", () => {
+    assert.throws(() => billingAccountQueries("org' OR 1=1 --"));
+  });
+
   it("never selects a card, token, or key column", () => {
     for (const query of Object.values(billingAccountQueries(ORG))) {
       assert.doesNotMatch(query, SENSITIVE_COLUMN);
