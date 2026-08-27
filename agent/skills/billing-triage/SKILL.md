@@ -214,4 +214,4 @@ The status line is fixed; do not use a free-form reply on financial tickets. Nev
 
 ## Routing
 
-Route financial tickets to Support/Financial, project Support, assign Aaron Fraga, and move to Todo. Priority High for an active billing/refund blocker, Medium otherwise.
+Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, and `priority` 2 (High) for an active billing/refund blocker, 3 (Medium) otherwise.
