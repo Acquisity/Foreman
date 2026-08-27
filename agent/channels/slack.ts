@@ -11,6 +11,7 @@ import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
+import { replyOf } from "../lib/slack-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -48,6 +49,12 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * default stamps nothing: a DM dispatched through it carries no trust, no
  * repository selection, and no intake-only marker, so every delivery from a
  * DM parked on an approval card that Slack cannot deliver an answer to.
+ *
+ * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
+ * so the model's narration stays in the session and only the requester-facing
+ * text reaches the thread. The handler mirrors eve's default
+ * `message.completed` branches, which are not exported, and changes only the
+ * post.
  */
 
 const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
@@ -80,6 +87,23 @@ export default slackChannel({
   credentials: connectSlackCredentials(
     process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
   ),
+  events: {
+    async "message.completed"(data, channel) {
+      if (data.finishReason === "tool-calls") {
+        channel.state.pendingToolCallMessage = data.message
+          ? (data.message.split("\n").find((line) => line.trim()) ?? null)
+          : null;
+        return;
+      }
+      channel.state.pendingToolCallMessage = null;
+      const reply = data.message ? replyOf(data.message) : "";
+      if (!reply) {
+        await channel.thread.startTyping();
+        return;
+      }
+      await channel.thread.post(reply);
+    },
+  },
   onAppMention: dispatch,
   onDirectMessage: dispatch,
   threadContext: { since: "last-agent-reply" },
