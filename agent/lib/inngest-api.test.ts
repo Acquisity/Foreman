@@ -5,6 +5,8 @@ import { errorText, findFunctionRuns } from "./inngest-api.js";
 const NOW = new Date("2026-08-27T18:00:00.000Z");
 const FN = "ads.google.sync-workspace-insights";
 const MORE_THAN = /more than/u;
+const HTTP_500 = /HTTP 500/u;
+const ABORTED = /aborted/u;
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(
@@ -232,5 +234,79 @@ describe("find_function_runs", () => {
     );
     assert.match(result.error ?? "", MORE_THAN);
     assert.deepEqual(result.runs, []);
+  });
+
+  it("retries the trace without output, then keeps the runs with traceError", async () => {
+    const urls: string[] = [];
+    const withRetry: typeof fetch = (url) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes("/trace?includeOutput=true")) {
+        return json({ message: "boom" }, 500);
+      }
+      if (u.endsWith("/trace")) {
+        return json(trace);
+      }
+      return json({ data: [run("run-2", "evt-2")] });
+    };
+    const recovered = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: withRetry, now: NOW }
+    );
+    assert.equal(recovered.latestTrace?.steps.length, 3);
+    assert.equal(recovered.traceError, undefined);
+    assert.ok(urls.some((u) => u.endsWith("/runs/run-2/trace")));
+
+    const bothFail: typeof fetch = (url) =>
+      String(url).includes("/trace")
+        ? json({ message: "boom" }, 500)
+        : json({ data: [run("run-2", "evt-2")] });
+    const kept = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      { fetch: bothFail, now: NOW }
+    );
+    assert.equal(kept.runs.length, 1);
+    assert.equal(kept.latestTrace, null);
+    assert.equal(kept.error, undefined);
+    assert.match(kept.traceError ?? "", HTTP_500);
+
+    const malformed = await findFunctionRuns(
+      "t",
+      { sinceHours: 1, status: "Failed" },
+      {
+        fetch: (url) =>
+          String(url).includes("/trace")
+            ? json({ data: "invalid" })
+            : json({ data: [run("run-2", "evt-2")] }),
+        now: NOW,
+      }
+    );
+    assert.equal(malformed.runs.length, 1);
+    assert.equal(malformed.error, undefined);
+    assert.ok(malformed.traceError);
+  });
+
+  it("rethrows caller cancellation instead of retrying or reporting it", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const fetchStub: typeof fetch = (url) => {
+      calls += 1;
+      if (String(url).includes("/trace")) {
+        controller.abort();
+        return Promise.reject(new Error("aborted"));
+      }
+      return json({ data: [run("run-2", "evt-2")] });
+    };
+    await assert.rejects(
+      findFunctionRuns(
+        "t",
+        { sinceHours: 1, status: "Failed" },
+        { fetch: fetchStub, now: NOW, signal: controller.signal }
+      ),
+      ABORTED
+    );
+    assert.equal(calls, 2);
   });
 });
