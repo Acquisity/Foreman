@@ -1,9 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import {
-  clearBillingApiRead,
-  stampBillingApiRead,
-  stampIntakeOnly,
-} from "./trust.js";
+import { stampBillingApiRead, stampIntakeOnly } from "./trust.js";
 
 // Slack channel IDs: an uppercase letter class then base-32-ish characters.
 // Anything else in the env list is a typo (a channel name, a quoted value),
@@ -82,18 +78,21 @@ export function resolveSlackIntakeWorkflow(
 }
 
 /**
- * Applies the hard intake boundary and any workflow-specific service access.
+ * Applies the hard intake boundary and the app-scoped billing reads.
+ *
+ * @remarks
+ * Billing reads are stamped for every intake-only channel, not per workflow.
+ * The channel is not a reliable classifier of the ask (money asks land in the
+ * feedback form), and an Acquisity Asks post is bot-authored, so the session
+ * runs under a service principal where every user-scoped connection fails
+ * with `principal_required`. The app-key root tools are the only billing path
+ * in those threads, and they are read-only by construction, so widening the
+ * channel set widens no write surface.
  */
 export function stampSlackIntakeAuth(
-  auth: SessionAuthContext,
-  channelId: string
+  auth: SessionAuthContext
 ): SessionAuthContext {
-  const intake = stampIntakeOnly(clearBillingApiRead(auth));
-  const workflow = resolveSlackIntakeWorkflow(channelId);
-  return workflow === BILLING_TRIAGE_WORKFLOW ||
-    workflow === INTERCOM_INTAKE_WORKFLOW
-    ? stampBillingApiRead(intake)
-    : intake;
+  return stampBillingApiRead(stampIntakeOnly(auth));
 }
 
 export function slackIntakeContext(channelId: string): string {

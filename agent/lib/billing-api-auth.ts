@@ -1,7 +1,7 @@
 import { requireEnv } from "./constants.js";
 import { managedConnect } from "./managed-connect.js";
 
-/** Required app-scoped API-key credentials for billing and Intercom intake reads. */
+/** Required app-scoped API-key credentials for intake-only channel billing reads. */
 export const autumnApiAuth = managedConnect({
   connector: requireEnv(
     "AUTUMN_API_CONNECTOR",
@@ -10,7 +10,7 @@ export const autumnApiAuth = managedConnect({
   principalType: "app",
 });
 
-/** Required app-scoped restricted-key credentials for billing and Intercom intake reads. */
+/** Required app-scoped restricted-key credentials for intake-only channel billing reads. */
 export const stripeApiAuth = managedConnect({
   connector: requireEnv(
     "STRIPE_API_CONNECTOR",

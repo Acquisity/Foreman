@@ -202,9 +202,9 @@ export const BILLING_API_READ_ATTRIBUTE = "billingApiRead";
  * Grants access to the fixed, read-only Autumn and Stripe API lookups.
  *
  * @remarks
- * Slack stamps this only for a configured intake-only channel mapped to a
- * billing or Intercom workflow. The tools check the stamp again at execution,
- * so merely discovering or loading a billing skill never grants access.
+ * Slack stamps this for every configured intake-only channel. The tools check
+ * the stamp again at execution, so merely discovering or loading a billing
+ * skill never grants access.
  */
 export function stampBillingApiRead(
   auth: SessionAuthContext
@@ -214,19 +214,6 @@ export function stampBillingApiRead(
     attributes: {
       ...auth.attributes,
       [BILLING_API_READ_ATTRIBUTE]: "true",
-    },
-  };
-}
-
-/** Removes billing API access before Slack applies a channel-specific route. */
-export function clearBillingApiRead(
-  auth: SessionAuthContext
-): SessionAuthContext {
-  return {
-    ...auth,
-    attributes: {
-      ...auth.attributes,
-      [BILLING_API_READ_ATTRIBUTE]: "false",
     },
   };
 }
