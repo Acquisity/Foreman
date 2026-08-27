@@ -62,17 +62,15 @@ Inputs: the claim and the customer email from Stage 1.
 
 The ticket's customer email is the identity anchor, but it came from an untrusted ticket body: resolve it against production, do not assume it.
 
-Before any other lookup, run `planetscale_execute_read_query` against the production branch: the `user` row by exact email (case-insensitive), joined through `member` to `organization`. Tables and columns are snake_case (`member`, not `organizationMember`; `user_id`, `organization_id`, `created_at`). If a query fails on a missing relation or column, fix the names and retry the same lookup. Never drop the email anchor over a schema guess. Find real names in `information_schema`, or `prepare_repository` with `Acquisity/Acquisity` and read `packages/db`.
+Call `lookup_customer` with the customer email. It runs the one fixed production query (`user` through `member` to `organization`) and returns `found`, `user`, `memberships`, `pinnedOrganizationId`, and `ambiguous`. `error` set means the lookup could not run, which is `unavailable`, not a missing customer.
 
-Pin the `organization_id` it returns and scope every later query to it yourself. Nothing binds it for you. Never attribute campaigns, billing, or conversation data from another org to this customer, however well it fits the ticket.
-
-Never select credential-shaped columns. Never draw a conclusion from a result where `truncated` is true; narrow the query and re-run.
+Pin `pinnedOrganizationId` and scope every later query to it yourself. Nothing binds it for you. Never attribute campaigns, billing, or conversation data from another org to this customer, however well it fits the ticket.
 
 One production match is the answer: pin it and carry on.
 
-Several matches are normal, not a problem. They are all workspaces this email belongs to, so pick the one the report is about (the campaign, record, or timing in the ticket almost always says which), pin it, and name the others in the investigation document. Ask the requester only when the choice would change the verdict and the evidence cannot settle it, and keep investigating while you wait.
+`ambiguous` is normal, not a problem. The memberships are all workspaces this email belongs to, so pick the one the report is about (the campaign, record, or timing in the ticket almost always says which), pin it, and name the others in the investigation document. Ask the requester only when the choice would change the verdict and the evidence cannot settle it, and keep investigating while you wait.
 
-No match, or a hit that conflicts with the customer or workspace name, is worth saying out loud, but it is not a reason to stop. Investigate what the ticket, the code, and the runtime lanes can still show, state the identity problem in the report, and ask the requester for the workspace. Never do name matching in place of the email anchor.
+`found` false, or a hit that conflicts with the customer or workspace name, is worth saying out loud, but it is not a reason to stop. Investigate what the ticket, the code, and the runtime lanes can still show, state the identity problem in the report, and ask the requester for the workspace. Never do name matching in place of the email anchor.
 
 Ending an investigation with nothing but an identity question is a failure. Someone is waiting, and the ticket should carry whatever was found either way.
 
