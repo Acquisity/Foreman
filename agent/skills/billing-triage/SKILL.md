@@ -57,7 +57,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 Billing flows in one direction. A subscription starts in the customer's workspace, lands in their Autumn account, and Autumn feeds it to Stripe for the actual charge. Read them in that order. Reading Stripe first tells you money moved without telling you what the customer thinks they bought.
 
-1. **PlanetScale**, first and always. `planetscale_execute_read_query`, scoped to the organization pinned by the identity gate. This is the workspace, which is what the customer actually sees, so it is where their account of events is grounded: org, billing account, plan state, credit balances, prior credits. This is the only database this skill reads.
+1. **PlanetScale**, first and always. Call `read_billing_account` with the `pinnedOrganizationId` from `lookup_customer`. It returns the organization with `partnerId`, the billing account with provider, subscription status and plan, and every wallet, plus the credit balance rows and the last 20 credit transactions and manual credits; a `truncated` flag names a history list that hit its cap. Read `partnerId` before anything else; a partner-governed organization follows the partner rule below. This is the workspace, which is what the customer actually sees, so it is where their account of events is grounded. Order and invoice rows beyond that still come from `planetscale_execute_read_query`, scoped to the same organization. This is the only database this skill reads.
 2. **Autumn**, second. In any configured intake-only channel, call the root tool `read_autumn_billing` with the customer or organization id verified in PlanetScale. It returns the customer's subscriptions, expanded plans and add-ons, and feature balances through a fixed read route. Elsewhere, use `autumn__getCustomer`, plus `autumn__getPlan` or `autumn__listPlans` when the catalog is needed. Both paths are read-only.
 3. **Stripe**, last. In any configured intake-only channel, call the root tool `read_stripe_billing`: use `customer` for bounded history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, that history is incomplete. Withhold the amount or refund verdict until an exact object id is identified and read. Elsewhere, use `stripe__stripe_api_read`, `stripe__stripe_api_search`, and `stripe__stripe_api_details`. Both paths are read-only, so no tool here can move money even if asked to.
 
@@ -100,7 +100,7 @@ This stays an explanation, never a fix. Billing triage proposes money decisions,
 
 ## Provider governance — Autumn vs Whop
 
-Check `organization.partner_id` before routing on the billing provider. Never route on `provider='whop'` alone: the partner field is the source of truth for which billing system owns the account.
+`read_billing_account` returns `organization.partnerId` and `billingAccount.provider`. Route on the partner, never on the provider alone: a non-null `partnerId` means a partner owns the account, whatever the provider says.
 
 ## Clarifying questions per type
 
