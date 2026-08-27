@@ -494,23 +494,29 @@ async function resolveLabelIds(
   ].filter(Boolean);
 }
 
-/** The assignee id: explicit name or email wins; otherwise the source issue's assignee, when it has one. */
+/**
+ * The assignee id: the source issue's assignee when `inheritAssigneeFrom` is
+ * given and that issue has one; otherwise `assignee` by name or email, which
+ * therefore acts as the fallback for an unassigned master.
+ */
 async function resolveAssigneeId(
   gql: Gql,
   input: RouteTicketInput
 ): Promise<string | undefined> {
-  if (input.assignee !== undefined) {
-    const { users } = await gql<{ users: { nodes: Named[] } }>(USERS_QUERY, {
-      name: input.assignee,
-    });
-    return exactlyOne("user", input.assignee, users.nodes);
-  }
   if (input.inheritAssigneeFrom !== undefined) {
     const { issue: source } = await gql<{ issue: RouteIssue }>(
       ROUTE_ISSUE_QUERY,
       { id: input.inheritAssigneeFrom }
     );
-    return source.assignee?.id;
+    if (source.assignee) {
+      return source.assignee.id;
+    }
+  }
+  if (input.assignee !== undefined) {
+    const { users } = await gql<{ users: { nodes: Named[] } }>(USERS_QUERY, {
+      name: input.assignee,
+    });
+    return exactlyOne("user", input.assignee, users.nodes);
   }
   return undefined;
 }
@@ -580,6 +586,16 @@ export async function routeTicket(
   });
 
   const update = await buildUpdate(gql, issue, input);
+  // Resolve the duplicate target before the first write, so a bad identifier
+  // fails the whole call rather than leaving a routed ticket with no relation.
+  const master =
+    input.duplicateOf === undefined
+      ? null
+      : (
+          await gql<{ issue: RouteIssue }>(ROUTE_ISSUE_QUERY, {
+            id: input.duplicateOf,
+          })
+        ).issue;
   if (Object.keys(update).length > 0) {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
       ISSUE_UPDATE,
@@ -596,22 +612,20 @@ export async function routeTicket(
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
 
-  if (input.duplicateOf !== undefined) {
+  if (master) {
     try {
-      const { issue: master } = await gql<{ issue: RouteIssue }>(
-        ROUTE_ISSUE_QUERY,
-        { id: input.duplicateOf }
-      );
-      await gql<{ issueRelationCreate: { success: boolean } }>(
-        RELATION_CREATE,
-        {
-          input: {
-            issueId: issue.id,
-            relatedIssueId: master.id,
-            type: "duplicate",
-          },
-        }
-      );
+      const { issueRelationCreate } = await gql<{
+        issueRelationCreate: { success: boolean };
+      }>(RELATION_CREATE, {
+        input: {
+          issueId: issue.id,
+          relatedIssueId: master.id,
+          type: "duplicate",
+        },
+      });
+      if (!issueRelationCreate.success) {
+        throw new Error("Linear did not confirm the relation.");
+      }
     } catch (error) {
       warnings.push(
         `Duplicate relation to ${input.duplicateOf} was not recorded: ${reason(error)}`
@@ -622,11 +636,16 @@ export async function routeTicket(
   for (const link of input.links ?? []) {
     try {
       // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
-      await gql<{ attachmentLinkURL: { success: boolean } }>(ATTACHMENT_LINK, {
+      const { attachmentLinkURL } = await gql<{
+        attachmentLinkURL: { success: boolean };
+      }>(ATTACHMENT_LINK, {
         issueId: issue.id,
         title: link.title,
         url: link.url,
       });
+      if (!attachmentLinkURL.success) {
+        throw new Error("Linear did not confirm the attachment.");
+      }
     } catch (error) {
       warnings.push(`Link ${link.url} was not attached: ${reason(error)}`);
     }

@@ -49,7 +49,7 @@ The Slack intake recency window exists so masters describe a current cluster of 
 If an eligible master already owns the cause:
 
 1. Read the master and the report with their current relations first. If the report is already parented to this master, that is done; do not append it again.
-2. Call `route_ticket` on this ticket with `parent` and `inheritAssigneeFrom` both set to the master, in one call, so the child never sits under a master owned by someone else. Where the master has no assignee, pass the area owner from the area-routing roster in `triage-investigate` Stage 6 as `assignee` and say in the document that the master was unassigned.
+2. Call `route_ticket` on this ticket with `parent` and `inheritAssigneeFrom` both set to the master and `assignee` set to the area owner from the area-routing roster in `triage-investigate` Stage 6, in one call, so the child never sits under a master owned by someone else. The tool inherits the master's assignee when it has one and uses the area owner only when it does not; say in the document when the master was unassigned.
 3. Comment the new evidence on the master in aggregate form, re-count the blast radius, update the master's section with the new figure and date, and re-weigh its priority. A second independent report is frequency evidence. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
 4. Apply the approved hotlane state: when the approved route is `HOTLANE`, call `route_ticket` on the master with `addLabels: ["fast-lane"]`; it keeps the master's other labels. Never lower the master's priority because of a workaround or one more report.
 

@@ -78,7 +78,7 @@ Docs: <https://docs.stripe.com/mcp>.
 
 `save_investigation_document` is a root tool, called bare: it owns the ticket's `Billing investigation` document, creating it once and rewriting it after, and refuses card or bank account numbers. Do not write that document through `save_document`.
 
-`route_ticket` is a root tool, called bare: the final routing write. It adds labels to the ticket's existing set (unknown names fail and list the valid ones), resolves state, project, and assignee by name, inherits an assignee from a master or parent, records a duplicate relation, attaches links, and reads the ticket back with the saved `projectId`. Use it for every routing write in these skills; `save_issue` stays for creating issues and for description edits. Its `labels` field replaces the whole set, which is why routing does not go through it.
+`route_ticket` is a root tool, called bare: the final routing write. It adds labels to the ticket's existing set (unknown names fail and list the valid ones), resolves state, project, and assignee by name, inherits an assignee from a master or parent, records a duplicate relation, attaches links, and reads the ticket back with the saved `projectId`. Use it for every routing write in these skills; `save_issue` stays for creating issues and for description edits. `save_issue`'s `labels` field replaces the whole set, which is why routing does not go through it.
 
 ## Repository (root tools, no prefix)
 

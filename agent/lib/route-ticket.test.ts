@@ -170,22 +170,25 @@ describe("routeTicket", () => {
     assert.match(result.warnings[0] ?? "", UNABLE_TO_FETCH);
   });
 
-  it("lets an explicit assignee beat an inherited one", async () => {
-    const linear = fakeLinear();
+  it("inherits an assigned master and falls back to assignee for an unassigned one", async () => {
+    const inherited = fakeLinear();
     await routeTicket(
       "t",
       { assignee: "Grace", inheritAssigneeFrom: "ENG-9", issue: "ENG-1" },
-      { fetch: linear.fetchStub }
+      { fetch: inherited.fetchStub }
     );
-    const [update] = linear.updates();
+    assert.deepEqual(inherited.updates()[0]?.variables.input, {
+      assigneeId: "u-ada",
+    });
+
+    const fallback = fakeLinear();
+    await routeTicket(
+      "t",
+      { assignee: "Grace", inheritAssigneeFrom: "ENG-1", issue: "ENG-1" },
+      { fetch: fallback.fetchStub }
+    );
+    const [update] = fallback.updates();
     assert.deepEqual(update?.variables.input, { assigneeId: "u-grace" });
-    assert.equal(
-      linear.calls.some(
-        (c) =>
-          c.query.startsWith("query RouteIssue") && c.variables.id === "ENG-9"
-      ),
-      false
-    );
   });
 
   it("rejects an unknown label before any write and lists the valid names", async () => {

@@ -316,7 +316,7 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 Do not route these to an area owner as engineering work. Nobody picks up a closed report, and an area owner reading their queue should not find one there. That is about routing, not about leaving the ticket ownerless.
 
-A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, plus the Stage 5 state, priority, and labels, so whoever owns the root cause owns the reports of it. Where that ticket has no assignee, fall back to the area-routing roster below and say in the document that the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Stage 5 state in the same pass, so it never sits open in anyone's queue.
+A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster below as the fallback, plus the Stage 5 state, priority, and labels, so whoever owns the root cause owns the reports of it. The tool inherits when that ticket has an assignee and uses the fallback when it does not; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket closes into its Stage 5 state in the same pass, so it never sits open in anyone's queue.
 
 ### When the root cause warrants action
 

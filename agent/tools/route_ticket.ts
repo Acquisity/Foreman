@@ -14,7 +14,7 @@ export default defineTool({
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
     "Names are resolved for you: state by name within the ticket's team, project by name, assignee by name or email. " +
-    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; an explicit assignee wins over an inherited one. " +
+    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; when that master has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
@@ -40,13 +40,19 @@ export default defineTool({
       .max(10)
       .optional()
       .describe("Label names to add; existing labels are kept."),
-    assignee: name.optional().describe("User name or email."),
+    assignee: name
+      .optional()
+      .describe(
+        "User name or email; with inheritAssigneeFrom, the fallback for an unassigned source."
+      ),
     duplicateOf: identifier
       .optional()
       .describe("Mark this ticket a duplicate of that issue."),
     inheritAssigneeFrom: identifier
       .optional()
-      .describe("Take the assignee from this issue (a master or parent)."),
+      .describe(
+        "Take the assignee from this issue (a master or parent) when it has one."
+      ),
     issue: identifier.describe("The ticket to route, such as ENG-123."),
     links: z
       .array(z.object({ title: name, url: z.string().url().max(2000) }))
