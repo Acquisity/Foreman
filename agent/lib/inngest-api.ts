@@ -266,6 +266,9 @@ async function getTrace(
     try {
       return await getJson(token, path, opts);
     } catch (withoutOutput) {
+      if (opts?.signal?.aborted) {
+        throw withoutOutput;
+      }
       throw new Error(
         `${withOutput instanceof Error ? withOutput.message : String(withOutput)} (and without output: ${withoutOutput instanceof Error ? withoutOutput.message : String(withoutOutput)})`,
         { cause: withoutOutput }
