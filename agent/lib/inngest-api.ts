@@ -110,10 +110,21 @@ async function getJson(
 ): Promise<unknown> {
   const fetchImpl = opts?.fetch ?? fetch;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const response = await fetchImpl(`${INNGEST_API_BASE}${path}`, {
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-    signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(`${INNGEST_API_BASE}${path}`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    });
+  } catch (error) {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
+    throw new Error(
+      `Inngest API ${path.split("?")[0]} failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
   if (!response.ok) {
     throw new Error(
       `Inngest API ${path.split("?")[0]} failed: HTTP ${response.status}.`
