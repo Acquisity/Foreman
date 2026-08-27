@@ -199,7 +199,7 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
   assert.ok(projectChoice > memorySearch);
   assert.ok(
     triageSkill.includes(
-      "Pass the evidence-backed project to the final `route_ticket` call"
+      "Pass the evidence-backed project to the ticket's one `route_ticket` call"
     )
   );
   assert.ok(

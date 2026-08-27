@@ -498,7 +498,7 @@ async function resolveLabelIds(
     throw new Error(
       `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${labels
         .map((label) => label.name)
-        .sort()
+        .sort((a, b) => a.localeCompare(b))
         .join(", ")}.`
     );
   }
