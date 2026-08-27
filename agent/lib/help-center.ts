@@ -45,10 +45,9 @@ export async function findHelpArticles(
 ): Promise<FindHelpArticleResult> {
   const baseUrl = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
   const fetchImpl = opts?.fetch ?? fetch;
-  const url = new URL("/api/search", baseUrl);
-  url.searchParams.set("query", query);
-
   try {
+    const url = new URL("/api/search", baseUrl);
+    url.searchParams.set("query", query);
     const response = await fetchImpl(url, {
       headers: { Accept: "application/json" },
       signal: opts?.signal

@@ -51,6 +51,15 @@ describe("find_help_article", () => {
     assert.match(result.error ?? "", HTTP_503);
   });
 
+  it("returns error for a malformed base url instead of throwing", async () => {
+    const result = await findHelpArticles("inbox", {
+      baseUrl: "not a url",
+      fetch: () => json([]),
+    });
+    assert.deepEqual(result.articles, []);
+    assert.ok(result.error);
+  });
+
   it("treats an empty hit list as a valid answer", async () => {
     const result = await findHelpArticles("zzz", {
       baseUrl: "https://example.test",
