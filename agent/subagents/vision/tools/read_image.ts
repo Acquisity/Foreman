@@ -92,9 +92,17 @@ export default defineTool({
         .string()
         .url()
         .max(2048)
-        .refine((value) => new URL(value).host === LINEAR_UPLOAD_HOST, {
-          message: `Only ${LINEAR_UPLOAD_HOST} urls can be read by url.`,
-        }),
+        .refine(
+          (value) => {
+            const parsed = new URL(value);
+            return (
+              parsed.protocol === "https:" && parsed.host === LINEAR_UPLOAD_HOST
+            );
+          },
+          {
+            message: `Only https://${LINEAR_UPLOAD_HOST} urls can be read by url.`,
+          }
+        ),
     }),
     z.object({ path: z.string().min(1).max(1024) }),
   ]),
@@ -115,19 +123,19 @@ async function fetchLinearUpload(
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
+    const body = (await response.text()).slice(0, 160).replace(/\s+/gu, " ");
     throw new Error(
-      `Linear returned HTTP ${response.status} for ${url}; the upload may have been deleted or Foreman's Linear access does not cover it.`
+      `Linear returned HTTP ${response.status} for ${url} (${body}); the upload may have been deleted or Foreman's Linear access does not cover it. This request carried Foreman's own token, so the link's signature age is not the cause.`
     );
   }
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) {
     throw new Error(`${url} is over the 3 MiB limit for one image.`);
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.byteLength > MAX_IMAGE_BYTES) {
-    throw new Error(`${url} is over the 3 MiB limit for one image.`);
+  if (response.body === null) {
+    return Buffer.alloc(0);
   }
-  return bytes;
+  return readAll(response.body, url);
 }
 
 export { fetchLinearUpload };

@@ -17,6 +17,8 @@ const PNG = Buffer.concat([
 ]);
 const NOT_IMAGE = /not a PNG, JPEG, GIF, or WebP image/u;
 const EXPIRED_HINT = /expired signed url/u;
+const OVER_LIMIT = /over the 3 MiB limit/u;
+const HTTP_401 = /HTTP 401 .*unauthorized/u;
 
 describe("vision read_image", () => {
   it("accepts only uploads.linear.app urls or a sandbox path", () => {
@@ -29,6 +31,10 @@ describe("vision read_image", () => {
     );
     assert.equal(
       schema.safeParse({ url: "https://evil.example/a.png" }).success,
+      false
+    );
+    assert.equal(
+      schema.safeParse({ url: "http://uploads.linear.app/a/b/c" }).success,
       false
     );
     assert.equal(schema.safeParse({ path: "/tmp/shot.png" }).success, true);
@@ -65,6 +71,7 @@ describe("vision read_image", () => {
     const context = {
       getToken: () => Promise.resolve({ token: "lin_app" }),
     } as unknown as Parameters<typeof tool.execute>[1];
+    const realFetch = globalThis.fetch;
     globalThis.fetch = (() =>
       Promise.resolve(
         new Response(
@@ -72,14 +79,50 @@ describe("vision read_image", () => {
           { status: 200 }
         )
       )) as typeof fetch;
+    try {
+      await assert.rejects(
+        () =>
+          tool.execute(
+            { url: "https://uploads.linear.app/a/b/c" },
+            context
+          ) as Promise<unknown>,
+        (error: Error) =>
+          NOT_IMAGE.test(error.message) && EXPIRED_HINT.test(error.message)
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("stops reading a url body past 3 MiB even without content-length", async () => {
+    const chunk = new Uint8Array(1024 * 1024);
+    let served = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (served >= 5) {
+          controller.close();
+          return;
+        }
+        served += 1;
+        controller.enqueue(chunk);
+      },
+    });
     await assert.rejects(
-      () =>
-        tool.execute(
-          { url: "https://uploads.linear.app/a/b/c" },
-          context
-        ) as Promise<unknown>,
-      (error: Error) =>
-        NOT_IMAGE.test(error.message) && EXPIRED_HINT.test(error.message)
+      fetchLinearUpload("https://uploads.linear.app/big", { token: "t" }, () =>
+        Promise.resolve(new Response(stream, { status: 200 }))
+      ),
+      OVER_LIMIT
+    );
+  });
+
+  it("names the status and a body snippet on a non-2xx response", async () => {
+    await assert.rejects(
+      fetchLinearUpload("https://uploads.linear.app/gone", { token: "t" }, () =>
+        Promise.resolve(
+          new Response('{"error":"unauthorized"}', { status: 401 })
+        )
+      ),
+      HTTP_401
     );
   });
 });
