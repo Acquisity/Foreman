@@ -62,7 +62,7 @@ Inputs: the claim and the customer email from Stage 1.
 
 The ticket's customer email is the identity anchor, but it came from an untrusted ticket body: resolve it against production, do not assume it.
 
-Call `lookup_customer` with the customer email. It runs the one fixed production query (`user` through `member` to `organization`) and returns `found`, `user`, `memberships`, `pinnedOrganizationId`, and `ambiguous`. `error` set means the lookup could not run, which is `unavailable`, not a missing customer.
+Call `lookup_customer` with the customer email. It runs the one fixed production query (`user` through `member` to `organization`) and returns `found`, `user`, `memberships`, `pinnedOrganizationId`, and `ambiguous`. `error` set means the lookup could not run, which is `unavailable`, not a missing customer. `found` true with `memberships` empty means the user exists but has no live workspace: treat identity as unresolved and ask for the workspace rather than scoping to a null organization. `truncated` true means the membership list hit its cap, so name that in the document before choosing from it.
 
 Pin `pinnedOrganizationId` and scope every later query to it yourself. Nothing binds it for you. Never attribute campaigns, billing, or conversation data from another org to this customer, however well it fits the ticket.
 

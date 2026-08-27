@@ -4,6 +4,7 @@ import {
   buildLookupCustomerQuery,
   customerEmailSchema,
   lookupCustomer,
+  MEMBERSHIP_LIMIT,
 } from "./lookup-customer.js";
 
 const row = (organizationId: string | null, role = "owner") => ({
@@ -76,5 +77,22 @@ describe("lookup_customer", () => {
     );
     assert.equal(failed.found, false);
     assert.equal(failed.error, "HTTP 500");
+
+    const drifted = await lookupCustomer("ada@example.com", () =>
+      Promise.resolve(JSON.stringify([{ nope: 1 }]))
+    );
+    assert.equal(drifted.found, false);
+    assert.ok(drifted.error);
+  });
+
+  it("flags a membership list that hit the cap", async () => {
+    const rows = Array.from({ length: MEMBERSHIP_LIMIT }, (_, i) =>
+      row(`org${i}`)
+    );
+    const result = await lookupCustomer("ada@example.com", () =>
+      Promise.resolve(JSON.stringify(rows))
+    );
+    assert.equal(result.truncated, true);
+    assert.equal(result.ambiguous, true);
   });
 });

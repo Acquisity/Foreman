@@ -5,6 +5,9 @@ import { parseReadQueryResult } from "./planetscale.js";
  * Fixed PlanetScale coordinates for the production database. The identity
  * lookup never lets the model pick a branch or database.
  */
+/** Membership rows fetched per lookup; `truncated` reports when the cap was hit. */
+export const MEMBERSHIP_LIMIT = 200;
+
 export const PRODUCTION_READ_QUERY_ARGS = {
   branch: "main",
   database: "acquisity",
@@ -41,7 +44,7 @@ export function buildLookupCustomerQuery(email: string): string {
     "left join organization o on o.id = m.organization_id",
     `where lower(u.email) = '${literal}'`,
     "order by o.created_at",
-    "limit 50",
+    `limit ${MEMBERSHIP_LIMIT}`,
   ].join("\n");
 }
 
@@ -71,6 +74,8 @@ export const lookupCustomerResultSchema = z.object({
   found: z.boolean(),
   memberships: z.array(membershipSchema),
   pinnedOrganizationId: z.string().nullable(),
+  /** The membership cap was hit, so the list may be incomplete. */
+  truncated: z.boolean(),
   user: z
     .object({
       createdAt: z.string().nullable(),
@@ -88,6 +93,7 @@ const EMPTY: LookupCustomerResult = {
   found: false,
   memberships: [],
   pinnedOrganizationId: null,
+  truncated: false,
   user: null,
 };
 
@@ -103,11 +109,12 @@ export async function lookupCustomer(
   email: string,
   run: (query: string) => Promise<string>
 ): Promise<LookupCustomerResult> {
-  let rows: unknown[];
+  let parsed: z.infer<typeof rowSchema>[];
   try {
-    ({ rows } = parseReadQueryResult(
+    const { rows } = parseReadQueryResult(
       await run(buildLookupCustomerQuery(email))
-    ));
+    );
+    parsed = rows.map((row) => rowSchema.parse(row));
   } catch (error) {
     return {
       ...EMPTY,
@@ -115,7 +122,6 @@ export async function lookupCustomer(
     };
   }
 
-  const parsed = rows.map((row) => rowSchema.parse(row));
   const [first] = parsed;
   if (!first) {
     return EMPTY;
@@ -143,6 +149,7 @@ export async function lookupCustomer(
       memberships.length === 1
         ? (memberships[0]?.organizationId ?? null)
         : null,
+    truncated: parsed.length >= MEMBERSHIP_LIMIT,
     user: {
       createdAt: first.user_created_at ?? null,
       email: first.email,
