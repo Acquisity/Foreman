@@ -18,8 +18,9 @@ const hitSchema = z.looseObject({
 export const helpArticleSchema = z.object({
   /**
    * Likely repository path of the article source in `Acquisity/Acquisity`,
-   * derived from the public url; the search does not expose the real file, so
-   * a section page lives at `<path without .mdx>/index.mdx` instead.
+   * derived from the search hit id (which mirrors the public url path); the
+   * search does not expose the real file, so a section page lives at
+   * `<path without .mdx>/index.mdx` instead.
    */
   path: z.string(),
   title: z.string(),
