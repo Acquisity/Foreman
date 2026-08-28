@@ -163,6 +163,25 @@ describe("find_function_runs", () => {
     assert.ok(urls.at(-1)?.includes("/runs/new/trace"));
   });
 
+  it("does not turn a 404 into no runs once the caller has cancelled", async () => {
+    const controller = new AbortController();
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      if (u.includes("/apps?")) {
+        return json({ data: [{ id: "app-a" }], page: { hasMore: false } });
+      }
+      controller.abort();
+      return json({ message: "not found" }, 404);
+    };
+    await assert.rejects(
+      findFunctionRuns(
+        "t",
+        { functionId: FN, sinceHours: 24, status: "Failed" },
+        { fetch: fetchStub, now: NOW, signal: controller.signal }
+      )
+    );
+  });
+
   it("orders numeric queuedAt values as timestamps, not strings", async () => {
     const fetchStub: typeof fetch = (url) => {
       const u = String(url);

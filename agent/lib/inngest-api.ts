@@ -205,7 +205,11 @@ async function runsInApp(
   try {
     body = await getJson(token, path, opts);
   } catch (error) {
-    if (error instanceof Error && error.message.endsWith("HTTP 404.")) {
+    if (
+      !opts?.signal?.aborted &&
+      error instanceof Error &&
+      error.message.endsWith("HTTP 404.")
+    ) {
       return null;
     }
     throw error;

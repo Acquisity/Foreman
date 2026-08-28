@@ -55,10 +55,9 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
         return json({ data: { issue: null } });
       }
       const master = body.variables.id === "ENG-9";
-      // A read of ENG-1 after the update is the read-back.
+      // A read of ENG-1 after any write is the read-back.
       const readBack =
-        !master &&
-        calls.some((c) => c.query.startsWith("mutation RouteIssueUpdate"));
+        !master && calls.some((c) => c.query.startsWith("mutation Route"));
       if (readBack && readBackFails) {
         return json({ errors: [{ message: "Linear is busy" }] });
       }
@@ -212,6 +211,21 @@ describe("routeTicket", () => {
       NOTHING_WRITTEN
     );
     assert.equal(linear.updates().length, 0);
+  });
+
+  it("stays routed with a warning when a links-only call lands and the read-back fails", async () => {
+    const linear = fakeLinear({ readBackFails: true });
+    const result = await routeTicket(
+      "t",
+      {
+        issue: "ENG-1",
+        links: [{ title: "Intercom", url: "https://app.intercom.com/c/1" }],
+      },
+      { fetch: linear.fetchStub }
+    );
+    assert.equal(linear.updates().length, 0);
+    assert.equal(result.warnings.length, 1);
+    assert.match(result.warnings[0] ?? "", READ_BACK_FAILED);
   });
 
   it("stays routed with a warning when the read-back after the update fails", async () => {
