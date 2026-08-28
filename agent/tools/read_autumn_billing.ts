@@ -6,7 +6,7 @@ import { canUseBillingApiRead } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Read one existing Autumn billing customer. The Autumn customer id is billingAccount.id from read_billing_account, never pinnedOrganizationId: Acquisity keys Autumn customers by billing account. The result's stripe_id is the cus_ id read_stripe_billing needs. Available in any configured intake-only channel. This never creates a customer or changes billing. When available is false, record Autumn as unverified rather than treating it as empty; a 404 reason means the id was wrong, so re-resolve it, unless billingAccount.provider is whop, which has no Autumn customer.",
+    "Read one existing Autumn billing customer. The Autumn customer id is billingAccount.id from read_billing_account, never pinnedOrganizationId: Acquisity keys Autumn customers by billing account. The result's stripe_id is the cus_ id read_stripe_billing needs. Available in any configured intake-only channel. This never creates a customer or changes billing. When available is false, record Autumn as unverified rather than treating it as empty; a 404 reason means the id was wrong, so re-resolve it, unless organization.partnerId is set: a partner-governed account has no customer in Acquisity's own Autumn.",
   async execute({ customerId }, ctx) {
     if (!canUseBillingApiRead(ctx.session.auth.current)) {
       return {
