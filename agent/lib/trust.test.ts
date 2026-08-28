@@ -4,6 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import {
   AUTONOMOUS_PRINCIPAL,
   isUnattended,
+  stampUnattended,
   UNATTENDED_ATTRIBUTE,
 } from "./trust.js";
 
@@ -32,11 +33,22 @@ test("isUnattended", async (t) => {
   });
 
   await t.test("is true for a stamped user principal", () => {
-    assert.equal(
-      isUnattended(auth({ attributes: { [UNATTENDED_ATTRIBUTE]: "true" } })),
-      true
-    );
+    assert.equal(isUnattended(stampUnattended(auth())), true);
   });
+
+  await t.test(
+    "the stamp preserves the principal and existing attributes",
+    () => {
+      const original = auth({ attributes: { existing: "value" } });
+      assert.deepEqual(stampUnattended(original), {
+        ...original,
+        attributes: {
+          existing: "value",
+          [UNATTENDED_ATTRIBUTE]: "true",
+        },
+      });
+    }
+  );
 
   await t.test("is false with no auth", () => {
     assert.equal(isUnattended(null), false);
