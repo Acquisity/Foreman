@@ -123,11 +123,20 @@ export interface FindRelatedIssuesInput {
   windowed: boolean;
 }
 
+/**
+ * Every word of the phrase must appear in the title or description; the
+ * whole phrase as one substring never matched the multi-word phrasings the
+ * skills ask for (seen on ENG-13091: "growth plan creator empty sections"
+ * missed a master carrying every one of those words).
+ */
+const WORDS = /\s+/u;
 const phraseFilter = (phrase: string) => ({
-  or: [
-    { title: { containsIgnoreCase: phrase } },
-    { description: { containsIgnoreCase: phrase } },
-  ],
+  and: phrase.split(WORDS).map((word) => ({
+    or: [
+      { title: { containsIgnoreCase: word } },
+      { description: { containsIgnoreCase: word } },
+    ],
+  })),
 });
 
 const toRelatedIssue = (node: IssueNode, phrase: string): RelatedIssue => ({

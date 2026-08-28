@@ -104,6 +104,40 @@ describe("findRelatedIssues", () => {
     assert.equal(result.createdAfter, null);
   });
 
+  it("requires every word of a phrase, each in title or description", async () => {
+    let filter: Record<string, unknown> | undefined;
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as {
+        variables: { filter: Record<string, unknown> };
+      };
+      ({ filter } = body.variables);
+      return json({
+        data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+      });
+    };
+    await findRelatedIssues(
+      "t",
+      { phrases: ["empty  sections"], scope: "duplicates", windowed: false },
+      { fetch: fetchStub }
+    );
+    assert.deepEqual(filter, {
+      and: [
+        {
+          or: [
+            { title: { containsIgnoreCase: "empty" } },
+            { description: { containsIgnoreCase: "empty" } },
+          ],
+        },
+        {
+          or: [
+            { title: { containsIgnoreCase: "sections" } },
+            { description: { containsIgnoreCase: "sections" } },
+          ],
+        },
+      ],
+    });
+  });
+
   it("runs a repeated phrase once", async () => {
     let calls = 0;
     const result = await findRelatedIssues(
