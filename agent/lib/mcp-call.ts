@@ -124,7 +124,9 @@ export async function callMcpTool(
   // Server text reaches the model through the tool's error field, so it is
   // bounded, redacted, and never carries the bearer back even if echoed.
   const scrub = (text: string): string =>
-    redact(text.split(options.token).join("[redacted]")).slice(0, DETAIL_CHARS);
+    redact(
+      options.token ? text.split(options.token).join("[redacted]") : text
+    ).slice(0, DETAIL_CHARS);
   const fetchImpl = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const signal = () => {
