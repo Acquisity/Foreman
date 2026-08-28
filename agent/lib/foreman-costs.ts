@@ -122,7 +122,7 @@ const readBoundedText = async (response: Response): Promise<string> => {
     }
     totalBytes += value.byteLength;
     if (totalBytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
+      await reader.cancel().catch(() => undefined);
       throw tooMuchData();
     }
     chunks.push(value);
