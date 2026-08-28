@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { z } from "zod";
 import {
   BillingApiError,
   readAutumnCustomer,
@@ -8,6 +9,7 @@ import {
   readStripeDispute,
   readStripePromotionCode,
   readStripeRefund,
+  stripeLookupSchema,
 } from "./billing-api.js";
 
 const json = (body: unknown, status = 200): Promise<Response> =>
@@ -96,6 +98,36 @@ describe("Autumn billing API 404", () => {
     await assert.rejects(
       readAutumnCustomer("secret-key", "org_123", { fetch: fetchStub }),
       AUTUMN_WRONG_ID
+    );
+  });
+});
+
+describe("Stripe lookup input", () => {
+  it("is a flat object whose lookup names its own id field", () => {
+    const schema = z.toJSONSchema(stripeLookupSchema) as { type?: string };
+    assert.equal(schema.type, "object");
+    assert.equal(
+      stripeLookupSchema.safeParse({
+        customerId: "cus_V3MWzkrYbpcag8",
+        lookup: "customer",
+      }).success,
+      true
+    );
+    assert.equal(
+      stripeLookupSchema.safeParse({ lookup: "customer" }).success,
+      false
+    );
+    assert.equal(
+      stripeLookupSchema.safeParse({
+        customerId: "4c05eed7",
+        lookup: "customer",
+      }).success,
+      false
+    );
+    assert.equal(
+      stripeLookupSchema.safeParse({ code: "SAVE20", lookup: "promotion_code" })
+        .success,
+      true
     );
   });
 });

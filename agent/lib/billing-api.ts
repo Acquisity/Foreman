@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 const AUTUMN_API_URL = "https://api.useautumn.com/v1";
 const STRIPE_API_URL = "https://api.stripe.com/v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -251,6 +253,62 @@ const safeStripeGet = async (
     };
   }
 };
+
+const stripeIdentifier = z.string().trim().min(1).max(128);
+const STRIPE_LOOKUP_ID = {
+  charge: ["chargeId", /^ch_[A-Za-z0-9]+$/u],
+  coupon: ["couponId", null],
+  customer: ["customerId", /^cus_[A-Za-z0-9]+$/u],
+  dispute: ["disputeId", /^du_[A-Za-z0-9]+$/u],
+  promotion_code: ["code", null],
+  refund: ["refundId", /^re_[A-Za-z0-9]+$/u],
+} as const;
+
+/**
+ * One flat object, not a discriminated union: a top-level `oneOf` reaches the
+ * model provider without `type: "object"`, and the call then arrives with no
+ * `lookup` at all. Each lookup names the one id field it needs.
+ */
+export const stripeLookupSchema = z
+  .object({
+    chargeId: stripeIdentifier.optional(),
+    code: stripeIdentifier.optional(),
+    couponId: stripeIdentifier.optional(),
+    customerId: stripeIdentifier.optional(),
+    disputeId: stripeIdentifier.optional(),
+    lookup: z
+      .enum([
+        "customer",
+        "promotion_code",
+        "coupon",
+        "charge",
+        "refund",
+        "dispute",
+      ])
+      .describe(
+        "customer needs customerId (cus_...); charge needs chargeId (ch_...); refund needs refundId (re_...); dispute needs disputeId (du_...); promotion_code needs code; coupon needs couponId."
+      ),
+    refundId: stripeIdentifier.optional(),
+  })
+  .superRefine((input, ctx) => {
+    const [field, pattern] = STRIPE_LOOKUP_ID[input.lookup];
+    const value = input[field];
+    if (value === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: `${input.lookup} lookup needs ${field}.`,
+        path: [field],
+      });
+    } else if (pattern && !pattern.test(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `${field} is not a Stripe ${input.lookup} id.`,
+        path: [field],
+      });
+    }
+  });
+
+export type StripeLookupInput = z.infer<typeof stripeLookupSchema>;
 
 /** Reads the bounded Stripe history needed for one known customer. */
 export async function readStripeCustomerBilling(
