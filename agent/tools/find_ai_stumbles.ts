@@ -71,7 +71,7 @@ export default defineTool({
       .max(200)
       .optional()
       .describe(
-        "Case-insensitive text matched against the stumble's title, subtitle, and description, such as 'meeting time' or 'wrong company name'."
+        "One short phrase matched as a case-insensitive substring of the stumble's title, subtitle, and description, such as 'meeting time' or 'company name'. Not a keyword list: 'meeting time reject' matches only that exact run of words, so search one phrase at a time and vary it."
       ),
     sinceHours: z.number().int().min(1).max(720).optional(),
   }),
