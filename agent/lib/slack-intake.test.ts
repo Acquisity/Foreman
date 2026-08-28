@@ -75,12 +75,16 @@ describe("intake-only channels", () => {
     ]);
   });
 
-  it("grants billing API reads to every intake channel, not per workflow", () => {
+  it("billing API reads run on every surface except an untrusted GitHub session", () => {
     const intake = stampSlackIntakeAuth(auth);
     assert.equal(isIntakeOnly(intake), true);
     assert.equal(canUseBillingApiRead(intake), true);
-    assert.equal(canUseBillingApiRead(auth), false);
-    assert.equal(canUseBillingApiRead(stampIntakeOnly(auth)), false);
+    assert.equal(canUseBillingApiRead(auth), true);
+    assert.equal(canUseBillingApiRead(stampIntakeOnly(auth)), true);
+    assert.equal(canUseBillingApiRead(null), true);
+    const github = { ...auth, principalId: "github:12345" };
+    assert.equal(canUseBillingApiRead(github), false);
+    assert.equal(canUseBillingApiRead(stampTrusted(github)), true);
   });
 
   it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {

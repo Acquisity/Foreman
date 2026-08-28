@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   billingAccountQueries,
+  DEFAULT_PARTNER_ID,
   HISTORY_LIMIT,
   organizationIdSchema,
   readBillingAccount,
@@ -54,6 +55,7 @@ describe("read_billing_account", () => {
     assert.ok(queries.every((query) => query.includes(`'${ORG}'`)));
     assert.equal(result.found, true);
     assert.equal(result.organization?.partnerId, null);
+    assert.equal(result.organization?.partnerGoverned, false);
     assert.deepEqual(result.billingAccount?.inboxes, {
       balance: 9,
       lifetimeGranted: null,
@@ -65,6 +67,26 @@ describe("read_billing_account", () => {
       manualCredits: false,
       transactions: false,
     });
+  });
+
+  it("treats the default partner as native and any other partner as governing", async () => {
+    const withPartner = (partner_id: string | null) =>
+      readBillingAccount(ORG, (query) =>
+        Promise.resolve(
+          query.includes("from organization")
+            ? JSON.stringify([{ ...orgRow, partner_id }])
+            : "[]"
+        )
+      );
+    assert.equal(
+      (await withPartner(DEFAULT_PARTNER_ID)).organization?.partnerGoverned,
+      false
+    );
+    assert.equal(
+      (await withPartner("7d0f2b7e-1a5c-4b7e-9c1d-2f3a4b5c6d7e")).organization
+        ?.partnerGoverned,
+      true
+    );
   });
 
   it("flags only the history list that hit its cap", async () => {

@@ -50,15 +50,15 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 
 ## Billing and Instantly (root tools)
 
-`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They keep their root authorization: available on attended intake-only triage surfaces. `available: false` is an evidence gap, not a reason to retry.
+`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They run on every surface. `available: false` is an evidence gap, not a reason to retry.
 
 ## Fixed evidence reads (root tools)
 
 The same fixed reads Foreman used to produce the evidence, all bare, so a claim is re-checked the way it was made rather than through a hand-written query or filter:
 
-- `lookup_customer`: customer email to the user, live memberships, and `pinnedOrganizationId`; `ambiguous` means several workspaces, `error` means the lookup could not run.
+- `lookup_customer`: customer email to the user, live memberships, and `pinnedOrganizationId`; `ambiguous` means several workspaces, `error` means the lookup could not run. The pin scopes PlanetScale only: Autumn is keyed by `billingAccount.id` from `read_billing_account`, and Stripe by that record's `stripe_id`. An Autumn 404 in a report under review is a wrong id, not an outage, unless `organization.partnerGoverned` is true: a partner-governed account has no customer in Acquisity's own Autumn.
 - `describe_table`: a production table's columns from `information_schema`; call it before writing any `planetscale_execute_read_query` against a table you have not seen.
-- `read_billing_account`: the organization with `partnerId`, the billing account, wallets, credit balances, and recent credit history; `unavailable` names a list that could not be read.
+- `read_billing_account`: the organization with `partnerId` and `partnerGoverned` (the default partner id `00000000-0000-0000-0000-000000000001` is native, not a partner), the billing account, wallets, credit balances, and recent credit history; `unavailable` names a list that could not be read.
 - `find_related_issues`: `scope: "duplicates"` across every team including closed and archived, or `scope: "masters"` on the Engineering Team; hits carry the phrases that matched.
 - `find_help_article`: help-center articles for feature words, with the likely repository path of each article under `apps/web/content/docs` to read from the pinned checkout (derived from the url; a section page is `<path without .mdx>/index.mdx`).
 - `find_function_runs`: an Inngest function's newest runs with the given status and the newest run's trace steps; `traceError` means the runs were listed but the trace could not be read. Omit the function id to see matching runs across every function.
