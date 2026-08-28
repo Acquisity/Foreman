@@ -202,11 +202,11 @@ The full block carries its three ideas under those bold headings: the symptom an
 
 ### Brief block: a customer report under a root cause
 
-A bug with a `parentId` is one more customer hitting an issue whose root cause already lives on the master ticket. Read the master with `linear__get_issue` on the `parentId` for its title and `url`, and count the reports hanging off that master with `linear__list_issues` filtered to `parentId` set to the master, so the note can say how many reports there are in total. Then write:
+A bug with a `parentId` is one more customer hitting an issue whose root cause already lives on the master ticket. Read the master with `linear__get_issue` on the `parentId` for its title and `url`, and count the reports hanging off that master with `linear__list_issues` filtered to `parentId` set to the master, so the note can say how many reports there are in total.
+
+Choose exactly one title line. When this is the message's first block, use `<the dispatch mentions> - **New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)`. When a fresh-bug block precedes this one, use `**New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)` without the mentions. Then continue:
 
 ```text
-<the dispatch mentions> - **New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)
-
 <brief plain description of this customer's situation>
 
 This is the same wider issue where <master summary>.
