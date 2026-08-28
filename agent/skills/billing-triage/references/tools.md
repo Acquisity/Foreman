@@ -16,7 +16,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the user-scoped MCP tools are the fallback when a root tool answers `available: false`.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the user-scoped MCP tools are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
 
 ## PlanetScale (`planetscale__`)
 
