@@ -195,36 +195,20 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[INTAKE_ONLY_ATTRIBUTE] === "true";
 }
 
-/** Auth attribute granting the app-scoped billing API read tools. */
-export const BILLING_API_READ_ATTRIBUTE = "billingApiRead";
-
 /**
- * Grants access to the fixed, read-only Autumn and Stripe API lookups.
- *
- * @remarks
- * Slack stamps this for every configured intake-only channel. The tools check
- * the stamp again at execution, so merely discovering or loading a billing
- * skill never grants access.
+ * Whether this session may use the fixed, read-only Autumn and Stripe API
+ * lookups. Every surface may: terminal, Slack (DMs, channels, intake
+ * channels), Linear Agent Sessions, schedules, and factory runs are all
+ * investigations. The one exception is a GitHub session that is neither a
+ * trusted collaborator's nor the factory's, because there outside text on a
+ * public pull request would be steering an app-scoped billing key.
  */
-export function stampBillingApiRead(
-  auth: SessionAuthContext
-): SessionAuthContext {
-  return {
-    ...auth,
-    attributes: {
-      ...auth.attributes,
-      [BILLING_API_READ_ATTRIBUTE]: "true",
-    },
-  };
-}
-
-/** Whether this attended session may use app-scoped billing API reads. */
 export function canUseBillingApiRead(auth: SessionAuthContext | null): boolean {
   return (
-    auth !== null &&
-    auth.attributes[BILLING_API_READ_ATTRIBUTE] === "true" &&
-    isIntakeOnly(auth) &&
-    !isUnattended(auth)
+    auth === null ||
+    isTrusted(auth) ||
+    isAutonomous(auth) ||
+    !auth.principalId.startsWith("github:")
   );
 }
 

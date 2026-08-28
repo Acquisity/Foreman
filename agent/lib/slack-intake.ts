@@ -1,5 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import { stampBillingApiRead, stampIntakeOnly } from "./trust.js";
+import { stampIntakeOnly } from "./trust.js";
 
 // Slack channel IDs: an uppercase letter class then base-32-ish characters.
 // Anything else in the env list is a typo (a channel name, a quoted value),
@@ -92,7 +92,7 @@ export function resolveSlackIntakeWorkflow(
 export function stampSlackIntakeAuth(
   auth: SessionAuthContext
 ): SessionAuthContext {
-  return stampBillingApiRead(stampIntakeOnly(auth));
+  return stampIntakeOnly(auth);
 }
 
 export function slackIntakeContext(channelId: string): string {
