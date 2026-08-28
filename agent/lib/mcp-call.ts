@@ -9,6 +9,8 @@
  * the returned value or in errors.
  */
 
+import { redact } from "./investigation-memory/case.js";
+
 const JSON_RPC_VERSION = "2.0";
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 const DEFAULT_TIMEOUT_MS = 50_000;
@@ -119,6 +121,10 @@ export async function callMcpTool(
   options: CallMcpToolOptions
 ): Promise<string> {
   const { args, label, tool, url } = options;
+  // Server text reaches the model through the tool's error field, so it is
+  // bounded, redacted, and never carries the bearer back even if echoed.
+  const scrub = (text: string): string =>
+    redact(text.split(options.token).join("[redacted]")).slice(0, DETAIL_CHARS);
   const fetchImpl = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const signal = () => {
@@ -146,7 +152,7 @@ export async function callMcpTool(
       signal: signal(),
     });
     if (!response.ok) {
-      const detail = (await response.text()).slice(0, DETAIL_CHARS);
+      const detail = scrub(await response.text());
       throw new McpHttpError(
         response.status,
         `${label} ${step} failed: HTTP ${response.status}. ${detail}`
@@ -175,7 +181,7 @@ export async function callMcpTool(
   );
   if (initializeMessage.error !== undefined) {
     throw new Error(
-      `${label} initialize error: ${JSON.stringify(initializeMessage.error)}.`
+      `${label} initialize error: ${scrub(JSON.stringify(initializeMessage.error))}.`
     );
   }
 
@@ -202,14 +208,14 @@ export async function callMcpTool(
   const callMessage = extractMessage(await callResponse.text(), label);
   if (callMessage.error !== undefined) {
     throw new Error(
-      `${label} tools/call error: ${JSON.stringify(callMessage.error)}.`
+      `${label} tools/call error: ${scrub(JSON.stringify(callMessage.error))}.`
     );
   }
 
   const { result } = callMessage;
   if (result?.isError === true) {
     throw new Error(
-      `${label} ${tool} failed: ${joinContentText(result.content) || "unknown error"}.`
+      `${label} ${tool} failed: ${scrub(joinContentText(result.content)) || "unknown error"}.`
     );
   }
   return joinContentText(result?.content);

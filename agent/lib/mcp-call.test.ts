@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { callMcpTool } from "./mcp-call.js";
+import { callMcpTool, McpHttpError } from "./mcp-call.js";
+
+const REDACTED = /\[redacted\]/u;
 
 const jsonResponse = (body: unknown, headers?: Record<string, string>) =>
   Promise.resolve(
@@ -55,5 +57,43 @@ describe("callMcpTool", () => {
       )
     );
     assert.equal(text, "hello");
+  });
+
+  it("never echoes the bearer token or an inline secret in an error", async () => {
+    const token = "sk-live-sentinel-0123456789abcdef";
+    const echo = `unauthorized: got Bearer ${token} for api_key=${token}`;
+    await assert.rejects(
+      call(
+        stub(() => Promise.resolve(new Response(echo, { status: 401 }))),
+        token
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof McpHttpError);
+        assert.equal(error.status, 401);
+        assert.ok(!error.message.includes(token), "token stripped");
+        assert.match(error.message, REDACTED);
+        return true;
+      }
+    );
+    await assert.rejects(
+      call(
+        stub(() =>
+          jsonResponse({
+            id: 2,
+            jsonrpc: "2.0",
+            result: {
+              content: [{ text: `bad request for ${token}`, type: "text" }],
+              isError: true,
+            },
+          })
+        ),
+        token
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.ok(!error.message.includes(token), "token stripped");
+        return true;
+      }
+    );
   });
 });
