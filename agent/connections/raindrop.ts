@@ -1,6 +1,5 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { requireEnv } from "../lib/constants.js";
-import { managedConnect } from "../lib/managed-connect.js";
+import { raindropAuth } from "../lib/raindrop-api-auth.js";
 
 /**
  * Raindrop MCP connection for AI-product observability evidence.
@@ -19,13 +18,7 @@ import { managedConnect } from "../lib/managed-connect.js";
  * flag reads, and `ask_agent_question`, which starts a paid investigation.
  */
 export default defineMcpClientConnection({
-  auth: managedConnect({
-    connector: requireEnv(
-      "RAINDROP_MCP_CONNECTOR",
-      "api.raindrop.ai/acquisity-foreman-raindrop"
-    ),
-    principalType: "app",
-  }),
+  auth: raindropAuth,
   description:
     "Raindrop AI observability, read-only: LLM events, traces, conversations, stumbles, signals, and issues.",
   tools: {
