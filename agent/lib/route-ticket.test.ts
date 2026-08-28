@@ -29,6 +29,7 @@ interface Call {
 /** A Linear stand-in: ENG-1 (Bug label, unassigned) and master ENG-9 (assigned to Ada). */
 const READ_BACK_FAILED = /could not be read back/u;
 const BEFORE_ROUTING = /before routing/u;
+const LINEAR_BUSY = /Linear is busy/u;
 
 const labelsFor = (master: boolean, readBack: boolean) => {
   if (master) {
@@ -209,6 +210,27 @@ describe("routeTicket", () => {
     assert.equal(result.warnings.length, 1);
     assert.match(result.warnings[0] ?? "", READ_BACK_FAILED);
     assert.match(result.warnings[0] ?? "", BEFORE_ROUTING);
+  });
+
+  it("rethrows caller cancellation during the read-back instead of reporting routed", async () => {
+    const linear = fakeLinear({ readBackFails: true });
+    const controller = new AbortController();
+    const fetchStub: typeof fetch = (url, init) => {
+      const body = JSON.parse(String(init?.body)) as Call;
+      if (body.query.startsWith("mutation RouteIssueUpdate")) {
+        controller.abort();
+      }
+      return linear.fetchStub(url, init);
+    };
+    await assert.rejects(
+      routeTicket(
+        "t",
+        { issue: "ENG-1", priority: 3 },
+        { fetch: fetchStub, signal: controller.signal }
+      ),
+      LINEAR_BUSY
+    );
+    assert.equal(linear.updates().length, 1);
   });
 
   it("inherits an assigned master and falls back to assignee for an unassigned one", async () => {

@@ -643,6 +643,13 @@ export async function routeTicket(
   const warnings: string[] = [];
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
+  // Caller cancellation is never a warning; the tool rethrows it.
+  const warn = (error: unknown, message: string) => {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
+    warnings.push(`${message}: ${reason(error)}`);
+  };
 
   if (master) {
     try {
@@ -659,8 +666,9 @@ export async function routeTicket(
         throw new Error("Linear did not confirm the relation.");
       }
     } catch (error) {
-      warnings.push(
-        `Duplicate relation to ${input.duplicateOf} was not recorded: ${reason(error)}`
+      warn(
+        error,
+        `Duplicate relation to ${input.duplicateOf} was not recorded`
       );
     }
   }
@@ -679,7 +687,7 @@ export async function routeTicket(
         throw new Error("Linear did not confirm the attachment.");
       }
     } catch (error) {
-      warnings.push(`Link ${link.url} was not attached: ${reason(error)}`);
+      warn(error, `Link ${link.url} was not attached`);
     }
   }
 
@@ -689,8 +697,9 @@ export async function routeTicket(
   try {
     return toResult(await requireIssue(gql, input.issue), warnings);
   } catch (error) {
-    warnings.push(
-      `The ticket was updated but could not be read back (${reason(error)}); the fields below are from before routing.`
+    warn(
+      error,
+      "The ticket was updated but could not be read back, so the fields below are from before routing"
     );
     return toResult(issue, warnings);
   }
