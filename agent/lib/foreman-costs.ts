@@ -105,6 +105,7 @@ export const readVercelCharges = async (
 const readBoundedText = async (response: Response): Promise<string> => {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
     throw tooMuchData();
   }
   if (response.body === null) {
