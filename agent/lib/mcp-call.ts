@@ -185,9 +185,14 @@ export async function callMcpTool(
     );
   }
 
+  // Subsequent requests carry the version the server chose in initialize.
+  const negotiated = initializeMessage.result?.protocolVersion;
   const sessionHeaders = {
     ...baseHeaders,
-    "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+    "MCP-Protocol-Version":
+      typeof negotiated === "string" && negotiated !== ""
+        ? negotiated
+        : MCP_PROTOCOL_VERSION,
     ...(sessionId ? { "mcp-session-id": sessionId } : {}),
   };
 

@@ -96,4 +96,30 @@ describe("callMcpTool", () => {
       }
     );
   });
+
+  it("sends the negotiated protocol version after initialize", async () => {
+    const versions: string[] = [];
+    const fetchStub: typeof fetch = (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { method: string };
+      const headers = init?.headers as Record<string, string | undefined>;
+      if (body.method === "initialize") {
+        return jsonResponse({
+          id: 1,
+          jsonrpc: "2.0",
+          result: { protocolVersion: "2025-03-26" },
+        });
+      }
+      versions.push(headers["MCP-Protocol-Version"] ?? "");
+      if (body.method === "notifications/initialized") {
+        return Promise.resolve(new Response(null, { status: 202 }));
+      }
+      return jsonResponse({
+        id: 2,
+        jsonrpc: "2.0",
+        result: { content: [{ text: "ok", type: "text" }] },
+      });
+    };
+    assert.equal(await call(fetchStub), "ok");
+    assert.deepEqual(versions, ["2025-03-26", "2025-03-26"]);
+  });
 });
