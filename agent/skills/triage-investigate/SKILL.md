@@ -143,7 +143,7 @@ Memory can suggest a duplicate candidate. It cannot mark one. Duplicates are sti
 
 ### Read the help center
 
-Call `find_help_article` with the feature and the action the customer took. The result carries each article's repository path under `apps/web/content/docs`: run `prepare_repository` with `Acquisity/Acquisity` and `read_file` that path before quoting anything, since the search returns titles, not bodies. Then quote the article that states the expected setup or behavior in the evidence record, compare it with the customer's actual state, and treat a contradiction as a User Error candidate with the article link as the unblock. Read code after that, to confirm what the article says or to explain what it does not cover.
+Call `find_help_article` with the feature and the action the customer took. The result carries each article's likely repository path under `apps/web/content/docs`: run `prepare_repository` with `Acquisity/Acquisity` and `read_file` that path before quoting anything, since the search returns titles, not bodies. The path is derived from the public url, so a section page lives at `<path without .mdx>/index.mdx` instead; when `read_file` misses, read that, and if it misses too, `glob` the slug under `apps/web/content/docs`. Then quote the article that states the expected setup or behavior in the evidence record, compare it with the customer's actual state, and treat a contradiction as a User Error candidate with the article link as the unblock. Read code after that, to confirm what the article says or to explain what it does not cover.
 
 ### Locate it in the code
 
