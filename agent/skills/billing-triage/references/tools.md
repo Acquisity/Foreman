@@ -42,11 +42,11 @@ The tools use an app-scoped IBG credential, require no requester OAuth, and expo
 
 ## Autumn (`autumn__`)
 
-In any configured intake-only channel, use the root tool `read_autumn_billing` instead. Pass only the existing customer or organization id already verified in PlanetScale. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
+In any configured intake-only channel, use the root tool `read_autumn_billing` instead. Pass `billingAccount.id` from `read_billing_account`: Acquisity keys Autumn customers by billing account id, and the organization id answers `customer_not_found`. A 404 reason is a wrong id, never an outage or an empty account; re-resolve before recording anything. The record's `stripe_id` is the `cus_` id Stripe needs. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
 
 The `autumn__` connection below is for attended users who have personally connected Autumn.
 
-`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
+`getCustomer`, keyed by the same billing account id, for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
 
 Also allowlisted: `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
 
@@ -60,7 +60,7 @@ Line items for domains and inboxes are both named generically. The identifier is
 
 ## Stripe (`stripe__`)
 
-In any configured intake-only channel, use the root tool `read_stripe_billing` instead. Its `customer` lookup reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
+In any configured intake-only channel, use the root tool `read_stripe_billing` instead. Its `customer` lookup takes the `cus_` id from the Autumn record's `stripe_id` and reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
 
 The `stripe__` connection below is for attended users who have personally connected Stripe.
 

@@ -193,7 +193,18 @@ export const readAutumnCustomer = (
     },
     options.fetch ?? fetch,
     new Set(["name"])
-  );
+  ).catch((error: unknown) => {
+    // Acquisity keys Autumn customers by billing_account.id. A 404 here is a
+    // wrong id, not a missing account or an outage; say so before the model
+    // writes "unavailable".
+    if (error instanceof BillingApiError && error.status === 404) {
+      throw new Error(
+        `Autumn has no customer with id ${customerId} (HTTP 404). Autumn keys customers by billingAccount.id from read_billing_account, never the organization id. Re-check the id before recording Autumn as unavailable, empty, or unverified.`,
+        { cause: error }
+      );
+    }
+    throw error;
+  });
 
 const stripeGet = (
   token: string,

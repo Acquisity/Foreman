@@ -56,7 +56,7 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` t
 
 The same fixed reads Foreman used to produce the evidence, all bare, so a claim is re-checked the way it was made rather than through a hand-written query or filter:
 
-- `lookup_customer`: customer email to the user, live memberships, and `pinnedOrganizationId`; `ambiguous` means several workspaces, `error` means the lookup could not run.
+- `lookup_customer`: customer email to the user, live memberships, and `pinnedOrganizationId`; `ambiguous` means several workspaces, `error` means the lookup could not run. The pin scopes PlanetScale only: Autumn is keyed by `billingAccount.id` from `read_billing_account`, and Stripe by that record's `stripe_id`. An Autumn 404 in a report under review is a wrong id, not an outage.
 - `describe_table`: a production table's columns from `information_schema`; call it before writing any `planetscale_execute_read_query` against a table you have not seen.
 - `read_billing_account`: the organization with `partnerId`, the billing account, wallets, credit balances, and recent credit history; `unavailable` names a list that could not be read.
 - `find_related_issues`: `scope: "duplicates"` across every team including closed and archived, or `scope: "masters"` on the Engineering Team; hits carry the phrases that matched.

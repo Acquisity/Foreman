@@ -20,6 +20,8 @@ const json = (body: unknown, status = 200): Promise<Response> =>
 
 const AUTUMN_TOO_MUCH_DATA = /Autumn returned too much data/u;
 const STRIPE_TOO_MUCH_DATA = /Stripe returned too much data/u;
+const AUTUMN_WRONG_ID =
+  /Autumn has no customer with id org_123 .*billingAccount\.id/u;
 
 describe("Autumn billing API", () => {
   it("uses the fixed read endpoint and expands billing evidence", async () => {
@@ -78,6 +80,22 @@ describe("Autumn billing API", () => {
         assert.equal(error.message.includes("secret provider detail"), false);
         return true;
       }
+    );
+  });
+});
+
+describe("Autumn billing API 404", () => {
+  it("names a wrong customer id instead of an unavailable provider", async () => {
+    const fetchStub: typeof fetch = () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ code: "customer_not_found" }), {
+          status: 404,
+        })
+      );
+
+    await assert.rejects(
+      readAutumnCustomer("secret-key", "org_123", { fetch: fetchStub }),
+      AUTUMN_WRONG_ID
     );
   });
 });
