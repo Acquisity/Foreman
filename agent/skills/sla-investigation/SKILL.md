@@ -24,7 +24,7 @@ Some in-scope bugs carry a `parentId`. That ticket is a customer report already 
 
 A bug with no `parentId` is a fresh bug. Give it the full investigation and a full block. A bug with a `parentId` is a customer report of its parent master. Do not run the full investigation and do not give it a full block; report it as a brief note, exactly as the Report format section shows.
 
-To write the note, `linear__get_issue` on the `parentId` so you hold the master's title and `url`. The note links both tickets and says in one line what this customer hit. The root cause lives on the master, so the note does not restate or re-verify it.
+To write the note, `linear__get_issue` on the `parentId` for the master's title and `url`, and count the reports hanging off that master. The note links both tickets and says briefly what this customer hit. The root cause lives on the master, so the note does not restate or re-verify it.
 
 ## Feature to project mapping
 
@@ -171,44 +171,59 @@ Never fill a gap with a guess dressed as a finding, and never launder a ticket's
 
 ## Report format
 
-Post one message covering every in-scope bug for this feature. Bottom line, natural language, plain terms a non-engineer can read, no em dashes.
+Post one message covering every in-scope bug for this feature. Bottom line, natural language, plain terms a non-engineer can read. Write in short paragraphs under bold headings; a wall of text is harder to scan.
 
-Tag the dispatch's mentions in the header line only. Inside a bug's block, tag its assignee. Bold is allowed only on the numbered title line, which is what makes the message scannable; nowhere else.
+Two block shapes, keyed on `parentId`. A fresh bug (no `parentId`, or the master ticket itself) gets the full block below. A customer report already attached to a master (`parentId` set) gets the brief block below, never the full one and never the full investigation.
 
-The session delivers one message to the channel, so do not plan on separate posts.
+The header names the fresh bugs and tags the dispatch's mentions. Customer reports are additional blocks after the fresh bugs; when a feature has no fresh bug, the message opens with the customer-report blocks and no bug count.
 
-Two block kinds. A fresh bug (no `parentId`) gets the full block below. A customer report of an open master (`parentId` set) gets the brief block below, never the full one and never the full investigation.
+Bold marks the headings, the title line, and the link labels, which is what makes the message scannable. The session delivers one message to the channel, so do not plan on separate posts.
 
-The header count is fresh bugs only. A customer report of a master is not a new bug and is not counted as one. When any are present, add ", plus <count> new report(s) of existing issues" to the header. When a feature has only those reports and no fresh bug, open with "<mentions> <count> new report(s) of existing issue(s) in <feature>" and list only the brief blocks.
+### Full block: a root-cause bug
 
 ```text
-<the mentions the dispatch gave you> <count> new SLA bug(s) in <feature><, plus <count> new report(s) of existing issues>
+<the mentions the dispatch gave you> — <count> new SLA bug(s) in <feature>
 
-*1. <short title, plain language>* (<@assignee>)
-<one line saying what the bug is, grounded in the ticket and the code>
-Impact: <what the user hits and how it blocks them, quantified with the number below>
-Root cause: <one sentence, from code you read this run, or "not identified yet">
-Affected: <the number, what it counts, the window, and the tool that produced it in parentheses>
-Ticket: <the ticket's own url field|ENG-XXXX>
+**<short title, plain language>** (<@assignee>)
 
-*2. <another fresh bug>* (<@assignee>)
-...
+**What happened**
+<1 to 3 sentences, plain language: the symptom and how it blocks the user>
 
-*3. <short one-line note naming this customer report>* (<@assignee>)
-<one line saying what this customer hit, in the ticket's own words>
-Open issue: <the master's url field|ENG-XXXX> <master title>
-Ticket: <the ticket's own url field|ENG-XXXX>
+**Technical details**
+<what the code or job does wrong, the root cause, and what will not fix it>
+
+**Scale and next step**
+<measured blast-radius figure, plus what engineering and support need to do>
+
+**Ticket:** [ENG-XXXX — short title](<the ticket's url field>)
 ```
 
-`Affected:` is the measurement, so it names a figure and where the figure came from: `212 workspaces with at least one misattributed event (PlanetScale)`, `487 users in the last 7 days (Sentry)`, `1,340 sessions on the People page under 900px tall in 30 days (PostHog)`. A reader has to be able to tell how hard the number is without asking.
+The full block carries its three ideas under those bold headings: the symptom and impact under **What happened**, the root cause under **Technical details**, and the blast-radius figure plus next steps under **Scale and next step**. Always carry the measured figure and name its source, as in `16 campaigns across 14 organisations (PlanetScale)`. A reader has to be able to tell how hard the number is without asking.
 
-`Impact:` uses that figure rather than a vague quantifier. "1,340 sessions a month land on a People page they cannot scroll" lands; "anyone on a small screen" does not, and it is what this report used to say when nothing had been measured.
+### Brief block: a customer report under a root cause
+
+A bug with a `parentId` is one more customer hitting an issue whose root cause already lives on the master ticket. Read the master with `linear__get_issue` on the `parentId` for its title and `url`, and count the reports hanging off that master with `linear__list_issues` filtered to `parentId` set to the master, so the note can say how many reports there are in total. Then write:
+
+```text
+**New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)
+
+<brief plain description of this customer's situation>
+
+This is the same wider issue where <master summary>.
+
+<one line on what is needed for this customer>
+
+**Main issue:** [ENG-XXXX — title](<the master's url field>)
+**New customer report:** [ENG-XXXX — title](<the ticket's url field>)
+```
+
+The count in the title is the total number of reports under that master, including this one. The note's description comes from the report ticket only; do not reinvestigate or restate the master.
 
 When a tool genuinely refuses, write `could not determine` and name the blocker in the same breath, as in `could not determine, the affected event is not recorded in PostHog`. That is an honest gap a reader can act on. A vague scope sentence in place of a number is not, so do not write one.
 
-`Affected:` and `Impact:` are for fresh bugs. A brief note has neither. Its `Open issue:` line is a real Slack link pasted the same way as `Ticket:`: the master's `url` field on the left of the pipe, its `ENG-XXXX` identifier on the right, then its title, so the reader sees the root-cause issue at a glance. The note's title and sentence come from the report ticket only; do not reinvestigate or restate the master.
+The `Ticket:`, `Main issue:`, and `New customer report:` lines are real links: paste the ticket's `url` field verbatim and label it `ENG-XXXX — short title`, so the message shows a readable label that clicks through. Never hand-build a URL from the identifier, and never write a bare `ENG-XXXX`.
 
-Blank line between blocks. The `Ticket:` line is a real Slack link: paste the ticket's `url` field verbatim on the left of the pipe and its `ENG-XXXX` identifier on the right, so the message shows `ENG-XXXX` and clicks through. Never hand-build that URL from the identifier, and never write a bare `ENG-XXXX`.
+Blank line between blocks.
 
 ## When there are no bugs
 
