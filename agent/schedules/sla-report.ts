@@ -111,7 +111,7 @@ export default defineSchedule({
     for (const { feature, channelId, tag } of FEATURE_CHANNELS) {
       try {
         const dispatch = to(slack, { channelId }).send(
-          `Daily SLA check for ${feature}. Load the sla-investigation skill and follow it end to end. Find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. Run the skill's required investigation on every one of them, including opening the repository, before you write anything. The repository for any code lookup is Acquisity/Acquisity. Post one report in the skill's format, tagging ${tag} in the header line and each bug's assignee in its own block. Delivery is conditional: if there are no in-scope bugs, reply with exactly <eve-empty-delivery/> and no other text, so nothing at all is posted. Do not explain that you found none.`,
+          `Daily SLA check for ${feature}. Load the sla-investigation skill and follow it end to end. Find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. Run the skill's required investigation on every fresh bug, including opening the repository, before you write anything. A bug already attached to a master ticket is a customer report, not a fresh bug, so the skill reports it as a brief note instead. The repository for any code lookup is Acquisity/Acquisity. Post one report in the skill's format, tagging ${tag} in the header line and each bug's assignee in its own block. Delivery is conditional: if there are no in-scope bugs, reply with exactly <eve-empty-delivery/> and no other text, so nothing at all is posted. Do not explain that you found none.`,
           { auth: authFor(channelId) }
         );
         waitUntil(

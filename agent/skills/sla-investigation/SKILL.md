@@ -74,7 +74,7 @@ An assignee missing from this table, or a ticket with no assignee, gets `unassig
 
 ## Tools: what each is for and how to use it
 
-Reach for the smallest tool that answers a given question. That is about not over-querying: it never excuses skipping the required investigation below, which every bug gets.
+Reach for the smallest tool that answers a given question. That is about not over-querying: it never excuses skipping the required investigation below, which every fresh bug gets.
 
 ### How to call any of these
 
