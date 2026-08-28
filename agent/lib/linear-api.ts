@@ -628,7 +628,10 @@ export async function routeTicket(
     input.duplicateOf === undefined
       ? null
       : await requireIssue(gql, input.duplicateOf);
-  if (Object.keys(update).length > 0) {
+  // A relation-only or links-only call has no issueUpdate; then the relation
+  // and links are the write, and a routed result needs at least one to land.
+  let wrote = Object.keys(update).length > 0;
+  if (wrote) {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
       ISSUE_UPDATE,
       { id: issue.id, input: update }
@@ -665,6 +668,7 @@ export async function routeTicket(
       if (!issueRelationCreate.success) {
         throw new Error("Linear did not confirm the relation.");
       }
+      wrote = true;
     } catch (error) {
       warn(
         error,
@@ -686,9 +690,14 @@ export async function routeTicket(
       if (!attachmentLinkURL.success) {
         throw new Error("Linear did not confirm the attachment.");
       }
+      wrote = true;
     } catch (error) {
       warn(error, `Link ${link.url} was not attached`);
     }
+  }
+
+  if (!wrote && warnings.length > 0) {
+    throw new Error(`Nothing was written. ${warnings.join(" ")}`);
   }
 
   // The read-back is after the write too: when it fails, the ticket is still

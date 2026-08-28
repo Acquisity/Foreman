@@ -30,6 +30,7 @@ interface Call {
 const READ_BACK_FAILED = /could not be read back/u;
 const BEFORE_ROUTING = /before routing/u;
 const LINEAR_BUSY = /Linear is busy/u;
+const NOTHING_WRITTEN = /Nothing was written/u;
 
 const labelsFor = (master: boolean, readBack: boolean) => {
   if (master) {
@@ -195,6 +196,22 @@ describe("routeTicket", () => {
     assert.equal(linear.updates().length, 1);
     assert.equal(result.warnings.length, 1);
     assert.match(result.warnings[0] ?? "", UNABLE_TO_FETCH);
+  });
+
+  it("fails a links-only call when the one link it was asked to write is not attached", async () => {
+    const linear = fakeLinear();
+    await assert.rejects(
+      routeTicket(
+        "t",
+        {
+          issue: "ENG-1",
+          links: [{ title: "Broken", url: "https://broken.example/1" }],
+        },
+        { fetch: linear.fetchStub }
+      ),
+      NOTHING_WRITTEN
+    );
+    assert.equal(linear.updates().length, 0);
   });
 
   it("stays routed with a warning when the read-back after the update fails", async () => {

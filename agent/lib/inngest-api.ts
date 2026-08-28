@@ -266,9 +266,11 @@ async function listRuns(
   }
   // Newest first across apps, so the traced "newest" run is not just the
   // first app's newest.
-  data.sort((a, b) =>
-    String(b.queuedAt ?? "").localeCompare(String(a.queuedAt ?? ""))
-  );
+  const queuedMs = (row: Record<string, unknown>) => {
+    const value = row.queuedAt;
+    return typeof value === "number" ? value : Date.parse(String(value ?? ""));
+  };
+  data.sort((a, b) => (queuedMs(b) || 0) - (queuedMs(a) || 0));
   return {
     data: data.slice(0, RUN_LIMIT),
     page: { hasMore: hasMore || data.length > RUN_LIMIT },
