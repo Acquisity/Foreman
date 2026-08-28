@@ -60,7 +60,7 @@ The same fixed reads Foreman used to produce the evidence, all bare, so a claim 
 - `describe_table`: a production table's columns from `information_schema`; call it before writing any `planetscale_execute_read_query` against a table you have not seen.
 - `read_billing_account`: the organization with `partnerId`, the billing account, wallets, credit balances, and recent credit history; `unavailable` names a list that could not be read.
 - `find_related_issues`: `scope: "duplicates"` across every team including closed and archived, or `scope: "masters"` on the Engineering Team; hits carry the phrases that matched.
-- `find_help_article`: help-center articles for feature words, with the repository path of each article under `apps/web/content/docs` to read from the pinned checkout.
+- `find_help_article`: help-center articles for feature words, with the likely repository path of each article under `apps/web/content/docs` to read from the pinned checkout (derived from the url; a section page is `<path without .mdx>/index.mdx`).
 - `find_function_runs`: an Inngest function's newest runs with the given status and the newest run's trace steps; `traceError` means the runs were listed but the trace could not be read. Omit the function id to see matching runs across every function.
 
 ## Screenshots (root tool)

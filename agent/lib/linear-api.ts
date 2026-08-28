@@ -353,12 +353,16 @@ async function readBack(
 
 /* ----------------------------- route_ticket ----------------------------- */
 
+/** Read before the update and again after it; both reads share one shape. */
 const ROUTE_ISSUE_QUERY = `query RouteIssue($id: String!) {
   issue(id: $id) {
-    id identifier
+    id identifier url priority
     team { id }
+    state { name }
     labels { nodes { id name } }
+    project { id name }
     assignee { id name }
+    parent { identifier }
   }
 }`;
 
@@ -403,17 +407,6 @@ const RELATION_CREATE = `mutation RouteRelation($input: IssueRelationCreateInput
 
 const ATTACHMENT_LINK = `mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {
   attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
-}`;
-
-const ROUTE_READ_BACK = `query RouteReadBack($id: String!) {
-  issue(id: $id) {
-    identifier url priority
-    state { name }
-    labels { nodes { name } }
-    project { id name }
-    assignee { name }
-    parent { identifier }
-  }
 }`;
 
 interface Named {
@@ -479,8 +472,29 @@ interface RouteIssue {
   id: string;
   identifier: string;
   labels: { nodes: Named[] };
+  parent: { identifier: string } | null;
+  priority: number;
+  project: Named | null;
+  state: { name: string };
   team: { id: string };
+  url: string;
 }
+
+const toResult = (
+  issue: RouteIssue,
+  warnings: string[]
+): RouteTicketResult => ({
+  assignee: issue.assignee?.name ?? null,
+  identifier: issue.identifier,
+  labels: issue.labels.nodes.map((label) => label.name),
+  parentIdentifier: issue.parent?.identifier ?? null,
+  priority: issue.priority,
+  projectId: issue.project?.id ?? null,
+  projectName: issue.project?.name ?? null,
+  state: issue.state.name,
+  url: issue.url,
+  warnings,
+});
 
 /** Unions the labels to add with the ticket's current labels; unknown names throw before any write. */
 async function resolveLabelIds(
@@ -594,7 +608,8 @@ async function buildUpdate(
  * otherwise, runs one
  * `issueUpdate`, then the optional duplicate relation and link attachments,
  * and reads the ticket back. Unknown label names fail before any write and
- * list the team's labels.
+ * list the team's labels. Once the update lands the result is always routed;
+ * a failed relation, link, or read-back becomes a warning.
  */
 export async function routeTicket(
   token: string,
@@ -613,7 +628,10 @@ export async function routeTicket(
     input.duplicateOf === undefined
       ? null
       : await requireIssue(gql, input.duplicateOf);
-  if (Object.keys(update).length > 0) {
+  // A relation-only or links-only call has no issueUpdate; then the relation
+  // and links are the write, and a routed result needs at least one to land.
+  let wrote = Object.keys(update).length > 0;
+  if (wrote) {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
       ISSUE_UPDATE,
       { id: issue.id, input: update }
@@ -628,6 +646,13 @@ export async function routeTicket(
   const warnings: string[] = [];
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
+  // Caller cancellation is never a warning; the tool rethrows it.
+  const warn = (error: unknown, message: string) => {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
+    warnings.push(`${message}: ${reason(error)}`);
+  };
 
   if (master) {
     try {
@@ -643,9 +668,11 @@ export async function routeTicket(
       if (!issueRelationCreate.success) {
         throw new Error("Linear did not confirm the relation.");
       }
+      wrote = true;
     } catch (error) {
-      warnings.push(
-        `Duplicate relation to ${input.duplicateOf} was not recorded: ${reason(error)}`
+      warn(
+        error,
+        `Duplicate relation to ${input.duplicateOf} was not recorded`
       );
     }
   }
@@ -663,34 +690,26 @@ export async function routeTicket(
       if (!attachmentLinkURL.success) {
         throw new Error("Linear did not confirm the attachment.");
       }
+      wrote = true;
     } catch (error) {
-      warnings.push(`Link ${link.url} was not attached: ${reason(error)}`);
+      warn(error, `Link ${link.url} was not attached`);
     }
   }
 
-  const { issue: saved } = await gql<{
-    issue: {
-      assignee: Named | null;
-      identifier: string;
-      labels: { nodes: Named[] };
-      parent: { identifier: string } | null;
-      priority: number;
-      project: Named | null;
-      state: { name: string };
-      url: string;
-    };
-  }>(ROUTE_READ_BACK, { id: issue.id });
+  if (!wrote && warnings.length > 0) {
+    throw new Error(`Nothing was written. ${warnings.join(" ")}`);
+  }
 
-  return {
-    assignee: saved.assignee?.name ?? null,
-    identifier: saved.identifier,
-    labels: saved.labels.nodes.map((label) => label.name),
-    parentIdentifier: saved.parent?.identifier ?? null,
-    priority: saved.priority,
-    projectId: saved.project?.id ?? null,
-    projectName: saved.project?.name ?? null,
-    state: saved.state.name,
-    url: saved.url,
-    warnings,
-  };
+  // The read-back is after the write too: when it fails, the ticket is still
+  // routed, so report the pre-routing fields with a warning rather than a
+  // failure that would send the caller back to route it again.
+  try {
+    return toResult(await requireIssue(gql, input.issue), warnings);
+  } catch (error) {
+    warn(
+      error,
+      "The ticket was updated but could not be read back, so the fields below are from before routing"
+    );
+    return toResult(issue, warnings);
+  }
 }

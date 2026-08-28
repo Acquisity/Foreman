@@ -26,7 +26,7 @@ Use the built-in `connection_search` to discover what a connection actually expo
 
 ## Help center (root tool, no prefix)
 
-`find_help_article` is one GET against the web app's public `/api/search` route over the 442 help-center articles. No token, every surface. It returns titles, public urls, and repository paths; page hits only, five at most, and `error` means the search could not run.
+`find_help_article` is one GET against the web app's public `/api/search` route over the 442 help-center articles. No token, every surface. It returns titles, public urls, and likely repository paths (derived from the url; a section page is `<path without .mdx>/index.mdx`); page hits only, five at most, and `error` means the search could not run.
 
 ## Investigation memory (root tools, no prefix)
 

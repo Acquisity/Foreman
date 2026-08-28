@@ -121,6 +121,112 @@ describe("find_function_runs", () => {
     );
   });
 
+  it("traces the newest run across apps, not the first app's newest", async () => {
+    const urls: string[] = [];
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes("/apps?")) {
+        return json({
+          data: [{ id: "app-a" }, { id: "app-b" }],
+          page: { hasMore: false },
+        });
+      }
+      if (u.includes("/apps/app-a/functions/")) {
+        return json({
+          data: [
+            { ...run("old", "evt-old"), queuedAt: "2026-08-27T10:00:00Z" },
+          ],
+          page: { hasMore: false },
+        });
+      }
+      if (u.includes("/apps/app-b/functions/")) {
+        return json({
+          data: [
+            { ...run("new", "evt-new"), queuedAt: "2026-08-27T12:00:00Z" },
+          ],
+          page: { hasMore: false },
+        });
+      }
+      return json(trace);
+    };
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: FN, sinceHours: 24, status: "Failed" },
+      { fetch: fetchStub, now: NOW }
+    );
+    assert.deepEqual(
+      result.runs.map((r) => r.runId),
+      ["new", "old"]
+    );
+    assert.equal(result.latestTrace?.runId, "new");
+    assert.ok(urls.at(-1)?.includes("/runs/new/trace"));
+  });
+
+  it("does not turn a 404 into no runs once the caller has cancelled", async () => {
+    const controller = new AbortController();
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      if (u.includes("/apps?")) {
+        return json({ data: [{ id: "app-a" }], page: { hasMore: false } });
+      }
+      controller.abort();
+      return json({ message: "not found" }, 404);
+    };
+    await assert.rejects(
+      findFunctionRuns(
+        "t",
+        { functionId: FN, sinceHours: 24, status: "Failed" },
+        { fetch: fetchStub, now: NOW, signal: controller.signal }
+      )
+    );
+  });
+
+  it("orders numeric queuedAt values as timestamps, not strings", async () => {
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      if (u.includes("/apps?")) {
+        return json({ data: [{ id: "app-a" }], page: { hasMore: false } });
+      }
+      if (u.includes("/functions/")) {
+        return json({
+          data: [
+            { ...run("nine", "e9"), queuedAt: 9 },
+            { ...run("ten", "e10"), queuedAt: 10 },
+          ],
+          page: { hasMore: false },
+        });
+      }
+      return json(trace);
+    };
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: FN, sinceHours: 24, status: "Failed" },
+      { fetch: fetchStub, now: NOW }
+    );
+    assert.deepEqual(
+      result.runs.map((r) => r.runId),
+      ["ten", "nine"]
+    );
+    assert.equal(result.latestTrace?.runId, "ten");
+  });
+
+  it("treats a 200 answer with no data list for an unknown function as no runs", async () => {
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      if (u.includes("/apps?")) {
+        return json({ data: [{ id: "ai-clients" }], page: { hasMore: false } });
+      }
+      return json({ error: "function not found" });
+    };
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: "no.such.function", sinceHours: 24, status: "Failed" },
+      { fetch: fetchStub, now: NOW }
+    );
+    assert.deepEqual(result, { latestTrace: null, runs: [], truncated: false });
+  });
+
   it("lists across every function without an id, and returns latestTrace null without a second request when nothing ran", async () => {
     const urls: string[] = [];
     const result = await findFunctionRuns(
