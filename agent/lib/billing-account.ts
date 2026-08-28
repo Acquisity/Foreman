@@ -118,7 +118,10 @@ export const billingAccountResultSchema = z.object({
       createdAt: z.string().nullable(),
       id: z.string(),
       name: z.string().nullable(),
-      /** True when a partner other than Acquisity's default governs billing; route on this, not on provider. */
+      /**
+       * True when a partner other than Acquisity's default governs billing;
+       * route on this, not on provider.
+       */
       partnerGoverned: z.boolean(),
       partnerId: z.string().nullable(),
     })
