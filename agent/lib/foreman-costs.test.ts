@@ -167,6 +167,20 @@ describe("rendered report", () => {
     );
   });
 
+  it("withholds the total comparison when one source has no history", () => {
+    const text = renderCostReport({
+      credits: { balance: 50, totalUsed: 500 },
+      gateway: { averageCost: 20, cost: 30, lines: [] },
+      reportDay: "2026-08-27",
+      vercel: { averageCost: null, cost: 5, lines: [] },
+    });
+    assert.match(text, /^Total: \$35\.00 \(no comparison yet\)$/mu);
+    assert.match(
+      text,
+      /^AI Gateway: \$30\.00 \(7-day avg \$20\.00, \+50%\)$/mu
+    );
+  });
+
   it("keeps posting when one source failed", () => {
     const text = renderCostReport({
       credits: { error: "AI Gateway credits read could not run." },

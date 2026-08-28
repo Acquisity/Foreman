@@ -251,9 +251,10 @@ export const renderCostReport = (report: CostReport): string => {
   );
   const total = parts.reduce((sum, { cost }) => sum + (cost ?? 0), 0);
   const averages = parts.map(({ averageCost }) => averageCost);
-  const average = averages.every((value) => value === null)
-    ? null
-    : averages.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  const average =
+    averages.length === 0 || averages.some((value) => value === null)
+      ? null
+      : averages.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const lines = [
     `*Foreman running costs for ${report.reportDay}* (USD)`,
     parts.length === 0
