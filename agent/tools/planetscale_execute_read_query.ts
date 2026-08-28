@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { planetscaleAuth } from "#lib/constants.js";
+import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import {
   buildReadQueryResult,
   callPlanetscaleReadQuery,
@@ -35,7 +36,13 @@ export default defineTool({
   async execute(input, ctx) {
     const { token } = await ctx.getToken(planetscaleAuth);
 
-    const args: Record<string, unknown> = { query: input.query };
+    // Production coordinates are fixed; the model only ever passes `query`.
+    // Leaving them out used to fail the call and send the model hunting for
+    // them through the raw PlanetScale list tools (seen 2026-08-28).
+    const args: Record<string, unknown> = {
+      ...PRODUCTION_READ_QUERY_ARGS,
+      query: input.query,
+    };
     if (input.database !== undefined) {
       args.database = input.database;
     }
@@ -89,9 +96,18 @@ export default defineTool({
   // `planetscale_execute_read_query`; keep in sync with the server if it adds
   // or renames fields.
   inputSchema: z.object({
-    branch: z.string().optional().describe("The branch name."),
-    database: z.string().optional().describe("The database name."),
-    organization: z.string().optional().describe("The organization name."),
+    branch: z
+      .string()
+      .optional()
+      .describe("Branch name; defaults to production (main)."),
+    database: z
+      .string()
+      .optional()
+      .describe("Database name; defaults to production."),
+    organization: z
+      .string()
+      .optional()
+      .describe("Organization name; defaults to production."),
     postgres_database_name: z
       .string()
       .optional()
