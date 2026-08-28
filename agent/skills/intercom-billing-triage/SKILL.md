@@ -60,7 +60,7 @@ Read [references/tools.md](references/tools.md) before composing calls. It conta
 The order is mandatory:
 
 1. PlanetScale with `planetscale_execute_read_query`: current workspace, billing account, plan state, credit balances, prior credits, and `organization.partner_id`.
-2. Autumn with the root tool `read_autumn_billing`, using the `billing_account.id` column read in step 1 (the row `organization.billing_account_id` points to; `billingAccount.id` when `read_billing_account` did the read), never the organization id, which answers `customer_not_found`: provisioned subscriptions, expanded plans and add-ons, line-item metadata, the single feature-credit balance, and the `stripe_id` Stripe needs. A 404 means the id was wrong; re-resolve it before recording Autumn as unavailable. The one expected 404 is a partner-governed organization, a non-null `organization.partner_id`, which has no customer in Acquisity's own Autumn.
+2. Autumn with the root tool `read_autumn_billing`, using the `billing_account.id` column read in step 1 (the row `organization.billing_account_id` points to; `billingAccount.id` when `read_billing_account` did the read), never the organization id, which answers `customer_not_found`: provisioned subscriptions, expanded plans and add-ons, line-item metadata, the single feature-credit balance, and the `stripe_id` Stripe needs. A 404 means the id was wrong; re-resolve it before recording Autumn as unavailable. The one expected 404 is a partner-governed organization, an `organization.partner_id` that is neither null nor the default `00000000-0000-0000-0000-000000000001`, which has no customer in Acquisity's own Autumn.
 3. Stripe with the root tool `read_stripe_billing`: use `customer` for bounded customer, subscription, invoice, charge, credit-note, and balance history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, withhold the amount or refund verdict until the exact relevant object is identified and read.
 
 These billing tools use shared app-scoped Connect credentials, so the Intercom requester never has to begin a separate investigation or complete personal OAuth first. Their provider routes and methods are fixed reads. They cannot move money or change billing.
@@ -81,7 +81,7 @@ Check the recurring traps:
 - A workspace deletion or cancellation can fail to remove the Autumn subscription. The customer did their part; do not treat the surviving subscription as proof otherwise.
 - Autumn names domain and inbox line items generically. Read metadata such as the embedded domain before matching or counting.
 - The opposite sync failure can leave working entitlements with no Autumn subscription. Surface the free use, but never decide to recover past charges.
-- Read `organization.partner_id` before deciding Autumn versus Whop governance. Never route on `provider='whop'` alone.
+- Read `organization.partner_id` before deciding Autumn versus Whop governance: null or the default `00000000-0000-0000-0000-000000000001` is a native Autumn organization; any other value is partner-governed. Never route on `provider='whop'` alone.
 
 If the systems diverge without explaining why, use `prepare_repository` with `Acquisity/Acquisity`, then `grep` and `read_file` to identify the failing code path. This is explanation only. Do not edit the repository or implement a fix. When all systems agree, do not open the repository; the remaining question is discretion.
 
