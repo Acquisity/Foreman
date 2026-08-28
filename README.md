@@ -68,6 +68,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 ## Schedules
 
 - `sla-report` runs daily at 13:00 UTC, dispatching a per-feature SLA bug investigation into each feature's Slack channel plus a health heartbeat.
+- `ai-sdr-report` runs Mondays at 13:00 UTC, dispatching a weekly AI SDR performance report (volume, conversion rates, campaign type, and lifecycle) into the AI SDR channel.
 
 ## Configuration
 
