@@ -14,7 +14,7 @@ import { canUseBillingApiRead } from "#lib/trust.js";
 
 export default defineTool({
   description:
-    "Read Stripe billing evidence using the restricted app key, available on every surface. Use customer with the cus_ id from the Autumn record's stripe_id for a bounded bundle of customer, subscription, invoice, charge, credit-note, and balance history; charge, refund, or dispute for a known Stripe object; promotion_code for a customer-facing coupon code; or coupon for a known coupon id. This never changes billing. A per-section error or has_more value means that section is unverified, not empty.",
+    "Read Stripe billing evidence using the restricted app key, available on every surface except a GitHub session that is not a trusted collaborator's. Use customer with the cus_ id from the Autumn record's stripe_id for a bounded bundle of customer, subscription, invoice, charge, credit-note, and balance history; charge, refund, or dispute for a known Stripe object; promotion_code for a customer-facing coupon code; or coupon for a known coupon id. This never changes billing. A per-section error or has_more value means that section is unverified, not empty.",
   async execute(input, ctx) {
     if (!canUseBillingApiRead(ctx.session.auth.current)) {
       return {
