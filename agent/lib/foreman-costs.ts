@@ -95,16 +95,43 @@ export const readVercelCharges = async (
   if (!response.ok) {
     throw new Error(`Vercel billing responded ${response.status}.`);
   }
-  const declared = Number(response.headers.get("content-length"));
-  if (declared > MAX_RESPONSE_BYTES) {
-    throw new Error("Vercel billing returned too much data.");
-  }
-  const text = await response.text();
-  if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) {
-    throw new Error("Vercel billing returned too much data.");
-  }
-  return text;
+  return readBoundedText(response);
 };
+
+/**
+ * The export is streamed JSONL with no Content-Length, so the cap is
+ * enforced chunk by chunk and the stream is cancelled the moment it is hit.
+ */
+const readBoundedText = async (response: Response): Promise<string> => {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    throw tooMuchData();
+  }
+  if (response.body === null) {
+    return "";
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: the stream's done flag terminates the loop.
+  while (true) {
+    // biome-ignore lint/performance/noAwaitInLoops: chunks are read in order to enforce the byte cap.
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw tooMuchData();
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+};
+
+const tooMuchData = (): Error =>
+  new Error("Vercel billing returned too much data.");
 
 interface FocusRow {
   ChargePeriodStart: string;

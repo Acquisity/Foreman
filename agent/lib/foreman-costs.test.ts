@@ -15,6 +15,7 @@ import {
 const NOW = Date.parse("2026-08-28T13:00:00.000Z");
 const WINDOW = costWindow(NOW);
 const REFUSED = /Vercel billing responded 403/u;
+const TOO_MUCH_DATA = /Vercel billing returned too much data/u;
 
 const focus = (
   day: string,
@@ -73,6 +74,26 @@ describe("Vercel charges", () => {
       readVercelCharges("tok", WINDOW, { fetch: fetchStub }),
       REFUSED
     );
+  });
+
+  it("cancels an unbounded stream at the byte cap", async () => {
+    let cancelled = false;
+    const chunk = new Uint8Array(1024 * 1024);
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+      pull(controller) {
+        controller.enqueue(chunk);
+      },
+    });
+    const fetchStub: typeof fetch = () =>
+      Promise.resolve(new Response(body, { status: 200 }));
+    await assert.rejects(
+      readVercelCharges("tok", WINDOW, { fetch: fetchStub }),
+      TOO_MUCH_DATA
+    );
+    assert.equal(cancelled, true);
   });
 
   it("keeps only the project, labels days by period start, drops today", () => {
