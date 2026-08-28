@@ -121,6 +121,48 @@ describe("find_function_runs", () => {
     );
   });
 
+  it("traces the newest run across apps, not the first app's newest", async () => {
+    const urls: string[] = [];
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes("/apps?")) {
+        return json({
+          data: [{ id: "app-a" }, { id: "app-b" }],
+          page: { hasMore: false },
+        });
+      }
+      if (u.includes("/apps/app-a/functions/")) {
+        return json({
+          data: [
+            { ...run("old", "evt-old"), queuedAt: "2026-08-27T10:00:00Z" },
+          ],
+          page: { hasMore: false },
+        });
+      }
+      if (u.includes("/apps/app-b/functions/")) {
+        return json({
+          data: [
+            { ...run("new", "evt-new"), queuedAt: "2026-08-27T12:00:00Z" },
+          ],
+          page: { hasMore: false },
+        });
+      }
+      return json(trace);
+    };
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: FN, sinceHours: 24, status: "Failed" },
+      { fetch: fetchStub, now: NOW }
+    );
+    assert.deepEqual(
+      result.runs.map((r) => r.runId),
+      ["new", "old"]
+    );
+    assert.equal(result.latestTrace?.runId, "new");
+    assert.ok(urls.at(-1)?.includes("/runs/new/trace"));
+  });
+
   it("lists across every function without an id, and returns latestTrace null without a second request when nothing ran", async () => {
     const urls: string[] = [];
     const result = await findFunctionRuns(

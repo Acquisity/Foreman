@@ -244,6 +244,11 @@ async function listRuns(
     data.push(...page.data);
     hasMore = hasMore || page.page?.hasMore === true;
   }
+  // Newest first across apps, so the traced "newest" run is not just the
+  // first app's newest.
+  data.sort((a, b) =>
+    String(b.queuedAt ?? "").localeCompare(String(a.queuedAt ?? ""))
+  );
   return {
     data: data.slice(0, RUN_LIMIT),
     page: { hasMore: hasMore || data.length > RUN_LIMIT },
