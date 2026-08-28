@@ -13,7 +13,7 @@ import {
 
 export default defineTool({
   description:
-    "Read the complete weekly AI SDR performance report from fixed production queries. It chooses the latest complete Monday-to-Friday window, compares it with the prior week and four weeks earlier, counts only scheduled non-deleted bookings tied to an outreach campaign, and returns deterministic volume, conversion, campaign-type, and lifecycle metrics. Call once with no input.",
+    "Read the complete weekly AI SDR performance report from fixed production queries. It chooses the latest complete Monday-to-Friday window, compares it with the prior week and four weeks earlier, counts only scheduled non-deleted appointments whose origin is AI SDR, and returns deterministic volume, conversion, campaign-type, and lifecycle metrics. Call once with no input.",
   async execute(_input, ctx) {
     const { token } = await ctx.getToken(planetscaleAuth);
     return readAiSdrWeeklyReport(new Date(), async (query) => {

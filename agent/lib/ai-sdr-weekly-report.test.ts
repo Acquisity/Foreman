@@ -13,7 +13,7 @@ describe("aiSdrWeeklyReportQueries", () => {
     const queries = aiSdrWeeklyReportQueries(aiSdrReportWindows(NOW));
     assert.equal(queries.length, 3);
     assert.ok(queries[0]?.includes("from outreach_campaign_metrics m"));
-    assert.ok(queries[1]?.includes("from scheduling_external_booking b"));
+    assert.ok(queries[1]?.includes("from scheduling_appointment a"));
     assert.ok(queries[2]?.includes("from crm_message_thread t"));
     assert.ok(queries[1]?.includes("T00:00:00Z'::timestamptz"));
     assert.ok(
@@ -23,14 +23,19 @@ describe("aiSdrWeeklyReportQueries", () => {
     );
   });
 
-  test("counts only live scheduled bookings tied to an outreach campaign", () => {
+  test("counts only live AI SDR appointments and attributes methods safely", () => {
     const bookingQuery =
       aiSdrWeeklyReportQueries(aiSdrReportWindows(NOW))[1] ?? "";
     assert.ok(
-      bookingQuery.includes("join outreach_campaign c on c.id = b.campaign_id")
+      bookingQuery.includes(
+        "left join appointment_campaign ac on ac.appointment_id = a.id"
+      )
     );
-    assert.ok(bookingQuery.includes("b.deleted_at is null"));
-    assert.ok(bookingQuery.includes("b.status = 'scheduled'"));
+    assert.ok(bookingQuery.includes("a.origin = 'ai_sdr'"));
+    assert.ok(bookingQuery.includes("a.deleted_at is null"));
+    assert.ok(bookingQuery.includes("a.status = 'scheduled'"));
+    assert.ok(bookingQuery.includes("select distinct on (t.appointment_id)"));
+    assert.ok(!bookingQuery.includes("scheduling_external_booking"));
   });
 });
 
