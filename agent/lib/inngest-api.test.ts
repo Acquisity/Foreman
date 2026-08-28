@@ -163,6 +163,22 @@ describe("find_function_runs", () => {
     assert.ok(urls.at(-1)?.includes("/runs/new/trace"));
   });
 
+  it("treats a 200 answer with no data list for an unknown function as no runs", async () => {
+    const fetchStub: typeof fetch = (url) => {
+      const u = String(url);
+      if (u.includes("/apps?")) {
+        return json({ data: [{ id: "ai-clients" }], page: { hasMore: false } });
+      }
+      return json({ error: "function not found" });
+    };
+    const result = await findFunctionRuns(
+      "t",
+      { functionId: "no.such.function", sinceHours: 24, status: "Failed" },
+      { fetch: fetchStub, now: NOW }
+    );
+    assert.deepEqual(result, { latestTrace: null, runs: [], truncated: false });
+  });
+
   it("lists across every function without an id, and returns latestTrace null without a second request when nothing ran", async () => {
     const urls: string[] = [];
     const result = await findFunctionRuns(

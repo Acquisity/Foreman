@@ -190,6 +190,33 @@ const runPage = z.looseObject({
 });
 
 /**
+ * One app's runs of a function, or null when the app does not own it: the
+ * route answers 404, or 200 with no `data` list (seen 2026-08-28).
+ */
+async function runsInApp(
+  token: string,
+  appId: string,
+  functionId: string,
+  params: URLSearchParams,
+  opts?: InngestApiOptions
+): Promise<z.infer<typeof runPage> | null> {
+  const path = `/apps/${encodeURIComponent(appId)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
+  let body: unknown;
+  try {
+    body = await getJson(token, path, opts);
+  } catch (error) {
+    if (error instanceof Error && error.message.endsWith("HTTP 404.")) {
+      return null;
+    }
+    throw error;
+  }
+  if (!Array.isArray((body as { data?: unknown } | null)?.data)) {
+    return null;
+  }
+  return runPage.parse(body);
+}
+
+/**
  * `GET /runs` lists across every function; the per-function route lives under
  * the app (`/apps/{appId}/functions/{functionId}/runs`, the only form that
  * accepts a dotted function id), so a function id first lists the apps.
@@ -229,17 +256,10 @@ async function listRuns(
   const data: Record<string, unknown>[] = [];
   let hasMore = false;
   for (const appId of appIds) {
-    const path = `/apps/${encodeURIComponent(appId)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
-    let page: z.infer<typeof runPage>;
-    try {
-      // biome-ignore lint/performance/noAwaitInLoops: one app at a time; there is one app today.
-      page = runPage.parse(await getJson(token, path, opts));
-    } catch (error) {
-      // The function belongs to one app; the others answer 404.
-      if (error instanceof Error && error.message.endsWith("HTTP 404.")) {
-        continue;
-      }
-      throw error;
+    // biome-ignore lint/performance/noAwaitInLoops: one app at a time; there is one app today.
+    const page = await runsInApp(token, appId, functionId, params, opts);
+    if (!page) {
+      continue;
     }
     data.push(...page.data);
     hasMore = hasMore || page.page?.hasMore === true;
