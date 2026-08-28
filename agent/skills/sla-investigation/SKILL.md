@@ -175,7 +175,7 @@ Post one message covering every in-scope bug for this feature. Bottom line, natu
 
 Two block shapes, keyed on `parentId`. A fresh bug (no `parentId`, or the master ticket itself) gets the full block below. A customer report already attached to a master (`parentId` set) gets the brief block below, never the full one and never the full investigation.
 
-The header names the fresh bugs and tags the dispatch's mentions. Customer reports are additional blocks after the fresh bugs; when a feature has no fresh bug, the message opens with the customer-report blocks and no bug count.
+The header names the fresh bugs and tags the dispatch's mentions. Customer reports are additional blocks after the fresh bugs without repeating those mentions. When a feature has no fresh bug, the first customer-report block is the message header: prefix its title with the dispatch's mentions and ` - `, as the brief template shows. Later customer-report blocks do not repeat the mentions. When a brief block follows a fresh-bug header, omit that prefix.
 
 Bold marks the headings, the title line, and the link labels, which is what makes the message scannable. The session delivers one message to the channel, so do not plan on separate posts.
 
@@ -205,7 +205,7 @@ The full block carries its three ideas under those bold headings: the symptom an
 A bug with a `parentId` is one more customer hitting an issue whose root cause already lives on the master ticket. Read the master with `linear__get_issue` on the `parentId` for its title and `url`, and count the reports hanging off that master with `linear__list_issues` filtered to `parentId` set to the master, so the note can say how many reports there are in total. Then write:
 
 ```text
-**New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)
+<the dispatch mentions> - **New customer report of <master summary>, bringing us to <count> reports in total** (<@assignee>)
 
 <brief plain description of this customer's situation>
 
