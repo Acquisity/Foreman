@@ -16,6 +16,9 @@ const NOW = Date.parse("2026-08-28T13:00:00.000Z");
 const WINDOW = costWindow(NOW);
 const REFUSED = /Vercel billing responded 403/u;
 const TOO_MUCH_DATA = /Vercel billing returned too much data/u;
+const TOTAL_WITHOUT_COMPARISON = /^Total: \$35\.00 \(no comparison yet\)$/mu;
+const GATEWAY_WITH_COMPARISON =
+  /^AI Gateway: \$30\.00 \(7-day avg \$20\.00, \+50%\)$/mu;
 
 const focus = (
   day: string,
@@ -195,11 +198,8 @@ describe("rendered report", () => {
       reportDay: "2026-08-27",
       vercel: { averageCost: null, cost: 5, lines: [] },
     });
-    assert.match(text, /^Total: \$35\.00 \(no comparison yet\)$/mu);
-    assert.match(
-      text,
-      /^AI Gateway: \$30\.00 \(7-day avg \$20\.00, \+50%\)$/mu
-    );
+    assert.match(text, TOTAL_WITHOUT_COMPARISON);
+    assert.match(text, GATEWAY_WITH_COMPARISON);
   });
 
   it("keeps posting when one source failed", () => {
