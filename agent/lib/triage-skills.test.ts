@@ -43,6 +43,14 @@ const extractInstruction = (skill: string, start: string, end: string) => {
   return skill.slice(startIndex, endIndex);
 };
 
+test("Stage 5 names the Linear state for every handling path", () => {
+  assert.ok(
+    triageSkill.includes(
+      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`."
+    )
+  );
+});
+
 test("shared triage exposes one seven-stage workflow with settled fact boundaries", () => {
   const stages = [
     "Stage 1: Establish the case",

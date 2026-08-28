@@ -228,7 +228,7 @@ The handling path classifies the root cause, not the remedy. A ticket can be `En
 
 ### Decide the final Linear state
 
-Set the state that matches the handling path.
+Set the state that matches the handling path: `Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`.
 
 ### Set Linear priority
 
