@@ -42,7 +42,7 @@ The tools use an app-scoped IBG credential, require no requester OAuth, and expo
 
 ## Autumn (`autumn__`)
 
-Use the root tool `read_autumn_billing` first, on every surface. Pass `billingAccount.id` from `read_billing_account`: Acquisity keys Autumn customers by billing account id, and the organization id answers `customer_not_found`. A 404 reason is a wrong id, never an outage or an empty account; re-resolve before recording anything. The record's `stripe_id` is the `cus_` id Stripe needs. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
+Use the root tool `read_autumn_billing` first, on every surface. Pass `billingAccount.id` from `read_billing_account`: Acquisity keys Autumn customers by billing account id, and the organization id answers `customer_not_found`. A 404 reason is a wrong id, never an outage or an empty account; re-resolve before recording anything. The one expected 404 is a partner-governed organization, `organization.partnerGoverned` true, which is on Whop and has no customer in Acquisity's own Autumn; that is the partner rule, not an id problem. The record's `stripe_id` is the `cus_` id Stripe needs. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
 
 The `autumn__` connection below is the fallback when the root tool answers `available: false`, for users who have personally connected Autumn.
 
