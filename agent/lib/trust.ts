@@ -107,6 +107,14 @@ export function intakeIssueNumber(
  */
 export const UNATTENDED_ATTRIBUTE = "unattended";
 
+/** Returns a copy of `auth` marked as an unattended schedule dispatch. */
+export function stampUnattended(auth: SessionAuthContext): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [UNATTENDED_ATTRIBUTE]: "true" },
+  };
+}
+
 /**
  * Whether nobody is watching this session, whether it runs under
  * {@link AUTONOMOUS_PRINCIPAL} or under a user principal a schedule stamped

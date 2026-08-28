@@ -7,7 +7,7 @@ import {
   SLACK_TEAM_ID,
 } from "../lib/constants.js";
 import { slaWindowStart } from "../lib/sla-window.js";
-import { stampIntakeOnly, UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
+import { stampIntakeOnly, stampUnattended } from "../lib/trust.js";
 
 /** Who each channel's report tags. Support is cross-cutting, so it tags both. */
 const JAMES = "<@U0BA7JK9XRV>";
@@ -43,17 +43,16 @@ const FEATURE_CHANNELS = [
  * is the channel-wide handler in `agent/channels/slack.ts`, which would change
  * behavior for every human Slack session too, so it is a separate decision.
  */
-const OWNER_AUTH = {
+const OWNER_AUTH = stampUnattended({
   attributes: {
     team_id: SLACK_TEAM_ID,
-    [UNATTENDED_ATTRIBUTE]: "true",
     user_id: OWNER_USER_ID,
   },
   authenticator: "slack-webhook",
   issuer: `slack:${SLACK_TEAM_ID}`,
   principalId: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
   principalType: "user",
-} as const;
+});
 
 /**
  * The schedule builds its own auth rather than receiving a signed webhook, so
