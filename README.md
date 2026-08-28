@@ -68,6 +68,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 ## Schedules
 
 - `sla-report` runs daily at 13:00 UTC, dispatching a per-feature SLA bug investigation into each feature's Slack channel plus a health heartbeat.
+- `foreman-costs-report` runs daily at 13:00 UTC, posting yesterday's Foreman running costs (AI Gateway model spend, Vercel platform usage for the foreman project, credit balance) into the costs Slack channel. The figures come from the fixed `read_foreman_costs` tool, which renders the message itself.
 
 ## Configuration
 
@@ -83,6 +84,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `AUTUMN_API_CONNECTOR` | `api.useautumn.com/acquisity-foreman-autumn-api` (required) | App-scoped API-key connector for fixed Autumn reads in every configured intake-only channel |
 | `STRIPE_API_CONNECTOR` | `api.stripe.com/acquisity-foreman-stripe-api` (required) | App-scoped restricted-key connector for fixed Stripe reads in every configured intake-only channel |
 | `INSTANTLY_API_CONNECTOR` | `api.instantly.ai/acquisity-foreman` (required) | App-scoped API-key connector for fixed Instantly Workspace Group, account, campaign, and email-preview reads |
+| `VERCEL_API_CONNECTOR` | unset | App-scoped API-key connector holding a Vercel access token for the FOCUS billing export used by `read_foreman_costs`; unset drops the Vercel platform line from the daily cost report |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 
