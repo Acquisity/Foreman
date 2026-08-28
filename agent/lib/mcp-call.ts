@@ -64,22 +64,31 @@ function extractMessage(body: string, label: string): JsonRpcMessage {
     // Fall through to SSE extraction.
   }
 
+  // One SSE event can carry several `data:` fields; they join with newlines
+  // and end at a blank line, so parse per event, not per line.
   const messages: JsonRpcMessage[] = [];
-  for (const line of body.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) {
-      continue;
+  const dataLines: string[] = [];
+  const flush = () => {
+    if (dataLines.length === 0) {
+      return;
     }
-    const payload = trimmed.slice("data:".length).trim();
-    if (!payload) {
-      continue;
-    }
+    const payload = dataLines.join("\n");
+    dataLines.length = 0;
     try {
       messages.push(JSON.parse(payload) as JsonRpcMessage);
     } catch {
-      // Ignore malformed SSE lines.
+      // Ignore malformed SSE events.
+    }
+  };
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "") {
+      flush();
+    } else if (trimmed.startsWith("data:")) {
+      dataLines.push(trimmed.slice("data:".length).trim());
     }
   }
+  flush();
 
   const withResult = messages.find((message) => message.result !== undefined);
   const withError = messages.find((message) => message.error !== undefined);
