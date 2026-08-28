@@ -10,7 +10,7 @@ Two kinds of tool appear below, and they are called differently.
 
 **Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+**Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `read_billing_account`, `describe_table`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -20,11 +20,13 @@ Read them in flow order: PlanetScale, then Autumn, then Stripe. Every configured
 
 ## PlanetScale (`planetscale__`)
 
-`planetscale_execute_read_query`, an authored tool in `agent/tools/`, not the MCP tool of the same name. The MCP original is excluded from the allowlist because it returns rows unbounded; the authored wrapper truncates.
+`lookup_customer` is the identity gate: one fixed production query from a customer email to the user, live memberships, and `pinnedOrganizationId`. It is a root tool, called bare. Use it instead of writing the identity join yourself.
 
-Check the result flags before trusting rows: `truncated` means rows are missing, `oversizedRow` means a single row exceeded the cap so select fewer columns, `envelopeTooLarge` means oversized server metadata, and `raw` means the result could not be parsed. A refund amount computed from a truncated result is wrong.
+`read_billing_account` is the system-of-record read: one root tool, called bare, with the organization, partner, billing account, wallets, credit balances, and recent credit history in fixed queries. `planetscale_execute_read_query` stays for the rows it does not cover, such as `domain_purchase_order` and invoice rows; it is an authored tool in `agent/tools/`, not the MCP tool of the same name, which is excluded from the allowlist because it returns rows unbounded; the authored wrapper truncates.
 
-Scope every query to the organization pinned by the identity gate. Nothing binds it for you.
+On `planetscale_execute_read_query`, check the result flags before trusting rows: `truncated` means rows are missing, `oversizedRow` means a single row exceeded the cap so select fewer columns, `envelopeTooLarge` means oversized server metadata, and `raw` means the result could not be parsed. A refund amount computed from a truncated result is wrong.
+
+Scope every query to the organization pinned by the identity gate. Nothing binds it for you. Unsure of a table or column name: call `describe_table` first, a root tool called bare; do not guess names into a query.
 
 Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
 
@@ -74,9 +76,9 @@ Docs: <https://docs.stripe.com/mcp>.
 
 `get_issue`, `list_comments`, `save_comment`, `save_issue`, `save_document`.
 
-`save_document` takes exactly one parent; pass `issue` for the issue-scoped `Billing investigation` document. Use `patch` to update an existing one rather than creating a second.
+`save_investigation_document` is a root tool, called bare: it owns the ticket's `Billing investigation` document, creating it once and rewriting it after, and refuses card or bank account numbers. Do not write that document through `save_document`.
 
-`save_issue` traps: `labels` replaces the entire label set, so read current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low.
+`route_ticket` is a root tool, called bare: the final routing write. It adds labels to the ticket's existing set (unknown names fail and list the valid ones), resolves state, project, and assignee by name, inherits an assignee from a master or parent, records a duplicate relation, attaches links, and reads the ticket back with the saved `projectId`. Use it for every routing write in these skills; `save_issue` stays for creating issues and for description edits. `save_issue`'s `labels` field replaces the whole set, which is why routing does not go through it.
 
 ## Repository (root tools, no prefix)
 

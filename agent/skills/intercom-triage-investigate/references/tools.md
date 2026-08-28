@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_function_runs`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -23,6 +23,10 @@ Use the built-in `connection_search` to discover what a connection actually expo
 `prepare_repository`, `grep`, `glob` are authored tools in `agent/tools/`. `read_file` and `bash` are eve framework tools, registered automatically.
 
 `prepare_repository` takes `Acquisity/Acquisity`, refreshes the checkout to the remote HEAD, and returns `{ worktree, reused }`. It does not return a commit SHA; get it from `git -C <worktree> rev-parse HEAD`.
+
+## Help center (root tool, no prefix)
+
+`find_help_article` is one GET against the web app's public `/api/search` route over the 442 help-center articles. No token, every surface. It returns titles, public urls, and likely repository paths (derived from the url; a section page is `<path without .mdx>/index.mdx`); page hits only, five at most, and `error` means the search could not run.
 
 ## Investigation memory (root tools, no prefix)
 
@@ -44,21 +48,17 @@ Both writes are denied outright in sessions that are not authorized triage surfa
 
 ## PlanetScale (`planetscale__`)
 
+`lookup_customer` is the identity gate: one fixed production query from a customer email to the user, live memberships, and `pinnedOrganizationId`. It is a root tool, called bare. Use it instead of writing the identity join yourself.
+
 `planetscale_execute_read_query` is an authored tool in `agent/tools/`, not the MCP tool of the same name. The MCP original is deliberately excluded from the allowlist because it returns the full rows array unbounded, which can kill the session; the authored wrapper truncates instead.
 
 Read the result flags before trusting the rows: `truncated` means rows are missing, `oversizedRow` means one row alone exceeded the cap so select fewer columns, `envelopeTooLarge` means the server returned oversized metadata, and `raw` means the result could not be parsed.
 
 Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
 
-`planetscale_get_branch_schema` does not exist on this connection. The allowlist excludes it for returning every table's schema unbounded, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Read schema through `information_schema` instead, which is verified working:
+`planetscale_get_branch_schema` does not exist on this connection, and the MCP server does not register it either, so it fails as an unknown tool rather than a permission error. Unsure of a table or column name: call `describe_table` first. It is a root tool, called bare, and returns the table's columns with types from `information_schema`, or `found` false with similar table names; `found` false with no `error` means no public table has that name, while `error` means the lookup could not run and the name is unverified. Do not guess names into a query.
 
-```sql
-SELECT table_schema, table_name, column_name, data_type
-FROM information_schema.columns
-WHERE table_name = '<table>'
-```
-
-Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`. An `information_schema` query needs that last one passed explicitly.
+Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`. `describe_table` and `lookup_customer` carry them fixed; pass them yourself on `planetscale_execute_read_query`.
 
 ## Instantly (root tools, no prefix)
 
@@ -74,9 +74,11 @@ Call `list_instantly_subworkspaces` first. It follows Workspace Group pages up t
 
 `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment`.
 
-`save_issue` traps: `labels` replaces the entire label set, so read the current labels and pass the union. `priority` is a number, 1 Urgent through 4 Low. `relatedTo`, `blockedBy`, and `blocks` are append-only. Pass `assignee`, not `assigneeId`.
+`find_related_issues` is a root tool, called bare: fixed duplicate and master searches through the same Linear installation, phrases in, deduped hits out with the phrases that matched each. Use it for the Stage 3 duplicate search and the master search instead of composing `list_issues` filters; `list_issues` stays for everything else.
 
-`save_document` takes exactly one parent; pass `issue` for an issue-scoped document. Use `patch` to edit an existing one rather than rewriting it whole.
+`route_ticket` is a root tool, called bare: the final routing write. It adds labels to the ticket's existing set (unknown names fail and list the valid ones), resolves state, project, and assignee by name, inherits an assignee from a master or parent, records a duplicate relation, attaches links, and reads the ticket back with the saved `projectId`. Use it for every routing write in these skills; `save_issue` stays for creating issues and for description edits. `save_issue`'s `labels` field replaces the whole set, which is why routing does not go through it.
+
+`save_investigation_document` is a root tool, called bare: it owns the ticket's `Triage investigation` (or `Billing investigation`) document, creating it once and rewriting it after, and returns the `documentId` and `updatedAt` version pin. Do not write that document through `save_document`.
 
 The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the name `"Engineering"` returns nothing silently.
 
@@ -84,7 +86,7 @@ The Engineering Team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`. Passing the n
 
 `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health`.
 
-Start from the function named in the Code lane under `Investigate current evidence`, then `get_run_trace` on a failing run for the step that broke.
+Call `find_function_runs` with the function slug from the Code lane under `Investigate current evidence`. It is a root tool, called bare: the newest runs with the given status in the window, and `latestTrace.steps`, the trace steps of the newest matching run, with any step error bounded and redacted. Omit the slug to see matching runs across every function first. The connection tools above stay for anything else, such as a specific event's runs.
 
 ## Sentry (`sentry__`)
 
