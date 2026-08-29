@@ -12,7 +12,6 @@ import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
-import { replyOf } from "../lib/slack-reply.js";
 import { isStopRequest } from "../lib/slack-stop.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
@@ -63,11 +62,11 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * notice, so a real cancellation is confirmed exactly once and a `stop`
  * with no active turn stays quiet.
  *
- * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
- * so the model's narration stays in the session and only the requester-facing
- * text reaches the thread. The handler mirrors eve's default
- * `message.completed` branches, which are not exported, and changes only the
- * post.
+ * Delivery posts the complete final message: there is no marker that splits
+ * narration from reply, so the final message itself is the requester-facing
+ * text and an empty one falls back to a typing indicator. The handler mirrors
+ * eve's default `message.completed` branches, which are not exported, and
+ * changes only the post.
  */
 
 export const dispatch = async (
@@ -118,12 +117,13 @@ export const slackChannelEvents: SlackChannelEvents = {
       return;
     }
     channel.state.pendingToolCallMessage = null;
-    const reply = data.message ? replyOf(data.message) : "";
-    if (!reply) {
+    // Blankness decides the typing fallback, but the post itself is verbatim:
+    // trimming would destroy leading Markdown indentation in the reply.
+    if (!data.message?.trim()) {
       await channel.thread.startTyping();
       return;
     }
-    await channel.thread.post(reply);
+    await channel.thread.post(data.message);
   },
   async "turn.cancelled"(_data, channel) {
     await channel.thread.post("Stopped.");

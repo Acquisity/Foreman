@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import type {
   SlackEventContext,
   SlackInboundMessageContext,
@@ -133,5 +135,95 @@ describe("slack channel", () => {
     } as unknown as SlackEventContext;
     await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
     assert.deepEqual(posts, ["Stopped."]);
+  });
+
+  const completedEventChannel = (calls: string[]) =>
+    ({
+      state: {},
+      thread: {
+        post: (text: string) => {
+          calls.push(`post:${text}`);
+          return Promise.resolve();
+        },
+        startTyping: () => {
+          calls.push("typing");
+          return Promise.resolve();
+        },
+      },
+    }) as unknown as SlackEventContext;
+
+  const completed = (
+    finishReason: "stop" | "tool-calls",
+    text: string | null
+  ) => ({
+    finishReason,
+    message: text,
+    sequence: 1,
+    stepIndex: 0,
+    turnId: "t1",
+  });
+
+  it("posts the complete final message verbatim", async () => {
+    const handler = slackChannelEvents["message.completed"];
+    assert.ok(handler);
+    const calls: string[] = [];
+    // The retired marker is now ordinary content: nothing splits the post.
+    // Joined so the marker-removal scan below never matches this source.
+    const marker = ["---", "reply", "---"].join("");
+    const full = `\n  All of this posts, indentation included.\n${marker}\nEven this line.\n\n`;
+    await handler(
+      completed("stop", full),
+      completedEventChannel(calls),
+      {} as never
+    );
+    assert.deepEqual(calls, [`post:${full}`]);
+  });
+
+  it("starts typing instead of posting an empty final message", async () => {
+    const handler = slackChannelEvents["message.completed"];
+    assert.ok(handler);
+    const calls: string[] = [];
+    await handler(
+      completed("stop", "  \n"),
+      completedEventChannel(calls),
+      {} as never
+    );
+    assert.deepEqual(calls, ["typing"]);
+  });
+
+  it("keeps tool-call narration out of the thread", async () => {
+    const handler = slackChannelEvents["message.completed"];
+    assert.ok(handler);
+    const calls: string[] = [];
+    const eventChannel = completedEventChannel(calls);
+    await handler(
+      completed("tool-calls", "Checking Stripe now."),
+      eventChannel,
+      {} as never
+    );
+    assert.deepEqual(calls, []);
+    assert.equal(
+      eventChannel.state.pendingToolCallMessage,
+      "Checking Stripe now."
+    );
+  });
+});
+
+// Joined so this suite's own source never matches the needle.
+const RETIRED_REPLY_MARKER = ["---", "reply", "---"].join("");
+
+const collectFiles = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? collectFiles(path) : [path];
+  });
+
+describe("retired reply marker", () => {
+  it("appears nowhere under agent/", () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const offenders = collectFiles(root).filter((file) =>
+      readFileSync(file, "utf8").includes(RETIRED_REPLY_MARKER)
+    );
+    assert.deepEqual(offenders, []);
   });
 });
