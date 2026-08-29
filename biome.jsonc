@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core"],
+  // GSD planning artifacts (sketches, HTML mockups) are local tooling output,
+  // not agent code; keep the linter out of them.
+  "files": {
+    "includes": ["!.planning"]
+  },
   "linter": {
     "rules": {
       "style": {
