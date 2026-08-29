@@ -16,7 +16,7 @@ Root tools are authored in `agent/tools/` or provided by the eve framework. They
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
-Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
 ## Repository (root tools, no prefix)
 
