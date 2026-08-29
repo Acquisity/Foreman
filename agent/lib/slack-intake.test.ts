@@ -19,10 +19,7 @@ import {
   stampIntakeOnly,
   stampTrusted,
 } from "./trust.js";
-import {
-  INTAKE_ONLY_SIGN_IN_REASON,
-  intakeOnlySignInDenial,
-} from "./user-connect.js";
+import { SLACK_SIGN_IN_REASON, slackSignInDenial } from "./user-connect.js";
 
 const auth: SessionAuthContext = {
   attributes: {},
@@ -164,12 +161,16 @@ describe("intake-only channels", () => {
       id: auth_.principalId,
       type: "user",
     });
+    const slackAuth: SessionAuthContext = {
+      ...auth,
+      principalId: "slack:T123:U456",
+    };
     const required = new ConnectionAuthorizationRequiredError("jam");
-    const denial = intakeOnlySignInDenial(
+    const denial = slackSignInDenial(
       required,
-      principalFor(stampIntakeOnly(auth))
+      principalFor(stampIntakeOnly(slackAuth))
     );
-    assert.equal(denial?.reason, INTAKE_ONLY_SIGN_IN_REASON);
+    assert.equal(denial?.reason, SLACK_SIGN_IN_REASON);
     assert.equal(denial?.retryable, false);
     assert.equal(denial?.connectionName, "jam");
     assert.equal((denial?.message ?? "").includes("jam"), false);
@@ -178,17 +179,16 @@ describe("intake-only channels", () => {
       true
     );
 
-    // A developer channel keeps the normal consent flow, and an unrelated
+    // The denial covers every Slack-issued user principal now, so an
+    // unstamped developer-channel mention is denied the same way. An app
+    // principal never reaches the consent flow at all, and an unrelated
     // failure is never rewritten into a sign-in denial.
+    assert.ok(slackSignInDenial(required, principalFor(slackAuth)));
+    assert.equal(slackSignInDenial(required, { type: "app" }), undefined);
     assert.equal(
-      intakeOnlySignInDenial(required, principalFor(auth)),
-      undefined
-    );
-    assert.equal(intakeOnlySignInDenial(required, { type: "app" }), undefined);
-    assert.equal(
-      intakeOnlySignInDenial(
+      slackSignInDenial(
         new Error("mcp server unreachable"),
-        principalFor(stampIntakeOnly(auth))
+        principalFor(stampIntakeOnly(slackAuth))
       ),
       undefined
     );
