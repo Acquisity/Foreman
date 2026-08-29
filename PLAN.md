@@ -73,7 +73,7 @@ Outcome: cached prompt re-reads cannot park a long Slack thread on eve's Approve
 
 - [x] P4.1 Add `limits: { maxInputTokensPerSession: false }` to the root agent and a root-agent unit test that pins the exact limits object. Update the nearby rationale without changing other model/session settings. Tests: new root-agent test, check, typecheck. done 2026-08-29T20:13Z, root agent disables the default 40M input budget with the rationale recorded beside the setting and agent/agent.test.ts pinning the exact limits object.
 - [x] P4.2 Extend the suite's existing single `eve info` run in `critic.test.ts` to read the compiled manifest and assert the root input limit is `false`. Do not add a second concurrent compiler spawn. Tests: focused critic test and full test suite. done 2026-08-29T21:09Z, the discovery test now also parses the compiled manifest from the same `eve info` spawn and pins `config.limits.maxInputTokensPerSession` to `false`, proving the source-level pin survives compilation.
-- [ ] P4.3 Document why the input limit is disabled in README.md and AGENTS.md, then run `pnpm validate`.
+- [x] P4.3 Document why the input limit is disabled in README.md and AGENTS.md, then run `pnpm validate`. done 2026-08-29T22:09Z, README gained a Session limits section and AGENTS.md an Eve conventions bullet, both explaining the 40M default, the cached re-read failure mode, and the unanswerable budget card.
 
 ### P5 Guarantee that every finished Slack reply lands
 
@@ -159,3 +159,4 @@ These are text-only follow-ups. The automation must not edit `node_modules` or a
 - 2026-08-29T19:49Z P2.3: validate pass (388 tests, 0 errors/warnings); Codex review rounds 1 (APPROVE: 0 blocking, 0 high, 0 medium, 0 low).
 - 2026-08-29T20:13Z P4.1: validate pass (389 tests, 0 errors/warnings); Codex review rounds 1 (REJECT: 1 medium — unrelated .gitignore/biome.jsonc lint-scope change inside the P4.1 delta; fixed by splitting it into its own chore commit, final validate pass; second round not run because the fix reorganized commits, not the design).
 - 2026-08-29T21:09Z P4.2: validate pass (389 tests, 0 errors/warnings); Codex review rounds 1 (APPROVE: 0 blocking, 0 high, 0 medium, 0 low). Worker start initially blocked on Codex's hooks trust prompt; resolved by trusting Orca's hooks in the terminal and reusing it.
+- 2026-08-29T22:09Z P4.3: validate pass (389 tests, 0 errors/warnings); Codex review rounds 1 (APPROVE: 0 blocking, 0 high, 0 medium, 0 low). Same hooks trust prompt as P4.2; resolved the same way and retried the dispatch with --retry-of after the failed start marked the task failed. Validate needs .env plus .env.local sourced for the connector UIDs eve info evaluates.

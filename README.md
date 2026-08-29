@@ -89,6 +89,10 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 
 See [.env.example](.env.example) for all MCP connection UIDs. No repository or setup command is configured through the environment.
 
+### Session limits
+
+The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agent.ts](agent/agent.ts). eve defaults to a 40M-token input budget per session, and cached prompt re-reads count as provider-reported input on every model call, so a long Slack thread can cross it and park the session on eve's Approve/Stop budget card, which Slack cannot answer. Output stays on eve's existing uncapped default.
+
 ### Instantly admin workspace
 
 Foreman reads Instantly through the Acquisity admin workspace `IBG` (`24f5c554-bf6c-4f51-a909-d25d9617cff9`). The runtime lists Workspace Group pages up to a 100-page safety cap, keeps only accepted memberships, and applies `x-as-workspace` only after resolving the selected subworkspace against that complete bounded result. Reaching the cap fails closed instead of returning a partial list. Every resource page returns the selected workspace name and ID.
