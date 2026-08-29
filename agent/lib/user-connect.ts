@@ -82,19 +82,59 @@ export function userConnect(
   options: EveAuthorizationOptions & { readonly principalType?: "user" }
 ) {
   const auth = managedConnect({ ...options, principalType: "user" });
-  const wrapped: typeof auth = {
-    ...auth,
-    getToken: async (
-      opts: Parameters<InteractiveAuthorizationDefinition["getToken"]>[0]
-    ) => {
+  const wrappedGetToken: InteractiveAuthorizationDefinition["getToken"] =
+    async (opts) => {
       try {
         return await auth.getToken(opts);
       } catch (error) {
         throw slackSignInDenial(error, opts.principal) ?? error;
       }
-    },
-  };
-  return wrapped;
+    };
+  CONSENT_AUTH.set(wrappedGetToken, auth);
+  return { ...auth, getToken: wrappedGetToken };
+}
+
+/**
+ * Maps a `userConnect` definition's wrapped `getToken` to the interactive
+ * definition it wraps.
+ *
+ * @remarks
+ * Keyed by function reference, not by a property on the definition:
+ * `defineMcpClientConnection` normalizes `auth` into a fresh object with
+ * only the fields eve knows, which drops any extra key but carries
+ * `getToken` across by reference. `withoutConsent` replaces `getToken`, so
+ * a task-mode child's definition deliberately resolves to nothing here.
+ */
+const CONSENT_AUTH = new WeakMap<
+  InteractiveAuthorizationDefinition["getToken"],
+  InteractiveAuthorizationDefinition
+>();
+
+/**
+ * Returns the interactive authorization a `userConnect` definition wraps,
+ * or undefined for anything else.
+ *
+ * @remarks
+ * The wrapped `getToken` turns a missing grant into a terminal denial for
+ * Slack-issued sessions, so the consent flow can never start through it.
+ * The root `sign_in` tool is the deliberate exception: a person who
+ * explicitly asks to connect a service gets the unwrapped definition, whose
+ * missing grant still raises "authorization required" and parks the turn on
+ * the consent flow. Nothing else should use this.
+ */
+export function consentAuth(
+  auth: unknown
+): InteractiveAuthorizationDefinition | undefined {
+  if (typeof auth !== "object" || auth === null || !("getToken" in auth)) {
+    return;
+  }
+  const { getToken } = auth as { getToken: unknown };
+  if (typeof getToken !== "function") {
+    return;
+  }
+  return CONSENT_AUTH.get(
+    getToken as InteractiveAuthorizationDefinition["getToken"]
+  );
 }
 
 /**
