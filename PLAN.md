@@ -54,7 +54,7 @@ Review PLAN.md item `<id>`: `<goal>`. This is a read-only review of `git diff HE
 
 Outcome: later mentions wait behind the running turn. Only a message consisting of `stop` or `cancel`, with an optional bot mention and punctuation, cancels it, and Slack receives one cancellation notice.
 
-- [ ] P1.1 Add `agent/lib/slack-stop.ts` and tests for bounded literal stop/cancel detection. Accept optional Slack mentions, case, whitespace, and terminal punctuation; reject longer requests such as `stop the deploy`. This separate helper must survive P5's removal of the old reply-marker helper. Tests: focused new test file, `pnpm validate`.
+- [x] P1.1 Add `agent/lib/slack-stop.ts` and tests for bounded literal stop/cancel detection. Accept optional Slack mentions, case, whitespace, and terminal punctuation; reject longer requests such as `stop the deploy`. This separate helper must survive P5's removal of the old reply-marker helper. Tests: focused new test file, `pnpm validate`. done 2026-08-29T16:08Z, isStopRequest matches only literal stop/cancel with edge mentions and terminal punctuation under a 200-character bound, 13 focused tests.
 - [ ] P1.2 Set the Slack turn policy to queue, intercept literal stop/cancel before model delivery using the version-matched channel API, and post one short line from `turn.cancelled`. Update Slack channel documentation and AGENTS.md. Tests: channel discovery, existing Slack tests, `pnpm validate`.
 - AV P1 Slack: while one request is running, send another request and confirm it waits; send `stop` and confirm the active turn ends with one notice.
 
@@ -151,3 +151,5 @@ These are text-only follow-ups. The automation must not edit `node_modules` or a
 ## Session log
 
 <!-- Append one line per completed or blocked hourly session. -->
+
+- 2026-08-29T16:08Z P1.1: validate pass (368 tests, 0 errors/warnings); Codex review rounds 2 (round 1 REJECT: 1 high, 1 medium; round 2 REJECT: 1 high, 1 medium; all four findings fixed, final validate pass; third round not run per protocol cap).
