@@ -9,6 +9,7 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import {
+  FINAL_SLACK_POST_RULE,
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
@@ -63,9 +64,9 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * notice, so a real cancellation is confirmed exactly once and a `stop`
  * with no active turn stays quiet.
  *
- * Delivery posts the complete final message: there is no marker that splits
- * narration from reply, so the final message itself is the requester-facing
- * text and an empty one falls back to a typing indicator. Slack rejects a
+ * Delivery posts the complete final message under the canonical rule injected
+ * by dispatch: there is no marker that splits it, and an empty message falls
+ * back to a typing indicator. Slack rejects a
  * markdown post over 12,000 characters and eve swallows an event-handler
  * throw, so final replies go through `slack-post.ts`: ordered chunks that
  * prefer paragraph then line boundaries, plus one short visible fallback
@@ -110,7 +111,7 @@ export const dispatch = async (
         auth: stampSlackIntakeAuth(stamped),
         context: [slackIntakeContext(message.channelId)],
       }
-    : { auth: stamped };
+    : { auth: stamped, context: [FINAL_SLACK_POST_RULE] };
 };
 
 export const slackChannelEvents: SlackChannelEvents = {

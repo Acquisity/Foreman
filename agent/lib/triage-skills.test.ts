@@ -37,11 +37,6 @@ const hotlaneSkill = readFileSync(
   new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
   "utf8"
 );
-const slackWordingSkill = readFileSync(
-  new URL("../skills/slack-wording/SKILL.md", import.meta.url),
-  "utf8"
-);
-
 const extractInstruction = (skill: string, start: string, end: string) => {
   const startIndex = skill.indexOf(start);
   const endIndex = skill.indexOf(end, startIndex);
@@ -702,21 +697,6 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
   assert.ok(masterSelection.includes("do not apply the recency cutoff"));
   assert.ok(masterSelection.includes("In other contexts"));
   assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
-});
-
-test("Slack replies exclude internal investigation summaries", () => {
-  for (const skill of [triageHandlingSkill, intercomTriageSkill]) {
-    assert.ok(skill.includes("only") && skill.includes("requester-facing"));
-    assert.ok(skill.includes("investigation summary"));
-  }
-
-  assert.ok(slackWordingSkill.includes("final post"));
-  assert.ok(slackWordingSkill.includes("single-audience message"));
-  assert.ok(slackWordingSkill.includes("only the forwardable requester reply"));
-  assert.ok(slackWordingSkill.includes("Linear update report"));
-  assert.ok(
-    slackWordingSkill.includes("progress updates may be conversational")
-  );
 });
 
 test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {

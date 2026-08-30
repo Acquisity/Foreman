@@ -141,7 +141,7 @@ When a trusted colleague replies in the thread contradicting your conclusion, tr
 
 ## Step 9: Reply in Slack
 
-Load `slack-wording`. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences. The assistant message contains only this requester-facing copy, with no investigation summary preamble or internal action report.
+Load `slack-wording` and follow the canonical final-post rule injected by the Slack channel boundary. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences.
 
 Do not include Linear identifiers, assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status. Linear remains the internal handoff; Slack tells the requester what was found and what happens next.
 
