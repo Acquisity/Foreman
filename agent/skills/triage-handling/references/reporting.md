@@ -1,6 +1,6 @@
 # Triage reporting
 
-Use these exact output constraints and templates during Stage 6 of the triage-investigate workflow.
+Use these exact output constraints and templates during Stage 6 of the triage-handling workflow.
 
 ## Linear report template
 

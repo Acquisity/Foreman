@@ -6,11 +6,12 @@ const triageSkill = readFileSync(
   new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const triageHandlingSkill = readFileSync(
+  new URL("../skills/triage-handling/SKILL.md", import.meta.url),
+  "utf8"
+);
 const triageReportingReference = readFileSync(
-  new URL(
-    "../skills/triage-investigate/references/reporting.md",
-    import.meta.url
-  ),
+  new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
   "utf8"
 );
 const triageToolsReference = readFileSync(
@@ -43,36 +44,85 @@ const extractInstruction = (skill: string, start: string, end: string) => {
   return skill.slice(startIndex, endIndex);
 };
 
-test("Stage 5 names the Linear state for every handling path", () => {
+const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
+
+test("triage intake hands off to the handling skill after Stage 4", () => {
+  assert.ok(triageSkill.includes("## Handoff to handling"));
   assert.ok(
     triageSkill.includes(
+      "Stages 5 through 7 and the report templates live in the `triage-handling` skill"
+    )
+  );
+  assert.ok(
+    triageSkill.indexOf("## Handoff to handling") >
+      triageSkill.indexOf("## Stage 4: Investigate")
+  );
+  assert.equal(triageSkill.includes("## Stage 5"), false);
+  assert.equal(triageSkill.includes("[references/reporting.md]"), false);
+  assert.ok(triageHandlingSkill.includes("## Stage 5: Decide handling"));
+  assert.ok(
+    triageHandlingSkill.includes(
+      "Load after triage-investigate Stage 4 completes the evidence record"
+    )
+  );
+  assert.equal(triageHandlingSkill.includes("## Stage 1"), false);
+  assert.equal(triageHandlingSkill.includes("## Stage 4"), false);
+
+  const description = triageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  assert.ok(description.includes("Stages 1 through 4"));
+  assert.ok(description.includes("triage-handling"));
+  for (const moved of [
+    "severity weighting and priority bands",
+    "area-routing roster",
+    "root-cause masters",
+    "unblocking the customer",
+  ]) {
+    assert.equal(description.includes(moved), false, moved);
+  }
+});
+
+test("Stage 5 names the Linear state for every handling path", () => {
+  assert.ok(
+    triageHandlingSkill.includes(
       "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`."
     )
   );
 });
 
-test("shared triage exposes one seven-stage workflow with settled fact boundaries", () => {
-  const stages = [
+test("shared triage exposes one seven-stage workflow across intake and handling", () => {
+  const intakeStages = [
     "Stage 1: Establish the case",
     "Stage 2: Resolve customer identity once",
     "Stage 3: Check existing work and frame the investigation",
     "Stage 4: Investigate",
+  ];
+  const handlingStages = [
     "Stage 5: Decide handling",
     "Stage 6: Persist and route",
     "Stage 7: Finish the attended response and memory bookkeeping",
   ];
 
   let previousIndex = -1;
-  for (const stage of stages) {
+  for (const stage of intakeStages) {
     const stageIndex = triageSkill.indexOf(`## ${stage}`);
     assert.ok(stageIndex > previousIndex);
     previousIndex = stageIndex;
   }
+  previousIndex = -1;
+  for (const stage of handlingStages) {
+    const stageIndex = triageHandlingSkill.indexOf(`## ${stage}`);
+    assert.ok(stageIndex > previousIndex);
+    previousIndex = stageIndex;
+  }
 
-  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 4);
+  assert.equal(triageHandlingSkill.match(/^## Stage \d:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Purpose:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Inputs:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Completion:/gmu)?.length, 3);
   assert.ok(triageSkill.includes("runtime's `intakeOnly` value as a fact"));
   assert.ok(triageSkill.includes("including `null`"));
   assert.ok(
@@ -127,7 +177,9 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
   }
   assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
   assert.ok(
-    triageSkill.includes("[references/reporting.md](references/reporting.md)")
+    triageHandlingSkill.includes(
+      "[references/reporting.md](references/reporting.md)"
+    )
   );
   assert.ok(triageReportingReference.includes("## Linear report template"));
   assert.ok(
@@ -162,6 +214,11 @@ test("shared triage makes retrieval project-independent", () => {
     "route to Aaron Fraga as the triage skill already requires",
   ]) {
     assert.equal(triageSkill.includes(oldInstruction), false, oldInstruction);
+    assert.equal(
+      triageHandlingSkill.includes(oldInstruction),
+      false,
+      oldInstruction
+    );
   }
   assert.ok(establish.includes("ordinary intake metadata"));
   assert.ok(
@@ -179,7 +236,7 @@ test("shared triage makes retrieval project-independent", () => {
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius"
     )
   );
@@ -191,7 +248,7 @@ test("ENG-13175-shaped thread correction is recorded, not argued", () => {
     "put your overturned conclusion in `ruledOut`",
     "handle it as a correction under Stage 7",
   ]) {
-    assert.ok(triageSkill.includes(phrase), phrase);
+    assert.ok(triageHandlingSkill.includes(phrase), phrase);
   }
 });
 
@@ -199,19 +256,21 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
   const memorySearch = triageSkill.indexOf(
     "including projectless Linear tickets"
   );
-  const projectChoice = triageSkill.indexOf(
+  const handoff = triageSkill.indexOf("## Handoff to handling");
+  const projectChoice = triageHandlingSkill.indexOf(
     "### Choose the product project from completed evidence"
   );
 
   assert.ok(memorySearch >= 0);
-  assert.ok(projectChoice > memorySearch);
+  assert.ok(handoff > memorySearch);
+  assert.ok(projectChoice >= 0);
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Pass the evidence-backed project to the ticket's one `route_ticket` call"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "pass that resulting project id to `record_investigation_case`"
     )
   );
@@ -219,61 +278,65 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
 
 test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback", () => {
   assert.ok(
-    triageSkill.includes("incoming `Support` project cannot make this decision")
+    triageHandlingSkill.includes(
+      "incoming `Support` project cannot make this decision"
+    )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "When Aaron explicitly requests read-only validation during an attended manual test"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "apply no Linear mutation and do not record investigation memory"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "This is an operator instruction for that test, not a runtime authorization mode"
     )
   );
   assert.ok(
-    triageSkill.includes("Do not require or invent a session marker for it")
+    triageHandlingSkill.includes(
+      "Do not require or invent a session marker for it"
+    )
   );
 });
 
 test("shared triage stops unproven claims before classification or routing", () => {
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "When the deciding confirmation is still missing, take the unproven branch and stop before classification"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Preserve the source ticket's current state, priority, and labels"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Do not create or attach a master, route engineering work, or record investigation memory"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Before stopping, record any safe unblock supported by the completed evidence"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "action, owner, current status, and confirmation that it costs the customer neither data nor money"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "either the unproven branch has made the unblock explicit"
     )
   );
@@ -350,7 +413,7 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
 });
 
 test("Slack replies exclude internal investigation summaries", () => {
-  for (const skill of [triageSkill, intercomTriageSkill]) {
+  for (const skill of [triageHandlingSkill, intercomTriageSkill]) {
     assert.ok(skill.includes("only") && skill.includes("requester-facing"));
     assert.ok(skill.includes("investigation summary"));
   }
@@ -366,13 +429,14 @@ test("Slack replies exclude internal investigation summaries", () => {
 
 test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {
   const branch = extractInstruction(
-    triageSkill,
+    triageHandlingSkill,
     "### When the root cause warrants action",
     "### Area-routing roster"
   );
   assert.ok(branch.includes("Load `engineering-handoff`"));
   assert.ok(!branch.includes("linear__list_issues"));
   assert.ok(!triageSkill.includes("## Master ticket template"));
+  assert.ok(!triageHandlingSkill.includes("## Master ticket template"));
   for (const moved of [
     "## Preconditions",
     "## Match by cause, not symptom",
@@ -382,7 +446,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "## Read back before finishing",
     "One master per root cause",
     "`fast-lane`",
-    "area-routing roster in `triage-investigate` Stage 6",
+    "area-routing roster in `triage-handling` Stage 6",
     "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
@@ -431,7 +495,7 @@ test("incident-hotlane assesses and never writes", () => {
 
 test("triage reviews a Bug with the critic before routing it", () => {
   const review = extractInstruction(
-    triageSkill,
+    triageHandlingSkill,
     "### Review a Bug before routing it",
     "## Stage 6: Persist and route"
   );
@@ -486,6 +550,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
   }
   for (const surface of [
     triageSkill,
+    triageHandlingSkill,
     triageReportingReference,
     triageToolsReference,
     handoffSkill,
@@ -495,38 +560,38 @@ test("triage reviews a Bug with the critic before routing it", () => {
     }
   }
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>`"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "`Adjudicated <the updatedAt Stage 5 read back> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "A document created here for an unreviewed outcome is written once with `**Review**: Not required`"
     )
   );
-  assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
+  assert.ok(triageHandlingSkill.includes("are applied in Stage 6 without one"));
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Every decision above is provisional until the review below has settled the document"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "a hotlane-stopped review never reaches this stage's writes"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "For a `Bug` other than a `Duplicate`, the review in Stage 5 settled the document version"
     )
   );
@@ -559,5 +624,6 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "linearProjectId",
   ]) {
     assert.ok(!triageSkill.includes(excluded), excluded);
+    assert.ok(!triageHandlingSkill.includes(excluded), excluded);
   }
 });
