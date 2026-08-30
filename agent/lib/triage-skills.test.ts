@@ -438,43 +438,70 @@ test("triage reviews a Bug with the critic before routing it", () => {
   for (const rule of [
     "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
     "a duplicate routes nothing new to engineering",
+    "The critic runs exactly once per ticket",
+    "Foreman posts one progress line, delegates once, and adjudicates the result once",
+    "never parks the ticket on a person",
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
-    "Delegate to the `critic` subagent",
-    "the full 40-character SHA",
-    "`attempt 1`",
-    "Do not pass an `outputSchema`",
-    "Check the echo before reading the verdict",
-    "A result with an empty `criteria_results` is a review that could not start",
-    "that is a stop under step 5, not an echo defect, whatever `reviewed.commit` says",
-    "Otherwise, if `reviewed.commit` is `unpinned` or is not exactly the full 40-character commit you supplied, or `reviewed` does not echo exactly the issue id, document id, and `updatedAt` you supplied",
-    "Whatever the verdict says, do not count that result as an attempt: re-delegate once with the same attempt number and the same inputs",
-    "If the second result is also `unpinned` or mis-echoed, it is a stop",
-    "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
+    "Post one progress line to the attended thread",
+    "the next message the thread receives is the final reply",
+    "Delegate to the `critic` subagent exactly once",
+    "the full 40-character SHA",
+    "Do not pass an `outputSchema`",
+    "this reading is the one adjudication",
+    "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
     "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",
+    "A result with an empty `criteria_results` is a review that could not start",
+    "None of these is a reason for a second delegation",
+    "On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record",
+    "When the corrected record no longer supports the classification, change the classification and handling path",
+    "set its `**Review**` line to `Adjudicated: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> at <commit>`",
+    "followed by one short clause per blocking finding or the failure reason, each naming what settled it",
+    "That read-back `updatedAt` is the settled version the handoff checks",
     "In a read-only run, describe those writes instead of making them",
-    "once a version is approved, nothing may change it until routing is done",
-    "The Stage 7 reply after a stop states only what is known, says a person is settling it before anything is final, and promises no action",
-    "is a stop, not a retry",
-    "delegate again with `attempt 2`",
-    "On a second `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on any stop",
-    "`Stopped: <verdict or failure>`",
-    'Call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"` as the explicit human-routing fallback',
-    "There is no attempt 3 and no fresh reviewer chain",
     "as the literal marker `read-only`",
     "Do not touch the document",
+    "Once the review settles a version, approved or adjudicated, nothing may change it until routing is done",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
   assert.ok(
-    review.indexOf("Check the echo before reading the verdict") <
-      review.indexOf("Read the result as a whole before acting on `verdict`"),
-    "the echo check precedes the verdict read"
+    review.indexOf("Post one progress line to the attended thread") <
+      review.indexOf("Delegate to the `critic` subagent exactly once"),
+    "the progress line precedes the delegation"
+  );
+  const retryWording = [
+    "attempt 1",
+    "attempt 2",
+    "attempt 3",
+    "re-delegate",
+    "delegate again",
+    "second `CHALLENGE`",
+    "fresh reviewer",
+    "new critic review",
+  ];
+  for (const excluded of retryWording) {
+    assert.ok(!review.includes(excluded), excluded);
+  }
+  for (const surface of [
+    triageSkill,
+    triageReportingReference,
+    triageToolsReference,
+    handoffSkill,
+  ]) {
+    for (const excluded of retryWording) {
+      assert.ok(!surface.includes(excluded), excluded);
+    }
+  }
+  assert.ok(
+    triageSkill.includes(
+      "save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>`"
+    )
   );
   assert.ok(
     triageSkill.includes(
-      "After the handoff has read its writes back, save it once more with `**Review**: Approved"
+      "`Adjudicated <the updatedAt Stage 5 read back> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
     )
   );
   assert.ok(
@@ -485,27 +512,46 @@ test("triage reviews a Bug with the critic before routing it", () => {
   assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
   assert.ok(
     triageSkill.includes(
-      "Every decision above is provisional until the review below has approved the document"
-    )
-  );
-  assert.ok(
-    triageSkill.includes("a stopped review never reaches this stage's writes")
-  );
-  assert.ok(
-    triageSkill.includes(
-      "A reviewed `Bug` is final only when its review was approved; a stopped review records nothing. A `Duplicate` is final once its master link is saved"
+      "Every decision above is provisional until the review below has settled the document"
     )
   );
   assert.ok(
     triageSkill.includes(
-      "For a `Bug` other than a `Duplicate`, the review in Stage 5 approved the document version"
+      "a hotlane-stopped review never reaches this stage's writes"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "For a `Bug` other than a `Duplicate`, the review in Stage 5 settled the document version"
     )
   );
   assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
   assert.ok(
+    triageReportingReference.includes(
+      "Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>"
+    )
+  );
+  assert.ok(
+    triageReportingReference.includes(
+      "names each blocking finding or the failure reason in the `**Review**` line itself"
+    )
+  );
+  assert.ok(handoffSkill.includes("The critic reviews a ticket exactly once"));
+  assert.ok(
+    handoffSkill.includes(
+      "the `updatedAt` Stage 5 read back after its settling save"
+    )
+  );
+  assert.ok(
     triageToolsReference.includes("## Critic (subagent) and the review skills")
   );
   assert.ok(triageToolsReference.includes("never pass an `outputSchema`"));
+  assert.ok(triageToolsReference.includes("exactly once per ticket"));
   for (const excluded of [
     "create_triage_review_packet",
     "read_triage_review_verdict",
