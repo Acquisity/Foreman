@@ -14,10 +14,6 @@ const triageReportingReference = readFileSync(
   new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
   "utf8"
 );
-const triageToolsReference = readFileSync(
-  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
-  "utf8"
-);
 const intercomTriageSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
@@ -45,6 +41,7 @@ const extractInstruction = (skill: string, start: string, end: string) => {
 };
 
 const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
+const BACKTICK_TOKEN_PATTERN = /`([^`]+)`/gu;
 
 test("triage intake hands off to the handling skill after Stage 4", () => {
   assert.ok(triageSkill.includes("## Handoff to handling"));
@@ -151,31 +148,276 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "Deployment or edge failures",
     "The conversation behind the report",
   ];
-  const toolCatalogs = [
-    "Repository (root tools, no prefix)",
-    "Investigation memory (root tools, no prefix)",
-    "PlanetScale (`planetscale__`)",
-    "Instantly (root tools, no prefix)",
-    "Linear (`linear__`)",
-    "Inngest (`inngest__`)",
-    "Sentry (`sentry__`)",
-    "Axiom (`axiom__`)",
-    "PostHog (`posthog__`)",
-    "Lucent (`lucent__`)",
-    "Jam (`jam__`)",
-    "Vercel (`vercel__`)",
-    "Intercom (`intercom__`)",
-    "Resend (`resend__`)",
-    "Modem (`modem__`)",
-  ];
+  // The full exact-name catalog, pinned against the folded table so a dropped
+  // row or renamed tool fails here. Keys are the table's Surface labels.
+  const toolCatalog: Record<string, string[]> = {
+    Axiom: [
+      "queryDataset",
+      "listDatasets",
+      "getDatasetFields",
+      "queryMetrics",
+      "listMetrics",
+      "searchMetrics",
+      "listMetricTags",
+      "getMetricTagValues",
+      "checkMonitors",
+      "getMonitorHistory",
+      "getSavedQueries",
+      "listDashboards",
+      "getDashboard",
+      "exportDashboard",
+      "listNotifiers",
+    ],
+    "Customer identity": ["lookup_customer"],
+    "Help center": ["find_help_article"],
+    "Inngest connection": [
+      "list_function_runs",
+      "list_runs",
+      "get_run",
+      "get_run_trace",
+      "get_event_runs",
+      "list_functions",
+      "get_function",
+      "list_envs",
+      "query_insights",
+      "list_insights_tables",
+      "list_insights_event_schemas",
+      "get_app",
+      "get_apps",
+      "list_webhooks",
+      "health",
+    ],
+    "Inngest runs": ["find_function_runs"],
+    Instantly: ["list_instantly_subworkspaces", "read_instantly_subworkspace"],
+    Intercom: [
+      "search",
+      "fetch",
+      "search_conversations",
+      "get_conversation",
+      "search_contacts",
+      "get_contact",
+      "get_company",
+      "list_companies",
+    ],
+    "Investigation memory": [
+      "search_investigation_memory",
+      "record_investigation_case",
+      "correct_investigation_case",
+    ],
+    Jam: [
+      "search",
+      "fetch",
+      "listJams",
+      "getDetails",
+      "getMetadata",
+      "getConsoleLogs",
+      "getNetworkRequests",
+      "getUserEvents",
+      "getScreenshots",
+      "getFrames",
+      "getVideoTranscript",
+      "analyzeVideo",
+      "getRecordingLink",
+      "getRecordingUrlVerifyLink",
+      "listRecordingLinks",
+      "listRecordingLinkJams",
+      "listRecordingUrls",
+      "listFolders",
+      "listMembers",
+    ],
+    "Linear connection": [
+      "list_issues",
+      "get_issue",
+      "list_issue_labels",
+      "save_issue",
+      "save_document",
+      "list_comments",
+      "save_comment",
+    ],
+    "Linear searches and routing writes": [
+      "find_related_issues",
+      "route_ticket",
+      "save_investigation_document",
+    ],
+    Lucent: ["list_issues", "get_issue", "list_insights"],
+    Modem: ["search_modem"],
+    "PlanetScale connection": [
+      "planetscale_list_organizations",
+      "planetscale_get_organization",
+      "planetscale_list_databases",
+      "planetscale_get_database",
+      "planetscale_list_branches",
+      "planetscale_get_branch",
+      "planetscale_get_insights",
+      "planetscale_list_schema_recommendations",
+      "planetscale_search_documentation",
+    ],
+    "PlanetScale data": ["planetscale_execute_read_query", "describe_table"],
+    PostHog: [
+      "exec",
+      "persons",
+      "session-recording",
+      "error-tracking",
+      "query",
+      "execute-sql",
+      "insight",
+      "event-definition",
+      "heatmaps",
+    ],
+    Repository: ["prepare_repository", "grep", "glob", "read_file", "bash"],
+    Resend: [
+      "list-emails",
+      "get-email",
+      "list-logs",
+      "get-log",
+      "list-domains",
+      "get-domain",
+      "list-suppressions",
+      "get-suppression",
+      "list-contacts",
+      "get-contact",
+      "list-broadcasts",
+      "get-broadcast",
+      "list-templates",
+      "get-template",
+      "list-webhooks",
+      "get-webhook",
+      "list-segments",
+      "get-segment",
+      "list-topics",
+      "get-topic",
+      "list-received-emails",
+      "get-received-email",
+      "list-received-email-attachments",
+      "get-received-email-attachment",
+      "list-sent-email-attachments",
+      "get-sent-email-attachment",
+    ],
+    Sentry: [
+      "find_organizations",
+      "find_projects",
+      "find_issues",
+      "search_issues",
+      "get_issue_details",
+      "search_events",
+      "search_issue_events",
+    ],
+    Vercel: [
+      "get_runtime_errors",
+      "get_runtime_logs",
+      "list_deployments",
+      "get_deployment",
+      "get_deployment_build_logs",
+      "list_projects",
+      "get_project",
+      "list_teams",
+      "get_web_analytics",
+      "search_vercel_documentation",
+      "web_fetch_vercel_url",
+      "get_access_to_vercel_url",
+      "list_agent_runs",
+      "get_agent_run",
+      "get_agent_run_trace",
+      "list_agent_run_projects",
+      "list_toolbar_threads",
+      "get_toolbar_thread",
+    ],
+  };
 
+  const catalogTable = extractInstruction(
+    triageSkill,
+    "Exact tool names, one row per surface",
+    "### Record the lanes"
+  );
   for (const lane of evidenceLanes) {
     assert.ok(triageSkill.includes(lane), lane);
   }
-  for (const catalog of toolCatalogs) {
-    assert.ok(triageToolsReference.includes(`## ${catalog}`), catalog);
+  for (const laneRule of [
+    "follows Workspace Group pages up to a 100-page safety cap",
+    "returns only accepted subworkspaces",
+    "never a complete list",
+    "must resolve exactly once",
+    "fail closed",
+    "accepts a URL",
+    "`get_contact` returns the profile only and is not a step on this path",
+    "strip the prefix or the filter matches nothing",
+    "filters structured fields and has no free-text",
+  ]) {
+    assert.ok(triageSkill.includes(laneRule), laneRule);
   }
-  assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
+
+  // Parse each Markdown row and deep-equal the surface, call prefix, and
+  // exact ordered token set, so a renamed tool, a wrong call kind, or an
+  // extra row or token fails here instead of passing on a substring.
+  const parsedRows = catalogTable
+    .split("\n")
+    .filter(
+      (line) =>
+        line.startsWith("| ") &&
+        !line.startsWith("| Surface") &&
+        !line.startsWith("| ---")
+    )
+    .map((line) => {
+      const cells = line
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim());
+      const [surface = "", callAs = "", namesCell = ""] = cells;
+      return {
+        callAs: callAs.replaceAll("`", ""),
+        names: [...namesCell.matchAll(BACKTICK_TOKEN_PATTERN)].map(
+          (match) => match[1]
+        ),
+        surface,
+      };
+    });
+  const expectedShape: Array<readonly [string, string]> = [
+    ["Repository", "root, bare"],
+    ["Help center", "root, bare"],
+    ["Investigation memory", "root, bare"],
+    ["Customer identity", "root, bare"],
+    ["PlanetScale data", "root, bare"],
+    ["PlanetScale connection", "planetscale__"],
+    ["Instantly", "root, bare"],
+    ["Linear searches and routing writes", "root, bare"],
+    ["Linear connection", "linear__"],
+    ["Inngest runs", "root, bare"],
+    ["Inngest connection", "inngest__"],
+    ["Sentry", "sentry__"],
+    ["Axiom", "axiom__"],
+    ["PostHog", "posthog__"],
+    ["Lucent", "lucent__"],
+    ["Jam", "jam__"],
+    ["Vercel", "vercel__"],
+    ["Intercom", "intercom__"],
+    ["Resend", "resend__"],
+    ["Modem", "modem__"],
+  ];
+  assert.deepEqual(
+    parsedRows,
+    expectedShape.map(([surface, callAs]) => ({
+      callAs,
+      names: toolCatalog[surface],
+      surface,
+    }))
+  );
+  for (const note of [
+    "Never invent a tool name from a service's REST API or CLI",
+    "with the `connection` argument naming one connection",
+    "never as `planetscale__planetscale_execute_read_query`",
+    "no allowlist",
+    "kebab-case",
+    "`truncated`",
+    "`oversizedRow`",
+    "`envelopeTooLarge`",
+    "`raw`",
+    "organization `acquisity`, database `acquisity`, branch `main`",
+    "8eaf95ab-56ac-4490-8253-f6a96793dc40",
+    "no write tool to reach even by accident",
+  ]) {
+    assert.ok(catalogTable.includes(note), note);
+  }
+  assert.equal(triageSkill.includes("references/tools.md"), false);
   assert.ok(
     triageHandlingSkill.includes(
       "[references/reporting.md](references/reporting.md)"
@@ -552,7 +794,6 @@ test("triage reviews a Bug with the critic before routing it", () => {
     triageSkill,
     triageHandlingSkill,
     triageReportingReference,
-    triageToolsReference,
     handoffSkill,
   ]) {
     for (const excluded of retryWording) {
@@ -612,11 +853,6 @@ test("triage reviews a Bug with the critic before routing it", () => {
       "the `updatedAt` Stage 5 read back after its settling save"
     )
   );
-  assert.ok(
-    triageToolsReference.includes("## Critic (subagent) and the review skills")
-  );
-  assert.ok(triageToolsReference.includes("never pass an `outputSchema`"));
-  assert.ok(triageToolsReference.includes("exactly once per ticket"));
   for (const excluded of [
     "create_triage_review_packet",
     "read_triage_review_verdict",
