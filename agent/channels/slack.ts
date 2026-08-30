@@ -1,6 +1,7 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
 import {
   defaultSlackAuth,
+  type SlackChannelEvents,
   type SlackInboundMessageContext,
   type SlackMessage,
   slackChannel,
@@ -12,6 +13,7 @@ import {
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
 import { replyOf } from "../lib/slack-reply.js";
+import { isStopRequest } from "../lib/slack-stop.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -50,6 +52,17 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * repository selection, and no intake-only marker, so every delivery from a
  * DM parked on an approval card that Slack cannot deliver an answer to.
  *
+ * Later mentions wait behind the running turn instead of replacing it: the
+ * queue turn policy delivers a follow-up after the active turn finishes,
+ * where the default steer policy cancelled the active turn and silently lost
+ * the earlier request. One message still cancels on purpose: a text that is
+ * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
+ * cancels the active turn through `ctx.cancel()`, and is consumed without
+ * reaching the model. Anything longer, such as `stop the deploy`, is
+ * ordinary model input. The `turn.cancelled` event posts the single short
+ * notice, so a real cancellation is confirmed exactly once and a `stop`
+ * with no active turn stays quiet.
+ *
  * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
  * so the model's narration stays in the session and only the requester-facing
  * text reaches the thread. The handler mirrors eve's default
@@ -57,9 +70,22 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * post.
  */
 
-const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
+export const dispatch = async (
+  ctx: SlackInboundMessageContext,
+  message: SlackMessage
+) => {
+  // Admission comes first: an event the auth check would reject must never
+  // cancel work either, so the stop command runs only for an admitted
+  // author.
   const auth = defaultSlackAuth(message, ctx);
   if (auth === null) {
+    return null;
+  }
+  // A literal stop/cancel is a command for the running turn, never model
+  // input: cancel the active turn and consume the message. `turn.cancelled`
+  // posts the notice; with no active turn the message drops quietly.
+  if (isStopRequest(message.text)) {
+    await ctx.cancel();
     return null;
   }
   const repositories = extractRepositoryUrls(message.text);
@@ -83,28 +109,34 @@ const dispatch = (ctx: SlackInboundMessageContext, message: SlackMessage) => {
     : { auth: stamped };
 };
 
+export const slackChannelEvents: SlackChannelEvents = {
+  async "message.completed"(data, channel) {
+    if (data.finishReason === "tool-calls") {
+      channel.state.pendingToolCallMessage = data.message
+        ? (data.message.split("\n").find((line) => line.trim()) ?? null)
+        : null;
+      return;
+    }
+    channel.state.pendingToolCallMessage = null;
+    const reply = data.message ? replyOf(data.message) : "";
+    if (!reply) {
+      await channel.thread.startTyping();
+      return;
+    }
+    await channel.thread.post(reply);
+  },
+  async "turn.cancelled"(_data, channel) {
+    await channel.thread.post("Stopped.");
+  },
+};
+
 export default slackChannel({
   credentials: connectSlackCredentials(
     process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
   ),
-  events: {
-    async "message.completed"(data, channel) {
-      if (data.finishReason === "tool-calls") {
-        channel.state.pendingToolCallMessage = data.message
-          ? (data.message.split("\n").find((line) => line.trim()) ?? null)
-          : null;
-        return;
-      }
-      channel.state.pendingToolCallMessage = null;
-      const reply = data.message ? replyOf(data.message) : "";
-      if (!reply) {
-        await channel.thread.startTyping();
-        return;
-      }
-      await channel.thread.post(reply);
-    },
-  },
+  events: slackChannelEvents,
   onAppMention: dispatch,
   onDirectMessage: dispatch,
   threadContext: { since: "last-agent-reply" },
+  turnPolicy: "queue",
 });
