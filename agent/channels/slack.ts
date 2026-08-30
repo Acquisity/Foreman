@@ -12,6 +12,7 @@ import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
+import { postSlackReply } from "../lib/slack-post.js";
 import { isStopRequest } from "../lib/slack-stop.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
@@ -64,9 +65,13 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  *
  * Delivery posts the complete final message: there is no marker that splits
  * narration from reply, so the final message itself is the requester-facing
- * text and an empty one falls back to a typing indicator. The handler mirrors
- * eve's default `message.completed` branches, which are not exported, and
- * changes only the post.
+ * text and an empty one falls back to a typing indicator. Slack rejects a
+ * markdown post over 12,000 characters and eve swallows an event-handler
+ * throw, so final replies go through `slack-post.ts`: ordered chunks that
+ * prefer paragraph then line boundaries, plus one short visible fallback
+ * naming the Slack error when a post is rejected. The handler mirrors eve's
+ * default `message.completed` branches, which are not exported, and changes
+ * only the post.
  */
 
 export const dispatch = async (
@@ -123,7 +128,7 @@ export const slackChannelEvents: SlackChannelEvents = {
       await channel.thread.startTyping();
       return;
     }
-    await channel.thread.post(data.message);
+    await postSlackReply((chunk) => channel.thread.post(chunk), data.message);
   },
   async "turn.cancelled"(_data, channel) {
     await channel.thread.post("Stopped.");
