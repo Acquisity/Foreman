@@ -6,7 +6,7 @@ description: "Assess whether a completed triage investigation describes an incid
 
 Decide, from the completed investigation, whether this failure needs urgent handling and what work that implies. Route by user and business impact, not by complaint volume or how the reporter phrased it. One affected workspace is enough when a core function is blocked or materially impaired.
 
-This skill performs no writes. It does not change Linear, assign work, create a master, send a message, or touch production. It returns a structured assessment that Foreman includes in the critic review and acts on only after approval, in Stage 6. If a challenge overturns it, there is nothing to roll back.
+This skill performs no writes. It does not change Linear, assign work, create a master, send a message, or touch production. It returns a structured assessment that Foreman includes in the critic review and acts on only after the review has settled, in Stage 6. If a challenge overturns it, there is nothing to roll back.
 
 ## Evaluate core-function impact
 

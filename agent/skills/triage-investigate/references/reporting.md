@@ -80,7 +80,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 **Ticket**: <ENG-XXXX>
 **Classification**: <User Error | Platform Limitation | Bug>
 **Organization**: <organization_id> (<org name>)
-**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Stopped: <reason> | Not required>
+**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> | Stopped: NEEDS_HUMAN_URGENT | Not required>
 
 ## Claim
 The one testable sentence from Stage 1.
@@ -109,6 +109,8 @@ What was checked and eliminated, so the next agent does not redo it.
 ## Next steps
 What action the root cause warrants.
 ```
+
+An `Adjudicated` review names each blocking finding or the failure reason in the `**Review**` line itself, one short clause per finding with what settled it, so the next person starts from the findings rather than from nothing.
 
 ## Master ticket template
 
