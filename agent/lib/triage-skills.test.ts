@@ -6,6 +6,10 @@ const triageSkill = readFileSync(
   new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
+const triageToolCatalog = readFileSync(
+  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
+  "utf8"
+);
 const triageHandlingSkill = readFileSync(
   new URL("../skills/triage-handling/SKILL.md", import.meta.url),
   "utf8"
@@ -155,8 +159,9 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "Deployment or edge failures",
     "The conversation behind the report",
   ];
-  // The full exact-name catalog, pinned against the folded table so a dropped
-  // row or renamed tool fails here. Keys are the table's Surface labels.
+  // The full exact-name catalog, pinned against the reference booklet table so
+  // a dropped row or renamed tool fails here. Keys are the table's Surface
+  // labels.
   const toolCatalog: Record<string, string[]> = {
     Axiom: [
       "queryDataset",
@@ -331,11 +336,6 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ],
   };
 
-  const catalogTable = extractInstruction(
-    triageSkill,
-    "Exact tool names, one row per surface",
-    "### Record the lanes"
-  );
   for (const lane of evidenceLanes) {
     assert.ok(triageSkill.includes(lane), lane);
   }
@@ -356,10 +356,11 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     assert.ok(triageSkill.includes(laneRule), laneRule);
   }
 
-  // Parse each Markdown row and deep-equal the surface, call prefix, and
-  // exact ordered token set, so a renamed tool, a wrong call kind, or an
-  // extra row or token fails here instead of passing on a substring.
-  const parsedRows = catalogTable
+  // Parse each Markdown row of the reference booklet and deep-equal the
+  // surface, call prefix, and exact ordered token set, so a renamed tool, a
+  // wrong call kind, or an extra row or token fails here instead of passing
+  // on a substring.
+  const parsedRows = triageToolCatalog
     .split("\n")
     .filter(
       (line) =>
@@ -425,9 +426,16 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "8eaf95ab-56ac-4490-8253-f6a96793dc40",
     "no write tool to reach even by accident",
   ]) {
-    assert.ok(catalogTable.includes(note), note);
+    assert.ok(triageToolCatalog.includes(note), note);
   }
-  assert.equal(triageSkill.includes("references/tools.md"), false);
+  // The catalog moved out of the intake skill into the reference booklet;
+  // the skill links it and carries no inline table.
+  assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
+  assert.equal(triageSkill.includes("| Surface | Call as |"), false);
+  assert.equal(
+    triageSkill.includes("Exact tool names, one row per surface"),
+    false
+  );
   assert.ok(
     triageHandlingSkill.includes(
       "[references/reporting.md](references/reporting.md)"
@@ -444,6 +452,38 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     triageReportingReference.includes("live in the `engineering-handoff` skill")
   );
   assert.ok(handoffSkill.includes("## Master ticket template"));
+});
+
+test("triage intake mandates loading the tool catalog before evidence collection", () => {
+  const stage4Index = triageSkill.indexOf("## Stage 4: Investigate");
+  const gateIndex = triageSkill.indexOf("### Load the tool catalog first");
+  const firstLaneIndex = triageSkill.indexOf("### Search investigation memory");
+
+  assert.ok(stage4Index >= 0);
+  assert.ok(gateIndex > stage4Index);
+  assert.ok(firstLaneIndex > gateIndex);
+
+  const gate = extractInstruction(
+    triageSkill,
+    "### Load the tool catalog first",
+    "### Search investigation memory"
+  );
+  assert.ok(gate.includes("[references/tools.md](references/tools.md)"));
+  assert.ok(gate.includes("before the first evidence lane runs"));
+  assert.ok(gate.includes("mandatory"));
+  assert.ok(
+    gate.includes(
+      "do not continue into evidence collection until the catalog is loaded"
+    )
+  );
+});
+
+test("triage intake skill stays within its 15000-byte budget", () => {
+  const intakeBytes = Buffer.byteLength(triageSkill, "utf8");
+  assert.ok(
+    intakeBytes <= 15_000,
+    `triage-investigate SKILL.md is ${intakeBytes} bytes, over the 15000-byte budget`
+  );
 });
 
 test("shared triage makes retrieval project-independent", () => {
