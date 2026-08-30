@@ -2,7 +2,7 @@
 
 Every source a triage investigation can cite, and how the critic reaches it. Each entry is the root Foreman definition mounted into the child; the credential path is the root's own `managedConnect` or `userConnect` object, reused as is. The critic holds no connector, token, or credential of its own and can never write.
 
-Connection tools are called as `<connection>__<tool>`; use `connection_search` to discover what a connection exposes before calling one. Root tools are called by their bare name and are always present without any search: never report one as unavailable unless you called it and it failed or answered `available: false`.
+Connection tools are called as `<connection>__<tool>`; use `connection_search` with the `connection` argument naming one connection to discover what it exposes before calling one. Root tools are called by their bare name and are always present without any search: never report one as unavailable unless you called it and it failed or answered `available: false`.
 
 ## Repository (root tools)
 
