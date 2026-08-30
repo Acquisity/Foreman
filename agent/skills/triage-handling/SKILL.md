@@ -16,31 +16,19 @@ The lanes are recorded, so the evidence is complete. Say plainly whether the evi
 
 When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
-Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the classification rules in `triage-investigate`.
-
-A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one of them, it is not a Bug yet. Say what is missing and who can supply it.
-
-Verdict quality bar: name the cause, not the mechanism.
+Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the classification rules in `triage-investigate`. A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one, it is not a Bug yet: say what is missing and who can supply it. Verdict quality bar: name the cause, not the mechanism.
 
 ### Find the unblock
 
-The verdict says what is wrong. It does not say what the customer does tomorrow morning. Answer that separately, and answer it even when the verdict is `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix.
+The verdict says what is wrong, not what the customer does tomorrow morning. Answer that separately, even on a `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix. Ask what gets them working today: a setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product, a manual step on our side. The cause found here says which of these would actually work, which is why this follows the verdict.
 
-Ask what gets them working today. A setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product that avoids the broken one, a manual step on our side. The cause found in this stage is what tells you which of these would actually work, which is why this comes after the verdict and not before.
+When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. Naming Support or engineering does not make an unverified action real. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
 
-When there is one, name it, say who performs it and whether it has already been done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them.
-
-An unblock that someone at Acquisity would perform is only real once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it. Without all four there is no unblock to offer: record that none was confirmed and what evidence is missing. Naming Support or engineering does not make an unverified action real.
-
-When there is not one, say so explicitly. An unblock section that is silently absent reads as one nobody looked for.
-
-The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority. A customer working again today and a defect still tracked at full severity are both true at once.
+The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority.
 
 ### Decide the handling path
 
-Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`.
-
-The handling path classifies the root cause, not the remedy. A ticket can be `Engineering Todo` and have had the customer unblocked in the same pass; the two are recorded separately and neither cancels the other.
+Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`. The path classifies the root cause, not the remedy: a ticket can be `Engineering Todo` with the customer unblocked in the same pass, and the two are recorded separately, neither cancelling the other.
 
 ### Decide the final Linear state
 
@@ -48,14 +36,12 @@ Set the state that matches the handling path: `Engineering Todo` is `Todo` (the 
 
 ### Set Linear priority
 
-Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `route_ticket` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low.
-
-Weigh these in order:
+Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `route_ticket` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low. Weigh in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
 2. Blast radius, quantified from primary data in Stage 4, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
 3. Frequency. A small failure that hits every send or sync outweighs a severe one that fires rarely.
-4. Customer tier. Enterprise or partner exposure breaks ties only. Never a reason to inflate a band.
+4. Customer tier. Enterprise or partner exposure breaks ties only, never a reason to inflate a band.
 5. Money. An active billing or refund blocker is at least `High`.
 
 Bands:
@@ -65,9 +51,7 @@ Bands:
 - `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
 - `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
 
-A workaround does not enter the weighting. It makes the customer's day survivable; it does not make the defect smaller. Letting one lower the band would mean the better we get at unblocking people, the less likely the cause is ever fixed.
-
-Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review. This is not licence to inflate: the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority and the parent's assignee.
+A workaround does not enter the weighting: it makes the customer's day survivable, not the defect smaller. Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review; the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority and the parent's assignee.
 
 ### Label the ticket
 
@@ -83,17 +67,7 @@ Every decision above is provisional until the review below has settled the docum
 
 This review runs only when the classification is `Bug` and the handling path is not `Duplicate`. `User Error`, `Platform Limitation`, the unproven stop, and a `Duplicate` go straight to Stage 6: a duplicate routes nothing new to engineering, and the master it attaches to already carries the reviewed root cause.
 
-The critic runs exactly once per ticket. Foreman posts one progress line, delegates once, and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane below stops a reviewed ticket for a person.
-
-1. Write the investigation document now. Call `save_investigation_document` with `lane: "triage"` and the full document from the template in [references/reporting.md](references/reporting.md), with every Stage 4 lane, the Stage 5 decisions, and the line `**Review**: Pending critic`. Keep the returned `documentId` and `updatedAt`; the critic reviews that exact version. Once the review settles a version, approved or adjudicated, nothing may change it until routing is done. When Aaron has asked for read-only validation, write nothing to Linear: pass the document id and `updatedAt` as the literal marker `read-only` and carry the full document text in the critic message.
-2. Load `incident-hotlane` and produce its assessment from the document. It changes nothing; its route, proposed label, workstreams, and blast-radius figures are inputs to the review and to Stage 6. If the route is `NEEDS_HUMAN_URGENT`, do not call the critic: set the document's `**Review**` line to `Stopped: NEEDS_HUMAN_URGENT` with the assessment under it, call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"` and add a one-line comment that a possible high-risk incident is awaiting confirmation, leave the ticket's state, priority, and labels untouched, and skip to Stage 7 with nothing settled; that reply states only what is known, says a person is confirming it, and promises no action. In a read-only run, describe those writes instead of making them.
-3. Post one progress line to the attended thread, one short line that the finished investigation is getting an independent review before it is routed. That line is the whole review narrative the thread sees: a challenge, the corrections, and the adjudication are recorded in the document, never narrated in the thread, and the next message the thread receives is the final reply.
-4. Delegate to the `critic` subagent exactly once, with: the source issue id, the document id and its `updatedAt`, the repository commit Stage 4 read (the full 40-character SHA from the Code path section), and the proposed decisions (classification, unblock, handling path, state, priority, labels, the hotlane route and proposed label, and any existing master candidate with the match rationale). Name the two or three claims the decision actually turns on, so the critic verifies those first. Do not pass an `outputSchema`; the child owns its contract. Do not paste the document text unless this is a read-only run.
-5. Read the result as a whole before acting on `verdict`; this reading is the one adjudication. An `APPROVE` counts only when `criteria_results` holds exactly one entry for each of the twelve criterion slugs with no slug missing or repeated, no criterion is `FAIL`, and `blocking_findings` is empty. An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`. A result with an empty `criteria_results` is a review that could not start (the child names why in `summary`, such as a skill that failed to load). A `reviewed.commit` of `unpinned` or anything but the full 40-character commit supplied, or a `reviewed` that does not echo exactly the issue id, document id, and `updatedAt` supplied (or the `read-only` markers), means the critic's checkout or packet failed, not the evidence. A result that does not match the child's contract, a delegation error, or a timeout is a failed review. None of these is a reason for a second delegation.
-6. On a valid `APPROVE`: keep the critic's echoed `document_updated_at` and `commit` and continue to Stage 6 with the decisions as approved. Do not touch the document: the handoff checks that the version Linear holds is the one the critic reviewed, and the `**Review**` line is written only after routing, as Stage 6 describes.
-7. On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record. Take each blocking finding, or the gap the critic named, with its named next check: re-run the evidence lane or correct the decision it points at. When the review could not run at all, re-check the pivotal claims directly against the recorded lanes. When the corrected record no longer supports the classification, change the classification and handling path to what the evidence does support. Update the document with what changed, set its `**Review**` line to `Adjudicated: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> at <commit>` followed by one short clause per blocking finding or the failure reason, each naming what settled it, and read back the new `updatedAt`. That read-back `updatedAt` is the settled version the handoff checks, exactly as the critic's echo is on an approval. Continue to Stage 6 with the settled decisions. In a read-only run, carry the corrected text inline with the `read-only` markers instead.
-
-The critic reads evidence and recommends; Foreman adjudicates. One delegation, one adjudication: a challenge is not an insult to the investigation, and an approval is not permission to skip readback.
+The critic runs exactly once per ticket. Foreman posts one progress line, delegates once, and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane in the protocol stops a reviewed ticket for a person. Read [references/critic-review.md](references/critic-review.md) and follow it before Stage 6.
 
 Completion: either the unproven branch has made the unblock explicit, preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, the final Linear state, numeric priority, and complete label union are decided, and, for a `Bug` other than a `Duplicate`, the review has settled the exact document version that records them or the hotlane stopped the review and the ticket is with a person.
 
