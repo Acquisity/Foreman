@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import type { Session } from "eve/channels";
 import type {
   SlackInboundMessageContext,
   SlackMessage,
 } from "eve/channels/slack";
+import type { MessageStreamEvent } from "eve/client";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -43,12 +45,9 @@ const message = (text: string): SlackMessage => ({
   ts: "1700000000.000200",
 });
 
-const inboundContext = (
-  cancel: SlackInboundMessageContext["cancel"],
-  posts: string[] = []
-) =>
+const inboundContext = (session: Session | undefined, posts: string[] = []) =>
   ({
-    cancel,
+    resolveSession: () => Promise.resolve(session),
     slack: { channelId: "C0DEV", threadTs: "1700000000.000100" },
     thread: {
       post: (text: string) => {
@@ -57,6 +56,47 @@ const inboundContext = (
       },
     },
   }) as unknown as SlackInboundMessageContext;
+
+const streamEvent = (
+  type: MessageStreamEvent["type"],
+  turnId?: string
+): MessageStreamEvent =>
+  ({
+    data:
+      type === "session.waiting"
+        ? { continuationToken: "thread", wait: "next-user-message" }
+        : { sequence: 1, turnId },
+    meta: { at: "2026-08-31T12:00:00.000Z", id: `evt_${type}` },
+    type,
+  }) as MessageStreamEvent;
+
+const eventStream = (
+  events: readonly MessageStreamEvent[]
+): ReadableStream<MessageStreamEvent> =>
+  new ReadableStream({
+    start(controller) {
+      for (const event of events) {
+        controller.enqueue(event);
+      }
+      controller.close();
+    },
+  });
+
+const cancellableSession = (
+  snapshot: readonly MessageStreamEvent[],
+  confirmation: readonly MessageStreamEvent[],
+  calls: unknown[]
+): Session =>
+  ({
+    cancel: (options?: { turnId?: string }) => {
+      calls.push(options);
+      return Promise.resolve({ sessionId: "s1", status: "accepted" });
+    },
+    getEventStream: ({ startIndex = 0 } = {}) =>
+      Promise.resolve(eventStream(startIndex === 0 ? snapshot : confirmation)),
+    getStreamTailIndex: () => Promise.resolve(snapshot.length - 1),
+    id: "s1",
+  }) as unknown as Session;
 
 describe("slack channel", () => {
   it("is discovered with the queue turn policy so follow-ups wait", () => {
@@ -67,38 +107,77 @@ describe("slack channel", () => {
   it("cancels the active turn and consumes a literal stop", async () => {
     const calls: unknown[] = [];
     const posts: string[] = [];
+    const session = cancellableSession(
+      [streamEvent("turn.started", "t1")],
+      [streamEvent("turn.cancelled", "t1")],
+      calls
+    );
     const result = await dispatch(
-      inboundContext(() => {
-        calls.push("cancel");
-        return Promise.resolve({ sessionId: "s1", status: "accepted" });
-      }, posts),
+      inboundContext(session, posts),
       message("stop")
     );
     assert.equal(result, null);
-    assert.deepEqual(calls, ["cancel"]);
+    assert.deepEqual(calls, [{ turnId: "t1" }]);
     assert.deepEqual(posts, ["Stopped."]);
   });
 
   it("accepts a mention and terminal punctuation around cancel", async () => {
     const calls: unknown[] = [];
+    const session = cancellableSession(
+      [streamEvent("turn.started", "t1")],
+      [streamEvent("turn.cancelled", "t1")],
+      calls
+    );
     const result = await dispatch(
-      inboundContext(() => {
-        calls.push("cancel");
-        return Promise.resolve({ sessionId: "s1", status: "accepted" });
-      }),
+      inboundContext(session),
       message("<@U999>  Cancel!!")
     );
     assert.equal(result, null);
-    assert.deepEqual(calls, ["cancel"]);
+    assert.deepEqual(calls, [{ turnId: "t1" }]);
   });
 
-  it("stays quiet when a stop arrives with no active turn", async () => {
+  it("stays quiet when an accepted session is already parked", async () => {
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    const session = cancellableSession(
+      [
+        streamEvent("turn.started", "t1"),
+        streamEvent("turn.completed", "t1"),
+        streamEvent("session.waiting"),
+      ],
+      [],
+      calls
+    );
+    const result = await dispatch(
+      inboundContext(session, posts),
+      message("stop")
+    );
+    assert.equal(result, null);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(posts, []);
+  });
+
+  it("stays quiet when the observed turn completes before cancellation", async () => {
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    const session = cancellableSession(
+      [streamEvent("turn.started", "t1")],
+      [streamEvent("turn.completed", "t1"), streamEvent("session.waiting")],
+      calls
+    );
+    const result = await dispatch(
+      inboundContext(session, posts),
+      message("stop")
+    );
+    assert.equal(result, null);
+    assert.deepEqual(calls, [{ turnId: "t1" }]);
+    assert.deepEqual(posts, []);
+  });
+
+  it("stays quiet when the Slack thread has no session owner", async () => {
     const posts: string[] = [];
     const result = await dispatch(
-      inboundContext(
-        () => Promise.resolve({ status: "no_active_turn" }) as never,
-        posts
-      ),
+      inboundContext(undefined, posts),
       message("stop")
     );
     assert.equal(result, null);
@@ -106,29 +185,16 @@ describe("slack channel", () => {
   });
 
   it("never lets an authorless event cancel work", async () => {
-    let cancelled = false;
     const authorless = { ...message("stop"), author: undefined };
-    const result = await dispatch(
-      inboundContext(() => {
-        cancelled = true;
-        return Promise.resolve({ sessionId: "s1", status: "accepted" });
-      }),
-      authorless
-    );
-    assert.equal(cancelled, false);
+    const result = await dispatch(inboundContext(undefined), authorless);
     assert.equal(result, null);
   });
 
   it("delivers a longer request that merely starts with stop", async () => {
-    let cancelled = false;
     const result = await dispatch(
-      inboundContext(() => {
-        cancelled = true;
-        return Promise.resolve({ sessionId: "s1", status: "accepted" });
-      }),
+      inboundContext(undefined),
       message("stop the deploy")
     );
-    assert.equal(cancelled, false);
     assert.ok(result && "auth" in result && result.auth);
   });
 

@@ -13,7 +13,7 @@ import {
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
 import { replyOf } from "../lib/slack-reply.js";
-import { isStopRequest } from "../lib/slack-stop.js";
+import { cancelActiveSlackTurn, isStopRequest } from "../lib/slack-stop.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -57,11 +57,13 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * where the default steer policy cancelled the active turn and silently lost
  * the earlier request. One message still cancels on purpose: a text that is
  * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
- * cancels the active turn through `ctx.cancel()`, and is consumed without
+ * cancels the active turn through its exact session handle, and is consumed
+ * without
  * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. An accepted stop command posts the single short
- * notice itself, so unrelated cooperative cancellations stay quiet and a
- * `stop` with no active turn does too.
+ * ordinary model input. The stop path posts the single short notice only
+ * after the exact turn emits its durable cancellation boundary, so unrelated
+ * cooperative cancellations and no-op requests against parked sessions stay
+ * quiet.
  *
  * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
  * so the model's narration stays in the session and only the requester-facing
@@ -82,12 +84,11 @@ export const dispatch = async (
     return null;
   }
   // A literal stop/cancel is a command for the running turn, never model
-  // input: cancel the active turn and consume the message. Acknowledging here
-  // ties the notice to this command instead of every cooperative cancellation;
-  // with no active turn the message drops quietly.
+  // input: cancel the exact active turn and consume the message. Confirming its
+  // durable cancellation boundary ties the notice to this command instead of
+  // another cooperative cancellation; with no active turn it drops quietly.
   if (isStopRequest(message.text)) {
-    const result = await ctx.cancel();
-    if (result.status === "accepted") {
+    if (await cancelActiveSlackTurn(ctx)) {
       await ctx.thread.post("Stopped.");
     }
     return null;
