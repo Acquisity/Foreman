@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { Session } from "eve/channels";
 import type {
+  SlackChannelEvents,
   SlackEventContext,
   SlackInboundMessageContext,
   SlackMessage,
@@ -344,9 +345,29 @@ describe("slack channel", () => {
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
-  it("does not attribute an unrelated cooperative cancellation to stop", () => {
+  it("clears progress without attributing cooperative cancellation to stop", async () => {
     const handler = slackChannelEvents["turn.cancelled"];
-    assert.equal(handler, undefined);
+    assert.ok(handler);
+    const posts: string[] = [];
+    const eventChannel = {
+      state: {
+        progress: {
+          posts: 1,
+          startedAtMs: Date.now(),
+          toolCalls: 3,
+          waitLabel: null,
+        },
+      },
+      thread: {
+        post: (text: string) => {
+          posts.push(text);
+          return Promise.resolve();
+        },
+      },
+    } as unknown as SlackEventContext;
+    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
+    assert.deepEqual(posts, []);
+    assert.equal(eventChannel.state.progress, undefined);
   });
 
   const completedEventChannel = (calls: string[]) =>
@@ -418,6 +439,608 @@ describe("slack channel", () => {
       eventChannel.state.pendingToolCallMessage,
       "Checking Stripe now."
     );
+  });
+});
+
+describe("slack channel progress", () => {
+  const MINUTE_MS = 60_000;
+  const T0 = 1_000_000;
+
+  // Fake clock: the handlers read Date.now(), and each test advances `now`
+  // to walk a turn across the 5- and 15-minute thresholds in order.
+  const clock = (t: TestContext) => {
+    let now = T0;
+    t.mock.method(Date, "now", () => now);
+    return {
+      advance: (ms: number) => {
+        now += ms;
+      },
+    };
+  };
+
+  const progressChannel = (
+    calls: string[],
+    state: Record<string, unknown> = {}
+  ) =>
+    ({
+      slack: {
+        channelId: "C0DEV",
+        request: (operation: string, body: Record<string, unknown>) => {
+          assert.equal(operation, "chat.postMessage");
+          calls.push(`post:${String(body.text)}`);
+          return Promise.resolve({ ok: true });
+        },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
+      state,
+      thread: {
+        post: (text: string) => {
+          calls.push(`post:${text}`);
+          return Promise.resolve();
+        },
+        startTyping: (status?: string) => {
+          calls.push(`typing:${status ?? ""}`);
+          return Promise.resolve();
+        },
+      },
+    }) as unknown as SlackEventContext;
+
+  const sessionWith = (auth: unknown) =>
+    ({ session: { auth: { current: auth } } }) as never;
+
+  const trustedCtx = sessionWith({ attributes: { trusted: "true" } });
+
+  const postsOf = (calls: string[]) =>
+    calls.filter((call) => call.startsWith("post:"));
+
+  const typingsOf = (calls: string[]) =>
+    calls.filter((call) => call.startsWith("typing:"));
+
+  const handlerFor = <K extends keyof SlackChannelEvents>(key: K) => {
+    const handler = slackChannelEvents[key];
+    assert.ok(handler);
+    return handler;
+  };
+
+  // Event fixtures use the real stream-event shapes and valid statuses.
+  const turnStartedEvent = { sequence: 1, turnId: "t1" };
+
+  const reasoningEvent = (reasoningSoFar: string) => ({
+    reasoningDelta: reasoningSoFar,
+    reasoningSoFar,
+    sequence: 2,
+    stepIndex: 0,
+    turnId: "t1",
+  });
+
+  const actionsRequestedEvent = {
+    actions: [
+      {
+        callId: "c1",
+        input: { pattern: "useEveAgent" },
+        kind: "tool-call",
+        toolName: "grep",
+      },
+    ],
+    sequence: 3,
+    stepIndex: 0,
+    turnId: "t1",
+  } as const;
+
+  const toolResultEvent = {
+    result: {
+      callId: "c1",
+      kind: "tool-result",
+      output: {},
+      toolName: "grep",
+    },
+    sequence: 4,
+    status: "completed",
+    stepIndex: 0,
+    turnId: "t1",
+  } as const;
+
+  // The dispatch-failure member of the subagent-result union, so the fixture
+  // needs no child outcome payload; the handler reads only kind and name.
+  const subagentResultEvent = {
+    result: {
+      callId: "c2",
+      isError: true,
+      kind: "subagent-result",
+      origin: "dispatch",
+      output: {},
+      subagentName: "investigator",
+    },
+    sequence: 5,
+    status: "failed",
+    stepIndex: 0,
+    turnId: "t1",
+  } as const;
+
+  const skillResultEvent = {
+    result: {
+      callId: "c3",
+      kind: "load-skill-result",
+      name: "triage-investigate",
+      output: {},
+    },
+    sequence: 6,
+    status: "completed",
+    stepIndex: 0,
+    turnId: "t1",
+  } as const;
+
+  const finalMessageEvent = (text: string) =>
+    ({
+      finishReason: "stop",
+      message: text,
+      sequence: 8,
+      stepIndex: 1,
+      turnId: "t1",
+    }) as const;
+
+  it("seeds progress state and mirrors the Working indicator on turn start", async () => {
+    const handler = handlerFor("turn.started");
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls, {
+      lastReasoningTypingAtMs: 1,
+      pendingToolCallMessage: "Checking Stripe now.",
+    });
+    const before = Date.now();
+    await handler(turnStartedEvent, eventChannel, trustedCtx);
+    assert.deepEqual(calls, ["typing:Working..."]);
+    assert.equal(eventChannel.state.pendingToolCallMessage, null);
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    const { progress } = eventChannel.state;
+    assert.ok(progress);
+    assert.equal(progress.posts, 0);
+    assert.equal(progress.toolCalls, 0);
+    assert.equal(progress.waitLabel, null);
+    assert.ok(progress.startedAtMs >= before);
+  });
+
+  it("posts both thresholds in order across one long turn", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS - 1000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Checking the code."),
+      eventChannel,
+      trustedCtx
+    );
+    // The 5-minute line lands during streaming, before any action result.
+    now.advance(2000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Checking the code more deeply."),
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(3 * MINUTE_MS);
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(6 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(MINUTE_MS + 2000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Drafting the reply."),
+      eventChannel,
+      trustedCtx
+    );
+    // A further checkpoint after both lines never produces a third.
+    now.advance(5 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("message.completed")(
+      finalMessageEvent("All done."),
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 0 tool calls so far.",
+      "post:Still working: 15 minutes in, 1 tool calls so far. Currently waiting on grep.",
+      "post:All done.",
+    ]);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("catches up one line per checkpoint when the first event arrives late", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    // No lifecycle event until past both thresholds: the first checkpoint
+    // posts the overdue 5-minute line, the next one the 15-minute line.
+    now.advance(16 * MINUTE_MS);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Back from a long tool call."),
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 0 tool calls so far.",
+      "post:Still working: 15 minutes in, 1 tool calls so far. Currently waiting on grep.",
+    ]);
+    assert.equal(eventChannel.state.progress?.posts, 2);
+  });
+
+  it("retries an ambiguous progress post with the same provider id", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const errors: unknown[] = [];
+    t.mock.method(console, "error", (...args: unknown[]) => {
+      errors.push(args);
+    });
+    let rejectNextPost = true;
+    const postedIds = new Set<string>();
+    const attemptedIds: string[] = [];
+    const eventChannel = {
+      slack: {
+        channelId: "C0DEV",
+        request: (_operation: string, body: Record<string, unknown>) => {
+          const clientMessageId = String(body.client_msg_id);
+          attemptedIds.push(clientMessageId);
+          if (!postedIds.has(clientMessageId)) {
+            postedIds.add(clientMessageId);
+            calls.push(`post:${String(body.text)}`);
+          }
+          if (rejectNextPost) {
+            rejectNextPost = false;
+            return Promise.reject(new Error("response lost after acceptance"));
+          }
+          return Promise.resolve({ ok: true });
+        },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
+      state: {} as Record<string, unknown>,
+      thread: {
+        startTyping: (status?: string) => {
+          calls.push(`typing:${status ?? ""}`);
+          return Promise.resolve();
+        },
+      },
+    } as unknown as SlackEventContext;
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS + 1000);
+    // Slack accepts the first attempt but its response is lost. The error is
+    // logged and the threshold stays unconsumed.
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Checking the code."),
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(errors.length, 1);
+    assert.equal(eventChannel.state.progress?.posts, 0);
+    // The next checkpoint has fresher bookkeeping, but retries the same
+    // logical threshold with the same client_msg_id. Slack keeps the first
+    // accepted text instead of creating a second visible progress line.
+    now.advance(MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.posts, 1);
+    assert.equal(attemptedIds.length, 2);
+    assert.equal(attemptedIds[0], attemptedIds[1]);
+    assert.match(attemptedIds[0] ?? "", UUID_V5);
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 0 tool calls so far.",
+    ]);
+  });
+
+  it("counts only tool results while every result refreshes the wait label", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS + 1000);
+    // A finished subagent updates the label but is not a tool call, so the
+    // 5-minute line still reports zero tool calls.
+    await handlerFor("action.result")(
+      subagentResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 0 tool calls so far. Currently waiting on investigator.",
+    ]);
+    assert.equal(eventChannel.state.progress?.toolCalls, 0);
+    assert.equal(eventChannel.state.progress?.waitLabel, "investigator");
+    // A skill load also refreshes the label without increasing the count.
+    await handlerFor("action.result")(
+      skillResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.toolCalls, 0);
+    assert.equal(eventChannel.state.progress?.waitLabel, "triage-investigate");
+    // A tool result is the only kind that increments the promised count.
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.toolCalls, 1);
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+    assert.equal(postsOf(calls).length, 1);
+  });
+
+  it("clears a stale wait label for a bare skill request and unnamed result", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+
+    await handlerFor("actions.requested")(
+      {
+        ...actionsRequestedEvent,
+        actions: [
+          {
+            callId: "c2",
+            input: { skill: "triage-investigate" },
+            kind: "load-skill",
+          },
+        ],
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, null);
+
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+
+    await handlerFor("action.result")(
+      {
+        ...skillResultEvent,
+        result: {
+          callId: "c4",
+          kind: "load-skill-result",
+          output: {},
+        },
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, null);
+  });
+
+  it("stays silent for an intake-only session across the whole turn", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    const intakeCtx = sessionWith({
+      attributes: { intakeOnly: "true", trusted: "true" },
+    });
+    await handlerFor("turn.started")(turnStartedEvent, eventChannel, intakeCtx);
+    assert.equal(eventChannel.state.progress, undefined);
+    now.advance(6 * MINUTE_MS);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Investigating."),
+      eventChannel,
+      intakeCtx
+    );
+    now.advance(4 * MINUTE_MS);
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      intakeCtx
+    );
+    now.advance(6 * MINUTE_MS);
+    await handlerFor("action.result")(toolResultEvent, eventChannel, intakeCtx);
+    await handlerFor("message.completed")(
+      finalMessageEvent("Filed to Linear."),
+      eventChannel,
+      intakeCtx
+    );
+    // The final reply still lands; no progress line ever does.
+    assert.deepEqual(postsOf(calls), ["post:Filed to Linear."]);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("tears down progress and posts the mirrored error on turn failure", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(2 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("turn.failed")(
+      {
+        code: "model-error",
+        details: { errorId: "err_123", name: "AIError" },
+        message: "Model call failed",
+        sequence: 7,
+        turnId: "t1",
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), [
+      "post:I hit an error while handling your request (AIError: Model call failed).\n\nPlease try again, rephrase, or reach out if it keeps failing.\n\n_Error id: `err_123`_",
+    ]);
+    assert.equal(eventChannel.state.progress, undefined);
+    // A late result after the failure cannot resurrect tracking or post.
+    now.advance(20 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(postsOf(calls).length, 1);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("ignores a late action result after the final reply", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(30 * 1000);
+    await handlerFor("message.completed")(
+      finalMessageEvent("All done."),
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), ["post:All done."]);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("clears progress state when the turn is cancelled", async () => {
+    const handler = handlerFor("turn.cancelled");
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls, {
+      progress: {
+        posts: 1,
+        startedAtMs: Date.now(),
+        toolCalls: 3,
+        waitLabel: null,
+      },
+    });
+    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
+    assert.deepEqual(calls, []);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("mirrors the default actions.requested typing label and prefers narration", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Working...",
+      "typing:grep useEveAgent",
+    ]);
+    // Buffered model narration wins over the derived label and is consumed.
+    eventChannel.state.pendingToolCallMessage = "Checking Stripe now.";
+    now.advance(1000);
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Working...",
+      "typing:grep useEveAgent",
+      "typing:Checking Stripe now.",
+    ]);
+    assert.equal(eventChannel.state.pendingToolCallMessage, null);
+  });
+
+  it("mirrors the default reasoning.appended typing throttle", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("First thought."),
+      eventChannel,
+      trustedCtx
+    );
+    // A different status inside the five-second window is suppressed.
+    now.advance(1000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Different thought."),
+      eventChannel,
+      trustedCtx
+    );
+    // A substantial extension of the last posted status posts immediately.
+    now.advance(1000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("First thought. Extended."),
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Working...",
+      "typing:First thought.",
+      "typing:First thought. Extended.",
+    ]);
   });
 });
 

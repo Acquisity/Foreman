@@ -148,6 +148,9 @@ const stopConfirmationId = (
   ctx: SlackInboundMessageContext,
   turnId: string
 ): string => {
+  // Preserve the original byte encoding across rolling deployments. Slack
+  // deduplicates retries by this id, so adding a namespace or trailing
+  // separator would allow an old and a new handler to post twice.
   const hex = createHash("sha256")
     .update(ctx.slack.teamId ?? "")
     .update("\0")
@@ -156,10 +159,7 @@ const stopConfirmationId = (
     .update(ctx.slack.threadTs)
     .update("\0")
     .update(turnId)
-    .digest()
-    .toString("hex");
-  // Slack clients use UUID-shaped client_msg_id values. Fix the version and
-  // variant nibbles while retaining the remaining deterministic hash payload.
+    .digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
