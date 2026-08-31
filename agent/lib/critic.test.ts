@@ -145,12 +145,20 @@ describe("critic subagent", () => {
       readFileSync(info.artifacts.discoveryManifest, "utf8")
     ) as {
       diagnosticsSummary: { errors: number };
+      hooks: { logicalPath: string }[];
       subagents: DiscoveredSubagent[];
       tools: { logicalPath: string }[];
     };
     assert.equal(manifest.diagnosticsSummary.errors, 0);
     assert.ok(
       manifest.tools.some((tool) => tool.logicalPath === "tools/sign_in.ts")
+    );
+    // P7.1 rides this run: the ops hook must be discovered from
+    // agent/hooks/ops.ts. The exact ten subscribed events are pinned in
+    // ops-log.test.ts.
+    assert.ok(
+      manifest.hooks.some((hook) => hook.logicalPath === "hooks/ops.ts"),
+      "ops hook must appear in the discovery manifest"
     );
     const critic = manifest.subagents.find(
       (entry) => entry.subagentId === "critic"
