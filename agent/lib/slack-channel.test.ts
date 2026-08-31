@@ -11,6 +11,8 @@ import type { MessageStreamEvent } from "eve/client";
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
 const ENV_ASSIGNMENT = /^([A-Z][A-Z0-9_]*)=/u;
+const UUID_V5 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 for (const line of readFileSync(
   new URL("../../.env.example", import.meta.url),
   "utf8"
@@ -45,15 +47,30 @@ const message = (text: string): SlackMessage => ({
   ts: "1700000000.000200",
 });
 
-const inboundContext = (session: Session | undefined, posts: string[] = []) =>
+const inboundContext = (
+  session: Session | undefined,
+  posts: string[] = [],
+  postedIds = new Set<string>(),
+  requests: unknown[] = []
+) =>
   ({
     resolveSession: () => Promise.resolve(session),
-    slack: { channelId: "C0DEV", threadTs: "1700000000.000100" },
-    thread: {
-      post: (text: string) => {
-        posts.push(text);
-        return Promise.resolve();
+    slack: {
+      channelId: "C0DEV",
+      request: (operation: string, body: Record<string, unknown>) => {
+        requests.push({ body, operation });
+        const clientMessageId = body.client_msg_id;
+        if (
+          typeof clientMessageId === "string" &&
+          !postedIds.has(clientMessageId)
+        ) {
+          postedIds.add(clientMessageId);
+          posts.push(String(body.text));
+        }
+        return Promise.resolve({ ok: true });
       },
+      teamId: "T123",
+      threadTs: "1700000000.000100",
     },
   }) as unknown as SlackInboundMessageContext;
 
@@ -134,6 +151,40 @@ describe("slack channel", () => {
     );
     assert.equal(result, null);
     assert.deepEqual(calls, [{ turnId: "t1" }]);
+  });
+
+  it("deduplicates confirmations for concurrent stops across handlers", async () => {
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    const postedIds = new Set<string>();
+    const requests: Array<{
+      body: Record<string, unknown>;
+      operation: string;
+    }> = [];
+    const session = cancellableSession(
+      [streamEvent("turn.started", "t1")],
+      [streamEvent("turn.cancelled", "t1")],
+      calls
+    );
+    await Promise.all([
+      dispatch(
+        inboundContext(session, posts, postedIds, requests),
+        message("stop")
+      ),
+      dispatch(
+        inboundContext(session, posts, postedIds, requests),
+        message("cancel")
+      ),
+    ]);
+    assert.equal(calls.length, 2);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0]?.operation, "chat.postMessage");
+    assert.equal(
+      requests[0]?.body.client_msg_id,
+      requests[1]?.body.client_msg_id
+    );
+    assert.match(String(requests[0]?.body.client_msg_id), UUID_V5);
+    assert.deepEqual(posts, ["Stopped."]);
   });
 
   it("stays quiet when an accepted session is already parked", async () => {

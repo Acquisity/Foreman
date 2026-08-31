@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
 import {
   isCurrentTurnBoundaryEvent,
@@ -96,19 +97,19 @@ const confirmsCancellation = async (
  */
 export const cancelActiveSlackTurn = async (
   ctx: SlackInboundMessageContext
-): Promise<boolean> => {
+): Promise<string | null> => {
   const session = await ctx.resolveSession();
   if (!session) {
-    return false;
+    return null;
   }
   const tailIndex = await session.getStreamTailIndex();
   if (tailIndex < 0) {
-    return false;
+    return null;
   }
   const snapshot = await session.getEventStream({ startIndex: 0 });
   const turnId = await activeTurnAtTail(snapshot, tailIndex);
   if (!turnId) {
-    return false;
+    return null;
   }
 
   // Open from the observed tail before requesting cancellation. The durable
@@ -120,10 +121,45 @@ export const cancelActiveSlackTurn = async (
   try {
     const result = await session.cancel({ turnId });
     if (result.status !== "accepted") {
-      return false;
+      return null;
     }
-    return await confirmsCancellation(reader, turnId);
+    return (await confirmsCancellation(reader, turnId)) ? turnId : null;
   } finally {
     await reader.cancel();
+  }
+};
+
+const stopConfirmationId = (
+  ctx: SlackInboundMessageContext,
+  turnId: string
+): string => {
+  const hex = createHash("sha256")
+    .update(ctx.slack.teamId ?? "")
+    .update("\0")
+    .update(ctx.slack.channelId)
+    .update("\0")
+    .update(ctx.slack.threadTs)
+    .update("\0")
+    .update(turnId)
+    .digest()
+    .toString("hex");
+  // Slack clients use UUID-shaped client_msg_id values. Fix the version and
+  // variant nibbles while retaining the remaining deterministic hash payload.
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
+
+/** Posts one provider-idempotent confirmation for an exact cancelled turn. */
+export const postStopConfirmation = async (
+  ctx: SlackInboundMessageContext,
+  turnId: string
+): Promise<void> => {
+  const response = await ctx.slack.request("chat.postMessage", {
+    channel: ctx.slack.channelId,
+    client_msg_id: stopConfirmationId(ctx, turnId),
+    text: "Stopped.",
+    thread_ts: ctx.slack.threadTs,
+  });
+  if (!response.ok) {
+    throw new Error("Slack could not post the stop confirmation.");
   }
 };

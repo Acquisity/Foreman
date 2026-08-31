@@ -13,7 +13,11 @@ import {
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
 import { replyOf } from "../lib/slack-reply.js";
-import { cancelActiveSlackTurn, isStopRequest } from "../lib/slack-stop.js";
+import {
+  cancelActiveSlackTurn,
+  isStopRequest,
+  postStopConfirmation,
+} from "../lib/slack-stop.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 /**
@@ -88,8 +92,9 @@ export const dispatch = async (
   // durable cancellation boundary ties the notice to this command instead of
   // another cooperative cancellation; with no active turn it drops quietly.
   if (isStopRequest(message.text)) {
-    if (await cancelActiveSlackTurn(ctx)) {
-      await ctx.thread.post("Stopped.");
+    const cancelledTurnId = await cancelActiveSlackTurn(ctx);
+    if (cancelledTurnId) {
+      await postStopConfirmation(ctx, cancelledTurnId);
     }
     return null;
   }
