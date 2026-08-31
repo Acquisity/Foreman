@@ -40,6 +40,13 @@ describe("splitSlackReply", () => {
     assert.deepEqual(chunks, [`${first}\n`, "b".repeat(80)]);
   });
 
+  it("uses a later line boundary after a leading blank paragraph", () => {
+    const text = `\n\nabc\n${"x".repeat(10)}`;
+    const chunks = splitSlackReply(text, 10);
+    assert.deepEqual(chunks, ["\n\nabc\n", "x".repeat(10)]);
+    assert.equal(chunks.join(""), text);
+  });
+
   it("hard-cuts at the limit only when the window has no boundary", () => {
     const text = "a".repeat(LIMIT * 2 + 10);
     const chunks = splitSlackReply(text, LIMIT);

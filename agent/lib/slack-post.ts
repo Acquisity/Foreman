@@ -29,7 +29,7 @@ export const splitSlackReply = (
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
     const paragraph = window.lastIndexOf("\n\n");
-    const line = paragraph === -1 ? window.lastIndexOf("\n") : -1;
+    const line = window.lastIndexOf("\n");
     let cut = limit;
     if (paragraph > 0) {
       cut = paragraph + 2;
