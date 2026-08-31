@@ -481,6 +481,14 @@ test("triage intake skill stays within its 15000-byte budget", () => {
   );
 });
 
+test("triage handling skill stays within its 20000-byte budget", () => {
+  const handlingBytes = Buffer.byteLength(triageHandlingSkill, "utf8");
+  assert.ok(
+    handlingBytes <= 20_000,
+    `triage-handling SKILL.md is ${handlingBytes} bytes, over the 20000-byte budget`
+  );
+});
+
 test("shared triage makes retrieval project-independent", () => {
   const establish = extractInstruction(
     triageSkill,
