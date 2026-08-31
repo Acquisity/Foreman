@@ -1,6 +1,6 @@
 # Area-routing roster
 
-Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and Stage 6 reached area routing. If either gate is absent, stop reading and return to the unfinished stage. This is the owner source for Stage 6 routing and the `engineering-handoff` master assignee. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
+Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and Stage 6 reached area routing before its duplicate or engineering-handoff branch. If either gate is absent, stop reading and return to the unfinished stage. This is the owner source for Stage 6 routing and the `engineering-handoff` master assignee. Use the emails verbatim: the routing map only accepts assignees on its allowlist, and an unlisted area owner falls back to Aaron Fraga.
 
 - AI SDR: Koppany Kondricz (`koppany.kondricz@acquisity.ai`)
 - Cold Email: Anthony Adewale (`anthony.adewale@acquisity.ai`)

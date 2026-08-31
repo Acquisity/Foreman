@@ -90,7 +90,7 @@ When Stage 5 review ran, the document already exists at the settled version: do 
 
 ### Comment on the ticket
 
-Write the report comment from the template in [references/reporting.md](references/reporting.md): the root cause in plain language and what happens next, four blocks as a ceiling. The evidence lives in the document, not here. The customer already has their answer from this comment; routing below changes what engineering sees, never what they were told, so never hold the comment back for it.
+Write the report comment from [references/reporting.md](references/reporting.md): the root cause and next step, four blocks maximum. Evidence stays in the document. For the unproven branch, save only this document and comment, then stop: do not choose or change the project, read the roster, call `route_ticket`, or load `engineering-handoff`; preserve state, priority, labels, project, parent, and assignee.
 
 ### Choose the product project from completed evidence
 
@@ -100,6 +100,12 @@ If the completed evidence genuinely cannot determine ownership, leave the projec
 
 When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
 
+### Area-routing roster
+
+Take the product area from the evidence-backed project selected after the investigation, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
+
+The roster exists on the production ENG team only; SAN sandbox tickets always route to Aaron Fraga. If the area is ambiguous, the project has no lead set, or the roster is unavailable, assign Aaron Fraga and say why in the report. Never route to retired or legacy projects.
+
 ### When the ticket is not engineering actionable
 
 `User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the Stage 5 state, priority, `addLabels`, and project; a `Duplicate` adds the fields below. The ticket carries the explanation and closes into the Stage 5 state; nothing goes to engineering and no queue should hold a closed report.
@@ -108,13 +114,7 @@ A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `i
 
 ### When the root cause warrants action
 
-The customer ticket never becomes the engineering ticket: a master owns the root cause and this ticket attaches to it. Load `engineering-handoff` and follow it; it hands back the master id, the parent and assignee it set, and the label state. The requester comment above and the Stage 7 reply stay here; the area-routing roster is the owner source `engineering-handoff` uses for an unassigned or new master.
-
-### Area-routing roster
-
-Take the product area from the evidence-backed project selected after the investigation, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
-
-The roster exists on the production ENG team only; SAN sandbox tickets always route to Aaron Fraga. If the area is ambiguous, the project has no lead set, or the roster is unavailable, assign Aaron Fraga and say why in the report. Never route to retired or legacy projects.
+The customer ticket never becomes the engineering ticket: a master owns the root cause and this ticket attaches to it. The area owner is now resolved from the roster. Load `engineering-handoff` and follow it; it hands back the master id, the parent and assignee it set, and the label state. The requester comment above and the Stage 7 reply stay here; the roster owns the fallback for an unassigned or new master.
 
 Internal notes (identity resolution, routing rationale, customer email addresses, queries) go in the Triage investigation document, never in the ticket comment; a customer-facing comment carries no `## Internal` section.
 

@@ -684,6 +684,29 @@ test("shared triage stops unproven claims before classification or routing", () 
       "Never load `engineering-handoff` or create or attach a master for this branch"
     )
   );
+  const unprovenExit = extractInstruction(
+    triageHandlingSkill,
+    "### Comment on the ticket",
+    "### Choose the product project from completed evidence"
+  );
+  assert.ok(
+    unprovenExit.includes(
+      "For the unproven branch, save only this document and comment, then stop"
+    )
+  );
+  for (const forbidden of [
+    "choose or change the project",
+    "read the roster",
+    "call `route_ticket`",
+    "load `engineering-handoff`",
+  ]) {
+    assert.ok(unprovenExit.includes(forbidden), forbidden);
+  }
+  assert.ok(
+    unprovenExit.includes(
+      "preserve state, priority, labels, project, parent, and assignee"
+    )
+  );
 });
 
 test("Slack product triage master searches enforce the 30-day cutoff", () => {
@@ -751,8 +774,19 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
   const branch = extractInstruction(
     triageHandlingSkill,
     "### When the root cause warrants action",
-    "### Area-routing roster"
+    "Internal notes"
   );
+  assert.ok(
+    triageHandlingSkill.indexOf("### Area-routing roster") <
+      triageHandlingSkill.indexOf(
+        "### When the ticket is not engineering actionable"
+      )
+  );
+  assert.ok(
+    triageHandlingSkill.indexOf("### Area-routing roster") <
+      triageHandlingSkill.indexOf("### When the root cause warrants action")
+  );
+  assert.ok(branch.includes("area owner is now resolved from the roster"));
   assert.ok(branch.includes("Load `engineering-handoff`"));
   assert.ok(!branch.includes("linear__list_issues"));
   assert.ok(!triageSkill.includes("## Master ticket template"));
