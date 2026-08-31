@@ -14,6 +14,13 @@ const triageReportingReference = readFileSync(
   new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
   "utf8"
 );
+const criticReviewReference = readFileSync(
+  new URL(
+    "../skills/triage-handling/references/critic-review.md",
+    import.meta.url
+  ),
+  "utf8"
+);
 const intercomTriageSkill = readFileSync(
   new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
   "utf8"
@@ -750,6 +757,12 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "The critic runs exactly once per ticket",
     "Foreman posts one progress line, delegates once, and adjudicates the result once",
     "never parks the ticket on a person",
+    "Foreman settles the findings against the Stage 4 evidence record and continues routing",
+    "[references/critic-review.md](references/critic-review.md)",
+  ]) {
+    assert.ok(review.includes(rule), rule);
+  }
+  for (const rule of [
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
@@ -773,11 +786,15 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "Do not touch the document",
     "Once the review settles a version, approved or adjudicated, nothing may change it until routing is done",
   ]) {
-    assert.ok(review.includes(rule), rule);
+    assert.ok(criticReviewReference.includes(rule), rule);
   }
   assert.ok(
-    review.indexOf("Post one progress line to the attended thread") <
-      review.indexOf("Delegate to the `critic` subagent exactly once"),
+    criticReviewReference.indexOf(
+      "Post one progress line to the attended thread"
+    ) <
+      criticReviewReference.indexOf(
+        "Delegate to the `critic` subagent exactly once"
+      ),
     "the progress line precedes the delegation"
   );
   const retryWording = [
@@ -792,11 +809,13 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ];
   for (const excluded of retryWording) {
     assert.ok(!review.includes(excluded), excluded);
+    assert.ok(!criticReviewReference.includes(excluded), excluded);
   }
   for (const surface of [
     triageSkill,
     triageHandlingSkill,
     triageReportingReference,
+    criticReviewReference,
     handoffSkill,
   ]) {
     for (const excluded of retryWording) {
@@ -864,5 +883,6 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ]) {
     assert.ok(!triageSkill.includes(excluded), excluded);
     assert.ok(!triageHandlingSkill.includes(excluded), excluded);
+    assert.ok(!criticReviewReference.includes(excluded), excluded);
   }
 });
