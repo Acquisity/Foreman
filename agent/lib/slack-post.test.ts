@@ -17,6 +17,15 @@ describe("splitSlackReply", () => {
     assert.deepEqual(splitSlackReply("", LIMIT), []);
   });
 
+  it("rejects limits that cannot guarantee progress and surrogate safety", () => {
+    for (const limit of [0, -1, 0.5, 1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(
+        () => splitSlackReply("reply", limit),
+        new RangeError("limit must be an integer of at least 2")
+      );
+    }
+  });
+
   it("prefers a paragraph boundary over a line boundary", () => {
     const first = `paragraph one${"a".repeat(60)}`;
     const text = `${first}\n\n${"b".repeat(80)}`;

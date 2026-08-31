@@ -21,6 +21,9 @@ export const splitSlackReply = (
   text: string,
   limit = SLACK_MARKDOWN_MAX_LENGTH
 ): string[] => {
+  if (!Number.isInteger(limit) || limit < 2) {
+    throw new RangeError("limit must be an integer of at least 2");
+  }
   const chunks: string[] = [];
   let rest = text;
   while (rest.length > limit) {
