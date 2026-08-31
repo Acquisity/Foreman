@@ -1,5 +1,9 @@
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxSession } from "eve/sandbox";
+import type {
+  SandboxCommandResult,
+  SandboxRunOptions,
+  SandboxSession,
+} from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
@@ -21,6 +25,82 @@ import {
 } from "#lib/repository-warmup.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
+
+/**
+ * Wall-clock bound for one clone, fetch/reset, or install.
+ *
+ * @remarks
+ * A stalled git or package-manager process holds the whole turn: eve's
+ * `run` blocks until the command exits, and nothing else in the session
+ * wakes up. Five minutes is above the slowest observed cold clone plus
+ * install of the warmed repositories and well under the invocation
+ * ceiling, so a healthy run never trips it and a wedged one always does.
+ */
+export const REPOSITORY_OPERATION_TIMEOUT_MS = 300_000;
+
+// The exit code a shell reports for a command killed by `timeout`, reused
+// here so the existing non-zero branches surface a deadline like any other
+// command failure.
+const TIMED_OUT_EXIT_CODE = 124;
+
+/**
+ * Applies the brokered GitHub credential to the sandbox firewall for the
+ * duration of one credential window.
+ */
+export type CredentialBroker = (sandbox: SandboxSession) => Promise<void>;
+
+export interface CheckoutOptions {
+  readonly broker?: CredentialBroker;
+  readonly timeoutMs?: number;
+}
+
+const brokerGitHubToken: CredentialBroker = async (sandbox) => {
+  const token = await mintInstallationToken(githubCredentials);
+  await sandbox.setNetworkPolicy(brokerPolicy(token));
+};
+
+/**
+ * Runs one sandbox command under a deadline.
+ *
+ * @remarks
+ * eve 0.44's sandbox `run` takes an `abortSignal` and no timeout of its own,
+ * and it composes the signal with the session's, so `AbortSignal.timeout` is
+ * the version-matched bound. A deadline comes back as a non-zero result so
+ * every caller's existing failure branch (which already discards the partial
+ * checkout) handles it; anything else, including a cancelled turn, still
+ * throws.
+ */
+const boundedRun = async (
+  sandbox: SandboxSession,
+  options: SandboxRunOptions,
+  timeoutMs: number
+): Promise<SandboxCommandResult> => {
+  const deadline = AbortSignal.timeout(timeoutMs);
+  try {
+    return await sandbox.run({ ...options, abortSignal: deadline });
+  } catch (error) {
+    if (!deadline.aborted) {
+      throw error;
+    }
+    return {
+      exitCode: TIMED_OUT_EXIT_CODE,
+      stderr: `timed out after ${timeoutMs}ms`,
+      stdout: "",
+    };
+  }
+};
+
+/**
+ * Removes a partial `/workspace/repo`, best effort: a failed cleanup must
+ * never mask the failure that triggered it.
+ */
+const discardCheckout = (
+  sandbox: SandboxSession,
+  timeoutMs: number
+): Promise<unknown> =>
+  boundedRun(sandbox, { command: "rm -rf /workspace/repo" }, timeoutMs).catch(
+    () => undefined
+  );
 
 const resolveTarget = (
   repository: string | undefined,
@@ -54,20 +134,34 @@ const detectWorktree = async (
     : "/workspace/repo";
 };
 
-const cloneExplicitRepository = async (
+export const cloneExplicitRepository = async (
   sandbox: SandboxSession,
-  repository: string
+  repository: string,
+  {
+    broker = brokerGitHubToken,
+    timeoutMs = REPOSITORY_OPERATION_TIMEOUT_MS,
+  }: CheckoutOptions = {}
 ): Promise<string | null> => {
-  const token = await mintInstallationToken(githubCredentials);
-  await sandbox.setNetworkPolicy(brokerPolicy(token));
+  await broker(sandbox);
+  let cloned = false;
   try {
-    const clone = await sandbox.run({
-      command: `git clone --depth 50 ${remoteUrl(repository)} /workspace/repo`,
-    });
-    return clone.exitCode === 0
+    const clone = await boundedRun(
+      sandbox,
+      {
+        command: `git clone --depth 50 ${remoteUrl(repository)} /workspace/repo`,
+      },
+      timeoutMs
+    );
+    cloned = clone.exitCode === 0;
+    return cloned
       ? null
       : `Could not clone ${repository}: ${String(clone.stderr || clone.stdout).trim()}`;
   } finally {
+    // A clone that timed out, failed, or threw leaves a partial checkout
+    // behind, and the next attempt would refuse to overwrite it.
+    if (!cloned) {
+      await discardCheckout(sandbox, timeoutMs);
+    }
     await sandbox.setNetworkPolicy("allow-all");
   }
 };
@@ -90,15 +184,19 @@ const originUrl = async (sandbox: SandboxSession): Promise<string | null> => {
  * when HEAD moved, or unconditionally when the checkout's install state is
  * unknown. Any failure removes the checkout so a retry can start over.
  */
-const refreshCheckout = async (
+export const refreshCheckout = async (
   sandbox: SandboxSession,
   repository: string,
   warmed: WarmRepository | null,
-  installAnyway: boolean
+  installAnyway: boolean,
+  {
+    broker = brokerGitHubToken,
+    timeoutMs = REPOSITORY_OPERATION_TIMEOUT_MS,
+  }: CheckoutOptions = {}
 ): Promise<string | null> => {
-  const token = await mintInstallationToken(githubCredentials);
-  await sandbox.setNetworkPolicy(brokerPolicy(token));
+  await broker(sandbox);
   let moved = true;
+  let refreshed = false;
   try {
     // The moved checkout is owned by the builder uid, not the session user, so
     // git would abort with "detected dubious ownership" unless it is trusted
@@ -106,28 +204,40 @@ const refreshCheckout = async (
     // does not cover the nested repo (safe.directory is not recursive), and the
     // later `safe.directory '${worktree}'` config runs after this step, so
     // register `/workspace/repo` before any git command.
-    const trust = await sandbox.run({
-      command: "git config --global --add safe.directory /workspace/repo",
-    });
+    const trust = await boundedRun(
+      sandbox,
+      { command: "git config --global --add safe.directory /workspace/repo" },
+      timeoutMs
+    );
     if (trust.exitCode !== 0) {
-      await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not trust the warmed checkout for ${repository}: ${String(trust.stderr || trust.stdout).trim()}`;
     }
-    const before = await sandbox.run({
-      command: "git -C /workspace/repo rev-parse HEAD",
-    });
-    const refresh = await sandbox.run({
-      command: `git -C /workspace/repo fetch ${remoteUrl(repository)} && git -C /workspace/repo reset --hard FETCH_HEAD`,
-    });
+    const before = await boundedRun(
+      sandbox,
+      { command: "git -C /workspace/repo rev-parse HEAD" },
+      timeoutMs
+    );
+    const refresh = await boundedRun(
+      sandbox,
+      {
+        command: `git -C /workspace/repo fetch ${remoteUrl(repository)} && git -C /workspace/repo reset --hard FETCH_HEAD`,
+      },
+      timeoutMs
+    );
     if (refresh.exitCode !== 0) {
-      await sandbox.run({ command: "rm -rf /workspace/repo" });
       return `Could not refresh ${repository}: ${String(refresh.stderr || refresh.stdout).trim()}`;
     }
-    const after = await sandbox.run({
-      command: "git -C /workspace/repo rev-parse HEAD",
-    });
+    const after = await boundedRun(
+      sandbox,
+      { command: "git -C /workspace/repo rev-parse HEAD" },
+      timeoutMs
+    );
     moved = String(before.stdout).trim() !== String(after.stdout).trim();
+    refreshed = true;
   } finally {
+    if (!refreshed) {
+      await discardCheckout(sandbox, timeoutMs);
+    }
     await sandbox.setNetworkPolicy("allow-all");
   }
 
@@ -139,16 +249,26 @@ const refreshCheckout = async (
 
   // Install after the brokered token window closes, so lifecycle scripts never
   // run with the GitHub credential injected.
-  const install = await sandbox.run({
-    command: warmInstallCommand(warmed.kind),
-    env: warmInstallEnv(warmed.kind),
-    workingDirectory: "/workspace/repo",
-  });
-  if (install.exitCode !== 0) {
-    await sandbox.run({ command: "rm -rf /workspace/repo" });
-    return `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
+  let installed = false;
+  try {
+    const install = await boundedRun(
+      sandbox,
+      {
+        command: warmInstallCommand(warmed.kind),
+        env: warmInstallEnv(warmed.kind),
+        workingDirectory: "/workspace/repo",
+      },
+      timeoutMs
+    );
+    installed = install.exitCode === 0;
+    return installed
+      ? null
+      : `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
+  } finally {
+    if (!installed) {
+      await discardCheckout(sandbox, timeoutMs);
+    }
   }
-  return null;
 };
 
 /**
