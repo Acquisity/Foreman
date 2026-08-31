@@ -11,6 +11,7 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import {
+  FINAL_SLACK_POST_RULE,
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
@@ -98,9 +99,8 @@ import {
  * default exactly (the same pattern as `message.completed` below) and adds
  * only the progress behavior.
  *
- * Delivery posts the complete final message: there is no marker that splits
- * narration from reply, so the final message itself is the requester-facing
- * text and an empty one falls back to a typing indicator. Slack rejects a
+ * Delivery sends each completed assistant response without a split marker;
+ * an empty response falls back to a typing indicator. Slack rejects a
  * markdown post over 12,000 characters and eve swallows an event-handler
  * throw, so final replies go through `slack-post.ts`: ordered chunks that
  * prefer paragraph then line boundaries, plus one short visible fallback
@@ -149,7 +149,7 @@ export const dispatch = async (
         auth: stampSlackIntakeAuth(stamped),
         context: [slackIntakeContext(message.channelId)],
       }
-    : { auth: stamped };
+    : { auth: stamped, context: [FINAL_SLACK_POST_RULE] };
 };
 
 // --- Mirrors of eve's unexported Slack default rendering -------------------

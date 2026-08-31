@@ -90,9 +90,37 @@ describe("critic subagent", () => {
     );
     assert.ok(instructions.includes("Load the `triage-critic` skill before"));
     assert.ok(instructions.includes("If the skill fails to load"));
-    assert.ok(skill.includes("There is no attempt 3"));
     assert.ok(skill.includes("`checkout_commit`"));
     assert.ok(skill.includes("as the literal marker `read-only`"));
+  });
+
+  it("carries no attempt numbering or retry language anywhere", () => {
+    // P6.2: the critic runs exactly once per ticket. The description,
+    // instructions, and child skill must not revive the two-attempt
+    // contract P6.1 removed from the caller.
+    const agentSource = readFileSync(new URL("agent.ts", criticRoot), "utf8");
+    for (const surface of [agentSource, instructions, skill]) {
+      const lowered = surface.toLowerCase();
+      for (const excluded of [
+        "attempt 1",
+        "attempt 2",
+        "attempt 3",
+        "attempt number",
+        "attempt limit",
+        "two-attempt",
+        "second review",
+        "re-review",
+        "review again",
+        "prior approval",
+        "failed last time",
+        "re-delegate",
+        "delegate again",
+      ]) {
+        assert.ok(!lowered.includes(excluded), excluded);
+      }
+    }
+    assert.ok(agentSource.includes("Called exactly once per ticket"));
+    assert.ok(skill.includes("Foreman calls you exactly once per ticket"));
   });
 
   it("disables every write-capable default tool", () => {

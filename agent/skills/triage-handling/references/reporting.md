@@ -1,6 +1,6 @@
 # Triage reporting
 
-Use these exact output constraints and templates during Stage 6 of the triage-investigate workflow.
+Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `triage-handling` reached a reporting step that links here. If either gate is absent, stop reading and return to the unfinished stage. Use these exact output constraints and templates when linked.
 
 ## Linear report template
 
@@ -51,7 +51,7 @@ This one is a duplicate, so the pointer to the ticket that now owns it leads and
 
 ### Bad comment
 
-Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment.
+Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment:
 
 ```markdown
 ## Summary
@@ -63,14 +63,11 @@ Reply counts by month, Jun through Aug, with the figure in the ticket corrected 
 ## Blast radius
 The whole cohort, org by org, with the query.
 
-## Open question
-...
-
 ## Internal
 Resolved identity: user_id, organization_id, the customer's email addresses, and which of the three matching workspaces was picked and why. Routed to the AI SDR area owner because the project is AI SDR.
 ```
 
-Nothing in the bad comment is wrong. It is all in the wrong place. The headings, the month-by-month breakdown, the corrected figure, the cohort count, the identity resolution, and the `## Internal` block all belong in the document, and the one sentence the reader needed is buried under them.
+Nothing in the bad comment is wrong; it is all in the wrong place, and the one sentence the reader needed is buried under it.
 
 ## Triage investigation document template
 
@@ -80,7 +77,7 @@ Nothing in the bad comment is wrong. It is all in the wrong place. The headings,
 **Ticket**: <ENG-XXXX>
 **Classification**: <User Error | Platform Limitation | Bug>
 **Organization**: <organization_id> (<org name>)
-**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Stopped: <reason> | Not required>
+**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> | Stopped: NEEDS_HUMAN_URGENT | Not required>
 
 ## Claim
 The one testable sentence from Stage 1.
@@ -109,6 +106,8 @@ What was checked and eliminated, so the next agent does not redo it.
 ## Next steps
 What action the root cause warrants.
 ```
+
+An `Adjudicated` review names each blocking finding or the failure reason in the `**Review**` line itself, one short clause per finding with what settled it, so the next person starts from the findings rather than from nothing.
 
 ## Master ticket template
 

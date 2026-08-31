@@ -30,7 +30,7 @@ const sources: Record<string, string> = {
     "../skills/intercom-triage-investigate/references/tools.md"
   ),
   "sla skill": readSource("../skills/sla-investigation/SKILL.md"),
-  "triage skill": readSource(
+  "triage tools": readSource(
     "../skills/triage-investigate/references/tools.md"
   ),
 };

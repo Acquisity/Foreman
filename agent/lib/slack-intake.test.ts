@@ -8,6 +8,7 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import {
+  FINAL_SLACK_POST_RULE,
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
   slackIntakeContext,
@@ -110,6 +111,14 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("progress updates are allowed"), true);
     assert.equal(context.includes("only the requester-facing answer"), true);
     assert.equal(context.includes("no internal summary or action log"), true);
+  });
+
+  it("states the final Slack-post rule exactly once per intake context", () => {
+    for (const channelId of ["C0BBPVC3N2X", "C0BC011NAQL", "C0BCV1WBR42"]) {
+      const context = slackIntakeContext(channelId);
+      const occurrences = context.split(FINAL_SLACK_POST_RULE).length - 1;
+      assert.equal(occurrences, 1, channelId);
+    }
   });
 
   it("starts Intercom intake from one conversation without an issue", () => {
