@@ -284,6 +284,27 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, DISCARD), false);
   });
 
+  it("stops a stalled warmed-checkout move", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command === "test -e /workspace/repo") {
+        return failed("");
+      }
+      return options.command.includes(`mv ${STAGING} /workspace/repo`)
+        ? stall(options)
+        : ok();
+    });
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", TIMED_OUT);
+    const move = commands.find((options) =>
+      options.command.includes(`mv ${STAGING} /workspace/repo`)
+    );
+    assert.ok(move?.abortSignal instanceof AbortSignal);
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
   it("refuses an occupied checkout that has no configured origin", async () => {
     // `git config --get` exits non-zero for a key that is simply absent, so an
     // unrelated local checkout is indistinguishable from debris and must not be

@@ -346,9 +346,14 @@ export const prepareWarmedOrClone = async (
   // `/workspace/repo` are not guaranteed to be one rename apart) leaves its
   // remains at the tool-owned path instead of at `/workspace/repo`, where a
   // later turn could not tell them from a checkout it must not touch.
-  const move = await sandbox.run({
-    command: `rm -rf ${STAGING_PATH} && mv ${path} ${STAGING_PATH} && mv ${STAGING_PATH} /workspace/repo`,
-  });
+  const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
+  const move = await boundedRun(
+    sandbox,
+    {
+      command: `rm -rf ${STAGING_PATH} && mv ${path} ${STAGING_PATH} && mv ${STAGING_PATH} /workspace/repo`,
+    },
+    timeoutMs
+  );
   if (move.exitCode !== 0) {
     return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
   }
