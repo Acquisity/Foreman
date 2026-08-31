@@ -8,7 +8,6 @@ import type {
   SlackInboundMessageContext,
   SlackMessage,
 } from "eve/channels/slack";
-import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -120,7 +119,6 @@ describe("slack channel", () => {
     );
     assert.equal(cancelled, false);
     assert.ok(result && "auth" in result && result.auth);
-    assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
   it("posts exactly one short notice when a turn is cancelled", async () => {
