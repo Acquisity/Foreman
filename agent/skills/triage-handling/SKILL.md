@@ -1,8 +1,12 @@
 ---
-description: "Handling for a completed Engineering Triage investigation: verdict, unblock, handling path, final Linear state, priority, labels, the one-pass Bug critic review, area routing, masters, the requester reply, and memory bookkeeping. Load after triage-investigate Stage 4 completes the evidence record."
+description: "Use only after triage-investigate explicitly records its Stage 4 completion checkpoint. Never load during Stages 1 through 4."
 ---
 
 # Triage handling
+
+## Entry gate
+
+Before this skill was loaded, working context must have contained `STAGE 4 COMPLETE: evidence record ready`. If not, read no references or decide handling; resume unfinished Stage 4. This load does not create the checkpoint.
 
 ## Stage 5: Decide handling
 

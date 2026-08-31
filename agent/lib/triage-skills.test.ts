@@ -48,14 +48,10 @@ const extractInstruction = (skill: string, start: string, end: string) => {
 
 const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
 const BACKTICK_TOKEN_PATTERN = /`([^`]+)`/gu;
+const STAGE_4_CHECKPOINT = "STAGE 4 COMPLETE: evidence record ready";
 
 test("triage intake hands off to the handling skill after Stage 4", () => {
   assert.ok(triageSkill.includes("## Handoff to handling"));
-  assert.ok(
-    triageSkill.includes(
-      "Stages 5 through 7 and the report templates live in the `triage-handling` skill"
-    )
-  );
   assert.ok(
     triageSkill.indexOf("## Handoff to handling") >
       triageSkill.indexOf("## Stage 4: Investigate")
@@ -63,17 +59,13 @@ test("triage intake hands off to the handling skill after Stage 4", () => {
   assert.equal(triageSkill.includes("## Stage 5"), false);
   assert.equal(triageSkill.includes("[references/reporting.md]"), false);
   assert.ok(triageHandlingSkill.includes("## Stage 5: Decide handling"));
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Load after triage-investigate Stage 4 completes the evidence record"
-    )
-  );
   assert.equal(triageHandlingSkill.includes("## Stage 1"), false);
   assert.equal(triageHandlingSkill.includes("## Stage 4"), false);
 
   const description = triageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
   assert.ok(description.includes("Stages 1 through 4"));
-  assert.ok(description.includes("triage-handling"));
+  assert.equal(description.includes("triage-handling"), false);
+  assert.ok(description.includes("never preload handling"));
   for (const moved of [
     "severity weighting and priority bands",
     "area-routing roster",
@@ -81,6 +73,54 @@ test("triage intake hands off to the handling skill after Stage 4", () => {
     "unblocking the customer",
   ]) {
     assert.equal(description.includes(moved), false, moved);
+  }
+});
+
+test("handling stays behind the explicit Stage 4 checkpoint", () => {
+  const handoff = triageSkill.slice(
+    triageSkill.indexOf("## Handoff to handling")
+  );
+  const handlingDescription =
+    triageHandlingSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  const entryGate = extractInstruction(
+    triageHandlingSkill,
+    "## Entry gate",
+    "## Stage 5: Decide handling"
+  );
+
+  assert.ok(handoff.includes(STAGE_4_CHECKPOINT));
+  assert.ok(
+    triageSkill.indexOf("## Handoff to handling") >
+      triageSkill.indexOf(
+        "Completion: every material conclusion has current evidence"
+      )
+  );
+  assert.ok(handoff.includes("Verify every Stage 4 completion condition"));
+  assert.ok(handoff.includes("Until it exists, do not load"));
+  assert.equal(handlingDescription.includes(STAGE_4_CHECKPOINT), false);
+  assert.ok(handlingDescription.includes("Stage 4 completion checkpoint"));
+  assert.ok(
+    handlingDescription.includes("Never load during Stages 1 through 4")
+  );
+  assert.ok(entryGate.includes(STAGE_4_CHECKPOINT));
+  assert.ok(entryGate.includes("Before this skill was loaded"));
+  assert.ok(entryGate.includes("If not, read no references"));
+  assert.ok(entryGate.includes("This load does not create the checkpoint"));
+
+  for (const reference of [
+    triageReportingReference,
+    criticReviewReference,
+    readFileSync(
+      new URL(
+        "../skills/triage-handling/references/roster.md",
+        import.meta.url
+      ),
+      "utf8"
+    ),
+  ]) {
+    assert.ok(reference.includes(STAGE_4_CHECKPOINT));
+    assert.ok(reference.includes("existed before this file was opened"));
+    assert.ok(reference.includes("If either gate is absent, stop reading"));
   }
 });
 

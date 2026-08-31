@@ -1,5 +1,5 @@
 ---
-description: "Engineering Triage intake and evidence (Stages 1 through 4). Load before investigating any triage ticket; after Stage 4, load the triage-handling skill for classification, priority, routing, and the reply."
+description: "Engineering Triage intake and evidence, Stages 1 through 4. Load for every triage ticket; never preload handling."
 ---
 
 # Triage investigate
@@ -139,4 +139,4 @@ Completion: every material conclusion has current evidence, contrary evidence ha
 
 ## Handoff to handling
 
-Stages 5 through 7 and the report templates live in the `triage-handling` skill. Load it once Stage 4 completes, before deciding handling.
+Verify every Stage 4 completion condition. Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling`. This internal checkpoint is not requester-facing. Until it exists, do not load that skill or its references.
