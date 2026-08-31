@@ -130,24 +130,40 @@ const defaultSleep: Sleeper = (milliseconds, signal) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
-/** Resolves when the signal aborts, bounding a disposal that never settles. */
-const abortSettled = (signal: AbortSignal): Promise<void> =>
-  new Promise((resolve) => {
-    if (signal.aborted) {
+/** Bounds a disposal by abort and removes its listener whichever settles first. */
+const settleBeforeAbort = (
+  settling: Promise<unknown> | undefined,
+  signal?: AbortSignal
+): Promise<void> => {
+  if (settling === undefined) {
+    return Promise.resolve();
+  }
+  if (signal === undefined) {
+    return settling.then(() => undefined);
+  }
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
       resolve();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
       return;
     }
-    signal.addEventListener("abort", () => resolve(), { once: true });
+    settling.then(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    });
   });
+};
 
 const discardResponseBody = async (
   response: Response,
   signal?: AbortSignal
 ): Promise<void> => {
   const discarded = response.body?.cancel().catch(() => undefined);
-  await (signal === undefined
-    ? discarded
-    : Promise.race([discarded, abortSettled(signal)]));
+  await settleBeforeAbort(discarded, signal);
 };
 
 const readBeforeAbort = <T>(
@@ -214,9 +230,7 @@ const readBoundedText = async (
     totalBytes += value.byteLength;
     if (totalBytes > MAX_RESPONSE_BYTES) {
       const cancelled = reader.cancel().catch(() => undefined);
-      await (signal === undefined
-        ? cancelled
-        : Promise.race([cancelled, abortSettled(signal)]));
+      await settleBeforeAbort(cancelled, signal);
       if (signal?.aborted) {
         throw signal.reason;
       }
