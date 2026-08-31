@@ -61,6 +61,67 @@ const truncateLabel = (label: string): string => {
 };
 
 /**
+ * Structural projection of eve's `RuntimeActionResult` union, carrying only
+ * the name each result kind reports. Keeping the projection local leaves the
+ * helper pure and testable without importing runtime internals.
+ */
+export type SlackProgressActionResult =
+  | { readonly kind: "tool-result"; readonly toolName: string }
+  | { readonly kind: "subagent-result"; readonly subagentName: string }
+  | { readonly kind: "load-skill-result"; readonly name?: string | undefined };
+
+/**
+ * Derives the short wait label a finished action leaves behind: the tool or
+ * subagent name, or null when the result names nothing (a skill load that
+ * activated no skill). Channel handlers feed this into the state's
+ * `waitLabel`; the decision helper bounds and normalizes it.
+ */
+export const slackProgressActionLabel = (
+  result: SlackProgressActionResult
+): string | null => {
+  if (result.kind === "tool-result") {
+    return result.toolName;
+  }
+  if (result.kind === "subagent-result") {
+    return result.subagentName;
+  }
+  return result.name ?? null;
+};
+
+/**
+ * Structural projection of eve's `RuntimeActionRequest` union, carrying only
+ * the name each requested action kind reports. Same rationale as
+ * {@link SlackProgressActionResult}.
+ */
+export type SlackProgressActionRequest =
+  | { readonly kind: "tool-call"; readonly toolName: string }
+  | { readonly kind: "subagent-call"; readonly subagentName: string }
+  | { readonly kind: "remote-agent-call"; readonly remoteAgentName: string }
+  | { readonly kind: "load-skill" };
+
+/**
+ * Derives the wait label for a batch of requested actions from the first
+ * one: the tool, subagent, or remote agent the turn is about to wait on, or
+ * null for an empty batch or a bare skill load. Channel handlers feed this
+ * into the state's `waitLabel` when the model requests actions.
+ */
+export const slackProgressActionRequestLabel = (
+  actions: readonly SlackProgressActionRequest[]
+): string | null => {
+  const [first] = actions;
+  if (!first || first.kind === "load-skill") {
+    return null;
+  }
+  if (first.kind === "tool-call") {
+    return first.toolName;
+  }
+  if (first.kind === "subagent-call") {
+    return first.subagentName;
+  }
+  return first.remoteAgentName;
+};
+
+/**
  * Returns the progress line due at `nowMs`, or null when none is due: no
  * state, the next threshold not yet reached, or both lines already posted.
  * The posted-line count selects the threshold, so a turn can never produce

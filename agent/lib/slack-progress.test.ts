@@ -6,6 +6,8 @@ import {
   SLACK_PROGRESS_LABEL_LIMIT,
   SLACK_PROGRESS_THRESHOLDS_MS,
   type SlackProgressState,
+  slackProgressActionLabel,
+  slackProgressActionRequestLabel,
 } from "./slack-progress.js";
 
 const [FIVE_MINUTES, FIFTEEN_MINUTES] = SLACK_PROGRESS_THRESHOLDS_MS;
@@ -170,6 +172,74 @@ describe("decideSlackProgressLine", () => {
     assert.equal(
       line.endsWith(`${"x".repeat(SLACK_PROGRESS_LABEL_LIMIT - 2)}😀....`),
       true
+    );
+  });
+});
+
+describe("slackProgressActionLabel", () => {
+  it("names a finished tool call", () => {
+    assert.equal(
+      slackProgressActionLabel({ kind: "tool-result", toolName: "grep" }),
+      "grep"
+    );
+  });
+
+  it("names a finished subagent call", () => {
+    assert.equal(
+      slackProgressActionLabel({
+        kind: "subagent-result",
+        subagentName: "investigator",
+      }),
+      "investigator"
+    );
+  });
+
+  it("names a skill load that activated a skill", () => {
+    assert.equal(
+      slackProgressActionLabel({
+        kind: "load-skill-result",
+        name: "triage-investigate",
+      }),
+      "triage-investigate"
+    );
+  });
+
+  it("returns null when a skill load names nothing", () => {
+    assert.equal(slackProgressActionLabel({ kind: "load-skill-result" }), null);
+  });
+});
+
+describe("slackProgressActionRequestLabel", () => {
+  it("names the first requested tool call", () => {
+    assert.equal(
+      slackProgressActionRequestLabel([
+        { kind: "tool-call", toolName: "grep" },
+        { kind: "tool-call", toolName: "read_file" },
+      ]),
+      "grep"
+    );
+  });
+
+  it("names a requested subagent or remote agent", () => {
+    assert.equal(
+      slackProgressActionRequestLabel([
+        { kind: "subagent-call", subagentName: "investigator" },
+      ]),
+      "investigator"
+    );
+    assert.equal(
+      slackProgressActionRequestLabel([
+        { kind: "remote-agent-call", remoteAgentName: "remote-critic" },
+      ]),
+      "remote-critic"
+    );
+  });
+
+  it("returns null for an empty batch or a bare skill load", () => {
+    assert.equal(slackProgressActionRequestLabel([]), null);
+    assert.equal(
+      slackProgressActionRequestLabel([{ kind: "load-skill" }]),
+      null
     );
   });
 });
