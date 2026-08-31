@@ -105,7 +105,9 @@ describe("prepare_repository sandbox bounds", () => {
       broker,
     });
     assert.equal(error, null);
-    const clone = commands[0]?.abortSignal;
+    const clone = commands.find((options) =>
+      options.command.startsWith("git clone")
+    )?.abortSignal;
     assert.ok(clone instanceof AbortSignal);
     assert.equal(clone.aborted, false);
   });
