@@ -115,6 +115,24 @@ const cancellableSession = (
     id: "s1",
   }) as unknown as Session;
 
+const cancellableSessionWithConfirmationStream = (
+  snapshot: readonly MessageStreamEvent[],
+  confirmation: ReadableStream<MessageStreamEvent>,
+  calls: unknown[],
+  onCancel: () => void
+): Session =>
+  ({
+    cancel: (options?: { turnId?: string }) => {
+      calls.push(options);
+      onCancel();
+      return Promise.resolve({ sessionId: "s1", status: "accepted" });
+    },
+    getEventStream: ({ startIndex = 0 } = {}) =>
+      Promise.resolve(startIndex === 0 ? eventStream(snapshot) : confirmation),
+    getStreamTailIndex: () => Promise.resolve(snapshot.length - 1),
+    id: "s1",
+  }) as unknown as Session;
+
 describe("slack channel", () => {
   it("is discovered with the queue turn policy so follow-ups wait", () => {
     assert.equal(channel.turnPolicy, "queue");
@@ -223,6 +241,41 @@ describe("slack channel", () => {
     assert.equal(result, null);
     assert.deepEqual(calls, [{ turnId: "t1" }]);
     assert.deepEqual(posts, []);
+  });
+
+  it("bounds cancellation confirmation and closes a stalled stream", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    let streamCancelled = false;
+    let cancellationRequested: (() => void) | undefined;
+    const cancellationStarted = new Promise<void>((resolve) => {
+      cancellationRequested = resolve;
+    });
+    const confirmation = new ReadableStream<MessageStreamEvent>({
+      cancel() {
+        streamCancelled = true;
+      },
+    });
+    const session = cancellableSessionWithConfirmationStream(
+      [streamEvent("turn.started", "t1")],
+      confirmation,
+      calls,
+      () => cancellationRequested?.()
+    );
+
+    const pendingDispatch = dispatch(
+      inboundContext(session, posts),
+      message("stop")
+    );
+    await cancellationStarted;
+    await Promise.resolve();
+    t.mock.timers.tick(10_000);
+
+    assert.equal(await pendingDispatch, null);
+    assert.deepEqual(calls, [{ turnId: "t1" }]);
+    assert.deepEqual(posts, []);
+    assert.equal(streamCancelled, true);
   });
 
   it("stays quiet when the Slack thread has no session owner", async () => {

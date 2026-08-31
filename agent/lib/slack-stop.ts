@@ -6,6 +6,7 @@ import {
 } from "eve/client";
 
 const MAX_TEXT_LENGTH = 200;
+const CANCELLATION_CONFIRMATION_TIMEOUT_MS = 10_000;
 
 const STOP_PATTERN =
   /^(?:<@[A-Za-z0-9]+(?:\|[^>]*)?>\s*)*(?:stop|cancel)(?:[\s.!?…]|<@[A-Za-z0-9]+(?:\|[^>]*)?>)*$/i;
@@ -118,13 +119,27 @@ export const cancelActiveSlackTurn = async (
     startIndex: tailIndex + 1,
   });
   const reader = confirmation.getReader();
+  let confirmationTimeout: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await session.cancel({ turnId });
     if (result.status !== "accepted") {
       return null;
     }
-    return (await confirmsCancellation(reader, turnId)) ? turnId : null;
+    const confirmed = await Promise.race([
+      confirmsCancellation(reader, turnId),
+      new Promise<false>((resolve) => {
+        confirmationTimeout = setTimeout(
+          () => resolve(false),
+          CANCELLATION_CONFIRMATION_TIMEOUT_MS
+        );
+        confirmationTimeout.unref?.();
+      }),
+    ]);
+    return confirmed ? turnId : null;
   } finally {
+    if (confirmationTimeout) {
+      clearTimeout(confirmationTimeout);
+    }
     await reader.cancel();
   }
 };
