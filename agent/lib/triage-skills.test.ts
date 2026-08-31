@@ -427,6 +427,16 @@ test("incident-hotlane assesses and never writes", () => {
     assert.ok(!hotlaneSkill.includes(excluded), excluded);
   }
   assert.ok(hotlaneSkill.includes("This skill does not set priority"));
+  assert.ok(
+    hotlaneSkill.includes(
+      "For `HOTLANE` and `STANDARD_ENGINEERING`, Foreman includes the assessment in the critic review"
+    )
+  );
+  assert.ok(
+    hotlaneSkill.includes(
+      "`NEEDS_HUMAN_URGENT` instead routes directly to a person before any critic review or settled decision"
+    )
+  );
 });
 
 test("triage reviews a Bug with the critic before routing it", () => {
