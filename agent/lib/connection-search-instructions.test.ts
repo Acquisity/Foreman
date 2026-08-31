@@ -30,9 +30,7 @@ const sources: Record<string, string> = {
     "../skills/intercom-triage-investigate/references/tools.md"
   ),
   "sla skill": readSource("../skills/sla-investigation/SKILL.md"),
-  "triage skill": readSource(
-    "../skills/triage-investigate/references/tools.md"
-  ),
+  "triage skill": readSource("../skills/triage-investigate/SKILL.md"),
 };
 
 const SENTENCE_END = /(?<=[.!?])\s+/u;
