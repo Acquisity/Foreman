@@ -152,11 +152,33 @@ const discardResponseBody = async (
 
 const readBeforeAbort = <T>(
   reader: ReadableStreamDefaultReader<T>,
-  aborted?: Promise<null>
-): Promise<ReadableStreamReadResult<T> | null> =>
-  aborted === undefined
-    ? reader.read()
-    : Promise.race([reader.read(), aborted]);
+  signal?: AbortSignal
+): Promise<ReadableStreamReadResult<T> | null> => {
+  if (signal === undefined) {
+    return reader.read();
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(null);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    reader.read().then(
+      (result) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(result);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+};
 
 const readBoundedText = async (
   response: Response,
@@ -177,11 +199,10 @@ const readBoundedText = async (
   const reader = response.body.getReader();
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  const aborted = signal && abortSettled(signal).then(() => null);
   // biome-ignore lint/suspicious/noUnnecessaryConditions: stream completion terminates the loop.
   while (true) {
     // biome-ignore lint/performance/noAwaitInLoops: chunks must be read sequentially to enforce the cap.
-    const result = await readBeforeAbort(reader, aborted);
+    const result = await readBeforeAbort(reader, signal);
     if (result === null) {
       reader.cancel().catch(() => undefined);
       throw signal?.reason;
