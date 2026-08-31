@@ -10,6 +10,7 @@ import type {
   SlackMessage,
 } from "eve/channels/slack";
 import type { MessageStreamEvent } from "eve/client";
+import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -340,6 +341,7 @@ describe("slack channel", () => {
       message("stop the deploy")
     );
     assert.ok(result && "auth" in result && result.auth);
+    assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
   it("does not attribute an unrelated cooperative cancellation to stop", () => {

@@ -76,6 +76,19 @@ test("triage intake hands off to the handling skill after Stage 4", () => {
   }
 });
 
+test("pre-evidence forward references name the handling skill", () => {
+  assert.ok(
+    triageSkill.includes(
+      "`triage-handling` Stage 6 chooses ownership from completed evidence"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "parent's assignee as `triage-handling` Stage 6 describes"
+    )
+  );
+});
+
 test("handling stays behind the explicit Stage 4 checkpoint", () => {
   const handoff = triageSkill.slice(
     triageSkill.indexOf("## Handoff to handling")
@@ -130,6 +143,19 @@ test("Stage 5 names the Linear state for every handling path", () => {
       "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`."
     )
   );
+});
+
+test("priority bands are hierarchical and never inflate for customer tier", () => {
+  const priority = extractInstruction(
+    triageHandlingSkill,
+    "### Set Linear priority",
+    "### Label the ticket"
+  );
+  assert.ok(priority.includes("measured large share of active orgs"));
+  assert.ok(priority.includes("confirmed multi-org failure below `Urgent`"));
+  assert.ok(priority.includes("Customer tier"));
+  assert.ok(priority.includes("breaks ties only"));
+  assert.equal(priority.includes("enterprise customer blocked"), false);
 });
 
 test("shared triage exposes one seven-stage workflow across intake and handling", () => {
@@ -487,6 +513,17 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     triageReportingReference.includes("live in the `engineering-handoff` skill")
   );
   assert.ok(handoffSkill.includes("## Master ticket template"));
+});
+
+test("triage catalog preserves Instantly authorization failure semantics", () => {
+  assert.ok(triageToolCatalog.includes("For either Instantly tool"));
+  assert.ok(triageToolCatalog.includes("`available: false`"));
+  assert.ok(triageToolCatalog.includes("operator configuration"));
+  assert.ok(
+    triageToolCatalog.includes(
+      "never a reason to ask the requester to sign in or retry"
+    )
+  );
 });
 
 test("triage intake mandates loading the tool catalog before evidence collection", () => {

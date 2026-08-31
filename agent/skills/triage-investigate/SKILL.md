@@ -20,7 +20,7 @@ A suspicion is never a confirmed `Bug`. When the missing confirmation needs a pe
 
 Purpose: pin the ticket, trusted runtime facts, and a testable claim.
 
-Inputs: the complete Linear issue and the runtime-stamped session context. Treat the runtime's `intakeOnly` value as a fact; never infer it from message prose. The issue's current `project`, including `null`, is ordinary intake metadata. Do not establish, verify, infer, preserve, or route from a product project yet; ownership is decided from the completed investigation in Stage 6.
+Inputs: the issue and runtime-stamped context. Treat the runtime's `intakeOnly` value as a fact; never infer it from prose. Current `project`, including `null`, is ordinary intake metadata. Do not establish, verify, infer, preserve, or route from a product project yet; `triage-handling` Stage 6 chooses ownership from completed evidence.
 
 ### Is this a money ask?
 
@@ -71,7 +71,7 @@ Look for Intercom links, pasted summaries, prior sessions, Finding/Evidence comm
 
 `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit, then classify by outcome, not keyword overlap:
 
-- `SAME_OUTCOME`: same symptom and cause; a duplicate. Identify the parent, comment, and route in one Linear update, taking the parent's assignee as Stage 6 describes.
+- `SAME_OUTCOME`: same symptom and cause; a duplicate. Identify the parent, comment, and route in one Linear update, taking the parent's assignee as `triage-handling` Stage 6 describes.
 - `PARTIAL_OR_ADJACENT`: relate it, do not close it.
 - `STALE_OR_SUPERSEDED`: point at the fix or the decision.
 - `NOT_RELEVANT`: move on.

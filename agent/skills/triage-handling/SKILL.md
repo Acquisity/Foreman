@@ -50,8 +50,8 @@ Priority comes from impact, never from the reporter's requested priority or how 
 
 Bands:
 
-- `Urgent`: production outage, security or data-loss risk, major revenue or customer-trust incident, or a core workflow blocked for many orgs.
-- `High`: multiple orgs blocked on a core workflow, money issue requiring action, repeat production failure, or an enterprise customer blocked.
+- `Urgent`: outage, security or data loss, major revenue or trust incident, or a core workflow unavailable for a measured large share of active orgs.
+- `High`: confirmed multi-org failure below `Urgent`, money issue requiring action, or repeat production failure.
 - `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
 - `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
 

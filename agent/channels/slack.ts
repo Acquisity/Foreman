@@ -9,6 +9,7 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import {
+  FINAL_SLACK_POST_RULE,
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
@@ -120,7 +121,7 @@ export const dispatch = async (
         auth: stampSlackIntakeAuth(stamped),
         context: [slackIntakeContext(message.channelId)],
       }
-    : { auth: stamped };
+    : { auth: stamped, context: [FINAL_SLACK_POST_RULE] };
 };
 
 export const slackChannelEvents: SlackChannelEvents = {

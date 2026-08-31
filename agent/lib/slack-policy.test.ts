@@ -27,8 +27,6 @@ const collectPolicySources = (directory: string): string[] =>
     return entry.isDirectory() ? collectPolicySources(path) : [path];
   });
 
-const POINTER_PATTERN =
-  /(?:canonical final-post (?:rule|stamp)|final-post rule lives only in `slack-intake\.ts`)/iu;
 const SEMANTIC_RESTATEMENT_PATTERNS = [
   /\bonly\b.*\brequester-facing\b|\brequester-facing\b.*\bonly\b/iu,
   /\bfinal (?:assistant )?(?:message|post)\b.*\brequester-facing\b|\brequester-facing\b.*\bfinal (?:assistant )?(?:message|post)\b/iu,
@@ -36,6 +34,9 @@ const SEMANTIC_RESTATEMENT_PATTERNS = [
   /\bsingle-audience\b/iu,
   /\b(?:internal investigation summary|action log|proof of work)\b.*\b(?:Slack|reply|post|message)\b|\b(?:Slack|reply|post|message)\b.*\b(?:internal investigation summary|action log|proof of work)\b/iu,
 ];
+
+const semanticallyRestatesPolicy = (line: string): boolean =>
+  SEMANTIC_RESTATEMENT_PATTERNS.some((pattern) => pattern.test(line));
 
 const extractInstruction = (source: string, start: string, end: string) => {
   const startIndex = source.indexOf(start);
@@ -57,16 +58,22 @@ test("final Slack-post policy is authored only in slack-intake", () => {
   for (const path of policySources) {
     const lines = readFileSync(path, "utf8").split("\n");
     for (const [index, line] of lines.entries()) {
-      if (POINTER_PATTERN.test(line)) {
-        continue;
-      }
-      if (SEMANTIC_RESTATEMENT_PATTERNS.some((pattern) => pattern.test(line))) {
+      if (semanticallyRestatesPolicy(line)) {
         offenders.push(`${relative(agentRoot, path)}:${index + 1}`);
       }
     }
   }
 
   assert.deepEqual(offenders, []);
+});
+
+test("a canonical pointer cannot hide a final-post policy restatement", () => {
+  assert.equal(
+    semanticallyRestatesPolicy(
+      "The final post is requester-facing only; see the canonical final-post rule in slack-intake.ts."
+    ),
+    true
+  );
 });
 
 test("Slack-facing skills defer to the canonical channel stamp", () => {
