@@ -1,6 +1,6 @@
 # Triage reporting
 
-Use these exact output constraints and templates during Stage 6 of the triage-handling workflow.
+Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `triage-handling` reached a reporting step that links here. If either gate is absent, stop reading and return to the unfinished stage. Use these exact output constraints and templates when linked.
 
 ## Linear report template
 
