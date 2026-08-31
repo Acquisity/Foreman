@@ -51,7 +51,11 @@ const inboundContext = (
   session: Session | undefined,
   posts: string[] = [],
   postedIds = new Set<string>(),
-  requests: unknown[] = []
+  requests: unknown[] = [],
+  requestOverride?: (
+    operation: string,
+    body: Record<string, unknown>
+  ) => Promise<{ ok: boolean }>
 ) =>
   ({
     resolveSession: () => Promise.resolve(session),
@@ -59,6 +63,9 @@ const inboundContext = (
       channelId: "C0DEV",
       request: (operation: string, body: Record<string, unknown>) => {
         requests.push({ body, operation });
+        if (requestOverride) {
+          return requestOverride(operation, body);
+        }
         const clientMessageId = body.client_msg_id;
         if (
           typeof clientMessageId === "string" &&
@@ -203,6 +210,36 @@ describe("slack channel", () => {
     );
     assert.match(String(requests[0]?.body.client_msg_id), UUID_V5);
     assert.deepEqual(posts, ["Stopped."]);
+  });
+
+  it("keeps a completed stop successful when confirmation delivery fails", async (t) => {
+    const warnings: string[] = [];
+    t.mock.method(console, "warn", (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    });
+    const requestOutcomes = [
+      () => Promise.resolve({ ok: false }),
+      () => Promise.reject(new Error("provider response must stay private")),
+    ];
+    const results = await Promise.all(
+      requestOutcomes.map((requestOverride) => {
+        const session = cancellableSession(
+          [streamEvent("turn.started", "t1")],
+          [streamEvent("turn.cancelled", "t1")],
+          []
+        );
+        return dispatch(
+          inboundContext(session, [], new Set<string>(), [], requestOverride),
+          message("stop")
+        );
+      })
+    );
+    assert.deepEqual(results, [null, null]);
+    assert.deepEqual(warnings, [
+      "Slack stop confirmation could not be posted.",
+      "Slack stop confirmation could not be posted.",
+    ]);
+    assert.equal(warnings.join(" ").includes("provider response"), false);
   });
 
   it("stays quiet when an accepted session is already parked", async () => {

@@ -168,13 +168,20 @@ export const postStopConfirmation = async (
   ctx: SlackInboundMessageContext,
   turnId: string
 ): Promise<void> => {
-  const response = await ctx.slack.request("chat.postMessage", {
-    channel: ctx.slack.channelId,
-    client_msg_id: stopConfirmationId(ctx, turnId),
-    text: "Stopped.",
-    thread_ts: ctx.slack.threadTs,
-  });
-  if (!response.ok) {
-    throw new Error("Slack could not post the stop confirmation.");
+  try {
+    const response = await ctx.slack.request("chat.postMessage", {
+      channel: ctx.slack.channelId,
+      client_msg_id: stopConfirmationId(ctx, turnId),
+      text: "Stopped.",
+      thread_ts: ctx.slack.threadTs,
+    });
+    if (response.ok) {
+      return;
+    }
+  } catch {
+    // The cancellation has already settled. Eve catches an authored Slack
+    // handler rejection after acknowledging the webhook, so throwing cannot
+    // produce a useful retry and only misclassifies the successful stop.
   }
+  console.warn("Slack stop confirmation could not be posted.");
 };
