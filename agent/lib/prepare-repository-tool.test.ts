@@ -334,6 +334,40 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, DISCARD), false);
   });
 
+  it("keeps an adopted checkout when its refresh fails", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command.includes("remote.origin.url")) {
+        return ok(remoteUrl(REPOSITORY));
+      }
+      return options.command.includes("fetch")
+        ? failed("could not read")
+        : ok("sha");
+    });
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFRESH_FAILED);
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
+  it("keeps an adopted checkout when its install fails", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command.includes("remote.origin.url")) {
+        return ok(remoteUrl(REPOSITORY));
+      }
+      return options.command.includes("pnpm install")
+        ? failed("ERR_PNPM_OUTDATED_LOCKFILE")
+        : ok("sha");
+    });
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", INSTALL_FAILED);
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
   it("still refuses a checkout of a different repository", async () => {
     const { commands, sandbox } = fakeSandbox((options) =>
       options.command.includes("remote.origin.url") ? ok(OTHER_ORIGIN) : ok()

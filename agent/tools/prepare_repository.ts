@@ -51,6 +51,7 @@ export type CredentialBroker = (sandbox: SandboxSession) => Promise<void>;
 
 export interface CheckoutOptions {
   readonly broker?: CredentialBroker;
+  readonly owned?: boolean;
   readonly timeoutMs?: number;
 }
 
@@ -218,6 +219,7 @@ export const refreshCheckout = async (
   installAnyway: boolean,
   {
     broker = brokerGitHubToken,
+    owned = true,
     timeoutMs = REPOSITORY_OPERATION_TIMEOUT_MS,
   }: CheckoutOptions = {}
 ): Promise<string | null> => {
@@ -262,7 +264,7 @@ export const refreshCheckout = async (
     moved = String(before.stdout).trim() !== String(after.stdout).trim();
     refreshed = true;
   } finally {
-    if (!refreshed) {
+    if (owned && !refreshed) {
       await discardPath(sandbox, "/workspace/repo", timeoutMs);
     }
     await sandbox.setNetworkPolicy("allow-all");
@@ -292,7 +294,7 @@ export const refreshCheckout = async (
       ? null
       : `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
   } finally {
-    if (!installed) {
+    if (owned && !installed) {
       await discardPath(sandbox, "/workspace/repo", timeoutMs);
     }
   }
@@ -321,7 +323,10 @@ export const prepareWarmedOrClone = async (
     // land here anyway: `/workspace/repo` only ever appears as a rename of a
     // finished checkout from `STAGING_PATH`.
     return (await originUrl(sandbox)) === remoteUrl(repository).toLowerCase()
-      ? refreshCheckout(sandbox, repository, warmed, true, options)
+      ? refreshCheckout(sandbox, repository, warmed, true, {
+          ...options,
+          owned: false,
+        })
       : "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
   }
 
