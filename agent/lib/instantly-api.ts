@@ -318,6 +318,12 @@ const withDeadline = async <T>(
  * Disposes a retryable response inside the attempt's own deadline, so a body
  * whose cancellation never settles cannot outlive the request's own time. The
  * deadline is disarmed only once the attempt is finished with the response.
+ *
+ * Because that bound is an abort, disposal can end without having finished.
+ * The composed signal's first abort reason, which never changes once set,
+ * decides what the attempt does next: this request's own expiry is reported as
+ * a timeout and never retried, a caller's cancellation propagates unchanged,
+ * and a disposal that genuinely finished leaves the retry untouched.
  */
 const disposeResponse = async (
   response: Response,
@@ -327,6 +333,10 @@ const disposeResponse = async (
     await discardResponseBody(response, deadline.signal);
   } finally {
     deadline.clear();
+  }
+  if (deadline.signal.aborted) {
+    const reason: unknown = deadline.signal.reason;
+    throw deadline.expiry(reason) ?? reason;
   }
 };
 

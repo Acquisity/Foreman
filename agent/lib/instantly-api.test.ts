@@ -787,17 +787,66 @@ describe("Instantly request deadlines", () => {
       await discarding;
 
       // The attempt's own deadline still covers disposing the response, so the
-      // stalled cancellation gives way to the retry instead of hanging.
+      // stalled cancellation gives way instead of hanging, and the request
+      // that ran out of its own time is reported rather than retried.
       expire();
 
       const outcome = await Promise.race([
-        pending.then((result) => result.subworkspaces.length),
+        pending.then(
+          () => "resolved" as const,
+          (error: unknown) => error
+        ),
         flush().then(() => "hung" as const),
       ]);
 
-      assert.equal(outcome, 1);
-      assert.equal(calls, 2);
+      assert.notEqual(outcome, "hung");
+      assert.equal(isTimeout(outcome), true);
+      assert.equal(calls, 1);
     });
+  });
+
+  it("propagates a caller abort during disposal as cancellation", async () => {
+    let calls = 0;
+    let cancelling: () => void = () => undefined;
+    const discarding = new Promise<void>((resolve) => {
+      cancelling = resolve;
+    });
+    const controller = new AbortController();
+    const fetchStub: typeof fetch = () => {
+      calls += 1;
+      if (calls > 1) {
+        return json({ items: [member()] });
+      }
+      return Promise.resolve(
+        new Response(
+          new ReadableStream({
+            cancel: () => {
+              cancelling();
+              // A cancellation that never settles, as a stalled body gives.
+              return new Promise<void>(() => undefined);
+            },
+            start(controller_) {
+              controller_.enqueue(new TextEncoder().encode("{}"));
+            },
+          }),
+          // Over the retry wait cap, so the retryable status would otherwise
+          // surface as a rate-limit error rather than the caller's abort.
+          { headers: { "retry-after": "6" }, status: 429 }
+        )
+      );
+    };
+
+    const pending = listInstantlySubworkspaces("secret-key", {
+      fetch: fetchStub,
+      signal: controller.signal,
+      sleep: () => Promise.resolve(),
+    });
+    await discarding;
+
+    controller.abort();
+
+    await assert.rejects(pending, isCancellation);
+    assert.equal(calls, 1);
   });
 
   it("does not report an unrelated TimeoutError as a deadline expiry", async () => {
