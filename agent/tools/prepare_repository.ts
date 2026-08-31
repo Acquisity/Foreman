@@ -277,9 +277,10 @@ export const refreshCheckout = async (
  * install. Falls back to a cold clone for any repository that was not
  * pre-warmed (or whose warmed checkout is missing).
  */
-const prepareWarmedOrClone = async (
+export const prepareWarmedOrClone = async (
   sandbox: SandboxSession,
-  repository: string
+  repository: string,
+  options: CheckoutOptions = {}
 ): Promise<string | null> => {
   const warmed = findWarmRepository(repository);
   const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
@@ -287,10 +288,22 @@ const prepareWarmedOrClone = async (
     // A durable step retry or dev queue redelivery reruns this tool after an
     // earlier execution placed the checkout but never wrote the marker. Adopt
     // that checkout when it is this repository; anything else stays untouched.
-    if ((await originUrl(sandbox)) !== remoteUrl(repository).toLowerCase()) {
+    const origin = await originUrl(sandbox);
+    if (origin === null) {
+      // Debris, not a checkout: a turn cancelled mid-clone leaves a directory
+      // with no readable origin, and the cleanup in `finally` could not remove
+      // it because eve binds the cancelled turn signal into every later `run`.
+      // Nothing without an origin is adoptable, so clear it and start over
+      // rather than wedging every retry on "already exists".
+      await discardCheckout(
+        sandbox,
+        options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS
+      );
+    } else if (origin === remoteUrl(repository).toLowerCase()) {
+      return refreshCheckout(sandbox, repository, warmed, true, options);
+    } else {
       return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
     }
-    return refreshCheckout(sandbox, repository, warmed, true);
   }
 
   // Derive the path from the matched config's canonical slug, not the caller's
@@ -302,7 +315,7 @@ const prepareWarmedOrClone = async (
     ? await sandbox.run({ command: `test -d ${path}` })
     : null;
   if (!(warmed && checkout) || checkout.exitCode !== 0) {
-    return cloneExplicitRepository(sandbox, repository);
+    return cloneExplicitRepository(sandbox, repository, options);
   }
 
   const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
@@ -311,7 +324,7 @@ const prepareWarmedOrClone = async (
   }
   // From here `/workspace/repo` is populated, so any failure must roll it
   // back or a retry in this session wedges on "already exists".
-  return refreshCheckout(sandbox, repository, warmed, false);
+  return refreshCheckout(sandbox, repository, warmed, false, options);
 };
 
 export default defineTool({

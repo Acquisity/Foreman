@@ -7,6 +7,7 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const {
   cloneExplicitRepository,
+  prepareWarmedOrClone,
   REPOSITORY_OPERATION_TIMEOUT_MS,
   refreshCheckout,
 } = await import("../tools/prepare_repository.js");
@@ -19,6 +20,9 @@ const CLONE_FAILED = /repository not found/u;
 const CLONE_THREW = /sandbox gone/u;
 const REFRESH_FAILED = /could not read/u;
 const INSTALL_FAILED = /ERR_PNPM_OUTDATED_LOCKFILE/u;
+const CANCELLED = /turn cancelled/u;
+const REFUSED = /refusing to overwrite/u;
+const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 
 interface RunOptions {
   abortSignal?: AbortSignal;
@@ -68,6 +72,22 @@ const broker = (sandbox: SandboxSession) =>
 
 const ran = (commands: RunOptions[], needle: string) =>
   commands.some((options) => options.command.includes(needle));
+
+/**
+ * Models eve 0.44's `bindSandboxAbortSignal`: the session returned by
+ * `ctx.getSandbox()` composes the turn's abort signal into every call, so once
+ * the turn is cancelled every later command, the cleanup included, rejects
+ * before it starts.
+ */
+const cancelledSandbox = () => {
+  const turn = AbortSignal.abort(new Error("turn cancelled"));
+  return fakeSandbox((options) => {
+    const composed = options.abortSignal
+      ? AbortSignal.any([turn, options.abortSignal])
+      : turn;
+    return composed.aborted ? Promise.reject(composed.reason) : ok();
+  });
+};
 
 describe("prepare_repository sandbox bounds", () => {
   it("bounds every repository operation at five minutes", () => {
@@ -199,6 +219,52 @@ describe("prepare_repository sandbox bounds", () => {
     );
     assert.match(error ?? "", INSTALL_FAILED);
     assert.ok(ran(commands, DISCARD));
+  });
+
+  it("propagates a turn cancellation instead of reporting a timeout", async () => {
+    const { commands, policies, sandbox } = cancelledSandbox();
+    await assert.rejects(
+      cloneExplicitRepository(sandbox, REPOSITORY, {
+        broker,
+        timeoutMs: TIMEOUT_MS,
+      }),
+      CANCELLED
+    );
+    // The cleanup is attempted and cannot run: the bound session aborts it, so
+    // the partial checkout survives for the next attempt to deal with.
+    assert.ok(ran(commands, DISCARD));
+    assert.equal(policies.at(-1), "allow-all");
+  });
+
+  it("reclaims the checkout a cancelled cleanup could not remove", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command.includes("remote.origin.url")) {
+        return failed("");
+      }
+      return options.command.startsWith("test -d") ? failed("") : ok();
+    });
+    assert.equal(
+      await prepareWarmedOrClone(sandbox, REPOSITORY, {
+        broker,
+        timeoutMs: TIMEOUT_MS,
+      }),
+      null
+    );
+    assert.ok(ran(commands, DISCARD));
+    assert.ok(ran(commands, "git clone"));
+  });
+
+  it("still refuses a checkout of a different repository", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url") ? ok(OTHER_ORIGIN) : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFUSED);
+    assert.equal(ran(commands, DISCARD), false);
+    assert.equal(ran(commands, "git clone"), false);
   });
 
   it("keeps an unchanged checkout that needs no install", async () => {
