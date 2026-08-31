@@ -748,8 +748,9 @@ describe("slack channel progress", () => {
     );
     assert.equal(errors.length, 1);
     assert.equal(eventChannel.state.progress?.posts, 0);
-    // The next checkpoint retries the same logical post with the same
-    // client_msg_id. Slack deduplicates it and the threshold is consumed.
+    // The next checkpoint has fresher bookkeeping, but retries the same
+    // logical threshold with the same client_msg_id. Slack keeps the first
+    // accepted text instead of creating a second visible progress line.
     now.advance(MINUTE_MS);
     await handlerFor("action.result")(
       toolResultEvent,

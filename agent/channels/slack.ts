@@ -258,6 +258,9 @@ const checkSlackProgress = async (
   }
   // A stable provider id keeps an ambiguous retry from creating a duplicate
   // if Slack accepted the first request but its response was lost. The
+  // logical identity is this turn's threshold, not the rendered text: if
+  // bookkeeping changes before a retry, Slack may retain the first accepted
+  // text so that one visible threshold line takes priority over freshness.
   // threshold is consumed only after Slack confirms the idempotent post. A
   // rejection stays unconsumed so the next checkpoint retries the same id.
   try {
