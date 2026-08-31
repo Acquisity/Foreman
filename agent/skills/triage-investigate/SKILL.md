@@ -94,6 +94,10 @@ Work the lanes in order and record every one in the Triage investigation documen
 
 Keep the three database surfaces separate. PlanetScale: the read-only production and customer-data database, reached only through `planetscale_execute_read_query`. Investigation memory: Foreman's own private Postgres of sanitized past-investigation patterns, reached only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`; it holds no customer data and is never current production evidence. The `neon__*` connection investigates other Neon databases, unrelated to memory. Never locate, inspect, or verify a database to use memory: no listing projects, schemas, or roles, counting rows, testing SQL, hunting credentials, or using `neon__*` on memory's behalf. The three memory tools are the whole interface. Record `available: false` or a failed write in the document and carry on; memory availability never changes the verdict or appears in the Slack reply.
 
+### Load the tool catalog first
+
+Load [references/tools.md](references/tools.md) now, before the first evidence lane runs. This load is mandatory: do not continue into evidence collection until the catalog is loaded. It carries the exact tool name for every surface in the lanes below and the known call traps.
+
 ### Search investigation memory
 
 After stating the claim, call `search_investigation_memory` with the claim or visible error text and the component, provider, and dependency keys already known. It accepts no Linear project id and searches the server-owned live product areas for every authorized attended triage surface, including projectless Linear tickets and tickets that arrive under `Support`. The incoming project never gates this call, and a memory result never chooses the eventual project.
@@ -117,33 +121,6 @@ Results are sanitized past investigations: no customer identity, no production r
 ### Check the runtime and provider systems
 
 Pick the lanes the symptom points at; naming one not applicable is an answer, guessing is not. Search each system on the axis it uses: identity (the Stage 2 org id, user id, or email, never a display name), symptom (the product's own words for the behavior), or time (the window the claim names). One empty search closes nothing; vary the axis. A lane you could not search is `Could not run`, not evidence of absence.
-
-Exact tool names, one row per surface. Connection tools are called by qualified name, `<connection>__<tool>`; root tools are called bare. `planetscale_execute_read_query` is the trap: a root tool, called bare, never as `planetscale__planetscale_execute_read_query`. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data. Unlisted tool: use `connection_search` with the `connection` argument naming one connection, or record the lane as `Could not run`.
-
-| Surface | Call as | Exact tool names |
-| --- | --- | --- |
-| Repository | root, bare | `prepare_repository`, `grep`, `glob`, `read_file`, `bash` |
-| Help center | root, bare | `find_help_article` |
-| Investigation memory | root, bare | `search_investigation_memory`, `record_investigation_case`, `correct_investigation_case` |
-| Customer identity | root, bare | `lookup_customer` |
-| PlanetScale data | root, bare | `planetscale_execute_read_query`, `describe_table` |
-| PlanetScale connection | `planetscale__` | `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation` |
-| Instantly | root, bare | `list_instantly_subworkspaces`, `read_instantly_subworkspace` |
-| Linear searches and routing writes | root, bare | `find_related_issues`, `route_ticket`, `save_investigation_document` |
-| Linear connection | `linear__` | `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment` |
-| Inngest runs | root, bare | `find_function_runs` |
-| Inngest connection | `inngest__` | `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health` |
-| Sentry | `sentry__` | `find_organizations`, `find_projects`, `find_issues`, `search_issues`, `get_issue_details`, `search_events`, `search_issue_events` |
-| Axiom | `axiom__` | `queryDataset`, `listDatasets`, `getDatasetFields`, `queryMetrics`, `listMetrics`, `searchMetrics`, `listMetricTags`, `getMetricTagValues`, `checkMonitors`, `getMonitorHistory`, `getSavedQueries`, `listDashboards`, `getDashboard`, `exportDashboard`, `listNotifiers` |
-| PostHog | `posthog__` | `exec` with a named command: `persons`, `session-recording`, `error-tracking`, `query`, `execute-sql`, `insight`, `event-definition`, `heatmaps` |
-| Lucent | `lucent__` | `list_issues`, `get_issue`, `list_insights` |
-| Jam | `jam__` | `search`, `fetch`, `listJams`, `getDetails`, `getMetadata`, `getConsoleLogs`, `getNetworkRequests`, `getUserEvents`, `getScreenshots`, `getFrames`, `getVideoTranscript`, `analyzeVideo`, `getRecordingLink`, `getRecordingUrlVerifyLink`, `listRecordingLinks`, `listRecordingLinkJams`, `listRecordingUrls`, `listFolders`, `listMembers` |
-| Vercel | `vercel__` | `get_runtime_errors`, `get_runtime_logs`, `list_deployments`, `get_deployment`, `get_deployment_build_logs`, `list_projects`, `get_project`, `list_teams`, `get_web_analytics`, `search_vercel_documentation`, `web_fetch_vercel_url`, `get_access_to_vercel_url`, `list_agent_runs`, `get_agent_run`, `get_agent_run_trace`, `list_agent_run_projects`, `list_toolbar_threads`, `get_toolbar_thread` |
-| Intercom | `intercom__` | `search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies` |
-| Resend | `resend__` | `list-emails`, `get-email`, `list-logs`, `get-log`, `list-domains`, `get-domain`, `list-suppressions`, `get-suppression`, `list-contacts`, `get-contact`, `list-broadcasts`, `get-broadcast`, `list-templates`, `get-template`, `list-webhooks`, `get-webhook`, `list-segments`, `get-segment`, `list-topics`, `get-topic`, `list-received-emails`, `get-received-email`, `list-received-email-attachments`, `get-received-email-attachment`, `list-sent-email-attachments`, `get-sent-email-attachment` |
-| Modem | `modem__` | `search_modem` |
-
-Sentry and PostHog carry no allowlist; their rows are the confirmed names, not the whole surface. Resend names are kebab-case, not snake_case: `list_emails` is not a tool, `list-emails` is. The PlanetScale connection is read-only with no write tool to reach even by accident; `planetscale_get_branch_schema` does not exist. Read the `planetscale_execute_read_query` result flags before trusting rows: `truncated` (rows missing), `oversizedRow` (one row exceeded the cap), `envelopeTooLarge` (oversized metadata), `raw` (unparseable). Coordinates are organization `acquisity`, database `acquisity`, branch `main`: `describe_table` and `lookup_customer` carry them fixed; pass them yourself on `planetscale_execute_read_query`. The Linear Engineering team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`; the name `Engineering` returns nothing silently. Intercom authorization failures are operator configuration: mark the lane `Could not run` and continue.
 
 - Background work: AI SDR runs, syncs, scrapes, imports, provisioning. `find_function_runs` with the function slug; `latestTrace.steps` shows the step that broke.
 - Errors, crashes, stack traces: Sentry `find_issues` first, `search_issues` only when that finds nothing, then `get_issue_details` for the stacktrace and first/last seen to date the failure against the claim.

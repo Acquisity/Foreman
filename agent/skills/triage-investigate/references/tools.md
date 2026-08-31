@@ -1,0 +1,30 @@
+# Triage tool catalog
+
+The triage-investigate skill mandates loading this catalog at the start of Stage 4, before the first evidence lane runs; every lane call uses a name from this catalog.
+
+Exact tool names, one row per surface. Connection tools are called by qualified name, `<connection>__<tool>`; root tools are called bare. `planetscale_execute_read_query` is the trap: a root tool, called bare, never as `planetscale__planetscale_execute_read_query`. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data. Unlisted tool: use `connection_search` with the `connection` argument naming one connection, or record the lane as `Could not run`.
+
+| Surface | Call as | Exact tool names |
+| --- | --- | --- |
+| Repository | root, bare | `prepare_repository`, `grep`, `glob`, `read_file`, `bash` |
+| Help center | root, bare | `find_help_article` |
+| Investigation memory | root, bare | `search_investigation_memory`, `record_investigation_case`, `correct_investigation_case` |
+| Customer identity | root, bare | `lookup_customer` |
+| PlanetScale data | root, bare | `planetscale_execute_read_query`, `describe_table` |
+| PlanetScale connection | `planetscale__` | `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation` |
+| Instantly | root, bare | `list_instantly_subworkspaces`, `read_instantly_subworkspace` |
+| Linear searches and routing writes | root, bare | `find_related_issues`, `route_ticket`, `save_investigation_document` |
+| Linear connection | `linear__` | `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment` |
+| Inngest runs | root, bare | `find_function_runs` |
+| Inngest connection | `inngest__` | `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health` |
+| Sentry | `sentry__` | `find_organizations`, `find_projects`, `find_issues`, `search_issues`, `get_issue_details`, `search_events`, `search_issue_events` |
+| Axiom | `axiom__` | `queryDataset`, `listDatasets`, `getDatasetFields`, `queryMetrics`, `listMetrics`, `searchMetrics`, `listMetricTags`, `getMetricTagValues`, `checkMonitors`, `getMonitorHistory`, `getSavedQueries`, `listDashboards`, `getDashboard`, `exportDashboard`, `listNotifiers` |
+| PostHog | `posthog__` | `exec` with a named command: `persons`, `session-recording`, `error-tracking`, `query`, `execute-sql`, `insight`, `event-definition`, `heatmaps` |
+| Lucent | `lucent__` | `list_issues`, `get_issue`, `list_insights` |
+| Jam | `jam__` | `search`, `fetch`, `listJams`, `getDetails`, `getMetadata`, `getConsoleLogs`, `getNetworkRequests`, `getUserEvents`, `getScreenshots`, `getFrames`, `getVideoTranscript`, `analyzeVideo`, `getRecordingLink`, `getRecordingUrlVerifyLink`, `listRecordingLinks`, `listRecordingLinkJams`, `listRecordingUrls`, `listFolders`, `listMembers` |
+| Vercel | `vercel__` | `get_runtime_errors`, `get_runtime_logs`, `list_deployments`, `get_deployment`, `get_deployment_build_logs`, `list_projects`, `get_project`, `list_teams`, `get_web_analytics`, `search_vercel_documentation`, `web_fetch_vercel_url`, `get_access_to_vercel_url`, `list_agent_runs`, `get_agent_run`, `get_agent_run_trace`, `list_agent_run_projects`, `list_toolbar_threads`, `get_toolbar_thread` |
+| Intercom | `intercom__` | `search`, `fetch`, `search_conversations`, `get_conversation`, `search_contacts`, `get_contact`, `get_company`, `list_companies` |
+| Resend | `resend__` | `list-emails`, `get-email`, `list-logs`, `get-log`, `list-domains`, `get-domain`, `list-suppressions`, `get-suppression`, `list-contacts`, `get-contact`, `list-broadcasts`, `get-broadcast`, `list-templates`, `get-template`, `list-webhooks`, `get-webhook`, `list-segments`, `get-segment`, `list-topics`, `get-topic`, `list-received-emails`, `get-received-email`, `list-received-email-attachments`, `get-received-email-attachment`, `list-sent-email-attachments`, `get-sent-email-attachment` |
+| Modem | `modem__` | `search_modem` |
+
+Sentry and PostHog carry no allowlist; their rows are the confirmed names, not the whole surface. Resend names are kebab-case, not snake_case: `list_emails` is not a tool, `list-emails` is. The PlanetScale connection is read-only with no write tool to reach even by accident; `planetscale_get_branch_schema` does not exist. Read the `planetscale_execute_read_query` result flags before trusting rows: `truncated` (rows missing), `oversizedRow` (one row exceeded the cap), `envelopeTooLarge` (oversized metadata), `raw` (unparseable). Coordinates are organization `acquisity`, database `acquisity`, branch `main`: `describe_table` and `lookup_customer` carry them fixed; pass them yourself on `planetscale_execute_read_query`. The Linear Engineering team id is `8eaf95ab-56ac-4490-8253-f6a96793dc40`; the name `Engineering` returns nothing silently. Intercom authorization failures are operator configuration: mark the lane `Could not run` and continue.
