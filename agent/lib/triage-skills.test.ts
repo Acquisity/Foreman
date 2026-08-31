@@ -6,15 +6,23 @@ const triageSkill = readFileSync(
   new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
   "utf8"
 );
-const triageReportingReference = readFileSync(
-  new URL(
-    "../skills/triage-investigate/references/reporting.md",
-    import.meta.url
-  ),
+const triageToolCatalog = readFileSync(
+  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
   "utf8"
 );
-const triageToolsReference = readFileSync(
-  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
+const triageHandlingSkill = readFileSync(
+  new URL("../skills/triage-handling/SKILL.md", import.meta.url),
+  "utf8"
+);
+const triageReportingReference = readFileSync(
+  new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
+  "utf8"
+);
+const criticReviewReference = readFileSync(
+  new URL(
+    "../skills/triage-handling/references/critic-review.md",
+    import.meta.url
+  ),
   "utf8"
 );
 const intercomTriageSkill = readFileSync(
@@ -29,11 +37,6 @@ const hotlaneSkill = readFileSync(
   new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
   "utf8"
 );
-const slackWordingSkill = readFileSync(
-  new URL("../skills/slack-wording/SKILL.md", import.meta.url),
-  "utf8"
-);
-
 const extractInstruction = (skill: string, start: string, end: string) => {
   const startIndex = skill.indexOf(start);
   const endIndex = skill.indexOf(end, startIndex);
@@ -43,36 +46,152 @@ const extractInstruction = (skill: string, start: string, end: string) => {
   return skill.slice(startIndex, endIndex);
 };
 
-test("Stage 5 names the Linear state for every handling path", () => {
+const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
+const BACKTICK_TOKEN_PATTERN = /`([^`]+)`/gu;
+const STAGE_4_CHECKPOINT = "STAGE 4 COMPLETE: evidence record ready";
+
+test("triage intake hands off to the handling skill after Stage 4", () => {
+  assert.ok(triageSkill.includes("## Handoff to handling"));
+  assert.ok(
+    triageSkill.indexOf("## Handoff to handling") >
+      triageSkill.indexOf("## Stage 4: Investigate")
+  );
+  assert.equal(triageSkill.includes("## Stage 5"), false);
+  assert.equal(triageSkill.includes("[references/reporting.md]"), false);
+  assert.ok(triageHandlingSkill.includes("## Stage 5: Decide handling"));
+  assert.equal(triageHandlingSkill.includes("## Stage 1"), false);
+  assert.equal(triageHandlingSkill.includes("## Stage 4"), false);
+
+  const description = triageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  assert.ok(description.includes("Stages 1 through 4"));
+  assert.equal(description.includes("triage-handling"), false);
+  assert.ok(description.includes("never preload handling"));
+  for (const moved of [
+    "severity weighting and priority bands",
+    "area-routing roster",
+    "root-cause masters",
+    "unblocking the customer",
+  ]) {
+    assert.equal(description.includes(moved), false, moved);
+  }
+});
+
+test("pre-evidence forward references name the handling skill", () => {
   assert.ok(
     triageSkill.includes(
+      "`triage-handling` Stage 6 chooses ownership from completed evidence"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "parent's assignee as `triage-handling` Stage 6 describes"
+    )
+  );
+});
+
+test("handling stays behind the explicit Stage 4 checkpoint", () => {
+  const handoff = triageSkill.slice(
+    triageSkill.indexOf("## Handoff to handling")
+  );
+  const handlingDescription =
+    triageHandlingSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  const entryGate = extractInstruction(
+    triageHandlingSkill,
+    "## Entry gate",
+    "## Stage 5: Decide handling"
+  );
+
+  assert.ok(handoff.includes(STAGE_4_CHECKPOINT));
+  assert.ok(
+    triageSkill.indexOf("## Handoff to handling") >
+      triageSkill.indexOf(
+        "Completion: every material conclusion has current evidence"
+      )
+  );
+  assert.ok(handoff.includes("Verify every Stage 4 completion condition"));
+  assert.ok(handoff.includes("Until it exists, do not load"));
+  assert.equal(handlingDescription.includes(STAGE_4_CHECKPOINT), false);
+  assert.ok(handlingDescription.includes("Stage 4 completion checkpoint"));
+  assert.ok(
+    handlingDescription.includes("Never load during Stages 1 through 4")
+  );
+  assert.ok(entryGate.includes(STAGE_4_CHECKPOINT));
+  assert.ok(entryGate.includes("Before this skill was loaded"));
+  assert.ok(entryGate.includes("If not, read no references"));
+  assert.ok(entryGate.includes("This load does not create the checkpoint"));
+
+  for (const reference of [
+    triageReportingReference,
+    criticReviewReference,
+    readFileSync(
+      new URL(
+        "../skills/triage-handling/references/roster.md",
+        import.meta.url
+      ),
+      "utf8"
+    ),
+  ]) {
+    assert.ok(reference.includes(STAGE_4_CHECKPOINT));
+    assert.ok(reference.includes("existed before this file was opened"));
+    assert.ok(reference.includes("If either gate is absent, stop reading"));
+  }
+});
+
+test("Stage 5 names the Linear state for every handling path", () => {
+  assert.ok(
+    triageHandlingSkill.includes(
       "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`."
     )
   );
 });
 
-test("shared triage exposes one seven-stage workflow with settled fact boundaries", () => {
-  const stages = [
+test("priority bands are hierarchical and never inflate for customer tier", () => {
+  const priority = extractInstruction(
+    triageHandlingSkill,
+    "### Set Linear priority",
+    "### Label the ticket"
+  );
+  assert.ok(priority.includes("measured large share of active orgs"));
+  assert.ok(priority.includes("confirmed multi-org failure below `Urgent`"));
+  assert.ok(priority.includes("Customer tier"));
+  assert.ok(priority.includes("breaks ties only"));
+  assert.equal(priority.includes("enterprise customer blocked"), false);
+});
+
+test("shared triage exposes one seven-stage workflow across intake and handling", () => {
+  const intakeStages = [
     "Stage 1: Establish the case",
     "Stage 2: Resolve customer identity once",
     "Stage 3: Check existing work and frame the investigation",
     "Stage 4: Investigate",
+  ];
+  const handlingStages = [
     "Stage 5: Decide handling",
     "Stage 6: Persist and route",
     "Stage 7: Finish the attended response and memory bookkeeping",
   ];
 
   let previousIndex = -1;
-  for (const stage of stages) {
+  for (const stage of intakeStages) {
     const stageIndex = triageSkill.indexOf(`## ${stage}`);
     assert.ok(stageIndex > previousIndex);
     previousIndex = stageIndex;
   }
+  previousIndex = -1;
+  for (const stage of handlingStages) {
+    const stageIndex = triageHandlingSkill.indexOf(`## ${stage}`);
+    assert.ok(stageIndex > previousIndex);
+    previousIndex = stageIndex;
+  }
 
-  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 7);
-  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 4);
+  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 4);
+  assert.equal(triageHandlingSkill.match(/^## Stage \d:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Purpose:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Inputs:/gmu)?.length, 3);
+  assert.equal(triageHandlingSkill.match(/^Completion:/gmu)?.length, 3);
   assert.ok(triageSkill.includes("runtime's `intakeOnly` value as a fact"));
   assert.ok(triageSkill.includes("including `null`"));
   assert.ok(
@@ -101,33 +220,287 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "Deployment or edge failures",
     "The conversation behind the report",
   ];
-  const toolCatalogs = [
-    "Repository (root tools, no prefix)",
-    "Investigation memory (root tools, no prefix)",
-    "PlanetScale (`planetscale__`)",
-    "Instantly (root tools, no prefix)",
-    "Linear (`linear__`)",
-    "Inngest (`inngest__`)",
-    "Sentry (`sentry__`)",
-    "Axiom (`axiom__`)",
-    "PostHog (`posthog__`)",
-    "Lucent (`lucent__`)",
-    "Jam (`jam__`)",
-    "Vercel (`vercel__`)",
-    "Intercom (`intercom__`)",
-    "Resend (`resend__`)",
-    "Modem (`modem__`)",
-  ];
+  // The full exact-name catalog, pinned against the reference booklet table so
+  // a dropped row or renamed tool fails here. Keys are the table's Surface
+  // labels.
+  const toolCatalog: Record<string, string[]> = {
+    Axiom: [
+      "queryDataset",
+      "listDatasets",
+      "getDatasetFields",
+      "queryMetrics",
+      "listMetrics",
+      "searchMetrics",
+      "listMetricTags",
+      "getMetricTagValues",
+      "checkMonitors",
+      "getMonitorHistory",
+      "getSavedQueries",
+      "listDashboards",
+      "getDashboard",
+      "exportDashboard",
+      "listNotifiers",
+    ],
+    "Customer identity": ["lookup_customer"],
+    "Help center": ["find_help_article"],
+    "Inngest connection": [
+      "list_function_runs",
+      "list_runs",
+      "get_run",
+      "get_run_trace",
+      "get_event_runs",
+      "list_functions",
+      "get_function",
+      "list_envs",
+      "query_insights",
+      "list_insights_tables",
+      "list_insights_event_schemas",
+      "get_app",
+      "get_apps",
+      "list_webhooks",
+      "health",
+    ],
+    "Inngest runs": ["find_function_runs"],
+    Instantly: ["list_instantly_subworkspaces", "read_instantly_subworkspace"],
+    Intercom: [
+      "search",
+      "fetch",
+      "search_conversations",
+      "get_conversation",
+      "search_contacts",
+      "get_contact",
+      "get_company",
+      "list_companies",
+    ],
+    "Investigation memory": [
+      "search_investigation_memory",
+      "record_investigation_case",
+      "correct_investigation_case",
+    ],
+    Jam: [
+      "search",
+      "fetch",
+      "listJams",
+      "getDetails",
+      "getMetadata",
+      "getConsoleLogs",
+      "getNetworkRequests",
+      "getUserEvents",
+      "getScreenshots",
+      "getFrames",
+      "getVideoTranscript",
+      "analyzeVideo",
+      "getRecordingLink",
+      "getRecordingUrlVerifyLink",
+      "listRecordingLinks",
+      "listRecordingLinkJams",
+      "listRecordingUrls",
+      "listFolders",
+      "listMembers",
+    ],
+    "Linear connection": [
+      "list_issues",
+      "get_issue",
+      "list_issue_labels",
+      "save_issue",
+      "save_document",
+      "list_comments",
+      "save_comment",
+    ],
+    "Linear searches and routing writes": [
+      "find_related_issues",
+      "route_ticket",
+      "save_investigation_document",
+    ],
+    Lucent: ["list_issues", "get_issue", "list_insights"],
+    Modem: ["search_modem"],
+    "PlanetScale connection": [
+      "planetscale_list_organizations",
+      "planetscale_get_organization",
+      "planetscale_list_databases",
+      "planetscale_get_database",
+      "planetscale_list_branches",
+      "planetscale_get_branch",
+      "planetscale_get_insights",
+      "planetscale_list_schema_recommendations",
+      "planetscale_search_documentation",
+    ],
+    "PlanetScale data": ["planetscale_execute_read_query", "describe_table"],
+    PostHog: [
+      "exec",
+      "persons",
+      "session-recording",
+      "error-tracking",
+      "query",
+      "execute-sql",
+      "insight",
+      "event-definition",
+      "heatmaps",
+    ],
+    Repository: ["prepare_repository", "grep", "glob", "read_file", "bash"],
+    Resend: [
+      "list-emails",
+      "get-email",
+      "list-logs",
+      "get-log",
+      "list-domains",
+      "get-domain",
+      "list-suppressions",
+      "get-suppression",
+      "list-contacts",
+      "get-contact",
+      "list-broadcasts",
+      "get-broadcast",
+      "list-templates",
+      "get-template",
+      "list-webhooks",
+      "get-webhook",
+      "list-segments",
+      "get-segment",
+      "list-topics",
+      "get-topic",
+      "list-received-emails",
+      "get-received-email",
+      "list-received-email-attachments",
+      "get-received-email-attachment",
+      "list-sent-email-attachments",
+      "get-sent-email-attachment",
+    ],
+    Sentry: [
+      "find_organizations",
+      "find_projects",
+      "find_issues",
+      "search_issues",
+      "get_issue_details",
+      "search_events",
+      "search_issue_events",
+    ],
+    Vercel: [
+      "get_runtime_errors",
+      "get_runtime_logs",
+      "list_deployments",
+      "get_deployment",
+      "get_deployment_build_logs",
+      "list_projects",
+      "get_project",
+      "list_teams",
+      "get_web_analytics",
+      "search_vercel_documentation",
+      "web_fetch_vercel_url",
+      "get_access_to_vercel_url",
+      "list_agent_runs",
+      "get_agent_run",
+      "get_agent_run_trace",
+      "list_agent_run_projects",
+      "list_toolbar_threads",
+      "get_toolbar_thread",
+    ],
+  };
 
   for (const lane of evidenceLanes) {
     assert.ok(triageSkill.includes(lane), lane);
   }
-  for (const catalog of toolCatalogs) {
-    assert.ok(triageToolsReference.includes(`## ${catalog}`), catalog);
+  for (const laneRule of [
+    "follows Workspace Group pages up to a 100-page safety cap",
+    "returns only accepted subworkspaces",
+    "never a complete list",
+    "must resolve exactly once",
+    "fail closed",
+    "accepts a URL",
+    "`get_contact` returns the profile only and is not a step on this path",
+    "strip the prefix or the filter matches nothing",
+    "filters structured fields and has no free-text",
+    "title, description, attachments, links, comments, labels, priority, project, assignee, requester",
+    "`search_issues` only when that finds nothing",
+    "Prefer a bounded `COUNT` or narrow `SELECT`",
+  ]) {
+    assert.ok(triageSkill.includes(laneRule), laneRule);
   }
+
+  // Parse each Markdown row of the reference booklet and deep-equal the
+  // surface, call prefix, and exact ordered token set, so a renamed tool, a
+  // wrong call kind, or an extra row or token fails here instead of passing
+  // on a substring.
+  const parsedRows = triageToolCatalog
+    .split("\n")
+    .filter(
+      (line) =>
+        line.startsWith("| ") &&
+        !line.startsWith("| Surface") &&
+        !line.startsWith("| ---")
+    )
+    .map((line) => {
+      const cells = line
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim());
+      const [surface = "", callAs = "", namesCell = ""] = cells;
+      return {
+        callAs: callAs.replaceAll("`", ""),
+        names: [...namesCell.matchAll(BACKTICK_TOKEN_PATTERN)].map(
+          (match) => match[1]
+        ),
+        surface,
+      };
+    });
+  const expectedShape: Array<readonly [string, string]> = [
+    ["Repository", "root, bare"],
+    ["Help center", "root, bare"],
+    ["Investigation memory", "root, bare"],
+    ["Customer identity", "root, bare"],
+    ["PlanetScale data", "root, bare"],
+    ["PlanetScale connection", "planetscale__"],
+    ["Instantly", "root, bare"],
+    ["Linear searches and routing writes", "root, bare"],
+    ["Linear connection", "linear__"],
+    ["Inngest runs", "root, bare"],
+    ["Inngest connection", "inngest__"],
+    ["Sentry", "sentry__"],
+    ["Axiom", "axiom__"],
+    ["PostHog", "posthog__"],
+    ["Lucent", "lucent__"],
+    ["Jam", "jam__"],
+    ["Vercel", "vercel__"],
+    ["Intercom", "intercom__"],
+    ["Resend", "resend__"],
+    ["Modem", "modem__"],
+  ];
+  assert.deepEqual(
+    parsedRows,
+    expectedShape.map(([surface, callAs]) => ({
+      callAs,
+      names: toolCatalog[surface],
+      surface,
+    }))
+  );
+  for (const note of [
+    "Never invent a tool name from a service's REST API or CLI",
+    "with the `connection` argument naming one connection",
+    "never as `planetscale__planetscale_execute_read_query`",
+    "no allowlist",
+    "kebab-case",
+    "`truncated`",
+    "`oversizedRow`",
+    "`envelopeTooLarge`",
+    "`raw`",
+    "organization `acquisity`, database `acquisity`, branch `main`",
+    "8eaf95ab-56ac-4490-8253-f6a96793dc40",
+    "no write tool to reach even by accident",
+  ]) {
+    assert.ok(triageToolCatalog.includes(note), note);
+  }
+  // The catalog moved out of the intake skill into the reference booklet;
+  // the skill links it and carries no inline table.
   assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
+  assert.equal(triageSkill.includes("| Surface | Call as |"), false);
+  assert.equal(
+    triageSkill.includes("Exact tool names, one row per surface"),
+    false
+  );
   assert.ok(
-    triageSkill.includes("[references/reporting.md](references/reporting.md)")
+    triageHandlingSkill.includes(
+      "[references/reporting.md](references/reporting.md)"
+    )
   );
   assert.ok(triageReportingReference.includes("## Linear report template"));
   assert.ok(
@@ -140,6 +513,57 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     triageReportingReference.includes("live in the `engineering-handoff` skill")
   );
   assert.ok(handoffSkill.includes("## Master ticket template"));
+});
+
+test("triage catalog preserves Instantly authorization failure semantics", () => {
+  assert.ok(triageToolCatalog.includes("For either Instantly tool"));
+  assert.ok(triageToolCatalog.includes("`available: false`"));
+  assert.ok(triageToolCatalog.includes("operator configuration"));
+  assert.ok(
+    triageToolCatalog.includes(
+      "never a reason to ask the requester to sign in or retry"
+    )
+  );
+});
+
+test("triage intake mandates loading the tool catalog before evidence collection", () => {
+  const stage4Index = triageSkill.indexOf("## Stage 4: Investigate");
+  const gateIndex = triageSkill.indexOf("### Load the tool catalog first");
+  const firstLaneIndex = triageSkill.indexOf("### Search investigation memory");
+
+  assert.ok(stage4Index >= 0);
+  assert.ok(gateIndex > stage4Index);
+  assert.ok(firstLaneIndex > gateIndex);
+
+  const gate = extractInstruction(
+    triageSkill,
+    "### Load the tool catalog first",
+    "### Search investigation memory"
+  );
+  assert.ok(gate.includes("[references/tools.md](references/tools.md)"));
+  assert.ok(gate.includes("before the first evidence lane runs"));
+  assert.ok(gate.includes("mandatory"));
+  assert.ok(
+    gate.includes(
+      "do not continue into evidence collection until the catalog is loaded"
+    )
+  );
+});
+
+test("triage intake skill stays within its 15000-byte budget", () => {
+  const intakeBytes = Buffer.byteLength(triageSkill, "utf8");
+  assert.ok(
+    intakeBytes <= 15_000,
+    `triage-investigate SKILL.md is ${intakeBytes} bytes, over the 15000-byte budget`
+  );
+});
+
+test("triage handling skill stays within its 20000-byte budget", () => {
+  const handlingBytes = Buffer.byteLength(triageHandlingSkill, "utf8");
+  assert.ok(
+    handlingBytes <= 20_000,
+    `triage-handling SKILL.md is ${handlingBytes} bytes, over the 20000-byte budget`
+  );
 });
 
 test("shared triage makes retrieval project-independent", () => {
@@ -162,6 +586,11 @@ test("shared triage makes retrieval project-independent", () => {
     "route to Aaron Fraga as the triage skill already requires",
   ]) {
     assert.equal(triageSkill.includes(oldInstruction), false, oldInstruction);
+    assert.equal(
+      triageHandlingSkill.includes(oldInstruction),
+      false,
+      oldInstruction
+    );
   }
   assert.ok(establish.includes("ordinary intake metadata"));
   assert.ok(
@@ -179,7 +608,7 @@ test("shared triage makes retrieval project-independent", () => {
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius"
     )
   );
@@ -191,7 +620,7 @@ test("ENG-13175-shaped thread correction is recorded, not argued", () => {
     "put your overturned conclusion in `ruledOut`",
     "handle it as a correction under Stage 7",
   ]) {
-    assert.ok(triageSkill.includes(phrase), phrase);
+    assert.ok(triageHandlingSkill.includes(phrase), phrase);
   }
 });
 
@@ -199,19 +628,21 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
   const memorySearch = triageSkill.indexOf(
     "including projectless Linear tickets"
   );
-  const projectChoice = triageSkill.indexOf(
+  const handoff = triageSkill.indexOf("## Handoff to handling");
+  const projectChoice = triageHandlingSkill.indexOf(
     "### Choose the product project from completed evidence"
   );
 
   assert.ok(memorySearch >= 0);
-  assert.ok(projectChoice > memorySearch);
+  assert.ok(handoff > memorySearch);
+  assert.ok(projectChoice >= 0);
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Pass the evidence-backed project to the ticket's one `route_ticket` call"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "pass that resulting project id to `record_investigation_case`"
     )
   );
@@ -219,61 +650,65 @@ test("ENG-12880-shaped projectless intake searches memory before choosing a proj
 
 test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback", () => {
   assert.ok(
-    triageSkill.includes("incoming `Support` project cannot make this decision")
+    triageHandlingSkill.includes(
+      "incoming `Support` project cannot make this decision"
+    )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "When Aaron explicitly requests read-only validation during an attended manual test"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "apply no Linear mutation and do not record investigation memory"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "This is an operator instruction for that test, not a runtime authorization mode"
     )
   );
   assert.ok(
-    triageSkill.includes("Do not require or invent a session marker for it")
+    triageHandlingSkill.includes(
+      "Do not require or invent a session marker for it"
+    )
   );
 });
 
 test("shared triage stops unproven claims before classification or routing", () => {
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "When the deciding confirmation is still missing, take the unproven branch and stop before classification"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Preserve the source ticket's current state, priority, and labels"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Do not create or attach a master, route engineering work, or record investigation memory"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Before stopping, record any safe unblock supported by the completed evidence"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "action, owner, current status, and confirmation that it costs the customer neither data nor money"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "either the unproven branch has made the unblock explicit"
     )
   );
@@ -284,6 +719,29 @@ test("shared triage stops unproven claims before classification or routing", () 
   assert.ok(
     triageReportingReference.includes(
       "Never load `engineering-handoff` or create or attach a master for this branch"
+    )
+  );
+  const unprovenExit = extractInstruction(
+    triageHandlingSkill,
+    "### Comment on the ticket",
+    "### Choose the product project from completed evidence"
+  );
+  assert.ok(
+    unprovenExit.includes(
+      "For the unproven branch, save only this document and comment, then stop"
+    )
+  );
+  for (const forbidden of [
+    "choose or change the project",
+    "read the roster",
+    "call `route_ticket`",
+    "load `engineering-handoff`",
+  ]) {
+    assert.ok(unprovenExit.includes(forbidden), forbidden);
+  }
+  assert.ok(
+    unprovenExit.includes(
+      "preserve state, priority, labels, project, parent, and assignee"
     )
   );
 });
@@ -349,30 +807,27 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
   assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
 });
 
-test("Slack replies exclude internal investigation summaries", () => {
-  for (const skill of [triageSkill, intercomTriageSkill]) {
-    assert.ok(skill.includes("only") && skill.includes("requester-facing"));
-    assert.ok(skill.includes("investigation summary"));
-  }
-
-  assert.ok(slackWordingSkill.includes("final post"));
-  assert.ok(slackWordingSkill.includes("single-audience message"));
-  assert.ok(slackWordingSkill.includes("only the forwardable requester reply"));
-  assert.ok(slackWordingSkill.includes("Linear update report"));
-  assert.ok(
-    slackWordingSkill.includes("progress updates may be conversational")
-  );
-});
-
 test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {
   const branch = extractInstruction(
-    triageSkill,
+    triageHandlingSkill,
     "### When the root cause warrants action",
-    "### Area-routing roster"
+    "Internal notes"
   );
+  assert.ok(
+    triageHandlingSkill.indexOf("### Area-routing roster") <
+      triageHandlingSkill.indexOf(
+        "### When the ticket is not engineering actionable"
+      )
+  );
+  assert.ok(
+    triageHandlingSkill.indexOf("### Area-routing roster") <
+      triageHandlingSkill.indexOf("### When the root cause warrants action")
+  );
+  assert.ok(branch.includes("area owner is now resolved from the roster"));
   assert.ok(branch.includes("Load `engineering-handoff`"));
   assert.ok(!branch.includes("linear__list_issues"));
   assert.ok(!triageSkill.includes("## Master ticket template"));
+  assert.ok(!triageHandlingSkill.includes("## Master ticket template"));
   for (const moved of [
     "## Preconditions",
     "## Match by cause, not symptom",
@@ -382,7 +837,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "## Read back before finishing",
     "One master per root cause",
     "`fast-lane`",
-    "area-routing roster in `triage-investigate` Stage 6",
+    "area-routing roster in `triage-handling` Stage 6",
     "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
@@ -441,7 +896,7 @@ test("incident-hotlane assesses and never writes", () => {
 
 test("triage reviews a Bug with the critic before routing it", () => {
   const review = extractInstruction(
-    triageSkill,
+    triageHandlingSkill,
     "### Review a Bug before routing it",
     "## Stage 6: Persist and route"
   );
@@ -451,6 +906,12 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "The critic runs exactly once per ticket",
     "Foreman posts one progress line, delegates once, and adjudicates the result once",
     "never parks the ticket on a person",
+    "Foreman settles the findings against the Stage 4 evidence record and continues routing",
+    "[references/critic-review.md](references/critic-review.md)",
+  ]) {
+    assert.ok(review.includes(rule), rule);
+  }
+  for (const rule of [
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
@@ -476,11 +937,15 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "Do not touch the document",
     "Once the review settles a version, approved or adjudicated, nothing may change it until routing is done",
   ]) {
-    assert.ok(review.includes(rule), rule);
+    assert.ok(criticReviewReference.includes(rule), rule);
   }
   assert.ok(
-    review.indexOf("Post one progress line to the attended thread") <
-      review.indexOf("Delegate to the `critic` subagent exactly once"),
+    criticReviewReference.indexOf(
+      "Post one progress line to the attended thread"
+    ) <
+      criticReviewReference.indexOf(
+        "Delegate to the `critic` subagent exactly once"
+      ),
     "the progress line precedes the delegation"
   );
   const retryWording = [
@@ -495,11 +960,13 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ];
   for (const excluded of retryWording) {
     assert.ok(!review.includes(excluded), excluded);
+    assert.ok(!criticReviewReference.includes(excluded), excluded);
   }
   for (const surface of [
     triageSkill,
+    triageHandlingSkill,
     triageReportingReference,
-    triageToolsReference,
+    criticReviewReference,
     handoffSkill,
   ]) {
     for (const excluded of retryWording) {
@@ -507,48 +974,48 @@ test("triage reviews a Bug with the critic before routing it", () => {
     }
   }
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>`"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "`Adjudicated <the adjudicated-evidence updatedAt Stage 5 read back before the settling save> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "A document created here for an unreviewed outcome is written once with `**Review**: Not required`"
     )
   );
-  assert.ok(triageSkill.includes("are applied in Stage 6 without one"));
+  assert.ok(triageHandlingSkill.includes("are applied in Stage 6 without one"));
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "Every decision above is provisional until the review below has settled the document"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "a hotlane-stopped review never reaches this stage's writes"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "When Stage 5 review ran, it settled the document version"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "do not call `save_investigation_document` before routing, even when adjudication changed the final classification or handling path"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    triageHandlingSkill.includes(
       "An outcome reclassified during adjudication still entered review and keeps its settled document unchanged"
     )
   );
@@ -569,11 +1036,6 @@ test("triage reviews a Bug with the critic before routing it", () => {
       "the `updatedAt` Stage 5 read back after its settling save"
     )
   );
-  assert.ok(
-    triageToolsReference.includes("## Critic (subagent) and the review skills")
-  );
-  assert.ok(triageToolsReference.includes("never pass an `outputSchema`"));
-  assert.ok(triageToolsReference.includes("exactly once per ticket"));
   for (const excluded of [
     "create_triage_review_packet",
     "read_triage_review_verdict",
@@ -581,5 +1043,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "linearProjectId",
   ]) {
     assert.ok(!triageSkill.includes(excluded), excluded);
+    assert.ok(!triageHandlingSkill.includes(excluded), excluded);
+    assert.ok(!criticReviewReference.includes(excluded), excluded);
   }
 });

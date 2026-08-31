@@ -1,6 +1,6 @@
 # Triage reporting
 
-Use these exact output constraints and templates during Stage 6 of the triage-investigate workflow.
+Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `triage-handling` reached a reporting step that links here. If either gate is absent, stop reading and return to the unfinished stage. Use these exact output constraints and templates when linked.
 
 ## Linear report template
 
@@ -51,7 +51,7 @@ This one is a duplicate, so the pointer to the ticket that now owns it leads and
 
 ### Bad comment
 
-Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment.
+Same shape of ticket, seven-plus paragraphs, everything the document was for pasted into the comment:
 
 ```markdown
 ## Summary
@@ -63,14 +63,11 @@ Reply counts by month, Jun through Aug, with the figure in the ticket corrected 
 ## Blast radius
 The whole cohort, org by org, with the query.
 
-## Open question
-...
-
 ## Internal
 Resolved identity: user_id, organization_id, the customer's email addresses, and which of the three matching workspaces was picked and why. Routed to the AI SDR area owner because the project is AI SDR.
 ```
 
-Nothing in the bad comment is wrong. It is all in the wrong place. The headings, the month-by-month breakdown, the corrected figure, the cohort count, the identity resolution, and the `## Internal` block all belong in the document, and the one sentence the reader needed is buried under them.
+Nothing in the bad comment is wrong; it is all in the wrong place, and the one sentence the reader needed is buried under it.
 
 ## Triage investigation document template
 
