@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
+import { remoteUrl } from "./repository.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
@@ -14,6 +15,9 @@ const {
 
 const REPOSITORY = "Acquisity/Foreman";
 const DISCARD = "rm -rf /workspace/repo";
+const STAGING = "/workspace/.repo-staging";
+const DISCARD_STAGING = `rm -rf ${STAGING}`;
+const PUBLISH = `mv ${STAGING} /workspace/repo`;
 const TIMEOUT_MS = 20;
 const TIMED_OUT = /timed out after 20ms/u;
 const CLONE_FAILED = /repository not found/u;
@@ -23,6 +27,7 @@ const INSTALL_FAILED = /ERR_PNPM_OUTDATED_LOCKFILE/u;
 const CANCELLED = /turn cancelled/u;
 const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
+const PUBLISH_FAILED = /cross-device link/u;
 
 interface RunOptions {
   abortSignal?: AbortSignal;
@@ -114,7 +119,8 @@ describe("prepare_repository sandbox bounds", () => {
       timeoutMs: TIMEOUT_MS,
     });
     assert.match(error ?? "", TIMED_OUT);
-    assert.ok(ran(commands, DISCARD));
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.equal(ran(commands, DISCARD), false);
     assert.equal(policies.at(-1), "allow-all");
   });
 
@@ -129,7 +135,8 @@ describe("prepare_repository sandbox bounds", () => {
       timeoutMs: TIMEOUT_MS,
     });
     assert.match(error ?? "", CLONE_FAILED);
-    assert.ok(ran(commands, DISCARD));
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.equal(ran(commands, DISCARD), false);
     assert.equal(policies.at(-1), "allow-all");
   });
 
@@ -146,11 +153,12 @@ describe("prepare_repository sandbox bounds", () => {
       }),
       CLONE_THREW
     );
-    assert.ok(ran(commands, DISCARD));
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.equal(ran(commands, DISCARD), false);
     assert.equal(policies.at(-1), "allow-all");
   });
 
-  it("keeps a successful clone and still drops the credential", async () => {
+  it("clones to the staging path and publishes it by rename", async () => {
     const { commands, policies, sandbox } = fakeSandbox(() => ok());
     assert.equal(
       await cloneExplicitRepository(sandbox, REPOSITORY, {
@@ -159,8 +167,25 @@ describe("prepare_repository sandbox bounds", () => {
       }),
       null
     );
+    assert.ok(
+      ran(commands, `git clone --depth 50 ${remoteUrl(REPOSITORY)} ${STAGING}`)
+    );
+    assert.ok(ran(commands, PUBLISH));
     assert.equal(ran(commands, DISCARD), false);
     assert.equal(policies.at(-1), "allow-all");
+  });
+
+  it("discards only the staging path when the publishing rename fails", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command === PUBLISH ? failed("mv: cross-device link") : ok()
+    );
+    const error = await cloneExplicitRepository(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", PUBLISH_FAILED);
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.equal(ran(commands, DISCARD), false);
   });
 
   it("stops a stalled fetch/reset, discards the checkout, and drops the credential", async () => {
@@ -231,18 +256,19 @@ describe("prepare_repository sandbox bounds", () => {
       CANCELLED
     );
     // The cleanup is attempted and cannot run: the bound session aborts it, so
-    // the partial checkout survives for the next attempt to deal with.
-    assert.ok(ran(commands, DISCARD));
+    // the partial clone survives at the staging path for the next attempt to
+    // clear. `/workspace/repo` is never created, so it is never removed either.
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.equal(ran(commands, DISCARD), false);
     assert.equal(policies.at(-1), "allow-all");
   });
 
-  it("reclaims the checkout a cancelled cleanup could not remove", async () => {
-    const { commands, sandbox } = fakeSandbox((options) => {
-      if (options.command.includes("remote.origin.url")) {
-        return failed("");
-      }
-      return options.command.startsWith("test -d") ? failed("") : ok();
-    });
+  it("reclaims a clone a cancelled turn left unfinished at the staging path", async () => {
+    // `/workspace/repo` is absent (the earlier turn never got to publish it) and
+    // only the staging path holds debris, which this attempt clears by name.
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.startsWith("test ") ? failed("") : ok()
+    );
     assert.equal(
       await prepareWarmedOrClone(sandbox, REPOSITORY, {
         broker,
@@ -250,8 +276,62 @@ describe("prepare_repository sandbox bounds", () => {
       }),
       null
     );
-    assert.ok(ran(commands, DISCARD));
-    assert.ok(ran(commands, "git clone"));
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.ok(
+      ran(commands, `git clone --depth 50 ${remoteUrl(REPOSITORY)} ${STAGING}`)
+    );
+    assert.ok(ran(commands, PUBLISH));
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
+  it("refuses an occupied checkout that has no configured origin", async () => {
+    // `git config --get` exits non-zero for a key that is simply absent, so an
+    // unrelated local checkout is indistinguishable from debris and must not be
+    // deleted on that inference.
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url") ? failed("") : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFUSED);
+    assert.equal(ran(commands, DISCARD), false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("refuses an occupied checkout whose config cannot be read", async () => {
+    // The same non-zero exit, this time because `.git/config` is unreadable, so
+    // the intended checkout is not destroyed by a transient read failure.
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url")
+        ? failed("fatal: unable to read config file")
+        : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFUSED);
+    assert.equal(ran(commands, DISCARD), false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("adopts an occupied checkout whose origin names this repository", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url")
+        ? ok(remoteUrl(REPOSITORY))
+        : ok("sha")
+    );
+    assert.equal(
+      await prepareWarmedOrClone(sandbox, REPOSITORY, {
+        broker,
+        timeoutMs: TIMEOUT_MS,
+      }),
+      null
+    );
+    assert.ok(ran(commands, "fetch"));
+    assert.equal(ran(commands, DISCARD), false);
   });
 
   it("still refuses a checkout of a different repository", async () => {

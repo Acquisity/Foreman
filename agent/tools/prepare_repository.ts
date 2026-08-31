@@ -91,14 +91,28 @@ const boundedRun = async (
 };
 
 /**
- * Removes a partial `/workspace/repo`, best effort: a failed cleanup must
- * never mask the failure that triggered it.
+ * Where a checkout is built before it becomes `/workspace/repo`.
+ *
+ * @remarks
+ * Nothing but this tool writes this path, so anything found here is provably
+ * an unfinished clone or move and can be cleared without inspecting it. That
+ * is the whole point: `/workspace/repo` is only ever published by renaming a
+ * finished checkout into place, so a `/workspace/repo` that exists is always a
+ * complete checkout whose origin decides what happens to it, and a failure to
+ * read that origin is never mistaken for proof of debris.
  */
-const discardCheckout = (
+const STAGING_PATH = "/workspace/.repo-staging";
+
+/**
+ * Removes a path this tool owns, best effort: a failed cleanup must never mask
+ * the failure that triggered it.
+ */
+const discardPath = (
   sandbox: SandboxSession,
+  path: string,
   timeoutMs: number
 ): Promise<unknown> =>
-  boundedRun(sandbox, { command: "rm -rf /workspace/repo" }, timeoutMs).catch(
+  boundedRun(sandbox, { command: `rm -rf ${path}` }, timeoutMs).catch(
     () => undefined
   );
 
@@ -143,24 +157,37 @@ export const cloneExplicitRepository = async (
   }: CheckoutOptions = {}
 ): Promise<string | null> => {
   await broker(sandbox);
-  let cloned = false;
+  let published = false;
   try {
+    // A turn cancelled mid-clone aborts the cleanup in `finally` too, because
+    // eve binds the cancelled turn's signal into every later `run`. Whatever it
+    // left can only be at the staging path, so clearing that first unwedges the
+    // retry without touching anything whose provenance is unknown.
+    await discardPath(sandbox, STAGING_PATH, timeoutMs);
     const clone = await boundedRun(
       sandbox,
       {
-        command: `git clone --depth 50 ${remoteUrl(repository)} /workspace/repo`,
+        command: `git clone --depth 50 ${remoteUrl(repository)} ${STAGING_PATH}`,
       },
       timeoutMs
     );
-    cloned = clone.exitCode === 0;
-    return cloned
+    if (clone.exitCode !== 0) {
+      return `Could not clone ${repository}: ${String(clone.stderr || clone.stdout).trim()}`;
+    }
+    const publish = await boundedRun(
+      sandbox,
+      { command: `mv ${STAGING_PATH} /workspace/repo` },
+      timeoutMs
+    );
+    published = publish.exitCode === 0;
+    return published
       ? null
-      : `Could not clone ${repository}: ${String(clone.stderr || clone.stdout).trim()}`;
+      : `Could not clone ${repository}: ${String(publish.stderr || publish.stdout).trim()}`;
   } finally {
-    // A clone that timed out, failed, or threw leaves a partial checkout
-    // behind, and the next attempt would refuse to overwrite it.
-    if (!cloned) {
-      await discardCheckout(sandbox, timeoutMs);
+    // A clone that timed out, failed, or threw leaves a partial checkout at the
+    // staging path, and the next attempt would refuse to clone over it.
+    if (!published) {
+      await discardPath(sandbox, STAGING_PATH, timeoutMs);
     }
     await sandbox.setNetworkPolicy("allow-all");
   }
@@ -236,7 +263,7 @@ export const refreshCheckout = async (
     refreshed = true;
   } finally {
     if (!refreshed) {
-      await discardCheckout(sandbox, timeoutMs);
+      await discardPath(sandbox, "/workspace/repo", timeoutMs);
     }
     await sandbox.setNetworkPolicy("allow-all");
   }
@@ -266,7 +293,7 @@ export const refreshCheckout = async (
       : `Could not install dependencies for ${repository}: ${String(install.stderr || install.stdout).trim()}`;
   } finally {
     if (!installed) {
-      await discardCheckout(sandbox, timeoutMs);
+      await discardPath(sandbox, "/workspace/repo", timeoutMs);
     }
   }
 };
@@ -286,24 +313,16 @@ export const prepareWarmedOrClone = async (
   const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
   if (occupied.exitCode === 0) {
     // A durable step retry or dev queue redelivery reruns this tool after an
-    // earlier execution placed the checkout but never wrote the marker. Adopt
-    // that checkout when it is this repository; anything else stays untouched.
-    const origin = await originUrl(sandbox);
-    if (origin === null) {
-      // Debris, not a checkout: a turn cancelled mid-clone leaves a directory
-      // with no readable origin, and the cleanup in `finally` could not remove
-      // it because eve binds the cancelled turn signal into every later `run`.
-      // Nothing without an origin is adoptable, so clear it and start over
-      // rather than wedging every retry on "already exists".
-      await discardCheckout(
-        sandbox,
-        options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS
-      );
-    } else if (origin === remoteUrl(repository).toLowerCase()) {
-      return refreshCheckout(sandbox, repository, warmed, true, options);
-    } else {
-      return "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
-    }
+    // earlier execution placed the checkout but never wrote the marker. Only a
+    // readable origin naming this repository proves the checkout is adoptable;
+    // anything else stays untouched. An absent origin and an unreadable
+    // `.git/config` both come back as a non-zero `git config`, so neither can
+    // be treated as proof of debris, and an unfinished clone or move cannot
+    // land here anyway: `/workspace/repo` only ever appears as a rename of a
+    // finished checkout from `STAGING_PATH`.
+    return (await originUrl(sandbox)) === remoteUrl(repository).toLowerCase()
+      ? refreshCheckout(sandbox, repository, warmed, true, options)
+      : "/workspace/repo already exists without a repository marker; refusing to overwrite it.";
   }
 
   // Derive the path from the matched config's canonical slug, not the caller's
@@ -318,7 +337,13 @@ export const prepareWarmedOrClone = async (
     return cloneExplicitRepository(sandbox, repository, options);
   }
 
-  const move = await sandbox.run({ command: `mv ${path} /workspace/repo` });
+  // Staged like the clone, so a move interrupted partway (the warm root and
+  // `/workspace/repo` are not guaranteed to be one rename apart) leaves its
+  // remains at the tool-owned path instead of at `/workspace/repo`, where a
+  // later turn could not tell them from a checkout it must not touch.
+  const move = await sandbox.run({
+    command: `rm -rf ${STAGING_PATH} && mv ${path} ${STAGING_PATH} && mv ${STAGING_PATH} /workspace/repo`,
+  });
   if (move.exitCode !== 0) {
     return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
   }
