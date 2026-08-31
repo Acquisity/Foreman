@@ -169,10 +169,18 @@ const readBoundedText = async (
   const reader = response.body.getReader();
   const chunks: Buffer[] = [];
   let totalBytes = 0;
+  const aborted = signal && abortSettled(signal).then(() => null);
   // biome-ignore lint/suspicious/noUnnecessaryConditions: stream completion terminates the loop.
   while (true) {
     // biome-ignore lint/performance/noAwaitInLoops: chunks must be read sequentially to enforce the cap.
-    const { done, value } = await reader.read();
+    const result = await (aborted === undefined
+      ? reader.read()
+      : Promise.race([reader.read(), aborted]));
+    if (result === null) {
+      void reader.cancel().catch(() => undefined);
+      throw signal?.reason;
+    }
+    const { done, value } = result;
     if (done) {
       break;
     }

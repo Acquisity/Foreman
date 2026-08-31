@@ -871,6 +871,43 @@ describe("Instantly request deadlines", () => {
     });
   });
 
+  it("bounds a response body read that never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let pulling: () => void = () => undefined;
+      const reading = new Promise<void>((resolve) => {
+        pulling = resolve;
+      });
+      let cancelling: () => void = () => undefined;
+      const cancelled = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+              },
+              pull: () => {
+                pulling();
+                return new Promise<void>(() => undefined);
+              },
+            })
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await reading;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+      await cancelled;
+    });
+  });
+
   it("propagates a caller abort during disposal as cancellation", async () => {
     let calls = 0;
     let cancelling: () => void = () => undefined;
