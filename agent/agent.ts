@@ -4,7 +4,10 @@ import { resolveModel } from "./lib/models.js";
 // Root agent runtime configuration: the model for Foreman, Acquisity's
 // general-purpose agent; the rest of the surface (channels, connections,
 // extensions, tools, skills, subagents) is discovered from the filesystem
-// under agent/. History compacts at 75% of the context window.
+// under agent/. History compacts at 50% of the context window. Eve adds the
+// system instructions and tool schemas after compaction, so the remaining
+// half reserves headroom for that envelope instead of filling the model window
+// with compacted history alone.
 //
 // Both per-session token caps are disabled. The input axis would otherwise
 // default to 40M tokens, and cached prompt re-reads count as input on every
@@ -17,7 +20,7 @@ import { resolveModel } from "./lib/models.js";
 // set_agent_models applies to the next session without a redeploy; without one, the compiled
 // default from MODELS runs.
 export default defineAgent({
-  compaction: { thresholdPercent: 0.75 },
+  compaction: { thresholdPercent: 0.5 },
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {

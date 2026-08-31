@@ -3,7 +3,13 @@ import { describe, it } from "node:test";
 
 const { default: rootAgent } = await import("./agent.js");
 
-describe("root agent limits", () => {
+describe("root agent runtime config", () => {
+  it("reserves half the context window for the post-compaction envelope", () => {
+    // Eve adds system instructions and tool schemas after compacting history.
+    // Pin the exact threshold so those surfaces retain half the model window.
+    assert.deepEqual(rootAgent.compaction, { thresholdPercent: 0.5 });
+  });
+
   it("disables the default 40M per-session input budget and nothing else", () => {
     // Cached prompt re-reads count as provider-reported input on every model
     // call, so eve's default input budget can park a long Slack thread on an
