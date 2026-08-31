@@ -6,6 +6,7 @@ const PAGE_LIMIT = 100;
 const MAX_GROUP_PAGES = 100;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_RETRY_DELAY_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 type Fetcher = typeof fetch;
@@ -244,6 +245,74 @@ const parsePage = async (
   }
 };
 
+interface RequestDeadline {
+  /** Disarms the deadline once the request is finished with. */
+  readonly clear: () => void;
+  /** The timeout error when this request's own deadline aborted it, else null. */
+  readonly expiry: (cause: unknown) => InstantlyApiError | null;
+  readonly signal: AbortSignal;
+}
+
+/**
+ * Arms one request's deadline and composes it with the caller's signal.
+ * Expiry is classified from the composed signal's first abort reason, which
+ * never changes once set, so a caller that aborts after the deadline fired
+ * cannot turn a timeout into a cancellation, and an unrelated error merely
+ * named TimeoutError never becomes the deadline message. The deadline is its
+ * own controller so that reason is an identity the classification can compare.
+ */
+const startDeadline = (callerSignal?: AbortSignal): RequestDeadline => {
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () =>
+      deadline.abort(
+        new DOMException("The operation timed out.", "TimeoutError")
+      ),
+    REQUEST_TIMEOUT_MS
+  );
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, deadline.signal])
+    : deadline.signal;
+  return {
+    clear: () => clearTimeout(timer),
+    expiry: (cause) =>
+      deadline.signal.aborted && signal.reason === deadline.signal.reason
+        ? new InstantlyApiError(
+            `Instantly did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds.`,
+            { cause, kind: "inaccessible" }
+          )
+        : null,
+    signal,
+  };
+};
+
+/** Runs one deadline-covered step, reporting an expiry as a timeout. */
+const withDeadline = async <T>(
+  deadline: RequestDeadline,
+  run: () => Promise<T>
+): Promise<T> => {
+  try {
+    return await run();
+  } catch (error) {
+    throw deadline.expiry(error) ?? error;
+  }
+};
+
+const requestHeaders = (
+  token: string,
+  workspaceId: string | undefined
+): Record<string, string> => ({
+  Authorization: `Bearer ${token}`,
+  ...(workspaceId === undefined ? {} : { "x-as-workspace": workspaceId }),
+});
+
+/** The backoff for a retryable status, or null when it exceeds the wait cap. */
+const retryDelayMs = (response: Response, attempt: number): number | null => {
+  const retryAfter = retryAfterSeconds(response);
+  const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
+  return delay > MAX_RETRY_DELAY_MS ? null : delay;
+};
+
 const callPage = async (
   token: string,
   path: string,
@@ -255,20 +324,22 @@ const callPage = async (
   let attempt = 0;
 
   while (attempt < 3) {
+    const deadline = startDeadline(options.signal);
     let response: Response;
     try {
       // biome-ignore lint/performance/noAwaitInLoops: retries are intentionally sequential.
       response = await fetchImpl(`${INSTANTLY_API_URL}${path}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(workspaceId === undefined
-            ? {}
-            : { "x-as-workspace": workspaceId }),
-        },
+        headers: requestHeaders(token, workspaceId),
         method: "GET",
-        signal: options.signal,
+        signal: deadline.signal,
       });
     } catch (error) {
+      deadline.clear();
+      // A request that ran out of its own time is reported, never retried.
+      const expired = deadline.expiry(error);
+      if (expired !== null) {
+        throw expired;
+      }
       if (isAbortError(error, options.signal)) {
         throw error;
       }
@@ -285,12 +356,17 @@ const callPage = async (
     }
 
     if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) {
-      return parsePage(response);
+      try {
+        // The deadline still covers the response body this request is reading.
+        return await withDeadline(deadline, () => parsePage(response));
+      } finally {
+        deadline.clear();
+      }
     }
+    deadline.clear();
 
-    const retryAfter = retryAfterSeconds(response);
-    const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
-    if (delay > MAX_RETRY_DELAY_MS) {
+    const delay = retryDelayMs(response, attempt);
+    if (delay === null) {
       const error = statusError(response);
       await discardResponseBody(response);
       throw error;
