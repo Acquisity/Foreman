@@ -3,6 +3,7 @@ import { z } from "zod";
 const AUTUMN_API_URL = "https://api.useautumn.com/v1";
 const STRIPE_API_URL = "https://api.stripe.com/v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const REQUEST_TIMEOUT_MS = 20_000;
 const SENSITIVE_RESPONSE_KEYS = new Set([
   "address",
   "billing_address",
@@ -143,15 +144,39 @@ const call = async (
   fetchImpl: Fetcher,
   rootSensitiveKeys: ReadonlySet<string> = new Set()
 ): Promise<unknown> => {
+  // The caller's signal stays on `init` so cancellation is still recognized
+  // after the deadline is composed in; only the request carries both. The
+  // failure is classified from the composed signal's first abort reason, which
+  // never changes once set: a caller that aborts after the deadline fired
+  // cannot turn the timeout into a cancellation, and an unrelated error merely
+  // named TimeoutError never becomes the deadline message. The deadline is its
+  // own controller so that reason is an identity the catch can compare.
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () =>
+      deadline.abort(
+        new DOMException("The operation timed out.", "TimeoutError")
+      ),
+    REQUEST_TIMEOUT_MS
+  );
+  const signal = init.signal
+    ? AbortSignal.any([init.signal, deadline.signal])
+    : deadline.signal;
   try {
     return await parseResponse(
       provider,
-      await fetchImpl(url, init),
+      await fetchImpl(url, { ...init, signal }),
       rootSensitiveKeys
     );
   } catch (error) {
+    if (deadline.signal.aborted && signal.reason === deadline.signal.reason) {
+      throw new Error(
+        `${provider} did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds.`,
+        { cause: error }
+      );
+    }
     if (
-      init.signal?.aborted ||
+      signal.aborted ||
       (error instanceof Error && error.name === "AbortError")
     ) {
       throw error;
@@ -163,6 +188,8 @@ const call = async (
       throw error;
     }
     throw new Error(`${provider} could not be reached.`, { cause: error });
+  } finally {
+    clearTimeout(timer);
   }
 };
 
