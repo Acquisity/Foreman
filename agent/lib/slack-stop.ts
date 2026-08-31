@@ -1,9 +1,9 @@
+import { createHash } from "node:crypto";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
 import {
   isCurrentTurnBoundaryEvent,
   type MessageStreamEvent,
 } from "eve/client";
-import { stableSlackClientMessageId } from "./slack-message-id.js";
 
 const MAX_TEXT_LENGTH = 200;
 const CANCELLATION_CONFIRMATION_TIMEOUT_MS = 10_000;
@@ -147,14 +147,21 @@ export const cancelActiveSlackTurn = async (
 const stopConfirmationId = (
   ctx: SlackInboundMessageContext,
   turnId: string
-): string =>
-  stableSlackClientMessageId(
-    "stop",
-    ctx.slack.teamId ?? "",
-    ctx.slack.channelId,
-    ctx.slack.threadTs,
-    turnId
-  );
+): string => {
+  // Preserve the original byte encoding across rolling deployments. Slack
+  // deduplicates retries by this id, so adding a namespace or trailing
+  // separator would allow an old and a new handler to post twice.
+  const hex = createHash("sha256")
+    .update(ctx.slack.teamId ?? "")
+    .update("\0")
+    .update(ctx.slack.channelId)
+    .update("\0")
+    .update(ctx.slack.threadTs)
+    .update("\0")
+    .update(turnId)
+    .digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
 
 /** Posts one provider-idempotent confirmation for an exact cancelled turn. */
 export const postStopConfirmation = async (

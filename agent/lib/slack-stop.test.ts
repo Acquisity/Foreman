@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isStopRequest } from "./slack-stop.js";
+import type { SlackInboundMessageContext } from "eve/channels/slack";
+import { isStopRequest, postStopConfirmation } from "./slack-stop.js";
 
 describe("isStopRequest", () => {
   it("accepts the bare words stop and cancel", () => {
@@ -79,5 +80,44 @@ describe("isStopRequest", () => {
     assert.equal(isStopRequest("st<@U123>op"), false);
     assert.equal(isStopRequest("s<@U1>top"), false);
     assert.equal(isStopRequest("<@U1>stop<@U2> deploy"), false);
+  });
+});
+
+describe("postStopConfirmation", () => {
+  it("keeps the legacy id stable when retrying an ambiguously accepted post", async (t) => {
+    t.mock.method(console, "warn", () => undefined);
+    const acceptedIds = new Set<string>();
+    const attemptedIds: string[] = [];
+    const posts: string[] = [];
+    let loseFirstResponse = true;
+    const ctx = {
+      slack: {
+        channelId: "C0DEV",
+        request: (_operation: string, body: Record<string, unknown>) => {
+          const id = String(body.client_msg_id);
+          attemptedIds.push(id);
+          if (!acceptedIds.has(id)) {
+            acceptedIds.add(id);
+            posts.push(String(body.text));
+          }
+          if (loseFirstResponse) {
+            loseFirstResponse = false;
+            return Promise.reject(new Error("response lost after acceptance"));
+          }
+          return Promise.resolve({ ok: true });
+        },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
+    } as unknown as SlackInboundMessageContext;
+
+    await postStopConfirmation(ctx, "t1");
+    await postStopConfirmation(ctx, "t1");
+
+    assert.deepEqual(attemptedIds, [
+      "03b20daa-a654-590a-8629-6e46c73043e0",
+      "03b20daa-a654-590a-8629-6e46c73043e0",
+    ]);
+    assert.deepEqual(posts, ["Stopped."]);
   });
 });
