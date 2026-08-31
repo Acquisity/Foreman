@@ -342,6 +342,9 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "`get_contact` returns the profile only and is not a step on this path",
     "strip the prefix or the filter matches nothing",
     "filters structured fields and has no free-text",
+    "title, description, attachments, links, comments, labels, priority, project, assignee, requester",
+    "`search_issues` only when that finds nothing",
+    "Prefer a bounded `COUNT` or narrow `SELECT`",
   ]) {
     assert.ok(triageSkill.includes(laneRule), laneRule);
   }
