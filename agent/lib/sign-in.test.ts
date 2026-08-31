@@ -90,7 +90,7 @@ describe("sign_in registry", () => {
 });
 
 describe("sign_in tool", () => {
-  it("refuses unattended sessions before requesting any token", async () => {
+  it("refuses unattended or non-user sessions before requesting any token", async () => {
     const cases = [
       null,
       { attributes: {}, principalId: AUTONOMOUS_PRINCIPAL },

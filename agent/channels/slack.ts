@@ -31,10 +31,11 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * on the direct path and inside the stations alike. The channel mapping tells
  * the model which intake workflow and skills to use.
  *
- * No Slack session shows a sign-in prompt: user-scoped connections authorize
- * through `userConnect`, which turns a missing grant for any Slack-issued user
- * principal into a terminal, non-retryable failure instead of posting a status
- * line and parking the turn on a consent flow Slack cannot answer.
+ * Automatic Slack connection attempts never show a sign-in prompt: user-scoped
+ * connections authorize through `userConnect`, which turns a missing grant for
+ * any Slack-issued user principal into a terminal, non-retryable failure. The
+ * attended root `sign_in` tool is the deliberate exception and may invoke
+ * consent after a person explicitly asks to connect one service.
  *
  * Only a full GitHub URL in the message selects the session repository. A bare
  * `owner/repo` token is not extracted here, because prose cannot be told apart

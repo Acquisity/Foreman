@@ -38,12 +38,17 @@ const sources: Record<string, string> = {
 const SENTENCE_END = /(?<=[.!?])\s+/u;
 
 // The only sanctioned negative mention, pinned in full: the critic's root
-// tools are always present, so it must never search for them. Any other
-// sentence mentioning connection_search must require the `connection`
-// argument verbatim.
+// tools are always present, so it must never search for them. Pin every
+// sanctioned sentence in full so an unscoped instruction cannot pass merely
+// by sharing a sentence with the required wording.
 const CRITIC_PROHIBITION_SENTENCE =
   "`planetscale_execute_read_query`, the Instantly and billing reads, `search_investigation_memory`, and `read_image` are root tools that are always present; call them directly and never wait for `connection_search` to list them.";
-const REQUIRED_SCOPE = "with the `connection` argument naming one connection";
+const SCOPED_INSTRUCTION_SENTENCES = new Set([
+  "Always call `connection_search` with the `connection` argument naming one connection; searching without it queries every connection at once.",
+  "Connection tools are called as `<connection>__<tool>`; use `connection_search` with the `connection` argument naming one connection to discover what it exposes before calling one.",
+  "Find them first with the built-in `connection_search`, called with the `connection` argument naming one connection; a connection's tools are discovered, not standing.",
+  "Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once.",
+]);
 
 const sentencesMentioningConnectionSearch = (source: string) =>
   source
@@ -53,8 +58,8 @@ const sentencesMentioningConnectionSearch = (source: string) =>
 // P2.2: discovery scopes to one connection. An unscoped connection_search
 // queries every connection at once, which resolves authorization for all of
 // them in one shot. Every authored mention must require the `connection`
-// argument; the critic skill's single prohibition sentence is the only
-// exception, matched by exact full-sentence equality.
+// argument; every allowed instruction and the critic skill's single
+// prohibition are matched by exact full-sentence equality.
 test("every authored connection_search instruction names one connection", () => {
   assert.deepEqual(
     sentencesMentioningConnectionSearch(sources["critic skill"]),
@@ -69,7 +74,7 @@ test("every authored connection_search instruction names one connection", () => 
     assert.ok(sentences.length > 0, `${name} never mentions connection_search`);
     for (const sentence of sentences) {
       assert.ok(
-        sentence.includes(REQUIRED_SCOPE),
+        SCOPED_INSTRUCTION_SENTENCES.has(sentence),
         `${name} has an unscoped connection_search instruction: ${sentence}`
       );
     }
