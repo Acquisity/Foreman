@@ -15,6 +15,7 @@ import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
+import { stableSlackClientMessageId } from "../lib/slack-message-id.js";
 import { postSlackReply } from "../lib/slack-post.js";
 import {
   decideSlackProgressLine,
@@ -244,7 +245,8 @@ const extractErrorId = (
 // posted-line count, so the extra checkpoints can never produce a third
 // line.
 const checkSlackProgress = async (
-  channel: SlackEventContext
+  channel: SlackEventContext,
+  turnId: string
 ): Promise<void> => {
   const { progress } = channel.state;
   if (!progress) {
@@ -254,13 +256,29 @@ const checkSlackProgress = async (
   if (!line) {
     return;
   }
-  // The threshold is consumed only after the post lands. A rejection is
-  // logged and contained exactly like postSlackReply's logged failure (eve
-  // swallows event-handler throws, so rethrowing would surface nothing),
-  // and the un-incremented state lets the next checkpoint retry the same
-  // threshold instead of losing the line silently.
+  // A stable provider id keeps an ambiguous retry from creating a duplicate
+  // if Slack accepted the first request but its response was lost. The
+  // threshold is consumed only after Slack confirms the idempotent post. A
+  // rejection stays unconsumed so the next checkpoint retries the same id.
   try {
-    await channel.thread.post(line);
+    const response = await channel.slack.request("chat.postMessage", {
+      channel: channel.slack.channelId,
+      client_msg_id: stableSlackClientMessageId(
+        "progress",
+        channel.slack.teamId ?? "",
+        channel.slack.channelId,
+        channel.slack.threadTs,
+        turnId,
+        String(progress.posts)
+      ),
+      text: line,
+      thread_ts: channel.slack.threadTs,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Slack chat.postMessage failed: ${String(response.error ?? "unknown_error")}`
+      );
+    }
   } catch (error) {
     console.error("Slack progress post failed.", error);
     return;
@@ -287,7 +305,7 @@ export const slackChannelEvents: SlackChannelEvents = {
           : progress.toolCalls,
       waitLabel: slackProgressActionLabel(data.result),
     };
-    await checkSlackProgress(channel);
+    await checkSlackProgress(channel, data.turnId);
   },
   async "actions.requested"(data, channel) {
     // Mirrors eve's default actions.requested typing indicator: buffered
@@ -304,7 +322,7 @@ export const slackChannelEvents: SlackChannelEvents = {
     await channel.thread.startTyping(
       truncateTypingStatus(narration ?? describeActionRequests(data.actions))
     );
-    await checkSlackProgress(channel);
+    await checkSlackProgress(channel, data.turnId);
   },
   async "message.completed"(data, channel) {
     if (data.finishReason === "tool-calls") {
@@ -352,7 +370,7 @@ export const slackChannelEvents: SlackChannelEvents = {
         channel.state.lastReasoningTypingStatus = status;
       }
     }
-    await checkSlackProgress(channel);
+    await checkSlackProgress(channel, data.turnId);
   },
   "turn.cancelled"(_data, channel) {
     // The explicit stop path owns its exact-turn confirmation. This handler

@@ -463,6 +463,16 @@ describe("slack channel progress", () => {
     state: Record<string, unknown> = {}
   ) =>
     ({
+      slack: {
+        channelId: "C0DEV",
+        request: (operation: string, body: Record<string, unknown>) => {
+          assert.equal(operation, "chat.postMessage");
+          calls.push(`post:${String(body.text)}`);
+          return Promise.resolve({ ok: true });
+        },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
       state,
       thread: {
         post: (text: string) => {
@@ -686,7 +696,7 @@ describe("slack channel progress", () => {
     assert.equal(eventChannel.state.progress?.posts, 2);
   });
 
-  it("retries the same threshold when Slack rejects the progress post", async (t) => {
+  it("retries an ambiguous progress post with the same provider id", async (t) => {
     const now = clock(t);
     const calls: string[] = [];
     const errors: unknown[] = [];
@@ -694,19 +704,29 @@ describe("slack channel progress", () => {
       errors.push(args);
     });
     let rejectNextPost = true;
+    const postedIds = new Set<string>();
+    const attemptedIds: string[] = [];
     const eventChannel = {
-      state: {} as Record<string, unknown>,
-      thread: {
-        post: (text: string) => {
-          calls.push(`post:${text}`);
+      slack: {
+        channelId: "C0DEV",
+        request: (_operation: string, body: Record<string, unknown>) => {
+          const clientMessageId = String(body.client_msg_id);
+          attemptedIds.push(clientMessageId);
+          if (!postedIds.has(clientMessageId)) {
+            postedIds.add(clientMessageId);
+            calls.push(`post:${String(body.text)}`);
+          }
           if (rejectNextPost) {
             rejectNextPost = false;
-            return Promise.reject(
-              new Error("Slack chat.postMessage failed: rate_limited")
-            );
+            return Promise.reject(new Error("response lost after acceptance"));
           }
-          return Promise.resolve();
+          return Promise.resolve({ ok: true });
         },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
+      state: {} as Record<string, unknown>,
+      thread: {
         startTyping: (status?: string) => {
           calls.push(`typing:${status ?? ""}`);
           return Promise.resolve();
@@ -719,8 +739,8 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     now.advance(5 * MINUTE_MS + 1000);
-    // The first attempt rejects: the error is logged, nothing throws, and
-    // the threshold stays unconsumed.
+    // Slack accepts the first attempt but its response is lost. The error is
+    // logged and the threshold stays unconsumed.
     await handlerFor("reasoning.appended")(
       reasoningEvent("Checking the code."),
       eventChannel,
@@ -728,8 +748,8 @@ describe("slack channel progress", () => {
     );
     assert.equal(errors.length, 1);
     assert.equal(eventChannel.state.progress?.posts, 0);
-    // The next checkpoint retries the same 5-minute line and consumes the
-    // threshold only once it lands.
+    // The next checkpoint retries the same logical post with the same
+    // client_msg_id. Slack deduplicates it and the threshold is consumed.
     now.advance(MINUTE_MS);
     await handlerFor("action.result")(
       toolResultEvent,
@@ -737,9 +757,11 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.equal(eventChannel.state.progress?.posts, 1);
+    assert.equal(attemptedIds.length, 2);
+    assert.equal(attemptedIds[0], attemptedIds[1]);
+    assert.match(attemptedIds[0] ?? "", UUID_V5);
     assert.deepEqual(postsOf(calls), [
       "post:Still working: 5 minutes in, 0 tool calls so far.",
-      "post:Still working: 5 minutes in, 1 tool calls so far. Currently waiting on grep.",
     ]);
   });
 
