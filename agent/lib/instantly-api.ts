@@ -6,6 +6,7 @@ const PAGE_LIMIT = 100;
 const MAX_GROUP_PAGES = 100;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_RETRY_DELAY_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 type Fetcher = typeof fetch;
@@ -129,14 +130,82 @@ const defaultSleep: Sleeper = (milliseconds, signal) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
-const discardResponseBody = async (response: Response): Promise<void> => {
-  await response.body?.cancel().catch(() => undefined);
+/** Bounds a disposal by abort and removes its listener whichever settles first. */
+const settleBeforeAbort = (
+  settling: Promise<unknown> | undefined,
+  signal?: AbortSignal
+): Promise<void> => {
+  if (settling === undefined) {
+    return Promise.resolve();
+  }
+  if (signal === undefined) {
+    return settling.then(() => undefined);
+  }
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    settling.then(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    });
+  });
 };
 
-const readBoundedText = async (response: Response): Promise<string> => {
+const discardResponseBody = async (
+  response: Response,
+  signal?: AbortSignal
+): Promise<void> => {
+  const discarded = response.body?.cancel().catch(() => undefined);
+  await settleBeforeAbort(discarded, signal);
+};
+
+const readBeforeAbort = <T>(
+  reader: ReadableStreamDefaultReader<T>,
+  signal?: AbortSignal
+): Promise<ReadableStreamReadResult<T> | null> => {
+  if (signal === undefined) {
+    return reader.read();
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(null);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    reader.read().then(
+      (result) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(result);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+};
+
+const readBoundedText = async (
+  response: Response,
+  signal?: AbortSignal
+): Promise<string> => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-    await discardResponseBody(response);
+    await discardResponseBody(response, signal);
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     throw tooMuchData();
   }
   if (response.body === null) {
@@ -149,13 +218,22 @@ const readBoundedText = async (response: Response): Promise<string> => {
   // biome-ignore lint/suspicious/noUnnecessaryConditions: stream completion terminates the loop.
   while (true) {
     // biome-ignore lint/performance/noAwaitInLoops: chunks must be read sequentially to enforce the cap.
-    const { done, value } = await reader.read();
+    const result = await readBeforeAbort(reader, signal);
+    if (result === null) {
+      reader.cancel().catch(() => undefined);
+      throw signal?.reason;
+    }
+    const { done, value } = result;
     if (done) {
       break;
     }
     totalBytes += value.byteLength;
     if (totalBytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined);
+      const cancelled = reader.cancel().catch(() => undefined);
+      await settleBeforeAbort(cancelled, signal);
+      if (signal?.aborted) {
+        throw signal.reason;
+      }
       throw tooMuchData();
     }
     chunks.push(Buffer.from(value));
@@ -223,14 +301,18 @@ const statusError = (response: Response): InstantlyApiError => {
 };
 
 const parsePage = async (
-  response: Response
+  response: Response,
+  signal?: AbortSignal
 ): Promise<z.infer<typeof pageSchema>> => {
   if (!response.ok) {
     const error = statusError(response);
-    await discardResponseBody(response);
+    await discardResponseBody(response, signal);
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     throw error;
   }
-  const text = await readBoundedText(response);
+  const text = await readBoundedText(response, signal);
   try {
     return pageSchema.parse(JSON.parse(text) as unknown);
   } catch (error) {
@@ -244,6 +326,100 @@ const parsePage = async (
   }
 };
 
+interface RequestDeadline {
+  /** Disarms the deadline once the request is finished with. */
+  readonly clear: () => void;
+  /** The timeout error when this request's own deadline aborted it, else null. */
+  readonly expiry: (cause: unknown) => InstantlyApiError | null;
+  readonly signal: AbortSignal;
+}
+
+/**
+ * Arms one request's deadline and composes it with the caller's signal.
+ * Expiry is classified from the composed signal's first abort reason, which
+ * never changes once set, so a caller that aborts after the deadline fired
+ * cannot turn a timeout into a cancellation, and an unrelated error merely
+ * named TimeoutError never becomes the deadline message. The deadline is its
+ * own controller so that reason is an identity the classification can compare.
+ */
+const startDeadline = (callerSignal?: AbortSignal): RequestDeadline => {
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () =>
+      deadline.abort(
+        new DOMException("The operation timed out.", "TimeoutError")
+      ),
+    REQUEST_TIMEOUT_MS
+  );
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, deadline.signal])
+    : deadline.signal;
+  return {
+    clear: () => clearTimeout(timer),
+    expiry: (cause) =>
+      deadline.signal.aborted && signal.reason === deadline.signal.reason
+        ? new InstantlyApiError(
+            `Instantly did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds.`,
+            { cause, kind: "inaccessible" }
+          )
+        : null,
+    signal,
+  };
+};
+
+/** Runs one deadline-covered step, reporting an expiry as a timeout. */
+const withDeadline = async <T>(
+  deadline: RequestDeadline,
+  run: () => Promise<T>
+): Promise<T> => {
+  try {
+    return await run();
+  } catch (error) {
+    throw deadline.expiry(error) ?? error;
+  }
+};
+
+/**
+ * Disposes a retryable response inside the attempt's own deadline, so a body
+ * whose cancellation never settles cannot outlive the request's own time. The
+ * deadline is disarmed only once the attempt is finished with the response.
+ *
+ * Because that bound is an abort, disposal can end without having finished.
+ * The composed signal's first abort reason, which never changes once set,
+ * decides what the attempt does next: this request's own expiry is reported as
+ * a timeout and never retried, a caller's cancellation propagates unchanged,
+ * and a disposal that genuinely finished leaves the retry untouched.
+ */
+const disposeResponse = async (
+  response: Response,
+  deadline: RequestDeadline
+): Promise<void> => {
+  try {
+    await discardResponseBody(response, deadline.signal);
+  } finally {
+    deadline.clear();
+  }
+  if (deadline.signal.aborted) {
+    const reason: unknown = deadline.signal.reason;
+    throw deadline.expiry(reason) ?? reason;
+  }
+};
+
+const requestHeaders = (
+  token: string,
+  workspaceId: string | undefined
+): Record<string, string> => ({
+  Authorization: `Bearer ${token}`,
+  ...(workspaceId === undefined ? {} : { "x-as-workspace": workspaceId }),
+});
+
+/** The backoff for a retryable status, or null when it exceeds the wait cap. */
+const retryDelayMs = (response: Response, attempt: number): number | null => {
+  const retryAfter = retryAfterSeconds(response);
+  const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
+  return delay > MAX_RETRY_DELAY_MS ? null : delay;
+};
+
 const callPage = async (
   token: string,
   path: string,
@@ -255,20 +431,22 @@ const callPage = async (
   let attempt = 0;
 
   while (attempt < 3) {
+    const deadline = startDeadline(options.signal);
     let response: Response;
     try {
       // biome-ignore lint/performance/noAwaitInLoops: retries are intentionally sequential.
       response = await fetchImpl(`${INSTANTLY_API_URL}${path}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(workspaceId === undefined
-            ? {}
-            : { "x-as-workspace": workspaceId }),
-        },
+        headers: requestHeaders(token, workspaceId),
         method: "GET",
-        signal: options.signal,
+        signal: deadline.signal,
       });
     } catch (error) {
+      deadline.clear();
+      // A request that ran out of its own time is reported, never retried.
+      const expired = deadline.expiry(error);
+      if (expired !== null) {
+        throw expired;
+      }
       if (isAbortError(error, options.signal)) {
         throw error;
       }
@@ -285,18 +463,22 @@ const callPage = async (
     }
 
     if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) {
-      return parsePage(response);
+      try {
+        // The deadline still covers the response body this request is reading.
+        return await withDeadline(deadline, () =>
+          parsePage(response, deadline.signal)
+        );
+      } finally {
+        deadline.clear();
+      }
     }
 
-    const retryAfter = retryAfterSeconds(response);
-    const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
-    if (delay > MAX_RETRY_DELAY_MS) {
-      const error = statusError(response);
-      await discardResponseBody(response);
-      throw error;
+    const delay = retryDelayMs(response, attempt);
+    await disposeResponse(response, deadline);
+    if (delay === null) {
+      throw statusError(response);
     }
     attempt += 1;
-    await discardResponseBody(response);
     await sleep(delay, options.signal);
   }
 

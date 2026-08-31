@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import {
   InstantlyApiError,
   listInstantlySubworkspaces,
@@ -16,6 +16,8 @@ const NO_ACCEPTED_WORKSPACE = /No accepted Instantly subworkspace/u;
 const REPEATED_CURSOR = /repeated a Workspace Group pagination cursor/u;
 const TOO_MANY_GROUP_PAGES = /too many Workspace Group pages/u;
 const WRONG_ADMIN_WORKSPACE = /configured IBG admin workspace/u;
+const INSTANTLY_TIMEOUT = /^Instantly did not respond within 15 seconds\.$/u;
+const INSTANTLY_UNREACHABLE = /^Instantly could not be reached\.$/u;
 
 const member = (
   overrides: Partial<Record<string, unknown>> = {}
@@ -549,5 +551,428 @@ describe("Instantly subworkspace reads", () => {
       ),
       true
     );
+  });
+});
+
+describe("Instantly request deadlines", () => {
+  /** Rejects only when the signal it was handed aborts, with that signal's reason. */
+  const signalDrivenFetch =
+    (started?: () => void): typeof fetch =>
+    (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal;
+        if (signal.aborted) {
+          reject(signal.reason);
+          return;
+        }
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+        started?.();
+      });
+
+  /** Runs `body` with the deadline timer under the test's control. */
+  const withDeadlineTimer = async (
+    body: (expire: () => void) => Promise<void>
+  ): Promise<void> => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      await body(() => mock.timers.tick(15_000));
+    } finally {
+      mock.timers.reset();
+    }
+  };
+
+  /** Starts a read whose fetch hangs until the composed signal aborts. */
+  const startRead = (read: (fetchImpl: typeof fetch) => Promise<unknown>) => {
+    let ready: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    return { pending: read(signalDrivenFetch(() => ready())), started };
+  };
+
+  /** Lets every pending job run, so a hung read is a failure, not a stall. */
+  const flush = async (): Promise<void> => {
+    for (let index = 0; index < 20; index += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: each tick must drain before the next.
+      await new Promise((resolve) => {
+        setImmediate(resolve);
+      });
+    }
+  };
+
+  const isCancellation = (error: unknown): boolean =>
+    error instanceof Error &&
+    !(error instanceof InstantlyApiError) &&
+    error.name === "AbortError";
+
+  const isTimeout = (error: unknown): boolean => {
+    assert.ok(error instanceof InstantlyApiError);
+    assert.equal(error.kind, "inaccessible");
+    assert.match(error.message, INSTANTLY_TIMEOUT);
+    return true;
+  };
+
+  it("gives every paginated request its own deadline composed with the caller signal", async () => {
+    const controller = new AbortController();
+    const sent: AbortSignal[] = [];
+    let calls = 0;
+    const fetchStub: typeof fetch = (_url, init) => {
+      sent.push(init?.signal as AbortSignal);
+      calls += 1;
+      return calls === 1
+        ? json({ items: [member()], next_starting_after: "cursor-1" })
+        : json({ items: [member({ sub_workspace_id: SECOND_WORKSPACE_ID })] });
+    };
+
+    const result = await listInstantlySubworkspaces("secret-key", {
+      fetch: fetchStub,
+      signal: controller.signal,
+    });
+
+    // Pagination is unchanged: both cursors walked, both pages kept.
+    assert.equal(calls, 2);
+    assert.equal(result.subworkspaces.length, 2);
+    assert.equal(sent.length, 2);
+    assert.notEqual(sent[0], sent[1]);
+    for (const signal of sent) {
+      assert.notEqual(signal, controller.signal);
+      assert.equal(signal.aborted, false);
+    }
+
+    controller.abort();
+    for (const signal of sent) {
+      assert.equal(signal.aborted, true);
+    }
+  });
+
+  it("attaches the deadline when the caller passes no signal", async () => {
+    let sent: AbortSignal | null | undefined;
+    const fetchStub: typeof fetch = (_url, init) => {
+      sent = init?.signal;
+      return json({ items: [member()] });
+    };
+
+    await listInstantlySubworkspaces("secret-key", { fetch: fetchStub });
+
+    assert.ok(sent instanceof AbortSignal);
+    assert.equal(sent.aborted, false);
+  });
+
+  it("maps an expired deadline to the Instantly timeout message", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const { pending, started } = startRead((fetchImpl) =>
+        listInstantlySubworkspaces("secret-key", { fetch: fetchImpl })
+      );
+      await started;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
+  it("does not retry a request that hit its deadline", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let calls = 0;
+      let ready: () => void = () => undefined;
+      const started = new Promise<void>((resolve) => {
+        ready = resolve;
+      });
+      const countingFetch: typeof fetch = (url, init) => {
+        calls += 1;
+        return signalDrivenFetch(() => ready())(url, init);
+      };
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: countingFetch,
+        sleep: () => Promise.resolve(),
+      });
+      await started;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+      assert.equal(calls, 1);
+    });
+  });
+
+  it("keeps an expired deadline a timeout when the caller aborts afterwards", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const controller = new AbortController();
+      const { pending, started } = startRead((fetchImpl) =>
+        listInstantlySubworkspaces("secret-key", {
+          fetch: fetchImpl,
+          signal: controller.signal,
+        })
+      );
+      await started;
+
+      // The deadline fires first, then the caller aborts before the rejection
+      // handler runs. The request still timed out.
+      expire();
+      controller.abort();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
+  it("reports a caller abort that beats the deadline as cancellation", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const controller = new AbortController();
+      const { pending, started } = startRead((fetchImpl) =>
+        listInstantlySubworkspaces("secret-key", {
+          fetch: fetchImpl,
+          signal: controller.signal,
+        })
+      );
+      await started;
+
+      controller.abort();
+      expire();
+
+      await assert.rejects(pending, isCancellation);
+    });
+  });
+
+  it("reports an already-aborted caller signal as cancellation", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await assert.rejects(
+      readInstantlySubworkspace(
+        "secret-key",
+        { id: WORKSPACE_ID },
+        "accounts",
+        {},
+        { fetch: signalDrivenFetch(), signal: controller.signal }
+      ),
+      isCancellation
+    );
+  });
+
+  it("bounds a retryable response whose body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let calls = 0;
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () => {
+        calls += 1;
+        if (calls > 1) {
+          return json({ items: [member()] });
+        }
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                // A cancellation that never settles, as a stalled body gives.
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("{}"));
+              },
+            }),
+            { status: 503 }
+          )
+        );
+      };
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+        sleep: () => Promise.resolve(),
+      });
+      await discarding;
+
+      // The attempt's own deadline still covers disposing the response, so the
+      // stalled cancellation gives way instead of hanging, and the request
+      // that ran out of its own time is reported rather than retried.
+      expire();
+
+      const outcome = await Promise.race([
+        pending.then(
+          () => "resolved" as const,
+          (error: unknown) => error
+        ),
+        flush().then(() => "hung" as const),
+      ]);
+
+      assert.notEqual(outcome, "hung");
+      assert.equal(isTimeout(outcome), true);
+      assert.equal(calls, 1);
+    });
+  });
+
+  it("bounds a non-retryable response whose body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("{}"));
+              },
+            }),
+            { status: 400 }
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await discarding;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
+  it("bounds oversized response disposal when body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new Uint8Array([1]));
+              },
+            }),
+            { headers: { "content-length": String(256 * 1024 + 1) } }
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await discarding;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
+  it("bounds a response body read that never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let pulling: () => void = () => undefined;
+      const reading = new Promise<void>((resolve) => {
+        pulling = resolve;
+      });
+      let cancelling: () => void = () => undefined;
+      const cancelled = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+              },
+              pull: () => {
+                pulling();
+                return new Promise<void>(() => undefined);
+              },
+            })
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await reading;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+      await cancelled;
+    });
+  });
+
+  it("propagates a caller abort during disposal as cancellation", async () => {
+    let calls = 0;
+    let cancelling: () => void = () => undefined;
+    const discarding = new Promise<void>((resolve) => {
+      cancelling = resolve;
+    });
+    const controller = new AbortController();
+    const fetchStub: typeof fetch = () => {
+      calls += 1;
+      if (calls > 1) {
+        return json({ items: [member()] });
+      }
+      return Promise.resolve(
+        new Response(
+          new ReadableStream({
+            cancel: () => {
+              cancelling();
+              // A cancellation that never settles, as a stalled body gives.
+              return new Promise<void>(() => undefined);
+            },
+            start(controller_) {
+              controller_.enqueue(new TextEncoder().encode("{}"));
+            },
+          }),
+          // Over the retry wait cap, so the retryable status would otherwise
+          // surface as a rate-limit error rather than the caller's abort.
+          { headers: { "retry-after": "6" }, status: 429 }
+        )
+      );
+    };
+
+    const pending = listInstantlySubworkspaces("secret-key", {
+      fetch: fetchStub,
+      signal: controller.signal,
+      sleep: () => Promise.resolve(),
+    });
+    await discarding;
+
+    controller.abort();
+
+    await assert.rejects(pending, isCancellation);
+    assert.equal(calls, 1);
+  });
+
+  it("does not report an unrelated TimeoutError as a deadline expiry", async () => {
+    let calls = 0;
+    const timeoutNamedFetch: typeof fetch = () => {
+      calls += 1;
+      return Promise.reject(
+        new DOMException("Upstream timed out.", "TimeoutError")
+      );
+    };
+
+    await assert.rejects(
+      listInstantlySubworkspaces("secret-key", {
+        fetch: timeoutNamedFetch,
+        sleep: () => Promise.resolve(),
+      }),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "inaccessible");
+        assert.match(error.message, INSTANTLY_UNREACHABLE);
+        return true;
+      }
+    );
+    assert.equal(calls, 3);
   });
 });
