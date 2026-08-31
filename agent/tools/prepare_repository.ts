@@ -246,6 +246,9 @@ export const refreshCheckout = async (
       { command: "git -C /workspace/repo rev-parse HEAD" },
       timeoutMs
     );
+    if (before.exitCode !== 0) {
+      return `Could not read the current revision for ${repository}: ${String(before.stderr || before.stdout).trim()}`;
+    }
     const refresh = await boundedRun(
       sandbox,
       {
@@ -261,6 +264,9 @@ export const refreshCheckout = async (
       { command: "git -C /workspace/repo rev-parse HEAD" },
       timeoutMs
     );
+    if (after.exitCode !== 0) {
+      return `Could not read the refreshed revision for ${repository}: ${String(after.stderr || after.stdout).trim()}`;
+    }
     moved = String(before.stdout).trim() !== String(after.stdout).trim();
     refreshed = true;
   } finally {

@@ -216,6 +216,39 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(policies.at(-1), "allow-all");
   });
 
+  it("stops a stalled current-revision probe before refreshing", async () => {
+    const { commands, policies, sandbox } = fakeSandbox((options) =>
+      options.command.includes("rev-parse HEAD") ? stall(options) : ok()
+    );
+    const error = await refreshCheckout(sandbox, REPOSITORY, null, false, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", TIMED_OUT);
+    assert.equal(ran(commands, "fetch"), false);
+    assert.ok(ran(commands, DISCARD));
+    assert.equal(policies.at(-1), "allow-all");
+  });
+
+  it("rejects a failed refreshed-revision probe", async () => {
+    let revisionProbes = 0;
+    const { commands, policies, sandbox } = fakeSandbox((options) => {
+      if (options.command.includes("rev-parse HEAD")) {
+        revisionProbes += 1;
+        return revisionProbes === 2 ? failed("could not read") : ok("sha");
+      }
+      return ok();
+    });
+    const error = await refreshCheckout(sandbox, REPOSITORY, null, false, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFRESH_FAILED);
+    assert.ok(ran(commands, "fetch"));
+    assert.ok(ran(commands, DISCARD));
+    assert.equal(policies.at(-1), "allow-all");
+  });
+
   it("stops a stalled install and discards the checkout", async () => {
     const { commands, sandbox } = fakeSandbox((options) =>
       options.command.includes("pnpm install") ? stall(options) : ok("sha")
