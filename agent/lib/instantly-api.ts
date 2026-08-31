@@ -150,10 +150,16 @@ const discardResponseBody = async (
     : Promise.race([discarded, abortSettled(signal)]));
 };
 
-const readBoundedText = async (response: Response): Promise<string> => {
+const readBoundedText = async (
+  response: Response,
+  signal?: AbortSignal
+): Promise<string> => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-    await discardResponseBody(response);
+    await discardResponseBody(response, signal);
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     throw tooMuchData();
   }
   if (response.body === null) {
@@ -172,7 +178,13 @@ const readBoundedText = async (response: Response): Promise<string> => {
     }
     totalBytes += value.byteLength;
     if (totalBytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined);
+      const cancelled = reader.cancel().catch(() => undefined);
+      await (signal === undefined
+        ? cancelled
+        : Promise.race([cancelled, abortSettled(signal)]));
+      if (signal?.aborted) {
+        throw signal.reason;
+      }
       throw tooMuchData();
     }
     chunks.push(Buffer.from(value));
@@ -240,14 +252,18 @@ const statusError = (response: Response): InstantlyApiError => {
 };
 
 const parsePage = async (
-  response: Response
+  response: Response,
+  signal?: AbortSignal
 ): Promise<z.infer<typeof pageSchema>> => {
   if (!response.ok) {
     const error = statusError(response);
-    await discardResponseBody(response);
+    await discardResponseBody(response, signal);
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     throw error;
   }
-  const text = await readBoundedText(response);
+  const text = await readBoundedText(response, signal);
   try {
     return pageSchema.parse(JSON.parse(text) as unknown);
   } catch (error) {
@@ -400,7 +416,9 @@ const callPage = async (
     if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) {
       try {
         // The deadline still covers the response body this request is reading.
-        return await withDeadline(deadline, () => parsePage(response));
+        return await withDeadline(deadline, () =>
+          parsePage(response, deadline.signal)
+        );
       } finally {
         deadline.clear();
       }

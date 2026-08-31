@@ -805,6 +805,72 @@ describe("Instantly request deadlines", () => {
     });
   });
 
+  it("bounds a non-retryable response whose body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("{}"));
+              },
+            }),
+            { status: 400 }
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await discarding;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
+  it("bounds oversized response disposal when body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new Uint8Array([1]));
+              },
+            }),
+            { headers: { "content-length": String(256 * 1024 + 1) } }
+          )
+        );
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+      });
+      await discarding;
+
+      expire();
+
+      await assert.rejects(pending, isTimeout);
+    });
+  });
+
   it("propagates a caller abort during disposal as cancellation", async () => {
     let calls = 0;
     let cancelling: () => void = () => undefined;
