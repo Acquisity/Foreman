@@ -150,6 +150,14 @@ const discardResponseBody = async (
     : Promise.race([discarded, abortSettled(signal)]));
 };
 
+const readBeforeAbort = <T>(
+  reader: ReadableStreamDefaultReader<T>,
+  aborted?: Promise<null>
+): Promise<ReadableStreamReadResult<T> | null> =>
+  aborted === undefined
+    ? reader.read()
+    : Promise.race([reader.read(), aborted]);
+
 const readBoundedText = async (
   response: Response,
   signal?: AbortSignal
@@ -173,11 +181,9 @@ const readBoundedText = async (
   // biome-ignore lint/suspicious/noUnnecessaryConditions: stream completion terminates the loop.
   while (true) {
     // biome-ignore lint/performance/noAwaitInLoops: chunks must be read sequentially to enforce the cap.
-    const result = await (aborted === undefined
-      ? reader.read()
-      : Promise.race([reader.read(), aborted]));
+    const result = await readBeforeAbort(reader, aborted);
     if (result === null) {
-      void reader.cancel().catch(() => undefined);
+      reader.cancel().catch(() => undefined);
       throw signal?.reason;
     }
     const { done, value } = result;
