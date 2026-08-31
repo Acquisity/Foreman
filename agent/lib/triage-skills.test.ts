@@ -466,9 +466,10 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "None of these is a reason for a second delegation",
     "On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record",
     "When the corrected record no longer supports the classification, change the classification and handling path",
-    "set its `**Review**` line to `Adjudicated: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> at <commit>`",
-    "followed by one short clause per blocking finding or the failure reason, each naming what settled it",
-    "That read-back `updatedAt` is the settled version the handoff checks",
+    "read back its adjudicated-evidence `updatedAt`",
+    "`**Review**: Adjudicated <that adjudicated-evidence updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`",
+    "followed by those same clauses",
+    "That final read-back `updatedAt` is the settled version the handoff checks",
     "In a read-only run, describe those writes instead of making them",
     "as the literal marker `read-only`",
     "Do not touch the document",
@@ -511,7 +512,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "`Adjudicated <the updatedAt Stage 5 read back> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
+      "`Adjudicated <the adjudicated-evidence updatedAt Stage 5 read back before the settling save> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
     )
   );
   assert.ok(
@@ -537,7 +538,17 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "For a `Bug` other than a `Duplicate`, the review in Stage 5 settled the document version"
+      "When Stage 5 review ran, it settled the document version"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "do not call `save_investigation_document` before routing, even when adjudication changed the final classification or handling path"
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "An outcome reclassified during adjudication still entered review and keeps its settled document unchanged"
     )
   );
   assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
