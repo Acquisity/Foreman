@@ -14,7 +14,7 @@ All of these hold before anything is written:
 
 - Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`.
 - The `Triage investigation` document is attached to the customer ticket and current.
-- When the workflow ran the critic, its verdict was `APPROVE` for this exact document version: the document id and `updatedAt` the critic echoed in `reviewed` still match what Linear returns now. A changed document needs a new review before any structural write.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket exactly once, so a document changed after its review settled has no review covering it and fails this precondition until Stage 5 re-adjudicates and re-saves it.
 - When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
 - The master search below has been run in this pass, not carried over from an earlier one.
 
@@ -71,7 +71,7 @@ The master carries only sanitized, aggregate engineering context: the cause, the
 
 After the writes, read the master and the report again and confirm: the parent relation, the assignee on both, the master's project, priority, label union including `fast-lane` when approved, and the report link from the master. If any of it disagrees with what was intended, stop and report the mismatch in the investigation document. Never create a second master as a recovery step; a duplicate master is worse than a missing link.
 
-Changing a diagnosis or moving a report between masters needs a new investigation document version and, where the workflow includes it, a new critic review, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
+Changing a diagnosis or moving a report between masters needs a new investigation document version whose changed findings Foreman adjudicates once and records on that version's `**Review**` line, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
 
 ## Return to Stage 6
 

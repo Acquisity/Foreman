@@ -6,7 +6,7 @@ description: "Assess whether a completed triage investigation describes an incid
 
 Decide, from the completed investigation, whether this failure needs urgent handling and what work that implies. Route by user and business impact, not by complaint volume or how the reporter phrased it. One affected workspace is enough when a core function is blocked or materially impaired.
 
-This skill performs no writes. It does not change Linear, assign work, create a master, send a message, or touch production. It returns a structured assessment that Foreman includes in the critic review and acts on only after approval, in Stage 6. If a challenge overturns it, there is nothing to roll back.
+This skill performs no writes. It does not change Linear, assign work, create a master, send a message, or touch production. For `HOTLANE` and `STANDARD_ENGINEERING`, Foreman includes the assessment in the critic review and acts on it only after the review has settled, in Stage 6. `NEEDS_HUMAN_URGENT` instead routes directly to a person before any critic review or settled decision. If a challenge overturns a reviewed assessment, there is nothing to roll back.
 
 ## Evaluate core-function impact
 
@@ -39,7 +39,7 @@ Propose `STANDARD_ENGINEERING` for a confirmed defect that meets none of those. 
 
 When evidence points at a high-risk condition but a critical evidence lane was unavailable, so the condition cannot be confirmed, return `NEEDS_HUMAN_URGENT`. Do not downgrade it to routine work. `NEEDS_HUMAN_URGENT` means Foreman stops before any settled classification, priority, label, master, or announcement, keeps the investigation document, and routes the case to a person with a clearly labelled provisional note that a possible high-risk incident is awaiting confirmation. Foreman does that; this skill only returns the route.
 
-A `HOTLANE` proposal maps to the existing `fast-lane` label on the ENG team. Stage 6 applies it after approval, alongside the numeric priority Stage 5 already decided. This skill does not set priority; Stage 5 owns it.
+A `HOTLANE` proposal maps to the existing `fast-lane` label on the ENG team. Stage 6 applies it after the critic review settles, alongside the numeric priority Stage 5 already decided. This skill does not set priority; Stage 5 owns it.
 
 ## Separate the four workstreams
 
@@ -73,5 +73,5 @@ Return:
 - `workaround_available`
 - `containment`, `customer_recovery`, `permanent_prevention`, `observability_gap`: recommended work, each `None needed: <reason>` when evidence shows nothing is required
 - `blast_radius`: one object with `confirmed_affected`, `potentially_exposed`, optional `affected_org_count` and `affected_user_count`, `method_or_source`, `window`, `measured_at`, and `limitations`
-- `notification_recommendation`: who should hear about this and what they need to know, for Foreman to act on after approval; this skill sends nothing and names no channel that the current triage workflow does not already use
+- `notification_recommendation`: who should hear about this and what they need to know, for Foreman to act on after review settlement for reviewed routes or during direct human routing for `NEEDS_HUMAN_URGENT`; this skill sends nothing and names no channel that the current triage workflow does not already use
 - `unknowns`

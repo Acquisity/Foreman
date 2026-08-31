@@ -1,5 +1,5 @@
 ---
-description: "The critic's complete review procedure: inputs, where to look, the twelve criteria, findings rule, verdicts, and the two-attempt limit. Load before reviewing any triage investigation."
+description: "The critic's complete review procedure: inputs, where to look, the twelve criteria, findings rule, and verdicts. Load before reviewing any triage investigation."
 ---
 
 # Triage critic
@@ -11,8 +11,7 @@ The caller's message names:
 - the source issue id;
 - the `Triage investigation` document id and its `updatedAt` value;
 - the repository commit the investigation read;
-- Foreman's proposed decisions: classification, unblock, handling path, final state, priority, labels, the hotlane proposal, and any existing master candidate with the match rationale;
-- the attempt number, 1 or 2. On attempt 2, either the list of criteria that failed on attempt 1 or a note that a prior approval was invalidated by a material change.
+- Foreman's proposed decisions: classification, unblock, handling path, final state, priority, labels, the hotlane proposal, and any existing master candidate with the match rationale.
 
 Read the document first. It holds the claim, root cause, evidence lanes, prior cases, blast radius, code path, unblock, and what was ruled out. When the caller passes the document id and `updatedAt` as the literal marker `read-only`, the caller could not write to Linear: review the document text carried in the message as the document, do not look for a Linear document, and echo `read-only` for both fields in `reviewed`. Judge the original evidence recorded there, not Foreman's summary of it. If the document, its `updatedAt`, or any decision-changing section is missing, return `INSUFFICIENT_EVIDENCE` and name what is missing. Never fill a gap by trusting the proposal.
 
@@ -43,7 +42,7 @@ Judge each separately, in this order, citing the evidence you used. Return exact
 11. `privacy_boundary`: customer-specific evidence stays on the source ticket; anything proposed for a shared master is aggregate and sanitized.
 12. `engineering_handoff`: when engineering work is proposed, there is a regression seam and an observable desired outcome.
 
-Mark a criterion `NOT_APPLICABLE` only when the proposal makes it moot, for example `master_match` when no master is proposed or `engineering_handoff` when no engineering work is proposed. A criterion that the proposal does rely on is never `NOT_APPLICABLE`: if it cannot support the proposed writes, it is `FAIL` with the blocking evidence, so attempt 2 has an exact target.
+Mark a criterion `NOT_APPLICABLE` only when the proposal makes it moot, for example `master_match` when no master is proposed or `engineering_handoff` when no engineering work is proposed. A criterion that the proposal does rely on is never `NOT_APPLICABLE`: if it cannot support the proposed writes, it is `FAIL` with the blocking evidence, so Foreman's adjudication has an exact target.
 
 ## Findings
 
@@ -57,8 +56,8 @@ Report a blocking finding only when you can name all four: the exact claim or de
 
 An `APPROVE` applies only to the exact document version and commit you reviewed. Echo them in `reviewed` verbatim. New evidence, a changed commit, a changed blast-radius query, a different master candidate, or a changed material decision invalidates it.
 
-## Attempts
+## One review
 
-Attempt 1 is a complete review of all twelve criteria. Attempt 2 after a `CHALLENGE` re-judges the failed criteria against the corrected document and confirms the others still hold. Attempt 2 after an invalidated approval is a complete review again, because no part of the earlier decision can be assumed unchanged. There is no attempt 3; Foreman stops for a person after that.
+Foreman calls you exactly once per ticket and adjudicates your single result against the evidence record itself: a `CHALLENGE` tells Foreman what to settle, and a review that could not start tells Foreman what to re-check directly.
 
 Return only the structured result. Do not write findings anywhere else.
