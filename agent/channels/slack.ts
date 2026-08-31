@@ -12,7 +12,7 @@ import {
   slackIntakeContext,
   stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
-import { replyOf } from "../lib/slack-reply.js";
+import { postSlackReply } from "../lib/slack-post.js";
 import {
   cancelActiveSlackTurn,
   isStopRequest,
@@ -70,11 +70,15 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * cooperative cancellations and no-op requests against parked sessions stay
  * quiet.
  *
- * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
- * so the model's narration stays in the session and only the requester-facing
- * text reaches the thread. The handler mirrors eve's default
- * `message.completed` branches, which are not exported, and changes only the
- * post.
+ * Delivery posts the complete final message: there is no marker that splits
+ * narration from reply, so the final message itself is the requester-facing
+ * text and an empty one falls back to a typing indicator. Slack rejects a
+ * markdown post over 12,000 characters and eve swallows an event-handler
+ * throw, so final replies go through `slack-post.ts`: ordered chunks that
+ * prefer paragraph then line boundaries, plus one short visible fallback
+ * naming the Slack error when a post is rejected. The handler mirrors eve's
+ * default `message.completed` branches, which are not exported, and changes
+ * only the post.
  */
 
 export const dispatch = async (
@@ -129,12 +133,13 @@ export const slackChannelEvents: SlackChannelEvents = {
       return;
     }
     channel.state.pendingToolCallMessage = null;
-    const reply = data.message ? replyOf(data.message) : "";
-    if (!reply) {
+    // Blankness decides the typing fallback, but the post itself is verbatim:
+    // trimming would destroy leading Markdown indentation in the reply.
+    if (!data.message?.trim()) {
       await channel.thread.startTyping();
       return;
     }
-    await channel.thread.post(reply);
+    await postSlackReply((chunk) => channel.thread.post(chunk), data.message);
   },
 };
 
