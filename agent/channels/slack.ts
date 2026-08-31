@@ -59,9 +59,9 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
  * cancels the active turn through `ctx.cancel()`, and is consumed without
  * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. The `turn.cancelled` event posts the single short
- * notice, so a real cancellation is confirmed exactly once and a `stop`
- * with no active turn stays quiet.
+ * ordinary model input. An accepted stop command posts the single short
+ * notice itself, so unrelated cooperative cancellations stay quiet and a
+ * `stop` with no active turn does too.
  *
  * Delivery cuts the final message at the reply marker (see `slack-reply.ts`),
  * so the model's narration stays in the session and only the requester-facing
@@ -82,10 +82,14 @@ export const dispatch = async (
     return null;
   }
   // A literal stop/cancel is a command for the running turn, never model
-  // input: cancel the active turn and consume the message. `turn.cancelled`
-  // posts the notice; with no active turn the message drops quietly.
+  // input: cancel the active turn and consume the message. Acknowledging here
+  // ties the notice to this command instead of every cooperative cancellation;
+  // with no active turn the message drops quietly.
   if (isStopRequest(message.text)) {
-    await ctx.cancel();
+    const result = await ctx.cancel();
+    if (result.status === "accepted") {
+      await ctx.thread.post("Stopped.");
+    }
     return null;
   }
   const repositories = extractRepositoryUrls(message.text);
@@ -124,9 +128,6 @@ export const slackChannelEvents: SlackChannelEvents = {
       return;
     }
     await channel.thread.post(reply);
-  },
-  async "turn.cancelled"(_data, channel) {
-    await channel.thread.post("Stopped.");
   },
 };
 

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type {
-  SlackEventContext,
   SlackInboundMessageContext,
   SlackMessage,
 } from "eve/channels/slack";
@@ -44,10 +43,19 @@ const message = (text: string): SlackMessage => ({
   ts: "1700000000.000200",
 });
 
-const inboundContext = (cancel: SlackInboundMessageContext["cancel"]) =>
+const inboundContext = (
+  cancel: SlackInboundMessageContext["cancel"],
+  posts: string[] = []
+) =>
   ({
     cancel,
     slack: { channelId: "C0DEV", threadTs: "1700000000.000100" },
+    thread: {
+      post: (text: string) => {
+        posts.push(text);
+        return Promise.resolve();
+      },
+    },
   }) as unknown as SlackInboundMessageContext;
 
 describe("slack channel", () => {
@@ -58,15 +66,17 @@ describe("slack channel", () => {
 
   it("cancels the active turn and consumes a literal stop", async () => {
     const calls: unknown[] = [];
+    const posts: string[] = [];
     const result = await dispatch(
       inboundContext(() => {
         calls.push("cancel");
         return Promise.resolve({ sessionId: "s1", status: "accepted" });
-      }),
+      }, posts),
       message("stop")
     );
     assert.equal(result, null);
     assert.deepEqual(calls, ["cancel"]);
+    assert.deepEqual(posts, ["Stopped."]);
   });
 
   it("accepts a mention and terminal punctuation around cancel", async () => {
@@ -83,13 +93,16 @@ describe("slack channel", () => {
   });
 
   it("stays quiet when a stop arrives with no active turn", async () => {
+    const posts: string[] = [];
     const result = await dispatch(
       inboundContext(
-        () => Promise.resolve({ status: "no_active_turn" }) as never
+        () => Promise.resolve({ status: "no_active_turn" }) as never,
+        posts
       ),
       message("stop")
     );
     assert.equal(result, null);
+    assert.deepEqual(posts, []);
   });
 
   it("never lets an authorless event cancel work", async () => {
@@ -119,19 +132,8 @@ describe("slack channel", () => {
     assert.ok(result && "auth" in result && result.auth);
   });
 
-  it("posts exactly one short notice when a turn is cancelled", async () => {
+  it("does not attribute an unrelated cooperative cancellation to stop", () => {
     const handler = slackChannelEvents["turn.cancelled"];
-    assert.ok(handler);
-    const posts: string[] = [];
-    const eventChannel = {
-      thread: {
-        post: (text: string) => {
-          posts.push(text);
-          return Promise.resolve();
-        },
-      },
-    } as unknown as SlackEventContext;
-    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.equal(handler, undefined);
   });
 });
