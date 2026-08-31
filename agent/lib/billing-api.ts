@@ -3,6 +3,7 @@ import { z } from "zod";
 const AUTUMN_API_URL = "https://api.useautumn.com/v1";
 const STRIPE_API_URL = "https://api.stripe.com/v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const REQUEST_TIMEOUT_MS = 20_000;
 const SENSITIVE_RESPONSE_KEYS = new Set([
   "address",
   "billing_address",
@@ -143,10 +144,18 @@ const call = async (
   fetchImpl: Fetcher,
   rootSensitiveKeys: ReadonlySet<string> = new Set()
 ): Promise<unknown> => {
+  // The caller's signal stays on `init` so cancellation is still recognized
+  // after the deadline is composed in; only the request carries both.
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   try {
     return await parseResponse(
       provider,
-      await fetchImpl(url, init),
+      await fetchImpl(url, {
+        ...init,
+        signal: init.signal
+          ? AbortSignal.any([init.signal, deadline])
+          : deadline,
+      }),
       rootSensitiveKeys
     );
   } catch (error) {
@@ -155,6 +164,12 @@ const call = async (
       (error instanceof Error && error.name === "AbortError")
     ) {
       throw error;
+    }
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error(
+        `${provider} did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds.`,
+        { cause: error }
+      );
     }
     if (error instanceof BillingApiError || error instanceof SyntaxError) {
       throw error;

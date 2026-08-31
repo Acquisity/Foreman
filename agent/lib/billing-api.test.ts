@@ -22,6 +22,8 @@ const json = (body: unknown, status = 200): Promise<Response> =>
 
 const AUTUMN_TOO_MUCH_DATA = /Autumn returned too much data/u;
 const STRIPE_TOO_MUCH_DATA = /Stripe returned too much data/u;
+const AUTUMN_TIMEOUT = /^Error: Autumn did not respond within 20 seconds\.$/u;
+const STRIPE_TIMEOUT = /^Error: Stripe did not respond within 20 seconds\.$/u;
 const AUTUMN_WRONG_ID =
   /Autumn has no customer with id org_123 .*billingAccount\.id/u;
 
@@ -296,6 +298,80 @@ describe("billing response bounds", () => {
         fetch: () => json(oversized),
       }),
       STRIPE_TOO_MUCH_DATA
+    );
+  });
+});
+
+describe("billing read deadlines", () => {
+  const timedOutFetch: typeof fetch = () =>
+    Promise.reject(
+      new DOMException("The operation timed out.", "TimeoutError")
+    );
+
+  it("composes the deadline with the caller signal on every read", async () => {
+    const controller = new AbortController();
+    const sent: AbortSignal[] = [];
+    const fetchStub: typeof fetch = (_url, init) => {
+      sent.push(init?.signal as AbortSignal);
+      return json({ id: "x" });
+    };
+    const options = { fetch: fetchStub, signal: controller.signal };
+
+    await readAutumnCustomer("secret-key", "org_123", options);
+    await readStripeCharge("restricted-key", "ch_123", options);
+    await readStripeCustomerBilling("restricted-key", "cus_123", options);
+
+    assert.equal(sent.length, 8);
+    for (const signal of sent) {
+      assert.notEqual(signal, controller.signal);
+      assert.equal(signal.aborted, false);
+    }
+
+    controller.abort();
+    for (const signal of sent) {
+      assert.equal(signal.aborted, true);
+    }
+  });
+
+  it("attaches the deadline when the caller passes no signal", async () => {
+    let sent: AbortSignal | null | undefined;
+    const fetchStub: typeof fetch = (_url, init) => {
+      sent = init?.signal;
+      return json({ id: "re_123" });
+    };
+
+    await readStripeRefund("restricted-key", "re_123", { fetch: fetchStub });
+
+    assert.ok(sent instanceof AbortSignal);
+    assert.equal(sent.aborted, false);
+  });
+
+  it("maps deadline expiry to the provider timeout message", async () => {
+    await assert.rejects(
+      readAutumnCustomer("secret-key", "org_123", { fetch: timedOutFetch }),
+      AUTUMN_TIMEOUT
+    );
+    await assert.rejects(
+      readStripeCharge("restricted-key", "ch_123", { fetch: timedOutFetch }),
+      STRIPE_TIMEOUT
+    );
+  });
+
+  it("reports caller cancellation as cancellation, never as a timeout", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const cancelledFetch: typeof fetch = () =>
+      Promise.reject(new DOMException("Canceled", "AbortError"));
+
+    await assert.rejects(
+      readAutumnCustomer("secret-key", "org_123", {
+        fetch: cancelledFetch,
+        signal: controller.signal,
+      }),
+      (error) =>
+        error instanceof Error &&
+        error.name === "AbortError" &&
+        !error.message.includes("did not respond")
     );
   });
 });
