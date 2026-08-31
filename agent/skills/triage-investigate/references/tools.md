@@ -2,7 +2,7 @@
 
 The triage-investigate skill mandates loading this catalog at the start of Stage 4, before the first evidence lane runs; every lane call uses a name from this catalog.
 
-Exact tool names, one row per surface. Connection tools are called by qualified name, `<connection>__<tool>`; root tools are called bare. `planetscale_execute_read_query` is the trap: a root tool, called bare, never as `planetscale__planetscale_execute_read_query`. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data. Unlisted tool: use `connection_search` with the `connection` argument naming one connection, or record the lane as `Could not run`.
+Exact tool names, one row per surface. Connection tools are called by qualified name, `<connection>__<tool>`; root tools are called bare. `planetscale_execute_read_query` is the trap: a root tool, called bare, never as `planetscale__planetscale_execute_read_query`. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like missing data. Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once. If you cannot search, record the lane as `Could not run`.
 
 | Surface | Call as | Exact tool names |
 | --- | --- | --- |
