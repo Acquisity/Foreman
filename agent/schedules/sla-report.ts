@@ -34,14 +34,10 @@ const FEATURE_CHANNELS = [
  * Supermemory writes outright rather than parking a card on a person who is
  * asleep when this runs.
  *
- * Known gap, deliberately not solved here: if a user grant lapses, eve's
- * default `authorization.required` handler posts "Connect with <name> to
- * continue" into whichever feature channel that session targets, and delivers
- * the sign-in button ephemerally to `attributes.user_id`. The credential never
- * goes public and the notice edits itself once resolved, but the run stalls
- * until a person signs in, which a schedule should not need. The only override
- * is the channel-wide handler in `agent/channels/slack.ts`, which would change
- * behavior for every human Slack session too, so it is a separate decision.
+ * A lapsed user grant cannot park these runs: `userConnect` turns the sign-in
+ * request into a terminal, non-retryable failure for every Slack-issued user
+ * principal, including this schedule's, so the model works around the missing
+ * evidence source instead of stalling until a person signs in.
  */
 const OWNER_AUTH = stampUnattended({
   attributes: {

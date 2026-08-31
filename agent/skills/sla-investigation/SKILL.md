@@ -82,7 +82,7 @@ Two kinds of tool appear here and they are addressed differently.
 
 Tools this agent authors, plus the built-in file tools, are called by their bare name: `prepare_repository`, `grep`, `read_file`, `planetscale_execute_read_query`.
 
-Everything reached through a connection is called by its qualified name, `<connection>__<tool>`, where the connection name is the filename under `agent/connections/`. So it is `linear__list_issues`, never `list_issues`. Find them first with the built-in `connection_search`; a connection's tools are discovered, not standing. Local reference: `node_modules/eve/docs/connections/overview.mdx`.
+Everything reached through a connection is called by its qualified name, `<connection>__<tool>`, where the connection name is the filename under `agent/connections/`. So it is `linear__list_issues`, never `list_issues`. Find them first with the built-in `connection_search`, called with the `connection` argument naming one connection; a connection's tools are discovered, not standing. Local reference: `node_modules/eve/docs/connections/overview.mdx`.
 
 Every name below is written the way you call it.
 

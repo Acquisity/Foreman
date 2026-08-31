@@ -8,14 +8,13 @@ import {
   isConnectionAuthorizationRequiredError,
 } from "eve/connections";
 import { managedConnect } from "./managed-connect.js";
-import { INTAKE_ONLY_ATTRIBUTE } from "./trust.js";
 
 /**
- * Reason code carried by the denial an intake-only session gets instead of a
+ * Reason code carried by the denial a Slack-issued session gets instead of a
  * sign-in prompt. Surfaces on the failed tool result and on
  * `authorization.completed`, so it is the string to grep for in logs.
  */
-export const INTAKE_ONLY_SIGN_IN_REASON = "intake_only_sign_in_unavailable";
+export const SLACK_SIGN_IN_REASON = "slack_sign_in_unavailable";
 
 /**
  * Reason code carried by the denial a task-mode child gets instead of a
@@ -25,33 +24,33 @@ export const TASK_MODE_SIGN_IN_REASON = "task_mode_sign_in_unavailable";
 
 /**
  * Translates a user-scoped connection's "authorization required" signal into a
- * terminal failure when the session came from an intake-only Slack channel.
+ * terminal failure when the session's user principal came from Slack.
  *
  * @remarks
  * Returns undefined for every other case, so the caller rethrows the original
- * error and the normal consent flow runs unchanged.
+ * error and the normal consent flow runs unchanged. Linear Agent Sessions,
+ * local eve sessions, and app principals all keep it.
  *
  * Slack's default `authorization.required` handler posts a public status line
  * into the thread, delivers the sign-in link ephemerally to the triggering
- * user, and the runtime then parks the turn on the OAuth callback. In a
- * developer channel that is fine: the person reading it holds the grant and
- * completing it resumes the turn. An intake-only channel is requester-facing
- * and over a hundred people wide, so the status line reads as an internal
- * error to an audience that cannot act on it, and the park leaves the request
- * unanswered forever.
+ * user, and the runtime then parks the turn on the OAuth callback. A parked
+ * Slack turn leaves the request unanswered while the runtime waits, and an
+ * unattended Slack principal such as the SLA schedule's has nobody who could
+ * sign in at all. Every Slack-issued user principal gets the denial, not only
+ * intake-only channels: the park, not the audience, is the failure.
  *
  * Denying instead of parking keeps the turn alive. The model continues from
  * the evidence it has without narrating the connection failure. The failure
  * is stamped `retryable: false` so the runtime does not re-prompt.
  */
-export function intakeOnlySignInDenial(
+export function slackSignInDenial(
   error: unknown,
   principal: ConnectionPrincipal
 ): ConnectionAuthorizationFailedError | undefined {
   if (
     !isConnectionAuthorizationRequiredError(error) ||
     principal.type !== "user" ||
-    principal.attributes?.[INTAKE_ONLY_ATTRIBUTE] !== "true"
+    !principal.id.startsWith("slack:")
   ) {
     return;
   }
@@ -59,42 +58,83 @@ export function intakeOnlySignInDenial(
   return new ConnectionAuthorizationFailedError(name, {
     message:
       "An optional evidence source is unavailable for this turn. Continue without retrying it. In the reply, state only any product fact that remains unconfirmed, and omit the gap when it changes no conclusion or next step.",
-    reason: INTAKE_ONLY_SIGN_IN_REASON,
+    reason: SLACK_SIGN_IN_REASON,
     retryable: false,
   });
 }
 
 /**
  * Vercel Connect authorization for a user-scoped connection, with the
- * intake-only denial in front of the consent flow.
+ * Slack sign-in denial in front of the consent flow.
  *
  * @remarks
  * Every `principalType: "user"` connection uses this instead of `connect()`
  * directly. App-scoped connections (Linear, PlanetScale, Inngest, Lucent) never
  * run a consent flow, so they need nothing here.
  *
- * The gate reads the intake-only stamp off the resolved principal, which
- * carries the dispatching session's auth attributes. Only the Slack channel and
- * the SLA schedule stamp it, and only for a channel in
- * SLACK_INTAKE_ONLY_CHANNELS, so no other surface changes behavior.
+ * The gate recognizes a Slack-issued user principal by the `slack:` prefix on
+ * the resolved principal id, which carries the dispatching session's auth
+ * principal id. The Slack channel and the SLA schedule both build that shape,
+ * so every Slack session, intake-only or not, gets the denial while no other
+ * surface changes behavior.
  */
 export function userConnect(
   options: EveAuthorizationOptions & { readonly principalType?: "user" }
 ) {
   const auth = managedConnect({ ...options, principalType: "user" });
-  const wrapped: typeof auth = {
-    ...auth,
-    getToken: async (
-      opts: Parameters<InteractiveAuthorizationDefinition["getToken"]>[0]
-    ) => {
+  const wrappedGetToken: InteractiveAuthorizationDefinition["getToken"] =
+    async (opts) => {
       try {
         return await auth.getToken(opts);
       } catch (error) {
-        throw intakeOnlySignInDenial(error, opts.principal) ?? error;
+        throw slackSignInDenial(error, opts.principal) ?? error;
       }
-    },
-  };
-  return wrapped;
+    };
+  CONSENT_AUTH.set(wrappedGetToken, auth);
+  return { ...auth, getToken: wrappedGetToken };
+}
+
+/**
+ * Maps a `userConnect` definition's wrapped `getToken` to the interactive
+ * definition it wraps.
+ *
+ * @remarks
+ * Keyed by function reference, not by a property on the definition:
+ * `defineMcpClientConnection` normalizes `auth` into a fresh object with
+ * only the fields eve knows, which drops any extra key but carries
+ * `getToken` across by reference. `withoutConsent` replaces `getToken`, so
+ * a task-mode child's definition deliberately resolves to nothing here.
+ */
+const CONSENT_AUTH = new WeakMap<
+  InteractiveAuthorizationDefinition["getToken"],
+  InteractiveAuthorizationDefinition
+>();
+
+/**
+ * Returns the interactive authorization a `userConnect` definition wraps,
+ * or undefined for anything else.
+ *
+ * @remarks
+ * The wrapped `getToken` turns a missing grant into a terminal denial for
+ * Slack-issued sessions, so the consent flow can never start through it.
+ * The root `sign_in` tool is the deliberate exception: a person who
+ * explicitly asks to connect a service gets the unwrapped definition, whose
+ * missing grant still raises "authorization required" and parks the turn on
+ * the consent flow. Nothing else should use this.
+ */
+export function consentAuth(
+  auth: unknown
+): InteractiveAuthorizationDefinition | undefined {
+  if (typeof auth !== "object" || auth === null || !("getToken" in auth)) {
+    return;
+  }
+  const { getToken } = auth as { getToken: unknown };
+  if (typeof getToken !== "function") {
+    return;
+  }
+  return CONSENT_AUTH.get(
+    getToken as InteractiveAuthorizationDefinition["getToken"]
+  );
 }
 
 /**
@@ -145,7 +185,7 @@ export function withoutConsent(
  * so the caller rethrows anything else unchanged.
  *
  * @remarks
- * The wrapped definition is usually `userConnect`, whose intake-only gate runs
+ * The wrapped definition is usually `userConnect`, whose Slack gate runs
  * first and has already turned the same missing grant into its own denial by
  * the time this sees it. Both forms are the same condition for a child, so
  * both get the task-mode reason and wording.
@@ -156,7 +196,7 @@ function taskModeSignInDenial(
   const missingGrant =
     isConnectionAuthorizationRequiredError(error) ||
     (isConnectionAuthorizationFailedError(error) &&
-      error.reason === INTAKE_ONLY_SIGN_IN_REASON);
+      error.reason === SLACK_SIGN_IN_REASON);
   if (!missingGrant) {
     return;
   }

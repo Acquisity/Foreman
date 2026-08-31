@@ -56,6 +56,10 @@ export const MEMORY = `# Investigation memory
 
 Investigation memory is Foreman's own record of past investigations and of conclusions a colleague corrected. In an attended session, when someone asks how a customer does something, why the product behaved a certain way, or whether a problem has been seen before, restate the question and call \`search_investigation_memory\` before answering. What comes back is historical analogy, never current truth: offer a recorded resolution as the first thing to check, and verify anything that would change the answer against current evidence. When a colleague corrects a conclusion you gave in the thread, take the correction as final, reply with the corrected guidance, and record it: \`correct_investigation_case\` when that source already has an active case, otherwise \`record_investigation_case\` with your overturned conclusion in \`ruledOut\`. Store the pattern, never the customer. The reply carries only the corrected guidance: never say you logged, noted, recorded, or will remember it, and never mention memory reads, writes, or availability. When a memory tool answers \`available: false\` or a write fails, continue from current evidence.`;
 
+const CONNECTIONS = `# Connected services
+
+Connection tools are discovered, not standing. Always call \`connection_search\` with the \`connection\` argument naming one connection; searching without it queries every connection at once.`;
+
 const MODEL_SWAPS = `# Model controls
 
 Use \`read_agent_models\` and \`set_agent_models\` for live model controls in attended or trusted sessions. Unattended factory runs are read-only for model settings. Resolve loose names with \`list_gateway_models\` first and never guess an id. Changes apply to new sessions.`;
@@ -72,6 +76,7 @@ export const FACTORY_PROMPT = [
   IDENTITY,
   WRITING,
   REPOSITORIES,
+  CONNECTIONS,
   PIPELINE,
   MODEL_SWAPS,
   REPLIES,
@@ -82,6 +87,7 @@ export const GENERAL_PROMPT = [
   IDENTITY,
   WRITING,
   REPOSITORIES,
+  CONNECTIONS,
   GENERAL_MODE,
   MEMORY,
   MODEL_SWAPS,

@@ -127,12 +127,24 @@ describe("critic subagent", () => {
     ) as {
       artifacts: { discoveryManifest: string };
       subagents: string[];
+      tools: string[];
     };
     assert.ok(info.subagents.includes("critic"));
+    // P2.3's discovery check rides this same compiler run: the sign_in tool
+    // must compile and surface as a root tool.
+    assert.ok(info.tools.includes("sign_in"));
 
     const manifest = JSON.parse(
       readFileSync(info.artifacts.discoveryManifest, "utf8")
-    ) as { subagents: DiscoveredSubagent[] };
+    ) as {
+      diagnosticsSummary: { errors: number };
+      subagents: DiscoveredSubagent[];
+      tools: { logicalPath: string }[];
+    };
+    assert.equal(manifest.diagnosticsSummary.errors, 0);
+    assert.ok(
+      manifest.tools.some((tool) => tool.logicalPath === "tools/sign_in.ts")
+    );
     const critic = manifest.subagents.find(
       (entry) => entry.subagentId === "critic"
     );
