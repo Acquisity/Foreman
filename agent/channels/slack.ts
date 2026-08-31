@@ -285,7 +285,7 @@ export const slackChannelEvents: SlackChannelEvents = {
         data.result.kind === "tool-result"
           ? progress.toolCalls + 1
           : progress.toolCalls,
-      waitLabel: slackProgressActionLabel(data.result) ?? progress.waitLabel,
+      waitLabel: slackProgressActionLabel(data.result),
     };
     await checkSlackProgress(channel);
   },
@@ -296,10 +296,10 @@ export const slackChannelEvents: SlackChannelEvents = {
     channel.state.pendingToolCallMessage = null;
     const { progress } = channel.state;
     if (progress) {
-      const label = slackProgressActionRequestLabel(data.actions);
-      channel.state.progress = label
-        ? { ...progress, waitLabel: label }
-        : progress;
+      channel.state.progress = {
+        ...progress,
+        waitLabel: slackProgressActionRequestLabel(data.actions),
+      };
     }
     await channel.thread.startTyping(
       truncateTypingStatus(narration ?? describeActionRequests(data.actions))

@@ -782,6 +782,59 @@ describe("slack channel progress", () => {
     assert.equal(postsOf(calls).length, 1);
   });
 
+  it("clears a stale wait label for a bare skill request and unnamed result", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+
+    await handlerFor("actions.requested")(
+      {
+        ...actionsRequestedEvent,
+        actions: [
+          {
+            callId: "c2",
+            input: { skill: "triage-investigate" },
+            kind: "load-skill",
+          },
+        ],
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, null);
+
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+
+    await handlerFor("action.result")(
+      {
+        ...skillResultEvent,
+        result: {
+          callId: "c4",
+          kind: "load-skill-result",
+          output: {},
+        },
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, null);
+  });
+
   it("stays silent for an intake-only session across the whole turn", async (t) => {
     const now = clock(t);
     const calls: string[] = [];
