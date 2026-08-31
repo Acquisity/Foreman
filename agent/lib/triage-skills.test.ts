@@ -111,6 +111,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "Sentry (`sentry__`)",
     "Axiom (`axiom__`)",
     "PostHog (`posthog__`)",
+    "Raindrop (root tool, no prefix)",
     "Lucent (`lucent__`)",
     "Jam (`jam__`)",
     "Vercel (`vercel__`)",

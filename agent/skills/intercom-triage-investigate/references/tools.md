@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Connection tools live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
 
-Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_function_runs`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
+Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `describe_table`, `find_help_article`, `find_function_runs`, `find_ai_stumbles`, `find_related_issues`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
@@ -113,6 +113,12 @@ No allowlist. The server exposes a single tool, `exec`, which runs a named PostH
 Commands relevant to an investigation include `persons`, `session-recording`, `error-tracking`, `query`, `execute-sql`, `insight`, `event-definition`, and `heatmaps`.
 
 There is no tool that finds a person by display name. Resolve the person first through `persons` using the email or distinct id established under `Pin identity and check existing evidence`, then read their recordings. Composing a call like `posthog_get_session_recordings` will fail; that tool does not exist.
+
+## Raindrop (root tool, no prefix)
+
+`find_ai_stumbles`. One fixed call over the Raindrop connection: the one-off failures Raindrop flagged in the product's AI interactions (AI SDR replies, the assistant), newest first, 50 per page.
+
+Indexed by symptom and time, never by customer. Pass the behavior in the product's own words as `query` (`meeting time`, `wrong company name`) and the window the claim names as `sinceHours`; omit `query` to list everything in the window. Each stumble carries `eventAt`, when the interaction happened, and Raindrop's tags. Raindrop scans every `cadenceMinutes`, so frame findings as of `lastRunAt`, not live. `hasMore` true means call again with `page` + 1. `error` means the search could not run; record the lane as `Could not run`. The `raindrop__` connection tools stay for a specific event, trace, or conversation once a stumble names the time.
 
 ## Lucent (`lucent__`)
 
