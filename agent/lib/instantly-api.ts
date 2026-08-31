@@ -130,8 +130,24 @@ const defaultSleep: Sleeper = (milliseconds, signal) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
-const discardResponseBody = async (response: Response): Promise<void> => {
-  await response.body?.cancel().catch(() => undefined);
+/** Resolves when the signal aborts, bounding a disposal that never settles. */
+const abortSettled = (signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+
+const discardResponseBody = async (
+  response: Response,
+  signal?: AbortSignal
+): Promise<void> => {
+  const discarded = response.body?.cancel().catch(() => undefined);
+  await (signal === undefined
+    ? discarded
+    : Promise.race([discarded, abortSettled(signal)]));
 };
 
 const readBoundedText = async (response: Response): Promise<string> => {
@@ -298,6 +314,22 @@ const withDeadline = async <T>(
   }
 };
 
+/**
+ * Disposes a retryable response inside the attempt's own deadline, so a body
+ * whose cancellation never settles cannot outlive the request's own time. The
+ * deadline is disarmed only once the attempt is finished with the response.
+ */
+const disposeResponse = async (
+  response: Response,
+  deadline: RequestDeadline
+): Promise<void> => {
+  try {
+    await discardResponseBody(response, deadline.signal);
+  } finally {
+    deadline.clear();
+  }
+};
+
 const requestHeaders = (
   token: string,
   workspaceId: string | undefined
@@ -363,16 +395,13 @@ const callPage = async (
         deadline.clear();
       }
     }
-    deadline.clear();
 
     const delay = retryDelayMs(response, attempt);
+    await disposeResponse(response, deadline);
     if (delay === null) {
-      const error = statusError(response);
-      await discardResponseBody(response);
-      throw error;
+      throw statusError(response);
     }
     attempt += 1;
-    await discardResponseBody(response);
     await sleep(delay, options.signal);
   }
 

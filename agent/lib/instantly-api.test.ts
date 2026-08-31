@@ -592,6 +592,16 @@ describe("Instantly request deadlines", () => {
     return { pending: read(signalDrivenFetch(() => ready())), started };
   };
 
+  /** Lets every pending job run, so a hung read is a failure, not a stall. */
+  const flush = async (): Promise<void> => {
+    for (let index = 0; index < 20; index += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: each tick must drain before the next.
+      await new Promise((resolve) => {
+        setImmediate(resolve);
+      });
+    }
+  };
+
   const isCancellation = (error: unknown): boolean =>
     error instanceof Error &&
     !(error instanceof InstantlyApiError) &&
@@ -739,6 +749,55 @@ describe("Instantly request deadlines", () => {
       ),
       isCancellation
     );
+  });
+
+  it("bounds a retryable response whose body cancellation never settles", async () => {
+    await withDeadlineTimer(async (expire) => {
+      let calls = 0;
+      let cancelling: () => void = () => undefined;
+      const discarding = new Promise<void>((resolve) => {
+        cancelling = resolve;
+      });
+      const fetchStub: typeof fetch = () => {
+        calls += 1;
+        if (calls > 1) {
+          return json({ items: [member()] });
+        }
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              cancel: () => {
+                cancelling();
+                // A cancellation that never settles, as a stalled body gives.
+                return new Promise<void>(() => undefined);
+              },
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("{}"));
+              },
+            }),
+            { status: 503 }
+          )
+        );
+      };
+
+      const pending = listInstantlySubworkspaces("secret-key", {
+        fetch: fetchStub,
+        sleep: () => Promise.resolve(),
+      });
+      await discarding;
+
+      // The attempt's own deadline still covers disposing the response, so the
+      // stalled cancellation gives way to the retry instead of hanging.
+      expire();
+
+      const outcome = await Promise.race([
+        pending.then((result) => result.subworkspaces.length),
+        flush().then(() => "hung" as const),
+      ]);
+
+      assert.equal(outcome, 1);
+      assert.equal(calls, 2);
+    });
   });
 
   it("does not report an unrelated TimeoutError as a deadline expiry", async () => {
