@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import { z } from "zod";
 import {
   BillingApiError,
@@ -24,6 +24,7 @@ const AUTUMN_TOO_MUCH_DATA = /Autumn returned too much data/u;
 const STRIPE_TOO_MUCH_DATA = /Stripe returned too much data/u;
 const AUTUMN_TIMEOUT = /^Error: Autumn did not respond within 20 seconds\.$/u;
 const STRIPE_TIMEOUT = /^Error: Stripe did not respond within 20 seconds\.$/u;
+const STRIPE_UNREACHABLE = /^Error: Stripe could not be reached\.$/u;
 const AUTUMN_WRONG_ID =
   /Autumn has no customer with id org_123 .*billingAccount\.id/u;
 
@@ -303,10 +304,47 @@ describe("billing response bounds", () => {
 });
 
 describe("billing read deadlines", () => {
-  const timedOutFetch: typeof fetch = () =>
-    Promise.reject(
-      new DOMException("The operation timed out.", "TimeoutError")
-    );
+  /** Rejects only when the signal it was handed aborts, with that signal's reason. */
+  const signalDrivenFetch =
+    (started?: () => void): typeof fetch =>
+    (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal;
+        if (signal.aborted) {
+          reject(signal.reason);
+          return;
+        }
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+        started?.();
+      });
+
+  /** Runs `body` with the deadline timer under the test's control. */
+  const withDeadlineTimer = async (
+    body: (expire: () => void) => Promise<void>
+  ): Promise<void> => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      await body(() => mock.timers.tick(20_000));
+    } finally {
+      mock.timers.reset();
+    }
+  };
+
+  /** Starts a read whose fetch hangs until the composed signal aborts. */
+  const startRead = (read: (fetchImpl: typeof fetch) => Promise<unknown>) => {
+    let ready: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    return { pending: read(signalDrivenFetch(() => ready())), started };
+  };
+
+  const isCancellation = (error: unknown): boolean =>
+    error instanceof Error &&
+    error.name === "AbortError" &&
+    !error.message.includes("did not respond");
 
   it("composes the deadline with the caller signal on every read", async () => {
     const controller = new AbortController();
@@ -346,32 +384,92 @@ describe("billing read deadlines", () => {
     assert.equal(sent.aborted, false);
   });
 
-  it("maps deadline expiry to the provider timeout message", async () => {
-    await assert.rejects(
-      readAutumnCustomer("secret-key", "org_123", { fetch: timedOutFetch }),
-      AUTUMN_TIMEOUT
-    );
-    await assert.rejects(
-      readStripeCharge("restricted-key", "ch_123", { fetch: timedOutFetch }),
-      STRIPE_TIMEOUT
-    );
+  it("maps an expired deadline to the Autumn timeout message", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const { pending, started } = startRead((fetchImpl) =>
+        readAutumnCustomer("secret-key", "org_123", { fetch: fetchImpl })
+      );
+      await started;
+
+      expire();
+
+      await assert.rejects(pending, AUTUMN_TIMEOUT);
+    });
   });
 
-  it("reports caller cancellation as cancellation, never as a timeout", async () => {
+  it("maps an expired deadline to the Stripe timeout message", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const { pending, started } = startRead((fetchImpl) =>
+        readStripeCharge("restricted-key", "ch_123", { fetch: fetchImpl })
+      );
+      await started;
+
+      expire();
+
+      await assert.rejects(pending, STRIPE_TIMEOUT);
+    });
+  });
+
+  it("keeps an expired deadline a timeout when the caller aborts afterwards", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const controller = new AbortController();
+      const { pending, started } = startRead((fetchImpl) =>
+        readStripeCharge("restricted-key", "ch_123", {
+          fetch: fetchImpl,
+          signal: controller.signal,
+        })
+      );
+      await started;
+
+      // The deadline fires first, then the caller aborts before the rejection
+      // handler runs. The read still timed out.
+      expire();
+      controller.abort();
+
+      await assert.rejects(pending, STRIPE_TIMEOUT);
+    });
+  });
+
+  it("reports a caller abort that beats the deadline as cancellation", async () => {
+    await withDeadlineTimer(async (expire) => {
+      const controller = new AbortController();
+      const { pending, started } = startRead((fetchImpl) =>
+        readAutumnCustomer("secret-key", "org_123", {
+          fetch: fetchImpl,
+          signal: controller.signal,
+        })
+      );
+      await started;
+
+      controller.abort();
+      expire();
+
+      await assert.rejects(pending, isCancellation);
+    });
+  });
+
+  it("reports an already-aborted caller signal as cancellation", async () => {
     const controller = new AbortController();
     controller.abort();
-    const cancelledFetch: typeof fetch = () =>
-      Promise.reject(new DOMException("Canceled", "AbortError"));
 
     await assert.rejects(
       readAutumnCustomer("secret-key", "org_123", {
-        fetch: cancelledFetch,
+        fetch: signalDrivenFetch(),
         signal: controller.signal,
       }),
-      (error) =>
-        error instanceof Error &&
-        error.name === "AbortError" &&
-        !error.message.includes("did not respond")
+      isCancellation
+    );
+  });
+
+  it("does not report an unrelated TimeoutError as a deadline expiry", async () => {
+    const timeoutNamedFetch: typeof fetch = () =>
+      Promise.reject(new DOMException("Upstream timed out.", "TimeoutError"));
+
+    await assert.rejects(
+      readStripeCharge("restricted-key", "ch_123", {
+        fetch: timeoutNamedFetch,
+      }),
+      STRIPE_UNREACHABLE
     );
   });
 });
