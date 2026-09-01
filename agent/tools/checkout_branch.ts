@@ -34,6 +34,14 @@ export default defineTool({
       const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse HEAD`,
       });
+      if (head.exitCode !== 0) {
+        return {
+          error: `git rev-parse HEAD exited ${head.exitCode}: ${String(
+            head.stderr || head.stdout
+          ).trim()}`,
+          success: false as const,
+        };
+      }
       return {
         branch,
         sha: String(head.stdout).trim(),
