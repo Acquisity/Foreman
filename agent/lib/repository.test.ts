@@ -123,6 +123,9 @@ describe("repository targeting", () => {
       validateBranch("refs/heads/feature") ?? "",
       INVALID_BRANCH_PATTERN
     );
+    for (const branch of ["feature/.hidden", "feature/release.lock"]) {
+      assert.match(validateBranch(branch) ?? "", INVALID_BRANCH_PATTERN);
+    }
     assert.equal(validateBranch("foreman/fix-routing"), null);
   });
 });
