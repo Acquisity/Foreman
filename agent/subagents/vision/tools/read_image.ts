@@ -203,21 +203,37 @@ async function readBounded(
 ): Promise<Buffer> {
   const reader = stream.getReader();
   const deadline = AbortSignal.timeout(timeoutMs);
-  const expired = new Promise<never>((_resolve, reject) => {
-    deadline.addEventListener("abort", () =>
-      reject(
-        new Error(
-          `${what} did not finish reading within ${timeoutMs / 1000} seconds.`
-        )
-      )
-    );
-  });
+  const expired = new Error(
+    `${what} did not finish reading within ${timeoutMs / 1000} seconds.`
+  );
+  const read = (): Promise<ReadableStreamReadResult<Uint8Array>> =>
+    new Promise((resolve, reject) => {
+      const onAbort = () => {
+        deadline.removeEventListener("abort", onAbort);
+        reject(expired);
+      };
+      if (deadline.aborted) {
+        reject(expired);
+        return;
+      }
+      deadline.addEventListener("abort", onAbort, { once: true });
+      reader.read().then(
+        (result) => {
+          deadline.removeEventListener("abort", onAbort);
+          resolve(result);
+        },
+        (error: unknown) => {
+          deadline.removeEventListener("abort", onAbort);
+          reject(error);
+        }
+      );
+    });
   const chunks: Uint8Array[] = [];
   let total = 0;
   try {
     for (;;) {
-      // biome-ignore lint/performance/noAwaitInLoops: chunks arrive in order, and each one is raced against the deadline.
-      const { done, value } = await Promise.race([reader.read(), expired]);
+      // biome-ignore lint/performance/noAwaitInLoops: chunks arrive in order, and each read owns one deadline listener.
+      const { done, value } = await read();
       if (done) {
         return Buffer.concat(chunks);
       }
