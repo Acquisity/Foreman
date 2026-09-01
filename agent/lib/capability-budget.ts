@@ -644,8 +644,8 @@ const resolveGitHubExtensionToolsOnce = async (
 };
 
 /**
- * The extension resolver runs once per compiled entry and application root.
- * Every lane measuring that same application shares the result.
+ * The extension resolver runs once per lane, compiled entry, and application
+ * root. Repeated measurements of that same lane share the result.
  */
 const gitHubExtensionTools = new Map<string, Promise<ResolvedDynamicTool[]>>();
 
