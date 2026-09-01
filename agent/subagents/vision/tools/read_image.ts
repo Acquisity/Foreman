@@ -41,6 +41,19 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export const LINEAR_UPLOAD_HOST = "uploads.linear.app";
 const FETCH_TIMEOUT_MS = 20_000;
 
+/**
+ * Wall-clock bound on reading one image's bytes, url or sandbox path alike.
+ *
+ * @remarks
+ * eve 0.44's Vercel sandbox adapter drops the `abortSignal` it is handed on
+ * `readFile`, so a sandbox read cannot be cancelled from the outside and a
+ * stalled transfer would otherwise hold the turn open with nothing to wake it.
+ * The bound is enforced here instead, on the reader Foreman owns: the deadline
+ * cancels the stream, which is the layer that can actually stop the transfer.
+ * Twenty seconds matches the url deadline and is far above a 3 MiB read.
+ */
+const READ_TIMEOUT_MS = 20_000;
+
 const notAnImage = (what: string, bytes: Buffer) => {
   const head = bytes.subarray(0, 120).toString("utf8").replace(/\s+/gu, " ");
   const hint = head.startsWith("{")
@@ -77,7 +90,7 @@ export default defineTool({
       if (stream === null) {
         throw new Error(`No file at ${input.path}.`);
       }
-      bytes = await readAll(stream, input.path);
+      bytes = await readBounded(stream, input.path);
     }
     const what = "url" in input ? input.url : input.path;
     const mediaType = sniffImage(bytes);
@@ -135,10 +148,10 @@ async function fetchLinearUpload(
   if (response.body === null) {
     return Buffer.alloc(0);
   }
-  return readAll(response.body, url);
+  return readBounded(response.body, url);
 }
 
-export { fetchLinearUpload };
+export { fetchLinearUpload, readBounded };
 
 /** The first `chars` of a body, reading one chunk and cancelling the rest. */
 async function readPrefix(
@@ -166,21 +179,48 @@ const WHITESPACE = /\s+/gu;
  * Streamed and checked chunk by chunk rather than read whole and measured
  * after, so a path that names something enormous (a core dump, a tarball
  * with an image extension) costs one chunk over the limit, not its size.
+ *
+ * @remarks
+ * The read is also bounded in time. Each chunk races {@link READ_TIMEOUT_MS},
+ * and the reader is cancelled in `finally`, so a stalled source is dropped
+ * rather than waited on. The stream is read through its own reader rather than
+ * `for await` precisely so the deadline can cancel it: `for await` locks the
+ * stream, and a locked stream refuses to be cancelled.
  */
-async function readAll(
-  stream: AsyncIterable<Uint8Array>,
-  path: string
+async function readBounded(
+  stream: ReadableStream<Uint8Array>,
+  what: string,
+  timeoutMs: number = READ_TIMEOUT_MS
 ): Promise<Buffer> {
+  const reader = stream.getReader();
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const expired = new Promise<never>((_resolve, reject) => {
+    deadline.addEventListener("abort", () =>
+      reject(
+        new Error(
+          `${what} did not finish reading within ${timeoutMs / 1000} seconds.`
+        )
+      )
+    );
+  });
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for await (const chunk of stream) {
-    total += chunk.byteLength;
-    if (total > MAX_IMAGE_BYTES) {
-      throw new Error(
-        `${path} is over the 3 MiB limit for one image. Resize or crop it first.`
-      );
+  try {
+    for (;;) {
+      // biome-ignore lint/performance/noAwaitInLoops: chunks arrive in order, and each one is raced against the deadline.
+      const { done, value } = await Promise.race([reader.read(), expired]);
+      if (done) {
+        return Buffer.concat(chunks);
+      }
+      total += value.byteLength;
+      if (total > MAX_IMAGE_BYTES) {
+        throw new Error(
+          `${what} is over the 3 MiB limit for one image. Resize or crop it first.`
+        );
+      }
+      chunks.push(value);
     }
-    chunks.push(chunk);
+  } finally {
+    await reader.cancel().catch(() => undefined);
   }
-  return Buffer.concat(chunks);
 }

@@ -8,6 +8,7 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 const {
   default: tool,
   fetchLinearUpload,
+  readBounded,
   sniffImage,
 } = await import("../subagents/vision/tools/read_image.js");
 
@@ -19,6 +20,7 @@ const NOT_IMAGE = /not a PNG, JPEG, GIF, or WebP image/u;
 const EXPIRED_HINT = /expired signed url/u;
 const OVER_LIMIT = /over the 3 MiB limit/u;
 const HTTP_401 = /HTTP 401 .*unauthorized/u;
+const STALLED = /did not finish reading within 0.005 seconds/u;
 
 describe("vision read_image", () => {
   it("accepts only uploads.linear.app urls or a sandbox path", () => {
@@ -113,6 +115,24 @@ describe("vision read_image", () => {
       ),
       OVER_LIMIT
     );
+  });
+
+  it("gives up on a stalled read and cancels the stream", async () => {
+    let cancelled = false;
+    const stalled = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+      pull() {
+        // Never enqueues and never closes: the sandbox transfer that hangs.
+        return new Promise<void>(() => undefined);
+      },
+    });
+    await assert.rejects(
+      readBounded(stalled, "/workspace/shot.png", 5),
+      STALLED
+    );
+    assert.equal(cancelled, true);
   });
 
   it("names the status and a body snippet on a non-2xx response", async () => {
