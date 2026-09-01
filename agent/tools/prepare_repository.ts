@@ -322,6 +322,9 @@ export const prepareWarmedOrClone = async (
   const checkout = path
     ? await boundedRun(sandbox, { command: `test -d ${path}` }, timeoutMs)
     : null;
+  if (checkout?.exitCode === TIMED_OUT_EXIT_CODE) {
+    return `Could not determine whether the warmed checkout exists for ${repository}: ${checkout.stderr}`;
+  }
   if (!(warmed && checkout) || checkout.exitCode !== 0) {
     return cloneExplicitRepository(sandbox, repository, options);
   }

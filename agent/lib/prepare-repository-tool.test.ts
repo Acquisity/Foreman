@@ -30,6 +30,8 @@ const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 const PUBLISH_FAILED = /cross-device link/u;
 const PROBE_TIMED_OUT = /Could not tell whether a checkout is already present/u;
+const WARM_PROBE_TIMED_OUT =
+  /Could not determine whether the warmed checkout exists/u;
 
 interface RunOptions {
   abortSignal?: AbortSignal;
@@ -346,6 +348,22 @@ describe("prepare_repository sandbox bounds", () => {
     assert.ok(move?.abortSignal instanceof AbortSignal);
     assert.ok(commands.some((options) => options.command === DISCARD_STAGING));
     assert.equal(ran(commands, DISCARD), false);
+  });
+
+  it("refuses to clone when the warmed-checkout probe reaches its deadline", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command === "test -e /workspace/repo") {
+        return failed("");
+      }
+      return options.command.startsWith("test -d ") ? stall(options) : ok();
+    });
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", WARM_PROBE_TIMED_OUT);
+    assert.equal(ran(commands, "git clone"), false);
+    assert.equal(ran(commands, PUBLISH), false);
   });
 
   it("refuses an occupied checkout that has no configured origin", async () => {
