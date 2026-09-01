@@ -27,8 +27,15 @@ const { prepareRepositoryWorkspace } = await import(
 
 const OTHER = "Acquisity/Other";
 const PREVIOUS = "/workspace/.repo-previous";
-const RECOVER = `if [ -e ${PREVIOUS} ] && [ ! -e /workspace/repo ]; then mv ${PREVIOUS} /workspace/repo; fi`;
-const SET_ASIDE = `${RECOVER} && rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
+const RECOVER = `if [ -e ${PREVIOUS} ]; then if [ -e /workspace/repo ]; then echo "origin=$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS} /workspace/repo; fi; fi`;
+const SET_ASIDE = `rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
+const STRANDED = `origin=${remoteUrl(OTHER)}`;
+const IN_PLACE = `origin=${remoteUrl(REPOSITORY)}`;
+const RECOVERY_FAILED = /Could not restore the prepared checkout/u;
+const ORIGIN_UNREADABLE =
+  /Could not tell which repository the checkout beside/u;
+const STRANDED_LOST = /The prepared Acquisity\/Foreman could not be restored/u;
+const CONFIG_THREW = /config file locked/u;
 const RESTORE = `rm -rf /workspace/repo && mv ${PREVIOUS} /workspace/repo`;
 const DISCARD_PREVIOUS = `rm -rf ${PREVIOUS}`;
 const DISCARD_MARKER = `rm -rf ${REPOSITORY_MARKER}`;
@@ -332,17 +339,118 @@ describe("prepare_repository switching", () => {
     assert.deepEqual(written, []);
   });
 
-  it("recovers a stranded checkout before setting it aside again", async () => {
+  it("restores a stranded checkout before setting it aside again", async () => {
     const { commands } = await prepare(
       OTHER,
       markerFor(REPOSITORY),
       attendedAuth,
-      (options) => (options.command.startsWith("test ") ? failed("") : ok())
+      (options) => {
+        if (options.command === RECOVER) {
+          return ok(STRANDED);
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
     );
-    const setAside = commands.find((options) =>
-      options.command.includes("mv /workspace/repo")
+    // The set-aside deletes whatever waits at the previous path and moves what
+    // is published into it, so the marker's own checkout has to be back in
+    // place first or the switch sets aside a checkout nothing recorded and
+    // deletes the only copy of the one it did.
+    const order = commands.map((options) => options.command);
+    assert.ok(order.includes(RESTORE));
+    assert.ok(order.indexOf(RESTORE) < order.indexOf(SET_ASIDE));
+  });
+
+  it("rolls back a checkout published for a repository the marker does not name", async () => {
+    // A turn cancelled after the replacement was published but before the
+    // marker named it leaves both paths populated. The marker is what the
+    // session answers for, so its own checkout is the one that goes back.
+    const { commands, result } = await prepare(
+      REPOSITORY,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command === RECOVER ? ok(STRANDED) : ok())
     );
-    assert.ok(setAside?.command.startsWith(RECOVER));
+    assert.equal(result.success, true);
+    assert.equal(result.reused, true);
+    assert.ok(ran(commands, RESTORE));
+  });
+
+  it("refuses to reuse when a stranded checkout cannot be restored", async () => {
+    const { commands, result, written } = await prepare(
+      REPOSITORY,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command === RECOVER) {
+          return ok(STRANDED);
+        }
+        return options.command === RESTORE
+          ? failed("mv: cross-device link")
+          : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", STRANDED_LOST);
+    assert.ok(ran(commands, DISCARD_MARKER));
+    assert.deepEqual(written, []);
+  });
+
+  it("discards the set-aside copy left beside the checkout the marker names", async () => {
+    const { commands, result } = await prepare(
+      REPOSITORY,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command === RECOVER ? ok(IN_PLACE) : ok())
+    );
+    assert.equal(result.reused, true);
+    assert.ok(ran(commands, DISCARD_PREVIOUS));
+    assert.equal(ran(commands, RESTORE), false);
+  });
+
+  it("fails closed when the recovery cannot run", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) =>
+        options.command === RECOVER ? failed("mv: permission denied") : ok()
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", RECOVERY_FAILED);
+    assert.equal(ran(commands, SET_ASIDE), false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("fails closed when the published checkout's origin cannot be read", async () => {
+    const { commands, result } = await prepare(
+      REPOSITORY,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command === RECOVER ? ok("origin=") : ok())
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", ORIGIN_UNREADABLE);
+    assert.equal(ran(commands, RESTORE), false);
+    assert.equal(ran(commands, DISCARD_PREVIOUS), false);
+  });
+
+  it("restores the previous checkout when the workspace configuration throws", async () => {
+    const { commands, result, written } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.includes(CONFIGURE)) {
+          return Promise.reject(new Error("config file locked"));
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", CONFIG_THREW);
+    assert.match(result.error ?? "", PREVIOUS_KEPT);
+    assert.ok(ran(commands, RESTORE));
+    assert.deepEqual(written, []);
   });
 
   it("restores the previous checkout when the workspace cannot be configured", async () => {

@@ -87,19 +87,24 @@ const discardPath = (
     () => undefined
   );
 
+/** How the recovery probe reports the checkout it found still published. */
+const ORIGIN_PREFIX = "origin=";
+
 /**
- * Puts a checkout stranded by an interrupted switch back where its marker
- * says it is.
+ * Puts a checkout stranded by an interrupted switch back where its marker says
+ * it is, or reports what is published there instead.
  *
  * @remarks
  * A turn cancelled between the set-aside and the restore aborts the restore
  * too, because eve binds the cancelled turn's signal into every later `run`.
- * That leaves the marker naming a repository that only exists at the tool-owned
- * previous path, so every entry point that is about to trust the marker moves
- * it back first. It is a no-op unless the checkout is missing, so a previous
- * path left beside a live checkout is still ordinary debris.
+ * That can strand the marker's repository at the tool-owned previous path with
+ * nothing published, or, when the cancellation came after the replacement was
+ * published but before the marker named it, with a different repository
+ * published over it. The first is moved back here; the second cannot be
+ * decided by this command alone, so it reports the published checkout's origin
+ * and lets the caller weigh it against the marker.
  */
-const RECOVER_PREVIOUS = `if [ -e ${PREVIOUS_PATH} ] && [ ! -e /workspace/repo ]; then mv ${PREVIOUS_PATH} /workspace/repo; fi`;
+const RECOVER_PREVIOUS = `if [ -e ${PREVIOUS_PATH} ]; then if [ -e /workspace/repo ]; then echo "${ORIGIN_PREFIX}$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS_PATH} /workspace/repo; fi; fi`;
 
 /**
  * Puts the set-aside checkout back and reports whether the session is left on
@@ -192,6 +197,55 @@ const readExistingMarker = async (
   } catch {
     return null;
   }
+};
+
+/**
+ * Leaves the marker's own checkout published at `/workspace/repo` before
+ * anything trusts the marker, or explains why it could not.
+ *
+ * @remarks
+ * An interrupted switch can leave both tool-owned paths populated: the marker's
+ * repository set aside, and the replacement it never recorded published over
+ * it. Reusing that would answer for a repository the session never prepared,
+ * and setting it aside would delete the only copy of the one it did, so the
+ * published checkout's origin decides. One the marker names keeps its place and
+ * the set-aside copy is provable debris; one it does not name is rolled back;
+ * an origin that cannot be read, and a recovery that cannot run, fail closed
+ * rather than guess. Every caller therefore starts from the same invariant:
+ * `/workspace/repo` holds the repository the marker names and nothing waits at
+ * the previous path.
+ */
+const reconcilePrevious = async (
+  sandbox: SandboxSession,
+  previous: PreparedMarker,
+  timeoutMs: number
+): Promise<string | null> => {
+  const recover = await boundedRun(
+    sandbox,
+    { command: RECOVER_PREVIOUS },
+    timeoutMs
+  );
+  if (recover.exitCode !== 0) {
+    return `Could not restore the prepared checkout of ${previous.slug}: ${String(recover.stderr || recover.stdout).trim()}`;
+  }
+  const reported = String(recover.stdout)
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(ORIGIN_PREFIX));
+  if (reported === undefined) {
+    return null;
+  }
+  const origin = reported.slice(ORIGIN_PREFIX.length).toLowerCase();
+  if (origin === "") {
+    return `Could not tell which repository the checkout beside the set-aside ${previous.slug} holds.`;
+  }
+  if (origin === remoteUrl(previous.slug).toLowerCase()) {
+    await discardPath(sandbox, PREVIOUS_PATH, timeoutMs);
+    return null;
+  }
+  return (await restorePrevious(sandbox, timeoutMs))
+    ? null
+    : `The prepared ${previous.slug} could not be restored, so this session has no repository prepared.`;
 };
 
 /**
@@ -552,7 +606,7 @@ const replaceCheckout = async (
   const setAside = await boundedRun(
     sandbox,
     {
-      command: `${RECOVER_PREVIOUS} && rm -rf ${PREVIOUS_PATH} && mv /workspace/repo ${PREVIOUS_PATH}`,
+      command: `rm -rf ${PREVIOUS_PATH} && mv /workspace/repo ${PREVIOUS_PATH}`,
     },
     timeoutMs
   );
@@ -646,6 +700,67 @@ const configureWorkspace = async (
     : `Could not configure the workspace: ${String(config.stderr || config.stdout).trim()}`;
 };
 
+/**
+ * Configures the workspace and records the prepared repository, putting the
+ * checkout the switch replaced back if either step fails or throws.
+ *
+ * @remarks
+ * A completed switch still has its previous checkout set aside, because the
+ * marker names it until the write here succeeds. Both steps run inside the
+ * rollback: a cancelled turn or a dead sandbox throws straight through the
+ * config too, and without that the marker would be left naming a repository
+ * `/workspace/repo` no longer holds.
+ */
+const recordPreparedRepository = async (
+  sandbox: SandboxSession,
+  {
+    previous,
+    target,
+    timeoutMs,
+    worktree,
+  }: {
+    previous: PreparedMarker | null;
+    target: RepositoryTarget & { source: "explicit" | "github-webhook" };
+    timeoutMs: number;
+    worktree: "/workspace" | "/workspace/repo";
+  }
+): Promise<string | null> => {
+  const abandon = async (error: string) =>
+    previous
+      ? rollbackMessage(
+          await restorePrevious(sandbox, timeoutMs),
+          previous.slug,
+          error
+        )
+      : error;
+  let configError: string | null;
+  try {
+    configError = await configureWorkspace(sandbox, worktree);
+  } catch (error) {
+    return abandon(
+      `Could not configure the workspace: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (configError) {
+    return abandon(configError);
+  }
+  try {
+    await sandbox.writeTextFile({
+      content: JSON.stringify(
+        { ...target, branchPrefix: FOREMAN_BRANCH_PREFIX, worktree },
+        null,
+        2
+      ),
+      path: REPOSITORY_MARKER,
+    });
+  } catch (error) {
+    return abandon(
+      `Could not record the prepared ${target.slug}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  return null;
+};
+
 /** The part of eve's tool context preparing a repository reads. */
 interface PrepareContext {
   getSandbox: () => Promise<SandboxSession>;
@@ -679,18 +794,19 @@ export const prepareRepositoryWorkspace = async (
   const sandbox = await ctx.getSandbox();
   const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
   const previous = await readExistingMarker(sandbox);
+  // Reusing the marker and setting its checkout aside both trust it, so an
+  // interrupted switch is settled before either one reads /workspace/repo.
+  if (previous?.worktree === "/workspace/repo") {
+    const unreconciled = await reconcilePrevious(sandbox, previous, timeoutMs);
+    if (unreconciled) {
+      return { error: unreconciled, success: false as const };
+    }
+  }
   const from = previous
     ? { repository: previous.slug, source: previous.source }
     : null;
   const current = { repository: target.slug, source: target.source };
   if (previous && previous.slug.toLowerCase() === target.slug.toLowerCase()) {
-    // Reusing the marker means trusting it, so a checkout an interrupted
-    // switch left set aside has to come back before it is reused.
-    if (previous.worktree === "/workspace/repo") {
-      await boundedRun(sandbox, { command: RECOVER_PREVIOUS }, timeoutMs).catch(
-        () => undefined
-      );
-    }
     return {
       current,
       previous: from,
@@ -722,38 +838,14 @@ export const prepareRepositoryWorkspace = async (
     return { error: prepareError, success: false as const };
   }
 
-  // A completed switch still has its previous checkout set aside, because the
-  // marker names it until the write below succeeds. Every failure from here on
-  // puts that checkout back rather than leaving the marker pointing at a
-  // repository it does not name.
-  const abandon = async (error: string) => ({
-    error: previous
-      ? rollbackMessage(
-          await restorePrevious(sandbox, timeoutMs),
-          previous.slug,
-          error
-        )
-      : error,
-    success: false as const,
+  const recordError = await recordPreparedRepository(sandbox, {
+    previous,
+    target,
+    timeoutMs,
+    worktree,
   });
-
-  const configError = await configureWorkspace(sandbox, worktree);
-  if (configError) {
-    return abandon(configError);
-  }
-  try {
-    await sandbox.writeTextFile({
-      content: JSON.stringify(
-        { ...target, branchPrefix: FOREMAN_BRANCH_PREFIX, worktree },
-        null,
-        2
-      ),
-      path: REPOSITORY_MARKER,
-    });
-  } catch (error) {
-    return abandon(
-      `Could not record the prepared ${target.slug}: ${error instanceof Error ? error.message : String(error)}`
-    );
+  if (recordError) {
+    return { error: recordError, success: false as const };
   }
   if (previous) {
     await discardPath(sandbox, PREVIOUS_PATH, timeoutMs);
