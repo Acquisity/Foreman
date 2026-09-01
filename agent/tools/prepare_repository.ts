@@ -90,6 +90,9 @@ const discardPath = (
 /** How the recovery probe reports the checkout it found still published. */
 const ORIGIN_PREFIX = "origin=";
 
+/** Recovery output proving neither the published nor set-aside checkout exists. */
+const MISSING_CHECKOUT = "missing-checkout";
+
 /**
  * Puts a checkout stranded by an interrupted switch back where its marker says
  * it is, or reports what is published there instead.
@@ -104,7 +107,7 @@ const ORIGIN_PREFIX = "origin=";
  * decided by this command alone, so it reports the published checkout's origin
  * and lets the caller weigh it against the marker.
  */
-const RECOVER_PREVIOUS = `if [ -e ${PREVIOUS_PATH} ]; then if [ -e /workspace/repo ]; then echo "${ORIGIN_PREFIX}$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS_PATH} /workspace/repo; fi; fi`;
+const RECOVER_PREVIOUS = `if [ -e ${PREVIOUS_PATH} ]; then if [ -e /workspace/repo ]; then echo "${ORIGIN_PREFIX}$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS_PATH} /workspace/repo; fi; elif [ ! -e /workspace/repo ]; then echo "${MISSING_CHECKOUT}"; fi`;
 
 /**
  * Puts the set-aside checkout back and reports whether the session is left on
@@ -228,10 +231,14 @@ const reconcilePrevious = async (
   if (recover.exitCode !== 0) {
     return `Could not restore the prepared checkout of ${previous.slug}: ${String(recover.stderr || recover.stdout).trim()}`;
   }
-  const reported = String(recover.stdout)
+  const output = String(recover.stdout)
     .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith(ORIGIN_PREFIX));
+    .map((line) => line.trim());
+  if (output.includes(MISSING_CHECKOUT)) {
+    await discardPath(sandbox, REPOSITORY_MARKER, timeoutMs);
+    return `The prepared checkout of ${previous.slug} is missing, so this session has no repository prepared.`;
+  }
+  const reported = output.find((line) => line.startsWith(ORIGIN_PREFIX));
   if (reported === undefined) {
     return null;
   }

@@ -27,7 +27,7 @@ const { prepareRepositoryWorkspace } = await import(
 
 const OTHER = "Acquisity/Other";
 const PREVIOUS = "/workspace/.repo-previous";
-const RECOVER = `if [ -e ${PREVIOUS} ]; then if [ -e /workspace/repo ]; then echo "origin=$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS} /workspace/repo; fi; fi`;
+const RECOVER = `if [ -e ${PREVIOUS} ]; then if [ -e /workspace/repo ]; then echo "origin=$(git config --file /workspace/repo/.git/config --get remote.origin.url)"; else mv ${PREVIOUS} /workspace/repo; fi; elif [ ! -e /workspace/repo ]; then echo "missing-checkout"; fi`;
 const SET_ASIDE = `rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
 const STRANDED = `origin=${remoteUrl(OTHER)}`;
 const IN_PLACE = `origin=${remoteUrl(REPOSITORY)}`;
@@ -47,6 +47,7 @@ const CONFIG_FAILED = /Could not configure the workspace/u;
 const MARKER_WRITE_FAILED = /Could not record the prepared Acquisity\/Other/u;
 const CONFIGURE = "user.name";
 const PREVIOUS_LOST = /could not be restored/u;
+const NO_REPOSITORY = /no repository prepared/u;
 const MARKED_OTHER = /Acquisity\/Other/u;
 
 const attendedAuth: SessionAuthContext = {
@@ -417,6 +418,20 @@ describe("prepare_repository switching", () => {
     );
     assert.equal(result.success, false);
     assert.match(result.error ?? "", RECOVERY_FAILED);
+    assert.equal(ran(commands, SET_ASIDE), false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("clears a marker whose checkout has disappeared", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command === RECOVER ? ok("missing-checkout") : ok())
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", NO_REPOSITORY);
+    assert.ok(ran(commands, DISCARD_MARKER));
     assert.equal(ran(commands, SET_ASIDE), false);
     assert.equal(ran(commands, "git clone"), false);
   });
