@@ -1,7 +1,7 @@
 /**
  * Deterministic measurement of the capability catalog each session lane
- * carries, derived from eve's compiled manifest and the authored session
- * configuration.
+ * carries, derived from eve's compiled manifest, the authored session
+ * configuration, and the same resolvers eve runs for dynamic capabilities.
  *
  * @remarks
  * This module measures and reports. It gates nothing: every lane sees the
@@ -11,26 +11,35 @@
  * for an unattended factory run). Reading a lane's numbers must never change
  * what that lane may call.
  *
- * The compiled manifest is `.eve/compile/compiled-agent-manifest.json`,
- * written by `eve info` and `eve build`. It records the authored surface eve
- * loads at runtime, so the same source tree always measures the same. A
- * dynamic tool appears there only as its resolver descriptor: the GitHub
- * extension's 31 entries resolve inside eve at `step.started` and are not in
- * the manifest, so they are reported as unresolved rather than guessed at.
+ * Three sources are measured, and every one of them is resolved rather than
+ * estimated:
+ *
+ * - The compiled manifest `.eve/compile/compiled-agent-manifest.json`, written
+ *   by `eve info` and `eve build`. It records the authored and mounted surface
+ *   eve loads at runtime, so the same source tree always measures the same.
+ * - Dynamic capabilities, which appear in the manifest only as a resolver
+ *   descriptor. Each descriptor is run through its own authored module, so the
+ *   GitHub extension's tools are counted with the names, descriptions, and
+ *   schemas the model actually sees. A descriptor with no registered resolver
+ *   fails the measurement instead of being reported as a smaller number.
+ * - The subagent delegation tools eve lowers at runtime. Their input schema is
+ *   framework-owned and identical for every subagent, so it is read from eve
+ *   itself rather than guessed at.
+ *
+ * eve's own built-in tools (`bash`, `read_file`, and the rest) are outside the
+ * compiled manifest and outside this measurement. They are the same in every
+ * lane by construction, so they cannot explain a difference between lanes,
+ * which is what this report exists to show.
  */
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import type { SessionAuthContext } from "eve/context";
 import type { DynamicResolveContext } from "eve/skills";
 import { z } from "zod";
 import factoryPipeline from "../skills/factory-pipeline.js";
 import { OWNER_USER_ID, SLACK_TEAM_ID } from "./constants.js";
-import { stampRepository } from "./repository.js";
-import {
-  stampAutonomous,
-  stampIntakeOnly,
-  stampInvestigationMemory,
-  stampTrusted,
-} from "./trust.js";
+import { githubFactoryAuth, slackSessionAuth } from "./session-auth.js";
 
 /** The four session lanes the report covers. */
 export const CAPABILITY_LANES = [
@@ -54,13 +63,36 @@ const namedEntrySchema = z.object({
   sourceId: z.string(),
 });
 
+/** The manifest shape this measurement was written against. */
+export const MEASURED_MANIFEST_KIND = "eve-agent-compiled-manifest";
+
+/**
+ * The manifest revision this measurement was written against.
+ *
+ * @remarks
+ * Pinned on purpose. A revision bump means eve changed what it records, and
+ * the fields read below have to be checked against the new shape before the
+ * numbers mean anything. Failing on an unrecognized revision is the point:
+ * measuring it anyway would publish a total nobody had verified.
+ */
+export const MEASURED_MANIFEST_VERSION = 41;
+
 /**
  * The slice of eve's compiled manifest this measurement reads. Unlisted keys
- * are dropped, so a manifest that grows new fields still parses.
+ * are dropped, so a manifest that grows new fields still parses, while a
+ * manifest of another kind or revision is rejected outright.
  */
 export const capabilityManifestSchema = z.object({
+  config: z
+    .object({
+      experimental: z
+        .object({ subagentPersistentSessions: z.boolean().optional() })
+        .optional(),
+    })
+    .optional(),
   dynamicSkills: z.array(dynamicEntrySchema).default([]),
   dynamicTools: z.array(dynamicEntrySchema).default([]),
+  kind: z.literal(MEASURED_MANIFEST_KIND),
   skills: z
     .array(namedEntrySchema.extend({ markdown: z.string().default("") }))
     .default([]),
@@ -68,6 +100,7 @@ export const capabilityManifestSchema = z.object({
   tools: z
     .array(namedEntrySchema.extend({ inputSchema: z.unknown().optional() }))
     .default([]),
+  version: z.literal(MEASURED_MANIFEST_VERSION),
 });
 
 export type CapabilityManifest = z.infer<typeof capabilityManifestSchema>;
@@ -81,22 +114,55 @@ export function parseCapabilityManifest(raw: unknown): CapabilityManifest {
 export const COMPILED_MANIFEST_PATH =
   ".eve/compile/compiled-agent-manifest.json";
 
+/** Where the same commands record how that manifest was produced. */
+export const COMPILE_METADATA_PATH = ".eve/compile/compile-metadata.json";
+
+const compileMetadataSchema = z.object({
+  generator: z.object({ name: z.literal("eve"), version: z.string() }),
+  kind: z.literal("eve-compile-metadata"),
+  status: z.literal("ready"),
+});
+
+const requireFromHere = createRequire(import.meta.url);
+
+/** The eve package this process would run, resolved from node_modules. */
+const evePackageUrl = (): URL =>
+  pathToFileURL(requireFromHere.resolve("eve/package.json"));
+
+const installedEveVersion = (): string =>
+  z
+    .object({ version: z.string() })
+    .parse(JSON.parse(readFileSync(evePackageUrl(), "utf8"))).version;
+
+const readJsonFile = (path: URL): unknown =>
+  JSON.parse(readFileSync(path, "utf8"));
+
 /**
- * Reads the compiled manifest, or returns null when it has not been written
- * yet. A fresh checkout has no `.eve/`, so callers report that rather than
- * measuring a surface that was never compiled.
+ * Reads the compiled manifest after proving where it came from.
+ *
+ * @remarks
+ * An artifact that exists is not an artifact that describes this tree: a
+ * half-written compile, or one left behind by a different eve, would measure a
+ * surface the agent no longer has. The compile metadata must report a ready
+ * compile from the installed eve, and the manifest itself must be the kind and
+ * revision this module reads. Anything else throws, and callers report the
+ * failure instead of a number. Freshness against the working tree is the
+ * caller's job: `pnpm report:capabilities` compiles immediately before
+ * reading, and `pnpm validate` compiles before running the tests.
  */
-export function readCompiledManifest(appRoot: URL): CapabilityManifest | null {
-  try {
-    return parseCapabilityManifest(
-      JSON.parse(readFileSync(new URL(COMPILED_MANIFEST_PATH, appRoot), "utf8"))
+export function readCompiledManifest(appRoot: URL): CapabilityManifest {
+  const metadata = compileMetadataSchema.parse(
+    readJsonFile(new URL(COMPILE_METADATA_PATH, appRoot))
+  );
+  const eveVersion = installedEveVersion();
+  if (metadata.generator.version !== eveVersion) {
+    throw new Error(
+      `${COMPILED_MANIFEST_PATH} was compiled by eve ${metadata.generator.version} but eve ${eveVersion} is installed. Recompile with 'npx eve info'.`
     );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
-    }
-    throw error;
   }
+  return parseCapabilityManifest(
+    readJsonFile(new URL(COMPILED_MANIFEST_PATH, appRoot))
+  );
 }
 
 /** What a dynamic skill resolver returns when it offers the lane a skill. */
@@ -118,14 +184,6 @@ export interface CapabilityRow {
   readonly source: string;
 }
 
-/** A capability source the compiled manifest cannot measure. */
-export interface UnresolvedSource {
-  readonly events: readonly string[];
-  readonly kind: CapabilityKind;
-  readonly slug: string;
-  readonly source: string;
-}
-
 /** The measured catalog for one lane. */
 export interface LaneBudget {
   /** Skill markdown, appended only when the model loads the skill. */
@@ -134,50 +192,65 @@ export interface LaneBudget {
   readonly catalogChars: number;
   readonly lane: CapabilityLane;
   readonly rows: readonly CapabilityRow[];
-  readonly unresolved: readonly UnresolvedSource[];
 }
 
-// The Slack author eve projects for a mention in an Acquisity channel. Only
-// the shape matters: every lane difference below comes from the stamps the
-// authored channels add on top of it.
+// The Slack author eve projects for a mention in an Acquisity channel, in the
+// shape `defaultSlackAuth` builds. Only the shape matters: every lane
+// difference below comes from the stamps the authored channels add on top of
+// it, which `session-auth.ts` owns for both the channel and this measurement.
 const SLACK_AUTH: SessionAuthContext = {
   attributes: {
     author_type: "user",
     channel_id: "C0CAPABILITYBUDGET",
     team_id: SLACK_TEAM_ID,
+    thread_ts: "1756000000.000100",
     user_id: OWNER_USER_ID,
   },
   authenticator: "slack-webhook",
+  issuer: `slack:${SLACK_TEAM_ID}`,
   principalId: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
   principalType: "user",
 };
 
-// A signed GitHub webhook sender, before `agent/channels/github.ts` rewrites
-// it into the unattended factory principal.
-const GITHUB_AUTH: SessionAuthContext = {
-  attributes: {},
-  authenticator: "github-webhook",
-  principalId: "github:1",
-  principalType: "user",
-};
-
-/** The repository the repository-selected lane names in its request. */
+/** The repository the repository-selected and factory lanes name. */
 const MEASURED_REPOSITORY = "Acquisity/Foreman";
 
-const attendedSlackAuth = (): SessionAuthContext =>
-  stampInvestigationMemory(stampTrusted(SLACK_AUTH));
+/** The issue number the measured factory run is dispatched from. */
+const MEASURED_INTAKE_ISSUE = 1;
+
+// A signed GitHub webhook sender, in the shape `defaultGitHubAuth` builds,
+// before `githubFactoryAuth` rewrites it into the unattended factory
+// principal.
+const GITHUB_AUTH: SessionAuthContext = {
+  attributes: {
+    conversation_kind: "issue",
+    issue_number: String(MEASURED_INTAKE_ISSUE),
+    repository: MEASURED_REPOSITORY,
+    user_login: "capability-budget",
+    user_type: "User",
+  },
+  authenticator: "github-webhook",
+  issuer: "github:Acquisity",
+  principalId: "github:1",
+  principalType: "user",
+  subject: "capability-budget",
+};
 
 /**
- * The auth context each lane's channel stamps at dispatch, built from the
- * same helpers `agent/channels/slack.ts` and `agent/channels/github.ts` use,
- * so a change to either one moves the measurement with it.
+ * The auth each lane's channel stamps at dispatch, composed by the same
+ * helpers `agent/channels/slack.ts` and `agent/channels/github.ts` call, so a
+ * change to either dispatch moves the measurement with it.
  */
 const LANE_AUTH: Record<CapabilityLane, () => SessionAuthContext> = {
-  "autonomous-factory": () => stampAutonomous(stampTrusted(GITHUB_AUTH), 1),
+  "autonomous-factory": () =>
+    githubFactoryAuth(GITHUB_AUTH, MEASURED_REPOSITORY, MEASURED_INTAKE_ISSUE),
   "repository-interactive": () =>
-    stampRepository(attendedSlackAuth(), MEASURED_REPOSITORY, "explicit"),
-  slack: attendedSlackAuth,
-  "slack-intake-only": () => stampIntakeOnly(attendedSlackAuth()),
+    slackSessionAuth(SLACK_AUTH, {
+      intakeOnly: false,
+      repository: MEASURED_REPOSITORY,
+    }),
+  slack: () => slackSessionAuth(SLACK_AUTH, { intakeOnly: false }),
+  "slack-intake-only": () => slackSessionAuth(SLACK_AUTH, { intakeOnly: true }),
 };
 
 /** The session auth a lane runs under. */
@@ -194,20 +267,76 @@ const resolveContext = (lane: CapabilityLane): DynamicResolveContext => ({
   },
 });
 
-/** A dynamic skill this lane resolves, or null when the lane gets none. */
-export async function resolveFactoryPipelineSkill(
-  lane: CapabilityLane
-): Promise<z.infer<typeof resolvedSkillSchema> | null> {
-  const resolve = factoryPipeline.events["turn.started"];
-  if (!resolve) {
-    return null;
-  }
-  const resolved = await resolve({}, resolveContext(lane));
-  const parsed = resolvedSkillSchema.safeParse(resolved);
-  return parsed.success ? parsed.data : null;
+/**
+ * The authored module behind each compiled dynamic skill, keyed by the source
+ * the manifest records.
+ *
+ * @remarks
+ * One entry per dynamic skill in the tree. A compiled entry with no module
+ * here is rejected rather than measured with another entry's result, which
+ * would report the wrong name, description, and body under the new slug.
+ */
+const DYNAMIC_SKILL_SOURCES = new Map<string, typeof factoryPipeline>([
+  ["skills/factory-pipeline.ts", factoryPipeline],
+]);
+
+/** One dynamic skill a lane resolves. */
+interface ResolvedDynamicSkill {
+  readonly description: string;
+  readonly markdown: string;
+  readonly slug: string;
 }
 
-const EXTENSION_SOURCE = /^(ext:[^:]+)/u;
+/** One model-visible tool a dynamic tool resolver returned. */
+interface ResolvedDynamicTool {
+  readonly description: string;
+  readonly name: string;
+  readonly schemaChars: number;
+  readonly source: string;
+}
+
+/** Everything a lane carries that the compiled manifest cannot state. */
+export interface ResolvedLaneCapabilities {
+  readonly dynamicSkills: readonly ResolvedDynamicSkill[];
+  readonly dynamicTools: readonly ResolvedDynamicTool[];
+  /** Input schema characters on each subagent's delegation tool. */
+  readonly subagentSchemaChars: number;
+}
+
+const dynamicSkillEntry = async (
+  entry: z.infer<typeof dynamicEntrySchema>,
+  lane: CapabilityLane
+): Promise<ResolvedDynamicSkill | null> => {
+  const module = DYNAMIC_SKILL_SOURCES.get(entry.sourceId);
+  if (!module) {
+    throw new Error(
+      `Dynamic skill '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
+    );
+  }
+  // Resolvers run at session, turn, or step scope; the compiled entry names
+  // the events this one handles, and the first non-nil result in that order is
+  // what the lane carries.
+  const resolutions = await Promise.all(
+    entry.eventNames.map((eventName) => {
+      const resolve = module.events[eventName as keyof typeof module.events];
+      if (!resolve) {
+        throw new Error(
+          `Dynamic skill '${entry.slug}' compiled for '${eventName}' but its module has no such resolver.`
+        );
+      }
+      return resolve({}, resolveContext(lane));
+    })
+  );
+  for (const resolution of resolutions) {
+    const parsed = resolvedSkillSchema.safeParse(resolution);
+    if (parsed.success) {
+      return { ...parsed.data, slug: entry.slug };
+    }
+  }
+  return null;
+};
+
+const EXTENSION_SOURCE = /^(ext:([^:]+))/u;
 
 /**
  * The source a capability came from: an extension namespace such as
@@ -220,6 +349,191 @@ export function capabilitySource(sourceId: string): string {
   }
   const [directory] = sourceId.split("/");
   return `${directory ?? sourceId}/`;
+}
+
+// eve binds an extension's mount config to the namespace it was mounted under,
+// reading the ambient scope when the extension module is first evaluated. The
+// resolver below sets that scope so the authored mount in
+// `agent/extensions/github.ts` binds, then restores it: nothing else in this
+// process mounts an extension, and leaving a scope set would bind the next one
+// under the wrong namespace.
+const EXTENSION_CONFIG_SCOPE = Symbol.for("eve.ext-config-scope");
+
+const toolInputSchemaChars = (schema: unknown, name: string): number => {
+  try {
+    const json: Record<string, unknown> = {
+      ...z.toJSONSchema(schema as z.ZodType, { io: "input" }),
+    };
+    // The manifest records lowered schemas without the dialect keyword, and
+    // neither does the model see it. JSON.stringify drops undefined values.
+    json.$schema = undefined;
+    return JSON.stringify(json).length;
+  } catch (error) {
+    throw new Error(
+      `Could not lower the input schema of '${name}' to JSON Schema.`,
+      { cause: error }
+    );
+  }
+};
+
+const resolvedToolMapSchema = z.record(
+  z.string(),
+  z.object({ description: z.string().default(""), inputSchema: z.unknown() })
+);
+
+/**
+ * Resolves the GitHub extension's tool surface the way eve does at
+ * `step.started`: the authored mount binds its allowlist and overrides, and
+ * the extension returns one tool definition per included entry. Nothing leaves
+ * the process; the credential is resolved per call at execution time, which
+ * this never reaches.
+ */
+const resolveGitHubExtensionToolsOnce = async (
+  entry: z.infer<typeof dynamicEntrySchema>
+): Promise<ResolvedDynamicTool[]> => {
+  const source = capabilitySource(entry.sourceId);
+  const namespace = EXTENSION_SOURCE.exec(entry.sourceId)?.[2];
+  if (!namespace) {
+    throw new Error(`Dynamic tool ${entry.sourceId} names no extension.`);
+  }
+  const globals = globalThis as unknown as Record<symbol, unknown>;
+  const previousScope = globals[EXTENSION_CONFIG_SCOPE];
+  globals[EXTENSION_CONFIG_SCOPE] = namespace;
+  let resolved: unknown;
+  try {
+    await import("../extensions/github.js");
+    const { github } = await import("@github-tools/eve-extension/tools");
+    const resolve = github.events["step.started"];
+    if (!resolve) {
+      throw new Error(
+        `The ${namespace} extension no longer resolves tools at step.started.`
+      );
+    }
+    resolved = await resolve({}, resolveContext("slack"));
+  } finally {
+    globals[EXTENSION_CONFIG_SCOPE] = previousScope;
+  }
+  const tools = resolvedToolMapSchema.parse(resolved);
+  const names = Object.keys(tools);
+  if (names.length === 0) {
+    throw new Error(
+      `The ${namespace} extension resolved no tools; its mount config did not bind, so the catalog cannot be measured.`
+    );
+  }
+  return names.map((name) => {
+    const tool = tools[name];
+    const visibleName = `${namespace}__${name}`;
+    return {
+      description: tool?.description ?? "",
+      name: visibleName,
+      schemaChars: toolInputSchemaChars(tool?.inputSchema, visibleName),
+      source,
+    };
+  });
+};
+
+/**
+ * The extension resolver runs once per process, and every caller shares that
+ * one result.
+ *
+ * @remarks
+ * Two reasons, both structural. The resolver reads only the bound mount
+ * config, so its answer is the same for every lane. And binding that config
+ * goes through a process-wide scope, so two resolutions racing each other
+ * could mount under the wrong namespace.
+ */
+let gitHubExtensionTools: Promise<ResolvedDynamicTool[]> | undefined;
+
+const resolveGitHubExtensionTools = (
+  entry: z.infer<typeof dynamicEntrySchema>
+): Promise<ResolvedDynamicTool[]> => {
+  gitHubExtensionTools ??= resolveGitHubExtensionToolsOnce(entry);
+  return gitHubExtensionTools;
+};
+
+/**
+ * The resolver behind each compiled dynamic tool, keyed by the source the
+ * manifest records. A compiled entry with no resolver here fails the
+ * measurement rather than leaving the lane's largest tool source uncounted.
+ */
+const DYNAMIC_TOOL_SOURCES = new Map<
+  string,
+  (entry: z.infer<typeof dynamicEntrySchema>) => Promise<ResolvedDynamicTool[]>
+>([["ext:github:tools/github.mjs", resolveGitHubExtensionTools]]);
+
+const eveSubagentRegistryUrl = (): URL =>
+  new URL("./dist/src/runtime/subagents/registry.js", evePackageUrl());
+
+const subagentRegistrySchema = z.object({
+  getSubagentToolInputJsonSchema: z.custom<(persistent: boolean) => unknown>(
+    (value) => typeof value === "function"
+  ),
+});
+
+/**
+ * The characters every subagent's delegation tool carries in its input schema.
+ *
+ * @remarks
+ * eve lowers one fixed schema onto every subagent tool, so it is framework
+ * cost rather than authored cost, and it appears nowhere in the compiled
+ * manifest. It is read from the installed eve instead of restated here: a
+ * copied schema would keep reporting the old number after eve changed the real
+ * one. If eve stops exposing it, this throws and no total is published.
+ */
+export async function subagentDelegationSchemaChars(
+  persistentSessions: boolean
+): Promise<number> {
+  const url = eveSubagentRegistryUrl();
+  let module: unknown;
+  try {
+    module = await import(url.href);
+  } catch (error) {
+    throw new Error(
+      `eve's subagent delegation schema is not readable at ${url.href}.`,
+      { cause: error }
+    );
+  }
+  const parsed = subagentRegistrySchema.safeParse(module);
+  if (!parsed.success) {
+    throw new Error(
+      `eve no longer exposes getSubagentToolInputJsonSchema at ${url.href}, so subagent schema characters cannot be measured.`
+    );
+  }
+  return JSON.stringify(
+    parsed.data.getSubagentToolInputJsonSchema(persistentSessions)
+  ).length;
+}
+
+/**
+ * Resolves everything one lane carries that the compiled manifest states only
+ * as a descriptor. Throws when any compiled dynamic entry has no resolver, so
+ * a partial catalog is never published as a whole one.
+ */
+export async function resolveLaneCapabilities(
+  manifest: CapabilityManifest,
+  lane: CapabilityLane
+): Promise<ResolvedLaneCapabilities> {
+  const skills = await Promise.all(
+    manifest.dynamicSkills.map((entry) => dynamicSkillEntry(entry, lane))
+  );
+  const tools = await Promise.all(
+    manifest.dynamicTools.map((entry) => {
+      const resolve = DYNAMIC_TOOL_SOURCES.get(entry.sourceId);
+      if (!resolve) {
+        throw new Error(
+          `Dynamic tool '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
+        );
+      }
+      return resolve(entry);
+    })
+  );
+  return {
+    dynamicSkills: skills.filter((skill) => skill !== null),
+    dynamicTools: tools.flat(),
+    subagentSchemaChars: await subagentDelegationSchemaChars(
+      manifest.config?.experimental?.subagentPersistentSessions === true
+    ),
+  };
 }
 
 interface MeasuredEntry {
@@ -261,38 +575,31 @@ const groupRows = (
  *
  * @param manifest - The parsed compiled manifest.
  * @param lane - The lane to measure.
- * @param dynamicSkill - What the lane's dynamic skill resolvers returned, from
- * {@link resolveFactoryPipelineSkill}. Passed in so the measurement itself
- * stays a pure function of the manifest and the resolved configuration.
+ * @param resolved - What this lane's dynamic resolvers returned, from
+ * {@link resolveLaneCapabilities}. Passed in so the measurement itself stays a
+ * pure function of the manifest and the resolved configuration.
  */
 export function measureLane(
   manifest: CapabilityManifest,
   lane: CapabilityLane,
-  dynamicSkill: z.infer<typeof resolvedSkillSchema> | null
+  resolved: ResolvedLaneCapabilities
 ): LaneBudget {
-  const toolRows = groupRows(
-    "tool",
-    manifest.tools.map((tool) => ({
+  const toolRows = groupRows("tool", [
+    ...manifest.tools.map((tool) => ({
       bodyChars: 0,
       descriptionChars: tool.description.length,
       nameChars: tool.name.length,
       schemaChars: schemaChars(tool.inputSchema),
       source: capabilitySource(tool.sourceId),
-    }))
-  );
-  const dynamicSkillEntries = manifest.dynamicSkills.flatMap((entry) =>
-    dynamicSkill === null
-      ? []
-      : [
-          {
-            bodyChars: dynamicSkill.markdown.length,
-            descriptionChars: dynamicSkill.description.length,
-            nameChars: entry.slug.length,
-            schemaChars: 0,
-            source: `dynamic:${entry.slug}`,
-          },
-        ]
-  );
+    })),
+    ...resolved.dynamicTools.map((tool) => ({
+      bodyChars: 0,
+      descriptionChars: tool.description.length,
+      nameChars: tool.name.length,
+      schemaChars: tool.schemaChars,
+      source: tool.source,
+    })),
+  ]);
   const skillRows = groupRows("skill", [
     ...manifest.skills.map((skill) => ({
       bodyChars: skill.markdown.length,
@@ -301,7 +608,13 @@ export function measureLane(
       schemaChars: 0,
       source: capabilitySource(skill.sourceId),
     })),
-    ...dynamicSkillEntries,
+    ...resolved.dynamicSkills.map((skill) => ({
+      bodyChars: skill.markdown.length,
+      descriptionChars: skill.description.length,
+      nameChars: skill.slug.length,
+      schemaChars: 0,
+      source: `dynamic:${skill.slug}`,
+    })),
   ]);
   const subagentRows = groupRows(
     "subagent",
@@ -309,7 +622,7 @@ export function measureLane(
       bodyChars: 0,
       descriptionChars: subagent.description.length,
       nameChars: subagent.name.length,
-      schemaChars: 0,
+      schemaChars: resolved.subagentSchemaChars,
       source: capabilitySource(subagent.sourceId),
     }))
   );
@@ -323,12 +636,6 @@ export function measureLane(
     ),
     lane,
     rows,
-    unresolved: manifest.dynamicTools.map((entry) => ({
-      events: entry.eventNames,
-      kind: "tool" as const,
-      slug: entry.slug,
-      source: capabilitySource(entry.sourceId),
-    })),
   };
 }
 
@@ -336,12 +643,16 @@ export function measureLane(
 export async function measureCapabilityBudget(
   manifest: CapabilityManifest
 ): Promise<LaneBudget[]> {
-  const skills = await Promise.all(
-    CAPABILITY_LANES.map((lane) => resolveFactoryPipelineSkill(lane))
+  const resolved = await Promise.all(
+    CAPABILITY_LANES.map((lane) => resolveLaneCapabilities(manifest, lane))
   );
-  return CAPABILITY_LANES.map((lane, index) =>
-    measureLane(manifest, lane, skills[index] ?? null)
-  );
+  return CAPABILITY_LANES.map((lane, index) => {
+    const laneCapabilities = resolved[index];
+    if (!laneCapabilities) {
+      throw new Error(`Lane ${lane} resolved no capability set.`);
+    }
+    return measureLane(manifest, lane, laneCapabilities);
+  });
 }
 
 const COLUMNS = [
@@ -383,9 +694,11 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
   const lines = [
     "Capability catalog by session lane",
     "",
-    "Catalog characters ride every turn. Body characters are skill markdown,",
-    "appended only when the model loads that skill. Subagent tool schemas are",
-    "framework-generated and are not in the compiled manifest, so they count 0.",
+    "Catalog characters ride every turn: names, descriptions, and input",
+    "schemas, including the tools an extension resolves at runtime and the",
+    "delegation schema eve lowers onto every subagent. Body characters are",
+    "skill markdown, appended only when the model loads that skill. eve's own",
+    "built-in tools are identical in every lane and are not measured here.",
   ];
   for (const budget of budgets) {
     lines.push(
@@ -396,11 +709,6 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
       "",
       `catalog ${budget.catalogChars} characters, body ${budget.bodyChars} characters`
     );
-    for (const entry of budget.unresolved) {
-      lines.push(
-        `unresolved ${entry.kind} ${entry.slug} from ${entry.source}, resolved at ${entry.events.join(", ")}`
-      );
-    }
   }
   return lines.join("\n");
 }

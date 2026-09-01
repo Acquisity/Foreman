@@ -16,15 +16,35 @@ const {
   measureLane,
   parseCapabilityManifest,
   readCompiledManifest,
-  resolveFactoryPipelineSkill,
+  resolveLaneCapabilities,
+  subagentDelegationSchemaChars,
 } = await import("./capability-budget.js");
 
-const { isAutonomous, isIntakeOnly, isTrusted } = await import("./trust.js");
+const {
+  AUTONOMOUS_PRINCIPAL,
+  canUseInvestigationMemory,
+  intakeIssueNumber,
+  isAutonomous,
+  isIntakeOnly,
+  isTrusted,
+  isUnattended,
+} = await import("./trust.js");
 const { repositoryFromAuth } = await import("./repository.js");
+
+const SECOND_PIPELINE = /second-pipeline/u;
+const UNRESOLVED_TOOL = /crm__crm/u;
+const GITHUB_TOOL_NAME = /^github__/u;
+const SLACK_PRINCIPAL = /^slack:/u;
+
+const MANIFEST_HEADER = {
+  kind: "eve-agent-compiled-manifest",
+  version: 41,
+} as const;
 
 // A hand-built manifest with one capability of each kind from each source, so
 // every counted character is known by inspection.
 const FIXTURE = parseCapabilityManifest({
+  ...MANIFEST_HEADER,
   dynamicSkills: [
     {
       eventNames: ["turn.started"],
@@ -60,7 +80,28 @@ const FIXTURE = parseCapabilityManifest({
   ],
 });
 
-const FACTORY_SKILL = { description: "dd", markdown: "mmm" };
+// One resolved set with known sizes, so the row arithmetic below is readable.
+const RESOLVED = {
+  dynamicSkills: [
+    { description: "dd", markdown: "mmm", slug: "factory-pipeline" },
+  ],
+  // name 8 + description 2 + schema 3 characters.
+  dynamicTools: [
+    {
+      description: "gh",
+      name: "github__x",
+      schemaChars: 3,
+      source: "ext:github",
+    },
+  ],
+  subagentSchemaChars: 7,
+};
+
+const NO_DYNAMIC = {
+  dynamicSkills: [],
+  dynamicTools: [],
+  subagentSchemaChars: 0,
+};
 
 describe("capability source grouping", () => {
   it("groups by extension namespace or authored directory", () => {
@@ -75,9 +116,21 @@ describe("capability source grouping", () => {
   });
 });
 
+describe("manifest provenance", () => {
+  it("rejects an artifact of another kind or revision", () => {
+    assert.throws(() =>
+      parseCapabilityManifest({ ...MANIFEST_HEADER, kind: "something-else" })
+    );
+    assert.throws(() =>
+      parseCapabilityManifest({ ...MANIFEST_HEADER, version: 40 })
+    );
+    assert.throws(() => parseCapabilityManifest({ tools: [] }));
+  });
+});
+
 describe("lane measurement", () => {
   it("counts names, descriptions, schemas, and bodies by source", () => {
-    const budget = measureLane(FIXTURE, "slack", FACTORY_SKILL);
+    const budget = measureLane(FIXTURE, "slack", RESOLVED);
     assert.deepEqual(budget.rows, [
       {
         bodyChars: 0,
@@ -87,6 +140,15 @@ describe("lane measurement", () => {
         nameChars: 1,
         schemaChars: 0,
         source: "ext:browser",
+      },
+      {
+        bodyChars: 0,
+        descriptionChars: 2,
+        entries: 1,
+        kind: "tool",
+        nameChars: 9,
+        schemaChars: 3,
+        source: "ext:github",
       },
       {
         bodyChars: 0,
@@ -121,31 +183,36 @@ describe("lane measurement", () => {
         entries: 1,
         kind: "subagent",
         nameChars: 1,
-        schemaChars: 0,
+        // The delegation schema eve lowers onto every subagent tool.
+        schemaChars: 7,
         source: "subagents/",
       },
     ]);
-    assert.equal(budget.catalogChars, 49);
+    assert.equal(budget.catalogChars, 49 + 14 + 7);
     assert.equal(budget.bodyChars, 7);
   });
 
   it("drops the dynamic skill row for a lane that resolves none", () => {
-    const budget = measureLane(FIXTURE, "autonomous-factory", null);
+    const budget = measureLane(FIXTURE, "autonomous-factory", {
+      ...RESOLVED,
+      dynamicSkills: [],
+    });
     assert.ok(
       !budget.rows.some((row) => row.source === "dynamic:factory-pipeline")
     );
-    assert.equal(budget.catalogChars, 49 - 16 - 2);
+    assert.equal(budget.catalogChars, 49 + 14 + 7 - 16 - 2);
     assert.equal(budget.bodyChars, 4);
   });
 
   it("sums entries from one source instead of listing them", () => {
     const manifest = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
       tools: [
         { description: "ab", name: "one", sourceId: "tools/one.ts" },
         { description: "c", name: "two", sourceId: "tools/two.ts" },
       ],
     });
-    assert.deepEqual(measureLane(manifest, "slack", null).rows, [
+    assert.deepEqual(measureLane(manifest, "slack", NO_DYNAMIC).rows, [
       {
         bodyChars: 0,
         descriptionChars: 3,
@@ -157,23 +224,89 @@ describe("lane measurement", () => {
       },
     ]);
   });
+});
 
-  it("reports a dynamic tool source as unresolved rather than guessing", () => {
-    assert.deepEqual(measureLane(FIXTURE, "slack", FACTORY_SKILL).unresolved, [
-      {
-        events: ["step.started"],
-        kind: "tool",
-        slug: "github__github",
-        source: "ext:github",
-      },
-    ]);
+describe("dynamic capability resolution", () => {
+  it("resolves each compiled dynamic skill through its own source", async () => {
+    const resolved = await resolveLaneCapabilities(FIXTURE, "slack");
+    assert.equal(resolved.dynamicSkills.length, 1);
+    assert.equal(resolved.dynamicSkills[0]?.slug, "factory-pipeline");
+    assert.ok((resolved.dynamicSkills[0]?.markdown.length ?? 0) > 0);
+  });
+
+  it("refuses a second dynamic skill rather than repeating the first", async () => {
+    const manifest = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
+      dynamicSkills: [
+        {
+          eventNames: ["turn.started"],
+          slug: "factory-pipeline",
+          sourceId: "skills/factory-pipeline.ts",
+        },
+        {
+          eventNames: ["turn.started"],
+          slug: "second-pipeline",
+          sourceId: "skills/second-pipeline.ts",
+        },
+      ],
+    });
+    await assert.rejects(
+      resolveLaneCapabilities(manifest, "slack"),
+      SECOND_PIPELINE
+    );
+  });
+
+  it("refuses a dynamic tool source it cannot resolve", async () => {
+    const manifest = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
+      dynamicTools: [
+        {
+          eventNames: ["step.started"],
+          slug: "crm__crm",
+          sourceId: "ext:crm:tools/crm.mjs",
+        },
+      ],
+    });
+    await assert.rejects(
+      resolveLaneCapabilities(manifest, "slack"),
+      UNRESOLVED_TOOL
+    );
+  });
+
+  it("resolves the GitHub extension's model-visible tools", async () => {
+    const resolved = await resolveLaneCapabilities(FIXTURE, "slack");
+    assert.equal(resolved.dynamicTools.length, 31);
+    for (const tool of resolved.dynamicTools) {
+      assert.equal(tool.source, "ext:github");
+      assert.match(tool.name, GITHUB_TOOL_NAME);
+      assert.ok(tool.description.length > 0, `${tool.name} has a description`);
+      assert.ok(tool.schemaChars > 0, `${tool.name} has an input schema`);
+    }
+  });
+
+  it("reads the subagent delegation schema from eve", async () => {
+    const chars = await subagentDelegationSchemaChars(false);
+    assert.ok(chars > 0);
+    // The persistent-session form adds the agentId continuation field.
+    assert.ok((await subagentDelegationSchemaChars(true)) > chars);
+  });
+
+  it("resolves the factory skill for every lane except the factory run", async () => {
+    const resolved = await Promise.all(
+      CAPABILITY_LANES.map((lane) => resolveLaneCapabilities(FIXTURE, lane))
+    );
+    for (const [index, lane] of CAPABILITY_LANES.entries()) {
+      assert.equal(
+        resolved[index]?.dynamicSkills.length,
+        lane === "autonomous-factory" ? 0 : 1,
+        `${lane} dynamic skills`
+      );
+    }
   });
 
   it("measures the same manifest identically every time", async () => {
-    const [first, second] = await Promise.all([
-      measureCapabilityBudget(FIXTURE),
-      measureCapabilityBudget(FIXTURE),
-    ]);
+    const first = await measureCapabilityBudget(FIXTURE);
+    const second = await measureCapabilityBudget(FIXTURE);
     assert.deepEqual(first, second);
     assert.deepEqual(
       first.map((budget) => budget.lane),
@@ -183,55 +316,85 @@ describe("lane measurement", () => {
 });
 
 describe("session lanes", () => {
-  it("stamps each lane the way its channel does", () => {
-    assert.ok(isTrusted(laneAuth("slack")));
-    assert.ok(!isIntakeOnly(laneAuth("slack")));
-    assert.ok(isIntakeOnly(laneAuth("slack-intake-only")));
-    assert.equal(
-      repositoryFromAuth(laneAuth("repository-interactive"))?.slug,
-      "Acquisity/Foreman"
-    );
-    assert.ok(isAutonomous(laneAuth("autonomous-factory")));
+  // Each expectation is read from the channel that dispatches the lane:
+  // `agent/channels/slack.ts` for the three Slack lanes, the factory intake
+  // branch of `agent/channels/github.ts` for the fourth. Both call the same
+  // helpers in `session-auth.ts` the measurement calls, so a stamp added on
+  // one side without the other fails here.
+  it("carries the complete Slack dispatch stamps", () => {
+    for (const lane of [
+      "slack",
+      "slack-intake-only",
+      "repository-interactive",
+    ] as const) {
+      const auth = laneAuth(lane);
+      assert.equal(auth.authenticator, "slack-webhook", lane);
+      assert.equal(auth.principalType, "user", lane);
+      assert.match(auth.principalId, SLACK_PRINCIPAL, lane);
+      assert.ok(isTrusted(auth), `${lane} trusted`);
+      assert.ok(canUseInvestigationMemory(auth), `${lane} reads memory`);
+      assert.ok(!isUnattended(auth), `${lane} attended`);
+      assert.ok(!isAutonomous(auth), `${lane} not autonomous`);
+      assert.equal(
+        isIntakeOnly(auth),
+        lane === "slack-intake-only",
+        `${lane} intake-only`
+      );
+      assert.deepEqual(
+        repositoryFromAuth(auth),
+        lane === "repository-interactive"
+          ? {
+              owner: "Acquisity",
+              repo: "Foreman",
+              slug: "Acquisity/Foreman",
+              source: "explicit",
+            }
+          : null,
+        `${lane} repository`
+      );
+    }
   });
 
-  it("resolves the factory skill for every lane except the factory run", async () => {
-    const skills = await Promise.all(
-      CAPABILITY_LANES.map((lane) => resolveFactoryPipelineSkill(lane))
-    );
-    for (const [index, lane] of CAPABILITY_LANES.entries()) {
-      const skill = skills[index];
-      if (lane === "autonomous-factory") {
-        assert.equal(skill, null);
-      } else {
-        assert.ok(skill && skill.markdown.length > 0);
-      }
-    }
+  it("carries the complete factory intake stamps", () => {
+    const auth = laneAuth("autonomous-factory");
+    assert.equal(auth.authenticator, "github-webhook");
+    assert.equal(auth.principalId, AUTONOMOUS_PRINCIPAL);
+    assert.equal(auth.principalType, "service");
+    assert.ok(isAutonomous(auth));
+    assert.ok(isUnattended(auth));
+    assert.equal(intakeIssueNumber(auth), 1);
+    // The GitHub channel never stamps an unattended run trusted, and never
+    // stamps it for investigation memory.
+    assert.ok(!isTrusted(auth));
+    assert.ok(!canUseInvestigationMemory(auth));
+    assert.ok(!isIntakeOnly(auth));
+    assert.deepEqual(repositoryFromAuth(auth), {
+      owner: "Acquisity",
+      repo: "Foreman",
+      slug: "Acquisity/Foreman",
+      source: "github-webhook",
+    });
   });
 });
 
 const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
-const TOTALS_LINE = /catalog 49 characters, body 7 characters/u;
-const UNRESOLVED_LINE = /unresolved tool github__github from ext:github/u;
+const TOTALS_LINE = /catalog 70 characters, body 7 characters/u;
 
 describe("capability report", () => {
   it("renders every lane with its totals", () => {
     const report = formatCapabilityBudget([
-      measureLane(FIXTURE, "slack", FACTORY_SKILL),
+      measureLane(FIXTURE, "slack", RESOLVED),
     ]);
     assert.match(report, LANE_HEADING);
     assert.match(report, TABLE_HEADING);
     assert.match(report, TOTALS_LINE);
-    assert.match(report, UNRESOLVED_LINE);
   });
 
-  it("measures the repository's own compiled manifest when it exists", async () => {
+  it("measures the repository's own compiled manifest", async () => {
+    // Not skippable: `pnpm validate` compiles before running the tests, so a
+    // missing or stale manifest is a failure here rather than a silent pass.
     const manifest = readCompiledManifest(new URL("../../", import.meta.url));
-    if (!manifest) {
-      // A fresh checkout has no `.eve/`; `pnpm validate` runs `eve info` after
-      // the tests, so the fixture cases above carry the method on their own.
-      return;
-    }
     const budgets = await measureCapabilityBudget(manifest);
     const byLane = new Map(budgets.map((budget) => [budget.lane, budget]));
     for (const lane of CAPABILITY_LANES) {
@@ -243,6 +406,19 @@ describe("capability report", () => {
           budget.rows.some((row) => row.kind === kind),
           `${lane} measures ${kind} characters`
         );
+      }
+      // The GitHub surface is resolved, not reported as unknown, and every
+      // subagent carries its framework-lowered delegation schema.
+      const github = budget.rows.find(
+        (row) => row.kind === "tool" && row.source === "ext:github"
+      );
+      assert.ok(github, `${lane} measures the GitHub tools`);
+      assert.equal(github.entries, 31, `${lane} counts every GitHub tool`);
+      assert.ok(github.schemaChars > 0, `${lane} counts GitHub schemas`);
+      for (const row of budget.rows.filter(
+        (entry) => entry.kind === "subagent"
+      )) {
+        assert.ok(row.schemaChars > 0, `${lane} counts subagent schemas`);
       }
     }
     const slack = byLane.get("slack");
