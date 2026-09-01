@@ -8,7 +8,7 @@ A new outside call belongs in this table. This document is the record; the table
 
 `agent/lib/outside-call-bounds.ts` is a small guard, not a completeness check. It is not a TypeScript parser and does not claim to find every outside call. It knows four literal call spellings, finds each by name across the authored non-test TypeScript under `agent/`, and reads that call's own argument list by matching parentheses, so a bound removed from one call is caught even when the call beside it keeps one:
 
-- a `.run(` outside `agent/lib/sandbox-deadline.ts`, because `boundedRun` is the only way Foreman runs a sandbox command
+- a `.run(` outside `agent/lib/sandbox-deadline.ts`, because `boundedRun` is the only `.run(`-spelled sandbox command path; `agent/lib/repository-snapshot.ts` uses `runCommand` and is bounded separately by the sandbox's own timeout
 - a `fetch` or `fetchImpl` call whose argument list carries no `signal`
 - a `head`, `put`, `del`, or `get` call in a file that imports `@vercel/blob`, with no `abortSignal`
 - a `neon` client built with no `fetchOptions` signal
