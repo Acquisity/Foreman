@@ -1,6 +1,5 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
 import { deliveryPolicy } from "#lib/github/approval.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import {
@@ -8,12 +7,28 @@ import {
   mintInstallationToken,
   validateBranch,
 } from "#lib/github/git-remote.js";
+import { logOpsEvent } from "#lib/ops-log.js";
 import {
   readPreparedRepository,
   remoteUrl,
   repositoryFromAuth,
 } from "#lib/repository.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
+
+/**
+ * Returns the refusal to the model and leaves exactly one bounded warning
+ * behind.
+ *
+ * @remarks
+ * A refused push is an operator-visible event, not a silent no-op, and
+ * `logOpsEvent` keeps the line one bounded JSON record that cannot break the
+ * turn. Branch names are model input, so nothing beyond the refusal reason
+ * reaches the log.
+ */
+const refuse = (code: string, error: string) => {
+  logOpsEvent("push_branch.refused", { code, message: error }, console.warn);
+  return { error, success: false as const };
+};
 
 export default defineTool({
   approval: deliveryPolicy,
@@ -22,13 +37,7 @@ export default defineTool({
   async execute({ branch }, ctx) {
     const refusal = validateBranch(branch);
     if (refusal) {
-      return { error: refusal, success: false as const };
-    }
-    if (!branch.startsWith(FOREMAN_BRANCH_PREFIX)) {
-      return {
-        error: `Branch must start with ${FOREMAN_BRANCH_PREFIX}.`,
-        success: false as const,
-      };
+      return refuse("invalid_branch", refusal);
     }
     const sandbox = await ctx.getSandbox();
     const prepared = await readPreparedRepository(sandbox);
@@ -43,10 +52,10 @@ export default defineTool({
       authoritative?.source === "github-webhook" &&
       authoritative.slug.toLowerCase() !== prepared.slug.toLowerCase()
     ) {
-      return {
-        error: `This signed GitHub session is bound to ${authoritative.slug} and cannot push to ${prepared.slug}.`,
-        success: false as const,
-      };
+      return refuse(
+        "repository_binding",
+        `This signed GitHub session is bound to ${authoritative.slug} and cannot push to ${prepared.slug}.`
+      );
     }
     const token = await mintInstallationToken(githubCredentials);
     try {
