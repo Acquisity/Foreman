@@ -34,6 +34,17 @@ export const REPOSITORY_KNOWLEDGE_PREFIX = "repository-knowledge/";
 /** Blob path prefix holding handoff artifacts passed between stations. */
 export const ARTIFACTS_PREFIX = "artifacts/";
 
+/**
+ * Wall-clock bound on one Blob operation.
+ *
+ * @remarks
+ * `@vercel/blob` retries internally but sets no overall deadline, so a store
+ * that never answers would hold the whole turn. Twenty seconds covers a
+ * document write with its retries; every caller already reports a Blob
+ * failure rather than depending on it.
+ */
+const BLOB_TIMEOUT_MS = 20_000;
+
 /** Blob path prefix holding the live station model overrides. */
 export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 
@@ -185,7 +196,10 @@ export const readDocument = async (
 ): Promise<
   { found: false } | { content: string; found: true; uploadedAt: string }
 > => {
-  const result = await get(key, { access: "public" });
+  const result = await get(key, {
+    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+    access: "public",
+  });
   if (!result?.stream) {
     return { found: false };
   }
@@ -218,6 +232,7 @@ export const writeDocument = (
   options: { allowOverwrite: boolean; contentType?: string }
 ) =>
   put(key, contents, {
+    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: options.allowOverwrite,
@@ -238,13 +253,13 @@ export const deleteDocument = async (
   key: string
 ): Promise<{ existed: boolean }> => {
   try {
-    await head(key);
+    await head(key, { abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS) });
   } catch (error) {
     if (error instanceof BlobNotFoundError) {
       return { existed: false };
     }
     throw error;
   }
-  await del(key);
+  await del(key, { abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS) });
   return { existed: true };
 };

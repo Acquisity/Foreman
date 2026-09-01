@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
 import { remoteUrl } from "./repository.js";
+import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const {
   cloneExplicitRepository,
+  detectWorktree,
   prepareWarmedOrClone,
-  REPOSITORY_OPERATION_TIMEOUT_MS,
   refreshCheckout,
 } = await import("../tools/prepare_repository.js");
 
@@ -28,6 +29,9 @@ const CANCELLED = /turn cancelled/u;
 const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 const PUBLISH_FAILED = /cross-device link/u;
+const PROBE_TIMED_OUT = /Could not tell whether a checkout is already present/u;
+const WARM_PROBE_TIMED_OUT =
+  /Could not determine whether the warmed checkout exists/u;
 
 interface RunOptions {
   abortSignal?: AbortSignal;
@@ -97,6 +101,11 @@ const cancelledSandbox = () => {
 describe("prepare_repository sandbox bounds", () => {
   it("bounds every repository operation at five minutes", () => {
     assert.equal(REPOSITORY_OPERATION_TIMEOUT_MS, 300_000);
+  });
+
+  it("fails closed when the workspace repository probe reaches its deadline", async () => {
+    const { sandbox } = fakeSandbox(stall);
+    assert.equal(await detectWorktree(sandbox, TIMEOUT_MS), null);
   });
 
   it("passes an unaborted deadline signal to the clone by default", async () => {
@@ -341,6 +350,22 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, DISCARD), false);
   });
 
+  it("refuses to clone when the warmed-checkout probe reaches its deadline", async () => {
+    const { commands, sandbox } = fakeSandbox((options) => {
+      if (options.command === "test -e /workspace/repo") {
+        return failed("");
+      }
+      return options.command.startsWith("test -d ") ? stall(options) : ok();
+    });
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", WARM_PROBE_TIMED_OUT);
+    assert.equal(ran(commands, "git clone"), false);
+    assert.equal(ran(commands, PUBLISH), false);
+  });
+
   it("refuses an occupied checkout that has no configured origin", async () => {
     // `git config --get` exits non-zero for a key that is simply absent, so an
     // unrelated local checkout is indistinguishable from debris and must not be
@@ -371,6 +396,22 @@ describe("prepare_repository sandbox bounds", () => {
     });
     assert.match(error ?? "", REFUSED);
     assert.equal(ran(commands, DISCARD), false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("bounds the occupied checkout origin probe with the caller's deadline", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url") ? stall(options) : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFUSED);
+    const origin = commands.find((options) =>
+      options.command.includes("remote.origin.url")
+    );
+    assert.ok(origin?.abortSignal instanceof AbortSignal);
     assert.equal(ran(commands, "git clone"), false);
   });
 
@@ -436,6 +477,19 @@ describe("prepare_repository sandbox bounds", () => {
     assert.match(error ?? "", REFUSED);
     assert.equal(ran(commands, DISCARD), false);
     assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("refuses rather than publishing over a checkout it could not probe", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command === "test -e /workspace/repo" ? stall(options) : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", PROBE_TIMED_OUT);
+    assert.equal(ran(commands, "git clone"), false);
+    assert.equal(ran(commands, PUBLISH), false);
   });
 
   it("keeps an unchanged checkout that needs no install", async () => {

@@ -6,6 +6,7 @@ import {
   mintInstallationToken,
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
+import { boundedRun } from "../../../lib/sandbox-deadline.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
@@ -45,7 +46,7 @@ export default defineTool({
       };
     }
     // Already pinned: a repeated call must not fight git's index.lock.
-    const current = await sandbox.run({
+    const current = await boundedRun(sandbox, {
       command: `git -C '${prepared.worktree}' rev-parse HEAD`,
     });
     if (current.exitCode === 0 && String(current.stdout).trim() === sha) {
@@ -67,7 +68,7 @@ export default defineTool({
       // means no git process; any other status fails closed and leaves it.
       const lock = `'${prepared.worktree}/.git/index.lock'`;
       const clearStaleLock = `for i in 1 2 3 4 5 6 7 8 9 10; do [ -f ${lock} ] || break; pgrep -x git >/dev/null 2>&1; s=$?; if [ "$s" -eq 1 ]; then rm -f ${lock}; break; fi; sleep 1; done`;
-      const result = await sandbox.run({
+      const result = await boundedRun(sandbox, {
         command: `${clearStaleLock} && git -C '${prepared.worktree}' fetch --depth 1 ${remoteUrl(prepared.slug)} '${sha}' && git -C '${prepared.worktree}' checkout --detach '${sha}' && git -C '${prepared.worktree}' clean -fd -e .foreman`,
       });
       if (result.exitCode !== 0) {
@@ -79,7 +80,7 @@ export default defineTool({
     } finally {
       await sandbox.setNetworkPolicy("allow-all");
     }
-    const head = await sandbox.run({
+    const head = await boundedRun(sandbox, {
       command: `git -C '${prepared.worktree}' rev-parse HEAD`,
     });
     if (head.exitCode !== 0 || String(head.stdout).trim() !== sha) {

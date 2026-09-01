@@ -7,6 +7,7 @@ import {
   validateBranch,
 } from "#lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "#lib/repository.js";
+import { boundedRun } from "#lib/sandbox-deadline.js";
 
 export default defineTool({
   description:
@@ -21,7 +22,7 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
-      const result = await sandbox.run({
+      const result = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' fetch ${remoteUrl(prepared.slug)} '${branch}' && git -C '${prepared.worktree}' checkout -B '${branch}' FETCH_HEAD`,
       });
       if (result.exitCode !== 0) {
@@ -30,9 +31,17 @@ export default defineTool({
           success: false as const,
         };
       }
-      const head = await sandbox.run({
+      const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse HEAD`,
       });
+      if (head.exitCode !== 0) {
+        return {
+          error: `git rev-parse HEAD exited ${head.exitCode}: ${String(
+            head.stderr || head.stdout
+          ).trim()}`,
+          success: false as const,
+        };
+      }
       return {
         branch,
         sha: String(head.stdout).trim(),

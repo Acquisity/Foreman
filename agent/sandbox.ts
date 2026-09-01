@@ -9,6 +9,7 @@ import {
 } from "eve/sandbox";
 import { vercel } from "eve/sandbox/vercel";
 import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
+import { boundedRun } from "#lib/sandbox-deadline.js";
 
 /**
  * Root agent sandbox configuration.
@@ -68,7 +69,7 @@ export default defineSandbox({
   },
   async onSession({ use }: SandboxSessionContext): Promise<void> {
     const sandbox = await use();
-    const result = await sandbox.run({
+    const result = await boundedRun(sandbox, {
       command: "git config --global --add safe.directory /workspace",
     });
     if (result.exitCode !== 0) {

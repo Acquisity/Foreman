@@ -1,9 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import type {
-  SandboxCommandResult,
-  SandboxRunOptions,
-  SandboxSession,
-} from "eve/sandbox";
+import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
@@ -23,25 +19,13 @@ import {
   warmInstallEnv,
   warmRepositoryPath,
 } from "#lib/repository-warmup.js";
+import {
+  boundedRun,
+  REPOSITORY_OPERATION_TIMEOUT_MS,
+  TIMED_OUT_EXIT_CODE,
+} from "#lib/sandbox-deadline.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
-
-/**
- * Wall-clock bound for one clone, fetch/reset, or install.
- *
- * @remarks
- * A stalled git or package-manager process holds the whole turn: eve's
- * `run` blocks until the command exits, and nothing else in the session
- * wakes up. Five minutes is above the slowest observed cold clone plus
- * install of the warmed repositories and well under the invocation
- * ceiling, so a healthy run never trips it and a wedged one always does.
- */
-export const REPOSITORY_OPERATION_TIMEOUT_MS = 300_000;
-
-// The exit code a shell reports for a command killed by `timeout`, reused
-// here so the existing non-zero branches surface a deadline like any other
-// command failure.
-const TIMED_OUT_EXIT_CODE = 124;
 
 /**
  * Applies the brokered GitHub credential to the sandbox firewall for the
@@ -58,37 +42,6 @@ export interface CheckoutOptions {
 const brokerGitHubToken: CredentialBroker = async (sandbox) => {
   const token = await mintInstallationToken(githubCredentials);
   await sandbox.setNetworkPolicy(brokerPolicy(token));
-};
-
-/**
- * Runs one sandbox command under a deadline.
- *
- * @remarks
- * eve 0.44's sandbox `run` takes an `abortSignal` and no timeout of its own,
- * and it composes the signal with the session's, so `AbortSignal.timeout` is
- * the version-matched bound. A deadline comes back as a non-zero result so
- * every caller's existing failure branch (which already discards the partial
- * checkout) handles it; anything else, including a cancelled turn, still
- * throws.
- */
-const boundedRun = async (
-  sandbox: SandboxSession,
-  options: SandboxRunOptions,
-  timeoutMs: number
-): Promise<SandboxCommandResult> => {
-  const deadline = AbortSignal.timeout(timeoutMs);
-  try {
-    return await sandbox.run({ ...options, abortSignal: deadline });
-  } catch (error) {
-    if (!deadline.aborted) {
-      throw error;
-    }
-    return {
-      exitCode: TIMED_OUT_EXIT_CODE,
-      stderr: `timed out after ${timeoutMs}ms`,
-      stdout: "",
-    };
-  }
 };
 
 /**
@@ -138,12 +91,18 @@ const readExistingMarker = async (sandbox: SandboxSession) => {
   }
 };
 
-const detectWorktree = async (
-  sandbox: SandboxSession
-): Promise<"/workspace" | "/workspace/repo"> => {
-  const root = await sandbox.run({
-    command: "git -C /workspace rev-parse --show-toplevel",
-  });
+export const detectWorktree = async (
+  sandbox: SandboxSession,
+  timeoutMs: number = REPOSITORY_OPERATION_TIMEOUT_MS
+): Promise<"/workspace" | "/workspace/repo" | null> => {
+  const root = await boundedRun(
+    sandbox,
+    { command: "git -C /workspace rev-parse --show-toplevel" },
+    timeoutMs
+  );
+  if (root.exitCode === TIMED_OUT_EXIT_CODE) {
+    return null;
+  }
   return root.exitCode === 0 && String(root.stdout).trim() === "/workspace"
     ? "/workspace"
     : "/workspace/repo";
@@ -197,11 +156,18 @@ export const cloneExplicitRepository = async (
 // Reads the checkout's origin from its config file directly: repository
 // discovery would refuse the builder-owned checkout as dubious ownership
 // before `safe.directory` is registered.
-const originUrl = async (sandbox: SandboxSession): Promise<string | null> => {
-  const origin = await sandbox.run({
-    command:
-      "git config --file /workspace/repo/.git/config --get remote.origin.url",
-  });
+const originUrl = async (
+  sandbox: SandboxSession,
+  timeoutMs: number
+): Promise<string | null> => {
+  const origin = await boundedRun(
+    sandbox,
+    {
+      command:
+        "git config --file /workspace/repo/.git/config --get remote.origin.url",
+    },
+    timeoutMs
+  );
   return origin.exitCode === 0
     ? String(origin.stdout).trim().toLowerCase()
     : null;
@@ -318,7 +284,18 @@ export const prepareWarmedOrClone = async (
   options: CheckoutOptions = {}
 ): Promise<string | null> => {
   const warmed = findWarmRepository(repository);
-  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
+  const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
+  const occupied = await boundedRun(
+    sandbox,
+    { command: "test -e /workspace/repo" },
+    timeoutMs
+  );
+  // A deadline here is not "nothing is there": publishing a checkout over an
+  // occupied path would move the staged clone inside the existing one. Refuse
+  // instead, and let the retry decide.
+  if (occupied.exitCode === TIMED_OUT_EXIT_CODE) {
+    return `Could not tell whether a checkout is already present for ${repository}: ${occupied.stderr}`;
+  }
   if (occupied.exitCode === 0) {
     // A durable step retry or dev queue redelivery reruns this tool after an
     // earlier execution placed the checkout but never wrote the marker. Only a
@@ -328,7 +305,8 @@ export const prepareWarmedOrClone = async (
     // be treated as proof of debris, and an unfinished clone or move cannot
     // land here anyway: `/workspace/repo` only ever appears as a rename of a
     // finished checkout from `STAGING_PATH`.
-    return (await originUrl(sandbox)) === remoteUrl(repository).toLowerCase()
+    return (await originUrl(sandbox, timeoutMs)) ===
+      remoteUrl(repository).toLowerCase()
       ? refreshCheckout(sandbox, repository, warmed, true, {
           ...options,
           owned: false,
@@ -342,8 +320,11 @@ export const prepareWarmedOrClone = async (
   // silently fall back to a cold clone.
   const path = warmed ? warmRepositoryPath(warmed.slug) : null;
   const checkout = path
-    ? await sandbox.run({ command: `test -d ${path}` })
+    ? await boundedRun(sandbox, { command: `test -d ${path}` }, timeoutMs)
     : null;
+  if (checkout?.exitCode === TIMED_OUT_EXIT_CODE) {
+    return `Could not determine whether the warmed checkout exists for ${repository}: ${checkout.stderr}`;
+  }
   if (!(warmed && checkout) || checkout.exitCode !== 0) {
     return cloneExplicitRepository(sandbox, repository, options);
   }
@@ -352,7 +333,6 @@ export const prepareWarmedOrClone = async (
   // `/workspace/repo` are not guaranteed to be one rename apart) leaves its
   // remains at the tool-owned path instead of at `/workspace/repo`, where a
   // later turn could not tell them from a checkout it must not touch.
-  const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
   const move = await boundedRun(
     sandbox,
     {
@@ -407,6 +387,13 @@ export default defineTool({
     }
 
     const worktree = await detectWorktree(sandbox);
+    if (worktree === null) {
+      return {
+        error:
+          "Could not determine whether /workspace is a repository before the deadline.",
+        success: false as const,
+      };
+    }
     if (worktree === "/workspace/repo") {
       const prepareError = await prepareWarmedOrClone(sandbox, target.slug);
       if (prepareError) {
@@ -420,7 +407,7 @@ export default defineTool({
     const safeIdentity = SAFE_IDENTITY_PATTERN.test(identity)
       ? identity
       : FALLBACK_BOT_NAME;
-    const config = await sandbox.run({
+    const config = await boundedRun(sandbox, {
       command: `git config --global --add safe.directory '${worktree}' && git config --global user.name '${safeIdentity}[bot]' && git config --global user.email '${safeIdentity.toLowerCase()}[bot]@users.noreply.github.com' && mkdir -p /workspace/.foreman`,
     });
     if (config.exitCode !== 0) {

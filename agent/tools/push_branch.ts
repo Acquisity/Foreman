@@ -13,6 +13,7 @@ import {
   remoteUrl,
   repositoryFromAuth,
 } from "#lib/repository.js";
+import { boundedRun } from "#lib/sandbox-deadline.js";
 
 export default defineTool({
   approval: deliveryPolicy,
@@ -50,7 +51,7 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     try {
       await sandbox.setNetworkPolicy(brokerPolicy(token));
-      const result = await sandbox.run({
+      const result = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' push ${remoteUrl(prepared.slug)} 'refs/heads/${branch}:refs/heads/${branch}'`,
       });
       if (result.exitCode !== 0) {
@@ -59,7 +60,7 @@ export default defineTool({
           success: false as const,
         };
       }
-      const head = await sandbox.run({
+      const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse '${branch}'`,
       });
       if (head.exitCode !== 0) {

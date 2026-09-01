@@ -59,20 +59,38 @@ export class MemoryUnavailableError extends Error {
   }
 }
 
-let client: NeonQueryFunction<false, false> | null = null;
+/**
+ * Wall-clock bound on one memory operation.
+ *
+ * @remarks
+ * The Neon serverless driver sends each query as its own HTTP request and
+ * enforces no deadline of its own, so an unreachable store would otherwise
+ * hold a triage turn open with nothing to wake it. Memory is an analogy
+ * lookup, never a gate: fifteen seconds is far above a healthy query and
+ * short enough that giving up costs the ticket nothing.
+ */
+export const MEMORY_QUERY_TIMEOUT_MS = 15_000;
 
+/**
+ * A client for one memory operation.
+ *
+ * @remarks
+ * Deliberately not cached. The driver is stateless (no pooled connection to
+ * keep alive), and the deadline it carries has to be fresh: a module-level
+ * client would hold one already-fired signal and refuse every later query.
+ * Several queries inside one exported function share the client, so the bound
+ * covers the whole operation rather than each round trip separately.
+ */
 function db(): NeonQueryFunction<false, false> {
-  if (client !== null) {
-    return client;
-  }
   const url = process.env.FOREMAN_MEMORY_DATABASE_URL;
   if (!url) {
     throw new MemoryUnavailableError(
       "FOREMAN_MEMORY_DATABASE_URL is not set, so investigation memory is unavailable."
     );
   }
-  client = neon(url);
-  return client;
+  return neon(url, {
+    fetchOptions: { signal: AbortSignal.timeout(MEMORY_QUERY_TIMEOUT_MS) },
+  });
 }
 
 /** Whether the deployment has an investigation-memory database configured. */
