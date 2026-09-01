@@ -29,7 +29,7 @@ npx eve info
 
 Verify with `pnpm validate`, then exercise both direct and factory paths in `pnpm dev`. Evals cost real tokens. Run `pipeline/full-pipeline` only with `PIPELINE_SCRATCH_REPO` set to a scratch repository.
 
-`pnpm report:capabilities` prints the capability catalog each session lane carries, measured by `agent/lib/capability-budget.ts`. It compiles the manifest itself before reading it, so the numbers describe the working tree, and it refuses to publish a total it cannot fully resolve: the GitHub extension's tools are resolved through the extension's own resolver and eve's subagent delegation schema is read from eve, while a compiled dynamic entry with no registered resolver fails the run. eve's built-in tools are identical in every lane and stay outside the measurement. The report measures only; it never decides what a lane may call.
+`pnpm report:capabilities` prints the capability catalog each session lane carries, measured by `agent/lib/capability-budget.ts`. It compiles the manifest itself before reading it, so the numbers describe the working tree, and it refuses to publish a total it cannot fully resolve: the GitHub extension's tools are counted only after eve's own dynamic-tool preparation admits them (the authored modules bundled with eve's durable-callback transform, then eve's step dispatch checking each `defineTool` brand, callback descriptor, name, and schema), eve's subagent delegation schema is read from eve, and a compiled dynamic entry with no registered resolver or a tool map eve would drop fails the run. eve's built-in tools are identical in every lane and stay outside the measurement. The report measures only; it never decides what a lane may call.
 
 ## Eve conventions
 
