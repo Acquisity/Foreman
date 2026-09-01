@@ -337,6 +337,9 @@ describe("prepare_repository sandbox bounds", () => {
       options.command.includes(`mv ${STAGING} /workspace/repo`)
     );
     assert.ok(move?.abortSignal instanceof AbortSignal);
+    assert.ok(
+      commands.some((options) => options.command === DISCARD_STAGING)
+    );
     assert.equal(ran(commands, DISCARD), false);
   });
 

@@ -361,6 +361,7 @@ export const prepareWarmedOrClone = async (
     timeoutMs
   );
   if (move.exitCode !== 0) {
+    await discardPath(sandbox, STAGING_PATH, timeoutMs);
     return `Could not move the warmed checkout for ${repository}: ${String(move.stderr || move.stdout).trim()}`;
   }
   // From here `/workspace/repo` is populated, so any failure must roll it
