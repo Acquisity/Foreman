@@ -250,7 +250,12 @@ describe("lane measurement", () => {
 
 describe("dynamic capability resolution", () => {
   it("resolves each compiled dynamic skill through its own source", async () => {
-    const resolved = await resolveLaneCapabilities(FIXTURE, "slack");
+    // The repository-selected lane is the one of the four the factory skill
+    // is offered to; see `factorySkillAvailable`.
+    const resolved = await resolveLaneCapabilities(
+      FIXTURE,
+      "repository-interactive"
+    );
     assert.equal(resolved.dynamicSkills.length, 1);
     assert.equal(resolved.dynamicSkills[0]?.slug, "factory-pipeline");
     assert.equal(resolved.dynamicSkills[0]?.source, "skills/");
@@ -380,14 +385,17 @@ describe("dynamic capability resolution", () => {
     assert.ok((await subagentDelegationSchemaChars(true)) > chars);
   });
 
-  it("resolves the factory skill for every lane except the factory run", async () => {
+  it("resolves the factory skill only for the repository-selected lane", async () => {
+    // None of the measured lanes carries explicit factory intent, so the
+    // selected repository is the only thing that offers the skill here. The
+    // gate itself is exercised in `factory-lane.test.ts`.
     const resolved = await Promise.all(
       CAPABILITY_LANES.map((lane) => resolveLaneCapabilities(FIXTURE, lane))
     );
     for (const [index, lane] of CAPABILITY_LANES.entries()) {
       assert.equal(
         resolved[index]?.dynamicSkills.length,
-        lane === "autonomous-factory" ? 0 : 1,
+        lane === "repository-interactive" ? 1 : 0,
         `${lane} dynamic skills`
       );
     }
@@ -513,9 +521,14 @@ describe("capability report", () => {
       }
     }
     const slack = byLane.get("slack");
+    const intake = byLane.get("slack-intake-only");
+    const repository = byLane.get("repository-interactive");
     const factory = byLane.get("autonomous-factory");
-    assert.ok(slack && factory);
-    // The one catalog difference the authored configuration makes today.
-    assert.ok(slack.catalogChars > factory.catalogChars);
+    assert.ok(slack && intake && repository && factory);
+    // The one catalog difference the authored configuration makes today: the
+    // factory skill, which only the repository-selected lane is offered.
+    assert.ok(repository.catalogChars > slack.catalogChars);
+    assert.equal(slack.catalogChars, intake.catalogChars);
+    assert.equal(slack.catalogChars, factory.catalogChars);
   });
 });

@@ -11,6 +11,11 @@ import type {
   SlackMessage,
 } from "eve/channels/slack";
 import type { MessageStreamEvent } from "eve/client";
+import {
+  FACTORY_REQUESTS,
+  NOT_FACTORY_REQUESTS,
+} from "./factory-intent-fixtures.js";
+import { factorySkillAvailable } from "./factory-lane.js";
 import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
 // Connector variables the channel module requires at evaluation time.
@@ -27,6 +32,10 @@ for (const line of readFileSync(
     process.env[name] ??= "stub/stub";
   }
 }
+// One intake-only channel, so the intake lane can be dispatched for real
+// rather than inferred from a hand-built auth object. Read at module load by
+// constants.ts, so it has to be set before the channel import below.
+process.env.SLACK_INTAKE_ONLY_CHANNELS = "C0INTAKEONLY";
 
 const {
   default: channel,
@@ -34,7 +43,7 @@ const {
   slackChannelEvents,
 } = await import("../channels/slack.js");
 
-const message = (text: string): SlackMessage => ({
+const message = (text: string, channelId = "C0DEV"): SlackMessage => ({
   attachments: [],
   author: {
     fullName: "Aaron Fraga",
@@ -43,7 +52,7 @@ const message = (text: string): SlackMessage => ({
     userId: "U123",
     userName: "aaron",
   },
-  channelId: "C0DEV",
+  channelId,
   markdown: text,
   raw: {},
   teamId: "T123",
@@ -343,6 +352,43 @@ describe("slack channel", () => {
     );
     assert.ok(result && "auth" in result && result.auth);
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
+  });
+
+  // Every case runs through the real dispatch: the defect this pins was a
+  // pattern the channel applied to the delivered text, so an auth object built
+  // by hand would have agreed with either implementation.
+  const dispatchedAuth = async (text: string, channelId?: string) => {
+    const result = await dispatch(
+      inboundContext(undefined),
+      channelId ? message(text, channelId) : message(text)
+    );
+    assert.ok(result && "auth" in result && result.auth);
+    return result.auth;
+  };
+
+  // Both lanes, because intake-only Slack reads the same message through the
+  // same dispatch and only the trust condition differs.
+  const dispatchedLanes = (text: string) =>
+    Promise.all([dispatchedAuth(text), dispatchedAuth(text, "C0INTAKEONLY")]);
+
+  it("stamps factory intent for every request in the matrix", async () => {
+    for (const text of FACTORY_REQUESTS) {
+      for (const auth of await dispatchedLanes(text)) {
+        assert.ok(factorySkillAvailable(auth), text);
+      }
+    }
+  });
+
+  it("stamps no factory intent for a name, a sentence, or a negation", async () => {
+    for (const text of NOT_FACTORY_REQUESTS) {
+      // An empty message is never delivered; every other case is.
+      if (text === "") {
+        continue;
+      }
+      for (const auth of await dispatchedLanes(text)) {
+        assert.ok(!factorySkillAvailable(auth), text);
+      }
+    }
   });
 
   it("clears progress without attributing cooperative cancellation to stop", async () => {

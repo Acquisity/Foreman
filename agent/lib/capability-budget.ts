@@ -4,12 +4,13 @@
  * configuration, and the same resolvers eve runs for dynamic capabilities.
  *
  * @remarks
- * This module measures and reports. It gates nothing: every lane sees the
- * same authored tools, skills, and subagents that eve compiles today, and the
- * only lane difference it can observe is one the authored configuration
- * already makes (the `factory-pipeline` dynamic skill, which resolves to null
- * for an unattended factory run). Reading a lane's numbers must never change
- * what that lane may call.
+ * This module measures and reports. It gates nothing: the lane differences it
+ * observes are the ones the authored configuration already makes, today the
+ * `factory-pipeline` dynamic skill, which `factorySkillAvailable` offers only
+ * to a lane that can take the factory path (of the four measured lanes, only
+ * `repository-interactive`, since none of them carries explicit factory
+ * intent). Reading a lane's numbers must never change what that lane may
+ * call.
  *
  * Three sources are measured, and every one of them is resolved rather than
  * estimated:
