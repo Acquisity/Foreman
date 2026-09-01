@@ -23,7 +23,7 @@ Skills under `agent/skills/` are load-on-demand procedures the model pulls in wh
 
 ## Execution paths
 
-General mode is the default for Slack, Linear, and ordinary interactive sessions. Small code and documentation changes stay direct: Foreman resolves the repository, prepares a workspace, creates a `foreman/` feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request when requested. It does not invoke factory stations merely because files change.
+General mode is the default for Slack, Linear, and ordinary interactive sessions. Small code and documentation changes stay direct: Foreman resolves the repository, prepares a workspace, creates a feature branch under any validated name, makes the change, runs proportionate checks, pushes, and opens a pull request when requested. It does not invoke factory stations merely because files change.
 
 Factory mode runs these stations in order:
 
@@ -77,7 +77,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `GITHUB_CONNECTOR` | `github/foreman-agent` | GitHub channel, API, and brokered git credentials |
 | `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and MCP |
 | `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
-| `FOREMAN_BRANCH_PREFIX` | `foreman/` | Foreman-owned feature branches |
+| `FOREMAN_BRANCH_PREFIX` | `foreman/` | Factory-owned feature branches, recognized for red-CI stabilization |
 | `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |

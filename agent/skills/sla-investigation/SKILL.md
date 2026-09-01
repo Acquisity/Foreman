@@ -105,7 +105,7 @@ What it is: the product monorepo (Next.js app, `packages/jobs` Inngest functions
 
 What it's for: tracing what the bug actually touches, so the root cause is grounded in code rather than in the ticket's claim about the code.
 
-How to use it: `prepare_repository` with `{ repository: "Acquisity/Acquisity" }` first. It returns a `worktree`, either `/workspace/repo` or `/workspace`, and every path you then pass to `grep` or `read_file` is relative to that root. A repository path from a ticket, such as `apps/web/lib/...`, hangs off it. Getting this wrong returns an empty result that looks like the code is absent when it is only somewhere else, so read the returned `worktree` rather than assuming one. A session may prepare one repository and cannot switch.
+How to use it: `prepare_repository` with `{ repository: "Acquisity/Acquisity" }` first. It returns a `worktree`, either `/workspace/repo` or `/workspace`, and every path you then pass to `grep` or `read_file` is relative to that root. A repository path from a ticket, such as `apps/web/lib/...`, hangs off it. Getting this wrong returns an empty result that looks like the code is absent when it is only somewhere else, so read the returned `worktree` rather than assuming one.
 
 ### PlanetScale (`planetscale_execute_read_query`)
 

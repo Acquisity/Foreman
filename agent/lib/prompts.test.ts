@@ -10,8 +10,12 @@ process.env.PLANETSCALE_MCP_CONNECTOR =
 const { FACTORY_PROMPT, GENERAL_MODE, GENERAL_PROMPT, PIPELINE, selectPrompt } =
   await import("./prompts.js");
 const { AUTONOMOUS_PRINCIPAL } = await import("./trust.js");
+const { FOREMAN_BRANCH_PREFIX } = await import("./constants.js");
 
 const CHANNEL_NAME = /Linear|Slack/;
+const REPLACES_PREPARED = /`prepare_repository` replaces the prepared one/u;
+const NEVER_REPLACED = /never replaced/u;
+const SIGNED_BINDING = /every repository tool to refuse anything else/u;
 
 describe("selectPrompt", () => {
   it("selects FACTORY_PROMPT for the autonomous principal and inlines the pipeline", () => {
@@ -50,5 +54,35 @@ describe("selectPrompt", () => {
         )
       );
     }
+  });
+});
+
+describe("repository guidance", () => {
+  it("describes attended replacement and the checkouts that are never replaced", () => {
+    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
+      assert.match(prompt, REPLACES_PREPARED);
+      assert.match(prompt, NEVER_REPLACED);
+    }
+  });
+
+  it("keeps a signed GitHub session bound for the whole session", () => {
+    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
+      assert.match(prompt, SIGNED_BINDING);
+    }
+  });
+
+  it("asks direct work for a feature branch without a required prefix", () => {
+    // `push_branch` validates the name and nothing else, so the general path
+    // must not send the model renaming a branch it can already deliver.
+    assert.ok(!GENERAL_PROMPT.includes(FOREMAN_BRANCH_PREFIX));
+    assert.ok(GENERAL_PROMPT.includes("create a feature branch"));
+  });
+
+  it("keeps the factory's own branch prefix on the implementer", () => {
+    // Ownership, not permission: the GitHub channel recognizes the factory's
+    // pull requests by this prefix for red-CI stabilization.
+    assert.ok(
+      PIPELINE.includes(`pushes a \`${FOREMAN_BRANCH_PREFIX}\` feature branch`)
+    );
   });
 });
