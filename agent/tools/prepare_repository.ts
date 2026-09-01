@@ -778,7 +778,9 @@ const recordPreparedRepository = async (
  * a silent no-op, and `logOpsEvent` keeps the line one bounded JSON record
  * that cannot break the turn. This is the only place a refusal is logged, so
  * a refusal that travelled through a rollback still leaves one line, and the
- * message is the same text the model reads.
+ * message is the same bounded reason the model reads: `logOpsEvent` truncates
+ * a string past `OPS_LOG_STRING_LIMIT`, so a long git or configuration error
+ * is logged as its prefix.
  */
 const refuse = (code: string, error: string) => {
   logOpsEvent(
