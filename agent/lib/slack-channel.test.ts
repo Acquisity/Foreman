@@ -28,6 +28,10 @@ for (const line of readFileSync(
     process.env[name] ??= "stub/stub";
   }
 }
+// One intake-only channel, so the intake lane can be dispatched for real
+// rather than inferred from a hand-built auth object. Read at module load by
+// constants.ts, so it has to be set before the channel import below.
+process.env.SLACK_INTAKE_ONLY_CHANNELS = "C0INTAKEONLY";
 
 const {
   default: channel,
@@ -35,7 +39,7 @@ const {
   slackChannelEvents,
 } = await import("../channels/slack.js");
 
-const message = (text: string): SlackMessage => ({
+const message = (text: string, channelId = "C0DEV"): SlackMessage => ({
   attachments: [],
   author: {
     fullName: "Aaron Fraga",
@@ -44,7 +48,7 @@ const message = (text: string): SlackMessage => ({
     userId: "U123",
     userName: "aaron",
   },
-  channelId: "C0DEV",
+  channelId,
   markdown: text,
   raw: {},
   teamId: "T123",
@@ -346,20 +350,80 @@ describe("slack channel", () => {
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
-  it("stamps factory intent only when the message asks for the factory", async () => {
-    const ordinary = await dispatch(
+  // Every case runs through the real dispatch: the defect this pins was a
+  // pattern the channel applied to the delivered text, so an auth object built
+  // by hand would have agreed with either implementation.
+  const dispatchedAuth = async (text: string, channelId?: string) => {
+    const result = await dispatch(
       inboundContext(undefined),
-      message("please fix the failing billing test")
+      channelId ? message(text, channelId) : message(text)
     );
-    assert.ok(ordinary && "auth" in ordinary && ordinary.auth);
-    assert.ok(!factorySkillAvailable(ordinary.auth));
+    assert.ok(result && "auth" in result && result.auth);
+    return result.auth;
+  };
 
-    const requested = await dispatch(
-      inboundContext(undefined),
-      message("take this through the factory")
+  it("stamps factory intent only when the message asks for the factory", async () => {
+    assert.ok(
+      !factorySkillAvailable(
+        await dispatchedAuth("please fix the failing billing test")
+      )
     );
-    assert.ok(requested && "auth" in requested && requested.auth);
-    assert.ok(factorySkillAvailable(requested.auth));
+    assert.ok(
+      factorySkillAvailable(
+        await dispatchedAuth("take this through the factory")
+      )
+    );
+  });
+
+  // Asserts that no lane gains the factory from `text`, ordinary or intake-only.
+  const assertNoIntent = async (texts: readonly string[], why: string) => {
+    const lanes = texts.flatMap((text) => [
+      { channelId: undefined, text },
+      { channelId: "C0INTAKEONLY", text },
+    ]);
+    const auths = await Promise.all(
+      lanes.map((lane) => dispatchedAuth(lane.text, lane.channelId))
+    );
+    for (const [index, auth] of auths.entries()) {
+      assert.ok(
+        !factorySkillAvailable(auth),
+        `${why}: ${lanes[index]?.text} in ${lanes[index]?.channelId ?? "C0DEV"}`
+      );
+    }
+  };
+
+  it("reads no factory intent out of a slug or a path", async () => {
+    // Each of these contains the word and none of them asks for anything.
+    await assertNoIntent(
+      [
+        "Acquisity/Foreman",
+        "factory/repo",
+        "owner/factory",
+        "channels/factory.ts",
+        "look at owner/factory and channels/factory.ts",
+      ],
+      "a slug or path is not a request"
+    );
+  });
+
+  it("reads no factory intent out of a negated request", async () => {
+    await assertNoIntent(
+      [
+        "do not use factory",
+        "don't run this through the factory",
+        "fix it directly, without the factory",
+        "skip the factory on this one",
+      ],
+      "a negated request asks for the opposite"
+    );
+  });
+
+  it("offers intake-only Slack the factory on an explicit request", async () => {
+    assert.ok(
+      factorySkillAvailable(
+        await dispatchedAuth("run the factory on this", "C0INTAKEONLY")
+      )
+    );
   });
 
   it("clears progress without attributing cooperative cancellation to stop", async () => {

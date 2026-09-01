@@ -1,3 +1,4 @@
+import type { UserContent } from "ai";
 import type { SessionAuthContext } from "eve/context";
 import { repositoryFromAuth } from "./repository.js";
 import { isAutonomous, isIntakeOnly, isTrusted } from "./trust.js";
@@ -33,17 +34,50 @@ import { isAutonomous, isIntakeOnly, isTrusted } from "./trust.js";
  */
 export const FACTORY_INTENT_ATTRIBUTE = "factoryIntent";
 
-// A request names the factory by word. `factory` is not a term ordinary
-// Acquisity conversation reaches for, and the ticket asks for explicit intent
-// rather than a guess at complexity, so one bounded word match is the whole
-// reading. Input is length-bounded before matching, like every other pattern
-// run over channel text.
+// A request names the factory by word, affirmatively. `factory` is not a term
+// ordinary Acquisity conversation reaches for, but it is a term that appears
+// inside names: a bare word match reads `factory/repo`, `owner/factory`, and
+// `channels/factory.ts` as requests, which would hand a slug or a file path the
+// authority the ticket keeps free-text tokens from having. So the word counts
+// only when it stands on its own, outside a slug or path component, and only
+// when the clause carrying it is not a negation ("do not use the factory").
+// Input is length-bounded before matching, like every other pattern run over
+// channel text.
 const MAX_INTENT_TEXT_LENGTH = 10_000;
-const FACTORY_INTENT_PATTERN = /\bfactory\b/iu;
+// Not preceded by a word character, `/`, or `.`, and not followed by a word
+// character, a `/`, or a file extension. A trailing sentence period still
+// counts, so "take this through the factory." reads as a request.
+const FACTORY_WORD_PATTERN = /(?<![\w/.])factory(?![\w/]|\.[a-z0-9])/giu;
+// A negator earlier in the same clause reverses the request. Apostrophes are
+// stripped before matching so "don't" and "dont" read alike.
+const NEGATION_PATTERN =
+  /\b(?:no|not|never|without|avoid|skip|dont|doesnt|didnt|cant|wont|isnt)\b[^.!?;\n]*$/iu;
+const APOSTROPHES = /['\u2019]/gu;
+
+const deliveredText = (content: string | UserContent): string => {
+  if (typeof content === "string") {
+    return content;
+  }
+  const parts: string[] = [];
+  for (const part of content) {
+    if (part.type === "text") {
+      parts.push(part.text);
+    }
+  }
+  return parts.join("\n");
+};
 
 /** Whether a delivered message explicitly asks for the factory. */
-export const isFactoryRequest = (text: string): boolean =>
-  FACTORY_INTENT_PATTERN.test(text.slice(0, MAX_INTENT_TEXT_LENGTH));
+export const isFactoryRequest = (content: string | UserContent): boolean => {
+  const text = deliveredText(content).slice(0, MAX_INTENT_TEXT_LENGTH);
+  for (const match of text.matchAll(FACTORY_WORD_PATTERN)) {
+    const clause = text.slice(0, match.index).replace(APOSTROPHES, "");
+    if (!NEGATION_PATTERN.test(clause)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /** Returns a copy of `auth` carrying the {@link FACTORY_INTENT_ATTRIBUTE}. */
 export const stampFactoryIntent = (
