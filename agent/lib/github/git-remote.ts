@@ -27,10 +27,17 @@ export const REPO_DIR = "/workspace/repo";
  * direct pushes to the default branch.
  */
 export function validateBranch(branch: string): string | null {
+  const components = branch.split("/");
   if (
     !BRANCH_PATTERN.test(branch) ||
     branch.includes("..") ||
-    branch.includes("//")
+    branch.includes("//") ||
+    components.some(
+      (component) =>
+        component.startsWith(".") ||
+        component.endsWith(".") ||
+        component.endsWith(".lock")
+    )
   ) {
     return `"${branch}" is not a valid branch name.`;
   }
