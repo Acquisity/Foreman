@@ -29,10 +29,15 @@ export const TIMED_OUT_EXIT_CODE = 124;
  * @remarks
  * eve 0.44's sandbox `run` takes an `abortSignal` and no timeout of its own,
  * and it composes the signal with the session's, so `AbortSignal.timeout` is
- * the version-matched bound. A deadline comes back as a non-zero result so
- * every caller's existing failure branch handles it; anything else, including
- * a cancelled turn, still throws, which is what keeps caller cancellation
- * distinguishable from a timeout.
+ * the version-matched bound. A caller that passes its own signal keeps it:
+ * the two are composed, so an already-aborted caller signal still cancels the
+ * command instead of being replaced by a fresh deadline.
+ *
+ * The failure is classified from the composed signal's reason, which latches
+ * whichever signal aborted first. A deadline comes back as a non-zero result
+ * so every caller's existing failure branch handles it; anything else,
+ * including a cancelled turn, still throws, even when the deadline fires
+ * afterwards while the rejection is in flight.
  */
 export const boundedRun = async (
   sandbox: SandboxSession,
@@ -40,10 +45,13 @@ export const boundedRun = async (
   timeoutMs: number = REPOSITORY_OPERATION_TIMEOUT_MS
 ): Promise<SandboxCommandResult> => {
   const deadline = AbortSignal.timeout(timeoutMs);
+  const composed = options.abortSignal
+    ? AbortSignal.any([options.abortSignal, deadline])
+    : deadline;
   try {
-    return await sandbox.run({ ...options, abortSignal: deadline });
+    return await sandbox.run({ ...options, abortSignal: composed });
   } catch (error) {
-    if (!deadline.aborted) {
+    if (!(deadline.aborted && composed.reason === deadline.reason)) {
       throw error;
     }
     return {

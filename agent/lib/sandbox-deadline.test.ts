@@ -24,12 +24,15 @@ const fakeSandbox = (run: (options: SandboxRunOptions) => Promise<unknown>) => {
   return { commands, sandbox };
 };
 
-/** A command that never returns until its own deadline aborts it. */
+/** A command that never returns until the signal it was handed aborts it. */
 const hangs = (options: SandboxRunOptions) =>
   new Promise<never>((_resolve, reject) => {
-    options.abortSignal?.addEventListener("abort", () =>
-      reject(options.abortSignal?.reason)
-    );
+    const signal = options.abortSignal;
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    signal?.addEventListener("abort", () => reject(signal.reason));
   });
 
 describe("boundedRun", () => {
@@ -59,6 +62,52 @@ describe("boundedRun", () => {
       boundedRun(sandbox, { command: "git fetch" }, 300_000),
       (error: unknown) => error === cancelled
     );
+  });
+
+  it("keeps an already-aborted caller signal instead of discarding it", async () => {
+    const caller = new AbortController();
+    caller.abort(new Error("turn cancelled before the command started"));
+    const { commands, sandbox } = fakeSandbox(hangs);
+    await assert.rejects(
+      // A short bound on purpose: a helper that dropped the caller's signal
+      // would report exit 124 here instead of rethrowing the cancellation.
+      boundedRun(
+        sandbox,
+        { abortSignal: caller.signal, command: "git fetch" },
+        50
+      ),
+      (error: unknown) => error === caller.signal.reason
+    );
+    assert.equal(commands[0]?.abortSignal?.aborted, true);
+    assert.equal(commands[0]?.abortSignal?.reason, caller.signal.reason);
+  });
+
+  it("rethrows a caller cancellation even when the deadline fires afterwards", async () => {
+    const caller = new AbortController();
+    const { sandbox } = fakeSandbox(hangs);
+    const running = boundedRun(
+      sandbox,
+      { abortSignal: caller.signal, command: "git fetch" },
+      20
+    );
+    caller.abort(new Error("turn cancelled"));
+    await assert.rejects(running, (error: unknown) => {
+      assert.equal((error as Error).message, "turn cancelled");
+      return true;
+    });
+  });
+
+  it("reports a timeout that wins the race against a later caller abort", async () => {
+    const caller = new AbortController();
+    const { sandbox } = fakeSandbox(hangs);
+    const result = await boundedRun(
+      sandbox,
+      { abortSignal: caller.signal, command: "git push" },
+      5
+    );
+    caller.abort(new Error("cancelled after the deadline"));
+    assert.equal(result.exitCode, TIMED_OUT_EXIT_CODE);
+    assert.match(result.stderr, TIMED_OUT_MESSAGE);
   });
 
   it("rethrows an ordinary failure that is not the deadline", async () => {
