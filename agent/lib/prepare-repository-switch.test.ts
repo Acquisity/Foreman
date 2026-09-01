@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
+import { OPS_LOG_LINE_LIMIT } from "./ops-log.js";
 import {
   broker,
   CANCELLED,
@@ -115,14 +116,12 @@ const prepare = async (
         : run(options),
     write
   );
-  const result = (await prepareRepositoryWorkspace(
-    requested,
-    {
-      getSandbox: () => Promise.resolve(sandbox),
-      session: { auth: { current: auth } },
-    },
-    { broker, timeoutMs: TIMEOUT_MS }
-  )) as {
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (line: unknown) => {
+    warnings.push(String(line));
+  };
+  let result: {
     current?: { repository: string; source: string };
     error?: string;
     previous?: { repository: string; source: string } | null;
@@ -130,7 +129,19 @@ const prepare = async (
     reused?: boolean;
     success?: boolean;
   };
-  return { commands, result, written };
+  try {
+    result = (await prepareRepositoryWorkspace(
+      requested,
+      {
+        getSandbox: () => Promise.resolve(sandbox),
+        session: { auth: { current: auth } },
+      },
+      { broker, timeoutMs: TIMEOUT_MS }
+    )) as typeof result;
+  } finally {
+    console.warn = original;
+  }
+  return { commands, result, warnings, written };
 };
 describe("prepare_repository switching", () => {
   it("reuses the repository it already prepared", async () => {
@@ -536,5 +547,67 @@ describe("prepare_repository switching", () => {
     assert.match(result.error ?? "", PREVIOUS_KEPT);
     assert.equal(ran(commands, "git clone"), false);
     assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+});
+
+describe("prepare_repository refusal logging", () => {
+  /** The one line a refusal is allowed to leave, parsed back. */
+  const record = (warnings: string[]) => {
+    assert.equal(warnings.length, 1);
+    assert.ok((warnings[0] ?? "").length <= OPS_LOG_LINE_LIMIT);
+    return JSON.parse(warnings[0] ?? "") as Record<string, unknown>;
+  };
+
+  it("warns once for a refusal the model can act on", async () => {
+    const { result, warnings } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      stampUnattended(attendedAuth)
+    );
+    assert.equal(result.success, false);
+    const line = record(warnings);
+    assert.equal(line.event, "prepare_repository.refused");
+    assert.equal(line.code, "checkout_unavailable");
+    // The operator reads the same reason the model did.
+    assert.match(String(line.message), UNATTENDED_REFUSAL);
+  });
+
+  it("warns once for an invalid repository, before any sandbox work", async () => {
+    const { commands, result, warnings } = await prepare(
+      "not a repository",
+      null,
+      attendedAuth
+    );
+    assert.equal(result.success, false);
+    assert.equal(record(warnings).code, "invalid_repository");
+    assert.deepEqual(commands, []);
+  });
+
+  it("warns once for a failed switch that rolled back, not once per step", async () => {
+    const { result, warnings } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.startsWith("git clone")) {
+          return failed("fatal: repository not found");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(String(record(warnings).message), PREVIOUS_KEPT);
+  });
+
+  it("stays quiet when the repository is prepared", async () => {
+    const { result, warnings } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) =>
+        options.command.startsWith("test ") ? failed("") : ok(HEAD_BEFORE)
+    );
+    assert.equal(result.success, true);
+    assert.deepEqual(warnings, []);
   });
 });
