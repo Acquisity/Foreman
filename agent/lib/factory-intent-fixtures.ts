@@ -32,15 +32,26 @@ export const NOT_FACTORY_REQUESTS = [
   "look at owner/factory and channels/factory.ts",
   // A longer word that starts or ends with it, in any script.
   "factoryé",
+  "factory\u0301",
   "refactory",
   "factories",
   "refactoring the intake handler",
+  // An apostrophe inside the word is not wrapping punctuation.
+  "fac'tory",
+  "fac’tory",
   // Ordinary work.
   "please fix the failing billing test",
   "",
   // A negator attached to the request itself.
   "do not use factory",
   "don't use the factory",
+  "cannot use the factory",
+  "can't use the factory",
+  "couldn't use the factory",
+  "mustn't use the factory",
+  "shouldn't use the factory",
+  "won't use the factory",
+  "wouldn't use the factory",
   "no factory please",
   "skip the factory",
   "skip the factory on this one",

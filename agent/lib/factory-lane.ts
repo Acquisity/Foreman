@@ -54,7 +54,8 @@ const FACTORY_WORD = "factory";
 // letter of any script is not stripped either. What is left has to equal the
 // word exactly, which is what makes `factory-pipeline.ts`, `factory-tools/repo`
 // and `factoryé` names rather than requests.
-const WRAPPING_PUNCTUATION = /^[^\p{L}\p{N}/\-_@#]+|[^\p{L}\p{N}/\-_@#]+$/gu;
+const WRAPPING_PUNCTUATION =
+  /^[^\p{L}\p{M}\p{N}/\-_@#]+|[^\p{L}\p{M}\p{N}/\-_@#]+$/gu;
 const APOSTROPHES = /['\u2019]/gu;
 const WHITESPACE = /\s+/u;
 // Ends a clause, so nothing before it belongs to the phrase that follows.
@@ -62,16 +63,21 @@ const CLAUSE_END = /[,.!?;:]$/u;
 const NEGATORS = new Set([
   "avoid",
   "cant",
+  "cannot",
+  "couldnt",
   "didnt",
   "doesnt",
   "dont",
   "isnt",
+  "mustnt",
   "never",
   "no",
   "not",
+  "shouldnt",
   "skip",
   "without",
   "wont",
+  "wouldnt",
 ]);
 // How far back a negator can reach. Negation belongs to the factory phrase, so
 // the scan stops at the clause before it ("no problem, run the factory" asks
@@ -97,10 +103,11 @@ const deliveredText = (content: string | UserContent): string => {
 
 /** The word a token carries, once wrapping punctuation is off it. */
 const bareWord = (token: string): string =>
-  token
-    .replace(WRAPPING_PUNCTUATION, "")
-    .replace(APOSTROPHES, "")
-    .toLowerCase();
+  token.replace(WRAPPING_PUNCTUATION, "").toLowerCase();
+
+/** A word normalized only for matching contractions in the negator set. */
+const negatorWord = (token: string): string =>
+  bareWord(token).replace(APOSTROPHES, "");
 
 /** Whether a negator attached to this phrase reverses the word at `index`. */
 const isNegated = (words: readonly string[], index: number): boolean => {
@@ -110,7 +117,7 @@ const isNegated = (words: readonly string[], index: number): boolean => {
     if (CLAUSE_END.test(token)) {
       return false;
     }
-    if (NEGATORS.has(bareWord(token))) {
+    if (NEGATORS.has(negatorWord(token))) {
       return true;
     }
   }
