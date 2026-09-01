@@ -20,8 +20,15 @@
  * - Dynamic capabilities, which appear in the manifest only as a resolver
  *   descriptor. Each descriptor is run through its own authored module, so the
  *   GitHub extension's tools are counted with the names, descriptions, and
- *   schemas the model actually sees. A descriptor with no registered resolver
- *   fails the measurement instead of being reported as a smaller number.
+ *   schemas the model actually sees. A dynamic tool is counted only after
+ *   eve's own runtime preparation admits it: the authored modules are bundled
+ *   with the same transform that stamps durable callback descriptors in a
+ *   deployment, and eve's step-time dispatch checks each entry's `defineTool`
+ *   brand, validates every durable callback, qualifies the names, and
+ *   serializes the schemas. A result eve would drop measures as a failure,
+ *   never as thirty-one model-visible tools. A descriptor with no registered
+ *   resolver fails the measurement instead of being reported as a smaller
+ *   number.
  * - The subagent delegation tools eve lowers at runtime. Their input schema is
  *   framework-owned and identical for every subagent, so it is read from eve
  *   itself rather than guessed at.
@@ -31,8 +38,10 @@
  * lane by construction, so they cannot explain a difference between lanes,
  * which is what this report exists to show.
  */
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SessionAuthContext } from "eve/context";
 import type { DynamicResolveContext } from "eve/skills";
@@ -55,6 +64,18 @@ const dynamicEntrySchema = z.object({
   eventNames: z.array(z.string()).default([]),
   slug: z.string(),
   sourceId: z.string(),
+});
+
+/**
+ * A compiled dynamic tool, in the shape eve's own resolver takes: the module
+ * it loads, the export it reads, and the extension namespace it prefixes
+ * tool names with.
+ */
+const dynamicToolEntrySchema = dynamicEntrySchema.extend({
+  exportName: z.string().optional(),
+  extensionNamespace: z.string().optional(),
+  logicalPath: z.string(),
+  sourceKind: z.literal("module"),
 });
 
 const namedEntrySchema = z.object({
@@ -83,6 +104,8 @@ export const MEASURED_MANIFEST_VERSION = 41;
  * manifest of another kind or revision is rejected outright.
  */
 export const capabilityManifestSchema = z.object({
+  /** The application root eve compiled, where its authored modules live. */
+  appRoot: z.string(),
   config: z
     .object({
       experimental: z
@@ -91,7 +114,7 @@ export const capabilityManifestSchema = z.object({
     })
     .optional(),
   dynamicSkills: z.array(dynamicEntrySchema).default([]),
-  dynamicTools: z.array(dynamicEntrySchema).default([]),
+  dynamicTools: z.array(dynamicToolEntrySchema).default([]),
   kind: z.literal(MEASURED_MANIFEST_KIND),
   skills: z
     .array(namedEntrySchema.extend({ markdown: z.string().default("") }))
@@ -116,6 +139,12 @@ export const COMPILED_MANIFEST_PATH =
 
 /** Where the same commands record how that manifest was produced. */
 export const COMPILE_METADATA_PATH = ".eve/compile/compile-metadata.json";
+
+/** Where the same commands write the module map the manifest's sources load through. */
+const COMPILED_MODULE_MAP_PATH = ".eve/compile/module-map.mjs";
+
+/** eve's own cache for bundled authored modules, which it evaluates from disk. */
+const AUTHORED_MODULE_CACHE_PATH = "node_modules/.cache/eve/authored-modules";
 
 const compileMetadataSchema = z.object({
   generator: z.object({ name: z.literal("eve"), version: z.string() }),
@@ -351,103 +380,270 @@ export function capabilitySource(sourceId: string): string {
   return `${directory ?? sourceId}/`;
 }
 
-// eve binds an extension's mount config to the namespace it was mounted under,
-// reading the ambient scope when the extension module is first evaluated. The
-// resolver below sets that scope so the authored mount in
-// `agent/extensions/github.ts` binds, then restores it: nothing else in this
-// process mounts an extension, and leaving a scope set would bind the next one
-// under the wrong namespace.
-const EXTENSION_CONFIG_SCOPE = Symbol.for("eve.ext-config-scope");
+const isFunction = (value: unknown): boolean => typeof value === "function";
 
-const toolInputSchemaChars = (schema: unknown, name: string): number => {
+/**
+ * Loads one of eve's runtime modules by path and checks it exposes what this
+ * measurement calls.
+ *
+ * @remarks
+ * eve's dynamic-tool preparation is not on its package exports map, so it is
+ * read from the installed package the way the subagent delegation schema is.
+ * A module eve moves or reshapes fails here with the path that broke, rather
+ * than measuring something else.
+ */
+const eveRuntimeModule = async <T extends z.ZodType>(
+  path: string,
+  shape: T
+): Promise<z.infer<T>> => {
+  const url = new URL(path, evePackageUrl());
+  let module: unknown;
   try {
-    const json: Record<string, unknown> = {
-      ...z.toJSONSchema(schema as z.ZodType, { io: "input" }),
-    };
-    // The manifest records lowered schemas without the dialect keyword, and
-    // neither does the model see it. JSON.stringify drops undefined values.
-    json.$schema = undefined;
-    return JSON.stringify(json).length;
+    module = await import(url.href);
   } catch (error) {
+    throw new Error(`eve's ${path} is not readable at ${url.href}.`, {
+      cause: error,
+    });
+  }
+  const parsed = shape.safeParse(module);
+  if (!parsed.success) {
     throw new Error(
-      `Could not lower the input schema of '${name}' to JSON Schema.`,
-      { cause: error }
+      `eve no longer exposes what capability-budget.ts calls at ${url.href}, so dynamic tools cannot be measured.`,
+      { cause: parsed.error }
     );
   }
+  return parsed.data;
 };
 
-const resolvedToolMapSchema = z.record(
-  z.string(),
-  z.object({ description: z.string().default(""), inputSchema: z.unknown() })
+const eveFunction = z.custom<(...args: unknown[]) => unknown>(isFunction);
+
+/** The compiled module map eve resolves authored sources through. */
+const compiledModuleMapSchema = z.object({
+  nodes: z.record(
+    z.string(),
+    z.object({ modules: z.record(z.string(), z.unknown()) })
+  ),
+});
+
+type CompiledModuleMap = z.infer<typeof compiledModuleMapSchema>;
+
+/**
+ * Bundles and evaluates the authored module map the way eve prepares a
+ * development generation, once per process.
+ *
+ * @remarks
+ * This is the one step that makes durable callback descriptors observable.
+ * eve stamps them with a source transform that runs when it bundles the
+ * authored modules for a deployment or a development generation, never when
+ * the same files are imported directly. `prepareMaterializedAuthoredModules`
+ * is eve's bundling entry point and applies that transform along with the
+ * extension mount scoping, so the evaluated modules carry exactly the
+ * callbacks a deployment carries. The bundle is written to eve's own cache for
+ * bundled authored modules and imported from there, as eve does, so its
+ * package imports resolve. Evaluating it runs the top level of every authored
+ * module, which is what `eve info` does too, so it needs the same environment.
+ */
+let authoredModuleMap: Promise<CompiledModuleMap> | undefined;
+
+const loadAuthoredModuleMapOnce = async (
+  appRoot: string
+): Promise<CompiledModuleMap> => {
+  const [
+    { loadCompiledManifest },
+    { createDiskRuntimeCompiledArtifactsSource },
+  ] = await Promise.all([
+    eveRuntimeModule(
+      "./dist/src/runtime/loaders/manifest.js",
+      z.object({ loadCompiledManifest: eveFunction })
+    ),
+    eveRuntimeModule(
+      "./dist/src/runtime/compiled-artifacts-source.js",
+      z.object({ createDiskRuntimeCompiledArtifactsSource: eveFunction })
+    ),
+  ]);
+  const { prepareMaterializedAuthoredModules } = await eveRuntimeModule(
+    "./dist/src/internal/materialized-authored-modules.js",
+    z.object({ prepareMaterializedAuthoredModules: eveFunction })
+  );
+  const manifest = await loadCompiledManifest({
+    compiledArtifactsSource: createDiskRuntimeCompiledArtifactsSource(appRoot),
+  });
+  const { moduleMapCode } = z.object({ moduleMapCode: z.string() }).parse(
+    await prepareMaterializedAuthoredModules({
+      manifest,
+      moduleMapPath: join(appRoot, COMPILED_MODULE_MAP_PATH),
+    })
+  );
+  const hash = createHash("sha256").update(moduleMapCode).digest("hex");
+  const directory = join(appRoot, AUTHORED_MODULE_CACHE_PATH);
+  const file = join(directory, `capability-budget-${hash}.mjs`);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(file, moduleMapCode);
+  const loaded: unknown = await import(`${pathToFileURL(file).href}?v=${hash}`);
+  return compiledModuleMapSchema.parse(
+    z.object({ moduleMap: z.unknown() }).parse(loaded).moduleMap
+  );
+};
+
+const loadAuthoredModuleMap = (appRoot: string): Promise<CompiledModuleMap> => {
+  authoredModuleMap ??= loadAuthoredModuleMapOnce(appRoot);
+  return authoredModuleMap;
+};
+
+/**
+ * A compiled dynamic tool with its event handlers reattached, in the shape
+ * eve's dynamic-tool lifecycle dispatches.
+ */
+export interface DynamicToolResolver {
+  readonly eventNames: readonly string[];
+  readonly events: Readonly<
+    Record<string, (event: unknown, ctx: unknown) => unknown>
+  >;
+  readonly exportName?: string;
+  /** Tool names from an extension are prefixed `${extensionNamespace}__`. */
+  readonly extensionNamespace?: string;
+  readonly logicalPath: string;
+  readonly slug: string;
+  readonly sourceId: string;
+  readonly sourceKind: "module";
+}
+
+const dynamicToolResolverSchema = z.custom<DynamicToolResolver>(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DynamicToolResolver).slug === "string" &&
+    typeof (value as DynamicToolResolver).events === "object"
 );
+
+/** One dynamic tool eve admitted, as it records it for the model call. */
+const admittedToolSchema = z.object({
+  description: z.string(),
+  inputSchema: z.record(z.string(), z.unknown()),
+  name: z.string(),
+});
+
+/** A key into eve's execution context. */
+const contextKeySchema = z.custom<object>(
+  (value) => typeof value === "object" && value !== null
+);
+
+interface EveContext {
+  readonly get: (key: object) => unknown;
+  readonly set: (key: object, value: unknown) => unknown;
+}
+
+/**
+ * Admits a dynamic tool resolver's result the way eve does before a model
+ * call, and returns only what eve admitted.
+ *
+ * @remarks
+ * This is eve's `step.started` dispatch, run against a fresh execution
+ * context: eve calls the resolver, requires every entry to be a `defineTool`,
+ * validates the durable descriptor on each execute, approval, and model-output
+ * callback, prefixes an extension's tool names with its namespace, and
+ * serializes each input schema the way it is sent to the model. eve drops a
+ * resolver's complete result when any entry fails, logging the reason on its
+ * `dynamic-tools` logger, so a dropped result surfaces here as an empty
+ * admission and the measurement fails instead of publishing a total for tools
+ * the model would never see.
+ *
+ * @param resolver - The compiled dynamic tool with its handlers attached.
+ * @param lane - The lane whose session auth the resolver sees.
+ * @param source - The source the admitted tools are reported under.
+ */
+export async function admitDynamicTools(
+  resolver: DynamicToolResolver,
+  lane: CapabilityLane,
+  source: string
+): Promise<ResolvedDynamicTool[]> {
+  const [{ ContextContainer }, keys, { dispatchDynamicToolEvent }] =
+    await Promise.all([
+      eveRuntimeModule(
+        "./dist/src/context/container.js",
+        z.object({
+          ContextContainer: z.custom<new () => EveContext>(isFunction),
+        })
+      ),
+      eveRuntimeModule(
+        "./dist/src/context/keys.js",
+        z.object({
+          AuthKey: contextKeySchema,
+          InitiatorAuthKey: contextKeySchema,
+          SessionIdKey: contextKeySchema,
+          StepDynamicToolMetadataKey: contextKeySchema,
+        })
+      ),
+      eveRuntimeModule(
+        "./dist/src/context/dynamic-tool-lifecycle.js",
+        z.object({ dispatchDynamicToolEvent: eveFunction })
+      ),
+    ]);
+  const ctx = new ContextContainer();
+  const auth = laneAuth(lane);
+  ctx.set(keys.SessionIdKey, `capability-budget:${lane}`);
+  ctx.set(keys.AuthKey, auth);
+  ctx.set(keys.InitiatorAuthKey, auth);
+  await dispatchDynamicToolEvent({
+    ctx,
+    event: { type: "step.started" },
+    messages: [],
+    resolvers: [resolver],
+  });
+  const admitted = admittedToolSchema
+    .array()
+    .parse(ctx.get(keys.StepDynamicToolMetadataKey) ?? []);
+  if (admitted.length === 0) {
+    throw new Error(
+      `eve admitted none of the tools '${resolver.slug}' resolves at step.started, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
+    );
+  }
+  return admitted.map((tool) => ({
+    description: tool.description,
+    name: tool.name,
+    // Serialized by eve without the dialect keyword, as the model sees it.
+    schemaChars: JSON.stringify(tool.inputSchema).length,
+    source,
+  }));
+}
 
 /**
  * Resolves the GitHub extension's tool surface the way eve does at
- * `step.started`: the authored mount binds its allowlist and overrides, and
- * the extension returns one tool definition per included entry. Nothing leaves
- * the process; the credential is resolved per call at execution time, which
- * this never reaches.
+ * `step.started`: the compiled entry is loaded from the bundled module map, so
+ * the authored mount in `agent/extensions/github.ts` binds its allowlist and
+ * overrides at bundle time, and eve's dispatch admits one tool per included
+ * entry. Nothing leaves the process; the credential is resolved per call at
+ * execution time, which this never reaches.
  */
 const resolveGitHubExtensionToolsOnce = async (
-  entry: z.infer<typeof dynamicEntrySchema>
+  entry: z.infer<typeof dynamicToolEntrySchema>,
+  appRoot: string
 ): Promise<ResolvedDynamicTool[]> => {
-  const source = capabilitySource(entry.sourceId);
-  const namespace = EXTENSION_SOURCE.exec(entry.sourceId)?.[2];
-  if (!namespace) {
-    throw new Error(`Dynamic tool ${entry.sourceId} names no extension.`);
-  }
-  const globals = globalThis as unknown as Record<symbol, unknown>;
-  const previousScope = globals[EXTENSION_CONFIG_SCOPE];
-  globals[EXTENSION_CONFIG_SCOPE] = namespace;
-  let resolved: unknown;
-  try {
-    await import("../extensions/github.js");
-    const { github } = await import("@github-tools/eve-extension/tools");
-    const resolve = github.events["step.started"];
-    if (!resolve) {
-      throw new Error(
-        `The ${namespace} extension no longer resolves tools at step.started.`
-      );
-    }
-    resolved = await resolve({}, resolveContext("slack"));
-  } finally {
-    globals[EXTENSION_CONFIG_SCOPE] = previousScope;
-  }
-  const tools = resolvedToolMapSchema.parse(resolved);
-  const names = Object.keys(tools);
-  if (names.length === 0) {
-    throw new Error(
-      `The ${namespace} extension resolved no tools; its mount config did not bind, so the catalog cannot be measured.`
-    );
-  }
-  return names.map((name) => {
-    const tool = tools[name];
-    const visibleName = `${namespace}__${name}`;
-    return {
-      description: tool?.description ?? "",
-      name: visibleName,
-      schemaChars: toolInputSchemaChars(tool?.inputSchema, visibleName),
-      source,
-    };
-  });
+  const [moduleMap, { resolveDynamicToolDefinition }] = await Promise.all([
+    loadAuthoredModuleMap(appRoot),
+    eveRuntimeModule(
+      "./dist/src/runtime/resolve-dynamic-tool.js",
+      z.object({ resolveDynamicToolDefinition: eveFunction })
+    ),
+  ]);
+  const resolver = dynamicToolResolverSchema.parse(
+    await resolveDynamicToolDefinition(entry, moduleMap, undefined)
+  );
+  return admitDynamicTools(resolver, "slack", capabilitySource(entry.sourceId));
 };
 
 /**
  * The extension resolver runs once per process, and every caller shares that
- * one result.
- *
- * @remarks
- * Two reasons, both structural. The resolver reads only the bound mount
- * config, so its answer is the same for every lane. And binding that config
- * goes through a process-wide scope, so two resolutions racing each other
- * could mount under the wrong namespace.
+ * one result: it reads only the bound mount config, so its answer is the same
+ * for every lane.
  */
 let gitHubExtensionTools: Promise<ResolvedDynamicTool[]> | undefined;
 
 const resolveGitHubExtensionTools = (
-  entry: z.infer<typeof dynamicEntrySchema>
+  entry: z.infer<typeof dynamicToolEntrySchema>,
+  appRoot: string
 ): Promise<ResolvedDynamicTool[]> => {
-  gitHubExtensionTools ??= resolveGitHubExtensionToolsOnce(entry);
+  gitHubExtensionTools ??= resolveGitHubExtensionToolsOnce(entry, appRoot);
   return gitHubExtensionTools;
 };
 
@@ -458,7 +654,10 @@ const resolveGitHubExtensionTools = (
  */
 const DYNAMIC_TOOL_SOURCES = new Map<
   string,
-  (entry: z.infer<typeof dynamicEntrySchema>) => Promise<ResolvedDynamicTool[]>
+  (
+    entry: z.infer<typeof dynamicToolEntrySchema>,
+    appRoot: string
+  ) => Promise<ResolvedDynamicTool[]>
 >([["ext:github:tools/github.mjs", resolveGitHubExtensionTools]]);
 
 const eveSubagentRegistryUrl = (): URL =>
@@ -524,7 +723,7 @@ export async function resolveLaneCapabilities(
           `Dynamic tool '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
         );
       }
-      return resolve(entry);
+      return resolve(entry, manifest.appRoot);
     })
   );
   return {
