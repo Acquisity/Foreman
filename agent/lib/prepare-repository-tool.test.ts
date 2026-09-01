@@ -2,16 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
 import { remoteUrl } from "./repository.js";
+import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
-const {
-  cloneExplicitRepository,
-  prepareWarmedOrClone,
-  REPOSITORY_OPERATION_TIMEOUT_MS,
-  refreshCheckout,
-} = await import("../tools/prepare_repository.js");
+const { cloneExplicitRepository, prepareWarmedOrClone, refreshCheckout } =
+  await import("../tools/prepare_repository.js");
 
 const REPOSITORY = "Acquisity/Foreman";
 const DISCARD = "rm -rf /workspace/repo";

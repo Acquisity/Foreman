@@ -1,9 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import type {
-  SandboxCommandResult,
-  SandboxRunOptions,
-  SandboxSession,
-} from "eve/sandbox";
+import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
@@ -23,6 +19,10 @@ import {
   warmInstallEnv,
   warmRepositoryPath,
 } from "#lib/repository-warmup.js";
+import {
+  boundedRun,
+  REPOSITORY_OPERATION_TIMEOUT_MS,
+} from "#lib/sandbox-deadline.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
 
@@ -35,14 +35,8 @@ const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
  * wakes up. Five minutes is above the slowest observed cold clone plus
  * install of the warmed repositories and well under the invocation
  * ceiling, so a healthy run never trips it and a wedged one always does.
+ * The station git tools share the same bound through `#lib/sandbox-deadline`.
  */
-export const REPOSITORY_OPERATION_TIMEOUT_MS = 300_000;
-
-// The exit code a shell reports for a command killed by `timeout`, reused
-// here so the existing non-zero branches surface a deadline like any other
-// command failure.
-const TIMED_OUT_EXIT_CODE = 124;
-
 /**
  * Applies the brokered GitHub credential to the sandbox firewall for the
  * duration of one credential window.
@@ -58,37 +52,6 @@ export interface CheckoutOptions {
 const brokerGitHubToken: CredentialBroker = async (sandbox) => {
   const token = await mintInstallationToken(githubCredentials);
   await sandbox.setNetworkPolicy(brokerPolicy(token));
-};
-
-/**
- * Runs one sandbox command under a deadline.
- *
- * @remarks
- * eve 0.44's sandbox `run` takes an `abortSignal` and no timeout of its own,
- * and it composes the signal with the session's, so `AbortSignal.timeout` is
- * the version-matched bound. A deadline comes back as a non-zero result so
- * every caller's existing failure branch (which already discards the partial
- * checkout) handles it; anything else, including a cancelled turn, still
- * throws.
- */
-const boundedRun = async (
-  sandbox: SandboxSession,
-  options: SandboxRunOptions,
-  timeoutMs: number
-): Promise<SandboxCommandResult> => {
-  const deadline = AbortSignal.timeout(timeoutMs);
-  try {
-    return await sandbox.run({ ...options, abortSignal: deadline });
-  } catch (error) {
-    if (!deadline.aborted) {
-      throw error;
-    }
-    return {
-      exitCode: TIMED_OUT_EXIT_CODE,
-      stderr: `timed out after ${timeoutMs}ms`,
-      stdout: "",
-    };
-  }
 };
 
 /**
