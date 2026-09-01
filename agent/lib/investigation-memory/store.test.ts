@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { neonConfig } from "@neondatabase/serverless";
 import { caseProjectionSchema } from "./case.js";
 import {
   type CaseRow,
@@ -10,7 +11,9 @@ import {
   idempotencyKey,
   isConfigured,
   MAX_SEARCH_LIMIT,
+  MEMORY_QUERY_TIMEOUT_MS,
   projectCase,
+  searchCasesGlobally,
 } from "./store.js";
 
 test("case projection converts Neon Date values to plain JSON", () => {
@@ -185,4 +188,39 @@ test("isConfigured reports the store as unavailable when unset", () => {
   } else {
     process.env.FOREMAN_MEMORY_DATABASE_URL = previous;
   }
+});
+
+test("every memory query carries a fresh deadline", async () => {
+  const previous = process.env.FOREMAN_MEMORY_DATABASE_URL;
+  process.env.FOREMAN_MEMORY_DATABASE_URL =
+    "postgres://user:pw@memory.example/db";
+  const signals: (AbortSignal | undefined)[] = [];
+  const previousFetch = neonConfig.fetchFunction;
+  neonConfig.fetchFunction = (
+    _url: unknown,
+    init: { signal?: AbortSignal }
+  ) => {
+    signals.push(init.signal);
+    return Promise.reject(new Error("upstream refused"));
+  };
+  try {
+    await assert.rejects(searchCasesGlobally({ text: "reset emails" }));
+    // A second operation must not reuse the first deadline: a cached client
+    // would hand every later query an already-fired signal.
+    await assert.rejects(searchCasesGlobally({ text: "reset emails" }));
+  } finally {
+    neonConfig.fetchFunction = previousFetch;
+    if (previous === undefined) {
+      delete process.env.FOREMAN_MEMORY_DATABASE_URL;
+    } else {
+      process.env.FOREMAN_MEMORY_DATABASE_URL = previous;
+    }
+  }
+  assert.ok(signals.length >= 2);
+  for (const signal of signals) {
+    assert.ok(signal instanceof AbortSignal);
+    assert.equal(signal.aborted, false);
+  }
+  assert.notEqual(signals[0], signals.at(-1));
+  assert.equal(MEMORY_QUERY_TIMEOUT_MS, 15_000);
 });

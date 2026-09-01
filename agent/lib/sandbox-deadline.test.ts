@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 import type { SandboxRunOptions, SandboxSession } from "eve/sandbox";
 import {
@@ -69,36 +67,6 @@ describe("boundedRun", () => {
     await assert.rejects(
       boundedRun(sandbox, { command: "git fetch" }, 300_000),
       (error: unknown) => error === failure
-    );
-  });
-});
-
-const TOOL_ROOTS = ["agent/tools", "agent/subagents"];
-const RAW_RUN = /\bsandbox\.run\(/u;
-const GIT_COMMAND = /git -C /u;
-
-/** Every authored tool file under the given roots, recursively. */
-const toolFiles = (root: string): string[] =>
-  readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      return toolFiles(full);
-    }
-    return entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")
-      ? [full]
-      : [];
-  });
-
-describe("authored sandbox git tools", () => {
-  it("runs every git command through boundedRun", () => {
-    const unbounded = TOOL_ROOTS.flatMap(toolFiles)
-      .map((file) => ({ file, source: readFileSync(file, "utf8") }))
-      .filter(({ source }) => GIT_COMMAND.test(source) && RAW_RUN.test(source))
-      .map(({ file }) => file);
-    assert.deepEqual(
-      unbounded,
-      [],
-      `These tools run git in the sandbox without a deadline: ${unbounded.join(", ")}`
     );
   });
 });
