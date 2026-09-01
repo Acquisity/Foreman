@@ -519,7 +519,8 @@ describe("prepare_repository sandbox bounds", () => {
 
 const OTHER = "Acquisity/Other";
 const PREVIOUS = "/workspace/.repo-previous";
-const SET_ASIDE = `rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
+const RECOVER = `if [ -e ${PREVIOUS} ] && [ ! -e /workspace/repo ]; then mv ${PREVIOUS} /workspace/repo; fi`;
+const SET_ASIDE = `${RECOVER} && rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
 const RESTORE = `rm -rf /workspace/repo && mv ${PREVIOUS} /workspace/repo`;
 const DISCARD_PREVIOUS = `rm -rf ${PREVIOUS}`;
 const DISCARD_MARKER = `rm -rf ${REPOSITORY_MARKER}`;
@@ -530,6 +531,9 @@ const SIGNED_REFUSAL = /signed GitHub session is bound/u;
 const UNATTENDED_REFUSAL = /unattended session already prepared/u;
 const WORKSPACE_REFUSAL = /session workspace itself/u;
 const PREVIOUS_KEPT = /Acquisity\/Foreman is still in place/u;
+const CONFIG_FAILED = /Could not configure the workspace/u;
+const MARKER_WRITE_FAILED = /Could not record the prepared Acquisity\/Other/u;
+const CONFIGURE = "user.name";
 const PREVIOUS_LOST = /could not be restored/u;
 const MARKED_OTHER = /Acquisity\/Other/u;
 
@@ -547,7 +551,8 @@ const attendedAuth: SessionAuthContext = {
  */
 const preparedSandbox = (
   marker: unknown,
-  run: (options: RunOptions) => Promise<RunResult>
+  run: (options: RunOptions) => Promise<RunResult>,
+  write: () => Promise<void> = () => Promise.resolve()
 ) => {
   const commands: RunOptions[] = [];
   const written: string[] = [];
@@ -565,7 +570,7 @@ const preparedSandbox = (
     setNetworkPolicy: () => Promise.resolve(),
     writeTextFile: ({ content }: { content: string }) => {
       written.push(content);
-      return Promise.resolve();
+      return write();
     },
   } as unknown as SandboxSession;
   return { commands, sandbox, written };
@@ -586,12 +591,16 @@ const prepare = async (
   requested: string | undefined,
   marker: unknown,
   auth: SessionAuthContext | null,
-  run: (options: RunOptions) => Promise<RunResult> = () => ok(HEAD_BEFORE)
+  run: (options: RunOptions) => Promise<RunResult> = () => ok(HEAD_BEFORE),
+  write?: () => Promise<void>
 ) => {
-  const { commands, sandbox, written } = preparedSandbox(marker, (options) =>
-    options.command.includes("rev-parse --show-toplevel")
-      ? failed("not a git repository")
-      : run(options)
+  const { commands, sandbox, written } = preparedSandbox(
+    marker,
+    (options) =>
+      options.command.includes("rev-parse --show-toplevel")
+        ? failed("not a git repository")
+        : run(options),
+    write
   );
   const result = (await prepareRepositoryWorkspace(
     requested,
@@ -629,7 +638,12 @@ describe("prepare_repository switching", () => {
       repository: REPOSITORY,
       source: "explicit",
     });
-    assert.equal(commands.length, 0);
+    // The only work a reuse does is putting back a checkout an interrupted
+    // switch stranded, so the marker it reuses names something on disk.
+    assert.deepEqual(
+      commands.map((options) => options.command),
+      [RECOVER]
+    );
   });
 
   it("replaces a different repository for an attended explicit request", async () => {
@@ -650,9 +664,11 @@ describe("prepare_repository switching", () => {
     assert.ok(ran(commands, SET_ASIDE));
     assert.ok(ran(commands, `git clone --depth 50 ${remoteUrl(OTHER)}`));
     assert.ok(ran(commands, PUBLISH));
-    assert.ok(ran(commands, DISCARD_PREVIOUS));
     assert.equal(ran(commands, RESTORE), false);
     assert.match(written.at(-1) ?? "", MARKED_OTHER);
+    // The set-aside checkout is the rollback source until the marker names its
+    // replacement, so it is discarded last of all.
+    assert.equal(commands.at(-1)?.command, DISCARD_PREVIOUS);
   });
 
   it("refuses to replace the checkout a signed GitHub session is bound to", async () => {
@@ -731,6 +747,144 @@ describe("prepare_repository switching", () => {
       (options) => {
         if (options.command.startsWith("git clone")) {
           return failed("fatal: repository not found");
+        }
+        if (options.command === RESTORE) {
+          return failed("mv: cross-device link");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", PREVIOUS_LOST);
+    assert.ok(ran(commands, DISCARD_MARKER));
+  });
+
+  it("puts the previous checkout back when a switch throws", async () => {
+    const { commands, sandbox, written } = preparedSandbox(
+      markerFor(REPOSITORY),
+      (options) => {
+        if (options.command.includes("rev-parse --show-toplevel")) {
+          return failed("not a git repository");
+        }
+        if (options.command.startsWith("git clone")) {
+          return Promise.reject(new Error("sandbox gone"));
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    await assert.rejects(
+      prepareRepositoryWorkspace(
+        OTHER,
+        {
+          getSandbox: () => Promise.resolve(sandbox),
+          session: { auth: { current: attendedAuth } },
+        },
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      CLONE_THREW
+    );
+    assert.ok(ran(commands, RESTORE));
+    assert.deepEqual(written, []);
+  });
+
+  it("rethrows a cancelled switch and leaves the checkout recoverable", async () => {
+    // eve binds the cancelled turn's signal into every later command, so the
+    // restore cannot run: the previous checkout stays at the tool-owned path
+    // for the next attempt to move back.
+    const turn = AbortSignal.abort(new Error("turn cancelled"));
+    let cancelled = false;
+    const { commands, sandbox, written } = preparedSandbox(
+      markerFor(REPOSITORY),
+      (options) => {
+        if (options.command.includes("rev-parse --show-toplevel")) {
+          return failed("not a git repository");
+        }
+        if (options.command === SET_ASIDE) {
+          cancelled = true;
+          return ok();
+        }
+        if (!cancelled) {
+          return options.command.startsWith("test ") ? failed("") : ok();
+        }
+        const composed = options.abortSignal
+          ? AbortSignal.any([turn, options.abortSignal])
+          : turn;
+        return Promise.reject(composed.reason);
+      }
+    );
+    await assert.rejects(
+      prepareRepositoryWorkspace(
+        OTHER,
+        {
+          getSandbox: () => Promise.resolve(sandbox),
+          session: { auth: { current: attendedAuth } },
+        },
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      CANCELLED
+    );
+    // The restore was attempted even though the cancelled turn refused it.
+    assert.ok(ran(commands, RESTORE));
+    assert.deepEqual(written, []);
+  });
+
+  it("recovers a stranded checkout before setting it aside again", async () => {
+    const { commands } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command.startsWith("test ") ? failed("") : ok())
+    );
+    const setAside = commands.find((options) =>
+      options.command.includes("mv /workspace/repo")
+    );
+    assert.ok(setAside?.command.startsWith(RECOVER));
+  });
+
+  it("restores the previous checkout when the workspace cannot be configured", async () => {
+    const { commands, result, written } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.includes(CONFIGURE)) {
+          return failed("could not lock config file");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", CONFIG_FAILED);
+    assert.match(result.error ?? "", PREVIOUS_KEPT);
+    assert.ok(ran(commands, RESTORE));
+    // The marker still names the repository that is back on disk.
+    assert.deepEqual(written, []);
+    assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+
+  it("restores the previous checkout when the marker cannot be written", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => (options.command.startsWith("test ") ? failed("") : ok()),
+      () => Promise.reject(new Error("blob write failed"))
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", MARKER_WRITE_FAILED);
+    assert.match(result.error ?? "", PREVIOUS_KEPT);
+    assert.ok(ran(commands, RESTORE));
+    assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+
+  it("clears the marker when a failed configuration cannot be rolled back", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.includes(CONFIGURE)) {
+          return failed("could not lock config file");
         }
         if (options.command === RESTORE) {
           return failed("mv: cross-device link");
