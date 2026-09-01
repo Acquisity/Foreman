@@ -117,6 +117,17 @@ describe("repository guidance", () => {
     );
   });
 
+  it("says what the factory's branch prefix marks, so the model cannot guess", () => {
+    // Removing the prefix instruction without saying what the prefix means
+    // left the model inventing one: it called it a convention for Foreman's
+    // own direct changes, which is backwards.
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "`FOREMAN_BRANCH_PREFIX` marks the factory's own branches so the GitHub channel can recognize them for red-CI stabilization, which is ownership rather than permission, and a direct change does not need it."
+      )
+    );
+  });
+
   it("keeps the factory's own branch prefix on the implementer", () => {
     // Ownership, not permission: the GitHub channel recognizes the factory's
     // pull requests by this prefix for red-CI stabilization.
