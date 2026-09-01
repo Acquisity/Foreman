@@ -9,6 +9,7 @@ import {
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
+import { isFactoryRequest } from "../lib/factory-lane.js";
 import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import {
@@ -136,6 +137,10 @@ export const dispatch = async (
   // slackSessionAuth stamps it for every admitted Slack session.
   const intakeOnly = SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
   const stamped = slackSessionAuth(auth, {
+    // The factory skill is offered only where the lane warrants it, and this
+    // dispatch is the only place that sees the delivered text: a dynamic skill
+    // resolver runs at turn.started with an empty message snapshot.
+    factoryIntent: isFactoryRequest(message.text),
     intakeOnly,
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,

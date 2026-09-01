@@ -1,4 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
+import { stampFactoryIntent } from "./factory-lane.js";
 import { stampRepository } from "./repository.js";
 import { stampSlackIntakeAuth } from "./slack-intake.js";
 import {
@@ -25,11 +26,13 @@ import {
  *
  * @param auth - eve's projected Slack author, from `defaultSlackAuth`.
  * @param options - `repository` when the message named exactly one GitHub URL,
- * and whether the channel is intake-only.
+ * `factoryIntent` when the message explicitly asked for the factory, and
+ * whether the channel is intake-only.
  */
 export const slackSessionAuth = (
   auth: SessionAuthContext,
   options: {
+    readonly factoryIntent?: boolean | undefined;
     readonly intakeOnly: boolean;
     readonly repository?: string | undefined;
   }
@@ -38,9 +41,12 @@ export const slackSessionAuth = (
   const withRepository = options.repository
     ? stampRepository(trusted, options.repository, "explicit")
     : trusted;
+  const withIntent = options.factoryIntent
+    ? stampFactoryIntent(withRepository)
+    : withRepository;
   // Investigation memory follows the same gate as trust here: the app is only
   // invited into Acquisity channels, so channel membership is the boundary.
-  const stamped = stampInvestigationMemory(withRepository);
+  const stamped = stampInvestigationMemory(withIntent);
   return options.intakeOnly ? stampSlackIntakeAuth(stamped) : stamped;
 };
 
