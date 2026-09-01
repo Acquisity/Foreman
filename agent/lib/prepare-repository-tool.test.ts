@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { SessionAuthContext } from "eve/context";
 import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
-import { remoteUrl } from "./repository.js";
+import { REPOSITORY_MARKER, remoteUrl, stampRepository } from "./repository.js";
 import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
+import { stampUnattended } from "./trust.js";
+
+// The commit identity resolves from the environment, so a switch never reaches
+// the connector metadata call a Connect runtime would have to serve.
+process.env.FOREMAN_BOT_NAME ??= "Foreman";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
@@ -10,6 +16,7 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 const {
   cloneExplicitRepository,
   detectWorktree,
+  prepareRepositoryWorkspace,
   prepareWarmedOrClone,
   refreshCheckout,
 } = await import("../tools/prepare_repository.js");
@@ -507,5 +514,363 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, DISCARD), false);
     assert.equal(ran(commands, "pnpm install"), false);
     assert.equal(policies.at(-1), "allow-all");
+  });
+});
+
+const OTHER = "Acquisity/Other";
+const PREVIOUS = "/workspace/.repo-previous";
+const SET_ASIDE = `rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
+const RESTORE = `rm -rf /workspace/repo && mv ${PREVIOUS} /workspace/repo`;
+const DISCARD_PREVIOUS = `rm -rf ${PREVIOUS}`;
+const DISCARD_MARKER = `rm -rf ${REPOSITORY_MARKER}`;
+const LOCKFILE_DIFF = "diff --name-only";
+const HEAD_BEFORE = "1111111111111111111111111111111111111111";
+const HEAD_AFTER = "2222222222222222222222222222222222222222";
+const SIGNED_REFUSAL = /signed GitHub session is bound/u;
+const UNATTENDED_REFUSAL = /unattended session already prepared/u;
+const WORKSPACE_REFUSAL = /session workspace itself/u;
+const PREVIOUS_KEPT = /Acquisity\/Foreman is still in place/u;
+const PREVIOUS_LOST = /could not be restored/u;
+const MARKED_OTHER = /Acquisity\/Other/u;
+
+const attendedAuth: SessionAuthContext = {
+  attributes: {},
+  authenticator: "slack",
+  principalId: "user:1",
+  principalType: "user",
+};
+
+/**
+ * A sandbox holding a repository marker, so the tool sees a session that has
+ * already prepared something. The marker write is captured rather than
+ * performed: what matters is which repository the session ends up recording.
+ */
+const preparedSandbox = (
+  marker: unknown,
+  run: (options: RunOptions) => Promise<RunResult>
+) => {
+  const commands: RunOptions[] = [];
+  const written: string[] = [];
+  const sandbox = {
+    readTextFile: ({ path }: { path: string }) =>
+      Promise.resolve(
+        path === REPOSITORY_MARKER && marker !== null
+          ? JSON.stringify(marker)
+          : null
+      ),
+    run: (options: RunOptions) => {
+      commands.push(options);
+      return run(options);
+    },
+    setNetworkPolicy: () => Promise.resolve(),
+    writeTextFile: ({ content }: { content: string }) => {
+      written.push(content);
+      return Promise.resolve();
+    },
+  } as unknown as SandboxSession;
+  return { commands, sandbox, written };
+};
+
+const markerFor = (
+  slug: string,
+  source: "explicit" | "github-webhook" = "explicit",
+  worktree = "/workspace/repo"
+) => ({ slug, source, worktree });
+
+/**
+ * Runs the tool's preparation against a marked-up sandbox. `/workspace` is
+ * never a repository here, so the checkout always lives at `/workspace/repo`,
+ * which is the only shape a switch is allowed in.
+ */
+const prepare = async (
+  requested: string | undefined,
+  marker: unknown,
+  auth: SessionAuthContext | null,
+  run: (options: RunOptions) => Promise<RunResult> = () => ok(HEAD_BEFORE)
+) => {
+  const { commands, sandbox, written } = preparedSandbox(marker, (options) =>
+    options.command.includes("rev-parse --show-toplevel")
+      ? failed("not a git repository")
+      : run(options)
+  );
+  const result = (await prepareRepositoryWorkspace(
+    requested,
+    {
+      getSandbox: () => Promise.resolve(sandbox),
+      session: { auth: { current: auth } },
+    },
+    { broker, timeoutMs: TIMEOUT_MS }
+  )) as {
+    current?: { repository: string; source: string };
+    error?: string;
+    previous?: { repository: string; source: string } | null;
+    replaced?: boolean;
+    reused?: boolean;
+    success?: boolean;
+  };
+  return { commands, result, written };
+};
+
+describe("prepare_repository switching", () => {
+  it("reuses the repository it already prepared", async () => {
+    const { commands, result } = await prepare(
+      REPOSITORY,
+      markerFor(REPOSITORY),
+      attendedAuth
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.reused, true);
+    assert.equal(result.replaced, false);
+    assert.deepEqual(result.previous, {
+      repository: REPOSITORY,
+      source: "explicit",
+    });
+    assert.deepEqual(result.current, {
+      repository: REPOSITORY,
+      source: "explicit",
+    });
+    assert.equal(commands.length, 0);
+  });
+
+  it("replaces a different repository for an attended explicit request", async () => {
+    const { commands, result, written } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) =>
+        options.command.startsWith("test ") ? failed("") : ok(HEAD_BEFORE)
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.replaced, true);
+    assert.deepEqual(result.previous, {
+      repository: REPOSITORY,
+      source: "explicit",
+    });
+    assert.deepEqual(result.current, { repository: OTHER, source: "explicit" });
+    assert.ok(ran(commands, SET_ASIDE));
+    assert.ok(ran(commands, `git clone --depth 50 ${remoteUrl(OTHER)}`));
+    assert.ok(ran(commands, PUBLISH));
+    assert.ok(ran(commands, DISCARD_PREVIOUS));
+    assert.equal(ran(commands, RESTORE), false);
+    assert.match(written.at(-1) ?? "", MARKED_OTHER);
+  });
+
+  it("refuses to replace the checkout a signed GitHub session is bound to", async () => {
+    const { commands, result, written } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY, "github-webhook"),
+      stampRepository(attendedAuth, REPOSITORY, "github-webhook")
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", SIGNED_REFUSAL);
+    assert.equal(ran(commands, SET_ASIDE), false);
+    assert.deepEqual(written, []);
+  });
+
+  it("refuses a signed session's retarget before it reaches the checkout", async () => {
+    // `resolveRepository` rejects the request itself, so the marker is never
+    // even consulted: message text cannot redirect a signed webhook.
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY, "github-webhook"),
+      stampRepository(attendedAuth, REPOSITORY, "github-webhook")
+    );
+    assert.equal(result.success, false);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("refuses to switch in an unattended run", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      stampUnattended(attendedAuth)
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", UNATTENDED_REFUSAL);
+    assert.equal(ran(commands, SET_ASIDE), false);
+  });
+
+  it("refuses to replace the session workspace checkout", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY, "explicit", "/workspace"),
+      attendedAuth
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", WORKSPACE_REFUSAL);
+    assert.equal(ran(commands, SET_ASIDE), false);
+  });
+
+  it("restores the previous checkout when the replacement clone fails", async () => {
+    const { commands, result, written } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.startsWith("git clone")) {
+          return failed("fatal: repository not found");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", CLONE_FAILED);
+    assert.match(result.error ?? "", PREVIOUS_KEPT);
+    assert.ok(ran(commands, DISCARD_STAGING));
+    assert.ok(ran(commands, RESTORE));
+    // The marker still names the repository that is back on disk.
+    assert.deepEqual(written, []);
+    assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+
+  it("clears the marker when the previous checkout cannot be restored", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.startsWith("git clone")) {
+          return failed("fatal: repository not found");
+        }
+        if (options.command === RESTORE) {
+          return failed("mv: cross-device link");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", PREVIOUS_LOST);
+    assert.ok(ran(commands, DISCARD_MARKER));
+  });
+
+  it("keeps the previous checkout when it cannot be set aside", async () => {
+    const { commands, result } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) =>
+        options.command === SET_ASIDE ? failed("mv: permission denied") : ok()
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? "", PREVIOUS_KEPT);
+    assert.equal(ran(commands, "git clone"), false);
+    assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+});
+
+describe("prepare_repository lockfile installs", () => {
+  /** Refreshes a warmed checkout whose HEAD moved, with the diff answered. */
+  const refreshMovedHead = (lockfile: (options: RunOptions) => RunResult) => {
+    let revisions = 0;
+    return fakeSandbox((options) => {
+      if (options.command.includes("rev-parse HEAD")) {
+        revisions += 1;
+        return ok(revisions === 1 ? HEAD_BEFORE : HEAD_AFTER);
+      }
+      return options.command.includes(LOCKFILE_DIFF)
+        ? Promise.resolve(lockfile(options))
+        : ok();
+    });
+  };
+
+  it("skips the install when HEAD moved but the lockfile did not", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(
+      ran(
+        commands,
+        `git -C /workspace/repo diff --name-only ${HEAD_BEFORE} ${HEAD_AFTER} -- pnpm-lock.yaml`
+      )
+    );
+    assert.equal(ran(commands, "pnpm install"), false);
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
+  it("installs when the lockfile moved with HEAD", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "pnpm-lock.yaml\n",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
+  });
+
+  it("installs when the lockfile diff cannot be read", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 128,
+      stderr: "fatal: bad object",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
+  });
+
+  it("reads the bun lockfile for a bun repository", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    await refreshCheckout(
+      sandbox,
+      "Acquisity/Acquisity",
+      { kind: "bun", slug: "Acquisity/Acquisity" },
+      false,
+      { broker, timeoutMs: TIMEOUT_MS }
+    );
+    assert.ok(ran(commands, "-- bun.lock"));
+    assert.equal(ran(commands, "bun install"), false);
+  });
+
+  it("installs without a diff when the checkout's install state is unknown", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        true,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.equal(ran(commands, LOCKFILE_DIFF), false);
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
   });
 });

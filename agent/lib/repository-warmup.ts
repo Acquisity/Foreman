@@ -84,6 +84,18 @@ export const warmInstallCommand = (kind: WarmKind): string =>
     : "bun install --frozen-lockfile";
 
 /**
+ * The lockfile whose contents decide whether a warm install is still current.
+ *
+ * @remarks
+ * It is the file the matching `--frozen-lockfile` install reads, so a revision
+ * that leaves it untouched cannot change what that install would produce.
+ * Manifest edits that do not reach the lockfile are exactly the case a frozen
+ * install refuses to act on anyway.
+ */
+export const warmLockfile = (kind: WarmKind): string =>
+  kind === "pnpm" ? "pnpm-lock.yaml" : "bun.lock";
+
+/**
  * The bun the snapshot installs, matching the `setup-bun` pin in
  * Acquisity/Acquisity's own CI so the warm install reads `bun.lock` the same
  * way its build machines do. Bump it when that pin moves.
