@@ -1,11 +1,28 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
+import {
+  broker,
+  CANCELLED,
+  CLONE_FAILED,
+  CLONE_THREW,
+  DISCARD,
+  DISCARD_STAGING,
+  failed,
+  fakeSandbox,
+  HEAD_AFTER,
+  HEAD_BEFORE,
+  ok,
+  PUBLISH,
+  REPOSITORY,
+  type RunOptions,
+  type RunResult,
+  ran,
+  STAGING,
+  stall,
+  TIMEOUT_MS,
+} from "./prepare-repository-fixtures.js";
 import { remoteUrl } from "./repository.js";
 import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
-
-process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const {
   cloneExplicitRepository,
@@ -14,73 +31,16 @@ const {
   refreshCheckout,
 } = await import("../tools/prepare_repository.js");
 
-const REPOSITORY = "Acquisity/Foreman";
-const DISCARD = "rm -rf /workspace/repo";
-const STAGING = "/workspace/.repo-staging";
-const DISCARD_STAGING = `rm -rf ${STAGING}`;
-const PUBLISH = `mv ${STAGING} /workspace/repo`;
-const TIMEOUT_MS = 20;
 const TIMED_OUT = /timed out after 20ms/u;
-const CLONE_FAILED = /repository not found/u;
-const CLONE_THREW = /sandbox gone/u;
 const REFRESH_FAILED = /could not read/u;
 const INSTALL_FAILED = /ERR_PNPM_OUTDATED_LOCKFILE/u;
-const CANCELLED = /turn cancelled/u;
 const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 const PUBLISH_FAILED = /cross-device link/u;
 const PROBE_TIMED_OUT = /Could not tell whether a checkout is already present/u;
 const WARM_PROBE_TIMED_OUT =
   /Could not determine whether the warmed checkout exists/u;
-
-interface RunOptions {
-  abortSignal?: AbortSignal;
-  command: string;
-}
-
-interface RunResult {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-}
-
-const ok = (stdout = ""): Promise<RunResult> =>
-  Promise.resolve({ exitCode: 0, stderr: "", stdout });
-
-const failed = (stderr: string): Promise<RunResult> =>
-  Promise.resolve({ exitCode: 1, stderr, stdout: "" });
-
-/** Never settles until the caller's deadline aborts it. */
-const stall = (options: RunOptions): Promise<RunResult> =>
-  new Promise((_resolve, reject) => {
-    options.abortSignal?.addEventListener("abort", () => {
-      reject(options.abortSignal?.reason);
-    });
-  });
-
-const fakeSandbox = (run: (options: RunOptions) => Promise<RunResult>) => {
-  const commands: RunOptions[] = [];
-  const policies: SandboxNetworkPolicy[] = [];
-  const sandbox = {
-    run: (options: RunOptions) => {
-      commands.push(options);
-      return run(options);
-    },
-    setNetworkPolicy: (policy: SandboxNetworkPolicy) => {
-      policies.push(policy);
-      return Promise.resolve();
-    },
-  } as unknown as SandboxSession;
-  return { commands, policies, sandbox };
-};
-
-// Stands in for the brokered GitHub token so the tests never mint one; the
-// firewall write is what the `finally` has to undo.
-const broker = (sandbox: SandboxSession) =>
-  sandbox.setNetworkPolicy({ allow: { "*": [] } });
-
-const ran = (commands: RunOptions[], needle: string) =>
-  commands.some((options) => options.command.includes(needle));
+const LOCKFILE_DIFF = "diff --name-only";
 
 /**
  * Models eve 0.44's `bindSandboxAbortSignal`: the session returned by
@@ -507,5 +467,121 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, DISCARD), false);
     assert.equal(ran(commands, "pnpm install"), false);
     assert.equal(policies.at(-1), "allow-all");
+  });
+});
+describe("prepare_repository lockfile installs", () => {
+  /** Refreshes a warmed checkout whose HEAD moved, with the diff answered. */
+  const refreshMovedHead = (lockfile: (options: RunOptions) => RunResult) => {
+    let revisions = 0;
+    return fakeSandbox((options) => {
+      if (options.command.includes("rev-parse HEAD")) {
+        revisions += 1;
+        return ok(revisions === 1 ? HEAD_BEFORE : HEAD_AFTER);
+      }
+      return options.command.includes(LOCKFILE_DIFF)
+        ? Promise.resolve(lockfile(options))
+        : ok();
+    });
+  };
+
+  it("skips the install when HEAD moved but the lockfile did not", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(
+      ran(
+        commands,
+        `git -C /workspace/repo diff --name-only ${HEAD_BEFORE} ${HEAD_AFTER} -- pnpm-lock.yaml`
+      )
+    );
+    assert.equal(ran(commands, "pnpm install"), false);
+    assert.equal(ran(commands, DISCARD), false);
+  });
+
+  it("installs when the lockfile moved with HEAD", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "pnpm-lock.yaml\n",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
+  });
+
+  it("installs when the lockfile diff cannot be read", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 128,
+      stderr: "fatal: bad object",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        false,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
+  });
+
+  it("reads the bun lockfile for a bun repository", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    await refreshCheckout(
+      sandbox,
+      "Acquisity/Acquisity",
+      { kind: "bun", slug: "Acquisity/Acquisity" },
+      false,
+      { broker, timeoutMs: TIMEOUT_MS }
+    );
+    assert.ok(ran(commands, "-- bun.lock"));
+    assert.equal(ran(commands, "bun install"), false);
+  });
+
+  it("installs without a diff when the checkout's install state is unknown", async () => {
+    const { commands, sandbox } = refreshMovedHead(() => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    }));
+    assert.equal(
+      await refreshCheckout(
+        sandbox,
+        REPOSITORY,
+        { kind: "pnpm", slug: REPOSITORY },
+        true,
+        { broker, timeoutMs: TIMEOUT_MS }
+      ),
+      null
+    );
+    assert.equal(ran(commands, LOCKFILE_DIFF), false);
+    assert.ok(ran(commands, "pnpm install --frozen-lockfile"));
   });
 });
