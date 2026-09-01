@@ -82,19 +82,68 @@ describe("boundedRun", () => {
     assert.equal(commands[0]?.abortSignal?.reason, caller.signal.reason);
   });
 
-  it("rethrows a caller cancellation even when the deadline fires afterwards", async () => {
+  it("rethrows a caller cancellation whose rejection lands after the deadline", async () => {
+    const cancelled = new Error("turn cancelled");
+    // The command is aborted first but only rejects long after the 5ms bound
+    // expired, which is the race a helper classifying from its own timer gets
+    // wrong: it reports exit 124 for a turn the caller cancelled.
+    const { sandbox } = fakeSandbox(
+      () =>
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(cancelled), 40);
+        })
+    );
     const caller = new AbortController();
-    const { sandbox } = fakeSandbox(hangs);
     const running = boundedRun(
       sandbox,
       { abortSignal: caller.signal, command: "git fetch" },
-      20
+      5
     );
-    caller.abort(new Error("turn cancelled"));
-    await assert.rejects(running, (error: unknown) => {
-      assert.equal((error as Error).message, "turn cancelled");
-      return true;
-    });
+    caller.abort(cancelled);
+    await assert.rejects(running, (error: unknown) => error === cancelled);
+  });
+
+  it("rethrows a session cancellation eve composed in, deadline or not", async () => {
+    // eve wraps a second composition around whatever it is handed and folds
+    // the session's signal into it, so the session can win a race this helper
+    // never sees on its own signals.
+    const session = new AbortController();
+    const { sandbox } = fakeSandbox(
+      (options) =>
+        new Promise<never>((_resolve, reject) => {
+          const bound = AbortSignal.any([
+            session.signal,
+            options.abortSignal as AbortSignal,
+          ]);
+          bound.addEventListener("abort", () => {
+            setTimeout(() => reject(bound.reason), 40);
+          });
+        })
+    );
+    const running = boundedRun(sandbox, { command: "git fetch" }, 5);
+    session.abort(new Error("session cancelled"));
+    await assert.rejects(
+      running,
+      (error: unknown) => error === session.signal.reason
+    );
+  });
+
+  it("reports a deadline the sandbox wrapped in another error", async () => {
+    const { sandbox } = fakeSandbox(
+      (options) =>
+        new Promise<never>((_resolve, reject) => {
+          options.abortSignal?.addEventListener("abort", () =>
+            reject(
+              new Error("command aborted", {
+                cause: options.abortSignal?.reason,
+              })
+            )
+          );
+        })
+    );
+    const result = await boundedRun(sandbox, { command: "git push" }, 5);
+    assert.equal(result.exitCode, TIMED_OUT_EXIT_CODE);
+    assert.match(result.stderr, TIMED_OUT_MESSAGE);
   });
 
   it("reports a timeout that wins the race against a later caller abort", async () => {

@@ -23,41 +23,66 @@ export const REPOSITORY_OPERATION_TIMEOUT_MS = 300_000;
  */
 export const TIMED_OUT_EXIT_CODE = 124;
 
+/** How far down a `cause` chain the deadline reason is still recognised. */
+const MAX_CAUSE_DEPTH = 5;
+
+/** Whether `error` is the deadline reason, or wraps it as a cause. */
+const causedBy = (error: unknown, reason: Error): boolean => {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth += 1) {
+    if (current === reason) {
+      return true;
+    }
+    if (!(current instanceof Error)) {
+      return false;
+    }
+    current = current.cause;
+  }
+  return false;
+};
+
 /**
  * Runs one sandbox command under a deadline.
  *
  * @remarks
  * eve 0.44's sandbox `run` takes an `abortSignal` and no timeout of its own,
- * and it composes the signal with the session's, so `AbortSignal.timeout` is
- * the version-matched bound. A caller that passes its own signal keeps it:
- * the two are composed, so an already-aborted caller signal still cancels the
- * command instead of being replaced by a fresh deadline.
+ * so the deadline is supplied here. A caller that passes its own signal keeps
+ * it: the two are composed, so an already-aborted caller signal still cancels
+ * the command instead of being replaced by a fresh deadline.
  *
- * The failure is classified from the composed signal's reason, which latches
- * whichever signal aborted first. A deadline comes back as a non-zero result
- * so every caller's existing failure branch handles it; anything else,
- * including a cancelled turn, still throws, even when the deadline fires
- * afterwards while the rejection is in flight.
+ * The failure is classified from the thrown reason, not from the local
+ * signals. eve wraps a second composition around whatever it is handed and
+ * folds the session's own cancellation into it
+ * (`bindSandboxAbortSignal`, `eve@0.44.0`), so the winner of the race is only
+ * visible in what the command rejects with. A deadline this helper armed comes
+ * back as a non-zero result, identified by its own reason object rather than
+ * by a timer having merely fired, so every caller's existing failure branch
+ * handles it. Anything else, including a session or caller cancellation whose
+ * rejection arrives after the deadline expired, still throws.
  */
 export const boundedRun = async (
   sandbox: SandboxSession,
   options: SandboxRunOptions,
   timeoutMs: number = REPOSITORY_OPERATION_TIMEOUT_MS
 ): Promise<SandboxCommandResult> => {
-  const deadline = AbortSignal.timeout(timeoutMs);
+  const expired = new Error(`timed out after ${timeoutMs}ms`);
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(expired), timeoutMs);
   const composed = options.abortSignal
-    ? AbortSignal.any([options.abortSignal, deadline])
-    : deadline;
+    ? AbortSignal.any([options.abortSignal, deadline.signal])
+    : deadline.signal;
   try {
     return await sandbox.run({ ...options, abortSignal: composed });
   } catch (error) {
-    if (!(deadline.aborted && composed.reason === deadline.reason)) {
+    if (!causedBy(error, expired)) {
       throw error;
     }
     return {
       exitCode: TIMED_OUT_EXIT_CODE,
-      stderr: `timed out after ${timeoutMs}ms`,
+      stderr: expired.message,
       stdout: "",
     };
+  } finally {
+    clearTimeout(timer);
   }
 };
