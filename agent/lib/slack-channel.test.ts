@@ -11,6 +11,7 @@ import type {
   SlackMessage,
 } from "eve/channels/slack";
 import type { MessageStreamEvent } from "eve/client";
+import { factorySkillAvailable } from "./factory-lane.js";
 import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
 // Connector variables the channel module requires at evaluation time.
@@ -343,6 +344,22 @@ describe("slack channel", () => {
     );
     assert.ok(result && "auth" in result && result.auth);
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
+  });
+
+  it("stamps factory intent only when the message asks for the factory", async () => {
+    const ordinary = await dispatch(
+      inboundContext(undefined),
+      message("please fix the failing billing test")
+    );
+    assert.ok(ordinary && "auth" in ordinary && ordinary.auth);
+    assert.ok(!factorySkillAvailable(ordinary.auth));
+
+    const requested = await dispatch(
+      inboundContext(undefined),
+      message("take this through the factory")
+    );
+    assert.ok(requested && "auth" in requested && requested.auth);
+    assert.ok(factorySkillAvailable(requested.auth));
   });
 
   it("clears progress without attributing cooperative cancellation to stop", async () => {
