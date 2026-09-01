@@ -11,7 +11,8 @@ import {
 import { mentionPattern, resolveBotName } from "../lib/github/bot-name.js";
 import { githubCredentials } from "../lib/github/credentials.js";
 import { stampRepository } from "../lib/repository.js";
-import { stampAutonomous, stampTrusted } from "../lib/trust.js";
+import { githubFactoryAuth } from "../lib/session-auth.js";
+import { stampTrusted } from "../lib/trust.js";
 
 /**
  * Commenter roles allowed to start a session by mentioning the agent.
@@ -263,12 +264,9 @@ export default githubChannel({
       return null;
     }
     return {
-      auth: stampAutonomous(
-        stampRepository(
-          defaultGitHubAuth(ctx),
-          ctx.repository.fullName,
-          "github-webhook"
-        ),
+      auth: githubFactoryAuth(
+        defaultGitHubAuth(ctx),
+        ctx.repository.fullName,
         pullNumber
       ),
       context: [CI_FIX_TASK],
@@ -312,7 +310,11 @@ export default githubChannel({
         return null;
       }
       return {
-        auth: stampAutonomous(bound, pullNumber),
+        auth: githubFactoryAuth(
+          defaultGitHubAuth(ctx),
+          ctx.repository.fullName,
+          pullNumber
+        ),
         context: [
           REVIEW_FEEDBACK_TASK,
           `Feedback id: github-comment:${comment.id}. Current observed head: ${response.body.head?.sha ?? "unknown"}.`,
@@ -338,12 +340,9 @@ export default githubChannel({
       return null;
     }
     return {
-      auth: stampAutonomous(
-        stampRepository(
-          defaultGitHubAuth(ctx),
-          ctx.repository.fullName,
-          "github-webhook"
-        ),
+      auth: githubFactoryAuth(
+        defaultGitHubAuth(ctx),
+        ctx.repository.fullName,
         issue.issueNumber
       ),
       context: [FACTORY_INTAKE_TASK],
@@ -364,7 +363,11 @@ export default githubChannel({
     return pullRequest.action === "synchronize" &&
       isOwnFactoryHead(raw.head, ctx.repository.fullName)
       ? {
-          auth: stampAutonomous(bound, pullRequest.pullRequestNumber),
+          auth: githubFactoryAuth(
+            defaultGitHubAuth(ctx),
+            ctx.repository.fullName,
+            pullRequest.pullRequestNumber
+          ),
           context: [
             `A new head ${pullRequest.headSha ?? "unknown"} was pushed to this Foreman pull request. Load factory-pipeline, reconcile the durable run against this exact current head, rerun independent review when needed, and continue stabilization without merging.`,
           ],
