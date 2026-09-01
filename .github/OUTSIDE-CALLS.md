@@ -4,7 +4,11 @@ Every call Foreman itself writes that leaves the process, and the deadline it ru
 
 Eve framework-owned traffic (model provider requests, MCP connection traffic, channel delivery, workflow and queue steps) is deliberately absent: eve owns those deadlines, and P8 does not reach into them.
 
-A new outside call belongs in this table. Two tests fail if one is added without a bound: `agent/lib/outside-call-bounds.test.ts` scans the authored sandbox git tools and `agent/lib/blob.ts`, and `agent/lib/sandbox-deadline.test.ts` covers the shared helper.
+A new outside call belongs in this table. Two tests fail if one is added without a bound.
+
+`agent/lib/outside-call-bounds.test.ts` sweeps every authored non-test TypeScript file under `agent/` through the inspector in `agent/lib/outside-call-bounds.ts`. The inspection is per call site, not per file: each call is located by its own parentheses and each option is read from that call's own argument list, so a bound removed from one call fails the sweep even when a neighbouring call still has one, and an unrelated call in the same file cannot stand in for a missing bound. Four classes are enforced. A `.run(` written anywhere under `agent/` outside `agent/lib/sandbox-deadline.ts` fails, whatever the receiver is called, because `boundedRun` is the only way Foreman runs a sandbox command. A `fetch` or `fetchImpl` call whose init object carries no `signal` fails. A call to an operation imported from `@vercel/blob` with no `abortSignal` in any argument fails. A `neon` client built without a `fetchOptions` signal fails. The same test carries a mutation case per class, each one a real call site with a single bound taken away, so the guard is checked to fail rather than assumed to.
+
+`agent/lib/sandbox-deadline.test.ts` covers the shared sandbox helper, including the races between a caller's own cancellation and the deadline.
 
 ## HTTP requests
 
@@ -16,7 +20,7 @@ A new outside call belongs in this table. Two tests fail if one is added without
 | `agent/lib/inngest-api.ts` | 15s per request | Composed with the caller's signal; a caller abort rethrows unwrapped. |
 | `agent/lib/help-center.ts` | 10s per request | Composed with the caller's signal. A failure returns `error` rather than throwing, because search is advisory. |
 | `agent/lib/planetscale.ts` | 50s per request, three requests per read | Matched to the PlanetScale MCP server's own 50s query deadline, so the bound never fires before the upstream's does. |
-| `agent/subagents/vision/tools/read_image.ts` | 20s | Covers the body read; the signal is passed to `fetch`, so a stalled download aborts with it. |
+| `agent/subagents/vision/tools/read_image.ts` | 20s | Covers the body read; the signal is passed to `fetch`, so a stalled download aborts with it. The same 20s per-chunk reader deadline bounds the sandbox path branch, which no signal reaches (see the sandbox file I/O note below). |
 
 ## Other clients
 
@@ -28,6 +32,8 @@ A new outside call belongs in this table. Two tests fail if one is added without
 ## Sandbox commands
 
 All of these run through `boundedRun` in `agent/lib/sandbox-deadline.ts`, which returns exit code 124 rather than throwing, so each caller's existing non-zero branch handles a deadline. A cancelled turn still throws, which is what keeps cancellation distinguishable from a timeout.
+
+A caller that passes its own `abortSignal` keeps it: the helper composes the caller's signal with the deadline rather than replacing it, so an already-aborted caller signal still cancels the command. The failure is classified from the composed signal's reason, which latches whichever signal aborted first, so a deadline that fires while a cancellation is already in flight cannot turn that cancellation into a reported timeout.
 
 | Call | Bound | Notes |
 | --- | --- | --- |
@@ -51,7 +57,13 @@ Each of these is a call Foreman makes with no deadline, for a stated reason.
 
 ### Sandbox file I/O
 
-`readFile`, `readTextFile`, `writeTextFile`, and `removePath` read or write one small fixed-size file: the repository marker, or an image already in the sandbox. eve's `bindSandboxAbortSignal` composes the turn's abort signal into every one of them (`eve@0.44.0`, `dist/src/execution/sandbox/abort-bound-session.js`), so a cancelled turn already unwinds them. The unbounded-work risk that motivates P8 is in commands, not in these.
+Foreman authors four file-I/O calls: `readTextFile` on the repository marker in `agent/lib/repository.ts` and `agent/tools/prepare_repository.ts`, `writeTextFile` on the same marker in `agent/tools/prepare_repository.ts`, and `readFile` on a sandbox image path in `agent/subagents/vision/tools/read_image.ts`.
+
+The abort signal does not reach them. eve's `bindSandboxAbortSignal` does compose the turn's signal into every file call (`eve@0.44.0`, `dist/src/execution/sandbox/abort-bound-session.js`), and the session layer forwards it to the backend (`dist/src/execution/sandbox/session.js`), but the production Vercel backend drops it: `readFile` calls the SDK as `readFile({ path })` and `writeFile` calls `writeFiles([{ content, path }])`, neither passing a signal, and `removePath` is the only file operation that forwards one (`dist/src/execution/sandbox/bindings/vercel.js`). Foreman calls no `removePath`. `@vercel/sandbox@3.0.1` does accept `opts.signal` on these operations and sets no timeout of its own (`dist/api-client/base-client.js` passes only the caller's signal to `fetch`), so the capability exists and is simply never handed a signal. An earlier revision of this document claimed a cancelled turn unwinds these reads and writes. It does not, on the platform Foreman deploys to.
+
+The two marker calls stay exempt, with the real bound stated rather than assumed: one read and one write of a JSON document of a few hundred bytes, on a path Foreman controls, whose only deadline is the Vercel function's own invocation ceiling. eve's abort plumbing does not shorten that. Bounding them would mean re-plumbing eve's sandbox adapter, which is out of scope here; revisit if the adapter starts forwarding the signal, or if a marker read is ever seen to hang.
+
+The image read is bounded, because it is the one that reads an arbitrary path for an arbitrary number of bytes. `read_image` reads the stream through its own reader with a 20-second per-chunk deadline and cancels the reader in `finally`, so a stalled sandbox transfer is dropped rather than waited on. Cancelling the reader is the layer that can actually stop the transfer; the signal eve would pass is not.
 
 ### Agent browser install
 
