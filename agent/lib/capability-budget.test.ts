@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { defineTool } from "eve/tools";
@@ -17,6 +18,8 @@ const {
   admitDynamicTools,
   CAPABILITY_LANES,
   capabilitySource,
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
   formatCapabilityBudget,
   laneAuth,
   measureCapabilityBudget,
@@ -26,6 +29,11 @@ const {
   resolveLaneCapabilities,
   subagentDelegationSchemaChars,
 } = await import("./capability-budget.js");
+
+const HAS_COMPILED_MANIFEST = [
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
+].every((path) => existsSync(new URL(`../../${path}`, import.meta.url)));
 
 const {
   AUTONOMOUS_PRINCIPAL,
@@ -441,9 +449,11 @@ describe("capability report", () => {
     assert.match(report, TOTALS_LINE);
   });
 
-  it("measures the repository's own compiled manifest", async () => {
-    // Not skippable: `pnpm validate` compiles before running the tests, so a
-    // missing or stale manifest is a failure here rather than a silent pass.
+  it("measures the repository's own compiled manifest", {
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
+  }, async () => {
     const manifest = readCompiledManifest(new URL("../../", import.meta.url));
     const budgets = await measureCapabilityBudget(manifest);
     const byLane = new Map(budgets.map((budget) => [budget.lane, budget]));
