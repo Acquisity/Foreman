@@ -14,7 +14,7 @@ Root tools are authored in `agent/tools/` or provided by the eve framework. They
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
-Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
 Read them in flow order: Intercom, then PlanetScale, then Autumn, then Stripe. Autumn and Stripe use app-scoped root tools in this intake workflow, not the requester's personal MCP grants.
 
@@ -50,7 +50,7 @@ The tools use an app-scoped IBG credential, require no requester OAuth, and expo
 
 ## Autumn (root tool)
 
-Call `read_autumn_billing` with the existing customer or organization id already verified in PlanetScale. It uses the shared app-scoped API key, so it is available before any requester-specific consent. Its only provider operation is Autumn's `customers.get` read with plans and balances expanded. It cannot create a missing customer or call a write route.
+Call `read_autumn_billing` with the `billing_account.id` column from the PlanetScale read (the row `organization.billing_account_id` points to; `billingAccount.id` when `read_billing_account` did the read). Acquisity keys Autumn customers by billing account id; the organization id answers `customer_not_found`, and a 404 reason is a wrong id rather than an outage, except for a partner-governed organization, an `organization.partner_id` that is neither null nor the default `00000000-0000-0000-0000-000000000001`, which has no customer in Acquisity's own Autumn. The record's `stripe_id` is the `cus_` id for `read_stripe_billing`. It uses the shared app-scoped API key, so it is available before any requester-specific consent. Its only provider operation is Autumn's `customers.get` read with plans and balances expanded. It cannot create a missing customer or call a write route.
 
 When `available` is false, record Autumn as `Could not run`; never read it as the customer having no Autumn account.
 

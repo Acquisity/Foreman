@@ -7,7 +7,7 @@ import {
   SLACK_TEAM_ID,
 } from "../lib/constants.js";
 import { slaWindowStart } from "../lib/sla-window.js";
-import { stampIntakeOnly, UNATTENDED_ATTRIBUTE } from "../lib/trust.js";
+import { stampIntakeOnly, stampUnattended } from "../lib/trust.js";
 
 /** Who each channel's report tags. Support is cross-cutting, so it tags both. */
 const JAMES = "<@U0BA7JK9XRV>";
@@ -34,26 +34,21 @@ const FEATURE_CHANNELS = [
  * Supermemory writes outright rather than parking a card on a person who is
  * asleep when this runs.
  *
- * Known gap, deliberately not solved here: if a user grant lapses, eve's
- * default `authorization.required` handler posts "Connect with <name> to
- * continue" into whichever feature channel that session targets, and delivers
- * the sign-in button ephemerally to `attributes.user_id`. The credential never
- * goes public and the notice edits itself once resolved, but the run stalls
- * until a person signs in, which a schedule should not need. The only override
- * is the channel-wide handler in `agent/channels/slack.ts`, which would change
- * behavior for every human Slack session too, so it is a separate decision.
+ * A lapsed user grant cannot park these runs: `userConnect` turns the sign-in
+ * request into a terminal, non-retryable failure for every Slack-issued user
+ * principal, including this schedule's, so the model works around the missing
+ * evidence source instead of stalling until a person signs in.
  */
-const OWNER_AUTH = {
+const OWNER_AUTH = stampUnattended({
   attributes: {
     team_id: SLACK_TEAM_ID,
-    [UNATTENDED_ATTRIBUTE]: "true",
     user_id: OWNER_USER_ID,
   },
   authenticator: "slack-webhook",
   issuer: `slack:${SLACK_TEAM_ID}`,
   principalId: `slack:${SLACK_TEAM_ID}:${OWNER_USER_ID}`,
   principalType: "user",
-} as const;
+});
 
 /**
  * The schedule builds its own auth rather than receiving a signed webhook, so
@@ -111,7 +106,7 @@ export default defineSchedule({
     for (const { feature, channelId, tag } of FEATURE_CHANNELS) {
       try {
         const dispatch = to(slack, { channelId }).send(
-          `Daily SLA check for ${feature}. Load the sla-investigation skill and follow it end to end. Find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. Run the skill's required investigation on every one of them, including opening the repository, before you write anything. The repository for any code lookup is Acquisity/Acquisity. Post one report in the skill's format, tagging ${tag} in the header line and each bug's assignee in its own block. Delivery is conditional: if there are no in-scope bugs, reply with exactly <eve-empty-delivery/> and no other text, so nothing at all is posted. Do not explain that you found none.`,
+          `Daily SLA check for ${feature}. Load the sla-investigation skill and follow it end to end. Find new SLA bugs for ${feature}: Bug label, Urgent or High priority, SLA started at or after ${since}. Run the skill's required investigation on every fresh bug, including opening the repository, before you write anything. A bug already attached to a master ticket is a customer report, not a fresh bug, so the skill reports it as a brief note instead. The repository for any code lookup is Acquisity/Acquisity. Post one report in the skill's format, tagging ${tag} in the header line and each bug's assignee in its own block. Delivery is conditional: if there are no in-scope bugs, reply with exactly <eve-empty-delivery/> and no other text, so nothing at all is posted. Do not explain that you found none.`,
           { auth: authFor(channelId) }
         );
         waitUntil(

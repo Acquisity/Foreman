@@ -69,6 +69,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 
 - `sla-report` runs daily at 13:00 UTC, dispatching a per-feature SLA bug investigation into each feature's Slack channel plus a health heartbeat.
 - `foreman-costs-report` runs daily at 13:00 UTC, posting yesterday's Foreman running costs (AI Gateway model spend, Vercel platform usage for the foreman project, credit balance) into the costs Slack channel. The figures come from the fixed `read_foreman_costs` tool, which renders the message itself.
+- `ai-sdr-report` runs Mondays at 13:00 UTC, dispatching a weekly AI SDR performance report (volume, conversion rates, campaign type, and lifecycle) into the AI SDR channel.
 
 ## Configuration
 
@@ -89,6 +90,10 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 
 See [.env.example](.env.example) for all MCP connection UIDs. No repository or setup command is configured through the environment.
+
+### Session limits
+
+The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agent.ts](agent/agent.ts). eve defaults to a 40M-token input budget per session, and cached prompt re-reads count as provider-reported input on every model call, so a long Slack thread can cross it and park the session on eve's Approve/Stop budget card, which Slack cannot answer. Output stays on eve's existing uncapped default.
 
 ### Instantly admin workspace
 

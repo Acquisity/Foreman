@@ -8,6 +8,7 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import {
+  FINAL_SLACK_POST_RULE,
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
   slackIntakeContext,
@@ -19,10 +20,7 @@ import {
   stampIntakeOnly,
   stampTrusted,
 } from "./trust.js";
-import {
-  INTAKE_ONLY_SIGN_IN_REASON,
-  intakeOnlySignInDenial,
-} from "./user-connect.js";
+import { SLACK_SIGN_IN_REASON, slackSignInDenial } from "./user-connect.js";
 
 const auth: SessionAuthContext = {
   attributes: {},
@@ -75,12 +73,16 @@ describe("intake-only channels", () => {
     ]);
   });
 
-  it("grants billing API reads to every intake channel, not per workflow", () => {
+  it("billing API reads run on every surface except an untrusted GitHub session", () => {
     const intake = stampSlackIntakeAuth(auth);
     assert.equal(isIntakeOnly(intake), true);
     assert.equal(canUseBillingApiRead(intake), true);
-    assert.equal(canUseBillingApiRead(auth), false);
-    assert.equal(canUseBillingApiRead(stampIntakeOnly(auth)), false);
+    assert.equal(canUseBillingApiRead(auth), true);
+    assert.equal(canUseBillingApiRead(stampIntakeOnly(auth)), true);
+    assert.equal(canUseBillingApiRead(null), true);
+    const github = { ...auth, principalId: "github:12345" };
+    assert.equal(canUseBillingApiRead(github), false);
+    assert.equal(canUseBillingApiRead(stampTrusted(github)), true);
   });
 
   it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {
@@ -109,6 +111,14 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("progress updates are allowed"), true);
     assert.equal(context.includes("only the requester-facing answer"), true);
     assert.equal(context.includes("no internal summary or action log"), true);
+  });
+
+  it("states the final Slack-post rule exactly once per intake context", () => {
+    for (const channelId of ["C0BBPVC3N2X", "C0BC011NAQL", "C0BCV1WBR42"]) {
+      const context = slackIntakeContext(channelId);
+      const occurrences = context.split(FINAL_SLACK_POST_RULE).length - 1;
+      assert.equal(occurrences, 1, channelId);
+    }
   });
 
   it("starts Intercom intake from one conversation without an issue", () => {
@@ -160,12 +170,16 @@ describe("intake-only channels", () => {
       id: auth_.principalId,
       type: "user",
     });
+    const slackAuth: SessionAuthContext = {
+      ...auth,
+      principalId: "slack:T123:U456",
+    };
     const required = new ConnectionAuthorizationRequiredError("jam");
-    const denial = intakeOnlySignInDenial(
+    const denial = slackSignInDenial(
       required,
-      principalFor(stampIntakeOnly(auth))
+      principalFor(stampIntakeOnly(slackAuth))
     );
-    assert.equal(denial?.reason, INTAKE_ONLY_SIGN_IN_REASON);
+    assert.equal(denial?.reason, SLACK_SIGN_IN_REASON);
     assert.equal(denial?.retryable, false);
     assert.equal(denial?.connectionName, "jam");
     assert.equal((denial?.message ?? "").includes("jam"), false);
@@ -174,17 +188,16 @@ describe("intake-only channels", () => {
       true
     );
 
-    // A developer channel keeps the normal consent flow, and an unrelated
+    // The denial covers every Slack-issued user principal now, so an
+    // unstamped developer-channel mention is denied the same way. An app
+    // principal never reaches the consent flow at all, and an unrelated
     // failure is never rewritten into a sign-in denial.
+    assert.ok(slackSignInDenial(required, principalFor(slackAuth)));
+    assert.equal(slackSignInDenial(required, { type: "app" }), undefined);
     assert.equal(
-      intakeOnlySignInDenial(required, principalFor(auth)),
-      undefined
-    );
-    assert.equal(intakeOnlySignInDenial(required, { type: "app" }), undefined);
-    assert.equal(
-      intakeOnlySignInDenial(
+      slackSignInDenial(
         new Error("mcp server unreachable"),
-        principalFor(stampIntakeOnly(auth))
+        principalFor(stampIntakeOnly(slackAuth))
       ),
       undefined
     );

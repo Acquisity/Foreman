@@ -14,9 +14,9 @@ Two kinds of tool appear below, and they are called differently.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
 
-Use the built-in `connection_search` to discover what a connection actually exposes. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. Every configured intake-only channel uses the app-scoped root tools described below. Other attended surfaces keep the broader user-scoped MCP tools.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the user-scoped MCP tools are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
 
 ## PlanetScale (`planetscale__`)
 
@@ -42,11 +42,11 @@ The tools use an app-scoped IBG credential, require no requester OAuth, and expo
 
 ## Autumn (`autumn__`)
 
-In any configured intake-only channel, use the root tool `read_autumn_billing` instead. Pass only the existing customer or organization id already verified in PlanetScale. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
+Use the root tool `read_autumn_billing` first, on every surface. Pass `billingAccount.id` from `read_billing_account`: Acquisity keys Autumn customers by billing account id, and the organization id answers `customer_not_found`. A 404 reason is a wrong id, never an outage or an empty account; re-resolve before recording anything. The one expected 404 is a partner-governed organization, `organization.partnerGoverned` true, which is on Whop and has no customer in Acquisity's own Autumn; that is the partner rule, not an id problem. The record's `stripe_id` is the `cus_` id Stripe needs. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
 
-The `autumn__` connection below is for attended users who have personally connected Autumn.
+The `autumn__` connection below is the fallback when the root tool answers `available: false`, for users who have personally connected Autumn.
 
-`getCustomer` for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
+`getCustomer`, keyed by the same billing account id, for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
 
 Also allowlisted: `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
 
@@ -60,9 +60,9 @@ Line items for domains and inboxes are both named generically. The identifier is
 
 ## Stripe (`stripe__`)
 
-In any configured intake-only channel, use the root tool `read_stripe_billing` instead. Its `customer` lookup reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
+Use the root tool `read_stripe_billing` first, on every surface. Its `customer` lookup takes the `cus_` id from the Autumn record's `stripe_id` and reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
 
-The `stripe__` connection below is for attended users who have personally connected Stripe.
+The `stripe__` connection below is the fallback when the root tool answers `available: false`, for users who have personally connected Stripe.
 
 `stripe_api_read` for a known object, `stripe_api_search` to find one, `stripe_api_details` when a call shape is unclear. `search_stripe_documentation` for API semantics. `get_stripe_account_info` and `list_available_accounts_or_orgs` for account context.
 

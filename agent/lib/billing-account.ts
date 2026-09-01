@@ -4,6 +4,13 @@ import { parseReadQueryResult } from "./planetscale.js";
 /** Organization ids are uuids in `packages/db` (`primaryId`). */
 export const organizationIdSchema = z.string().trim().toLowerCase().uuid();
 
+/**
+ * Acquisity's own partner row (`apps/web/lib/partner/constants.ts`). Native
+ * organizations carry it or null; any other partner id puts billing on the
+ * partner's provider (`resolveBillingProviderForPartner`).
+ */
+export const DEFAULT_PARTNER_ID = "00000000-0000-0000-0000-000000000001";
+
 /** Rows per history list; hitting it sets the matching `truncated` flag. */
 export const HISTORY_LIMIT = 20;
 
@@ -111,7 +118,11 @@ export const billingAccountResultSchema = z.object({
       createdAt: z.string().nullable(),
       id: z.string(),
       name: z.string().nullable(),
-      /** Non-null means a partner governs billing; read it before routing on provider. */
+      /**
+       * True when a partner other than Acquisity's default governs billing;
+       * route on this, not on provider.
+       */
+      partnerGoverned: z.boolean(),
       partnerId: z.string().nullable(),
     })
     .nullable(),
@@ -232,6 +243,9 @@ export async function readBillingAccount(
         createdAt: row.created_at ?? null,
         id: row.id,
         name: row.name ?? null,
+        partnerGoverned:
+          (row.partner_id ?? null) !== null &&
+          row.partner_id !== DEFAULT_PARTNER_ID,
         partnerId: row.partner_id ?? null,
       },
       transactions,

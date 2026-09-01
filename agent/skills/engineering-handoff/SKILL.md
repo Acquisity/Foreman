@@ -6,7 +6,7 @@ description: "Turn an approved, engineering-actionable triage investigation into
 
 Create durable engineering work from an approved diagnosis without turning every customer report into its own investigation. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps.
 
-`triage-investigate` still owns investigation, classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, the area-routing roster, and the customer ticket's final state, labels, priority, and project. This skill owns finding or creating the master, the customer ticket's `parentId` and `assignee` that link it to the master, the content boundary between report and master, and proving the writes landed.
+`triage-investigate` still owns the investigation, and `triage-handling` owns classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, the area-routing roster, and the customer ticket's final state, labels, priority, and project. This skill owns finding or creating the master, the customer ticket's `parentId` and `assignee` that link it to the master, the content boundary between report and master, and proving the writes landed.
 
 ## Preconditions
 
@@ -14,7 +14,7 @@ All of these hold before anything is written:
 
 - Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`.
 - The `Triage investigation` document is attached to the customer ticket and current.
-- When the workflow ran the critic, its verdict was `APPROVE` for this exact document version: the document id and `updatedAt` the critic echoed in `reviewed` still match what Linear returns now. A changed document needs a new review before any structural write.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket exactly once, so a document changed after its review settled has no review covering it and fails this precondition until Stage 5 re-adjudicates and re-saves it.
 - When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
 - The master search below has been run in this pass, not carried over from an earlier one.
 
@@ -49,13 +49,13 @@ The Slack intake recency window exists so masters describe a current cluster of 
 If an eligible master already owns the cause:
 
 1. Read the master and the report with their current relations first. If the report is already parented to this master, that is done; do not append it again.
-2. Call `route_ticket` on this ticket once, with `parent` and `inheritAssigneeFrom` both set to the master, `assignee` set to the area owner from the area-routing roster in `triage-investigate` Stage 6, and the Stage 5 `state`, `priority`, and `addLabels` plus the Stage 6 `project`, so the report carries its own decisions and the child never sits under a master owned by someone else. The tool inherits the master's assignee when it has one and uses the area owner only when it does not; say in the document when the master was unassigned.
+2. Call `route_ticket` on this ticket once, with `parent` and `inheritAssigneeFrom` both set to the master, `assignee` set to the area owner from the area-routing roster in `triage-handling` Stage 6, and the Stage 5 `state`, `priority`, and `addLabels` plus the Stage 6 `project`, so the report carries its own decisions and the child never sits under a master owned by someone else. The tool inherits the master's assignee when it has one and uses the area owner only when it does not; say in the document when the master was unassigned.
 3. Comment the new evidence on the master in aggregate form, re-count the blast radius, update the master's section with the new figure and date, and re-weigh its priority. A second independent report is frequency evidence. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
 4. Apply the approved hotlane state: when the approved route is `HOTLANE`, call `route_ticket` on the master with `addLabels: ["fast-lane"]`; it keeps the master's other labels. Never lower the master's priority because of a workaround or one more report.
 
 ## Create one master
 
-If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project Stage 6 selected from completed evidence (never the report's incoming intake project; when Stage 6 could not determine one, leave the master unprojected and say so in the document), labelled with the type, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to the area owner from the roster in `triage-investigate` Stage 6. Then call `route_ticket` on this ticket once, with `parent` set to the new master, `assignee` set to that same area owner, and the Stage 5 `state`, `priority`, and `addLabels` plus the Stage 6 `project`. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
+If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project Stage 6 selected from completed evidence (never the report's incoming intake project; when Stage 6 could not determine one, leave the master unprojected and say so in the document), labelled with the type, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to the area owner from the roster in `triage-handling` Stage 6. Then call `route_ticket` on this ticket once, with `parent` set to the new master, `assignee` set to that same area owner, and the Stage 5 `state`, `priority`, and `addLabels` plus the Stage 6 `project`. In an intake-only Slack workflow, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
 
 Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
@@ -71,7 +71,7 @@ The master carries only sanitized, aggregate engineering context: the cause, the
 
 After the writes, read the master and the report again and confirm: the parent relation, the assignee on both, the master's project, priority, label union including `fast-lane` when approved, and the report link from the master. If any of it disagrees with what was intended, stop and report the mismatch in the investigation document. Never create a second master as a recovery step; a duplicate master is worse than a missing link.
 
-Changing a diagnosis or moving a report between masters needs a new investigation document version and, where the workflow includes it, a new critic review, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
+Changing a diagnosis or moving a report between masters needs a new investigation document version whose changed findings Foreman adjudicates once and records on that version's `**Review**` line, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
 
 ## Return to Stage 6
 

@@ -90,9 +90,37 @@ describe("critic subagent", () => {
     );
     assert.ok(instructions.includes("Load the `triage-critic` skill before"));
     assert.ok(instructions.includes("If the skill fails to load"));
-    assert.ok(skill.includes("There is no attempt 3"));
     assert.ok(skill.includes("`checkout_commit`"));
     assert.ok(skill.includes("as the literal marker `read-only`"));
+  });
+
+  it("carries no attempt numbering or retry language anywhere", () => {
+    // P6.2: the critic runs exactly once per ticket. The description,
+    // instructions, and child skill must not revive the two-attempt
+    // contract P6.1 removed from the caller.
+    const agentSource = readFileSync(new URL("agent.ts", criticRoot), "utf8");
+    for (const surface of [agentSource, instructions, skill]) {
+      const lowered = surface.toLowerCase();
+      for (const excluded of [
+        "attempt 1",
+        "attempt 2",
+        "attempt 3",
+        "attempt number",
+        "attempt limit",
+        "two-attempt",
+        "second review",
+        "re-review",
+        "review again",
+        "prior approval",
+        "failed last time",
+        "re-delegate",
+        "delegate again",
+      ]) {
+        assert.ok(!lowered.includes(excluded), excluded);
+      }
+    }
+    assert.ok(agentSource.includes("Called exactly once per ticket"));
+    assert.ok(skill.includes("Foreman calls you exactly once per ticket"));
   });
 
   it("disables every write-capable default tool", () => {
@@ -125,14 +153,41 @@ describe("critic subagent", () => {
         stdio: ["ignore", "pipe", "pipe"],
       })
     ) as {
-      artifacts: { discoveryManifest: string };
+      artifacts: { compiledManifest: string; discoveryManifest: string };
       subagents: string[];
+      tools: string[];
     };
     assert.ok(info.subagents.includes("critic"));
+    // P2.3's discovery check rides this same compiler run: the sign_in tool
+    // must compile and surface as a root tool.
+    assert.ok(info.tools.includes("sign_in"));
+    // P4.2 also rides this run: the compiled manifest must carry the root
+    // agent's disabled per-session input budget, proving agent.test.ts's
+    // source-level pin survives compilation into what eve actually runs.
+    const compiled = JSON.parse(
+      readFileSync(info.artifacts.compiledManifest, "utf8")
+    ) as { config: { limits: { maxInputTokensPerSession: boolean } } };
+    assert.equal(compiled.config.limits.maxInputTokensPerSession, false);
 
     const manifest = JSON.parse(
       readFileSync(info.artifacts.discoveryManifest, "utf8")
-    ) as { subagents: DiscoveredSubagent[] };
+    ) as {
+      diagnosticsSummary: { errors: number };
+      hooks: { logicalPath: string }[];
+      subagents: DiscoveredSubagent[];
+      tools: { logicalPath: string }[];
+    };
+    assert.equal(manifest.diagnosticsSummary.errors, 0);
+    assert.ok(
+      manifest.tools.some((tool) => tool.logicalPath === "tools/sign_in.ts")
+    );
+    // P7.1 rides this run: the ops hook must be discovered from
+    // agent/hooks/ops.ts. The exact ten subscribed events are pinned in
+    // ops-log.test.ts.
+    assert.ok(
+      manifest.hooks.some((hook) => hook.logicalPath === "hooks/ops.ts"),
+      "ops hook must appear in the discovery manifest"
+    );
     const critic = manifest.subagents.find(
       (entry) => entry.subagentId === "critic"
     );

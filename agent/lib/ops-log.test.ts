@@ -1,0 +1,192 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import opsHook from "../hooks/ops.js";
+import {
+  formatOpsEvent,
+  logOpsEvent,
+  OPS_LOG_LINE_LIMIT,
+  OPS_LOG_STRING_LIMIT,
+} from "./ops-log.js";
+
+describe("formatOpsEvent", () => {
+  it("emits one line of valid JSON with the event and fields", () => {
+    const line = formatOpsEvent("turn.completed", {
+      sessionId: "s1",
+      turnId: "t1",
+    });
+    assert.equal(line.includes("\n"), false);
+    assert.deepEqual(JSON.parse(line), {
+      event: "turn.completed",
+      sessionId: "s1",
+      turnId: "t1",
+    });
+  });
+
+  it("keeps the event name when a field is also named event", () => {
+    const parsed = JSON.parse(
+      formatOpsEvent("session.started", {
+        event: "forged",
+      } as Parameters<typeof formatOpsEvent>[1])
+    );
+    assert.equal(parsed.event, "session.started");
+  });
+
+  it("truncates messages and event names to the string bound", () => {
+    const longEvent = "e".repeat(OPS_LOG_STRING_LIMIT + 50);
+    const parsed = JSON.parse(
+      formatOpsEvent(longEvent, {
+        message: "x".repeat(10_000),
+      })
+    );
+    assert.equal(parsed.message.length, OPS_LOG_STRING_LIMIT + 3);
+    assert.equal(parsed.message.endsWith("..."), true);
+    assert.equal(parsed.event.length, OPS_LOG_STRING_LIMIT + 3);
+    assert.equal(parsed.event.endsWith("..."), true);
+  });
+
+  it("serializes non-string values without conversion hooks", () => {
+    let toStringCalls = 0;
+    const objectValue = {
+      toString() {
+        toStringCalls += 1;
+        return "unsafe";
+      },
+    };
+    const parsed = JSON.parse(
+      formatOpsEvent("input.requested", {
+        code: 10n,
+        connection: Symbol("connection"),
+        message: objectValue,
+        requests: 3,
+        sessionId: undefined,
+        stepIndex: Number.NaN,
+        turnId: () => "turn",
+      })
+    );
+    assert.deepEqual(parsed, {
+      code: "[BigInt]",
+      connection: "[Symbol]",
+      event: "input.requested",
+      message: "[Object]",
+      requests: 3,
+      sessionId: null,
+      stepIndex: "[NonFiniteNumber]",
+      turnId: "[Function]",
+    });
+    assert.equal(toStringCalls, 0);
+  });
+
+  it("ignores unknown fields instead of traversing them", () => {
+    let ownKeysCalls = 0;
+    let descriptorCalls = 0;
+    const hostile = new Proxy(
+      {},
+      {
+        getOwnPropertyDescriptor: () => {
+          descriptorCalls += 1;
+          throw new Error("must not inspect unknown values");
+        },
+        ownKeys: () => {
+          ownKeysCalls += 1;
+          return Array.from({ length: 50_000 }, (_, index) => `key${index}`);
+        },
+      }
+    );
+    const parsed = JSON.parse(
+      formatOpsEvent("turn.started", {
+        hostile,
+      } as Parameters<typeof formatOpsEvent>[1])
+    );
+    assert.deepEqual(parsed, { event: "turn.started" });
+    assert.equal(ownKeysCalls, 0);
+    assert.equal(descriptorCalls, 0);
+  });
+
+  it("performs a constant number of descriptor reads", () => {
+    let descriptorReads = 0;
+    let ownKeysCalls = 0;
+    const fields = new Proxy(
+      { sessionId: "s1", turnId: "t1" },
+      {
+        getOwnPropertyDescriptor(target, key) {
+          descriptorReads += 1;
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+        ownKeys() {
+          ownKeysCalls += 1;
+          return Array.from({ length: 50_000 }, (_, index) => `key${index}`);
+        },
+      }
+    );
+    const parsed = JSON.parse(formatOpsEvent("turn.started", fields));
+    assert.deepEqual(parsed, {
+      event: "turn.started",
+      sessionId: "s1",
+      turnId: "t1",
+    });
+    assert.equal(descriptorReads, 7);
+    assert.equal(ownKeysCalls, 0);
+  });
+
+  it("falls back when a known-field descriptor read throws", () => {
+    const hostile = new Proxy(
+      {},
+      {
+        getOwnPropertyDescriptor: () => {
+          throw new Error("hostile");
+        },
+      }
+    );
+    const line = formatOpsEvent("step.failed", hostile);
+    assert.equal(line.length <= OPS_LOG_LINE_LIMIT, true);
+    assert.deepEqual(JSON.parse(line), {
+      error: "ops_log_format_failed",
+      event: "step.failed",
+    });
+  });
+});
+
+describe("logOpsEvent", () => {
+  it("emits exactly one formatted line through the logger", () => {
+    const lines: string[] = [];
+    logOpsEvent("session.failed", { code: "boom" }, (line) => {
+      lines.push(line);
+    });
+    assert.equal(lines.length, 1);
+    assert.deepEqual(JSON.parse(lines[0]), {
+      code: "boom",
+      event: "session.failed",
+    });
+  });
+
+  it("never throws when the logger throws", () => {
+    assert.doesNotThrow(() => {
+      logOpsEvent("turn.cancelled", {}, () => {
+        throw new Error("logger down");
+      });
+    });
+  });
+});
+
+describe("ops hook", () => {
+  it("subscribes to exactly the ten covered events", () => {
+    assert.deepEqual(
+      Object.keys(opsHook.events ?? {}).sort(),
+      [
+        "authorization.required",
+        "input.requested",
+        "session.completed",
+        "session.failed",
+        "session.started",
+        "step.failed",
+        "turn.cancelled",
+        "turn.completed",
+        "turn.failed",
+        "turn.started",
+      ].sort()
+    );
+    for (const handler of Object.values(opsHook.events ?? {})) {
+      assert.equal(typeof handler, "function");
+    }
+  });
+});
