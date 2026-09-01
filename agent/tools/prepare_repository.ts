@@ -28,17 +28,6 @@ import {
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
 
 /**
- * Wall-clock bound for one clone, fetch/reset, or install.
- *
- * @remarks
- * A stalled git or package-manager process holds the whole turn: eve's
- * `run` blocks until the command exits, and nothing else in the session
- * wakes up. Five minutes is above the slowest observed cold clone plus
- * install of the warmed repositories and well under the invocation
- * ceiling, so a healthy run never trips it and a wedged one always does.
- * The station git tools share the same bound through `#lib/sandbox-deadline`.
- */
-/**
  * Applies the brokered GitHub credential to the sandbox firewall for the
  * duration of one credential window.
  */
