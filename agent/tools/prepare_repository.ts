@@ -6,6 +6,7 @@ import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
 import { FALLBACK_BOT_NAME, resolveBotName } from "#lib/github/bot-name.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "#lib/github/git-remote.js";
+import { logOpsEvent } from "#lib/ops-log.js";
 import {
   parseRepository,
   REPOSITORY_MARKER,
@@ -768,6 +769,28 @@ const recordPreparedRepository = async (
   return null;
 };
 
+/**
+ * Returns the refusal to the model and leaves exactly one bounded warning
+ * behind.
+ *
+ * @remarks
+ * A repository this session may not prepare is an operator-visible event, not
+ * a silent no-op, and `logOpsEvent` keeps the line one bounded JSON record
+ * that cannot break the turn. This is the only place a refusal is logged, so
+ * a refusal that travelled through a rollback still leaves one line, and the
+ * message is the same bounded reason the model reads: `logOpsEvent` truncates
+ * a string past `OPS_LOG_STRING_LIMIT`, so a long git or configuration error
+ * is logged as its prefix.
+ */
+const refuse = (code: string, error: string) => {
+  logOpsEvent(
+    "prepare_repository.refused",
+    { code, message: error },
+    console.warn
+  );
+  return { error, success: false as const };
+};
+
 /** The part of eve's tool context preparing a repository reads. */
 interface PrepareContext {
   getSandbox: () => Promise<SandboxSession>;
@@ -792,10 +815,10 @@ export const prepareRepositoryWorkspace = async (
   try {
     target = resolveTarget(repository, ctx.session.auth.current);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Invalid repository.",
-      success: false as const,
-    };
+    return refuse(
+      "invalid_repository",
+      error instanceof Error ? error.message : "Invalid repository."
+    );
   }
 
   const sandbox = await ctx.getSandbox();
@@ -806,7 +829,7 @@ export const prepareRepositoryWorkspace = async (
   if (previous?.worktree === "/workspace/repo") {
     const unreconciled = await reconcilePrevious(sandbox, previous, timeoutMs);
     if (unreconciled) {
-      return { error: unreconciled, success: false as const };
+      return refuse("unreconciled_switch", unreconciled);
     }
   }
   const from = previous
@@ -827,11 +850,10 @@ export const prepareRepositoryWorkspace = async (
 
   const worktree = await detectWorktree(sandbox);
   if (worktree === null) {
-    return {
-      error:
-        "Could not determine whether /workspace is a repository before the deadline.",
-      success: false as const,
-    };
+    return refuse(
+      "worktree_unknown",
+      "Could not determine whether /workspace is a repository before the deadline."
+    );
   }
   const prepareError = previous
     ? await switchPreparedRepository(sandbox, previous, {
@@ -842,7 +864,7 @@ export const prepareRepositoryWorkspace = async (
       })
     : await prepareFreshCheckout(sandbox, target.slug, worktree, options);
   if (prepareError) {
-    return { error: prepareError, success: false as const };
+    return refuse("checkout_unavailable", prepareError);
   }
 
   const recordError = await recordPreparedRepository(sandbox, {
@@ -852,7 +874,7 @@ export const prepareRepositoryWorkspace = async (
     worktree,
   });
   if (recordError) {
-    return { error: recordError, success: false as const };
+    return refuse("marker_unwritable", recordError);
   }
   if (previous) {
     await discardPath(sandbox, PREVIOUS_PATH, timeoutMs);

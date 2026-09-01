@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
+import { OPS_LOG_LINE_LIMIT, OPS_LOG_STRING_LIMIT } from "./ops-log.js";
 import {
   broker,
   CANCELLED,
@@ -19,6 +20,7 @@ import {
   TIMEOUT_MS,
 } from "./prepare-repository-fixtures.js";
 import { REPOSITORY_MARKER, remoteUrl, stampRepository } from "./repository.js";
+import { TIMED_OUT_EXIT_CODE } from "./sandbox-deadline.js";
 import { stampUnattended } from "./trust.js";
 
 const { prepareRepositoryWorkspace } = await import(
@@ -49,6 +51,18 @@ const CONFIGURE = "user.name";
 const PREVIOUS_LOST = /could not be restored/u;
 const NO_REPOSITORY = /no repository prepared/u;
 const MARKED_OTHER = /Acquisity\/Other/u;
+const NO_REPOSITORY_SELECTED =
+  /No repository is selected\. Provide one explicit owner\/repo slug or GitHub URL\./u;
+const WORKTREE_UNKNOWN =
+  /Could not determine whether \/workspace is a repository/u;
+
+/** What `boundedRun` returns for a command its deadline killed. */
+const timedOut = (): Promise<RunResult> =>
+  Promise.resolve({
+    exitCode: TIMED_OUT_EXIT_CODE,
+    stderr: "timed out",
+    stdout: "",
+  });
 
 const attendedAuth: SessionAuthContext = {
   attributes: {},
@@ -105,24 +119,24 @@ const prepare = async (
   marker: unknown,
   auth: SessionAuthContext | null,
   run: (options: RunOptions) => Promise<RunResult> = () => ok(HEAD_BEFORE),
-  write?: () => Promise<void>
+  write?: () => Promise<void>,
+  toplevel: (options: RunOptions) => Promise<RunResult> = () =>
+    failed("not a git repository")
 ) => {
   const { commands, sandbox, written } = preparedSandbox(
     marker,
     (options) =>
       options.command.includes("rev-parse --show-toplevel")
-        ? failed("not a git repository")
+        ? toplevel(options)
         : run(options),
     write
   );
-  const result = (await prepareRepositoryWorkspace(
-    requested,
-    {
-      getSandbox: () => Promise.resolve(sandbox),
-      session: { auth: { current: auth } },
-    },
-    { broker, timeoutMs: TIMEOUT_MS }
-  )) as {
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (line: unknown) => {
+    warnings.push(String(line));
+  };
+  let result: {
     current?: { repository: string; source: string };
     error?: string;
     previous?: { repository: string; source: string } | null;
@@ -130,7 +144,19 @@ const prepare = async (
     reused?: boolean;
     success?: boolean;
   };
-  return { commands, result, written };
+  try {
+    result = (await prepareRepositoryWorkspace(
+      requested,
+      {
+        getSandbox: () => Promise.resolve(sandbox),
+        session: { auth: { current: auth } },
+      },
+      { broker, timeoutMs: TIMEOUT_MS }
+    )) as typeof result;
+  } finally {
+    console.warn = original;
+  }
+  return { commands, result, warnings, written };
 };
 describe("prepare_repository switching", () => {
   it("reuses the repository it already prepared", async () => {
@@ -536,5 +562,125 @@ describe("prepare_repository switching", () => {
     assert.match(result.error ?? "", PREVIOUS_KEPT);
     assert.equal(ran(commands, "git clone"), false);
     assert.equal(ran(commands, DISCARD_MARKER), false);
+  });
+});
+
+describe("prepare_repository refusal logging", () => {
+  /** The one line a refusal is allowed to leave, parsed back. */
+  const record = (warnings: string[]) => {
+    assert.equal(warnings.length, 1);
+    assert.ok((warnings[0] ?? "").length <= OPS_LOG_LINE_LIMIT);
+    return JSON.parse(warnings[0] ?? "") as Record<string, unknown>;
+  };
+
+  /** What `logOpsEvent` keeps of a reason the model read in full. */
+  const bounded = (message: string) =>
+    message.length > OPS_LOG_STRING_LIMIT
+      ? `${message.slice(0, OPS_LOG_STRING_LIMIT)}...`
+      : message;
+
+  /**
+   * Every route the tool refuses on. Each one is its own call site, so a
+   * route that stops logging has to fail here rather than hide behind a
+   * sibling that still does.
+   */
+  const routes = [
+    {
+      code: "invalid_repository",
+      name: "an unparseable repository",
+      reason: NO_REPOSITORY_SELECTED,
+      run: () => prepare("not a repository", null, attendedAuth),
+    },
+    {
+      code: "unreconciled_switch",
+      name: "an interrupted switch that cannot be settled",
+      reason: RECOVERY_FAILED,
+      run: () =>
+        prepare(OTHER, markerFor(REPOSITORY), attendedAuth, (options) =>
+          options.command === RECOVER ? failed("mv: permission denied") : ok()
+        ),
+    },
+    {
+      code: "worktree_unknown",
+      name: "a worktree probe that misses the deadline",
+      reason: WORKTREE_UNKNOWN,
+      // `detectWorktree` reads a deadline off the exit code, which is how
+      // `boundedRun` reports one, so the probe reports it directly here.
+      run: () =>
+        prepare(OTHER, null, attendedAuth, () => ok(), undefined, timedOut),
+    },
+    {
+      code: "checkout_unavailable",
+      name: "a switch this session may not make",
+      reason: UNATTENDED_REFUSAL,
+      run: () =>
+        prepare(OTHER, markerFor(REPOSITORY), stampUnattended(attendedAuth)),
+    },
+    {
+      code: "marker_unwritable",
+      name: "a marker that cannot be recorded",
+      reason: MARKER_WRITE_FAILED,
+      run: () =>
+        prepare(
+          OTHER,
+          markerFor(REPOSITORY),
+          attendedAuth,
+          (options) =>
+            options.command.startsWith("test ") ? failed("") : ok(),
+          () => Promise.reject(new Error("blob write failed"))
+        ),
+    },
+  ] as const;
+
+  for (const route of routes) {
+    it(`warns once for ${route.name}`, async () => {
+      const { result, warnings } = await route.run();
+      assert.equal(result.success, false);
+      const line = record(warnings);
+      assert.equal(line.event, "prepare_repository.refused");
+      assert.equal(line.code, route.code);
+      // The operator reads the same reason the model did, bounded by the
+      // ops-log string limit rather than repeated in full.
+      assert.match(String(line.message), route.reason);
+      assert.equal(String(line.message), bounded(result.error ?? ""));
+    });
+  }
+
+  it("refuses an invalid repository before any sandbox work", async () => {
+    const { commands, result } = await prepare(
+      "not a repository",
+      null,
+      attendedAuth
+    );
+    assert.equal(result.success, false);
+    assert.deepEqual(commands, []);
+  });
+
+  it("warns once for a failed switch that rolled back, not once per step", async () => {
+    const { result, warnings } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) => {
+        if (options.command.startsWith("git clone")) {
+          return failed("fatal: repository not found");
+        }
+        return options.command.startsWith("test ") ? failed("") : ok();
+      }
+    );
+    assert.equal(result.success, false);
+    assert.match(String(record(warnings).message), PREVIOUS_KEPT);
+  });
+
+  it("stays quiet when the repository is prepared", async () => {
+    const { result, warnings } = await prepare(
+      OTHER,
+      markerFor(REPOSITORY),
+      attendedAuth,
+      (options) =>
+        options.command.startsWith("test ") ? failed("") : ok(HEAD_BEFORE)
+    );
+    assert.equal(result.success, true);
+    assert.deepEqual(warnings, []);
   });
 });
