@@ -314,6 +314,7 @@ interface ResolvedDynamicSkill {
   readonly description: string;
   readonly markdown: string;
   readonly slug: string;
+  readonly source: string;
 }
 
 /** One model-visible tool a dynamic tool resolver returned. */
@@ -359,7 +360,11 @@ const dynamicSkillEntry = async (
   for (const resolution of resolutions) {
     const parsed = resolvedSkillSchema.safeParse(resolution);
     if (parsed.success) {
-      return { ...parsed.data, slug: entry.slug };
+      return {
+        ...parsed.data,
+        slug: entry.slug,
+        source: capabilitySource(entry.sourceId),
+      };
     }
   }
   return null;
@@ -828,7 +833,7 @@ export function measureLane(
       descriptionChars: skill.description.length,
       nameChars: skill.slug.length,
       schemaChars: 0,
-      source: `dynamic:${skill.slug}`,
+      source: skill.source,
     })),
   ]);
   const subagentRows = groupRows(

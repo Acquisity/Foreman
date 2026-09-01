@@ -108,7 +108,12 @@ const FIXTURE = parseCapabilityManifest({
 // One resolved set with known sizes, so the row arithmetic below is readable.
 const RESOLVED = {
   dynamicSkills: [
-    { description: "dd", markdown: "mmm", slug: "factory-pipeline" },
+    {
+      description: "dd",
+      markdown: "mmm",
+      slug: "factory-pipeline",
+      source: "skills/",
+    },
   ],
   // name 8 + description 2 + schema 3 characters.
   dynamicTools: [
@@ -185,20 +190,11 @@ describe("lane measurement", () => {
         source: "tools/",
       },
       {
-        bodyChars: 3,
-        descriptionChars: 2,
-        entries: 1,
+        bodyChars: 7,
+        descriptionChars: 4,
+        entries: 2,
         kind: "skill",
-        nameChars: 16,
-        schemaChars: 0,
-        source: "dynamic:factory-pipeline",
-      },
-      {
-        bodyChars: 4,
-        descriptionChars: 2,
-        entries: 1,
-        kind: "skill",
-        nameChars: 2,
+        nameChars: 18,
         schemaChars: 0,
         source: "skills/",
       },
@@ -223,7 +219,7 @@ describe("lane measurement", () => {
       dynamicSkills: [],
     });
     assert.ok(
-      !budget.rows.some((row) => row.source === "dynamic:factory-pipeline")
+      budget.rows.some((row) => row.source === "skills/" && row.entries === 1)
     );
     assert.equal(budget.catalogChars, 49 + 14 + 7 - 16 - 2);
     assert.equal(budget.bodyChars, 4);
@@ -256,6 +252,7 @@ describe("dynamic capability resolution", () => {
     const resolved = await resolveLaneCapabilities(FIXTURE, "slack");
     assert.equal(resolved.dynamicSkills.length, 1);
     assert.equal(resolved.dynamicSkills[0]?.slug, "factory-pipeline");
+    assert.equal(resolved.dynamicSkills[0]?.source, "skills/");
     assert.ok((resolved.dynamicSkills[0]?.markdown.length ?? 0) > 0);
   });
 
