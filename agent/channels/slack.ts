@@ -9,11 +9,11 @@ import {
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
-import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
+import { extractRepositoryUrls } from "../lib/repository.js";
+import { slackSessionAuth } from "../lib/session-auth.js";
 import {
   FINAL_SLACK_POST_RULE,
   slackIntakeContext,
-  stampSlackIntakeAuth,
 } from "../lib/slack-intake.js";
 import { stableSlackClientMessageId } from "../lib/slack-message-id.js";
 import { postSlackReply } from "../lib/slack-post.js";
@@ -27,11 +27,7 @@ import {
   isStopRequest,
   postStopConfirmation,
 } from "../lib/slack-stop.js";
-import {
-  isIntakeOnly,
-  stampInvestigationMemory,
-  stampTrusted,
-} from "../lib/trust.js";
+import { isIntakeOnly } from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -133,23 +129,19 @@ export const dispatch = async (
     return null;
   }
   const repositories = extractRepositoryUrls(message.text);
-  const trusted = stampTrusted(auth);
   const [repository] = repositories;
-  const withRepository =
-    repositories.length === 1 && repository
-      ? stampRepository(trusted, repository.slug, "explicit")
-      : trusted;
-  // Investigation memory follows the same gate as trust here: the app is only
-  // invited into Acquisity channels, so channel membership is the boundary.
-  // Restricting it to the routed intake channels was tighter than the design
-  // asked for and left developer channels silently without history, which
-  // reads as memory being broken rather than being off.
-  const stamped = stampInvestigationMemory(withRepository);
-  return SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId)
-    ? {
-        auth: stampSlackIntakeAuth(stamped),
-        context: [slackIntakeContext(message.channelId)],
-      }
+  // Restricting investigation memory to the routed intake channels was tighter
+  // than the design asked for and left developer channels silently without
+  // history, which reads as memory being broken rather than being off, so
+  // slackSessionAuth stamps it for every admitted Slack session.
+  const intakeOnly = SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
+  const stamped = slackSessionAuth(auth, {
+    intakeOnly,
+    repository:
+      repositories.length === 1 && repository ? repository.slug : undefined,
+  });
+  return intakeOnly
+    ? { auth: stamped, context: [slackIntakeContext(message.channelId)] }
     : { auth: stamped, context: [FINAL_SLACK_POST_RULE] };
 };
 

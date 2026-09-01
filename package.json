@@ -16,10 +16,11 @@
     "dev": "eve dev",
     "eval": "eve eval",
     "fix": "ultracite fix",
+    "report:capabilities": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/capability-budget.ts",
     "start": "eve start",
     "test": "tsx --test \"agent/**/*.test.ts\"",
     "typecheck": "tsc",
-    "validate": "pnpm run check && pnpm run typecheck && pnpm run test && eve info"
+    "validate": "pnpm run check && pnpm run typecheck && eve info && pnpm run test"
   },
   "dependencies": {
     "@agent-browser/eve": "^0.34.0",

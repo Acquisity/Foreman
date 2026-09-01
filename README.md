@@ -110,8 +110,9 @@ pnpm install
 pnpm dev
 pnpm validate
 pnpm eval --tag fast
+pnpm report:capabilities
 ```
 
-`pnpm validate` runs Ultracite formatting and lint, TypeScript, unit tests, and `eve info` discovery. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
+`pnpm validate` runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
 
 Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Autumn, Stripe, Instantly, and Intercom credentials; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.
