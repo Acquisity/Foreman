@@ -42,7 +42,7 @@ export const LINEAR_UPLOAD_HOST = "uploads.linear.app";
 const FETCH_TIMEOUT_MS = 20_000;
 
 /**
- * Wall-clock bound on reading one image's bytes, url or sandbox path alike.
+ * Wall-clock bound on draining one image's bytes, url or sandbox path alike.
  *
  * @remarks
  * eve 0.44's Vercel sandbox adapter drops the `abortSignal` it is handed on
@@ -51,6 +51,10 @@ const FETCH_TIMEOUT_MS = 20_000;
  * The bound is enforced here instead, on the reader Foreman owns: the deadline
  * cancels the stream, which is the layer that can actually stop the transfer.
  * Twenty seconds matches the url deadline and is far above a 3 MiB read.
+ *
+ * It bounds the draining only. Acquiring the stream, the `readFile` call that
+ * returns it, is still bounded by nothing but the Vercel invocation ceiling,
+ * for the reason recorded in `.github/OUTSIDE-CALLS.md`.
  */
 const READ_TIMEOUT_MS = 20_000;
 
@@ -169,7 +173,7 @@ async function readPrefix(
       .slice(0, chars)
       .replace(WHITESPACE, " ");
   } finally {
-    await reader.cancel().catch(() => undefined);
+    reader.cancel().catch(() => undefined);
   }
 }
 
@@ -181,11 +185,16 @@ const WHITESPACE = /\s+/gu;
  * with an image extension) costs one chunk over the limit, not its size.
  *
  * @remarks
- * The read is also bounded in time. Each chunk races {@link READ_TIMEOUT_MS},
- * and the reader is cancelled in `finally`, so a stalled source is dropped
- * rather than waited on. The stream is read through its own reader rather than
- * `for await` precisely so the deadline can cancel it: `for await` locks the
- * stream, and a locked stream refuses to be cancelled.
+ * One {@link READ_TIMEOUT_MS} deadline covers the whole read, not each chunk:
+ * it is armed once and every chunk races the same expiry, so a source that
+ * dribbles a byte at a time is bounded exactly like one that stalls outright.
+ * The stream is read through its own reader rather than `for await` precisely
+ * so the deadline can cancel it: `for await` locks the stream, and a locked
+ * stream refuses to be cancelled.
+ *
+ * Cancellation is started in `finally` and deliberately not awaited. A source
+ * whose `cancel` never settles would otherwise hold this function open
+ * forever, which is the hang the deadline exists to end.
  */
 async function readBounded(
   stream: ReadableStream<Uint8Array>,
@@ -221,6 +230,6 @@ async function readBounded(
       chunks.push(value);
     }
   } finally {
-    await reader.cancel().catch(() => undefined);
+    reader.cancel().catch(() => undefined);
   }
 }

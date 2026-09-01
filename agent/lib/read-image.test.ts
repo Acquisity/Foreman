@@ -135,6 +135,19 @@ describe("vision read_image", () => {
     assert.equal(cancelled, true);
   });
 
+  it("does not wait on a cancel that never settles", async () => {
+    const stalled = new ReadableStream<Uint8Array>({
+      // The sandbox stream that hangs and whose cancellation hangs with it: an
+      // awaited cancel here would hold the read open past its own deadline.
+      cancel: () => new Promise<void>(() => undefined),
+      pull: () => new Promise<void>(() => undefined),
+    });
+    await assert.rejects(
+      readBounded(stalled, "/workspace/shot.png", 5),
+      STALLED
+    );
+  });
+
   it("names the status and a body snippet on a non-2xx response", async () => {
     await assert.rejects(
       fetchLinearUpload("https://uploads.linear.app/gone", { token: "t" }, () =>
