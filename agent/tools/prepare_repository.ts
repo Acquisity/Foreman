@@ -22,6 +22,7 @@ import {
 import {
   boundedRun,
   REPOSITORY_OPERATION_TIMEOUT_MS,
+  TIMED_OUT_EXIT_CODE,
 } from "#lib/sandbox-deadline.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
@@ -104,7 +105,7 @@ const readExistingMarker = async (sandbox: SandboxSession) => {
 const detectWorktree = async (
   sandbox: SandboxSession
 ): Promise<"/workspace" | "/workspace/repo"> => {
-  const root = await sandbox.run({
+  const root = await boundedRun(sandbox, {
     command: "git -C /workspace rev-parse --show-toplevel",
   });
   return root.exitCode === 0 && String(root.stdout).trim() === "/workspace"
@@ -161,7 +162,7 @@ export const cloneExplicitRepository = async (
 // discovery would refuse the builder-owned checkout as dubious ownership
 // before `safe.directory` is registered.
 const originUrl = async (sandbox: SandboxSession): Promise<string | null> => {
-  const origin = await sandbox.run({
+  const origin = await boundedRun(sandbox, {
     command:
       "git config --file /workspace/repo/.git/config --get remote.origin.url",
   });
@@ -281,7 +282,18 @@ export const prepareWarmedOrClone = async (
   options: CheckoutOptions = {}
 ): Promise<string | null> => {
   const warmed = findWarmRepository(repository);
-  const occupied = await sandbox.run({ command: "test -e /workspace/repo" });
+  const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
+  const occupied = await boundedRun(
+    sandbox,
+    { command: "test -e /workspace/repo" },
+    timeoutMs
+  );
+  // A deadline here is not "nothing is there": publishing a checkout over an
+  // occupied path would move the staged clone inside the existing one. Refuse
+  // instead, and let the retry decide.
+  if (occupied.exitCode === TIMED_OUT_EXIT_CODE) {
+    return `Could not tell whether a checkout is already present for ${repository}: ${occupied.stderr}`;
+  }
   if (occupied.exitCode === 0) {
     // A durable step retry or dev queue redelivery reruns this tool after an
     // earlier execution placed the checkout but never wrote the marker. Only a
@@ -305,7 +317,7 @@ export const prepareWarmedOrClone = async (
   // silently fall back to a cold clone.
   const path = warmed ? warmRepositoryPath(warmed.slug) : null;
   const checkout = path
-    ? await sandbox.run({ command: `test -d ${path}` })
+    ? await boundedRun(sandbox, { command: `test -d ${path}` }, timeoutMs)
     : null;
   if (!(warmed && checkout) || checkout.exitCode !== 0) {
     return cloneExplicitRepository(sandbox, repository, options);
@@ -315,7 +327,6 @@ export const prepareWarmedOrClone = async (
   // `/workspace/repo` are not guaranteed to be one rename apart) leaves its
   // remains at the tool-owned path instead of at `/workspace/repo`, where a
   // later turn could not tell them from a checkout it must not touch.
-  const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
   const move = await boundedRun(
     sandbox,
     {
@@ -383,7 +394,7 @@ export default defineTool({
     const safeIdentity = SAFE_IDENTITY_PATTERN.test(identity)
       ? identity
       : FALLBACK_BOT_NAME;
-    const config = await sandbox.run({
+    const config = await boundedRun(sandbox, {
       command: `git config --global --add safe.directory '${worktree}' && git config --global user.name '${safeIdentity}[bot]' && git config --global user.email '${safeIdentity.toLowerCase()}[bot]@users.noreply.github.com' && mkdir -p /workspace/.foreman`,
     });
     if (config.exitCode !== 0) {

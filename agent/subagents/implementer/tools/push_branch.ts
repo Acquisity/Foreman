@@ -8,6 +8,7 @@ import {
   validateBranch,
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
+import { boundedRun } from "../../../lib/sandbox-deadline.js";
 
 /**
  * Pushes a committed feature branch of the sandbox checkout to the factory
@@ -36,7 +37,7 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
-      const push = await sandbox.run({
+      const push = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' push ${url} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
       });
       if (push.exitCode !== 0) {
@@ -47,7 +48,7 @@ export default defineTool({
           success: false as const,
         };
       }
-      const head = await sandbox.run({
+      const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse '${input.branch}'`,
       });
       if (head.exitCode !== 0) {

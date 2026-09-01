@@ -7,6 +7,7 @@ import {
   validateBranch,
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
+import { boundedRun } from "../../../lib/sandbox-deadline.js";
 
 /**
  * Fetches an existing factory branch and checks it out in the sandbox, for
@@ -32,7 +33,7 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));
     try {
-      const fetch = await sandbox.run({
+      const fetch = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' FETCH_HEAD`,
       });
       if (fetch.exitCode !== 0) {
@@ -43,7 +44,7 @@ export default defineTool({
           success: false as const,
         };
       }
-      const head = await sandbox.run({
+      const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse HEAD`,
       });
       return {

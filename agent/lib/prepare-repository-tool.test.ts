@@ -25,6 +25,7 @@ const CANCELLED = /turn cancelled/u;
 const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 const PUBLISH_FAILED = /cross-device link/u;
+const PROBE_TIMED_OUT = /Could not tell whether a checkout is already present/u;
 
 interface RunOptions {
   abortSignal?: AbortSignal;
@@ -433,6 +434,19 @@ describe("prepare_repository sandbox bounds", () => {
     assert.match(error ?? "", REFUSED);
     assert.equal(ran(commands, DISCARD), false);
     assert.equal(ran(commands, "git clone"), false);
+  });
+
+  it("refuses rather than publishing over a checkout it could not probe", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command === "test -e /workspace/repo" ? stall(options) : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", PROBE_TIMED_OUT);
+    assert.equal(ran(commands, "git clone"), false);
+    assert.equal(ran(commands, PUBLISH), false);
   });
 
   it("keeps an unchanged checkout that needs no install", async () => {

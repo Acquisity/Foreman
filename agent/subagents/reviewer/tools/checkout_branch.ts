@@ -7,6 +7,7 @@ import {
   validateBranch,
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
+import { boundedRun } from "../../../lib/sandbox-deadline.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
@@ -44,7 +45,7 @@ export default defineTool({
     const token = await mintInstallationToken(githubCredentials);
     try {
       await sandbox.setNetworkPolicy(brokerPolicy(token));
-      const fetch = await sandbox.run({
+      const fetch = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' fetch ${url} '${input.branch}' && test "$(git -C '${prepared.worktree}' rev-parse FETCH_HEAD)" = '${headSha}' && git -C '${prepared.worktree}' checkout -B '${input.branch}' '${headSha}' && git -C '${prepared.worktree}' reset --hard '${headSha}' && git -C '${prepared.worktree}' clean -fd -e .foreman/`,
       });
       if (fetch.exitCode !== 0) {
@@ -55,7 +56,7 @@ export default defineTool({
           success: false as const,
         };
       }
-      const head = await sandbox.run({
+      const head = await boundedRun(sandbox, {
         command: `git -C '${prepared.worktree}' rev-parse HEAD`,
       });
       return {
