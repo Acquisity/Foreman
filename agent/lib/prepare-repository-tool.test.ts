@@ -1,93 +1,46 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { SessionAuthContext } from "eve/context";
-import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
-import { REPOSITORY_MARKER, remoteUrl, stampRepository } from "./repository.js";
+import {
+  broker,
+  CANCELLED,
+  CLONE_FAILED,
+  CLONE_THREW,
+  DISCARD,
+  DISCARD_STAGING,
+  failed,
+  fakeSandbox,
+  HEAD_AFTER,
+  HEAD_BEFORE,
+  ok,
+  PUBLISH,
+  REPOSITORY,
+  type RunOptions,
+  type RunResult,
+  ran,
+  STAGING,
+  stall,
+  TIMEOUT_MS,
+} from "./prepare-repository-fixtures.js";
+import { remoteUrl } from "./repository.js";
 import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
-import { stampUnattended } from "./trust.js";
-
-// The commit identity resolves from the environment, so a switch never reaches
-// the connector metadata call a Connect runtime would have to serve.
-process.env.FOREMAN_BOT_NAME ??= "Foreman";
-
-process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const {
   cloneExplicitRepository,
   detectWorktree,
-  prepareRepositoryWorkspace,
   prepareWarmedOrClone,
   refreshCheckout,
 } = await import("../tools/prepare_repository.js");
 
-const REPOSITORY = "Acquisity/Foreman";
-const DISCARD = "rm -rf /workspace/repo";
-const STAGING = "/workspace/.repo-staging";
-const DISCARD_STAGING = `rm -rf ${STAGING}`;
-const PUBLISH = `mv ${STAGING} /workspace/repo`;
-const TIMEOUT_MS = 20;
 const TIMED_OUT = /timed out after 20ms/u;
-const CLONE_FAILED = /repository not found/u;
-const CLONE_THREW = /sandbox gone/u;
 const REFRESH_FAILED = /could not read/u;
 const INSTALL_FAILED = /ERR_PNPM_OUTDATED_LOCKFILE/u;
-const CANCELLED = /turn cancelled/u;
 const REFUSED = /refusing to overwrite/u;
 const OTHER_ORIGIN = "https://github.com/Acquisity/Other.git";
 const PUBLISH_FAILED = /cross-device link/u;
 const PROBE_TIMED_OUT = /Could not tell whether a checkout is already present/u;
 const WARM_PROBE_TIMED_OUT =
   /Could not determine whether the warmed checkout exists/u;
-
-interface RunOptions {
-  abortSignal?: AbortSignal;
-  command: string;
-}
-
-interface RunResult {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-}
-
-const ok = (stdout = ""): Promise<RunResult> =>
-  Promise.resolve({ exitCode: 0, stderr: "", stdout });
-
-const failed = (stderr: string): Promise<RunResult> =>
-  Promise.resolve({ exitCode: 1, stderr, stdout: "" });
-
-/** Never settles until the caller's deadline aborts it. */
-const stall = (options: RunOptions): Promise<RunResult> =>
-  new Promise((_resolve, reject) => {
-    options.abortSignal?.addEventListener("abort", () => {
-      reject(options.abortSignal?.reason);
-    });
-  });
-
-const fakeSandbox = (run: (options: RunOptions) => Promise<RunResult>) => {
-  const commands: RunOptions[] = [];
-  const policies: SandboxNetworkPolicy[] = [];
-  const sandbox = {
-    run: (options: RunOptions) => {
-      commands.push(options);
-      return run(options);
-    },
-    setNetworkPolicy: (policy: SandboxNetworkPolicy) => {
-      policies.push(policy);
-      return Promise.resolve();
-    },
-  } as unknown as SandboxSession;
-  return { commands, policies, sandbox };
-};
-
-// Stands in for the brokered GitHub token so the tests never mint one; the
-// firewall write is what the `finally` has to undo.
-const broker = (sandbox: SandboxSession) =>
-  sandbox.setNetworkPolicy({ allow: { "*": [] } });
-
-const ran = (commands: RunOptions[], needle: string) =>
-  commands.some((options) => options.command.includes(needle));
+const LOCKFILE_DIFF = "diff --name-only";
 
 /**
  * Models eve 0.44's `bindSandboxAbortSignal`: the session returned by
@@ -516,402 +469,6 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(policies.at(-1), "allow-all");
   });
 });
-
-const OTHER = "Acquisity/Other";
-const PREVIOUS = "/workspace/.repo-previous";
-const RECOVER = `if [ -e ${PREVIOUS} ] && [ ! -e /workspace/repo ]; then mv ${PREVIOUS} /workspace/repo; fi`;
-const SET_ASIDE = `${RECOVER} && rm -rf ${PREVIOUS} && mv /workspace/repo ${PREVIOUS}`;
-const RESTORE = `rm -rf /workspace/repo && mv ${PREVIOUS} /workspace/repo`;
-const DISCARD_PREVIOUS = `rm -rf ${PREVIOUS}`;
-const DISCARD_MARKER = `rm -rf ${REPOSITORY_MARKER}`;
-const LOCKFILE_DIFF = "diff --name-only";
-const HEAD_BEFORE = "1111111111111111111111111111111111111111";
-const HEAD_AFTER = "2222222222222222222222222222222222222222";
-const SIGNED_REFUSAL = /signed GitHub session is bound/u;
-const UNATTENDED_REFUSAL = /unattended session already prepared/u;
-const WORKSPACE_REFUSAL = /session workspace itself/u;
-const PREVIOUS_KEPT = /Acquisity\/Foreman is still in place/u;
-const CONFIG_FAILED = /Could not configure the workspace/u;
-const MARKER_WRITE_FAILED = /Could not record the prepared Acquisity\/Other/u;
-const CONFIGURE = "user.name";
-const PREVIOUS_LOST = /could not be restored/u;
-const MARKED_OTHER = /Acquisity\/Other/u;
-
-const attendedAuth: SessionAuthContext = {
-  attributes: {},
-  authenticator: "slack",
-  principalId: "user:1",
-  principalType: "user",
-};
-
-/**
- * A sandbox holding a repository marker, so the tool sees a session that has
- * already prepared something. The marker write is captured rather than
- * performed: what matters is which repository the session ends up recording.
- */
-const preparedSandbox = (
-  marker: unknown,
-  run: (options: RunOptions) => Promise<RunResult>,
-  write: () => Promise<void> = () => Promise.resolve()
-) => {
-  const commands: RunOptions[] = [];
-  const written: string[] = [];
-  const sandbox = {
-    readTextFile: ({ path }: { path: string }) =>
-      Promise.resolve(
-        path === REPOSITORY_MARKER && marker !== null
-          ? JSON.stringify(marker)
-          : null
-      ),
-    run: (options: RunOptions) => {
-      commands.push(options);
-      return run(options);
-    },
-    setNetworkPolicy: () => Promise.resolve(),
-    writeTextFile: ({ content }: { content: string }) => {
-      written.push(content);
-      return write();
-    },
-  } as unknown as SandboxSession;
-  return { commands, sandbox, written };
-};
-
-const markerFor = (
-  slug: string,
-  source: "explicit" | "github-webhook" = "explicit",
-  worktree = "/workspace/repo"
-) => ({ slug, source, worktree });
-
-/**
- * Runs the tool's preparation against a marked-up sandbox. `/workspace` is
- * never a repository here, so the checkout always lives at `/workspace/repo`,
- * which is the only shape a switch is allowed in.
- */
-const prepare = async (
-  requested: string | undefined,
-  marker: unknown,
-  auth: SessionAuthContext | null,
-  run: (options: RunOptions) => Promise<RunResult> = () => ok(HEAD_BEFORE),
-  write?: () => Promise<void>
-) => {
-  const { commands, sandbox, written } = preparedSandbox(
-    marker,
-    (options) =>
-      options.command.includes("rev-parse --show-toplevel")
-        ? failed("not a git repository")
-        : run(options),
-    write
-  );
-  const result = (await prepareRepositoryWorkspace(
-    requested,
-    {
-      getSandbox: () => Promise.resolve(sandbox),
-      session: { auth: { current: auth } },
-    },
-    { broker, timeoutMs: TIMEOUT_MS }
-  )) as {
-    current?: { repository: string; source: string };
-    error?: string;
-    previous?: { repository: string; source: string } | null;
-    replaced?: boolean;
-    reused?: boolean;
-    success?: boolean;
-  };
-  return { commands, result, written };
-};
-
-describe("prepare_repository switching", () => {
-  it("reuses the repository it already prepared", async () => {
-    const { commands, result } = await prepare(
-      REPOSITORY,
-      markerFor(REPOSITORY),
-      attendedAuth
-    );
-    assert.equal(result.success, true);
-    assert.equal(result.reused, true);
-    assert.equal(result.replaced, false);
-    assert.deepEqual(result.previous, {
-      repository: REPOSITORY,
-      source: "explicit",
-    });
-    assert.deepEqual(result.current, {
-      repository: REPOSITORY,
-      source: "explicit",
-    });
-    // The only work a reuse does is putting back a checkout an interrupted
-    // switch stranded, so the marker it reuses names something on disk.
-    assert.deepEqual(
-      commands.map((options) => options.command),
-      [RECOVER]
-    );
-  });
-
-  it("replaces a different repository for an attended explicit request", async () => {
-    const { commands, result, written } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) =>
-        options.command.startsWith("test ") ? failed("") : ok(HEAD_BEFORE)
-    );
-    assert.equal(result.success, true);
-    assert.equal(result.replaced, true);
-    assert.deepEqual(result.previous, {
-      repository: REPOSITORY,
-      source: "explicit",
-    });
-    assert.deepEqual(result.current, { repository: OTHER, source: "explicit" });
-    assert.ok(ran(commands, SET_ASIDE));
-    assert.ok(ran(commands, `git clone --depth 50 ${remoteUrl(OTHER)}`));
-    assert.ok(ran(commands, PUBLISH));
-    assert.equal(ran(commands, RESTORE), false);
-    assert.match(written.at(-1) ?? "", MARKED_OTHER);
-    // The set-aside checkout is the rollback source until the marker names its
-    // replacement, so it is discarded last of all.
-    assert.equal(commands.at(-1)?.command, DISCARD_PREVIOUS);
-  });
-
-  it("refuses to replace the checkout a signed GitHub session is bound to", async () => {
-    const { commands, result, written } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY, "github-webhook"),
-      stampRepository(attendedAuth, REPOSITORY, "github-webhook")
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", SIGNED_REFUSAL);
-    assert.equal(ran(commands, SET_ASIDE), false);
-    assert.deepEqual(written, []);
-  });
-
-  it("refuses a signed session's retarget before it reaches the checkout", async () => {
-    // `resolveRepository` rejects the request itself, so the marker is never
-    // even consulted: message text cannot redirect a signed webhook.
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY, "github-webhook"),
-      stampRepository(attendedAuth, REPOSITORY, "github-webhook")
-    );
-    assert.equal(result.success, false);
-    assert.equal(ran(commands, "git clone"), false);
-  });
-
-  it("refuses to switch in an unattended run", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      stampUnattended(attendedAuth)
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", UNATTENDED_REFUSAL);
-    assert.equal(ran(commands, SET_ASIDE), false);
-  });
-
-  it("refuses to replace the session workspace checkout", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY, "explicit", "/workspace"),
-      attendedAuth
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", WORKSPACE_REFUSAL);
-    assert.equal(ran(commands, SET_ASIDE), false);
-  });
-
-  it("restores the previous checkout when the replacement clone fails", async () => {
-    const { commands, result, written } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => {
-        if (options.command.startsWith("git clone")) {
-          return failed("fatal: repository not found");
-        }
-        return options.command.startsWith("test ") ? failed("") : ok();
-      }
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", CLONE_FAILED);
-    assert.match(result.error ?? "", PREVIOUS_KEPT);
-    assert.ok(ran(commands, DISCARD_STAGING));
-    assert.ok(ran(commands, RESTORE));
-    // The marker still names the repository that is back on disk.
-    assert.deepEqual(written, []);
-    assert.equal(ran(commands, DISCARD_MARKER), false);
-  });
-
-  it("clears the marker when the previous checkout cannot be restored", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => {
-        if (options.command.startsWith("git clone")) {
-          return failed("fatal: repository not found");
-        }
-        if (options.command === RESTORE) {
-          return failed("mv: cross-device link");
-        }
-        return options.command.startsWith("test ") ? failed("") : ok();
-      }
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", PREVIOUS_LOST);
-    assert.ok(ran(commands, DISCARD_MARKER));
-  });
-
-  it("puts the previous checkout back when a switch throws", async () => {
-    const { commands, sandbox, written } = preparedSandbox(
-      markerFor(REPOSITORY),
-      (options) => {
-        if (options.command.includes("rev-parse --show-toplevel")) {
-          return failed("not a git repository");
-        }
-        if (options.command.startsWith("git clone")) {
-          return Promise.reject(new Error("sandbox gone"));
-        }
-        return options.command.startsWith("test ") ? failed("") : ok();
-      }
-    );
-    await assert.rejects(
-      prepareRepositoryWorkspace(
-        OTHER,
-        {
-          getSandbox: () => Promise.resolve(sandbox),
-          session: { auth: { current: attendedAuth } },
-        },
-        { broker, timeoutMs: TIMEOUT_MS }
-      ),
-      CLONE_THREW
-    );
-    assert.ok(ran(commands, RESTORE));
-    assert.deepEqual(written, []);
-  });
-
-  it("rethrows a cancelled switch and leaves the checkout recoverable", async () => {
-    // eve binds the cancelled turn's signal into every later command, so the
-    // restore cannot run: the previous checkout stays at the tool-owned path
-    // for the next attempt to move back.
-    const turn = AbortSignal.abort(new Error("turn cancelled"));
-    let cancelled = false;
-    const { commands, sandbox, written } = preparedSandbox(
-      markerFor(REPOSITORY),
-      (options) => {
-        if (options.command.includes("rev-parse --show-toplevel")) {
-          return failed("not a git repository");
-        }
-        if (options.command === SET_ASIDE) {
-          cancelled = true;
-          return ok();
-        }
-        if (!cancelled) {
-          return options.command.startsWith("test ") ? failed("") : ok();
-        }
-        const composed = options.abortSignal
-          ? AbortSignal.any([turn, options.abortSignal])
-          : turn;
-        return Promise.reject(composed.reason);
-      }
-    );
-    await assert.rejects(
-      prepareRepositoryWorkspace(
-        OTHER,
-        {
-          getSandbox: () => Promise.resolve(sandbox),
-          session: { auth: { current: attendedAuth } },
-        },
-        { broker, timeoutMs: TIMEOUT_MS }
-      ),
-      CANCELLED
-    );
-    // The restore was attempted even though the cancelled turn refused it.
-    assert.ok(ran(commands, RESTORE));
-    assert.deepEqual(written, []);
-  });
-
-  it("recovers a stranded checkout before setting it aside again", async () => {
-    const { commands } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => (options.command.startsWith("test ") ? failed("") : ok())
-    );
-    const setAside = commands.find((options) =>
-      options.command.includes("mv /workspace/repo")
-    );
-    assert.ok(setAside?.command.startsWith(RECOVER));
-  });
-
-  it("restores the previous checkout when the workspace cannot be configured", async () => {
-    const { commands, result, written } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => {
-        if (options.command.includes(CONFIGURE)) {
-          return failed("could not lock config file");
-        }
-        return options.command.startsWith("test ") ? failed("") : ok();
-      }
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", CONFIG_FAILED);
-    assert.match(result.error ?? "", PREVIOUS_KEPT);
-    assert.ok(ran(commands, RESTORE));
-    // The marker still names the repository that is back on disk.
-    assert.deepEqual(written, []);
-    assert.equal(ran(commands, DISCARD_MARKER), false);
-  });
-
-  it("restores the previous checkout when the marker cannot be written", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => (options.command.startsWith("test ") ? failed("") : ok()),
-      () => Promise.reject(new Error("blob write failed"))
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", MARKER_WRITE_FAILED);
-    assert.match(result.error ?? "", PREVIOUS_KEPT);
-    assert.ok(ran(commands, RESTORE));
-    assert.equal(ran(commands, DISCARD_MARKER), false);
-  });
-
-  it("clears the marker when a failed configuration cannot be rolled back", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) => {
-        if (options.command.includes(CONFIGURE)) {
-          return failed("could not lock config file");
-        }
-        if (options.command === RESTORE) {
-          return failed("mv: cross-device link");
-        }
-        return options.command.startsWith("test ") ? failed("") : ok();
-      }
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", PREVIOUS_LOST);
-    assert.ok(ran(commands, DISCARD_MARKER));
-  });
-
-  it("keeps the previous checkout when it cannot be set aside", async () => {
-    const { commands, result } = await prepare(
-      OTHER,
-      markerFor(REPOSITORY),
-      attendedAuth,
-      (options) =>
-        options.command === SET_ASIDE ? failed("mv: permission denied") : ok()
-    );
-    assert.equal(result.success, false);
-    assert.match(result.error ?? "", PREVIOUS_KEPT);
-    assert.equal(ran(commands, "git clone"), false);
-    assert.equal(ran(commands, DISCARD_MARKER), false);
-  });
-});
-
 describe("prepare_repository lockfile installs", () => {
   /** Refreshes a warmed checkout whose HEAD moved, with the diff answered. */
   const refreshMovedHead = (lockfile: (options: RunOptions) => RunResult) => {
