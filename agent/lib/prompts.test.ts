@@ -32,10 +32,15 @@ const PROTECTED_CHECKOUTS = [
 /**
  * `github__` tools take `owner` and `repo` from the model, and nothing in
  * `agent/extensions/github.ts` rebinds them to the signed repository, so the
- * prompt must ask for the binding rather than promise it is enforced.
+ * prompt must ask for the binding rather than promise it is enforced. The
+ * clause names the two tools the model drives directly and stays silent about
+ * the rest: `read_repository_knowledge`, `update_repository_knowledge`,
+ * `read_pipeline_run`, and `record_pipeline_run` also refuse a retarget
+ * through `resolveRepositoryInput`, so the wording must not claim the check
+ * lives only in those two.
  */
 const SIGNED_BINDING_CLAUSE =
-  "pass it as the `owner` and `repo` of every `github__` call. Only `prepare_repository` and `push_branch` check that binding at runtime; the `github__` tools act on whatever repository they are handed, so naming another one there is a mistake nothing catches.";
+  "pass it as the `owner` and `repo` of every `github__` call. `prepare_repository` and `push_branch` check that binding at runtime, but the `github__` tools do not: they act on whatever repository they are handed, so naming another one there is a mistake nothing catches.";
 
 describe("selectPrompt", () => {
   it("selects FACTORY_PROMPT for the autonomous principal and inlines the pipeline", () => {
