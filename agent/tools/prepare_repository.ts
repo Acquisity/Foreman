@@ -102,12 +102,18 @@ const readExistingMarker = async (sandbox: SandboxSession) => {
   }
 };
 
-const detectWorktree = async (
-  sandbox: SandboxSession
-): Promise<"/workspace" | "/workspace/repo"> => {
-  const root = await boundedRun(sandbox, {
-    command: "git -C /workspace rev-parse --show-toplevel",
-  });
+export const detectWorktree = async (
+  sandbox: SandboxSession,
+  timeoutMs: number = REPOSITORY_OPERATION_TIMEOUT_MS
+): Promise<"/workspace" | "/workspace/repo" | null> => {
+  const root = await boundedRun(
+    sandbox,
+    { command: "git -C /workspace rev-parse --show-toplevel" },
+    timeoutMs
+  );
+  if (root.exitCode === TIMED_OUT_EXIT_CODE) {
+    return null;
+  }
   return root.exitCode === 0 && String(root.stdout).trim() === "/workspace"
     ? "/workspace"
     : "/workspace/repo";
@@ -381,6 +387,13 @@ export default defineTool({
     }
 
     const worktree = await detectWorktree(sandbox);
+    if (worktree === null) {
+      return {
+        error:
+          "Could not determine whether /workspace is a repository before the deadline.",
+        success: false as const,
+      };
+    }
     if (worktree === "/workspace/repo") {
       const prepareError = await prepareWarmedOrClone(sandbox, target.slug);
       if (prepareError) {

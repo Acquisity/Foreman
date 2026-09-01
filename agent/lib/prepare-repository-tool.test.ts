@@ -7,8 +7,12 @@ import { REPOSITORY_OPERATION_TIMEOUT_MS } from "./sandbox-deadline.js";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
-const { cloneExplicitRepository, prepareWarmedOrClone, refreshCheckout } =
-  await import("../tools/prepare_repository.js");
+const {
+  cloneExplicitRepository,
+  detectWorktree,
+  prepareWarmedOrClone,
+  refreshCheckout,
+} = await import("../tools/prepare_repository.js");
 
 const REPOSITORY = "Acquisity/Foreman";
 const DISCARD = "rm -rf /workspace/repo";
@@ -95,6 +99,11 @@ const cancelledSandbox = () => {
 describe("prepare_repository sandbox bounds", () => {
   it("bounds every repository operation at five minutes", () => {
     assert.equal(REPOSITORY_OPERATION_TIMEOUT_MS, 300_000);
+  });
+
+  it("fails closed when the workspace repository probe reaches its deadline", async () => {
+    const { sandbox } = fakeSandbox(stall);
+    assert.equal(await detectWorktree(sandbox, TIMEOUT_MS), null);
   });
 
   it("passes an unaborted deadline signal to the clone by default", async () => {
