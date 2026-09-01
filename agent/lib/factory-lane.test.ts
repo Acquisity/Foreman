@@ -3,6 +3,10 @@ import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { DynamicResolveContext } from "eve/skills";
 import {
+  FACTORY_REQUESTS,
+  NOT_FACTORY_REQUESTS,
+} from "./factory-intent-fixtures.js";
+import {
   factorySkillAvailable,
   hasFactoryIntent,
   isFactoryRequest,
@@ -79,38 +83,16 @@ const resolveSkill = (auth: SessionAuthContext) => {
 };
 
 describe("explicit factory intent", () => {
-  it("reads an explicit request for the factory out of the message", () => {
-    assert.ok(isFactoryRequest("run the factory on this"));
-    assert.ok(isFactoryRequest("Use FACTORY mode please"));
+  it("reads a request that names the factory as a word", () => {
+    for (const text of FACTORY_REQUESTS) {
+      assert.ok(isFactoryRequest(text), text);
+    }
   });
 
-  it("does not read intent out of ordinary work requests", () => {
-    assert.ok(!isFactoryRequest("please fix the failing billing test"));
-    assert.ok(!isFactoryRequest("refactoring the intake handler"));
-    assert.ok(!isFactoryRequest(""));
-  });
-
-  it("does not read intent out of a slug or a path component", () => {
-    assert.ok(!isFactoryRequest("Acquisity/Foreman"));
-    assert.ok(!isFactoryRequest("factory/repo"));
-    assert.ok(!isFactoryRequest("owner/factory"));
-    assert.ok(!isFactoryRequest("channels/factory.ts"));
-    assert.ok(!isFactoryRequest("see agent/lib/factory-lane.ts"));
-  });
-
-  it("does not read intent out of a negated request", () => {
-    assert.ok(!isFactoryRequest("do not use factory"));
-    assert.ok(!isFactoryRequest("don't run this through the factory"));
-    assert.ok(!isFactoryRequest("fix it directly, without the factory"));
-    assert.ok(!isFactoryRequest("skip the factory on this one"));
-  });
-
-  it("still reads an affirmative request in an ordinary sentence", () => {
-    // A trailing sentence period is not a file extension, and a clause that
-    // ends before the request does not negate it.
-    assert.ok(isFactoryRequest("take this through the factory."));
-    assert.ok(isFactoryRequest("not urgent. run the factory on it"));
-    assert.ok(isFactoryRequest("load the factory-pipeline skill"));
+  it("reads no request out of a name, a plain sentence, or a negation", () => {
+    for (const text of NOT_FACTORY_REQUESTS) {
+      assert.ok(!isFactoryRequest(text), text);
+    }
   });
 
   it("reads the text parts of a structured message", () => {
@@ -252,14 +234,11 @@ describe("interactive dispatch outside Slack", () => {
     );
   });
 
-  it("reads no Linear intent out of a slug, a path, or a negation", () => {
-    for (const text of [
-      "Acquisity/Foreman",
-      "factory/repo",
-      "owner/factory",
-      "channels/factory.ts",
-      "fix this directly, without the factory",
-    ]) {
+  it("reads no Linear intent out of a name or a negation", () => {
+    for (const text of NOT_FACTORY_REQUESTS) {
+      if (text === "") {
+        continue;
+      }
       assert.ok(!factorySkillAvailable(linearAuth(text)), text);
       // The issue title is read for the message too when no prompt body is.
       assert.ok(!factorySkillAvailable(linearAuth("look here", text)), text);
@@ -273,12 +252,17 @@ describe("interactive dispatch outside Slack", () => {
     ).auth;
 
   it("offers a production eve session the factory when it asks", () => {
-    const requested = eveAuth("run the factory on this", EVE_AUTH);
-    assert.ok(requested);
-    assert.ok(factorySkillAvailable(requested));
-    assert.ok(!factorySkillAvailable(eveAuth("fix the flaky test", EVE_AUTH)));
-    assert.ok(!factorySkillAvailable(eveAuth("owner/factory", EVE_AUTH)));
-    assert.ok(!factorySkillAvailable(eveAuth("no factory please", EVE_AUTH)));
+    for (const text of FACTORY_REQUESTS) {
+      const requested = eveAuth(text, EVE_AUTH);
+      assert.ok(requested);
+      assert.ok(factorySkillAvailable(requested), text);
+    }
+    for (const text of NOT_FACTORY_REQUESTS) {
+      if (text === "") {
+        continue;
+      }
+      assert.ok(!factorySkillAvailable(eveAuth(text, EVE_AUTH)), text);
+    }
   });
 
   it("leaves an unauthenticated eve request without auth to stamp", () => {

@@ -11,6 +11,10 @@ import type {
   SlackMessage,
 } from "eve/channels/slack";
 import type { MessageStreamEvent } from "eve/client";
+import {
+  FACTORY_REQUESTS,
+  NOT_FACTORY_REQUESTS,
+} from "./factory-intent-fixtures.js";
 import { factorySkillAvailable } from "./factory-lane.js";
 import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
@@ -362,68 +366,29 @@ describe("slack channel", () => {
     return result.auth;
   };
 
-  it("stamps factory intent only when the message asks for the factory", async () => {
-    assert.ok(
-      !factorySkillAvailable(
-        await dispatchedAuth("please fix the failing billing test")
-      )
-    );
-    assert.ok(
-      factorySkillAvailable(
-        await dispatchedAuth("take this through the factory")
-      )
-    );
-  });
+  // Both lanes, because intake-only Slack reads the same message through the
+  // same dispatch and only the trust condition differs.
+  const dispatchedLanes = (text: string) =>
+    Promise.all([dispatchedAuth(text), dispatchedAuth(text, "C0INTAKEONLY")]);
 
-  // Asserts that no lane gains the factory from `text`, ordinary or intake-only.
-  const assertNoIntent = async (texts: readonly string[], why: string) => {
-    const lanes = texts.flatMap((text) => [
-      { channelId: undefined, text },
-      { channelId: "C0INTAKEONLY", text },
-    ]);
-    const auths = await Promise.all(
-      lanes.map((lane) => dispatchedAuth(lane.text, lane.channelId))
-    );
-    for (const [index, auth] of auths.entries()) {
-      assert.ok(
-        !factorySkillAvailable(auth),
-        `${why}: ${lanes[index]?.text} in ${lanes[index]?.channelId ?? "C0DEV"}`
-      );
+  it("stamps factory intent for every request in the matrix", async () => {
+    for (const text of FACTORY_REQUESTS) {
+      for (const auth of await dispatchedLanes(text)) {
+        assert.ok(factorySkillAvailable(auth), text);
+      }
     }
-  };
-
-  it("reads no factory intent out of a slug or a path", async () => {
-    // Each of these contains the word and none of them asks for anything.
-    await assertNoIntent(
-      [
-        "Acquisity/Foreman",
-        "factory/repo",
-        "owner/factory",
-        "channels/factory.ts",
-        "look at owner/factory and channels/factory.ts",
-      ],
-      "a slug or path is not a request"
-    );
   });
 
-  it("reads no factory intent out of a negated request", async () => {
-    await assertNoIntent(
-      [
-        "do not use factory",
-        "don't run this through the factory",
-        "fix it directly, without the factory",
-        "skip the factory on this one",
-      ],
-      "a negated request asks for the opposite"
-    );
-  });
-
-  it("offers intake-only Slack the factory on an explicit request", async () => {
-    assert.ok(
-      factorySkillAvailable(
-        await dispatchedAuth("run the factory on this", "C0INTAKEONLY")
-      )
-    );
+  it("stamps no factory intent for a name, a sentence, or a negation", async () => {
+    for (const text of NOT_FACTORY_REQUESTS) {
+      // An empty message is never delivered; every other case is.
+      if (text === "") {
+        continue;
+      }
+      for (const auth of await dispatchedLanes(text)) {
+        assert.ok(!factorySkillAvailable(auth), text);
+      }
+    }
   });
 
   it("clears progress without attributing cooperative cancellation to stop", async () => {
