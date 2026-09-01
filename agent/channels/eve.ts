@@ -1,6 +1,12 @@
+import type { UserContent } from "ai";
 import { type AuthFn, localDev, vercelOidc } from "eve/channels/auth";
-import { eveChannel } from "eve/channels/eve";
-import { stampFactoryIntent } from "../lib/factory-lane.js";
+import {
+  defaultEveAuth,
+  type EveMessageContext,
+  type EveMessageResult,
+  eveChannel,
+} from "eve/channels/eve";
+import { isFactoryRequest, stampFactoryIntent } from "../lib/factory-lane.js";
 import { stampInvestigationMemory } from "../lib/trust.js";
 
 const localDevAuth = localDev();
@@ -20,20 +26,34 @@ const localDevAuth = localDev();
  * one surface where a person can exercise the memory tools without a Linear Agent
  * Session or a routed Slack channel. `localDev()` only resolves against a local
  * request, so nothing here reaches production, where `vercelOidc()` runs instead and
- * stamps neither attribute.
- *
- * It carries factory intent for the same dev-only reason. The dev TUI delivers no
- * channel text this shim can read, and both execution paths have to be exercisable
- * from `pnpm dev`, so the local session is the one surface that always sees the
- * factory skill. Production eve sessions resolve through `vercelOidc()` and do not.
+ * stamps neither the user principal nor the memory attribute.
  */
 const localDevUser: AuthFn<Request> = async (request) => {
   const local = await localDevAuth(request);
   return local
-    ? stampFactoryIntent(
-        stampInvestigationMemory({ ...local, principalType: "user" })
-      )
+    ? stampInvestigationMemory({ ...local, principalType: "user" })
     : null;
 };
 
-export default eveChannel({ auth: [localDevUser, vercelOidc()] });
+/**
+ * Reads explicit factory intent out of the delivered eve message.
+ *
+ * @remarks
+ * eve is an interactive lane, so it can ask for the factory the same way Slack
+ * and Linear do, and this hook is the only place that sees the delivered text:
+ * a dynamic skill resolver runs at `turn.started`, where eve hands it an empty
+ * message snapshot. Route auth stays where it is; this only adds the stamp,
+ * which is why it applies to the dev TUI and to a production `vercelOidc()`
+ * session alike rather than being a dev-only shim.
+ */
+export const onMessage = (
+  ctx: EveMessageContext,
+  message: string | UserContent
+): EveMessageResult => {
+  const auth = defaultEveAuth(ctx);
+  return {
+    auth: auth && isFactoryRequest(message) ? stampFactoryIntent(auth) : auth,
+  };
+};
+
+export default eveChannel({ auth: [localDevUser, vercelOidc()], onMessage });

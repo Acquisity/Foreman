@@ -20,6 +20,8 @@ process.env.PLANETSCALE_MCP_CONNECTOR ??=
 const { default: factoryPipeline } = await import(
   "../skills/factory-pipeline.js"
 );
+const { onAgentSession } = await import("../channels/linear.js");
+const { onMessage } = await import("../channels/eve.js");
 
 const REPOSITORY = "Acquisity/Foreman";
 const PIPELINE_HEADING = /Factory pipeline/u;
@@ -33,6 +35,16 @@ const SLACK_AUTH: SessionAuthContext = {
   authenticator: "slack-webhook",
   issuer: "slack:T0FACTORYLANE",
   principalId: "slack:T0FACTORYLANE:U0FACTORYLANE",
+  principalType: "user",
+};
+
+// A production eve caller, as `vercelOidc()` resolves one: no factory stamp
+// of its own, so the delivered message is the only thing that can add it.
+const EVE_AUTH: SessionAuthContext = {
+  attributes: {},
+  authenticator: "vercel-oidc",
+  issuer: "https://oidc.vercel.com/acquisity",
+  principalId: "vercel:acquisity:foreman",
   principalType: "user",
 };
 
@@ -76,6 +88,34 @@ describe("explicit factory intent", () => {
     assert.ok(!isFactoryRequest("please fix the failing billing test"));
     assert.ok(!isFactoryRequest("refactoring the intake handler"));
     assert.ok(!isFactoryRequest(""));
+  });
+
+  it("does not read intent out of a slug or a path component", () => {
+    assert.ok(!isFactoryRequest("Acquisity/Foreman"));
+    assert.ok(!isFactoryRequest("factory/repo"));
+    assert.ok(!isFactoryRequest("owner/factory"));
+    assert.ok(!isFactoryRequest("channels/factory.ts"));
+    assert.ok(!isFactoryRequest("see agent/lib/factory-lane.ts"));
+  });
+
+  it("does not read intent out of a negated request", () => {
+    assert.ok(!isFactoryRequest("do not use factory"));
+    assert.ok(!isFactoryRequest("don't run this through the factory"));
+    assert.ok(!isFactoryRequest("fix it directly, without the factory"));
+    assert.ok(!isFactoryRequest("skip the factory on this one"));
+  });
+
+  it("still reads an affirmative request in an ordinary sentence", () => {
+    // A trailing sentence period is not a file extension, and a clause that
+    // ends before the request does not negate it.
+    assert.ok(isFactoryRequest("take this through the factory."));
+    assert.ok(isFactoryRequest("not urgent. run the factory on it"));
+    assert.ok(isFactoryRequest("load the factory-pipeline skill"));
+  });
+
+  it("reads the text parts of a structured message", () => {
+    assert.ok(isFactoryRequest([{ text: "run the factory", type: "text" }]));
+    assert.ok(!isFactoryRequest([{ text: "owner/factory", type: "text" }]));
   });
 
   it("bounds the text it matches", () => {
@@ -169,5 +209,79 @@ describe("authority boundary", () => {
     });
     assert.equal(repositoryFromAuth(auth), null);
     assert.ok(!factorySkillAvailable(auth));
+  });
+});
+
+// Linear Agent Sessions and eve are interactive lanes too, so each one is
+// dispatched for real here: a gate that only Slack could satisfy would take
+// the factory away from a session that explicitly asked for it.
+describe("interactive dispatch outside Slack", () => {
+  const linearAuth = (
+    text: string,
+    issueTitle = "Investigate the retry loop"
+  ) =>
+    onAgentSession({} as never, {
+      action: "prompted",
+      agentActivity: {
+        body: text,
+        content: {},
+        id: "activity-1",
+        user: { displayName: "Aaron Fraga", id: "user-1" },
+      },
+      agentSession: {
+        creator: { displayName: "Aaron Fraga", id: "user-1" },
+        id: "session-1",
+        issue: { id: "issue-1", identifier: "ENG-1", title: issueTitle },
+      },
+      delivery: { event: "AgentSessionEvent", id: "delivery-1" },
+      kind: "agent_session",
+      previousComments: [],
+      raw: {},
+    })?.auth ?? null;
+
+  it("offers a Linear session the factory when it asks, with no GitHub URL", () => {
+    const auth = linearAuth("please take this through the factory");
+    assert.ok(auth);
+    assert.equal(repositoryFromAuth(auth), null);
+    assert.ok(factorySkillAvailable(auth));
+  });
+
+  it("withholds it from an ordinary Linear session", () => {
+    assert.ok(
+      !factorySkillAvailable(linearAuth("why is this retrying twice?"))
+    );
+  });
+
+  it("reads no Linear intent out of a slug, a path, or a negation", () => {
+    for (const text of [
+      "Acquisity/Foreman",
+      "factory/repo",
+      "owner/factory",
+      "channels/factory.ts",
+      "fix this directly, without the factory",
+    ]) {
+      assert.ok(!factorySkillAvailable(linearAuth(text)), text);
+      // The issue title is read for the message too when no prompt body is.
+      assert.ok(!factorySkillAvailable(linearAuth("look here", text)), text);
+    }
+  });
+
+  const eveAuth = (message: string, caller: SessionAuthContext | null) =>
+    onMessage(
+      { eve: { caller, request: new Request("https://foreman.test/eve/v1") } },
+      message
+    ).auth;
+
+  it("offers a production eve session the factory when it asks", () => {
+    const requested = eveAuth("run the factory on this", EVE_AUTH);
+    assert.ok(requested);
+    assert.ok(factorySkillAvailable(requested));
+    assert.ok(!factorySkillAvailable(eveAuth("fix the flaky test", EVE_AUTH)));
+    assert.ok(!factorySkillAvailable(eveAuth("owner/factory", EVE_AUTH)));
+    assert.ok(!factorySkillAvailable(eveAuth("no factory please", EVE_AUTH)));
+  });
+
+  it("leaves an unauthenticated eve request without auth to stamp", () => {
+    assert.equal(eveAuth("run the factory", null), null);
   });
 });
