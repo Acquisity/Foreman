@@ -82,7 +82,8 @@ export const inspect = (file: string, source: string): Inspection => {
   const violations: Violation[] = [];
   let inspected = 0;
   const lineAt = (index: number) => source.slice(0, index).split("\n").length;
-  if (!file.endsWith(DEADLINE_HELPER)) {
+  const normalizedFile = file.replaceAll("\\", "/");
+  if (!normalizedFile.endsWith(DEADLINE_HELPER)) {
     for (const match of source.matchAll(SANDBOX_RUN)) {
       inspected += 1;
       violations.push({

@@ -97,6 +97,14 @@ describe("authored outside calls stay bounded", () => {
     );
   });
 
+  it("recognizes the sandbox helper on Windows paths", () => {
+    const source = read("agent/lib/sandbox-deadline.ts");
+    assert.deepEqual(
+      inspect("C:\\repo\\agent\\lib\\sandbox-deadline.ts", source).violations,
+      []
+    );
+  });
+
   for (const mutation of MUTATIONS) {
     it(`fails on ${mutation.what}`, () => {
       const source = read(mutation.file);
