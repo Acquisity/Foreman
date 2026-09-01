@@ -1,17 +1,25 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxSession } from "eve/sandbox";
+import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
 import { REPOSITORY_MARKER, stampRepository } from "./repository.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
-const { default: pushBranch } = await import("../tools/push_branch.js");
+const { default: pushBranch, pushPreparedBranch } = await import(
+  "../tools/push_branch.js"
+);
 
 const PREPARED = "Acquisity/Foreman";
+const WORKTREE = "/workspace/repo";
 // A branch a person would push by hand: no `foreman/` prefix anywhere in it.
 const HUMAN_BRANCH = "afragahaha/eng-13319";
+const SHA = "9f1c0a2b3d4e5f60718293a4b5c6d7e8f9012345";
+// The exact command a delivered push has to run: the validated literal GitHub
+// URL of the prepared repository, and a fully qualified refspec.
+const PUSH_COMMAND = `git -C '${WORKTREE}' push https://github.com/${PREPARED}.git 'refs/heads/${HUMAN_BRANCH}:refs/heads/${HUMAN_BRANCH}'`;
+const REV_PARSE_COMMAND = `git -C '${WORKTREE}' rev-parse '${HUMAN_BRANCH}'`;
 const NOT_ALLOWED = /not allowed/u;
 const OTHER_REPOSITORY = /Acquisity\/Other/u;
 
@@ -31,6 +39,7 @@ interface Run {
 
 const fakeSandbox = () => {
   const commands: Run[] = [];
+  const policies: (SandboxNetworkPolicy | string)[] = [];
   const sandbox = {
     readTextFile: ({ path }: { path: string }) =>
       Promise.resolve(
@@ -38,60 +47,85 @@ const fakeSandbox = () => {
           ? JSON.stringify({
               slug: PREPARED,
               source: "github-webhook",
-              worktree: "/workspace/repo",
+              worktree: WORKTREE,
             })
           : null
       ),
     run: (options: Run) => {
       commands.push(options);
-      return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
+      return Promise.resolve({
+        exitCode: 0,
+        stderr: "",
+        // Only `rev-parse` reports a commit; a push writes nothing to stdout.
+        stdout: options.command.includes("rev-parse") ? `${SHA}\n` : "",
+      });
     },
-    setNetworkPolicy: () => Promise.resolve(),
+    setNetworkPolicy: (policy: SandboxNetworkPolicy | string) => {
+      policies.push(policy);
+      return Promise.resolve();
+    },
   } as unknown as SandboxSession;
-  return { commands, sandbox };
+  return { commands, policies, sandbox };
 };
 
-/** Runs the tool with `console.warn` captured, so warnings are assertable. */
+/**
+ * Runs the push with `console.warn` captured and the credential window
+ * stubbed, so an accepted push reaches the git commands instead of stopping at
+ * a token only a Connect runtime can mint.
+ */
 const push = async (branch: string, current: SessionAuthContext | null) => {
-  const { commands, sandbox } = fakeSandbox();
+  const { commands, policies, sandbox } = fakeSandbox();
   const warnings: string[] = [];
   const original = console.warn;
   console.warn = (line: unknown) => {
     warnings.push(String(line));
   };
   let sandboxes = 0;
+  let brokered = 0;
   const context = {
     getSandbox: () => {
       sandboxes += 1;
       return Promise.resolve(sandbox);
     },
     session: { auth: { current } },
-  } as unknown as Parameters<typeof pushBranch.execute>[1];
+  };
   try {
-    const result = await Promise.resolve(
-      pushBranch.execute({ branch }, context)
-    ).catch((error: unknown) => ({ threw: String(error) }));
-    return { commands, result, sandboxes, warnings };
+    const result = await pushPreparedBranch(branch, context, () => {
+      brokered += 1;
+      return Promise.resolve();
+    });
+    return { brokered, commands, policies, result, sandboxes, warnings };
   } finally {
     console.warn = original;
   }
 };
 
-const refusalOf = (result: unknown) =>
-  result as { error?: string; success?: boolean };
+const outcome = (result: unknown) =>
+  result as {
+    branch?: string;
+    error?: string;
+    sha?: string;
+    success?: boolean;
+  };
 
 describe("push_branch branch names", () => {
-  it("accepts a validated human branch name with no foreman/ prefix", async () => {
-    const { result, sandboxes, warnings } = await push(
-      HUMAN_BRANCH,
-      signedFor(PREPARED)
-    );
+  it("pushes a validated human branch name with no foreman/ prefix", async () => {
+    const { brokered, commands, policies, result, sandboxes, warnings } =
+      await push(HUMAN_BRANCH, signedFor(PREPARED));
 
-    // Nothing refused it: the tool read the prepared repository and ran on to
-    // the brokered credential, which only a real Connect runtime can mint.
-    assert.equal(refusalOf(result).success, undefined);
+    assert.deepEqual(outcome(result), {
+      branch: HUMAN_BRANCH,
+      sha: SHA,
+      success: true,
+    });
+    assert.deepEqual(
+      commands.map((run) => run.command),
+      [PUSH_COMMAND, REV_PARSE_COMMAND]
+    );
     assert.equal(sandboxes, 1);
-    assert.ok((result as { threw?: string }).threw);
+    assert.equal(brokered, 1);
+    // The credential window closes even on the accepted path.
+    assert.deepEqual(policies, ["allow-all"]);
     assert.deepEqual(warnings, []);
   });
 
@@ -99,8 +133,8 @@ describe("push_branch branch names", () => {
     it(`refuses ${branch} before reaching a sandbox`, async () => {
       const { result, sandboxes, warnings } = await push(branch, null);
 
-      assert.equal(refusalOf(result).success, false);
-      assert.match(refusalOf(result).error ?? "", NOT_ALLOWED);
+      assert.equal(outcome(result).success, false);
+      assert.match(outcome(result).error ?? "", NOT_ALLOWED);
       assert.equal(sandboxes, 0);
       assert.equal(warnings.length, 1);
     });
@@ -115,11 +149,29 @@ describe("push_branch branch names", () => {
     it(`refuses unsafe branch ${branch}`, async () => {
       const { result, sandboxes, warnings } = await push(branch, null);
 
-      assert.equal(refusalOf(result).success, false);
+      assert.equal(outcome(result).success, false);
       assert.equal(sandboxes, 0);
       assert.equal(warnings.length, 1);
     });
   }
+
+  it("routes the tool through the same push", async () => {
+    const original = console.warn;
+    console.warn = () => {
+      // The refusal warning is not under test here.
+    };
+    try {
+      const result = await pushBranch.execute({ branch: "main" }, {
+        getSandbox: () => Promise.reject(new Error("unreachable")),
+        session: { auth: { current: null } },
+      } as unknown as Parameters<typeof pushBranch.execute>[1]);
+
+      assert.equal(outcome(result).success, false);
+      assert.match(outcome(result).error ?? "", NOT_ALLOWED);
+    } finally {
+      console.warn = original;
+    }
+  });
 });
 
 describe("push_branch repository binding", () => {
@@ -129,19 +181,28 @@ describe("push_branch repository binding", () => {
       signedFor("Acquisity/Other")
     );
 
-    assert.equal(refusalOf(result).success, false);
-    assert.match(refusalOf(result).error ?? "", OTHER_REPOSITORY);
+    assert.equal(outcome(result).success, false);
+    assert.match(outcome(result).error ?? "", OTHER_REPOSITORY);
     assert.deepEqual(commands, []);
     assert.equal(warnings.length, 1);
   });
 
-  it("lets an explicit authority prepare another repository", async () => {
-    const { result, warnings } = await push(
+  it("lets an explicit authority push the prepared repository", async () => {
+    const { commands, result, warnings } = await push(
       HUMAN_BRANCH,
       stampRepository(baseAuth, "Acquisity/Other", "explicit")
     );
 
-    assert.equal(refusalOf(result).success, undefined);
+    assert.deepEqual(outcome(result), {
+      branch: HUMAN_BRANCH,
+      sha: SHA,
+      success: true,
+    });
+    // The prepared repository decides the remote, never the stamped default.
+    assert.deepEqual(
+      commands.map((run) => run.command),
+      [PUSH_COMMAND, REV_PARSE_COMMAND]
+    );
     assert.deepEqual(warnings, []);
   });
 });
