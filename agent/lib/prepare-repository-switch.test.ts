@@ -186,7 +186,7 @@ describe("prepare_repository switching", () => {
     const { commands, result, written } = await prepare(
       OTHER,
       markerFor(REPOSITORY, "github-webhook"),
-      stampRepository(attendedAuth, REPOSITORY, "github-webhook")
+      attendedAuth
     );
     assert.equal(result.success, false);
     assert.match(result.error ?? "", SIGNED_REFUSAL);
