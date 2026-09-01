@@ -342,6 +342,17 @@ describe("dynamic capability resolution", () => {
     }
   });
 
+  it("does not reuse dynamic tools across application roots", async () => {
+    await resolveLaneCapabilities(FIXTURE, "slack");
+    const otherApp = parseCapabilityManifest({
+      ...FIXTURE,
+      appRoot: fileURLToPath(
+        new URL("../../missing-capability-budget-app", import.meta.url)
+      ),
+    });
+    await assert.rejects(resolveLaneCapabilities(otherApp, "slack"));
+  });
+
   it("reads the subagent delegation schema from eve", async () => {
     const chars = await subagentDelegationSchemaChars(false);
     assert.ok(chars > 0);

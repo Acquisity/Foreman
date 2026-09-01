@@ -429,7 +429,7 @@ type CompiledModuleMap = z.infer<typeof compiledModuleMapSchema>;
 
 /**
  * Bundles and evaluates the authored module map the way eve prepares a
- * development generation, once per process.
+ * development generation, once per application root.
  *
  * @remarks
  * This is the one step that makes durable callback descriptors observable.
@@ -443,7 +443,7 @@ type CompiledModuleMap = z.infer<typeof compiledModuleMapSchema>;
  * package imports resolve. Evaluating it runs the top level of every authored
  * module, which is what `eve info` does too, so it needs the same environment.
  */
-let authoredModuleMap: Promise<CompiledModuleMap> | undefined;
+const authoredModuleMaps = new Map<string, Promise<CompiledModuleMap>>();
 
 const loadAuthoredModuleMapOnce = async (
   appRoot: string
@@ -486,8 +486,13 @@ const loadAuthoredModuleMapOnce = async (
 };
 
 const loadAuthoredModuleMap = (appRoot: string): Promise<CompiledModuleMap> => {
-  authoredModuleMap ??= loadAuthoredModuleMapOnce(appRoot);
-  return authoredModuleMap;
+  const cached = authoredModuleMaps.get(appRoot);
+  if (cached) {
+    return cached;
+  }
+  const loading = loadAuthoredModuleMapOnce(appRoot);
+  authoredModuleMaps.set(appRoot, loading);
+  return loading;
 };
 
 /**
@@ -633,18 +638,29 @@ const resolveGitHubExtensionToolsOnce = async (
 };
 
 /**
- * The extension resolver runs once per process, and every caller shares that
- * one result: it reads only the bound mount config, so its answer is the same
- * for every lane.
+ * The extension resolver runs once per compiled entry and application root.
+ * Every lane measuring that same application shares the result.
  */
-let gitHubExtensionTools: Promise<ResolvedDynamicTool[]> | undefined;
+const gitHubExtensionTools = new Map<string, Promise<ResolvedDynamicTool[]>>();
 
 const resolveGitHubExtensionTools = (
   entry: z.infer<typeof dynamicToolEntrySchema>,
   appRoot: string
 ): Promise<ResolvedDynamicTool[]> => {
-  gitHubExtensionTools ??= resolveGitHubExtensionToolsOnce(entry, appRoot);
-  return gitHubExtensionTools;
+  const key = JSON.stringify([
+    appRoot,
+    entry.sourceId,
+    entry.logicalPath,
+    entry.slug,
+    entry.eventNames,
+  ]);
+  const cached = gitHubExtensionTools.get(key);
+  if (cached) {
+    return cached;
+  }
+  const loading = resolveGitHubExtensionToolsOnce(entry, appRoot);
+  gitHubExtensionTools.set(key, loading);
+  return loading;
 };
 
 /**
