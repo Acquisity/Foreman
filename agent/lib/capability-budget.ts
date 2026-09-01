@@ -627,7 +627,8 @@ export async function admitDynamicTools(
  */
 const resolveGitHubExtensionToolsOnce = async (
   entry: z.infer<typeof dynamicToolEntrySchema>,
-  appRoot: string
+  appRoot: string,
+  lane: CapabilityLane
 ): Promise<ResolvedDynamicTool[]> => {
   const [moduleMap, { resolveDynamicToolDefinition }] = await Promise.all([
     loadAuthoredModuleMap(appRoot),
@@ -639,7 +640,7 @@ const resolveGitHubExtensionToolsOnce = async (
   const resolver = dynamicToolResolverSchema.parse(
     await resolveDynamicToolDefinition(entry, moduleMap, undefined)
   );
-  return admitDynamicTools(resolver, "slack", capabilitySource(entry.sourceId));
+  return admitDynamicTools(resolver, lane, capabilitySource(entry.sourceId));
 };
 
 /**
@@ -648,22 +649,37 @@ const resolveGitHubExtensionToolsOnce = async (
  */
 const gitHubExtensionTools = new Map<string, Promise<ResolvedDynamicTool[]>>();
 
+/** Complete identity of one lane's compiled dynamic-tool resolution. */
+export const dynamicToolCacheKey = (
+  entry: z.infer<typeof dynamicToolEntrySchema>,
+  appRoot: string,
+  lane: CapabilityLane
+): string =>
+  JSON.stringify([
+    appRoot,
+    lane,
+    {
+      eventNames: entry.eventNames,
+      exportName: entry.exportName ?? null,
+      extensionNamespace: entry.extensionNamespace ?? null,
+      logicalPath: entry.logicalPath,
+      slug: entry.slug,
+      sourceId: entry.sourceId,
+      sourceKind: entry.sourceKind,
+    },
+  ]);
+
 const resolveGitHubExtensionTools = (
   entry: z.infer<typeof dynamicToolEntrySchema>,
-  appRoot: string
+  appRoot: string,
+  lane: CapabilityLane
 ): Promise<ResolvedDynamicTool[]> => {
-  const key = JSON.stringify([
-    appRoot,
-    entry.sourceId,
-    entry.logicalPath,
-    entry.slug,
-    entry.eventNames,
-  ]);
+  const key = dynamicToolCacheKey(entry, appRoot, lane);
   const cached = gitHubExtensionTools.get(key);
   if (cached) {
     return cached;
   }
-  const loading = resolveGitHubExtensionToolsOnce(entry, appRoot);
+  const loading = resolveGitHubExtensionToolsOnce(entry, appRoot, lane);
   gitHubExtensionTools.set(key, loading);
   return loading;
 };
@@ -677,7 +693,8 @@ const DYNAMIC_TOOL_SOURCES = new Map<
   string,
   (
     entry: z.infer<typeof dynamicToolEntrySchema>,
-    appRoot: string
+    appRoot: string,
+    lane: CapabilityLane
   ) => Promise<ResolvedDynamicTool[]>
 >([["ext:github:tools/github.mjs", resolveGitHubExtensionTools]]);
 
@@ -744,7 +761,7 @@ export async function resolveLaneCapabilities(
           `Dynamic tool '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
         );
       }
-      return resolve(entry, manifest.appRoot);
+      return resolve(entry, manifest.appRoot, lane);
     })
   );
   return {

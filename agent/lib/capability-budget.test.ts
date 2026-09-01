@@ -20,6 +20,7 @@ const {
   capabilitySource,
   COMPILED_MANIFEST_PATH,
   COMPILE_METADATA_PATH,
+  dynamicToolCacheKey,
   formatCapabilityBudget,
   laneAuth,
   measureCapabilityBudget,
@@ -348,6 +349,28 @@ describe("dynamic capability resolution", () => {
       ),
     });
     await assert.rejects(resolveLaneCapabilities(otherApp, "slack"));
+  });
+
+  it("keys dynamic tools by lane and complete entry identity", () => {
+    const [entry] = FIXTURE.dynamicTools;
+    assert.ok(entry);
+    const slack = dynamicToolCacheKey(entry, APP_ROOT, "slack");
+    assert.notEqual(
+      slack,
+      dynamicToolCacheKey(entry, APP_ROOT, "autonomous-factory")
+    );
+    assert.notEqual(
+      slack,
+      dynamicToolCacheKey({ ...entry, exportName: "other" }, APP_ROOT, "slack")
+    );
+    assert.notEqual(
+      slack,
+      dynamicToolCacheKey(
+        { ...entry, extensionNamespace: "other" },
+        APP_ROOT,
+        "slack"
+      )
+    );
   });
 
   it("reads the subagent delegation schema from eve", async () => {
