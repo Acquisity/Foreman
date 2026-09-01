@@ -214,7 +214,7 @@ describe("lane measurement", () => {
     assert.equal(budget.bodyChars, 7);
   });
 
-  it("drops the dynamic skill row for a lane that resolves none", () => {
+  it("drops the dynamic skill from its source row when unresolved", () => {
     const budget = measureLane(FIXTURE, "autonomous-factory", {
       ...RESOLVED,
       dynamicSkills: [],
