@@ -167,11 +167,18 @@ export const cloneExplicitRepository = async (
 // Reads the checkout's origin from its config file directly: repository
 // discovery would refuse the builder-owned checkout as dubious ownership
 // before `safe.directory` is registered.
-const originUrl = async (sandbox: SandboxSession): Promise<string | null> => {
-  const origin = await boundedRun(sandbox, {
-    command:
-      "git config --file /workspace/repo/.git/config --get remote.origin.url",
-  });
+const originUrl = async (
+  sandbox: SandboxSession,
+  timeoutMs: number
+): Promise<string | null> => {
+  const origin = await boundedRun(
+    sandbox,
+    {
+      command:
+        "git config --file /workspace/repo/.git/config --get remote.origin.url",
+    },
+    timeoutMs
+  );
   return origin.exitCode === 0
     ? String(origin.stdout).trim().toLowerCase()
     : null;
@@ -309,7 +316,8 @@ export const prepareWarmedOrClone = async (
     // be treated as proof of debris, and an unfinished clone or move cannot
     // land here anyway: `/workspace/repo` only ever appears as a rename of a
     // finished checkout from `STAGING_PATH`.
-    return (await originUrl(sandbox)) === remoteUrl(repository).toLowerCase()
+    return (await originUrl(sandbox, timeoutMs)) ===
+      remoteUrl(repository).toLowerCase()
       ? refreshCheckout(sandbox, repository, warmed, true, {
           ...options,
           owned: false,

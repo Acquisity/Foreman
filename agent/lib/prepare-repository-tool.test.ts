@@ -381,6 +381,22 @@ describe("prepare_repository sandbox bounds", () => {
     assert.equal(ran(commands, "git clone"), false);
   });
 
+  it("bounds the occupied checkout origin probe with the caller's deadline", async () => {
+    const { commands, sandbox } = fakeSandbox((options) =>
+      options.command.includes("remote.origin.url") ? stall(options) : ok()
+    );
+    const error = await prepareWarmedOrClone(sandbox, REPOSITORY, {
+      broker,
+      timeoutMs: TIMEOUT_MS,
+    });
+    assert.match(error ?? "", REFUSED);
+    const origin = commands.find((options) =>
+      options.command.includes("remote.origin.url")
+    );
+    assert.ok(origin?.abortSignal instanceof AbortSignal);
+    assert.equal(ran(commands, "git clone"), false);
+  });
+
   it("adopts an occupied checkout whose origin names this repository", async () => {
     const { commands, sandbox } = fakeSandbox((options) =>
       options.command.includes("remote.origin.url")
