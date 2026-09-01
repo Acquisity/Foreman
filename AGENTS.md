@@ -20,6 +20,7 @@ pnpm check
 pnpm fix
 pnpm build
 pnpm eval
+pnpm report:capabilities
 pnpm test
 pnpm validate
 pnpm db:migrate
@@ -27,6 +28,8 @@ npx eve info
 ```
 
 Verify with `pnpm validate`, then exercise both direct and factory paths in `pnpm dev`. Evals cost real tokens. Run `pipeline/full-pipeline` only with `PIPELINE_SCRATCH_REPO` set to a scratch repository.
+
+`pnpm report:capabilities` prints the capability catalog each session lane carries, measured from eve's compiled manifest by `agent/lib/capability-budget.ts`. Run `npx eve info` first so the manifest exists. The report measures only; it never decides what a lane may call.
 
 ## Eve conventions
 
