@@ -809,10 +809,14 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
     ),
     "issue title rule is stated once, before both creation points"
   );
+  const titleRule = intercomTriageSkill.indexOf(
+    "is the title of any issue this skill creates"
+  );
   assert.ok(
-    intercomTriageSkill.indexOf(
-      "is the title of any issue this skill creates"
-    ) < intercomTriageSkill.indexOf("`linear__save_issue`")
+    [...intercomTriageSkill.matchAll(/`linear__save_issue`/g)].every(
+      ({ index }) => index !== undefined && titleRule < index
+    ),
+    "title rule precedes every issue-creation call"
   );
   assert.ok(bugHandoff.includes("exactly one critic pass"));
   assert.ok(bugHandoff.includes("`engineering-handoff`"));
