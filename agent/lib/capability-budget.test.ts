@@ -492,6 +492,8 @@ const TABLE_HEADING = /kind {6}source/u;
 const TOTALS_LINE =
   /catalog 70 characters \(about 18 tokens\), body 7 characters/u;
 const SHARE_LINE = /slack carries 50% of the repository-interactive catalog/u;
+const FACTORY_SHARE_LINE =
+  /slack carries 25% of the autonomous-factory catalog/u;
 
 describe("capability report", () => {
   it("renders every lane with its totals", () => {
@@ -511,8 +513,18 @@ describe("capability report", () => {
       ...measureLane(FIXTURE, "repository-interactive", RESOLVED),
       catalogChars: slack.catalogChars * 2,
     };
+    const factory = {
+      ...measureLane(FIXTURE, "autonomous-factory", RESOLVED),
+      catalogChars: slack.catalogChars * 4,
+    };
     assert.equal(ordinarySlackShare([slack, repository]), 0.5);
-    assert.match(formatCapabilityBudget([slack, repository]), SHARE_LINE);
+    assert.equal(
+      ordinarySlackShare([slack, factory], "autonomous-factory"),
+      0.25
+    );
+    const report = formatCapabilityBudget([slack, repository, factory]);
+    assert.match(report, SHARE_LINE);
+    assert.match(report, FACTORY_SHARE_LINE);
     // One lane alone compares nothing, and neither does an empty catalog.
     assert.equal(ordinarySlackShare([slack]), null);
     assert.equal(

@@ -584,15 +584,16 @@ export const CHARS_PER_TOKEN_ESTIMATE = 4;
 export const estimateTokens = (chars: number): number =>
   Math.ceil(chars / CHARS_PER_TOKEN_ESTIMATE);
 
-/** Ordinary Slack's catalog as a share of the repository-selected lane's. */
+/** Ordinary Slack's catalog as a share of a repository-carrying lane's. */
 export const ordinarySlackShare = (
-  budgets: readonly LaneBudget[]
+  budgets: readonly LaneBudget[],
+  againstLane: CapabilityLane = "repository-interactive"
 ): number | null => {
   const chars = (lane: CapabilityLane) =>
     budgets.find((budget) => budget.lane === lane)?.catalogChars;
   const slack = chars("slack");
-  const repository = chars("repository-interactive");
-  return slack === undefined || !repository ? null : slack / repository;
+  const repositoryLane = chars(againstLane);
+  return slack === undefined || !repositoryLane ? null : slack / repositoryLane;
 };
 
 const COLUMNS = [
@@ -653,14 +654,21 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
       `catalog ${budget.catalogChars} characters (about ${estimateTokens(budget.catalogChars)} tokens), body ${budget.bodyChars} characters`
     );
   }
-  const share = ordinarySlackShare(budgets);
-  if (share !== null) {
-    lines.push(
-      "",
-      "## Ordinary Slack against the repository-selected lane",
-      "",
-      `slack carries ${Math.round(share * 100)}% of the repository-interactive catalog. The regression test in capability-budget.test.ts holds this share at or below its ceiling.`
-    );
+  const repositoryLanes = [
+    "repository-interactive",
+    "autonomous-factory",
+  ] as const;
+  const shares = repositoryLanes.flatMap((lane) => {
+    const share = ordinarySlackShare(budgets, lane);
+    return share === null ? [] : [[lane, share] as const];
+  });
+  if (shares.length > 0) {
+    lines.push("", "## Ordinary Slack against repository-carrying lanes", "");
+    for (const [lane, share] of shares) {
+      lines.push(
+        `slack carries ${Math.round(share * 100)}% of the ${lane} catalog. The regression test in capability-budget.test.ts holds this share at or below its ceiling.`
+      );
+    }
   }
   return lines.join("\n");
 }
