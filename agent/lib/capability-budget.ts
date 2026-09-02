@@ -5,12 +5,15 @@
  *
  * @remarks
  * This module measures and reports. It gates nothing: the lane differences it
- * observes are the ones the authored configuration already makes, today the
- * `factory-pipeline` dynamic skill, which `factorySkillAvailable` offers only
- * to a lane that can take the factory path (of the four measured lanes, only
- * `repository-interactive`, since none of them carries explicit factory
- * intent). Reading a lane's numbers must never change what that lane may
- * call.
+ * observes are the ones the authored configuration already makes. Today those
+ * are the `factory-pipeline` dynamic skill and the repository and GitHub tool
+ * catalogs, offered by `factorySkillAvailable` and
+ * `repositoryCapabilitiesAvailable` to a lane that has a repository selected
+ * or a factory path open to it (of the four measured lanes, only
+ * `repository-interactive` and `autonomous-factory`, since none of them
+ * carries explicit factory intent). Reading a lane's numbers must never change
+ * what that lane may call, and no gate is restated here: a lane that carries
+ * nothing from a resolver measures as nothing.
  *
  * Three sources are measured, and every one of them is resolved rather than
  * estimated:
@@ -26,10 +29,12 @@
  *   with the same transform that stamps durable callback descriptors in a
  *   deployment, and eve's step-time dispatch checks each entry's `defineTool`
  *   brand, validates every durable callback, qualifies the names, and
- *   serializes the schemas. A result eve would drop measures as a failure,
- *   never as thirty-one model-visible tools. A descriptor with no registered
- *   resolver fails the measurement instead of being reported as a smaller
- *   number.
+ *   serializes the schemas. A resolver is counted on the way in as well as on
+ *   the way out, so a result eve would drop measures as a failure rather than
+ *   as thirty-one model-visible tools, while a lane a resolver deliberately
+ *   offers nothing to measures as zero. A descriptor whose module is not in
+ *   the bundled module map fails the measurement instead of being reported as
+ *   a smaller number.
  * - The subagent delegation tools eve lowers at runtime. Their input schema is
  *   framework-owned and identical for every subagent, so it is read from eve
  *   itself rather than guessed at.
@@ -371,16 +376,19 @@ const dynamicSkillEntry = async (
   return null;
 };
 
-const EXTENSION_SOURCE = /^(ext:([^:]+))/u;
+// `ext-override:` is the same extension, mounted as a directory so the
+// consumer can replace one of its contributions. The tools still reach the
+// model under the extension's namespace, so they are reported under it too.
+const EXTENSION_SOURCE = /^ext(?:-override)?:([^:]+)/u;
 
 /**
  * The source a capability came from: an extension namespace such as
  * `ext:browser`, or the authored directory such as `tools/`.
  */
 export function capabilitySource(sourceId: string): string {
-  const extension = EXTENSION_SOURCE.exec(sourceId);
-  if (extension?.[1]) {
-    return extension[1];
+  const namespace = EXTENSION_SOURCE.exec(sourceId)?.[1];
+  if (namespace) {
+    return `ext:${namespace}`;
   }
   const [directory] = sourceId.split("/");
   return `${directory ?? sourceId}/`;
@@ -544,20 +552,83 @@ interface EveContext {
   readonly set: (key: object, value: unknown) => unknown;
 }
 
+/** The metadata key eve files a resolver's result under, by event. */
+const DYNAMIC_TOOL_METADATA_KEY = {
+  "session.started": "SessionDynamicToolMetadataKey",
+  "step.started": "StepDynamicToolMetadataKey",
+  "turn.started": "TurnDynamicToolMetadataKey",
+} as const;
+
+type DynamicToolEventName = keyof typeof DYNAMIC_TOOL_METADATA_KEY;
+
+const isDynamicToolEvent = (name: string): name is DynamicToolEventName =>
+  name in DYNAMIC_TOOL_METADATA_KEY;
+
+// The brand `defineTool` stamps, read the way eve reads it, so a single tool
+// is told apart from a map of them without counting a tool's own fields.
+const TOOL_BRAND = Symbol.for("eve:tool-brand");
+
+const isBrandedTool = (value: unknown): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  (value as Record<symbol, unknown>)[TOOL_BRAND] === true;
+
+/** How many tool entries a resolver handed eve, before eve judged them. */
+const returnedEntryCount = (result: unknown): number => {
+  if (result === null || result === undefined) {
+    return 0;
+  }
+  if (isBrandedTool(result)) {
+    return 1;
+  }
+  // Anything else eve reads as a map of entries. A malformed result counts as
+  // one, so eve rejecting it still shows up as a shortfall.
+  return typeof result === "object" && !Array.isArray(result)
+    ? Math.max(1, Object.keys(result).length)
+    : 1;
+};
+
+/**
+ * Wraps a resolver so the number of entries it returned is observable
+ * alongside the number eve admitted.
+ */
+const countingResolver = (
+  resolver: DynamicToolResolver,
+  returned: { count: number }
+): DynamicToolResolver => ({
+  ...resolver,
+  events: Object.fromEntries(
+    Object.entries(resolver.events).map(([name, handler]) => [
+      name,
+      async (event: unknown, ctx: unknown) => {
+        const result = await handler(event, ctx);
+        returned.count += returnedEntryCount(result);
+        return result;
+      },
+    ])
+  ),
+});
+
 /**
  * Admits a dynamic tool resolver's result the way eve does before a model
  * call, and returns only what eve admitted.
  *
  * @remarks
- * This is eve's `step.started` dispatch, run against a fresh execution
- * context: eve calls the resolver, requires every entry to be a `defineTool`,
- * validates the durable descriptor on each execute, approval, and model-output
- * callback, prefixes an extension's tool names with its namespace, and
- * serializes each input schema the way it is sent to the model. eve drops a
- * resolver's complete result when any entry fails, logging the reason on its
- * `dynamic-tools` logger, so a dropped result surfaces here as an empty
- * admission and the measurement fails instead of publishing a total for tools
- * the model would never see.
+ * This is eve's own dispatch, run against a fresh execution context on each
+ * event the compiled entry declares: eve calls the resolver, requires every
+ * entry to be a `defineTool`, validates the durable descriptor on each
+ * execute, approval, and model-output callback, prefixes an extension's tool
+ * names with its namespace, and serializes each input schema the way it is
+ * sent to the model.
+ *
+ * A resolver that returns nothing for this lane measures as nothing, which is
+ * the point of a gated capability. What must never pass silently is eve
+ * dropping entries the resolver did hand it: eve discards a resolver's
+ * complete result when any entry is not a `defineTool` or one of its callbacks
+ * has no durable descriptor, logging the reason on its `dynamic-tools` logger
+ * and nothing else. So the resolver is counted on the way in as well as on the
+ * way out, and a shortfall fails the measurement instead of publishing a total
+ * for tools the model would never see.
  *
  * @param resolver - The compiled dynamic tool with its handlers attached.
  * @param lane - The lane whose session auth the resolver sees.
@@ -581,8 +652,10 @@ export async function admitDynamicTools(
         z.object({
           AuthKey: contextKeySchema,
           InitiatorAuthKey: contextKeySchema,
+          SessionDynamicToolMetadataKey: contextKeySchema,
           SessionIdKey: contextKeySchema,
           StepDynamicToolMetadataKey: contextKeySchema,
+          TurnDynamicToolMetadataKey: contextKeySchema,
         })
       ),
       eveRuntimeModule(
@@ -595,18 +668,34 @@ export async function admitDynamicTools(
   ctx.set(keys.SessionIdKey, `capability-budget:${lane}`);
   ctx.set(keys.AuthKey, auth);
   ctx.set(keys.InitiatorAuthKey, auth);
-  await dispatchDynamicToolEvent({
-    ctx,
-    event: { type: "step.started" },
-    messages: [],
-    resolvers: [resolver],
-  });
-  const admitted = admittedToolSchema
-    .array()
-    .parse(ctx.get(keys.StepDynamicToolMetadataKey) ?? []);
-  if (admitted.length === 0) {
+  const returned = { count: 0 };
+  const counted = countingResolver(resolver, returned);
+  const admitted: z.infer<typeof admittedToolSchema>[] = [];
+  // One dispatch per declared event, each read back from the key eve files
+  // that event's result under. An authored tool resolves at `turn.started`;
+  // the GitHub extension resolves at `step.started`.
+  for (const eventName of resolver.eventNames) {
+    if (!isDynamicToolEvent(eventName)) {
+      throw new Error(
+        `Dynamic tool '${resolver.slug}' declares unsupported event '${eventName}'.`
+      );
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: the dispatches share one context and each one reads and writes its own metadata key, so they have to run in order.
+    await dispatchDynamicToolEvent({
+      ctx,
+      event: { type: eventName },
+      messages: [],
+      resolvers: [counted],
+    });
+    admitted.push(
+      ...admittedToolSchema
+        .array()
+        .parse(ctx.get(keys[DYNAMIC_TOOL_METADATA_KEY[eventName]]) ?? [])
+    );
+  }
+  if (admitted.length < returned.count) {
     throw new Error(
-      `eve admitted none of the tools '${resolver.slug}' resolves at step.started, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
+      `eve admitted ${admitted.length} of the ${returned.count} tools '${resolver.slug}' resolves, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
     );
   }
   return admitted.map((tool) => ({
@@ -619,14 +708,16 @@ export async function admitDynamicTools(
 }
 
 /**
- * Resolves the GitHub extension's tool surface the way eve does at
- * `step.started`: the compiled entry is loaded from the bundled module map, so
- * the authored mount in `agent/extensions/github.ts` binds its allowlist and
- * overrides at bundle time, and eve's dispatch admits one tool per included
- * entry. Nothing leaves the process; the credential is resolved per call at
- * execution time, which this never reaches.
+ * Resolves one compiled dynamic tool the way eve does: the entry is loaded
+ * from the bundled module map, so the authored source binds at bundle time
+ * (for the GitHub surface that means the mount in
+ * `agent/extensions/github/extension.ts` and the lane gate in its
+ * `tools/github.ts` override), and eve's dispatch admits what that lane
+ * carries. An entry whose module is not in the map throws here rather than
+ * leaving a tool source uncounted. Nothing leaves the process; a credential is
+ * resolved per call at execution time, which this never reaches.
  */
-const resolveGitHubExtensionToolsOnce = async (
+const resolveCompiledDynamicToolsOnce = async (
   entry: z.infer<typeof dynamicToolEntrySchema>,
   appRoot: string,
   lane: CapabilityLane
@@ -645,10 +736,10 @@ const resolveGitHubExtensionToolsOnce = async (
 };
 
 /**
- * The extension resolver runs once per lane, compiled entry, and application
- * root. Repeated measurements of that same lane share the result.
+ * Each resolver runs once per lane, compiled entry, and application root.
+ * Repeated measurements of that same lane share the result.
  */
-const gitHubExtensionTools = new Map<string, Promise<ResolvedDynamicTool[]>>();
+const compiledDynamicTools = new Map<string, Promise<ResolvedDynamicTool[]>>();
 
 /** Complete identity of one lane's compiled dynamic-tool resolution. */
 export const dynamicToolCacheKey = (
@@ -670,34 +761,20 @@ export const dynamicToolCacheKey = (
     },
   ]);
 
-const resolveGitHubExtensionTools = (
+export const resolveCompiledDynamicTools = (
   entry: z.infer<typeof dynamicToolEntrySchema>,
   appRoot: string,
   lane: CapabilityLane
 ): Promise<ResolvedDynamicTool[]> => {
   const key = dynamicToolCacheKey(entry, appRoot, lane);
-  const cached = gitHubExtensionTools.get(key);
+  const cached = compiledDynamicTools.get(key);
   if (cached) {
     return cached;
   }
-  const loading = resolveGitHubExtensionToolsOnce(entry, appRoot, lane);
-  gitHubExtensionTools.set(key, loading);
+  const loading = resolveCompiledDynamicToolsOnce(entry, appRoot, lane);
+  compiledDynamicTools.set(key, loading);
   return loading;
 };
-
-/**
- * The resolver behind each compiled dynamic tool, keyed by the source the
- * manifest records. A compiled entry with no resolver here fails the
- * measurement rather than leaving the lane's largest tool source uncounted.
- */
-const DYNAMIC_TOOL_SOURCES = new Map<
-  string,
-  (
-    entry: z.infer<typeof dynamicToolEntrySchema>,
-    appRoot: string,
-    lane: CapabilityLane
-  ) => Promise<ResolvedDynamicTool[]>
->([["ext:github:tools/github.mjs", resolveGitHubExtensionTools]]);
 
 const eveSubagentRegistryUrl = (): URL =>
   new URL("./dist/src/runtime/subagents/registry.js", evePackageUrl());
@@ -755,15 +832,9 @@ export async function resolveLaneCapabilities(
     manifest.dynamicSkills.map((entry) => dynamicSkillEntry(entry, lane))
   );
   const tools = await Promise.all(
-    manifest.dynamicTools.map((entry) => {
-      const resolve = DYNAMIC_TOOL_SOURCES.get(entry.sourceId);
-      if (!resolve) {
-        throw new Error(
-          `Dynamic tool '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
-        );
-      }
-      return resolve(entry, manifest.appRoot, lane);
-    })
+    manifest.dynamicTools.map((entry) =>
+      resolveCompiledDynamicTools(entry, manifest.appRoot, lane)
+    )
   );
   return {
     dynamicSkills: skills.filter((skill) => skill !== null),
