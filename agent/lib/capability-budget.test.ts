@@ -17,10 +17,12 @@ const {
   capabilitySource,
   COMPILED_MANIFEST_PATH,
   COMPILE_METADATA_PATH,
+  estimateTokens,
   formatCapabilityBudget,
   laneAuth,
   measureCapabilityBudget,
   measureLane,
+  ordinarySlackShare,
   parseCapabilityManifest,
   readCompiledManifest,
   resolveLaneCapabilities,
@@ -48,7 +50,7 @@ const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
 
 /** The lanes `repositoryCapabilitiesAvailable` admits, of the four measured. */
-const REPOSITORY_LANES = new Set([
+const REPOSITORY_LANES = new Set<(typeof CAPABILITY_LANES)[number]>([
   "repository-interactive",
   "autonomous-factory",
 ]);
@@ -66,6 +68,21 @@ const GATED_REPOSITORY_TOOLS = [
   "update_repository_knowledge",
 ];
 const SLACK_PRINCIPAL = /^slack:/u;
+
+/**
+ * The most of the repository-selected catalog ordinary Slack may carry.
+ *
+ * @remarks
+ * The boundary ENG-13324's gate achieved and ENG-13325 enforces: measured at
+ * 73% (63,607 of 87,343 catalog characters) on 2026-09-02, from 100% before
+ * the gate. A ratio rather than a character count, so a description edit to a
+ * tool every lane carries moves both sides and still passes, while a change
+ * that hands ordinary Slack the GitHub surface, the gated repository tools,
+ * or another catalog of that size fails. The same ceiling is held against the
+ * factory lane, whose catalog is the repository-selected one minus the
+ * factory skill.
+ */
+const ORDINARY_SLACK_CATALOG_CEILING = 0.75;
 
 // The repository root, so a fixture's dynamic tool resolves through the same
 // bundled module map the repository's own manifest does.
@@ -468,7 +485,9 @@ describe("session lanes", () => {
 
 const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
-const TOTALS_LINE = /catalog 70 characters, body 7 characters/u;
+const TOTALS_LINE =
+  /catalog 70 characters \(about 18 tokens\), body 7 characters/u;
+const SHARE_LINE = /slack carries 50% of the repository-interactive catalog/u;
 
 describe("capability report", () => {
   it("renders every lane with its totals", () => {
@@ -478,6 +497,24 @@ describe("capability report", () => {
     assert.match(report, LANE_HEADING);
     assert.match(report, TABLE_HEADING);
     assert.match(report, TOTALS_LINE);
+  });
+
+  it("estimates tokens from characters and compares the Slack lane", () => {
+    assert.equal(estimateTokens(0), 0);
+    assert.equal(estimateTokens(63_607), 15_902);
+    const slack = measureLane(FIXTURE, "slack", RESOLVED);
+    const repository = {
+      ...measureLane(FIXTURE, "repository-interactive", RESOLVED),
+      catalogChars: slack.catalogChars * 2,
+    };
+    assert.equal(ordinarySlackShare([slack, repository]), 0.5);
+    assert.match(formatCapabilityBudget([slack, repository]), SHARE_LINE);
+    // One lane alone compares nothing, and neither does an empty catalog.
+    assert.equal(ordinarySlackShare([slack]), null);
+    assert.equal(
+      ordinarySlackShare([slack, { ...repository, catalogChars: 0 }]),
+      null
+    );
   });
 
   it("measures the repository's own compiled manifest", {
@@ -543,6 +580,53 @@ describe("capability report", () => {
     assert.equal(
       authoredTools("repository-interactive") - authoredTools("slack"),
       GATED_REPOSITORY_TOOLS.length
+    );
+    // The achieved budget boundary. Ordinary Slack must stay materially below
+    // both lanes that carry the repository surface; see the ceiling's remarks.
+    for (const full of [repository, factory]) {
+      assert.ok(
+        slack.catalogChars <=
+          full.catalogChars * ORDINARY_SLACK_CATALOG_CEILING,
+        `slack carries ${slack.catalogChars} of ${full.lane}'s ${full.catalogChars} catalog characters, above ${ORDINARY_SLACK_CATALOG_CEILING * 100}%`
+      );
+    }
+    // No loss on the admitted side: both repository lanes carry every authored
+    // tool the tree compiles, static and gated alike, and every subagent, and
+    // the factory skill is the only capability that separates the two.
+    const entries = (
+      lane: (typeof CAPABILITY_LANES)[number],
+      kind: string,
+      source: string
+    ) =>
+      byLane
+        .get(lane)
+        ?.rows.find((row) => row.kind === kind && row.source === source)
+        ?.entries ?? 0;
+    const authoredToolModules =
+      manifest.tools.filter(
+        (tool) => capabilitySource(tool.sourceId) === "tools/"
+      ).length +
+      manifest.dynamicTools.filter(
+        (tool) => capabilitySource(tool.sourceId) === "tools/"
+      ).length;
+    for (const lane of REPOSITORY_LANES) {
+      assert.equal(entries(lane, "tool", "tools/"), authoredToolModules, lane);
+      assert.equal(entries(lane, "tool", "ext:github"), 31, lane);
+    }
+    for (const lane of CAPABILITY_LANES) {
+      assert.equal(
+        entries(lane, "subagent", "subagents/"),
+        manifest.subagents.length,
+        lane
+      );
+    }
+    assert.equal(
+      entries("repository-interactive", "skill", "skills/"),
+      manifest.skills.length + manifest.dynamicSkills.length
+    );
+    assert.equal(
+      entries("autonomous-factory", "skill", "skills/"),
+      manifest.skills.length
     );
   });
 });
