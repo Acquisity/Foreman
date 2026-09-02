@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { githubCredentials } from "#lib/github/credentials.js";
 import {
@@ -7,9 +7,10 @@ import {
   validateBranch,
 } from "#lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "#lib/repository.js";
+import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
 
-export default defineTool({
+export const checkoutBranchTool = defineTool({
   description:
     "Fetch and check out an existing feature branch in the prepared repository for direct revision work. Uses the validated literal GitHub URL.",
   async execute({ branch }, ctx) {
@@ -52,4 +53,21 @@ export default defineTool({
     }
   },
   inputSchema: z.object({ branch: z.string().min(1) }),
+});
+
+/**
+ * Absent from a lane with no repository selected and no factory path open to
+ * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * gates the catalog only, never authorization, and the resolver re-runs each
+ * turn so a later message naming a repository restores the tool. The tool
+ * itself is the same object either way, so its callbacks keep the durable
+ * descriptors eve stamped on the `defineTool` call above.
+ */
+export default defineDynamic({
+  events: {
+    "turn.started": (_event, ctx) =>
+      repositoryCapabilitiesAvailable(ctx.session.auth.current)
+        ? checkoutBranchTool
+        : null,
+  },
 });

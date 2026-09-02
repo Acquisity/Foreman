@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import {
   isPipelineReady,
@@ -16,6 +16,7 @@ import {
   type RepositoryTarget,
   resolveRepositoryInput,
 } from "#lib/repository.js";
+import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 
 const inputSchema = z.object({
   actionableFeedbackRemaining: z.boolean().optional(),
@@ -138,7 +139,7 @@ const buildRun = (
   };
 };
 
-export default defineTool({
+export const recordPipelineRunTool = defineTool({
   description:
     "Create or advance durable factory pipeline state scoped to a repository and source or pull request. Deduplicates feedback, rejects stale-head events, counts unchanged blocker sets, escalates on the third repeat, and only records readiness when every readiness condition is true.",
   async execute(input, ctx) {
@@ -217,4 +218,21 @@ export default defineTool({
     }
   },
   inputSchema,
+});
+
+/**
+ * Absent from a lane with no repository selected and no factory path open to
+ * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * gates the catalog only, never authorization, and the resolver re-runs each
+ * turn so a later message naming a repository restores the tool. The tool
+ * itself is the same object either way, so its callbacks keep the durable
+ * descriptors eve stamped on the `defineTool` call above.
+ */
+export default defineDynamic({
+  events: {
+    "turn.started": (_event, ctx) =>
+      repositoryCapabilitiesAvailable(ctx.session.auth.current)
+        ? recordPipelineRunTool
+        : null,
+  },
 });

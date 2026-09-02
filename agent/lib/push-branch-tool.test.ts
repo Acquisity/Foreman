@@ -7,7 +7,9 @@ import { REPOSITORY_MARKER, stampRepository } from "./repository.js";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
-const { default: pushBranch, pushPreparedBranch } = await import(
+// The tool object itself, not the `defineDynamic` default export that gates
+// it by lane; the gate is covered in `repository-lane.test.ts`.
+const { pushBranchTool: pushBranch, pushPreparedBranch } = await import(
   "../tools/push_branch.js"
 );
 
