@@ -71,7 +71,7 @@ const GATED_REPOSITORY_TOOLS = [
 const SLACK_PRINCIPAL = /^slack:/u;
 
 /**
- * The most of the repository-selected catalog ordinary Slack may carry.
+ * The maximum share of a repository-selected catalog ordinary Slack may carry.
  *
  * @remarks
  * The boundary ENG-13324's gate achieved and ENG-13325 enforces: measured at
