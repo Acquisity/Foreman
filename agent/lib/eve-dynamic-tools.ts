@@ -238,7 +238,15 @@ const DYNAMIC_TOOL_METADATA_KEY = {
   "turn.started": "TurnDynamicToolMetadataKey",
 } as const;
 
-type DynamicToolEventName = keyof typeof DYNAMIC_TOOL_METADATA_KEY;
+/** A lifecycle event eve resolves dynamic tools on. */
+export type DynamicToolEventName = keyof typeof DYNAMIC_TOOL_METADATA_KEY;
+
+/** The same events in the order eve dispatches them within one turn. */
+const DYNAMIC_TOOL_EVENTS: readonly DynamicToolEventName[] = [
+  "session.started",
+  "turn.started",
+  "step.started",
+];
 
 const isDynamicToolEvent = (name: string): name is DynamicToolEventName =>
   name in DYNAMIC_TOOL_METADATA_KEY;
@@ -289,25 +297,13 @@ const countingResolver = (
 });
 
 /**
- * Admits a dynamic tool resolver's result the way eve does before a model
+ * Admits one dynamic tool resolver's result the way eve does before a model
  * call, and returns only what eve admitted.
  *
  * @remarks
- * This is eve's own dispatch, run against a fresh execution context on each
- * event the compiled entry declares: eve calls the resolver, requires every
- * entry to be a `defineTool`, validates the durable descriptor on each
- * execute, approval, and model-output callback, prefixes an extension's tool
- * names with its namespace, and serializes each input schema the way it is
- * sent to the model.
- *
- * A resolver that returns nothing for this session measures as nothing, which
- * is the point of a gated capability. What must never pass silently is eve
- * dropping entries the resolver did hand it: eve discards a resolver's
- * complete result when any entry is not a `defineTool` or one of its callbacks
- * has no durable descriptor, logging the reason on its `dynamic-tools` logger
- * and nothing else. So the resolver is counted on the way in as well as on the
- * way out, and a shortfall fails the measurement instead of publishing a total
- * for tools the model would never see.
+ * A one-resolver {@link openDynamicToolTurn}, dispatched on each event the
+ * compiled entry declares, in eve's own lifecycle order. Every rule that
+ * matters lives there.
  *
  * @param resolver - The compiled dynamic tool with its handlers attached.
  * @param session - The session whose auth the resolver sees.
@@ -316,6 +312,76 @@ export async function admitDynamicTools(
   resolver: DynamicToolResolver,
   session: DynamicToolSession
 ): Promise<AdmittedDynamicTool[]> {
+  for (const eventName of resolver.eventNames) {
+    if (!isDynamicToolEvent(eventName)) {
+      throw new Error(
+        `Dynamic tool '${resolver.slug}' declares unsupported event '${eventName}'.`
+      );
+    }
+  }
+  const turn = await openDynamicToolTurn([resolver], session);
+  let admitted: AdmittedDynamicTool[] = [];
+  for (const eventName of DYNAMIC_TOOL_EVENTS) {
+    if (resolver.eventNames.includes(eventName)) {
+      // biome-ignore lint/performance/noAwaitInLoops: the dispatches share one context in eve's own lifecycle order, so they have to run in sequence.
+      admitted = await turn.dispatch(eventName);
+    }
+  }
+  return admitted;
+}
+
+/**
+ * One session's dynamic-tool context, held open across lifecycle events.
+ *
+ * @remarks
+ * Order is the reason this exists. eve resolves `turn.started` once, before
+ * the turn's first tool runs, and `step.started` again before every model
+ * call, then offers the model the session, turn, and step results together
+ * (eve's own `buildDynamicTools`). So a capability the turn selects while it
+ * runs reaches the model only through a `step.started` resolver, and only a
+ * caller that dispatches the events in that order can tell the two apart.
+ */
+export interface DynamicToolTurn {
+  /**
+   * Dispatches one lifecycle event against the held context and returns every
+   * tool the model would carry after it, read from all three metadata keys the
+   * way eve reads them.
+   */
+  readonly dispatch: (
+    eventName: DynamicToolEventName
+  ) => Promise<AdmittedDynamicTool[]>;
+}
+
+/**
+ * Opens one session's dynamic-tool context over a set of resolvers.
+ *
+ * @remarks
+ * This is eve's own dispatch, run against one execution context the caller
+ * drives event by event: eve calls each resolver, requires every entry to be a
+ * `defineTool`, validates the durable descriptor on each execute, approval,
+ * and model-output callback, prefixes an extension's tool names with its
+ * namespace, and serializes each input schema the way it is sent to the model.
+ *
+ * A resolver that returns nothing for this session measures as nothing, which
+ * is the point of a gated capability. What must never pass silently is eve
+ * dropping entries a resolver did hand it: eve discards a resolver's complete
+ * result when any entry is not a `defineTool` or one of its callbacks has no
+ * durable descriptor, logging the reason on its `dynamic-tools` logger and
+ * nothing else. So the resolvers are counted on the way in as well as on the
+ * way out, and a shortfall throws instead of publishing a total for tools the
+ * model would never see.
+ *
+ * The state a resolver reads is a separate matter: eve's `defineState` reads
+ * the ambient context, which eve's dispatch does not enter, so a caller that
+ * wants a resolver to see session state runs this inside that context.
+ *
+ * @param resolvers - The compiled dynamic tools with their handlers attached.
+ * @param session - The session whose auth the resolvers see.
+ */
+export async function openDynamicToolTurn(
+  resolvers: readonly DynamicToolResolver[],
+  session: DynamicToolSession
+): Promise<DynamicToolTurn> {
   const [{ ContextContainer }, keys, { dispatchDynamicToolEvent }] =
     await Promise.all([
       eveRuntimeModule(
@@ -345,41 +411,44 @@ export async function admitDynamicTools(
   ctx.set(keys.AuthKey, session.auth);
   ctx.set(keys.InitiatorAuthKey, session.auth);
   const returned = { count: 0 };
-  const counted = countingResolver(resolver, returned);
-  const admitted: z.infer<typeof admittedToolSchema>[] = [];
-  // One dispatch per declared event, each read back from the key eve files
-  // that event's result under. An authored tool resolves at `turn.started`;
-  // the GitHub extension resolves at `step.started`.
-  for (const eventName of resolver.eventNames) {
-    if (!isDynamicToolEvent(eventName)) {
-      throw new Error(
-        `Dynamic tool '${resolver.slug}' declares unsupported event '${eventName}'.`
-      );
-    }
-    // biome-ignore lint/performance/noAwaitInLoops: the dispatches share one context and each one reads and writes its own metadata key, so they have to run in order.
-    await dispatchDynamicToolEvent({
-      ctx,
-      event: { type: eventName },
-      messages: [],
-      resolvers: [counted],
-    });
-    admitted.push(
-      ...admittedToolSchema
+  const counted = resolvers.map((resolver) =>
+    countingResolver(resolver, returned)
+  );
+  const slugs = resolvers.map((resolver) => resolver.slug).join(", ");
+  return {
+    dispatch: async (eventName: DynamicToolEventName) => {
+      // Counted per dispatch, against the key eve files this event's result
+      // under: eve replaces that key's entries for the resolvers that ran, so
+      // the two numbers describe the same dispatch even when a caller
+      // dispatches one event more than once.
+      returned.count = 0;
+      await dispatchDynamicToolEvent({
+        ctx,
+        event: { type: eventName },
+        messages: [],
+        resolvers: counted,
+      });
+      const forEvent = admittedToolSchema
         .array()
-        .parse(ctx.get(keys[DYNAMIC_TOOL_METADATA_KEY[eventName]]) ?? [])
-    );
-  }
-  if (admitted.length < returned.count) {
-    throw new Error(
-      `eve admitted ${admitted.length} of the ${returned.count} tools '${resolver.slug}' resolves, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
-    );
-  }
-  return admitted.map((tool) => ({
-    description: tool.description,
-    name: tool.name,
-    // Serialized by eve without the dialect keyword, as the model sees it.
-    schemaChars: JSON.stringify(tool.inputSchema).length,
-  }));
+        .parse(ctx.get(keys[DYNAMIC_TOOL_METADATA_KEY[eventName]]) ?? []);
+      if (forEvent.length < returned.count) {
+        throw new Error(
+          `eve admitted ${forEvent.length} of the ${returned.count} tools '${slugs}' resolves on ${eventName}, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
+        );
+      }
+      const admitted = DYNAMIC_TOOL_EVENTS.flatMap((name) =>
+        admittedToolSchema
+          .array()
+          .parse(ctx.get(keys[DYNAMIC_TOOL_METADATA_KEY[name]]) ?? [])
+      );
+      return admitted.map((tool) => ({
+        description: tool.description,
+        name: tool.name,
+        // Serialized by eve without the dialect keyword, as the model sees it.
+        schemaChars: JSON.stringify(tool.inputSchema).length,
+      }));
+    },
+  };
 }
 
 /**
@@ -392,11 +461,10 @@ export async function admitDynamicTools(
  * leaving a tool source uncounted. Nothing leaves the process; a credential is
  * resolved per call at execution time, which this never reaches.
  */
-const resolveCompiledDynamicToolsOnce = async (
+const loadCompiledDynamicToolResolver = async (
   entry: DynamicToolEntry,
-  appRoot: string,
-  session: DynamicToolSession
-): Promise<AdmittedDynamicTool[]> => {
+  appRoot: string
+): Promise<DynamicToolResolver> => {
   const [moduleMap, { resolveDynamicToolDefinition }] = await Promise.all([
     loadAuthoredModuleMap(appRoot),
     eveRuntimeModule(
@@ -404,11 +472,33 @@ const resolveCompiledDynamicToolsOnce = async (
       z.object({ resolveDynamicToolDefinition: eveFunction })
     ),
   ]);
-  const resolver = dynamicToolResolverSchema.parse(
+  return dynamicToolResolverSchema.parse(
     await resolveDynamicToolDefinition(entry, moduleMap, undefined)
   );
-  return admitDynamicTools(resolver, session);
 };
+
+/**
+ * Every compiled dynamic tool of one manifest, with its handlers attached, so
+ * a caller can dispatch them together through {@link openDynamicToolTurn}
+ * rather than one resolver at a time.
+ */
+export const loadCompiledDynamicToolResolvers = (
+  entries: readonly DynamicToolEntry[],
+  appRoot: string
+): Promise<DynamicToolResolver[]> =>
+  Promise.all(
+    entries.map((entry) => loadCompiledDynamicToolResolver(entry, appRoot))
+  );
+
+const resolveCompiledDynamicToolsOnce = async (
+  entry: DynamicToolEntry,
+  appRoot: string,
+  session: DynamicToolSession
+): Promise<AdmittedDynamicTool[]> =>
+  admitDynamicTools(
+    await loadCompiledDynamicToolResolver(entry, appRoot),
+    session
+  );
 
 /**
  * Each resolver runs once per session, compiled entry, and application root.

@@ -3,7 +3,11 @@ import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
-import { evePackageUrl } from "./eve-dynamic-tools.js";
+import {
+  evePackageUrl,
+  loadCompiledDynamicToolResolvers,
+  openDynamicToolTurn,
+} from "./eve-dynamic-tools.js";
 import { stampFactoryIntent } from "./factory-lane.js";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { repositoryFromAuth, stampRepository } from "./repository.js";
@@ -250,13 +254,18 @@ const createPullRequestApproval = (current: SessionAuthContext) =>
   }) as unknown as Parameters<typeof intakeOnlyPolicy>[0];
 
 describe("a repository prepared at runtime", () => {
-  it("turns the surface on for the rest of the same turn", async () => {
+  it("answers the gate yes from the moment the slug is recorded", async () => {
     // The regression this pins: Slack stamps a repository only from a full
     // GitHub URL, so "open a PR in the foreman repo" arrives with nothing
     // stamped. The model reads the slug, calls the ungated prepare_repository,
     // and used to get the checkout and neither the repository tools nor the
-    // GitHub surface. eve re-resolves dynamic tools per step with the context
-    // active, so recording the selection is enough for the next step.
+    // GitHub surface.
+    //
+    // This covers the predicate only: that a successful preparation records
+    // the slug and the gate reads it back in the same context. Whether a tool
+    // is then resolved into what the model carries is a lifecycle question the
+    // predicate cannot answer, and "the same turn a repository is prepared"
+    // below is the test that answers it.
     const auth = slack({ intakeOnly: false });
     assert.ok(!repositoryCapabilitiesAvailable(auth));
     await inSession(async () => {
@@ -320,6 +329,56 @@ describe("a repository prepared at runtime", () => {
     );
     assert.doesNotThrow(() => rememberSelectedRepository(REPOSITORY));
     assert.equal(selectedRepositorySlug(), null);
+  });
+});
+
+describe("the same turn a repository is prepared", () => {
+  it("resolves push_branch and the GitHub surface onto the step after prepare_repository", {
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
+  }, async () => {
+    // The lifecycle the ticket is about, dispatched in eve's own order against
+    // the compiled manifest: turn.started resolves once before the turn's
+    // first tool runs, then prepare_repository selects a repository, then the
+    // next model call resolves step.started. eve offers the model the session,
+    // turn, and step results together, so what dispatch returns is what the
+    // model would carry.
+    //
+    // A resolver that went back to turn.started would run before the slug was
+    // recorded, return null for this lane, and never run again this turn, so
+    // its tool would be missing below. That is the half-failure this pins: the
+    // GitHub surface resolving while push_branch does not means Foreman can
+    // open a pull request it cannot push a branch for.
+    const manifest = readCompiledManifest(new URL("../../", import.meta.url));
+    const resolvers = await loadCompiledDynamicToolResolvers(
+      manifest.dynamicTools,
+      manifest.appRoot
+    );
+    const auth = slack({ intakeOnly: false });
+    await inSession(async () => {
+      const turn = await openDynamicToolTurn(resolvers, {
+        auth,
+        id: "repository-lane:same-turn",
+      });
+      assert.deepEqual(
+        await turn.dispatch("turn.started"),
+        [],
+        "a bare-slug Slack turn starts with no repository capability at all"
+      );
+      assert.equal((await prepare(auth, REPOSITORY)).success, true);
+      const names = new Set(
+        (await turn.dispatch("step.started")).map((tool) => tool.name)
+      );
+      for (const tool of GATED_TOOLS) {
+        assert.ok(names.has(tool), `${tool} resolves on the following step`);
+      }
+      assert.equal(
+        [...names].filter((name) => GITHUB_TOOL_NAME.test(name)).length,
+        31,
+        "the GitHub surface resolves on the same step as push_branch"
+      );
+    });
   });
 });
 
