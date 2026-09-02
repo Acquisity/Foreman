@@ -142,7 +142,7 @@ If billing evidence also proves a product Bug, preserve the financial proposal a
 Load `slack-wording`. The Slack surface may contain only:
 
 1. Batched clarifying questions, when needed.
-2. One closing status reply after the Linear ticket and document exist.
+2. One closing status reply after the investigation and any required Linear writes are complete.
 
 State what happened, what needs a human decision, and who must act in plain language. Never mention Stripe, Autumn, internal system readouts, assignee names, raw customer identifiers, or a promise to move money.
 
