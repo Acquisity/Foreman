@@ -54,6 +54,7 @@ const overrideSource = readFileSync(
 );
 const FORWARDS_EXTENSION_RESOLVER =
   /const resolve = github\.events\["step\.started"\];/u;
+const CALLS_EXTENSION_RESOLVER = /await resolve\(event, ctx\)/u;
 const IMPORTS_EXTENSION_RESOLVER =
   /import \{ github \} from "@github-tools\/eve-extension\/tools";/u;
 const DEFINES_A_TOOL = /\bdefineTool\s*\(/u;
@@ -114,6 +115,7 @@ describe("github extension tool gate", () => {
   it("forwards the extension's own resolver", () => {
     assert.match(overrideSource, IMPORTS_EXTENSION_RESOLVER);
     assert.match(overrideSource, FORWARDS_EXTENSION_RESOLVER);
+    assert.match(overrideSource, CALLS_EXTENSION_RESOLVER);
   });
 
   it("never rebuilds a tool, which would carry no durable descriptor", () => {
