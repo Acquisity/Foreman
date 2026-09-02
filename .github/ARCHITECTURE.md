@@ -24,7 +24,7 @@ Every clone, fetch, and push targets `https://github.com/<validated-owner>/<vali
 
 ## Factory lifecycle
 
-The ordered stations are classifier, investigator, analyst, implementer, and reviewer. The root investigates relevant production tools before planning and passes self-contained evidence to children. Task-mode children cannot park and receive only their authored tools and the shared sandbox.
+The ordered stations are classifier, investigator, analyst, implementer, and reviewer. The root investigates relevant production tools before planning and passes self-contained evidence to children. Task-mode children cannot park and receive only their authored tools and the shared sandbox. The vision sidecar narrows that further: it carries `read_image` alone, with eve's `bash`, `read_file`, `write_file`, `web_fetch`, `web_search`, and `todo` defaults disabled, so a delegation that names no image is answered rather than searched for.
 
 After the reviewer approves the exact pushed head and an existing Linear ticket is confirmed, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, and PR synchronizations drive revisions on the existing branch. Webhooks are the only trigger; there is no reconciliation schedule. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
 
