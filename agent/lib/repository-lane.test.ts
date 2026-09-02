@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
+import type { UserContent } from "ai";
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
 import {
@@ -155,7 +156,7 @@ describe("repositoryCapabilitiesAvailable", () => {
 });
 
 describe("eve channel repository selection", () => {
-  const eveAuth = (message: string) =>
+  const eveAuth = (message: UserContent) =>
     onMessage(
       {
         eve: {
@@ -188,6 +189,38 @@ describe("eve channel repository selection", () => {
       assert.equal(repositoryFromAuth(eveAuth(message)), null, message);
       assert.ok(!repositoryCapabilitiesAvailable(eveAuth(message)), message);
     }
+  });
+
+  it("reads only text parts of a structured message for repository selection", () => {
+    assert.equal(
+      repositoryFromAuth(
+        eveAuth([
+          {
+            data: "irrelevant",
+            filename: `https://github.com/${REPOSITORY}`,
+            mediaType: "text/plain",
+            type: "file",
+          },
+        ])
+      ),
+      null
+    );
+    assert.equal(
+      repositoryFromAuth(
+        eveAuth([
+          {
+            data: "x".repeat(100_000),
+            mediaType: "text/plain",
+            type: "file",
+          },
+          {
+            text: `work on https://github.com/${REPOSITORY}`,
+            type: "text",
+          },
+        ])
+      )?.slug,
+      REPOSITORY
+    );
   });
 });
 

@@ -57,7 +57,12 @@ const localDevUser: AuthFn<Request> = async (request) => {
  * repository and GitHub catalogs rather than until it asked for them.
  */
 const messageText = (message: string | UserContent): string =>
-  typeof message === "string" ? message : JSON.stringify(message);
+  typeof message === "string"
+    ? message
+    : message
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n");
 
 export const onMessage = (
   ctx: EveMessageContext,
