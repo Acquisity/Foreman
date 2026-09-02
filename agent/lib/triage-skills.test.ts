@@ -802,6 +802,18 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   assert.ok(checkpoint > createReport);
   assert.ok(handoff > checkpoint);
   assert.ok(bugHandoff.includes("The report must exist before the handoff"));
+  // Both `linear__save_issue` sites inherit the title rule stated with the claim.
+  assert.ok(
+    intercomTriageSkill.includes(
+      "This sentence, minus customer identifiers, is the title of any issue this skill creates."
+    ),
+    "issue title rule is stated once, before both creation points"
+  );
+  assert.ok(
+    intercomTriageSkill.indexOf(
+      "is the title of any issue this skill creates"
+    ) < intercomTriageSkill.indexOf("`linear__save_issue`")
+  );
   assert.ok(bugHandoff.includes("exactly one critic pass"));
   assert.ok(bugHandoff.includes("`engineering-handoff`"));
   assert.equal(intercomTriageSkill.split(STAGE_4_CHECKPOINT).length, 2);

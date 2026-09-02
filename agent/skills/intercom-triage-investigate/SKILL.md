@@ -35,7 +35,7 @@ Both lanes are valid in this channel. Never redirect between separate Slack chan
 
 ## Step 3: State the claim
 
-Write one testable sentence: what the customer says happened, what they expected instead, when it happened, and which workspace, campaign, record, component, or provider was involved. If one detail is missing, write the narrowest honest assumption and ask for that detail in parallel. Do not guess silently and do not wait to investigate the evidence already present.
+Write one testable sentence: what the customer says happened, what they expected instead, when it happened, and which workspace, campaign, record, component, or provider was involved. If one detail is missing, write the narrowest honest assumption and ask for that detail in parallel. Do not guess silently and do not wait to investigate the evidence already present. This sentence, minus customer identifiers, is the title of any issue this skill creates.
 
 ## Step 3A: Search investigation memory
 
@@ -111,7 +111,7 @@ For a User Error, Platform Limitation, or unproven verdict, call `record_investi
 
 Store only the sanitized pattern: never emails, organization or user ids, production rows, raw logs, attachments, or credentials.
 
-A failed write changes nothing about the ticket or verdict and is never announced in Slack.
+A failed write changes nothing about the ticket or verdict.
 
 ### Corrections from the thread
 
