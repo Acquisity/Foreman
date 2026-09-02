@@ -22,6 +22,7 @@ const NOTHING_ADMITTED = /eve admitted 0 of the 1 tools 'crm'/u;
 // The repository root, so a fixture's dynamic tool resolves through the same
 // bundled module map the repository's own manifest does.
 const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const OTHER_APP_ROOT = `${APP_ROOT}other`;
 
 const ENTRY = {
   eventNames: ["step.started"],
@@ -73,6 +74,10 @@ describe("eve dynamic tool adapter", () => {
     assert.notEqual(
       slack,
       dynamicToolCacheKey(ENTRY, APP_ROOT, session("autonomous-factory").id)
+    );
+    assert.notEqual(
+      slack,
+      dynamicToolCacheKey(ENTRY, OTHER_APP_ROOT, session("slack").id)
     );
     assert.notEqual(
       slack,
