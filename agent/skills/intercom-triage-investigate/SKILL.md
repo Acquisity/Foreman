@@ -6,7 +6,7 @@ description: "Investigate product reports and feedback from one live Intercom co
 
 Use this procedure for product reports and feedback arriving through the mapped Intercom Slack intake. The source is one live Intercom conversation. There is no Linear issue at the start.
 
-The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling`, which reviews and routes it exactly as it does a Linear ticket. Every other outcome stays in this skill and continues through Steps 7 to 9 without loading `triage-handling`.
+The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling` for review and routing. Every other outcome stays here for Steps 7–9, without `triage-handling`.
 
 ## Boundaries
 
@@ -95,13 +95,13 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 ### A confirmed Bug: create the report, then hand off
 
-The report must exist before the handoff: the shared review writes the investigation document against it and passes its id to the critic. Create it with one `linear__save_issue` on the Engineering Team: the canonical conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
+The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one `linear__save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
 Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. It runs Stages 5 to 7 unchanged: the incident hotlane, exactly one critic pass, the document, comment, project, roster, the ticket's one `route_ticket` call, `engineering-handoff` for the master, and the memory record. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
 
 ## Step 7: Decide whether a follow-up is warranted
 
-For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one `linear__save_issue` on the Engineering Team with the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
+For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one `linear__save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
 
 ## Step 8: Record the case
 
