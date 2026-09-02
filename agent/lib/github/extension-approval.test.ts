@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { pullRequestReadinessPolicy } from "./approval.js";
+import { GITHUB_TOOL_ALLOWLIST } from "./tool-allowlist.js";
 
 /**
  * The extension config is checked as source text, because the extension module
@@ -15,7 +16,8 @@ import { pullRequestReadinessPolicy } from "./approval.js";
  * session has nobody watching for one, so the run never finishes.
  */
 const REQUIRE_APPROVAL_FALSE = /requireApproval:\s*false/u;
-const MERGE_TOOL = /"\w*[Mm]erge\w*"/u;
+const MERGE_TOOL = /merge/iu;
+const INCLUDES_ALLOWLIST = /include:\s*\[\.\.\.GITHUB_TOOL_ALLOWLIST\]/u;
 const INTAKE_OVERRIDE =
   /createPullRequest:\s*\{\s*approval:\s*durableIntakeOnlyApproval\s*\}/u;
 const READINESS_OVERRIDE =
@@ -74,7 +76,10 @@ describe("github extension config", () => {
   });
 
   it("keeps merge tools out of the allowlist", () => {
-    assert.doesNotMatch(call, MERGE_TOOL);
+    assert.match(call, INCLUDES_ALLOWLIST);
+    for (const tool of GITHUB_TOOL_ALLOWLIST) {
+      assert.doesNotMatch(tool, MERGE_TOOL);
+    }
   });
 
   it("gates the readiness transition", () => {

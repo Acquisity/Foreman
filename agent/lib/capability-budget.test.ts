@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
 
 // prompts.ts, reached through the factory-pipeline skill, reads both connector
 // variables at module load (constants.ts). Nothing is contacted. Measuring a
@@ -348,7 +349,10 @@ describe("dynamic capability resolution", () => {
       FIXTURE,
       "repository-interactive"
     );
-    assert.equal(resolved.dynamicTools.length, 31);
+    assert.deepEqual(
+      new Set(resolved.dynamicTools.map((tool) => tool.name)),
+      new Set(GITHUB_TOOL_ALLOWLIST.map((name) => `github__${name}`))
+    );
     for (const tool of resolved.dynamicTools) {
       assert.equal(tool.source, "ext:github");
       assert.match(tool.name, GITHUB_TOOL_NAME);
@@ -543,7 +547,11 @@ describe("capability report", () => {
       );
       if (REPOSITORY_LANES.has(lane)) {
         assert.ok(github, `${lane} measures the GitHub tools`);
-        assert.equal(github.entries, 31, `${lane} counts every GitHub tool`);
+        assert.equal(
+          github.entries,
+          GITHUB_TOOL_ALLOWLIST.length,
+          `${lane} counts every GitHub tool`
+        );
         assert.ok(github.schemaChars > 0, `${lane} counts GitHub schemas`);
       } else {
         assert.equal(github, undefined, `${lane} carries no GitHub tools`);
@@ -611,7 +619,11 @@ describe("capability report", () => {
       ).length;
     for (const lane of REPOSITORY_LANES) {
       assert.equal(entries(lane, "tool", "tools/"), authoredToolModules, lane);
-      assert.equal(entries(lane, "tool", "ext:github"), 31, lane);
+      assert.equal(
+        entries(lane, "tool", "ext:github"),
+        GITHUB_TOOL_ALLOWLIST.length,
+        lane
+      );
     }
     for (const lane of CAPABILITY_LANES) {
       assert.equal(
