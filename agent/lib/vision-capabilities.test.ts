@@ -92,7 +92,9 @@ describe("vision capability surface", () => {
   });
 
   it("compiles to read_image and nothing else", {
-    skip: !HAS_COMPILED_MANIFEST,
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
   }, () => {
     const { disabledFrameworkTools, tools } = visionNode();
     assert.deepEqual(
