@@ -666,7 +666,7 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
     lines.push("", "## Ordinary Slack against repository-carrying lanes", "");
     for (const [lane, share] of shares) {
       lines.push(
-        `slack carries ${Math.round(share * 100)}% of the ${lane} catalog. The regression test in capability-budget.test.ts holds this share at or below its ceiling.`
+        `slack carries ${(share * 100).toFixed(1)}% of the ${lane} catalog. The regression test in capability-budget.test.ts holds this share at or below its ceiling.`
       );
     }
   }

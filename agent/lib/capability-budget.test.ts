@@ -491,9 +491,10 @@ const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
 const TOTALS_LINE =
   /catalog 70 characters \(about 18 tokens\), body 7 characters/u;
-const SHARE_LINE = /slack carries 50% of the repository-interactive catalog/u;
+const SHARE_LINE =
+  /slack carries 50\.0% of the repository-interactive catalog/u;
 const FACTORY_SHARE_LINE =
-  /slack carries 25% of the autonomous-factory catalog/u;
+  /slack carries 25\.0% of the autonomous-factory catalog/u;
 
 describe("capability report", () => {
   it("renders every lane with its totals", () => {
