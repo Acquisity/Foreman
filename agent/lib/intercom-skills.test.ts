@@ -201,7 +201,7 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
     "- Linear issue IDs, ticket numbers, statuses"
   );
   const intercomException = wording.indexOf(
-    "The one exception to Linear issue IDs: the final reply of an Intercom investigation ends with the bare ticket identifier on its own line"
+    "The one exception to Linear issue IDs and raw IDs: the final reply of an Intercom investigation ends with the bare ticket identifier on its own line"
   );
 
   assert.ok(linearProhibition >= 0);
