@@ -1,12 +1,12 @@
 ---
-description: "Investigate product reports and feedback from one live Intercom conversation before any Linear issue exists. Classify money versus product, search all live product-area investigation memory immediately after stating the claim, verify current code and production evidence, create customer report and root-cause Linear work only for a confirmed bug, and reply in Slack."
+description: "Investigate product reports and feedback from one live Intercom conversation before any Linear issue exists. Classify money versus product, search all live product-area investigation memory immediately after stating the claim, verify current code and production evidence, create the customer report for a confirmed bug and hand it to triage-handling for review and routing, and reply in Slack."
 ---
 
 # Intercom product and feedback investigation
 
 Use this procedure for product reports and feedback arriving through the mapped Intercom Slack intake. The source is one live Intercom conversation. There is no Linear issue at the start.
 
-The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. A customer report is the record of one conversation. A root-cause master is the engineering work. They are never the same issue.
+The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling`, which reviews and routes it exactly as it does a Linear ticket. Every other outcome ends here.
 
 ## Boundaries
 
@@ -93,95 +93,38 @@ A confirmed `Bug` requires all three:
 
 Missing any item means the claim is not a confirmed Bug yet.
 
-## Step 7: Decide whether Linear work is warranted
+### A confirmed Bug: create the report, then hand off
 
-Whenever this step creates a customer-report or Support/Product follow-up with `linear__save_issue`, its one `route_ticket` call carries `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]` along with its routing fields. This attaches the conversation to the Linear ticket as a resource so the Intercom and Linear integration can show the ticket's progress. Keeping the URL only in the issue description or investigation document does not create that relationship. Attach it to the customer ticket, never the shared root-cause master.
+The report must exist before the handoff: the shared review writes the investigation document against it and passes its id to the critic. Create it with one `linear__save_issue` on the Engineering Team: the canonical conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
-For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record; label and route it as support or feedback, never as a Bug or engineering master.
+Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. It runs Stages 5 to 7 unchanged: the incident hotlane, exactly one critic pass, the document, comment, project, roster, the ticket's one `route_ticket` call, `engineering-handoff` for the master, and the memory record. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
 
-For a confirmed Bug, complete all of the following before the final Slack reply:
+## Step 7: Decide whether a follow-up is warranted
 
-1. Determine the product project from the live conversation plus verified current code and data. Never select it from a memory analogy. If the area is missing or unmapped, create the customer report without a project, assign Aaron Fraga, state that routing needs a human, and skip final memory recording. `Support` is a recordable area for cases support closes without engineering, not a home for a confirmed Bug.
-2. Search current Linear masters no further than 30 days back. Call `find_related_issues` with `scope: "masters"` and the root-cause, code-path, provider-failure, and symptom phrasings. The Engineering Team, the 30-day window for this intake-only Slack session, and full pagination are fixed inside the tool; `createdAfter` in the result is the cutoff it applied, and `truncated` true means candidates were dropped, so narrow the phrasings. Do not filter by a presumed master label. Apply this cutoff before selecting a candidate as the current master or setting it as the new report's parent: a master created exactly 30 days ago is eligible, while one more than 30 days old, even by one second, is stale and cannot parent the new report. Reject stale candidates for current-master selection and parent attachment even when another issue relation, investigation memory, an unbounded search, or prior knowledge surfaces them. Among the eligible candidates, match on root cause, not merely the visible outcome.
-3. Create one customer-report issue on the Engineering Team with `linear__save_issue`: the Intercom conversation URL, bounded conversation context, and testable claim in the description. The report gets exactly one `route_ticket` call: the classification's `state`, `priority`, `project` when known, `addLabels` (`intercom-sourced` and `Customer reported`; an unknown label fails the call before anything is written, so retry once without every label it rejected), the Intercom `links` above, and the parent. When step 2 found an eligible master that owns the root cause, make that call now with `parent` and `inheritAssigneeFrom` set to it and the area owner as the `assignee` fallback. When it did not find such a master, hold the call until step 6 has created one, so the parent goes in with everything else instead of in a second write.
-4. Call `save_investigation_document` with `lane: "triage"`, the report identifier, and the full document; it creates the report's one `Triage investigation` document or rewrites it. Keep raw customer identity, production rows, queries, and conversation evidence only on this report document.
-5. If an eligible master owns the root cause, the report is already parented to it by step 3. Link the new report from the master, add only aggregate new evidence there, recount its blast radius, and reweigh its priority. The report link is the route to the Intercom URL and bounded context; do not copy customer-specific conversation details onto the root-cause master.
-6. If no qualifying master created within the last 30 days owns the cause, create one root-cause master, then make the report's single `route_ticket` call held over from step 3, with all of its routing fields plus `parent` set to the new master and `assignee` set to the area owner. Link the report from the master and give the master the area owner too. An older matching master may be related for history, but never reused as the parent. Keep the Intercom URL and bounded context on the customer report and its document. One root cause gets one current master, regardless of the number of reports or implementation steps.
-7. Add the short report comment with the unblock first, the plain-language cause, the affected-workspace count, and the investigation-document link.
-
-Priority is evidence-based: Urgent for outage, security, or data-loss risk; High for multiple organizations blocked, repeated core failure, or active money impact; Medium for a real single-organization defect; Low for limitations, cosmetic cases, or resolved triage. A workaround does not lower the defect's priority.
-
-The 30-day window keeps a master representative of a current report cluster and preserves real-time blast-radius visibility. Recency only narrows the candidate set; every similarity, evidence, product-area, and duplicate safeguard still applies.
-
-Use the existing area-routing roster:
-
-- AI SDR: Koppany Kondricz (`koppany.kondricz@acquisity.ai`)
-- Cold Email: Anthony Adewale (`anthony.adewale@acquisity.ai`)
-- Website Builder: James Keeble (`james.keeble@aiacquisition.com`)
-- Core Platform: Anuj Bhatt (`anuj.bhatt@acquisity.ai`), fallback James Keeble
-- CRM: Ebubeker Rexha (`ebubeker.rexha@acquisity.ai`)
-- Support: Aaron Fraga (`aaron.fraga@acquisity.ai`), never an engineer
-- Anything missing, ambiguous, unmapped, or sandboxed: Aaron Fraga (`aaron.fraga@acquisity.ai`)
+For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one `linear__save_issue` on the Engineering Team with the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
 
 ## Step 8: Record the case
 
-Every settled verdict is recorded exactly once, with or without a Linear issue. Support repeats the User Error and Platform Limitation answers most, so those are the cases worth remembering.
+Every settled verdict is recorded exactly once, with or without a Linear issue. A Bug is recorded by `triage-handling` Stage 7 under its ticket identifier once its review has settled; skip this step for it.
 
-For a confirmed Bug with a customer-report ticket, an attached final document, and an explicit mapped Linear project, call `record_investigation_case` with the ticket identifier as `sourceIssueId` and that ticket's project id. The ticket's project is the authority for the product area.
+For a User Error, Platform Limitation, or unproven verdict, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. A Support/Product follow-up is a human action, not the case; the key stays the conversation. Put the unblock in `resolution` in the product's own words. Ordinary feedback with no finding is not recorded.
 
-For a User Error, Platform Limitation, or unproven verdict with no ticket, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. Put the unblock in `resolution` in the product's own words, because that is what the next similar question needs. Ordinary feedback with no finding is not recorded.
-
-Store only the sanitized pattern: claim, root cause, resolution, stripped error signatures, code path and commit, ruled-out conclusions, stable evidence handles, counted impact with its date, and conversation, ticket, and document links. Never store emails, organization or user ids, production rows, raw logs, attachments, or credentials.
+Store only the sanitized pattern: never emails, organization or user ids, production rows, raw logs, attachments, or credentials.
 
 A failed write changes nothing about the ticket or verdict and is never announced in Slack.
 
 ### Corrections from the thread
 
-When a trusted colleague replies in the thread contradicting your conclusion, treat the correction as the final verdict, reply with the corrected guidance, and record it. Look up the existing case first by passing the same `sourceIssueId` the original write used to `search_investigation_memory`: the ticket identifier when the verdict was a ticketed Bug, `intercom:<conversation id>` otherwise. When you cannot tell which, look up both. If the lookup answers `available: false`, memory is down: skip the bookkeeping, the corrected reply still goes out. If an active case exists, call `correct_investigation_case` with the full corrected case under that same source id, what the colleague said as `correctionReason`, and the Slack thread permalink in `evidenceRefs`. If the lookup answered and found nothing, call `record_investigation_case` with the corrected conclusion and put your overturned conclusion in `ruledOut`, so the next search surfaces both the wrong theory and the right answer. Never soften the correction into the record.
+When a trusted colleague replies in the thread contradicting your conclusion, treat the correction as the final verdict, reply with the corrected guidance, and record it. Look up the existing case first by passing the same `sourceIssueId` the original write used to `search_investigation_memory`: the ticket identifier for a Bug, `intercom:<conversation id>` otherwise; when you cannot tell which, look up both. `available: false` means memory is down: skip the bookkeeping, the corrected reply still goes out. If an active case exists, call `correct_investigation_case` with the full corrected case under that same source id, what the colleague said as `correctionReason`, and the Slack thread permalink in `evidenceRefs`. If the lookup answered and found nothing, call `record_investigation_case` with the corrected conclusion and put your overturned conclusion in `ruledOut`. Never soften the correction into the record.
 
 ## Step 9: Reply in Slack
 
-Load `slack-wording` and follow the canonical final-post rule injected by the Slack channel boundary. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences.
+This is the one reply for every outcome, the one `triage-handling` Stage 7 calls for on a Bug included. Load `slack-wording` and follow the canonical final-post rule injected by the Slack channel boundary. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences.
 
 Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.
 
-Do not include assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status. Linear remains the internal handoff; Slack tells the requester what was found and what happens next.
+Do not include assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status.
 
 ## Triage investigation document
 
-```markdown
-# Triage investigation
-
-Ticket: <ENG-XXXX>
-Intercom source: <canonical conversation URL>
-Conversation context: <bounded summary sufficient to resume>
-Classification: <User Error | Platform Limitation | Bug>
-Organization: <organization_id> (<workspace name>)
-
-## Claim
-The one testable sentence.
-
-## Root cause
-The cause, not merely the mechanism.
-
-## Prior cases
-Each historical analogy, its product area, why it looked relevant, and what current evidence confirmed or disconfirmed it.
-
-## Evidence
-Every code, production-data, runtime, Intercom, and feedback lane, including lanes that could not run.
-
-## Blast radius
-Current exact counts or the tightest bound, with the query and count date.
-
-## Code path
-Files, functions, expected behavior, and commit.
-
-## Unblock
-What gets the customer working, who performs it, and whether it is complete.
-
-## Ruled out
-Configuration, limitations, duplicates, and other causes eliminated.
-
-## Next steps
-The required support or engineering action.
-```
+A Bug's document is written by `triage-handling` from the template in its `references/reporting.md`, with two header lines added under `**Organization**`: `**Intercom source**: <canonical conversation URL>` and `**Conversation context**: <bounded summary>`. Raw customer identity, production rows, queries, and conversation evidence stay on that report document. No other outcome writes a document.

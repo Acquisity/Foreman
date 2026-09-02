@@ -558,6 +558,14 @@ test("triage intake skill stays within its 15000-byte budget", () => {
   );
 });
 
+test("Intercom product skill stays within the 15000-byte intake budget", () => {
+  const intercomBytes = Buffer.byteLength(intercomTriageSkill, "utf8");
+  assert.ok(
+    intercomBytes <= 15_000,
+    `intercom-triage-investigate SKILL.md is ${intercomBytes} bytes, over the 15000-byte budget`
+  );
+});
+
 test("triage handling skill stays within its 20000-byte budget", () => {
   const handlingBytes = Buffer.byteLength(triageHandlingSkill, "utf8");
   assert.ok(
@@ -753,11 +761,6 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
       skill: handoffSkill,
       start: "1. Call `find_related_issues`",
     },
-    {
-      end: "\n3. Create one customer-report issue",
-      skill: intercomTriageSkill,
-      start: "2. Search current Linear masters no further than 30 days back.",
-    },
   ];
 
   for (const { end, skill, start } of skills) {
@@ -783,6 +786,56 @@ test("Slack product triage master searches enforce the 30-day cutoff", () => {
     assert.ok(skill.includes("product-area"));
     assert.ok(skill.includes("duplicate"));
   }
+});
+
+test("Intercom Bug path creates the report, then hands off to the shared stages", () => {
+  const bugHandoff = extractInstruction(
+    intercomTriageSkill,
+    "### A confirmed Bug: create the report, then hand off",
+    "## Step 7:"
+  );
+  const createReport = bugHandoff.indexOf("`linear__save_issue`");
+  const checkpoint = bugHandoff.indexOf(STAGE_4_CHECKPOINT);
+  const handoff = bugHandoff.indexOf("load `triage-handling`");
+
+  assert.ok(createReport >= 0);
+  assert.ok(checkpoint > createReport);
+  assert.ok(handoff > checkpoint);
+  assert.ok(bugHandoff.includes("The report must exist before the handoff"));
+  assert.ok(bugHandoff.includes("exactly one critic pass"));
+  assert.ok(bugHandoff.includes("`engineering-handoff`"));
+  assert.equal(intercomTriageSkill.split(STAGE_4_CHECKPOINT).length, 2);
+  assert.equal(
+    intercomTriageSkill.split("load `triage-handling`").length,
+    2,
+    "only the Bug branch loads triage-handling"
+  );
+  assert.ok(
+    intercomTriageSkill.indexOf("load `triage-handling`") <
+      intercomTriageSkill.indexOf("## Step 7:")
+  );
+
+  // Rules the shared skills own no longer have a second copy here.
+  for (const owned of [
+    '`scope: "masters"`',
+    "30 days",
+    "root-cause master, then",
+    "`parent`",
+    "`inheritAssigneeFrom`",
+    "Urgent for outage",
+    "area-routing roster",
+    "koppany.kondricz",
+    "anthony.adewale",
+    "ebubeker.rexha",
+    "anuj.bhatt",
+    "james.keeble",
+  ]) {
+    assert.equal(intercomTriageSkill.includes(owned), false, owned);
+  }
+  assert.ok(handoffSkill.includes('`scope: "masters"`'));
+  assert.ok(handoffSkill.includes("## Create one master"));
+  assert.ok(triageHandlingSkill.includes("### Set Linear priority"));
+  assert.ok(triageHandlingSkill.includes("### Area-routing roster"));
 });
 
 test("shared triage preserves unbounded master lookup outside Slack intake", () => {
