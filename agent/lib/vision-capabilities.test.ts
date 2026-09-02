@@ -41,8 +41,11 @@ const DISABLED = [
 // The nested subagent node, which capability-budget's own schema drops: it
 // measures the root's surface and needs only each subagent's name.
 const TS_EXTENSION = /\.ts$/u;
-const NO_GUESSING = /do not guess a path/u;
-const NO_URL_OR_PATH = /"no url or path was given"/u;
+// The whole conditional, trigger included: a malformed or non-Linear url is
+// not "no url or path at all", so it must reach read_image and surface
+// read_image's own error instead of this answer.
+const NO_IMAGE_REFUSAL =
+  /If the parent gave you no url or path at all, do not guess a path: answer that the image could not be read, leave `visible_text` empty, and put "no url or path was given" in `uncertainties`\./u;
 
 const visionNodeSchema = z.object({
   subagents: z.array(
@@ -87,8 +90,7 @@ describe("vision capability surface", () => {
       new URL("instructions.md", VISION_ROOT),
       "utf8"
     );
-    assert.match(instructions, NO_GUESSING);
-    assert.match(instructions, NO_URL_OR_PATH);
+    assert.match(instructions, NO_IMAGE_REFUSAL);
   });
 
   it("compiles to read_image and nothing else", {
