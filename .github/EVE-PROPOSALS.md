@@ -6,7 +6,7 @@ Gating and composition Foreman wants but eve cannot express today, with what was
 
 Checked against eve 0.44.0.
 
-An extension mount contributes tools, channels, connections, skills, schedules, subagents, instruction fragments, and hooks, and none of it can be resolved per session. Only the tool slot has a per-session form, and only because a consumer directory mount may replace a same-named contribution and a dynamic definition may replace a dynamic one.
+An extension mount contributes tools, channels, connections, skills, schedules, subagents, instruction fragments, and hooks, and the mount itself cannot be resolved per session. Individual contributions can be: tools, skills, instruction fragments, and subagents each have a `defineDynamic` form that resolves per session, while channels, connections, schedules, and hooks have none. Reaching one of an extension's own contributions from the consumer is narrower still, because it needs a consumer directory mount replacing a same-named contribution, and a dynamic definition may only replace a dynamic one.
 
 Shipped: `agent/extensions/github/tools/github.ts` replaces the extension's own `tools/github.ts` slot with a `defineDynamic` that returns the extension's own resolver behind `repositoryCapabilitiesAvailable`, and `null` otherwise. That is the whole GitHub surface today, because the extension contributes nothing else, so nothing is left ungated in practice. It would not be true of an extension that also contributed a skill or a schedule.
 
