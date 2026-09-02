@@ -6,7 +6,7 @@ description: "Investigate product reports and feedback from one live Intercom co
 
 Use this procedure for product reports and feedback arriving through the mapped Intercom Slack intake. The source is one live Intercom conversation. There is no Linear issue at the start.
 
-The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling`, which reviews and routes it exactly as it does a Linear ticket. Every other outcome ends here.
+The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling`, which reviews and routes it exactly as it does a Linear ticket. Every other outcome stays in this skill and continues through Steps 7 to 9 without loading `triage-handling`.
 
 ## Boundaries
 
