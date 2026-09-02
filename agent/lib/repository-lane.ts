@@ -40,6 +40,12 @@ import { selectedRepositorySlug } from "./repository-selection.js";
  * the repository tools nor the GitHub surface, on that turn or any later one.
  * eve re-resolves dynamic tools per step with the context active, so the
  * recorded selection turns the catalog on for the next step of the same turn.
+ * That holds only while every resolver behind this gate runs at
+ * `step.started`, the six repository tools under `agent/tools/` as much as the
+ * GitHub surface: eve resolves `turn.started` once, before the turn's first
+ * tool runs, which is before `prepare_repository` can have recorded anything.
+ * A resolver moved back to `turn.started` would answer null for the whole turn
+ * and leave the lane able to open a pull request it cannot push a branch for.
  *
  * The state read cannot be allowed to throw: eve drops a failed resolver's
  * whole result, which would take the entire GitHub surface down with it, so
