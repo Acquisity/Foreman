@@ -143,7 +143,9 @@ When a trusted colleague replies in the thread contradicting your conclusion, tr
 
 Load `slack-wording` and follow the canonical final-post rule injected by the Slack channel boundary. Reply only after required Linear writes succeed. Lead with the unblock, state the finding plainly, and give the opener the next action in one to three sentences.
 
-Do not include Linear identifiers, assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status. Linear remains the internal handoff; Slack tells the requester what was found and what happens next.
+Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.
+
+Do not include assignees, internal routing, code paths, SQL, raw logs, system names, customer identifiers, or memory status. Linear remains the internal handoff; Slack tells the requester what was found and what happens next.
 
 ## Triage investigation document
 

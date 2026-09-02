@@ -21,6 +21,8 @@ The Slack channel boundary injects the canonical final-post rule into every Slac
 - Offers, promises, or recommendations of an action by you, "we", Support, engineering, or the team: rebooking, refunds, re-runs, recovery, configuration changes, monitoring, follow-up, or ticket updates. Unless the investigation verified that the action exists, is safe for the customer, and has an authorized owner, say that no safe action was confirmed and name the fact still missing, without implying what will happen once it arrives. Naming a human team does not make an unverified action real, and a write that failed or never ran is never reported as done.
 - Instructions to follow updates elsewhere.
 
+The one exception to Linear issue IDs and raw IDs: the final reply of an Intercom investigation ends with the bare ticket identifier on its own line when that investigation created a ticket. Everything else in the list above still applies.
+
 If missing evidence materially limits the answer, name the product fact that remains unconfirmed, not the failed tool, connection, or database. If it does not change the answer or next step, omit it. Never claim evidence was checked when it was not.
 
 ## Verdict phrasing per classification

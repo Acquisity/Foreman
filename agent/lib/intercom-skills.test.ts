@@ -117,6 +117,100 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
   assert.ok(billingSkill.includes(linkAttachment));
 });
 
+test("Intercom skills close with a customer-ready reply and the identifier", () => {
+  const wording = readFileSync(
+    new URL("../skills/slack-wording/SKILL.md", import.meta.url),
+    "utf8"
+  );
+  const closingReplySection = (skill: string, followingHeading: string) => {
+    const start = skill.indexOf("## Step 9: Reply in Slack");
+    const end = skill.indexOf(followingHeading, start);
+
+    assert.ok(start >= 0, "Step 9");
+    assert.ok(end > start, followingHeading);
+    return skill.slice(start, end);
+  };
+  const productReply = closingReplySection(
+    productSkill,
+    "## Triage investigation document"
+  );
+  const billingReply = closingReplySection(
+    billingSkill,
+    "## Billing investigation document"
+  );
+
+  for (const skill of [productReply, billingReply]) {
+    for (const phrase of [
+      'a short block headed "Reply you can send"',
+      "no internal names and no system names",
+      "Omit it when the reply asks the requester for missing information",
+      'when the requester wrote "do not reply to the customer" or anything equivalent',
+      "when the verdict routes to engineering with no customer-facing answer yet",
+      "end the reply with that bare identifier alone on the last line",
+      "never a URL",
+      "when it created none, say nothing about a ticket",
+    ]) {
+      assert.ok(skill.includes(phrase), phrase);
+    }
+
+    const replyBlock = skill.indexOf(
+      'a short block headed "Reply you can send"'
+    );
+    const missingInformation = skill.indexOf(
+      "Omit it when the reply asks the requester for missing information"
+    );
+    const noCustomerReply = skill.indexOf(
+      'when the requester wrote "do not reply to the customer" or anything equivalent'
+    );
+    const engineeringRoute = skill.indexOf(
+      "when the verdict routes to engineering with no customer-facing answer yet"
+    );
+    const identifier = skill.indexOf(
+      "end the reply with that bare identifier alone on the last line"
+    );
+    const noTicket = skill.indexOf(
+      "when it created none, say nothing about a ticket"
+    );
+
+    assert.ok(replyBlock >= 0);
+    assert.ok(missingInformation > replyBlock);
+    assert.ok(noCustomerReply > missingInformation);
+    assert.ok(engineeringRoute > noCustomerReply);
+    assert.ok(identifier > engineeringRoute);
+    assert.ok(noTicket > identifier);
+  }
+
+  assert.ok(
+    billingReply.includes(
+      "One closing status reply after the investigation and any required Linear writes are complete."
+    )
+  );
+
+  assert.ok(!productSkill.includes("Do not include Linear identifiers"));
+  assert.ok(
+    productSkill.includes("Do not include assignees, internal routing")
+  );
+  assert.ok(!billingSkill.includes("ticket identifiers"));
+  assert.ok(
+    billingSkill.includes(
+      "Never mention Stripe, Autumn, internal system readouts, assignee names"
+    )
+  );
+
+  const linearProhibition = wording.indexOf(
+    "- Linear issue IDs, ticket numbers, statuses"
+  );
+  const intercomException = wording.indexOf(
+    "The one exception to Linear issue IDs and raw IDs: the final reply of an Intercom investigation ends with the bare ticket identifier on its own line"
+  );
+
+  assert.ok(linearProhibition >= 0);
+  assert.ok(intercomException > linearProhibition);
+  assert.ok(
+    wording.includes("- Internal dev names, assignees, project owners")
+  );
+});
+
 test("Intercom skills own their tool references", () => {
   assert.ok(
     productSkill.includes("[references/tools.md](references/tools.md)")
