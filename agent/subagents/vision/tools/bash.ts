@@ -9,6 +9,6 @@ import { disableTool } from "eve/tools";
  * whole dump re-sent on every following step. One production run reached 106
  * steps and 46 out-of-memory kills before it failed and left the parent Slack
  * turn hung. The station reads one image it was given a url or a path for, so
- * a shell is capability it never needs.
+ * a shell is a capability it never needs.
  */
 export default disableTool();
