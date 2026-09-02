@@ -1,10 +1,10 @@
 import githubExtension from "@github-tools/eve-extension";
-import { GITHUB_CONNECTOR } from "../lib/github/credentials.js";
+import { GITHUB_CONNECTOR } from "../../lib/github/credentials.js";
 import {
   durableIntakeOnlyApproval,
   durableModelOutput,
   durableReadinessApproval,
-} from "../lib/github/durable-callbacks.js";
+} from "../../lib/github/durable-callbacks.js";
 
 /**
  * GitHub tool surface for the orchestrator, mounted as an eve extension.

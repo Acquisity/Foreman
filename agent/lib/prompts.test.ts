@@ -31,7 +31,7 @@ const PROTECTED_CHECKOUTS = [
 
 /**
  * `github__` tools take `owner` and `repo` from the model, and nothing in
- * `agent/extensions/github.ts` rebinds them to the signed repository, so the
+ * `agent/extensions/github/extension.ts` rebinds them to the signed repository, so the
  * prompt must ask for the binding rather than promise it is enforced. The
  * clause names the two tools the model drives directly and stays silent about
  * the rest: `read_repository_knowledge`, `update_repository_knowledge`,

@@ -36,10 +36,28 @@ const MODEL_OUTPUT_TOOLS = [
 const DOC_ONLY_PHRASE = /load-bearing/u;
 
 const source = readFileSync(
-  new URL("../../extensions/github.ts", import.meta.url),
+  new URL("../../extensions/github/extension.ts", import.meta.url),
   "utf8"
 );
 const call = source.slice(source.indexOf("githubExtension({"));
+
+/**
+ * The consumer's override of the extension's own tool slot, which is the only
+ * place eve 0.44 lets a lane gate an extension's tools. It must forward the
+ * extension's resolver rather than build tools of its own: every callback the
+ * extension stamps lives in its bundled module, and eve drops the whole
+ * 31-tool map when one entry lacks a durable descriptor.
+ */
+const overrideSource = readFileSync(
+  new URL("../../extensions/github/tools/github.ts", import.meta.url),
+  "utf8"
+);
+const FORWARDS_EXTENSION_RESOLVER =
+  /const resolve = github\.events\["step\.started"\];/u;
+const IMPORTS_EXTENSION_RESOLVER =
+  /import \{ github \} from "@github-tools\/eve-extension\/tools";/u;
+const DEFINES_A_TOOL = /\bdefineTool\s*\(/u;
+const GATE_IMPORT = /repositoryCapabilitiesAvailable/u;
 
 const approvalFor = (toolInput: unknown) =>
   ({ toolInput, toolName: "updatePullRequest" }) as never;
@@ -89,6 +107,21 @@ describe("github extension config", () => {
       "durableModelOutput", // listPullRequestFiles
       "durableReadinessApproval", // updatePullRequest
     ]);
+  });
+});
+
+describe("github extension tool gate", () => {
+  it("forwards the extension's own resolver", () => {
+    assert.match(overrideSource, IMPORTS_EXTENSION_RESOLVER);
+    assert.match(overrideSource, FORWARDS_EXTENSION_RESOLVER);
+  });
+
+  it("never rebuilds a tool, which would carry no durable descriptor", () => {
+    assert.doesNotMatch(overrideSource, DEFINES_A_TOOL);
+  });
+
+  it("decides on the lane, not on model-readable content", () => {
+    assert.match(overrideSource, GATE_IMPORT);
   });
 });
 
