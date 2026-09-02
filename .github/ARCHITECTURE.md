@@ -13,10 +13,11 @@ Factory mode activates deterministically only for a trusted GitHub issue label m
 `agent/lib/repository.ts` validates repository slugs, extracts explicit targets, stamps signed channel context, derives literal remote URLs, and reads the prepared workspace marker.
 
 - GitHub hooks stamp the signed webhook repository as `github-webhook`; it is authoritative.
-- Slack and Linear stamp an explicit repository only when exactly one is present.
+- Slack, Linear, and eve stamp an explicit repository only when the message names exactly one, and only by full GitHub URL.
 - `prepare_repository` refuses missing, ambiguous, and conflicting targets. It reuses `/workspace` after GitHub channel checkout or clones to `/workspace/repo` at runtime.
 - An attended session may prepare a different validated repository later, and the checkout is replaced rather than the request refused. The old checkout is set aside to a tool-owned path first, so a clone that fails, times out, or is refused puts it back and keeps the marker it had. A rollback that itself fails clears the marker, and the session is left with no repository prepared. An interrupted switch is settled by the published checkout's own origin before either reuse or a switch trusts the marker. A signed GitHub checkout, an unattended run, and a checkout at `/workspace` are never replaced. A refreshed checkout reinstalls dependencies only when the repository's lockfile moved between the old and new HEAD, or when its install state is unknown. Every refusal returns `success: false` with the reason and leaves one bounded warning behind.
 - GitHub extension calls supply `owner` and `repo` explicitly. The extension has no fixed context.
+- The repository tools and the GitHub tool surface are resolved per lane by `agent/lib/repository-lane.ts`. A session with no selected repository, no repository prepared, and no factory path open to it carries neither; a repository-selected or factory lane carries both, and a session that prepares a repository at runtime carries them from the next step of that turn. `prepare_repository` and `rebuild_warm_snapshot` stay static, because the first is how a lane names a repository at all; the slug it records lives in `agent/lib/repository-selection.ts`. The gate is catalog composition, not authorization: trust, approval, the intake-only denials, and signed webhook binding are unchanged by it.
 - Analyst, investigator, implementer, and reviewer share the root sandbox. The reviewer checkout tool verifies and hard-resets to the exact pushed SHA.
 
 Every clone, fetch, and push targets `https://github.com/<validated-owner>/<validated-repo>.git` literally. Installation credentials are injected by `brokerPolicy` at the sandbox firewall and removed in `finally`. `validateBranch` rejects protected or non-plain branch names; it is the whole gate, so `push_branch` delivers a human branch name such as `afragahaha/eng-13319` unchanged. The `FOREMAN_BRANCH_PREFIX` branches are the factory's own, and the GitHub channel uses the prefix to recognize them for red-CI stabilization, which is ownership rather than permission.
@@ -34,7 +35,7 @@ Readiness requires all of: internal approval for the current head, passing requi
 - GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Label intake additionally checks the labeler's repository permission. Signed repository context is stamped before any model step.
 - Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the current mode.
 - Slack mentions are trusted by channel membership and have no factory default.
-- The Eve HTTP channel uses local dev or Vercel OIDC auth.
+- The Eve HTTP channel uses local dev or Vercel OIDC auth, and stamps factory intent and a single URL-named repository from the delivered message like the other interactive channels.
 
 `agent/lib/trust.ts` is the sole caller-trust authority. Autonomous runs are denied writes to shared repository knowledge, global model configuration, and write-capable non-GitHub connections. Trusted attended callers write directly; other callers receive approval prompts.
 

@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { readDocument } from "#lib/blob.js";
 import { resolveRepositoryInput } from "#lib/repository.js";
@@ -6,8 +6,9 @@ import {
   legacyFactoryBrainKey,
   repositoryKnowledgeKey,
 } from "#lib/repository-knowledge.js";
+import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 
-export default defineTool({
+export const readRepositoryKnowledgeTool = defineTool({
   description:
     "Read verified, durable knowledge for one explicitly selected repository. Falls back to that repository's legacy factory-brain document only when no new knowledge document exists.",
   async execute({ repository }, ctx) {
@@ -50,4 +51,24 @@ export default defineTool({
     }
   },
   inputSchema: z.object({ repository: z.string().min(3).max(220) }),
+});
+
+/**
+ * Absent from a lane with no repository selected and no factory path open to
+ * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * gates the catalog only, never authorization. The resolver runs at
+ * `step.started`, the same event the GitHub surface it is gated alongside
+ * runs at, because eve resolves `turn.started` once before the turn's first
+ * tool runs: a repository `prepare_repository` selects mid-turn has to
+ * restore this tool on the next step of that same turn, not only on the next
+ * message. The tool itself is the same object either way, so its callbacks
+ * keep the durable descriptors eve stamped on the `defineTool` call above.
+ */
+export default defineDynamic({
+  events: {
+    "step.started": (_event, ctx) =>
+      repositoryCapabilitiesAvailable(ctx.session.auth.current)
+        ? readRepositoryKnowledgeTool
+        : null,
+  },
 });

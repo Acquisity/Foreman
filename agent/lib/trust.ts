@@ -143,7 +143,7 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * `push_branch` tool only): trusted callers write repository knowledge and
  * model overrides directly and push without a card, everyone else parks on
  * one. The GitHub extension write tools (createPullRequest, addIssueComment,
- * etc.) are ungated for every caller only because `agent/extensions/github.ts`
+ * etc.) are ungated for every caller only because `agent/extensions/github/extension.ts`
  * sets `requireApproval: false`; the extension defaults to `always()` on every
  * write tool. New capabilities gate on this
  * predicate (or {@link isUnattended} / {@link isScheduleAppAuth}) rather than

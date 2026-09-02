@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { defineTool } from "eve/tools";
-import { z } from "zod";
 
 // prompts.ts, reached through the factory-pipeline skill, reads both connector
 // variables at module load (constants.ts). Nothing is contacted. Measuring a
@@ -15,12 +13,10 @@ process.env.PLANETSCALE_MCP_CONNECTOR =
   "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const {
-  admitDynamicTools,
   CAPABILITY_LANES,
   capabilitySource,
   COMPILED_MANIFEST_PATH,
   COMPILE_METADATA_PATH,
-  dynamicToolCacheKey,
   formatCapabilityBudget,
   laneAuth,
   measureCapabilityBudget,
@@ -48,9 +44,27 @@ const {
 const { repositoryFromAuth } = await import("./repository.js");
 
 const SECOND_PIPELINE = /second-pipeline/u;
-const UNRESOLVED_TOOL = /crm__crm/u;
-const NOTHING_ADMITTED = /eve admitted none of the tools 'crm'/u;
+const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
+
+/** The lanes `repositoryCapabilitiesAvailable` admits, of the four measured. */
+const REPOSITORY_LANES = new Set([
+  "repository-interactive",
+  "autonomous-factory",
+]);
+
+/**
+ * The authored tools gated with the GitHub surface. `prepare_repository` is
+ * deliberately not among them: it is how a lane selects a repository at all.
+ */
+const GATED_REPOSITORY_TOOLS = [
+  "checkout_branch",
+  "push_branch",
+  "read_pipeline_run",
+  "read_repository_knowledge",
+  "record_pipeline_run",
+  "update_repository_knowledge",
+];
 const SLACK_PRINCIPAL = /^slack:/u;
 
 // The repository root, so a fixture's dynamic tool resolves through the same
@@ -75,13 +89,15 @@ const FIXTURE = parseCapabilityManifest({
     },
   ],
   dynamicTools: [
+    // The consumer's override of the extension's own `tools/github.ts` slot,
+    // exactly as `eve info` compiles it: the mount namespace is still github,
+    // so the tools still reach the model as `github__*`.
     {
       eventNames: ["step.started"],
       extensionNamespace: "github",
-      logicalPath:
-        "../node_modules/@github-tools/eve-extension/dist/extension/tools/github.mjs",
+      logicalPath: "extensions/github/tools/github.ts",
       slug: "github__github",
-      sourceId: "ext:github:tools/github.mjs",
+      sourceId: "ext-override:github:tools/github.ts",
       sourceKind: "module",
     },
   ],
@@ -138,6 +154,12 @@ describe("capability source grouping", () => {
   it("groups by extension namespace or authored directory", () => {
     assert.equal(capabilitySource("tools/checkout_branch.ts"), "tools/");
     assert.equal(capabilitySource("skills/aa/SKILL.md"), "skills/");
+    // A directory-mounted override is the same extension, so it reports under
+    // the namespace the model sees rather than under a source of its own.
+    assert.equal(
+      capabilitySource("ext-override:github:tools/github.ts"),
+      "ext:github"
+    );
     assert.equal(capabilitySource("subagents/analyst"), "subagents/");
     assert.equal(
       capabilitySource("ext:browser:tools/click.mjs"),
@@ -284,7 +306,7 @@ describe("dynamic capability resolution", () => {
     );
   });
 
-  it("refuses a dynamic tool source it cannot resolve", async () => {
+  it("refuses a dynamic tool whose module is not in the bundle", async () => {
     const manifest = parseCapabilityManifest({
       ...MANIFEST_HEADER,
       dynamicTools: [
@@ -304,38 +326,11 @@ describe("dynamic capability resolution", () => {
     );
   });
 
-  it("refuses to count a dynamic tool map eve would drop", async () => {
-    // eve stamps a durable descriptor on a callback only when it bundles the
-    // authored module, so every callback in this test process is bare, the
-    // way a policy handed to the GitHub extension's `overrides` from anywhere
-    // but durable-callbacks.ts is in a deployment. eve's own dispatch rejects
-    // the entry, drops the resolver's whole result, and the measurement must
-    // fail rather than count the tool as model-visible.
-    const resolver = {
-      eventNames: ["step.started"],
-      events: {
-        "step.started": () => ({
-          lookup: defineTool({
-            description: "Look a record up.",
-            execute: () => null,
-            inputSchema: z.object({ id: z.string() }),
-          }),
-        }),
-      },
-      extensionNamespace: "crm",
-      logicalPath: "../node_modules/crm/tools/crm.mjs",
-      slug: "crm",
-      sourceId: "ext:crm:tools/crm.mjs",
-      sourceKind: "module" as const,
-    };
-    await assert.rejects(
-      admitDynamicTools(resolver, "slack", "ext:crm"),
-      NOTHING_ADMITTED
-    );
-  });
-
   it("resolves the GitHub extension's model-visible tools", async () => {
-    const resolved = await resolveLaneCapabilities(FIXTURE, "slack");
+    const resolved = await resolveLaneCapabilities(
+      FIXTURE,
+      "repository-interactive"
+    );
     assert.equal(resolved.dynamicTools.length, 31);
     for (const tool of resolved.dynamicTools) {
       assert.equal(tool.source, "ext:github");
@@ -345,36 +340,33 @@ describe("dynamic capability resolution", () => {
     }
   });
 
+  it("resolves no GitHub tools for a lane with no repository need", async () => {
+    // The gate lives in `agent/extensions/github/tools/github.ts`; this is the
+    // runtime proof that eve's own dispatch carries nothing for that lane, not
+    // that the measurement declined to look.
+    const lanes = ["slack", "slack-intake-only"] as const;
+    const resolved = await Promise.all(
+      lanes.map((lane) => resolveLaneCapabilities(FIXTURE, lane))
+    );
+    for (const [index, lane] of lanes.entries()) {
+      assert.deepEqual(
+        resolved[index]?.dynamicTools,
+        [],
+        `${lane} GitHub tools`
+      );
+    }
+  });
+
   it("does not reuse dynamic tools across application roots", async () => {
-    await resolveLaneCapabilities(FIXTURE, "slack");
+    await resolveLaneCapabilities(FIXTURE, "repository-interactive");
     const otherApp = parseCapabilityManifest({
       ...FIXTURE,
       appRoot: fileURLToPath(
         new URL("../../missing-capability-budget-app", import.meta.url)
       ),
     });
-    await assert.rejects(resolveLaneCapabilities(otherApp, "slack"));
-  });
-
-  it("keys dynamic tools by lane and complete entry identity", () => {
-    const [entry] = FIXTURE.dynamicTools;
-    assert.ok(entry);
-    const slack = dynamicToolCacheKey(entry, APP_ROOT, "slack");
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey(entry, APP_ROOT, "autonomous-factory")
-    );
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey({ ...entry, exportName: "other" }, APP_ROOT, "slack")
-    );
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey(
-        { ...entry, extensionNamespace: "other" },
-        APP_ROOT,
-        "slack"
-      )
+    await assert.rejects(
+      resolveLaneCapabilities(otherApp, "repository-interactive")
     );
   });
 
@@ -506,14 +498,19 @@ describe("capability report", () => {
           `${lane} measures ${kind} characters`
         );
       }
-      // The GitHub surface is resolved, not reported as unknown, and every
-      // subagent carries its framework-lowered delegation schema.
+      // The GitHub surface is resolved, not reported as unknown, and only
+      // where the lane needs it. Every subagent carries its
+      // framework-lowered delegation schema in every lane.
       const github = budget.rows.find(
         (row) => row.kind === "tool" && row.source === "ext:github"
       );
-      assert.ok(github, `${lane} measures the GitHub tools`);
-      assert.equal(github.entries, 31, `${lane} counts every GitHub tool`);
-      assert.ok(github.schemaChars > 0, `${lane} counts GitHub schemas`);
+      if (REPOSITORY_LANES.has(lane)) {
+        assert.ok(github, `${lane} measures the GitHub tools`);
+        assert.equal(github.entries, 31, `${lane} counts every GitHub tool`);
+        assert.ok(github.schemaChars > 0, `${lane} counts GitHub schemas`);
+      } else {
+        assert.equal(github, undefined, `${lane} carries no GitHub tools`);
+      }
       for (const row of budget.rows.filter(
         (entry) => entry.kind === "subagent"
       )) {
@@ -525,10 +522,27 @@ describe("capability report", () => {
     const repository = byLane.get("repository-interactive");
     const factory = byLane.get("autonomous-factory");
     assert.ok(slack && intake && repository && factory);
-    // The one catalog difference the authored configuration makes today: the
-    // factory skill, which only the repository-selected lane is offered.
-    assert.ok(repository.catalogChars > slack.catalogChars);
+    // The lane matrix, read off the repository's own compiled manifest. The
+    // two Slack lanes with no repository need carry neither the GitHub surface
+    // nor the gated repository tools; both lanes that do carry both, and the
+    // repository-selected lane additionally carries the factory skill.
+    const authoredTools = (lane: (typeof CAPABILITY_LANES)[number]) =>
+      byLane
+        .get(lane)
+        ?.rows.find((row) => row.kind === "tool" && row.source === "tools/")
+        ?.entries ?? 0;
     assert.equal(slack.catalogChars, intake.catalogChars);
-    assert.equal(slack.catalogChars, factory.catalogChars);
+    assert.ok(repository.catalogChars > slack.catalogChars);
+    assert.ok(factory.catalogChars > slack.catalogChars);
+    assert.ok(repository.catalogChars > factory.catalogChars);
+    assert.equal(
+      authoredTools("repository-interactive"),
+      authoredTools("autonomous-factory")
+    );
+    assert.equal(authoredTools("slack"), authoredTools("slack-intake-only"));
+    assert.equal(
+      authoredTools("repository-interactive") - authoredTools("slack"),
+      GATED_REPOSITORY_TOOLS.length
+    );
   });
 });

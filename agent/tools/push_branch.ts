@@ -1,6 +1,6 @@
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { deliveryPolicy } from "#lib/github/approval.js";
 import { githubCredentials } from "#lib/github/credentials.js";
@@ -15,6 +15,7 @@ import {
   remoteUrl,
   repositoryFromAuth,
 } from "#lib/repository.js";
+import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
 
 /**
@@ -115,10 +116,30 @@ export const pushPreparedBranch = async (
   }
 };
 
-export default defineTool({
+export const pushBranchTool = defineTool({
   approval: deliveryPolicy,
   description:
     "Push a committed feature branch from the prepared repository for direct work. Protected branches are refused and the validated literal GitHub URL is used.",
   execute: ({ branch }, ctx) => pushPreparedBranch(branch, ctx),
   inputSchema: z.object({ branch: z.string().min(1) }),
+});
+
+/**
+ * Absent from a lane with no repository selected and no factory path open to
+ * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * gates the catalog only, never authorization. The resolver runs at
+ * `step.started`, the same event the GitHub surface it is gated alongside
+ * runs at, because eve resolves `turn.started` once before the turn's first
+ * tool runs: a repository `prepare_repository` selects mid-turn has to
+ * restore this tool on the next step of that same turn, not only on the next
+ * message. The tool itself is the same object either way, so its callbacks
+ * keep the durable descriptors eve stamped on the `defineTool` call above.
+ */
+export default defineDynamic({
+  events: {
+    "step.started": (_event, ctx) =>
+      repositoryCapabilitiesAvailable(ctx.session.auth.current)
+        ? pushBranchTool
+        : null,
+  },
 });
