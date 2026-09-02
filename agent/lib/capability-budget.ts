@@ -568,6 +568,34 @@ export async function measureCapabilityBudget(
   });
 }
 
+/**
+ * Characters per token used for the estimates the report prints.
+ *
+ * @remarks
+ * A deliberate approximation: the catalog is English descriptions and JSON
+ * schemas, which current tokenizers encode at roughly this density. No
+ * tokenizer is installed, and estimating with one would tie the number to one
+ * provider. The character counts are the measurement; the token figure only
+ * makes them legible.
+ */
+export const CHARS_PER_TOKEN_ESTIMATE = 4;
+
+/** The approximate tokens a character count costs on each model call. */
+export const estimateTokens = (chars: number): number =>
+  Math.ceil(chars / CHARS_PER_TOKEN_ESTIMATE);
+
+/** Ordinary Slack's catalog as a share of a repository-carrying lane's. */
+export const ordinarySlackShare = (
+  budgets: readonly LaneBudget[],
+  againstLane: CapabilityLane = "repository-interactive"
+): number | null => {
+  const chars = (lane: CapabilityLane) =>
+    budgets.find((budget) => budget.lane === lane)?.catalogChars;
+  const slack = chars("slack");
+  const repositoryLane = chars(againstLane);
+  return slack === undefined || !repositoryLane ? null : slack / repositoryLane;
+};
+
 const COLUMNS = [
   "kind",
   "source",
@@ -610,8 +638,11 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
     "Catalog characters ride every turn: names, descriptions, and input",
     "schemas, including the tools an extension resolves at runtime and the",
     "delegation schema eve lowers onto every subagent. Body characters are",
-    "skill markdown, appended only when the model loads that skill. eve's own",
-    "built-in tools are identical in every lane and are not measured here.",
+    "skill markdown, appended only when the model loads that skill. Token",
+    `figures divide characters by ${CHARS_PER_TOKEN_ESTIMATE} and are estimates. eve's own built-in`,
+    "tools are identical in every lane and are not measured here; they and the",
+    "other framework-owned catalogs no lane can shed are listed in",
+    ".github/EVE-PROPOSALS.md.",
   ];
   for (const budget of budgets) {
     lines.push(
@@ -620,8 +651,24 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
       "",
       ...renderTable(budget.rows.map(rowCells)),
       "",
-      `catalog ${budget.catalogChars} characters, body ${budget.bodyChars} characters`
+      `catalog ${budget.catalogChars} characters (about ${estimateTokens(budget.catalogChars)} tokens), body ${budget.bodyChars} characters`
     );
+  }
+  const repositoryLanes = [
+    "repository-interactive",
+    "autonomous-factory",
+  ] as const;
+  const shares = repositoryLanes.flatMap((lane) => {
+    const share = ordinarySlackShare(budgets, lane);
+    return share === null ? [] : [[lane, share] as const];
+  });
+  if (shares.length > 0) {
+    lines.push("", "## Ordinary Slack against repository-carrying lanes", "");
+    for (const [lane, share] of shares) {
+      lines.push(
+        `slack carries ${(share * 100).toFixed(1)}% of the ${lane} catalog. The regression test in capability-budget.test.ts holds this share at or below its ceiling.`
+      );
+    }
   }
   return lines.join("\n");
 }

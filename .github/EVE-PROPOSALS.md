@@ -27,3 +27,23 @@ Proposal: let a dynamic resolver returning `null` for a name suppress a same-nam
 Checked against eve 0.44.0.
 
 `defineDynamic` in a subagent's `agent.ts` does support per-session availability, so this is expressible. It is recorded here only as the not-yet-done half of the same question: the eight subagents cost about 8,000 catalog characters in every lane, and the five factory stations are useless outside a factory lane. Doing it needs the child-session auth contract checked first, which is its own ticket.
+
+The delegation input schema itself is not expressible. eve lowers one fixed schema onto every subagent tool, 579 characters each and 4,632 across the eight, read from `getSubagentToolInputJsonSchema` in eve's subagent registry. An authored subagent cannot shorten or replace it, so the only authored lever on that cost is gating the subagent.
+
+Proposal: let a subagent declare a narrower delegation schema, or let eve drop the optional fields a persistent-session-less agent never uses.
+
+## 4. Gate a static extension tool per session without one slot per tool
+
+Checked against eve 0.44.0. Recorded by ENG-13325 after the capability budget was remeasured.
+
+The browser extension contributes 21 static tools, 11,828 catalog characters, to every lane, and after the repository-lane gate they are the largest catalog ordinary Slack still carries. eve's per-slot override is the only gate: each of the 21 would need its own `agent/extensions/browser/tools/<name>.ts` carrying a `defineDynamic` that returns the extension's tool object behind an availability check, and the extension's instructions fragment, being additive, would stay in every lane regardless. That is section 1 again, at 21 files instead of one, and it is not attempted. Ordinary Slack is also the lane that uses the browser, for attended investigation and demo recording, so there is no lane today that could shed it without losing capability; this is a framework cost, not a gating omission.
+
+Proposal: the mount-level availability resolver of section 1, which would gate all 21 tools and the instructions fragment together.
+
+## 5. Gate eve's built-in tools per session
+
+Checked against eve 0.44.0.
+
+eve's default tools (`bash`, `read_file`, `web_fetch`, and the rest) are gated only globally: a `disableTool()` sentinel in `agent/tools/<slug>.ts` removes one for every session, which is how `agent` and `ask_question` are removed today. There is no per-session form, and the built-in catalog is outside the compiled manifest, so `pnpm report:capabilities` does not measure it. Every lane carries the same built-in set by construction.
+
+Proposal: accept a `defineDynamic` in a built-in tool's slot that returns the default or `null` per session, matching what authored and extension slots already allow.
