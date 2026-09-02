@@ -15,6 +15,7 @@ import {
   resolveRepository,
   resolveRepositoryInput,
 } from "#lib/repository.js";
+import { rememberSelectedRepository } from "#lib/repository-selection.js";
 import {
   findWarmRepository,
   type WarmRepository,
@@ -837,6 +838,7 @@ export const prepareRepositoryWorkspace = async (
     : null;
   const current = { repository: target.slug, source: target.source };
   if (previous && previous.slug.toLowerCase() === target.slug.toLowerCase()) {
+    rememberSelectedRepository(target.slug);
     return {
       current,
       previous: from,
@@ -879,6 +881,10 @@ export const prepareRepositoryWorkspace = async (
   if (previous) {
     await discardPath(sandbox, PREVIOUS_PATH, timeoutMs);
   }
+  // The marker is written; the catalog gate can only read session state, so
+  // the slug is recorded there too. Nothing else changes: a refusal above
+  // never reaches here, so a session that failed to prepare records nothing.
+  rememberSelectedRepository(target.slug);
   return {
     current,
     previous: from,

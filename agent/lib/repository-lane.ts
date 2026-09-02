@@ -1,6 +1,7 @@
 import type { SessionAuthContext } from "eve/context";
 import { factorySkillAvailable } from "./factory-lane.js";
 import { repositoryFromAuth } from "./repository.js";
+import { selectedRepositorySlug } from "./repository-selection.js";
 
 /**
  * Whether a session lane carries the repository tools and the GitHub tool
@@ -18,26 +19,41 @@ import { repositoryFromAuth } from "./repository.js";
  * extension alone is 31 tools and about a fifth of the model-visible catalog.
  *
  * The decision reads stamps the dispatching channel applied to the signed
- * event, never model-readable content, because a dynamic tool resolver is
- * handed an empty `ctx.messages`. Every interactive channel restamps its auth
- * on each delivery, so a later message naming a repository turns the catalog
- * on for the next turn without restarting the session.
+ * event, and durable session state Foreman's own tool wrote, never
+ * model-readable content: a dynamic tool resolver is handed an empty
+ * `ctx.messages`. Every interactive channel restamps its auth on each
+ * delivery, so a later message naming a repository turns the catalog on for
+ * the next turn without restarting the session.
  *
- * A lane qualifies when it has a selected repository, or when it could take
- * the factory path at all. The second clause is not redundant: the factory
- * skill is offered on explicit intent alone, and a lane that can load the
- * station procedure has to be able to run it. Reusing
- * {@link factorySkillAvailable} rather than restating its conditions also
- * keeps the intake-only rule in one place, where explicit intent counts only
- * from a trusted caller.
+ * A lane qualifies when it has a selected repository, when it could take the
+ * factory path at all, or when it has actually prepared a repository. The
+ * second clause is not redundant: the factory skill is offered on explicit
+ * intent alone, and a lane that can load the station procedure has to be able
+ * to run it. Reusing {@link factorySkillAvailable} rather than restating its
+ * conditions also keeps the intake-only rule in one place, where explicit
+ * intent counts only from a trusted caller.
  *
- * Deliberately not gated: `prepare_repository` is the door. A bare
- * `owner/repo` token in free text stamps no repository (see
- * `extractRepositoryUrls`), so the model reads the slug out of the request and
- * passes it to that tool, and the tool has to be there for it to do so.
+ * The third clause is the one that makes the door worth leaving open. A bare
+ * `owner/repo` slug in free text stamps no repository (see
+ * `extractRepositoryUrls`), so a Slack request to open a pull request in a
+ * repository named that way used to prepare the checkout and then find neither
+ * the repository tools nor the GitHub surface, on that turn or any later one.
+ * eve re-resolves dynamic tools per step with the context active, so the
+ * recorded selection turns the catalog on for the next step of the same turn.
+ *
+ * The state read cannot be allowed to throw: eve drops a failed resolver's
+ * whole result, which would take the entire GitHub surface down with it, so
+ * {@link selectedRepositorySlug} degrades to null and this falls back to the
+ * auth-only answer.
+ *
+ * Deliberately not gated: `prepare_repository` is the door, and the tool has
+ * to be there for the model to pass it the slug it read out of the request.
  * `rebuild_warm_snapshot` is warm-up operations rather than work on a selected
  * repository, and needs none.
  */
 export const repositoryCapabilitiesAvailable = (
   auth: SessionAuthContext | null
-): boolean => repositoryFromAuth(auth) !== null || factorySkillAvailable(auth);
+): boolean =>
+  repositoryFromAuth(auth) !== null ||
+  factorySkillAvailable(auth) ||
+  selectedRepositorySlug() !== null;

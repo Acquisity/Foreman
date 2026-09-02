@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
+import type { SandboxSession } from "eve/sandbox";
+import { evePackageUrl } from "./eve-dynamic-tools.js";
 import { stampFactoryIntent } from "./factory-lane.js";
+import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { repositoryFromAuth, stampRepository } from "./repository.js";
 import { repositoryCapabilitiesAvailable } from "./repository-lane.js";
+import { selectedRepositorySlug } from "./repository-selection.js";
 import { githubFactoryAuth, slackSessionAuth } from "./session-auth.js";
 
 // prompts.ts, reached through the factory-pipeline skill, reads both connector
@@ -180,6 +184,142 @@ describe("eve channel repository selection", () => {
       assert.equal(repositoryFromAuth(eveAuth(message)), null, message);
       assert.ok(!repositoryCapabilitiesAvailable(eveAuth(message)), message);
     }
+  });
+});
+
+/**
+ * eve's own context storage, reached by path the way `eve-dynamic-tools.ts`
+ * reaches eve's dynamic-tool runtime: none of it is on eve's package exports
+ * map, and a measurement that faked the scope would prove nothing about the
+ * scope eve actually runs a tool and a `step.started` resolver in. The storage
+ * itself lives on `globalThis`, so this shares the one the running eve uses.
+ */
+interface EveContextModule {
+  ContextContainer: new () => unknown;
+  contextStorage: { run: <T>(store: unknown, run: () => T) => T };
+}
+
+const { ContextContainer, contextStorage } = (await import(
+  new URL("./dist/src/context/container.js", evePackageUrl()).href
+)) as EveContextModule;
+
+/** Runs `body` inside one fresh eve context, as eve runs one session's turn. */
+const inSession = <T>(body: () => T): T =>
+  contextStorage.run(new ContextContainer(), body);
+
+/**
+ * A sandbox whose `/workspace` is already the repository, so preparing it
+ * clones nothing: what is under test is what a successful preparation records,
+ * not how the checkout arrived.
+ */
+const workspaceSandbox = () =>
+  ({
+    readTextFile: () => Promise.resolve(null),
+    run: ({ command }: { command: string }) =>
+      Promise.resolve({
+        exitCode: 0,
+        stderr: "",
+        stdout: command.includes("rev-parse --show-toplevel")
+          ? "/workspace"
+          : "",
+      }),
+    setNetworkPolicy: () => Promise.resolve(),
+    writeTextFile: () => Promise.resolve(),
+  }) as unknown as SandboxSession;
+
+const prepare = async (auth: SessionAuthContext, repository: string) => {
+  const { prepareRepositoryWorkspace } = await import(
+    "../tools/prepare_repository.js"
+  );
+  return await prepareRepositoryWorkspace(repository, {
+    getSandbox: () => Promise.resolve(workspaceSandbox()),
+    session: { auth: { current: auth } },
+  });
+};
+
+const pushApproval = (current: SessionAuthContext) =>
+  ({
+    session: { auth: { current } },
+    toolName: "push_branch",
+  }) as unknown as Parameters<typeof deliveryPolicy>[0];
+
+const createPullRequestApproval = (current: SessionAuthContext) =>
+  ({
+    session: { auth: { current } },
+    toolName: "github__createPullRequest",
+  }) as unknown as Parameters<typeof intakeOnlyPolicy>[0];
+
+describe("a repository prepared at runtime", () => {
+  it("turns the surface on for the rest of the same turn", async () => {
+    // The regression this pins: Slack stamps a repository only from a full
+    // GitHub URL, so "open a PR in the foreman repo" arrives with nothing
+    // stamped. The model reads the slug, calls the ungated prepare_repository,
+    // and used to get the checkout and neither the repository tools nor the
+    // GitHub surface. eve re-resolves dynamic tools per step with the context
+    // active, so recording the selection is enough for the next step.
+    const auth = slack({ intakeOnly: false });
+    assert.ok(!repositoryCapabilitiesAvailable(auth));
+    await inSession(async () => {
+      assert.equal(selectedRepositorySlug(), null);
+      const result = await prepare(auth, REPOSITORY);
+      assert.equal(result.success, true);
+      assert.equal(selectedRepositorySlug(), REPOSITORY);
+      assert.ok(repositoryCapabilitiesAvailable(auth));
+    });
+  });
+
+  it("widens the catalog in an intake-only channel without widening delivery", async () => {
+    // The one place a wider catalog must not become a wider permission:
+    // investigating a repository from an intake-only thread is the point, and
+    // delivering from one is denied whatever the catalog carries.
+    const auth = slack({ intakeOnly: true });
+    await inSession(async () => {
+      assert.equal((await prepare(auth, REPOSITORY)).success, true);
+      assert.ok(repositoryCapabilitiesAvailable(auth));
+      for (const status of [
+        deliveryPolicy(pushApproval(auth)),
+        intakeOnlyPolicy(pushApproval(auth)),
+        intakeOnlyPolicy(createPullRequestApproval(auth)),
+      ]) {
+        assert.equal(typeof status === "object" && status.type, "denied");
+      }
+    });
+  });
+
+  it("leaves a signed webhook session bound to the repository it was signed for", async () => {
+    const signed = stampRepository(GITHUB_AUTH, REPOSITORY, "github-webhook");
+    await inSession(async () => {
+      // A signed session cannot switch, so the state never disagrees with the
+      // signature; even if it did, authority is read from the auth alone.
+      const refused = await prepare(signed, "Acquisity/Other");
+      assert.equal(refused.success, false);
+      assert.equal(selectedRepositorySlug(), null);
+      assert.equal(repositoryFromAuth(signed)?.slug, REPOSITORY);
+      assert.equal(repositoryFromAuth(signed)?.source, "github-webhook");
+      assert.ok(repositoryCapabilitiesAvailable(signed));
+    });
+  });
+
+  it("answers from the auth alone when the state is unreadable", () => {
+    // Outside a context every state call throws, which is exactly what a
+    // resolver eve dispatches without one would hit. A resolver that threw
+    // would lose its whole result and take all 31 GitHub tools with it, so
+    // both accessors swallow and the gate falls back to what auth says.
+    assert.equal(selectedRepositorySlug(), null);
+    assert.ok(!repositoryCapabilitiesAvailable(slack({ intakeOnly: false })));
+    assert.ok(
+      repositoryCapabilitiesAvailable(
+        stampRepository(SLACK_AUTH, REPOSITORY, "explicit")
+      )
+    );
+  });
+
+  it("records nothing outside a session, and never throws trying", async () => {
+    const { rememberSelectedRepository } = await import(
+      "./repository-selection.js"
+    );
+    assert.doesNotThrow(() => rememberSelectedRepository(REPOSITORY));
+    assert.equal(selectedRepositorySlug(), null);
   });
 });
 
