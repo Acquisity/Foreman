@@ -144,7 +144,9 @@ Load `slack-wording`. The Slack surface may contain only:
 1. Batched clarifying questions, when needed.
 2. One closing status reply after the Linear ticket and document exist.
 
-State what happened, what needs a human decision, and who must act in plain language. Never mention Stripe, Autumn, internal system readouts, ticket identifiers, assignee names, raw customer identifiers, or a promise to move money.
+State what happened, what needs a human decision, and who must act in plain language. Never mention Stripe, Autumn, internal system readouts, assignee names, raw customer identifiers, or a promise to move money.
+
+Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.
 
 ## Billing investigation document
 

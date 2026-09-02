@@ -117,6 +117,49 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
   assert.ok(billingSkill.includes(linkAttachment));
 });
 
+test("Intercom skills close with a customer-ready reply and the identifier", () => {
+  const wording = readFileSync(
+    new URL("../skills/slack-wording/SKILL.md", import.meta.url),
+    "utf8"
+  );
+
+  for (const skill of [productSkill, billingSkill]) {
+    for (const phrase of [
+      'a short block headed "Reply you can send"',
+      "no internal names and no system names",
+      "Omit it when the reply asks the requester for missing information",
+      'when the requester wrote "do not reply to the customer" or anything equivalent',
+      "when the verdict routes to engineering with no customer-facing answer yet",
+      "end the reply with that bare identifier alone on the last line",
+      "never a URL",
+      "when it created none, say nothing about a ticket",
+    ]) {
+      assert.ok(skill.includes(phrase), phrase);
+    }
+  }
+
+  assert.ok(!productSkill.includes("Do not include Linear identifiers"));
+  assert.ok(
+    productSkill.includes("Do not include assignees, internal routing")
+  );
+  assert.ok(!billingSkill.includes("ticket identifiers"));
+  assert.ok(
+    billingSkill.includes(
+      "Never mention Stripe, Autumn, internal system readouts, assignee names"
+    )
+  );
+
+  assert.ok(
+    wording.includes(
+      "The one exception to Linear issue IDs: the final reply of an Intercom investigation ends with the bare ticket identifier on its own line"
+    )
+  );
+  assert.ok(wording.includes("- Linear issue IDs, ticket numbers, statuses"));
+  assert.ok(
+    wording.includes("- Internal dev names, assignees, project owners")
+  );
+});
+
 test("Intercom skills own their tool references", () => {
   assert.ok(
     productSkill.includes("[references/tools.md](references/tools.md)")
