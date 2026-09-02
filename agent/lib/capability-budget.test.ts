@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { defineTool } from "eve/tools";
-import { z } from "zod";
 
 // prompts.ts, reached through the factory-pipeline skill, reads both connector
 // variables at module load (constants.ts). Nothing is contacted. Measuring a
@@ -15,12 +13,10 @@ process.env.PLANETSCALE_MCP_CONNECTOR =
   "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const {
-  admitDynamicTools,
   CAPABILITY_LANES,
   capabilitySource,
   COMPILED_MANIFEST_PATH,
   COMPILE_METADATA_PATH,
-  dynamicToolCacheKey,
   formatCapabilityBudget,
   laneAuth,
   measureCapabilityBudget,
@@ -49,7 +45,6 @@ const { repositoryFromAuth } = await import("./repository.js");
 
 const SECOND_PIPELINE = /second-pipeline/u;
 const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
-const NOTHING_ADMITTED = /eve admitted 0 of the 1 tools 'crm'/u;
 const GITHUB_TOOL_NAME = /^github__/u;
 
 /** The lanes `repositoryCapabilitiesAvailable` admits, of the four measured. */
@@ -331,36 +326,6 @@ describe("dynamic capability resolution", () => {
     );
   });
 
-  it("refuses to count a dynamic tool map eve would drop", async () => {
-    // eve stamps a durable descriptor on a callback only when it bundles the
-    // authored module, so every callback in this test process is bare, the
-    // way a policy handed to the GitHub extension's `overrides` from anywhere
-    // but durable-callbacks.ts is in a deployment. eve's own dispatch rejects
-    // the entry, drops the resolver's whole result, and the measurement must
-    // fail rather than count the tool as model-visible.
-    const resolver = {
-      eventNames: ["step.started"],
-      events: {
-        "step.started": () => ({
-          lookup: defineTool({
-            description: "Look a record up.",
-            execute: () => null,
-            inputSchema: z.object({ id: z.string() }),
-          }),
-        }),
-      },
-      extensionNamespace: "crm",
-      logicalPath: "../node_modules/crm/tools/crm.mjs",
-      slug: "crm",
-      sourceId: "ext:crm:tools/crm.mjs",
-      sourceKind: "module" as const,
-    };
-    await assert.rejects(
-      admitDynamicTools(resolver, "slack", "ext:crm"),
-      NOTHING_ADMITTED
-    );
-  });
-
   it("resolves the GitHub extension's model-visible tools", async () => {
     const resolved = await resolveLaneCapabilities(
       FIXTURE,
@@ -402,28 +367,6 @@ describe("dynamic capability resolution", () => {
     });
     await assert.rejects(
       resolveLaneCapabilities(otherApp, "repository-interactive")
-    );
-  });
-
-  it("keys dynamic tools by lane and complete entry identity", () => {
-    const [entry] = FIXTURE.dynamicTools;
-    assert.ok(entry);
-    const slack = dynamicToolCacheKey(entry, APP_ROOT, "slack");
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey(entry, APP_ROOT, "autonomous-factory")
-    );
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey({ ...entry, exportName: "other" }, APP_ROOT, "slack")
-    );
-    assert.notEqual(
-      slack,
-      dynamicToolCacheKey(
-        { ...entry, extensionNamespace: "other" },
-        APP_ROOT,
-        "slack"
-      )
     );
   });
 
