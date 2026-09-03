@@ -10,7 +10,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions; a trusted `factory` label hands an issue to the pipeline unattended; red CI on a Foreman pull request triggers a fix loop.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues stay general by default; the factory loads on demand.
-- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. A screenshot or file attached to a mention is staged by eve under `/workspace/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
+- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
 - **eve** — the HTTP channel for the local dev TUI and Vercel OIDC.
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
