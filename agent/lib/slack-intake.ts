@@ -58,7 +58,7 @@ export const FINAL_SLACK_POST_RULE =
 const MAX_SLACK_ATTACHMENT_NAME_LENGTH = 200;
 
 const modelSafeAttachmentName = (attachment: SlackAttachment): string => {
-  const name = attachment.name?.replace(/\p{C}/gu, " ").trim();
+  const name = attachment.name?.replace(/[\p{C}\u2028\u2029]/gu, " ").trim();
   return JSON.stringify(
     (name || `unnamed ${attachment.type}`).slice(
       0,
