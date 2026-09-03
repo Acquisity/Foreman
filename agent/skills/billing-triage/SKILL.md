@@ -12,7 +12,7 @@ Decide whether this ticket is a **money** ask or a **product** ask.
 
 - If it is a money ask, continue with this skill.
 - If it is a product ask, hand it to the product triage procedure instead.
-- If the ask is money but the ticket landed in a product channel (or vice versa), cancel and redirect. Reply in the thread with the classification and where to refile: money asks belong in #acquisity-refunds-request, product asks in #acquisity-feedback, both filed with /acquisityasks. Then move the Linear issue to Canceled with `linear__save_issue` and `state: "Canceled"`, so there is one copy to follow. Then stop; do not investigate the mismatched ticket. Reference wording: "this looks like a billing or refund request rather than product feedback. Could you file it in #acquisity-refunds-request with /acquisityasks? I've closed this one so there is only one copy to follow."
+- If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
 - If you cannot place the ask, ask one batched question to place it before doing anything else.
 
 ## Step 1: Read the Linear issue
@@ -43,7 +43,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 ## Investigation order
 
-1. Step 0 classification: money vs product. If the channel mismatches, reply with the redirect, cancel the issue, and stop.
+1. Step 0 classification: money vs product. If the channel mismatches, say so in one line and continue with the procedure for the ask's real kind.
 2. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
 3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. The pin scopes PlanetScale only; Autumn and Stripe are keyed by the billing account, read in step 5. If `ambiguous` is true, stop and ask which workspace. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: say so and stop rather than reading billing for a null organization.
 4. Approval trail: read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
@@ -207,7 +207,7 @@ Anything worth a separate ticket, kept out of this refund decision.
 At most three things on a financial ticket:
 
 1. The batched clarifying questions, if any.
-2. The redirect message, if the channel mismatched. That reply and the cancel are the whole outcome; nothing else is posted.
+2. The one-line classification note, if the channel mismatched. It says which kind of ask this is and that it is being handled here; the investigation continues either way.
 3. One closing status reply, using the fixed status line.
 
 The status line is fixed; do not use a free-form reply on financial tickets. Never mention Stripe, Autumn, or billing systems by name in a Slack-facing message.
