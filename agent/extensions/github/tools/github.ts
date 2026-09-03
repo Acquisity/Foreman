@@ -25,7 +25,12 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
  * tool set here with no edit.
  *
  * `step.started` is the extension's own event and is kept, so an admitted lane
- * resolves exactly what it resolved before. `agent/lib/repository-lane.ts`
+ * resolves exactly what it resolved before. `null` is reserved for the lane
+ * gate. A missing slot throws instead, naming the package and the key: the
+ * resolver loses its result either way, but a throw is visible when tests and
+ * capability reporting resolve the lane before deploy, while `null` would look
+ * like a gated lane and drop all 31 tools from every lane silently.
+ * `agent/lib/repository-lane.ts`
  * owns the decision; it gates the catalog only. Every write these tools
  * perform stays gated where it already is, and a signed webhook still binds
  * its session to one repository.
@@ -37,7 +42,12 @@ export default defineDynamic({
         return null;
       }
       const resolve = github.events["step.started"];
-      return resolve === undefined ? null : await resolve(event, ctx);
+      if (resolve === undefined) {
+        throw new Error(
+          "@github-tools/eve-extension exposes no step.started resolver to forward; the GitHub tool override cannot gate a slot that moved"
+        );
+      }
+      return await resolve(event, ctx);
     },
   },
 });
