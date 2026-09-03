@@ -95,7 +95,7 @@ The budget was measured with that report before and after the repository-lane ga
 
 ## Before committing
 
-- `pnpm validate` passes with zero errors and warnings.
+- `pnpm validate` passes with zero errors and warnings. The `validate` workflow in `.github/workflows/validate.yml` runs the same command on every pull request to `main`, so a failure is red on the pull request as well.
 - No secrets, `node_modules`, `.eve`, `.vercel`, `.output`, or build artifacts are staged.
 - A request to do the work and deliver it is the authorization to branch, commit, push, and open a PR. Carry it through and report the result instead of stopping to ask. A Linear ticket must exist before a PR is opened; create one when none exists.
 - Marking a PR ready and merging still need the user's explicit word.
