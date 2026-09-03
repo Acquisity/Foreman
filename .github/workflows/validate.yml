@@ -1,0 +1,46 @@
+name: validate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    # Connector UIDs are identifiers, not credentials. `eve info` refuses to
+    # evaluate the tool files that read them when they are unset, so discovery
+    # needs a value for each one. Placeholders are enough: discovery never
+    # contacts a connector. Never put a secret here.
+    env:
+      AUTUMN_API_CONNECTOR: placeholder/foreman-ci
+      AUTUMN_MCP_CONNECTOR: placeholder/foreman-ci
+      AXIOM_MCP_CONNECTOR: placeholder/foreman-ci
+      EXA_MCP_CONNECTOR: placeholder/foreman-ci
+      INNGEST_MCP_CONNECTOR: placeholder/foreman-ci
+      INSTANTLY_API_CONNECTOR: placeholder/foreman-ci
+      INTERCOM_MCP_CONNECTOR: placeholder/foreman-ci
+      JAM_MCP_CONNECTOR: placeholder/foreman-ci
+      LINEAR_CONNECTOR: placeholder/foreman-ci
+      LUCENT_MCP_CONNECTOR: placeholder/foreman-ci
+      MODEM_MCP_CONNECTOR: placeholder/foreman-ci
+      NEON_MCP_CONNECTOR: placeholder/foreman-ci
+      OPENROUTER_MCP_CONNECTOR: placeholder/foreman-ci
+      PLANETSCALE_MCP_CONNECTOR: placeholder/foreman-ci
+      POSTHOG_MCP_CONNECTOR: placeholder/foreman-ci
+      RESEND_MCP_CONNECTOR: placeholder/foreman-ci
+      SENTRY_MCP_CONNECTOR: placeholder/foreman-ci
+      STRIPE_API_CONNECTOR: placeholder/foreman-ci
+      STRIPE_MCP_CONNECTOR: placeholder/foreman-ci
+      SUPERMEMORY_MCP_CONNECTOR: placeholder/foreman-ci
+      VERCEL_MCP_CONNECTOR: placeholder/foreman-ci
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate
