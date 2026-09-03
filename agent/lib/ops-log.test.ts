@@ -124,7 +124,7 @@ describe("formatOpsEvent", () => {
       sessionId: "s1",
       turnId: "t1",
     });
-    assert.equal(descriptorReads, 7);
+    assert.equal(descriptorReads, 9);
     assert.equal(ownKeysCalls, 0);
   });
 
@@ -168,11 +168,117 @@ describe("logOpsEvent", () => {
   });
 });
 
+type ActionResultHandler = (
+  event: {
+    data: {
+      error?: { code: string; message: string };
+      result: {
+        callId: string;
+        isError?: boolean;
+        kind: string;
+        output: unknown;
+        toolName: string;
+      };
+      status: string;
+      turnId: string;
+    };
+  },
+  ctx: { session: { id: string } }
+) => void;
+
+/** Runs the hook's action.result handler and returns the lines it logged. */
+const runActionResult = (
+  data: Parameters<ActionResultHandler>[0]["data"]
+): string[] => {
+  const handler = opsHook.events?.["action.result"] as ActionResultHandler;
+  const lines: string[] = [];
+  const { info } = console;
+  console.info = (line: string) => {
+    lines.push(line);
+  };
+  try {
+    handler({ data }, { session: { id: "s1" } });
+  } finally {
+    console.info = info;
+  }
+  return lines;
+};
+
+describe("ops hook action.result", () => {
+  it("logs one bounded payload-free line for an ok tool result", () => {
+    const lines = runActionResult({
+      result: {
+        callId: "c1",
+        kind: "tool-result",
+        output: { secret: "customer@example.com" },
+        toolName: "linear__get_issue",
+      },
+      status: "completed",
+      turnId: "t1",
+    });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].length <= OPS_LOG_LINE_LIMIT, true);
+    assert.equal(lines[0].includes("\n"), false);
+    assert.deepEqual(JSON.parse(lines[0]), {
+      code: null,
+      connection: "linear",
+      event: "action.result",
+      outcome: "ok",
+      sessionId: "s1",
+      tool: "linear__get_issue",
+      turnId: "t1",
+    });
+  });
+
+  it("logs the failure class only for an error tool result", () => {
+    const lines = runActionResult({
+      error: { code: "tool_execution_failed", message: "x".repeat(10_000) },
+      result: {
+        callId: "c2",
+        isError: true,
+        kind: "tool-result",
+        output: "stack trace with customer@example.com",
+        toolName: "read_file",
+      },
+      status: "failed",
+      turnId: "t1",
+    });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].length <= OPS_LOG_LINE_LIMIT, true);
+    assert.deepEqual(JSON.parse(lines[0]), {
+      code: "tool_execution_failed",
+      connection: null,
+      event: "action.result",
+      outcome: "error",
+      sessionId: "s1",
+      tool: "read_file",
+      turnId: "t1",
+    });
+  });
+
+  it("logs nothing for a subagent or skill result", () => {
+    assert.deepEqual(
+      runActionResult({
+        result: {
+          callId: "c3",
+          kind: "subagent-result",
+          output: "done",
+          toolName: "vision",
+        },
+        status: "completed",
+        turnId: "t1",
+      }),
+      []
+    );
+  });
+});
+
 describe("ops hook", () => {
-  it("subscribes to exactly the ten covered events", () => {
+  it("subscribes to exactly the eleven covered events", () => {
     assert.deepEqual(
       Object.keys(opsHook.events ?? {}).sort(),
       [
+        "action.result",
         "authorization.required",
         "input.requested",
         "session.completed",

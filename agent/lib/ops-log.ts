@@ -15,9 +15,11 @@ const OPS_FIELD_KEYS = [
   "code",
   "connection",
   "message",
+  "outcome",
   "requests",
   "sessionId",
   "stepIndex",
+  "tool",
   "turnId",
 ] as const;
 
