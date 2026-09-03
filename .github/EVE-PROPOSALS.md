@@ -47,3 +47,13 @@ Checked against eve 0.44.0.
 eve's default tools (`bash`, `read_file`, `web_fetch`, and the rest) are gated only globally: a `disableTool()` sentinel in `agent/tools/<slug>.ts` removes one for every session, which is how `agent` and `ask_question` are removed today. There is no per-session form, and the built-in catalog is outside the compiled manifest, so `pnpm report:capabilities` does not measure it. Every lane carries the same built-in set by construction.
 
 Proposal: accept a `defineDynamic` in a built-in tool's slot that returns the default or `null` per session, matching what authored and extension slots already allow.
+
+## 6. Time one tool call
+
+Checked against eve 0.44.0. Recorded by ENG-13396 with the `action.result` ops line.
+
+A tool-call duration is not expressible from a hook. `ActionResultStreamEvent.data` carries only `error`, `result`, `sequence`, `stepIndex`, `status`, and `turnId`, and `ActionsRequestedStreamEvent.data` carries only `actions`, `sequence`, `stepIndex`, and `turnId`. The result itself, `RuntimeToolResultActionResult`, carries only `callId`, `isError`, `kind`, `output`, and `toolName`. No timestamp and no elapsed time exists on either event, so a hook has nothing framework-supplied to subtract.
+
+Shipped: one bounded line per tool call with no duration, naming the tool, the connection, and `ok` or `error`. The hook keeps no state and starts no timer. Timing the call from a hook would mean recording a wall clock at `actions.requested`, keyed by call ID, and reading it back at `action.result`, which is hook-owned state that outlives the event that created it: it leaks whenever a call never returns, it is wrong under a resumed or replayed turn, and it invents a number eve never measured. That is exactly the unsafe approximation this file exists to avoid, so the line reports reach and failure and stays silent about latency.
+
+Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
