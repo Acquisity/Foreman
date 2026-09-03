@@ -1128,6 +1128,9 @@ test("triage reviews a Bug with the critic before routing it", () => {
 test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   // A refund ask posted in a product intake channel: no cancel, the billing
   // procedure runs where it landed, and routing comes from the evidence.
+  // Skills are prompts a model reads, and this repository runs no model, so
+  // this proves the skill text instructs all of that. It does not prove a live
+  // model followed the instruction; that is what the preview UAT checks.
   for (const skill of [triageSkill, billingSkill]) {
     assert.ok(!skill.includes('state: "Canceled"'));
     assert.ok(!skill.includes("acquisity-refunds-request"));
@@ -1153,11 +1156,27 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
       "routing sets the project and labels from the evidence, so the channel it arrived in changes nothing"
     )
   );
+  // Routing is the skill's last section, so it runs to the end of the file.
+  const routingIndex = billingSkill.indexOf("## Routing");
+  assert.ok(routingIndex >= 0);
+  const financialRouting = billingSkill.slice(routingIndex);
   assert.ok(
-    billingSkill.includes(
+    financialRouting.includes(
       'Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`'
     )
   );
+  assert.ok(financialRouting.includes("money-kind labels as `addLabels`"));
+  for (const label of [
+    "`Refund`",
+    "`Credits`",
+    "`Discount`",
+    "`intercom-sourced`",
+    "`Customer reported`",
+    "`Internal reported`",
+  ]) {
+    assert.ok(financialRouting.includes(label), label);
+  }
+  assert.ok(!financialRouting.includes("channel"));
 
   const labelRules = extractInstruction(
     triageHandlingSkill,
