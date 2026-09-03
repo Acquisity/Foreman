@@ -4,11 +4,16 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Connector UIDs are identifiers, not credentials. `eve info` refuses to
     # evaluate the tool files that read them when they are unset, so discovery
     # needs a value for each one. Placeholders are enough: discovery never
