@@ -220,7 +220,6 @@ describe("ops hook action.result", () => {
     assert.equal(lines[0].length <= OPS_LOG_LINE_LIMIT, true);
     assert.equal(lines[0].includes("\n"), false);
     assert.deepEqual(JSON.parse(lines[0]), {
-      code: null,
       connection: "linear",
       event: "action.result",
       outcome: "ok",
@@ -230,7 +229,7 @@ describe("ops hook action.result", () => {
     });
   });
 
-  it("logs the failure class only for an error tool result", () => {
+  it("logs no error code for an error tool result", () => {
     const lines = runActionResult({
       error: { code: "tool_execution_failed", message: "x".repeat(10_000) },
       result: {
@@ -246,12 +245,66 @@ describe("ops hook action.result", () => {
     assert.equal(lines.length, 1);
     assert.equal(lines[0].length <= OPS_LOG_LINE_LIMIT, true);
     assert.deepEqual(JSON.parse(lines[0]), {
-      code: "tool_execution_failed",
       connection: null,
       event: "action.result",
       outcome: "error",
       sessionId: "s1",
       tool: "read_file",
+      turnId: "t1",
+    });
+  });
+
+  it("never logs an error code eve read back out of the tool output", () => {
+    // eve builds `event.data.error` with `readActionResultOutputError`, which
+    // returns the tool output's own `code` and `message` verbatim. Logging
+    // that code would put tool output in the log.
+    const output = {
+      code: "CUSTOMER-4242",
+      message: "billing failed for customer@example.com",
+    };
+    const lines = runActionResult({
+      error: output,
+      result: {
+        callId: "c4",
+        isError: true,
+        kind: "tool-result",
+        output,
+        toolName: "stripe__create_refund",
+      },
+      status: "failed",
+      turnId: "t1",
+    });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].includes("CUSTOMER-4242"), false);
+    assert.equal(lines[0].includes("customer@example.com"), false);
+    assert.deepEqual(JSON.parse(lines[0]), {
+      connection: "stripe",
+      event: "action.result",
+      outcome: "error",
+      sessionId: "s1",
+      tool: "stripe__create_refund",
+      turnId: "t1",
+    });
+  });
+
+  it("reports an error outcome for a rejected tool result", () => {
+    const lines = runActionResult({
+      result: {
+        callId: "c5",
+        kind: "tool-result",
+        output: "rejected",
+        toolName: "github__createPullRequest",
+      },
+      status: "rejected",
+      turnId: "t1",
+    });
+    assert.equal(lines.length, 1);
+    assert.deepEqual(JSON.parse(lines[0]), {
+      connection: "github",
+      event: "action.result",
+      outcome: "error",
+      sessionId: "s1",
+      tool: "github__createPullRequest",
       turnId: "t1",
     });
   });

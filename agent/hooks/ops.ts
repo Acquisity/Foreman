@@ -9,8 +9,10 @@
  * `action.result` adds one line per tool call so a scan of `vercel logs` can
  * tabulate reach and failure per tool and per connection: successes are
  * otherwise invisible, and "never called" reads the same as "worked". The
- * line carries the tool name, the connection or none, `ok` or `error`, and
- * the failure class, never the tool input or output.
+ * line carries the tool name, the connection or none, and `ok` or `error`,
+ * never the tool input or output. It logs no error code: eve derives that
+ * code from the tool's own output, so logging it would put tool output in
+ * the log. `outcome` is computed from framework-owned values only.
  */
 import { defineHook } from "eve/hooks";
 import { logOpsEvent } from "../lib/ops-log.js";
@@ -37,11 +39,11 @@ export default defineHook({
         return;
       }
       logOpsEvent("action.result", {
-        // Only the bounded failure class, never the error message body.
-        code: event.data.error?.code,
         connection: connectionOf(result.toolName),
         // No duration: neither actions.requested nor action.result carries a
         // timestamp or elapsed time, and a hook must not keep its own state.
+        // `isError` and `status` are both framework-owned; `error.code` is
+        // read out of the tool's own output and so is never logged.
         outcome:
           result.isError || event.data.status !== "completed" ? "error" : "ok",
         sessionId: ctx.session.id,
