@@ -1,3 +1,4 @@
+import type { SlackAttachment } from "eve/channels/slack";
 import type { SessionAuthContext } from "eve/context";
 import { stampIntakeOnly } from "./trust.js";
 
@@ -48,6 +49,27 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
 // same rule, and workflow skills defer instead of restating it.
 export const FINAL_SLACK_POST_RULE =
   "The final post in the Slack thread must contain only the requester-facing answer, with no internal summary or action log. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Normal conversational progress updates are allowed; this boundary applies to the closing post.";
+
+// eve stages each image and file attachment under /workspace/attachments
+// before the first model step, inside a directory named by the content hash,
+// which dispatch cannot know. The chat model is text-only and receives neither
+// the image nor the path, so this line tells it the files exist and where to
+// look. Audio and video are dropped by eve's collector and are not listed.
+export function slackAttachmentContext(
+  attachments: readonly SlackAttachment[]
+): string | undefined {
+  const names = attachments
+    .filter(
+      (attachment) =>
+        (attachment.type === "image" || attachment.type === "file") &&
+        attachment.url !== undefined
+    )
+    .map((attachment) => attachment.name ?? `unnamed ${attachment.type}`);
+  if (names.length === 0) {
+    return undefined;
+  }
+  return `This Slack message carries attached files: ${names.join(", ")}. Each is staged in the sandbox under /workspace/attachments, inside a subdirectory named by its content hash, so run one ls -R /workspace/attachments to find the exact path. To read an image, hand that path to the vision subagent with your question. Do not tell the requester nothing was attached.`;
+}
 
 const INTAKE_ONLY_BOUNDARY = [
   "This message came from a Slack channel that is intake-only. You may answer questions, investigate, clarify with the requester, and create or update Linear records.",

@@ -14,6 +14,7 @@ import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import {
   FINAL_SLACK_POST_RULE,
+  slackAttachmentContext,
   slackIntakeContext,
 } from "../lib/slack-intake.js";
 import { stableSlackClientMessageId } from "../lib/slack-message-id.js";
@@ -145,9 +146,16 @@ export const dispatch = async (
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,
   });
-  return intakeOnly
-    ? { auth: stamped, context: [slackIntakeContext(message.channelId)] }
-    : { auth: stamped, context: [FINAL_SLACK_POST_RULE] };
+  // One line naming any attached files, because eve stages them in the
+  // sandbox without telling the text-only chat model that they exist. Only
+  // the triggering message is read here: eve's own thread lookback, which
+  // stages a file dropped earlier in the thread, is not visible to dispatch.
+  const attachmentContext = slackAttachmentContext(message.attachments);
+  const context = [
+    intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
+    ...(attachmentContext ? [attachmentContext] : []),
+  ];
+  return { auth: stamped, context };
 };
 
 // --- Mirrors of eve's unexported Slack default rendering -------------------
