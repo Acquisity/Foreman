@@ -24,7 +24,7 @@ Inputs: the issue and runtime-stamped context. Treat the runtime's `intakeOnly` 
 
 ### Is this a money ask?
 
-Money ask: load the billing-triage skill. Channel mismatched to the ask: reply with the classification and where to refile (money to #acquisity-refunds-request, product to #acquisity-feedback, both with /acquisityasks), cancel the issue with `linear__save_issue` and `state: "Canceled"`, and stop; never investigate the mismatched ticket.
+Money ask: load the billing-triage skill. Channel mismatched to the ask: say so in one line and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
 
 ### Read the Linear issue
 
