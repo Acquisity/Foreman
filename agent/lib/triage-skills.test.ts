@@ -812,8 +812,12 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   const titleRule = intercomTriageSkill.indexOf(
     "is the title of any issue this skill creates"
   );
+  const issueCreationCalls = [
+    ...intercomTriageSkill.matchAll(/`linear__save_issue`/g),
+  ];
+  assert.equal(issueCreationCalls.length, 2, "both issue-creation sites exist");
   assert.ok(
-    [...intercomTriageSkill.matchAll(/`linear__save_issue`/g)].every(
+    issueCreationCalls.every(
       ({ index }) => index !== undefined && titleRule < index
     ),
     "title rule precedes every issue-creation call"
