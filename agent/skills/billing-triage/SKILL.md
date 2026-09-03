@@ -214,4 +214,9 @@ The status line is fixed; do not use a free-form reply on financial tickets. Nev
 
 ## Routing
 
-Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, and `priority` 2 (High) for an active billing/refund blocker, 3 (Medium) otherwise.
+Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
+
+Apply the fewest labels that place the ask, the same way `triage-handling` does. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
+
+- One bucket label from the taxonomy: `Refund` for `refund` or `overcharged`, `Credits` for `credits` or `stripe_credit`, `Discount` for `coupon_code`.
+- The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
