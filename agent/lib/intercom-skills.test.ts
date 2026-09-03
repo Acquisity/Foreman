@@ -73,15 +73,48 @@ test("Intercom product skill creates engineering work only for a confirmed bug",
     "There is no Linear issue at the start",
     "Do not create a placeholder issue",
     "do not manufacture engineering work",
-    "For a confirmed Bug",
+    "### A confirmed Bug: create the report, then hand off",
     "canonical conversation URL",
-    "explicit mapped Linear project",
     "subscription behavior with no financial remedy",
-    "Link the new report from the master",
-    "do not copy customer-specific conversation details",
+    "never as a Bug or an engineering master",
   ]) {
     assert.ok(productSkill.includes(phrase), phrase);
   }
+});
+
+test("Intercom non-Bug outcomes end in the skill without the shared stages", () => {
+  const nonBug = productSkill.slice(productSkill.indexOf("## Step 7:"));
+
+  assert.ok(
+    nonBug.includes("## Step 7: Decide whether a follow-up is warranted")
+  );
+  assert.ok(nonBug.includes("## Step 8: Record the case"));
+  assert.ok(nonBug.includes("## Step 9: Reply in Slack"));
+  for (const outcome of [
+    "User Error, Platform Limitation, ordinary feedback, or an unproven claim",
+    "Support/Product follow-up",
+  ]) {
+    assert.ok(nonBug.includes(outcome), outcome);
+  }
+  assert.equal(nonBug.includes("load `triage-handling`"), false);
+  assert.equal(nonBug.includes("STAGE 4 COMPLETE"), false);
+  assert.equal(nonBug.includes("critic"), false);
+  assert.equal(nonBug.includes("engineering-handoff"), false);
+  assert.ok(
+    productSkill.includes(
+      "Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9"
+    )
+  );
+  assert.ok(
+    productSkill.includes(
+      "A Bug is recorded by `triage-handling` Stage 7 under its ticket identifier once its review has settled"
+    )
+  );
+  assert.ok(
+    productSkill.includes(
+      "the one `triage-handling` Stage 7 calls for on a Bug included"
+    )
+  );
 });
 
 test("Intercom billing skill preserves evidence order and human-only action", () => {
@@ -224,8 +257,12 @@ test("Intercom skills own their tool references", () => {
     "search_investigation_memory",
     "accepts no Linear project metadata",
     "known conversation id",
+    "`triage-handling` Stage 7 owns the write",
   ]) {
     assert.ok(productTools.includes(phrase), phrase);
+  }
+  for (const restated of ["## Master", "Overview", "parent", "roster"]) {
+    assert.equal(productTools.includes(restated), false, restated);
   }
 
   for (const phrase of [
