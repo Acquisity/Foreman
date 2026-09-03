@@ -6,6 +6,8 @@ on:
 
 jobs:
   validate:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     # Connector UIDs are identifiers, not credentials. `eve info` refuses to
     # evaluate the tool files that read them when they are unset, so discovery
@@ -35,6 +37,8 @@ jobs:
       VERCEL_MCP_CONNECTOR: placeholder/foreman-ci
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 11
