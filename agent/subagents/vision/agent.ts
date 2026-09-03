@@ -18,7 +18,7 @@ import { resolveModel } from "../../lib/models.js";
  */
 export default defineAgent({
   description:
-    "Read an image in the sandbox and answer a specific question about it. Pass the file path and exactly what you need to know, for example whether a button is disabled and what the error text says. Returns findings as text, never pixels, so the image never enters your history. Not for pixel-precise coordinates.",
+    "Read an image in the sandbox and answer a specific question about it. Pass the file path and exactly what you need to know, for example whether a button is disabled and what the error text says. A file attached in Slack is already staged under /workspace/attachments, and that staged path is what to pass. Returns findings as text, never pixels, so the image never enters your history. Not for pixel-precise coordinates.",
   model: defineDynamic({
     events: { "session.started": () => resolveModel("vision") },
   }),
