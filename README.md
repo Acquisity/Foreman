@@ -65,6 +65,10 @@ Durable documents live in one Vercel Blob store. Reserved prefixes are registere
 
 Settled investigations, including ticketless Intercom and Slack ones and conclusions a colleague corrected in a thread, are indexed in a private Foreman-owned Postgres database, reached through `FOREMAN_MEMORY_DATABASE_URL` and never through the read-only Neon MCP connection. The schema lives in `migrations/` and applies with `pnpm db:migrate`, a manual release step and never part of agent startup. Run a new migration against production before relying on the code that needs it: until `0002` runs, a ticketless write fails on the `NOT NULL` project column and the tool reports `recorded: false` without touching the verdict. It holds sanitized case patterns, not customer data: PlanetScale remains the only production database and the only source of current blast radius. Access is fail-closed and stamped per channel, so GitHub sessions and unattended runs cannot read or write it.
 
+## Operations logging
+
+`agent/hooks/ops.ts` writes one bounded JSON line per lifecycle event through `logOpsEvent` in `agent/lib/ops-log.ts`, so `vercel logs` can be counted. The eleven events are `session.started`, `session.completed`, `session.failed`, `turn.started`, `turn.completed`, `turn.cancelled`, `turn.failed`, `step.failed`, `authorization.required`, `input.requested`, and `action.result`. `action.result` covers every tool call, not only the failures, so a scan can tabulate reach and failure per tool and per connection: it names the tool, the connection derived from the `<connection>__<tool>` shape or none for an authored root tool, `ok` or `error`, and the bounded failure class. It carries no duration, because neither the request nor the result event carries a timestamp and the hook keeps no state. No line ever contains a tool input, a tool output, a message body, or customer data.
+
 ## Schedules
 
 - `sla-report` runs daily at 13:00 UTC, dispatching a per-feature SLA bug investigation into each feature's Slack channel plus a health heartbeat.
