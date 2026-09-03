@@ -440,6 +440,26 @@ describe("slack channel", () => {
     assert.ok(!line.includes("\u2028"));
   });
 
+  it("keeps a bounded attachment name on code point boundaries", async () => {
+    const boundedName = `${"a".repeat(199)}🦊`;
+    const result = await dispatch(
+      inboundContext(undefined),
+      attached("what does this show?", undefined, [
+        {
+          id: "F5",
+          mimeType: "image/png",
+          name: `${boundedName}ignored`,
+          size: 689,
+          type: "image",
+          url: "https://files.slack.com/F5",
+        },
+      ])
+    );
+    const line = result?.context?.[1] ?? "";
+    assert.ok(line.includes(JSON.stringify(boundedName)));
+    assert.ok(!line.includes("ignored"));
+  });
+
   it("keeps the attachment line on the intake-only lane", async () => {
     const result = await dispatch(
       inboundContext(undefined),
