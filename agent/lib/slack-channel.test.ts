@@ -565,7 +565,7 @@ describe("slack channel", () => {
     }
   });
 
-  it("tears down progress and posts one stop notice when the turn is cancelled", async (t) => {
+  it("tears down progress and posts one cancellation notice when the turn is cancelled", async (t) => {
     const handler = slackChannelEvents["turn.cancelled"];
     assert.ok(handler);
     const posts: string[] = [];
@@ -599,7 +599,7 @@ describe("slack channel", () => {
     assert.equal(eventChannel.state.progress, undefined);
     // A redelivered event retries the same provider id: one visible notice.
     await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.deepEqual(posts, ["Cancelled. This request did not finish."]);
     assert.equal(attemptedIds[0], attemptedIds[1]);
     assert.match(attemptedIds[0] ?? "", UUID_V5);
     // The notice never throws: eve would surface that as turn.failed.
@@ -616,7 +616,38 @@ describe("slack channel", () => {
       },
     } as unknown as SlackEventContext;
     await handler({ sequence: 1, turnId: "t2" }, failing, {} as never);
-    assert.deepEqual(warnings, ["Slack stop notice could not be posted."]);
+    assert.deepEqual(warnings, [
+      "Slack cancellation notice could not be posted.",
+    ]);
+  });
+
+  it("posts the same origin-neutral notice for a cancellation with no stop", async () => {
+    // A reset or a declined session limit also ends as turn.cancelled, and
+    // the handler has no stop marker to consult (eve 0.44: dispatch carries
+    // no channel state, the event carries only sequence and turnId), so the
+    // line never claims that someone stopped the turn.
+    const handler = slackChannelEvents["turn.cancelled"];
+    assert.ok(handler);
+    const posts: string[] = [];
+    const eventChannel = {
+      slack: {
+        channelId: "C0DEV",
+        request: (_operation: string, body: Record<string, unknown>) => {
+          posts.push(String(body.text));
+          return Promise.resolve({ ok: true });
+        },
+        teamId: "T123",
+        threadTs: "1700000000.000100",
+      },
+      state: {},
+    } as unknown as SlackEventContext;
+    await handler(
+      { sequence: 1, turnId: "t-reset" },
+      eventChannel,
+      {} as never
+    );
+    assert.deepEqual(posts, ["Cancelled. This request did not finish."]);
+    assert.ok(!posts[0]?.toLowerCase().includes("stop"));
   });
 
   const completedEventChannel = (calls: string[]) =>
@@ -1314,7 +1345,7 @@ describe("slack channel progress", () => {
       },
     });
     await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
-    assert.deepEqual(calls, ["post:Stopped."]);
+    assert.deepEqual(calls, ["post:Cancelled. This request did not finish."]);
     assert.equal(eventChannel.state.progress, undefined);
   });
 

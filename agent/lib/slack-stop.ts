@@ -160,16 +160,23 @@ const postNotice = async (
   console.warn(failure);
 };
 
-/** Posts one provider-idempotent notice for an exact cancelled turn. */
-export const postStopNotice = (
+/**
+ * Posts one provider-idempotent notice for an exact cancelled turn. The text
+ * is true for every cancellation source, because the handler cannot tell a
+ * literal stop from a reset or a session limit: in eve 0.44 dispatch has no
+ * channel state to record the stop in, `turn.cancelled` carries only the
+ * sequence and turn id, and `cancel` accepts only the turn id (see
+ * EVE-PROPOSALS.md).
+ */
+export const postCancelledNotice = (
   ctx: { readonly slack: SlackInboundMessageContext["slack"] },
   turnId: string
 ): Promise<void> =>
   postNotice(
     ctx.slack,
     stopNoticeId(ctx.slack, turnId),
-    "Stopped.",
-    "Slack stop notice could not be posted."
+    "Cancelled. This request did not finish.",
+    "Slack cancellation notice could not be posted."
   );
 
 /**

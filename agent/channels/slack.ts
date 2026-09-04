@@ -30,8 +30,8 @@ import {
   activeSlackTurn,
   cancelActiveSlackTurn,
   isStopRequest,
+  postCancelledNotice,
   postQueuedNotice,
-  postStopNotice,
 } from "../lib/slack-stop.js";
 import { isIntakeOnly } from "../lib/trust.js";
 
@@ -85,8 +85,10 @@ import { isIntakeOnly } from "../lib/trust.js";
  * turn's next step boundary, where its abort signal also reaches a running
  * tool and every delegated child, so the `turn.cancelled` handler below is
  * what posts the single short notice, at the moment the turn actually ends.
- * A stop with no active turn stays quiet, and dispatch logs one ops line
- * with what eve answered.
+ * That handler cannot tell a stop from any other cancellation, so the
+ * notice says the request was cancelled, not who cancelled it. A stop with
+ * no active turn stays quiet, and dispatch logs one ops line with what eve
+ * answered.
  *
  * A turn still running posts one short progress line every 5 minutes until
  * it ends, and re-sets the assistant status echo after each line, because a
@@ -436,9 +438,12 @@ export const slackChannelEvents: SlackChannelEvents = {
     // Progress goes first so no late checkpoint can post beside the notice.
     // The notice itself lands here because this event is the moment eve's
     // cooperative cancellation actually ends the turn, which may be one step
-    // boundary after the stop was requested.
+    // boundary after the stop was requested. The event does not say what
+    // cancelled the turn, and dispatch has no channel state to leave a stop
+    // marker in, so the notice is worded for every source: a literal stop, a
+    // session reset, or a declined session limit all read the same line.
     channel.state.progress = undefined;
-    await postStopNotice(channel, data.turnId);
+    await postCancelledNotice(channel, data.turnId);
   },
   async "turn.failed"(data, channel) {
     // A failed turn leaves no progress state behind. Mirrors eve's default
