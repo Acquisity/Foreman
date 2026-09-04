@@ -67,4 +67,3 @@ The Slack `turn.cancelled` handler posts the one short notice at the moment eve'
 Shipped: the notice is worded for every source, `Cancelled. This request did not finish.`, so it never claims a stop that did not happen. Keeping a stop flag outside eve would mean a store keyed by turn id that dispatch writes and a handler reads later, which leaks when the cancel never lands and is wrong under a replayed turn: hook-owned state outliving its event, the same shape section 6 refuses.
 
 Proposal: carry an optional `reason` on the cancel command through to `turn.cancelled` data, or hydrate channel state for the inbound message context so dispatch can leave a marker the settling handler reads.
-
