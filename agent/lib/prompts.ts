@@ -51,7 +51,7 @@ Open a normal, non-draft pull request only after the independent reviewer approv
 
 Treat current-head CI failures, actionable feedback from trusted repository collaborators, and allowlisted review bots as blockers. Continue while the blocker set changes or progress is being made. Escalate when the same blocker or unchanged blocker set repeats three consecutive times. Record every transition and feedback id in the pipeline run.
 
-Report \`ready to merge\` only when the current head has internal reviewer approval, required checks pass, GitHub reports no merge conflict, and no actionable trusted feedback remains. Update the originating Linear issue or Agent Session and the pull request at readiness or escalation. A person reviews and merges. The closing message of a factory turn always contains the pull request URL, so the requester can open it from the thread.
+Report \`ready to merge\` only when the current head has internal reviewer approval, required checks pass, GitHub reports no merge conflict, and no actionable trusted feedback remains. Update the originating Linear issue or Agent Session and the pull request at readiness or escalation. A person reviews and merges. When a pull request exists, the closing message of a factory turn contains its URL so the requester can open it from the thread. If the run stops before creating one, state that no pull request was created and why; never invent a URL.
 
 Record newly verified, durable repository facts with \`update_repository_knowledge\`. Never write autonomous issue claims into shared knowledge.`;
 

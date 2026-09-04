@@ -128,12 +128,12 @@ describe("repository guidance", () => {
     );
   });
 
-  it("makes the factory's closing message carry the pull request link", () => {
-    // ENG-13453: the closing post of a factory turn is the requester's only
-    // path to the pull request from the thread.
+  it("links a created pull request and never fabricates one", () => {
+    // ENG-13453: the closing post is the requester's path to a created pull
+    // request, while clarification and no-ticket exits must remain truthful.
     assert.ok(
       PIPELINE.includes(
-        "The closing message of a factory turn always contains the pull request URL, so the requester can open it from the thread."
+        "When a pull request exists, the closing message of a factory turn contains its URL so the requester can open it from the thread. If the run stops before creating one, state that no pull request was created and why; never invent a URL."
       )
     );
   });
