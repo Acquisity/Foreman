@@ -128,6 +128,16 @@ describe("repository guidance", () => {
     );
   });
 
+  it("makes the factory's closing message carry the pull request link", () => {
+    // ENG-13453: the closing post of a factory turn is the requester's only
+    // path to the pull request from the thread.
+    assert.ok(
+      PIPELINE.includes(
+        "The closing message of a factory turn always contains the pull request URL, so the requester can open it from the thread."
+      )
+    );
+  });
+
   it("keeps the factory's own branch prefix on the implementer", () => {
     // Ownership, not permission: the GitHub channel recognizes the factory's
     // pull requests by this prefix for red-CI stabilization.
