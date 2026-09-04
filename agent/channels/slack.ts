@@ -25,9 +25,11 @@ import {
   slackProgressActionRequestLabel,
 } from "../lib/slack-progress.js";
 import {
+  activeSlackTurn,
   cancelActiveSlackTurn,
   isStopRequest,
-  postStopConfirmation,
+  postQueuedNotice,
+  postStopNotice,
 } from "../lib/slack-stop.js";
 import { isIntakeOnly } from "../lib/trust.js";
 
@@ -71,15 +73,18 @@ import { isIntakeOnly } from "../lib/trust.js";
  * Later mentions wait behind the running turn instead of replacing it: the
  * queue turn policy delivers a follow-up after the active turn finishes,
  * where the default steer policy cancelled the active turn and silently lost
- * the earlier request. One message still cancels on purpose: a text that is
+ * the earlier request. A mention that arrives while a turn is active gets
+ * one line saying it is queued, so the requester is not left with silence
+ * until the turn ends. One message still cancels on purpose: a text that is
  * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
  * cancels the active turn through its exact session handle, and is consumed
- * without
- * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. The stop path posts the single short notice only
- * after the exact turn emits its durable cancellation boundary, so unrelated
- * cooperative cancellations and no-op requests against parked sessions stay
- * quiet.
+ * without reaching the model. Anything longer, such as `stop the deploy`, is
+ * ordinary model input. eve's cancellation is cooperative and lands at the
+ * turn's next step boundary, where its abort signal also reaches a running
+ * tool and every delegated child, so the `turn.cancelled` handler below is
+ * what posts the single short notice, at the moment the turn actually ends.
+ * A stop with no active turn stays quiet, and dispatch logs one ops line
+ * with what eve answered.
  *
  * A turn still running posts one short progress line every 5 minutes until
  * it ends, and re-sets the assistant status echo after each line, because a
@@ -121,15 +126,18 @@ export const dispatch = async (
     return null;
   }
   // A literal stop/cancel is a command for the running turn, never model
-  // input: cancel the exact active turn and consume the message. Confirming its
-  // durable cancellation boundary ties the notice to this command instead of
-  // another cooperative cancellation; with no active turn it drops quietly.
+  // input: cancel the exact active turn and consume the message. The notice
+  // is posted by the turn.cancelled handler when the cancellation lands.
   if (isStopRequest(message.text)) {
-    const cancelledTurnId = await cancelActiveSlackTurn(ctx);
-    if (cancelledTurnId) {
-      await postStopConfirmation(ctx, cancelledTurnId);
-    }
+    await cancelActiveSlackTurn(ctx);
     return null;
+  }
+  // Anything else that arrives during a turn is queued by eve behind it. Say
+  // so once, then restore the status echo the post just cleared.
+  const session = await ctx.resolveSession();
+  if (session && (await activeSlackTurn(session))) {
+    await postQueuedNotice(ctx, message.ts);
+    await ctx.thread.startTyping("Working...");
   }
   const repositories = extractRepositoryUrls(message.text);
   const [repository] = repositories;
@@ -390,11 +398,13 @@ export const slackChannelEvents: SlackChannelEvents = {
     }
     await checkSlackProgress(channel, data.turnId);
   },
-  "turn.cancelled"(_data, channel) {
-    // The explicit stop path owns its exact-turn confirmation. This handler
-    // only tears down progress so unrelated cooperative cancellations stay
-    // quiet and no late checkpoint can post beside the stop notice.
+  async "turn.cancelled"(data, channel) {
+    // Progress goes first so no late checkpoint can post beside the notice.
+    // The notice itself lands here because this event is the moment eve's
+    // cooperative cancellation actually ends the turn, which may be one step
+    // boundary after the stop was requested.
     channel.state.progress = undefined;
+    await postStopNotice(channel, data.turnId);
   },
   async "turn.failed"(data, channel) {
     // A failed turn leaves no progress state behind. Mirrors eve's default
