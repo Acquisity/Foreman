@@ -152,6 +152,23 @@ const opsLines = (t: TestContext) => {
   return lines;
 };
 
+const warnLines = (t: TestContext) => {
+  const lines: string[] = [];
+  t.mock.method(console, "warn", (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  });
+  return lines;
+};
+
+// A session whose durable stream cannot be read: every probe rejects.
+const unreadableSession = (): Session =>
+  ({
+    cancel: () => Promise.reject(new Error("never reached")),
+    getEventStream: () => Promise.reject(new Error("stream unavailable")),
+    getStreamTailIndex: () => Promise.reject(new Error("stream unavailable")),
+    id: "s1",
+  }) as unknown as Session;
+
 describe("slack channel", () => {
   it("is discovered with the queue turn policy so follow-ups wait", () => {
     assert.equal(channel.turnPolicy, "queue");
@@ -308,6 +325,50 @@ describe("slack channel", () => {
     );
     assert.ok(result && "auth" in result && result.auth);
     assert.deepEqual(posts, []);
+  });
+
+  it("still delivers a mention when the active-turn probe fails", async (t) => {
+    const warnings = warnLines(t);
+    const posts: string[] = [];
+    const result = await dispatch(
+      inboundContext(unreadableSession(), posts),
+      message("<@U999> all good?")
+    );
+    // Delivery goes on as if no turn were running: one bounded warning, no
+    // queued line, and eve never sees a rejected dispatch.
+    assert.ok(result && "auth" in result && result.auth);
+    assert.deepEqual(posts, []);
+    assert.deepEqual(warnings, [
+      '{"outcome":"error","event":"slack.active_turn"}',
+    ]);
+  });
+
+  it("keeps delivering when the status re-set fails after the queued line", async (t) => {
+    const warnings = warnLines(t);
+    const posts: string[] = [];
+    const session = cancellableSession([streamEvent("turn.started", "t1")], []);
+    const ctx = {
+      ...inboundContext(session, posts),
+      thread: {
+        startTyping: () => Promise.reject(new Error("status failed")),
+      },
+    } as unknown as SlackInboundMessageContext;
+    const result = await dispatch(ctx, message("<@U999> all good?"));
+    assert.ok(result && "auth" in result && result.auth);
+    assert.equal(posts.length, 1);
+    assert.deepEqual(warnings, ['{"outcome":"error","event":"slack.status"}']);
+  });
+
+  it("consumes a stop and logs an error outcome when the probe fails", async (t) => {
+    const lines = opsLines(t);
+    const result = await dispatch(
+      inboundContext(unreadableSession()),
+      message("stop")
+    );
+    assert.equal(result, null);
+    assert.deepEqual(lines, [
+      '{"outcome":"error","sessionId":"s1","turnId":null,"event":"slack.stop"}',
+    ]);
   });
 
   it("never lets an authorless event cancel work", async () => {
@@ -949,6 +1010,34 @@ describe("slack channel progress", () => {
       "post:Still working: 5 minutes in, 0 tool calls so far.",
       "typing:Working...",
     ]);
+  });
+
+  it("keeps the progress line and its count when the status re-set rejects", async (t) => {
+    const now = clock(t);
+    const warnings = warnLines(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    // Same state object, so the failing channel sees the seeded progress.
+    const failing = {
+      ...eventChannel,
+      thread: {
+        ...eventChannel.thread,
+        startTyping: () => Promise.reject(new Error("status failed")),
+      },
+    } as unknown as SlackEventContext;
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS);
+    // The handler resolves: eve would surface a rejection as turn.failed.
+    await handlerFor("action.result")(toolResultEvent, failing, trustedCtx);
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 1 tool calls so far. Currently waiting on grep.",
+    ]);
+    assert.equal(failing.state.progress?.posts, 1);
+    assert.deepEqual(warnings, ['{"outcome":"error","event":"slack.status"}']);
   });
 
   it("retries an ambiguous progress post with the same provider id", async (t) => {

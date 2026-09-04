@@ -6,10 +6,12 @@ import {
   type SlackEventContext,
   type SlackInboundMessageContext,
   type SlackMessage,
+  type SlackThread,
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { isFactoryRequest } from "../lib/factory-lane.js";
+import { logOpsEvent } from "../lib/ops-log.js";
 import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import {
@@ -133,11 +135,11 @@ export const dispatch = async (
     return null;
   }
   // Anything else that arrives during a turn is queued by eve behind it. Say
-  // so once, then restore the status echo the post just cleared.
-  const session = await ctx.resolveSession();
-  if (session && (await activeSlackTurn(session))) {
+  // so once, then restore the status echo the post just cleared. Both are
+  // contained: a probe or status failure must not cost the mention itself.
+  if (await probeActiveSlackTurn(ctx)) {
     await postQueuedNotice(ctx, message.ts);
-    await ctx.thread.startTyping("Working...");
+    await restoreSlackStatus(ctx.thread, "Working...");
   }
   const repositories = extractRepositoryUrls(message.text);
   const [repository] = repositories;
@@ -247,6 +249,37 @@ const extractErrorId = (
   return typeof id === "string" && id.length > 0 ? id : undefined;
 };
 
+// --- Contained side effects -------------------------------------------------
+// Dispatch and the lifecycle handlers must never reject: eve discards a
+// mention whose dispatch throws and surfaces a thrown handler as turn.failed.
+// The active-turn probe reads the durable stream and the status re-set calls
+// Slack, and neither is worth the delivery, so each failure becomes one
+// bounded ops warning (the allowlisted `outcome` field only, never the error
+// body) and the caller carries on as if there were nothing to do.
+
+const probeActiveSlackTurn = async (
+  ctx: SlackInboundMessageContext
+): Promise<string | null> => {
+  try {
+    const session = await ctx.resolveSession();
+    return session ? await activeSlackTurn(session) : null;
+  } catch {
+    logOpsEvent("slack.active_turn", { outcome: "error" }, console.warn);
+    return null;
+  }
+};
+
+const restoreSlackStatus = async (
+  thread: SlackThread,
+  status: string
+): Promise<void> => {
+  try {
+    await thread.startTyping(status);
+  } catch {
+    logOpsEvent("slack.status", { outcome: "error" }, console.warn);
+  }
+};
+
 // --- Progress checkpoint ----------------------------------------------------
 // turn.started seeds the state (never for intake-only sessions),
 // reasoning.appended, actions.requested, and action.result run this check,
@@ -304,7 +337,8 @@ const checkSlackProgress = async (
   channel.state.progress = { ...progress, posts: due.posts };
   // Re-set the status echo the post just cleared: the last reasoning status
   // when one was shown this turn, otherwise what the turn is waiting on.
-  await channel.thread.startTyping(
+  await restoreSlackStatus(
+    channel.thread,
     channel.state.lastReasoningTypingStatus ??
       (progress.waitLabel
         ? truncateTypingStatus(progress.waitLabel)

@@ -94,22 +94,27 @@ export const activeSlackTurn = async (
  * what eve answered. The notice is not posted here: eve's cancellation is
  * cooperative, so the turn ends at its next step boundary, and that is when
  * the channel's `turn.cancelled` handler posts it. A stop with no active
- * turn stays quiet.
+ * turn stays quiet. The path never rejects: dispatch is a Slack handler, and
+ * a stream read or cancel request that fails is logged as `error` instead.
  */
 export const cancelActiveSlackTurn = async (
   ctx: SlackInboundMessageContext
 ): Promise<void> => {
-  const session = await ctx.resolveSession();
-  const turnId = session ? await activeSlackTurn(session) : null;
-  const outcome =
-    session && turnId
-      ? (await session.cancel({ turnId })).status
-      : "no_active_turn";
-  logOpsEvent("slack.stop", {
-    outcome,
-    sessionId: session?.id ?? null,
-    turnId,
-  });
+  let sessionId: string | null = null;
+  let turnId: string | null = null;
+  let outcome = "error";
+  try {
+    const session = await ctx.resolveSession();
+    sessionId = session?.id ?? null;
+    turnId = session ? await activeSlackTurn(session) : null;
+    outcome =
+      session && turnId
+        ? (await session.cancel({ turnId })).status
+        : "no_active_turn";
+  } catch {
+    // Logged below with outcome "error"; the stop is consumed either way.
+  }
+  logOpsEvent("slack.stop", { outcome, sessionId, turnId });
 };
 
 const stopNoticeId = (
