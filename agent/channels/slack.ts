@@ -81,22 +81,23 @@ import { isIntakeOnly } from "../lib/trust.js";
  * cooperative cancellations and no-op requests against parked sessions stay
  * quiet.
  *
- * A turn still running at 5 and 15 minutes posts one short progress line at
- * each threshold and never a third. `turn.started` seeds the per-turn
- * progress state, skipping intake-only sessions entirely so those threads
- * receive the final answer and no intermediate lines. `reasoning.appended`,
- * `actions.requested`, and `action.result` are the checkpoints: they count
- * finished calls, record what the turn is waiting on, and post the line
- * `slack-progress.ts` says is due. The final `message.completed` branch,
- * `turn.cancelled`, and `turn.failed` clear the state without checking, so
- * a progress line can never precede, follow, or duplicate the
- * requester-facing reply, and a failed turn leaves nothing behind. eve
- * emits no event during a single uninterrupted tool execution and offers
- * authored channel code no durable wakeup, so a line that comes due
- * mid-action posts at the next lifecycle event. The overridden events all
- * carry eve defaults that are not exported; each handler mirrors its
- * default exactly (the same pattern as `message.completed` below) and adds
- * only the progress behavior.
+ * A turn still running posts one short progress line every 5 minutes until
+ * it ends, and re-sets the assistant status echo after each line, because a
+ * post clears it. `turn.started` seeds the per-turn progress state, skipping
+ * intake-only sessions entirely so those threads receive the final answer
+ * and no intermediate lines. `reasoning.appended`, `actions.requested`, and
+ * `action.result` are the checkpoints: they count finished calls, record
+ * what the turn is waiting on, and post the line `slack-progress.ts` says
+ * is due. The final `message.completed` branch, `turn.cancelled`, and
+ * `turn.failed` clear the state without checking, so a progress line can
+ * never precede, follow, or duplicate the requester-facing reply, and a
+ * failed turn leaves nothing behind. eve emits no event during a single
+ * uninterrupted tool execution or a parked delegation and offers authored
+ * channel code no durable wakeup, so a line that comes due mid-action posts
+ * at the next lifecycle event, as one line for however long the gap was.
+ * The overridden events all carry eve defaults that are not exported; each
+ * handler mirrors its default exactly (the same pattern as
+ * `message.completed` below) and adds only the progress behavior.
  *
  * Delivery sends each completed assistant response without a split marker;
  * an empty response falls back to a typing indicator. Slack rejects a
@@ -243,12 +244,13 @@ const extractErrorId = (
 // reasoning.appended, actions.requested, and action.result run this check,
 // and the final message.completed, turn.cancelled, and turn.failed tear the
 // state down. eve 0.44 emits no event during a single uninterrupted tool
-// execution and exposes no durable per-turn wakeup to authored channel code
-// (the durable sleep tool is model-invoked; schedules are static cron with
-// no access to another session's state), so a line that comes due
-// mid-action posts at the next lifecycle event. Thresholds are indexed by
-// posted-line count, so the extra checkpoints can never produce a third
-// line.
+// execution or a parked delegation and exposes no durable per-turn wakeup to
+// authored channel code (the durable sleep tool is model-invoked; schedules
+// are static cron with no access to another session's state), so a line that
+// comes due mid-action posts at the next lifecycle event, and the decision
+// helper skips the intervals that passed meanwhile so one checkpoint never
+// posts more than one line. A Slack post clears the assistant status the
+// thread was showing, so the checkpoint re-sets it right after the line.
 const checkSlackProgress = async (
   channel: SlackEventContext,
   turnId: string
@@ -257,16 +259,16 @@ const checkSlackProgress = async (
   if (!progress) {
     return;
   }
-  const line = decideSlackProgressLine(progress, Date.now());
-  if (!line) {
+  const due = decideSlackProgressLine(progress, Date.now());
+  if (!due) {
     return;
   }
   // A stable provider id keeps an ambiguous retry from creating a duplicate
   // if Slack accepted the first request but its response was lost. The
-  // logical identity is this turn's threshold, not the rendered text: if
-  // bookkeeping changes before a retry, Slack may retain the first accepted
-  // text so that one visible threshold line takes priority over freshness.
-  // threshold is consumed only after Slack confirms the idempotent post. A
+  // logical identity is this turn's posted-line count, not the rendered
+  // text: if bookkeeping changes before a retry, Slack may retain the first
+  // accepted text so that one visible line takes priority over freshness.
+  // The count is consumed only after Slack confirms the idempotent post. A
   // rejection stays unconsumed so the next checkpoint retries the same id.
   try {
     const response = await channel.slack.request("chat.postMessage", {
@@ -279,7 +281,7 @@ const checkSlackProgress = async (
         turnId,
         String(progress.posts)
       ),
-      text: line,
+      text: due.line,
       thread_ts: channel.slack.threadTs,
     });
     if (!response.ok) {
@@ -291,7 +293,15 @@ const checkSlackProgress = async (
     console.error("Slack progress post failed.", error);
     return;
   }
-  channel.state.progress = { ...progress, posts: progress.posts + 1 };
+  channel.state.progress = { ...progress, posts: due.posts };
+  // Re-set the status echo the post just cleared: the last reasoning status
+  // when one was shown this turn, otherwise what the turn is waiting on.
+  await channel.thread.startTyping(
+    channel.state.lastReasoningTypingStatus ??
+      (progress.waitLabel
+        ? truncateTypingStatus(progress.waitLabel)
+        : "Working...")
+  );
 };
 
 export const slackChannelEvents: SlackChannelEvents = {

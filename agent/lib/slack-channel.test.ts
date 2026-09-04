@@ -788,7 +788,7 @@ describe("slack channel progress", () => {
     assert.ok(progress.startedAtMs >= before);
   });
 
-  it("posts both thresholds in order across one long turn", async (t) => {
+  it("posts a line every 5 minutes across one long turn", async (t) => {
     const now = clock(t);
     const calls: string[] = [];
     const eventChannel = progressChannel(calls);
@@ -828,7 +828,7 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
-    // A further checkpoint after both lines never produces a third.
+    // Lines keep coming every 5 minutes for as long as the turn runs.
     now.advance(5 * MINUTE_MS);
     await handlerFor("action.result")(
       toolResultEvent,
@@ -842,13 +842,15 @@ describe("slack channel progress", () => {
     );
     assert.deepEqual(postsOf(calls), [
       "post:Still working: 5 minutes in, 0 tool calls so far.",
+      "post:Still working: 14 minutes in, 1 tool calls so far. Currently waiting on grep.",
       "post:Still working: 15 minutes in, 1 tool calls so far. Currently waiting on grep.",
+      "post:Still working: 20 minutes in, 2 tool calls so far. Currently waiting on grep.",
       "post:All done.",
     ]);
     assert.equal(eventChannel.state.progress, undefined);
   });
 
-  it("catches up one line per checkpoint when the first event arrives late", async (t) => {
+  it("posts one line for a late checkpoint and skips the missed intervals", async (t) => {
     const now = clock(t);
     const calls: string[] = [];
     const eventChannel = progressChannel(calls);
@@ -857,17 +859,18 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
-    // No lifecycle event until past both thresholds: the first checkpoint
-    // posts the overdue 5-minute line, the next one the 15-minute line.
-    now.advance(16 * MINUTE_MS);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("Back from a long tool call."),
+    // No lifecycle event for 33 minutes (a parked station delegation): the
+    // first checkpoint posts one line with the real elapsed time, and the
+    // checkpoints right after it post nothing until the next 5 minutes pass.
+    now.advance(33 * MINUTE_MS);
+    await handlerFor("action.result")(
+      subagentResultEvent,
       eventChannel,
       trustedCtx
     );
-    now.advance(MINUTE_MS);
-    await handlerFor("action.result")(
-      toolResultEvent,
+    now.advance(1000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Back from the implementer."),
       eventChannel,
       trustedCtx
     );
@@ -878,10 +881,74 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.deepEqual(postsOf(calls), [
-      "post:Still working: 5 minutes in, 0 tool calls so far.",
-      "post:Still working: 15 minutes in, 1 tool calls so far. Currently waiting on grep.",
+      "post:Still working: 33 minutes in, 0 tool calls so far. Currently waiting on investigator.",
     ]);
-    assert.equal(eventChannel.state.progress?.posts, 2);
+    assert.equal(eventChannel.state.progress?.posts, 6);
+    now.advance(MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(postsOf(calls).length, 2);
+    assert.equal(eventChannel.state.progress?.posts, 7);
+  });
+
+  it("re-sets the status echo right after each progress line", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    // No reasoning status shown yet: the wait label stands in for it.
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(calls.slice(-2), [
+      "post:Still working: 5 minutes in, 1 tool calls so far. Currently waiting on grep.",
+      "typing:grep",
+    ]);
+    // Once a reasoning status was shown, the line restores that status.
+    now.advance(1000);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Reading the failing test."),
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS);
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(calls.slice(-2), [
+      "post:Still working: 10 minutes in, 2 tool calls so far. Currently waiting on grep.",
+      "typing:Reading the failing test.",
+    ]);
+    // A cleared wait label and no reasoning status falls back to Working.
+    const bare = progressChannel(calls);
+    await handlerFor("turn.started")(turnStartedEvent, bare, trustedCtx);
+    now.advance(5 * MINUTE_MS);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent(""),
+      bare,
+      trustedCtx
+    );
+    assert.deepEqual(calls.slice(-2), [
+      "post:Still working: 5 minutes in, 0 tool calls so far.",
+      "typing:Working...",
+    ]);
   });
 
   it("retries an ambiguous progress post with the same provider id", async (t) => {

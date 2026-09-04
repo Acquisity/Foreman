@@ -1,14 +1,14 @@
 /**
- * Progress lines for long-running Slack turns. A turn still running at 5 and
- * 15 minutes gets one short line at each threshold and never a third: the
- * thresholds are indexed by how many lines the turn has already posted, so
- * two posted lines retire the helper for that turn no matter how long it
- * runs. The decision is pure; channel handlers own the state writes and the
- * posting.
+ * Progress lines for long-running Slack turns. A turn still running posts one
+ * short line every 5 minutes until it ends. The decision is pure and runs at
+ * lifecycle events only, so a checkpoint that arrives late (after a long tool
+ * call or a parked delegation) posts one line reporting the actual elapsed
+ * minutes and then skips the intervals it missed, never a burst of catch-up
+ * lines. Channel handlers own the state writes and the posting.
  */
 
-/** Elapsed-turn thresholds at which a progress line is due. */
-export const SLACK_PROGRESS_THRESHOLDS_MS = [300_000, 900_000] as const;
+/** Interval between progress lines, and the delay before the first one. */
+export const SLACK_PROGRESS_INTERVAL_MS = 300_000;
 
 /** Bound on the wait label so a progress line stays one short line. */
 export const SLACK_PROGRESS_LABEL_LIMIT = 80;
@@ -31,7 +31,7 @@ export interface SlackProgressState {
 
 declare module "eve/channels/slack" {
   interface SlackChannelState {
-    /** Per-turn progress state for the 5/15-minute lines. */
+    /** Per-turn progress state for the 5-minute lines. */
     progress?: SlackProgressState;
   }
 }
@@ -122,24 +122,29 @@ export const slackProgressActionRequestLabel = (
 };
 
 /**
- * Returns the progress line due at `nowMs`, or null when none is due: no
- * state, the next threshold not yet reached, or both lines already posted.
- * The posted-line count selects the threshold, so a turn can never produce
- * more than two lines.
+ * Returns the progress line due at `nowMs` with the `posts` count the state
+ * should carry once it is posted, or null when none is due: no state, or the
+ * next interval not yet reached. The posted-line count selects the interval,
+ * and the returned count jumps past every interval already elapsed, so one
+ * checkpoint posts at most one line however late it arrives.
  */
 export const decideSlackProgressLine = (
   state: SlackProgressState | null | undefined,
   nowMs: number
-): string | null => {
+): { readonly line: string; readonly posts: number } | null => {
   if (!state) {
     return null;
   }
-  const threshold = SLACK_PROGRESS_THRESHOLDS_MS[state.posts];
-  if (threshold === undefined || nowMs - state.startedAtMs < threshold) {
+  const elapsedMs = nowMs - state.startedAtMs;
+  const posts = Math.floor(elapsedMs / SLACK_PROGRESS_INTERVAL_MS);
+  if (posts <= state.posts) {
     return null;
   }
-  const minutes = threshold / 60_000;
+  const minutes = Math.floor(elapsedMs / 60_000);
   const label = state.waitLabel ? normalizeLabel(state.waitLabel) : "";
   const waiting = label ? ` Currently waiting on ${truncateLabel(label)}.` : "";
-  return `Still working: ${minutes} minutes in, ${state.toolCalls} tool calls so far.${waiting}`;
+  return {
+    line: `Still working: ${minutes} minutes in, ${state.toolCalls} tool calls so far.${waiting}`,
+    posts,
+  };
 };
