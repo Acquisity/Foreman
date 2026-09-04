@@ -138,6 +138,17 @@ describe("repository guidance", () => {
     );
   });
 
+  it("asks every station to return at a bounded checkpoint so the root gets an event", () => {
+    // ENG-13453: eve 0.44 emits no root event while a station runs, so the
+    // Slack progress line can only post when a station returns. The prompt
+    // rule is the chosen fix (option ii on the ticket); nothing enforces it.
+    assert.ok(
+      PIPELINE.includes(
+        "Tell every station in its message to return after about five minutes of work even when it is not finished, reporting what is done, what remains, and the artifact ids it produced, and re-delegate the remainder to the same station in a fresh self-contained message that carries that status."
+      )
+    );
+  });
+
   it("keeps the factory's own branch prefix on the implementer", () => {
     // Ownership, not permission: the GitHub channel recognizes the factory's
     // pull requests by this prefix for red-CI stabilization.
