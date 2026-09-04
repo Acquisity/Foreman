@@ -57,3 +57,13 @@ A tool-call duration is not expressible from a hook. `ActionResultStreamEvent.da
 Shipped: one bounded line per tool call with no duration, naming the tool, the connection, and `ok` or `error`. The hook keeps no state and starts no timer. Timing the call from a hook would mean carrying the `actions.requested` event's `meta.at`, keyed by call ID, and reading it back at `action.result`, which is hook-owned state that outlives the event that created it: it leaks whenever a call never returns, it is wrong under a resumed or replayed turn, and it invents a number eve never measured. That is exactly the unsafe approximation this file exists to avoid, so the line reports reach and failure and stays silent about latency.
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
+
+## 7. Tell a stop from any other cancellation in a channel handler
+
+Checked against eve 0.44.0. Recorded by ENG-13453 with the Slack cancellation notice.
+
+The Slack `turn.cancelled` handler posts the one short notice at the moment eve's cooperative cancellation ends the turn, and it cannot say what cancelled it. `TurnCancelledStreamEvent.data` carries only `sequence` and `turnId`; `SlackSessionOperations.cancel` and `Session.cancel` accept only `{ turnId }`, with no reason to carry through; and `SlackInboundMessageContext`, where dispatch consumes a literal `stop`, has no `state`, because eve hydrates `SlackChannelState` only for `events[type]` handlers. So dispatch has nowhere to record that a stop was requested, and the handler has nothing to read: a session reset, a declined or timed-out session limit, and a `stop` all arrive as the same event.
+
+Shipped: the notice is worded for every source, `Cancelled. This request did not finish.`, so it never claims a stop that did not happen. Keeping a stop flag outside eve would mean a store keyed by turn id that dispatch writes and a handler reads later, which leaks when the cancel never lands and is wrong under a replayed turn: hook-owned state outliving its event, the same shape section 6 refuses.
+
+Proposal: carry an optional `reason` on the cancel command through to `turn.cancelled` data, or hydrate channel state for the inbound message context so dispatch can leave a marker the settling handler reads.

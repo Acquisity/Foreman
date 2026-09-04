@@ -128,6 +128,27 @@ describe("repository guidance", () => {
     );
   });
 
+  it("links a created pull request and never fabricates one", () => {
+    // ENG-13453: the closing post is the requester's path to a created pull
+    // request, while clarification and no-ticket exits must remain truthful.
+    assert.ok(
+      PIPELINE.includes(
+        "When a pull request exists, the closing message of a factory turn contains its URL so the requester can open it from the thread. If the run stops before creating one, state that no pull request was created and why; never invent a URL."
+      )
+    );
+  });
+
+  it("asks every station to return at a bounded checkpoint so the root gets an event", () => {
+    // ENG-13453: eve 0.44 emits no root event while a station runs, so the
+    // Slack progress line can only post when a station returns. The prompt
+    // rule is the chosen fix (option ii on the ticket); nothing enforces it.
+    assert.ok(
+      PIPELINE.includes(
+        "Tell every station in its message to return after about five minutes of work even when it is not finished, reporting what is done, what remains, and the artifact ids it produced, and re-delegate the remainder to the same station in a fresh self-contained message that carries that status."
+      )
+    );
+  });
+
   it("keeps the factory's own branch prefix on the implementer", () => {
     // Ownership, not permission: the GitHub channel recognizes the factory's
     // pull requests by this prefix for red-CI stabilization.

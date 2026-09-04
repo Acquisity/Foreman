@@ -6,10 +6,12 @@ import {
   type SlackEventContext,
   type SlackInboundMessageContext,
   type SlackMessage,
+  type SlackThread,
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { isFactoryRequest } from "../lib/factory-lane.js";
+import { logOpsEvent } from "../lib/ops-log.js";
 import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import {
@@ -25,9 +27,11 @@ import {
   slackProgressActionRequestLabel,
 } from "../lib/slack-progress.js";
 import {
+  activeSlackTurn,
   cancelActiveSlackTurn,
   isStopRequest,
-  postStopConfirmation,
+  postCancelledNotice,
+  postQueuedNotice,
 } from "../lib/slack-stop.js";
 import { isIntakeOnly } from "../lib/trust.js";
 
@@ -71,32 +75,38 @@ import { isIntakeOnly } from "../lib/trust.js";
  * Later mentions wait behind the running turn instead of replacing it: the
  * queue turn policy delivers a follow-up after the active turn finishes,
  * where the default steer policy cancelled the active turn and silently lost
- * the earlier request. One message still cancels on purpose: a text that is
+ * the earlier request. A mention that arrives while a turn is active gets
+ * one line saying it is queued, so the requester is not left with silence
+ * until the turn ends. One message still cancels on purpose: a text that is
  * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
  * cancels the active turn through its exact session handle, and is consumed
- * without
- * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. The stop path posts the single short notice only
- * after the exact turn emits its durable cancellation boundary, so unrelated
- * cooperative cancellations and no-op requests against parked sessions stay
- * quiet.
+ * without reaching the model. Anything longer, such as `stop the deploy`, is
+ * ordinary model input. eve's cancellation is cooperative and lands at the
+ * turn's next step boundary, where its abort signal also reaches a running
+ * tool and every delegated child, so the `turn.cancelled` handler below is
+ * what posts the single short notice, at the moment the turn actually ends.
+ * That handler cannot tell a stop from any other cancellation, so the
+ * notice says the request was cancelled, not who cancelled it. A stop with
+ * no active turn stays quiet, and dispatch logs one ops line with what eve
+ * answered.
  *
- * A turn still running at 5 and 15 minutes posts one short progress line at
- * each threshold and never a third. `turn.started` seeds the per-turn
- * progress state, skipping intake-only sessions entirely so those threads
- * receive the final answer and no intermediate lines. `reasoning.appended`,
- * `actions.requested`, and `action.result` are the checkpoints: they count
- * finished calls, record what the turn is waiting on, and post the line
- * `slack-progress.ts` says is due. The final `message.completed` branch,
- * `turn.cancelled`, and `turn.failed` clear the state without checking, so
- * a progress line can never precede, follow, or duplicate the
- * requester-facing reply, and a failed turn leaves nothing behind. eve
- * emits no event during a single uninterrupted tool execution and offers
- * authored channel code no durable wakeup, so a line that comes due
- * mid-action posts at the next lifecycle event. The overridden events all
- * carry eve defaults that are not exported; each handler mirrors its
- * default exactly (the same pattern as `message.completed` below) and adds
- * only the progress behavior.
+ * A turn still running posts one short progress line every 5 minutes until
+ * it ends, and re-sets the assistant status echo after each line, because a
+ * post clears it. `turn.started` seeds the per-turn progress state, skipping
+ * intake-only sessions entirely so those threads receive the final answer
+ * and no intermediate lines. `reasoning.appended`, `actions.requested`, and
+ * `action.result` are the checkpoints: they count finished calls, record
+ * what the turn is waiting on, and post the line `slack-progress.ts` says
+ * is due. The final `message.completed` branch, `turn.cancelled`, and
+ * `turn.failed` clear the state without checking, so a progress line can
+ * never precede, follow, or duplicate the requester-facing reply, and a
+ * failed turn leaves nothing behind. eve emits no event during a single
+ * uninterrupted tool execution or a parked delegation and offers authored
+ * channel code no durable wakeup, so a line that comes due mid-action posts
+ * at the next lifecycle event, as one line for however long the gap was.
+ * The overridden events all carry eve defaults that are not exported; each
+ * handler mirrors its default exactly (the same pattern as
+ * `message.completed` below) and adds only the progress behavior.
  *
  * Delivery sends each completed assistant response without a split marker;
  * an empty response falls back to a typing indicator. Slack rejects a
@@ -120,15 +130,18 @@ export const dispatch = async (
     return null;
   }
   // A literal stop/cancel is a command for the running turn, never model
-  // input: cancel the exact active turn and consume the message. Confirming its
-  // durable cancellation boundary ties the notice to this command instead of
-  // another cooperative cancellation; with no active turn it drops quietly.
+  // input: cancel the exact active turn and consume the message. The notice
+  // is posted by the turn.cancelled handler when the cancellation lands.
   if (isStopRequest(message.text)) {
-    const cancelledTurnId = await cancelActiveSlackTurn(ctx);
-    if (cancelledTurnId) {
-      await postStopConfirmation(ctx, cancelledTurnId);
-    }
+    await cancelActiveSlackTurn(ctx);
     return null;
+  }
+  // Anything else that arrives during a turn is queued by eve behind it. Say
+  // so once, then restore the status echo the post just cleared. Both are
+  // contained: a probe or status failure must not cost the mention itself.
+  if (await probeActiveSlackTurn(ctx)) {
+    await postQueuedNotice(ctx, message.ts);
+    await restoreSlackStatus(ctx.thread, "Working...");
   }
   const repositories = extractRepositoryUrls(message.text);
   const [repository] = repositories;
@@ -238,17 +251,49 @@ const extractErrorId = (
   return typeof id === "string" && id.length > 0 ? id : undefined;
 };
 
+// --- Contained side effects -------------------------------------------------
+// Dispatch and the lifecycle handlers must never reject: eve discards a
+// mention whose dispatch throws and surfaces a thrown handler as turn.failed.
+// The active-turn probe reads the durable stream and the status re-set calls
+// Slack, and neither is worth the delivery, so each failure becomes one
+// bounded ops warning (the allowlisted `outcome` field only, never the error
+// body) and the caller carries on as if there were nothing to do.
+
+const probeActiveSlackTurn = async (
+  ctx: SlackInboundMessageContext
+): Promise<string | null> => {
+  try {
+    const session = await ctx.resolveSession();
+    return session ? await activeSlackTurn(session) : null;
+  } catch {
+    logOpsEvent("slack.active_turn", { outcome: "error" }, console.warn);
+    return null;
+  }
+};
+
+const restoreSlackStatus = async (
+  thread: SlackThread,
+  status: string
+): Promise<void> => {
+  try {
+    await thread.startTyping(status);
+  } catch {
+    logOpsEvent("slack.status", { outcome: "error" }, console.warn);
+  }
+};
+
 // --- Progress checkpoint ----------------------------------------------------
 // turn.started seeds the state (never for intake-only sessions),
 // reasoning.appended, actions.requested, and action.result run this check,
 // and the final message.completed, turn.cancelled, and turn.failed tear the
 // state down. eve 0.44 emits no event during a single uninterrupted tool
-// execution and exposes no durable per-turn wakeup to authored channel code
-// (the durable sleep tool is model-invoked; schedules are static cron with
-// no access to another session's state), so a line that comes due
-// mid-action posts at the next lifecycle event. Thresholds are indexed by
-// posted-line count, so the extra checkpoints can never produce a third
-// line.
+// execution or a parked delegation and exposes no durable per-turn wakeup to
+// authored channel code (the durable sleep tool is model-invoked; schedules
+// are static cron with no access to another session's state), so a line that
+// comes due mid-action posts at the next lifecycle event, and the decision
+// helper skips the intervals that passed meanwhile so one checkpoint never
+// posts more than one line. A Slack post clears the assistant status the
+// thread was showing, so the checkpoint re-sets it right after the line.
 const checkSlackProgress = async (
   channel: SlackEventContext,
   turnId: string
@@ -257,16 +302,16 @@ const checkSlackProgress = async (
   if (!progress) {
     return;
   }
-  const line = decideSlackProgressLine(progress, Date.now());
-  if (!line) {
+  const due = decideSlackProgressLine(progress, Date.now());
+  if (!due) {
     return;
   }
   // A stable provider id keeps an ambiguous retry from creating a duplicate
   // if Slack accepted the first request but its response was lost. The
-  // logical identity is this turn's threshold, not the rendered text: if
-  // bookkeeping changes before a retry, Slack may retain the first accepted
-  // text so that one visible threshold line takes priority over freshness.
-  // threshold is consumed only after Slack confirms the idempotent post. A
+  // logical identity is this turn's posted-line count, not the rendered
+  // text: if bookkeeping changes before a retry, Slack may retain the first
+  // accepted text so that one visible line takes priority over freshness.
+  // The count is consumed only after Slack confirms the idempotent post. A
   // rejection stays unconsumed so the next checkpoint retries the same id.
   try {
     const response = await channel.slack.request("chat.postMessage", {
@@ -279,7 +324,7 @@ const checkSlackProgress = async (
         turnId,
         String(progress.posts)
       ),
-      text: line,
+      text: due.line,
       thread_ts: channel.slack.threadTs,
     });
     if (!response.ok) {
@@ -291,7 +336,16 @@ const checkSlackProgress = async (
     console.error("Slack progress post failed.", error);
     return;
   }
-  channel.state.progress = { ...progress, posts: progress.posts + 1 };
+  channel.state.progress = { ...progress, posts: due.posts };
+  // Re-set the status echo the post just cleared: the last reasoning status
+  // when one was shown this turn, otherwise what the turn is waiting on.
+  await restoreSlackStatus(
+    channel.thread,
+    channel.state.lastReasoningTypingStatus ??
+      (progress.waitLabel
+        ? truncateTypingStatus(progress.waitLabel)
+        : "Working...")
+  );
 };
 
 export const slackChannelEvents: SlackChannelEvents = {
@@ -380,11 +434,16 @@ export const slackChannelEvents: SlackChannelEvents = {
     }
     await checkSlackProgress(channel, data.turnId);
   },
-  "turn.cancelled"(_data, channel) {
-    // The explicit stop path owns its exact-turn confirmation. This handler
-    // only tears down progress so unrelated cooperative cancellations stay
-    // quiet and no late checkpoint can post beside the stop notice.
+  async "turn.cancelled"(data, channel) {
+    // Progress goes first so no late checkpoint can post beside the notice.
+    // The notice itself lands here because this event is the moment eve's
+    // cooperative cancellation actually ends the turn, which may be one step
+    // boundary after the stop was requested. The event does not say what
+    // cancelled the turn, and dispatch has no channel state to leave a stop
+    // marker in, so the notice is worded for every source: a literal stop, a
+    // session reset, or a declined session limit all read the same line.
     channel.state.progress = undefined;
+    await postCancelledNotice(channel, data.turnId);
   },
   async "turn.failed"(data, channel) {
     // A failed turn leaves no progress state behind. Mirrors eve's default

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
-import { isStopRequest, postStopConfirmation } from "./slack-stop.js";
+import { isStopRequest, postCancelledNotice } from "./slack-stop.js";
 
 describe("isStopRequest", () => {
   it("accepts the bare words stop and cancel", () => {
@@ -83,7 +83,7 @@ describe("isStopRequest", () => {
   });
 });
 
-describe("postStopConfirmation", () => {
+describe("postCancelledNotice", () => {
   it("keeps the legacy id stable when retrying an ambiguously accepted post", async (t) => {
     t.mock.method(console, "warn", () => undefined);
     const acceptedIds = new Set<string>();
@@ -111,13 +111,13 @@ describe("postStopConfirmation", () => {
       },
     } as unknown as SlackInboundMessageContext;
 
-    await postStopConfirmation(ctx, "t1");
-    await postStopConfirmation(ctx, "t1");
+    await postCancelledNotice(ctx, "t1");
+    await postCancelledNotice(ctx, "t1");
 
     assert.deepEqual(attemptedIds, [
       "03b20daa-a654-590a-8629-6e46c73043e0",
       "03b20daa-a654-590a-8629-6e46c73043e0",
     ]);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.deepEqual(posts, ["Cancelled. This request did not finish."]);
   });
 });
