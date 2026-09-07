@@ -89,7 +89,7 @@ describe("Instantly Workspace Group", () => {
         : json({ items: [member()], next_starting_after: "next-page" });
     };
 
-    const result = await listInstantlySubworkspaces("secret-key", {
+    const result = await listInstantlySubworkspaces({
       fetch: fetchStub,
     });
 
@@ -110,7 +110,7 @@ describe("Instantly Workspace Group", () => {
     for (const { init } of calls) {
       assert.equal(init?.method, "GET");
       const headers = new Headers(init?.headers);
-      assert.equal(headers.get("Authorization"), "Bearer secret-key");
+      assert.equal(headers.get("Authorization"), null);
       assert.equal(headers.has("x-as-workspace"), false);
     }
   });
@@ -118,7 +118,7 @@ describe("Instantly Workspace Group", () => {
   it("does not expose provider error bodies", async () => {
     let canceled = 0;
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () =>
           cancelableError(401, () => {
             canceled += 1;
@@ -138,7 +138,7 @@ describe("Instantly Workspace Group", () => {
   it("rejects a credential for a different admin workspace", async () => {
     let calls = 0;
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () => {
           calls += 1;
           return json({
@@ -164,7 +164,7 @@ describe("Instantly Workspace Group", () => {
     let calls = 0;
     let canceled = 0;
     const delays: number[] = [];
-    const result = await listInstantlySubworkspaces("secret-key", {
+    const result = await listInstantlySubworkspaces({
       fetch: () => {
         calls += 1;
         return calls === 1
@@ -191,7 +191,7 @@ describe("Instantly Workspace Group", () => {
 
   it("returns a safe error instead of sleeping through a long rate limit", async () => {
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () => json({}, 429, { "Retry-After": "60" }),
       }),
       (error) => {
@@ -206,7 +206,7 @@ describe("Instantly Workspace Group", () => {
   it("retries transient network failures with bounded backoff", async () => {
     let calls = 0;
     const delays: number[] = [];
-    const result = await listInstantlySubworkspaces("secret-key", {
+    const result = await listInstantlySubworkspaces({
       fetch: () => {
         calls += 1;
         return calls < 3
@@ -226,7 +226,7 @@ describe("Instantly Workspace Group", () => {
 
   it("rejects a repeated cursor instead of looping", async () => {
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () =>
           json({ items: [member()], next_starting_after: "same-cursor" }),
       }),
@@ -237,7 +237,7 @@ describe("Instantly Workspace Group", () => {
   it("fails closed when the Workspace Group exceeds 100 pages", async () => {
     let calls = 0;
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () => {
           calls += 1;
           return json({
@@ -258,7 +258,7 @@ describe("Instantly Workspace Group", () => {
 
   it("rejects an oversized streamed provider response", async () => {
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () =>
           Promise.resolve(
             new Response("x".repeat(MAX_TEST_RESPONSE_BYTES + 1))
@@ -275,7 +275,7 @@ describe("Instantly Workspace Group", () => {
   it("cancels a response whose declared length exceeds the limit", async () => {
     let canceled = 0;
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: () =>
           cancelableError(
             200,
@@ -302,7 +302,6 @@ describe("Instantly subworkspace reads", () => {
         let calls = 0;
         await assert.rejects(
           readInstantlySubworkspace(
-            "secret-key",
             { id: WORKSPACE_ID },
             "campaigns",
             { limit },
@@ -358,7 +357,6 @@ describe("Instantly subworkspace reads", () => {
     };
 
     const result = await readInstantlySubworkspace(
-      "secret-key",
       { id: WORKSPACE_ID },
       "campaigns",
       { limit: 50, search: "Renewals", startingAfter: "campaign-cursor" },
@@ -379,13 +377,12 @@ describe("Instantly subworkspace reads", () => {
       true
     );
     const headers = new Headers(calls[2]?.init?.headers);
-    assert.equal(headers.get("Authorization"), "Bearer secret-key");
+    assert.equal(headers.get("Authorization"), null);
     assert.equal(headers.get("x-as-workspace"), WORKSPACE_ID);
   });
 
   it("normalizes an exact workspace name and rejects ambiguous matches", async () => {
     const result = await readInstantlySubworkspace(
-      "secret-key",
       { name: "  RICK   LIVINGSTON'S workspace " },
       "accounts",
       {},
@@ -400,7 +397,6 @@ describe("Instantly subworkspace reads", () => {
 
     await assert.rejects(
       readInstantlySubworkspace(
-        "secret-key",
         { name: "Duplicate" },
         "accounts",
         {},
@@ -428,7 +424,6 @@ describe("Instantly subworkspace reads", () => {
         let calls = 0;
         await assert.rejects(
           readInstantlySubworkspace(
-            "secret-key",
             { id: WORKSPACE_ID },
             "accounts",
             {},
@@ -448,7 +443,6 @@ describe("Instantly subworkspace reads", () => {
 
   it("allowlists account fields instead of returning provider credentials", async () => {
     const result = await readInstantlySubworkspace(
-      "secret-key",
       { id: WORKSPACE_ID },
       "accounts",
       {},
@@ -479,7 +473,6 @@ describe("Instantly subworkspace reads", () => {
     const preview = "x".repeat(MAX_TEST_RESPONSE_BYTES - 150);
     await assert.rejects(
       readInstantlySubworkspace(
-        "secret-key",
         { id: WORKSPACE_ID },
         "emails",
         {},
@@ -527,7 +520,6 @@ describe("Instantly subworkspace reads", () => {
     };
 
     const result = await readInstantlySubworkspace(
-      "secret-key",
       { id: WORKSPACE_ID },
       "emails",
       {
@@ -626,7 +618,7 @@ describe("Instantly request deadlines", () => {
         : json({ items: [member({ sub_workspace_id: SECOND_WORKSPACE_ID })] });
     };
 
-    const result = await listInstantlySubworkspaces("secret-key", {
+    const result = await listInstantlySubworkspaces({
       fetch: fetchStub,
       signal: controller.signal,
     });
@@ -654,7 +646,7 @@ describe("Instantly request deadlines", () => {
       return json({ items: [member()] });
     };
 
-    await listInstantlySubworkspaces("secret-key", { fetch: fetchStub });
+    await listInstantlySubworkspaces({ fetch: fetchStub });
 
     assert.ok(sent instanceof AbortSignal);
     assert.equal(sent.aborted, false);
@@ -663,7 +655,7 @@ describe("Instantly request deadlines", () => {
   it("maps an expired deadline to the Instantly timeout message", async () => {
     await withDeadlineTimer(async (expire) => {
       const { pending, started } = startRead((fetchImpl) =>
-        listInstantlySubworkspaces("secret-key", { fetch: fetchImpl })
+        listInstantlySubworkspaces({ fetch: fetchImpl })
       );
       await started;
 
@@ -684,7 +676,7 @@ describe("Instantly request deadlines", () => {
         calls += 1;
         return signalDrivenFetch(() => ready())(url, init);
       };
-      const pending = listInstantlySubworkspaces("secret-key", {
+      const pending = listInstantlySubworkspaces({
         fetch: countingFetch,
         sleep: () => Promise.resolve(),
       });
@@ -701,7 +693,7 @@ describe("Instantly request deadlines", () => {
     await withDeadlineTimer(async (expire) => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
-        listInstantlySubworkspaces("secret-key", {
+        listInstantlySubworkspaces({
           fetch: fetchImpl,
           signal: controller.signal,
         })
@@ -721,7 +713,7 @@ describe("Instantly request deadlines", () => {
     await withDeadlineTimer(async (expire) => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
-        listInstantlySubworkspaces("secret-key", {
+        listInstantlySubworkspaces({
           fetch: fetchImpl,
           signal: controller.signal,
         })
@@ -741,7 +733,6 @@ describe("Instantly request deadlines", () => {
 
     await assert.rejects(
       readInstantlySubworkspace(
-        "secret-key",
         { id: WORKSPACE_ID },
         "accounts",
         {},
@@ -780,7 +771,7 @@ describe("Instantly request deadlines", () => {
         );
       };
 
-      const pending = listInstantlySubworkspaces("secret-key", {
+      const pending = listInstantlySubworkspaces({
         fetch: fetchStub,
         sleep: () => Promise.resolve(),
       });
@@ -827,7 +818,7 @@ describe("Instantly request deadlines", () => {
           )
         );
 
-      const pending = listInstantlySubworkspaces("secret-key", {
+      const pending = listInstantlySubworkspaces({
         fetch: fetchStub,
       });
       await discarding;
@@ -860,7 +851,7 @@ describe("Instantly request deadlines", () => {
           )
         );
 
-      const pending = listInstantlySubworkspaces("secret-key", {
+      const pending = listInstantlySubworkspaces({
         fetch: fetchStub,
       });
       await discarding;
@@ -896,7 +887,7 @@ describe("Instantly request deadlines", () => {
           )
         );
 
-      const pending = listInstantlySubworkspaces("secret-key", {
+      const pending = listInstantlySubworkspaces({
         fetch: fetchStub,
       });
       await reading;
@@ -939,7 +930,7 @@ describe("Instantly request deadlines", () => {
       );
     };
 
-    const pending = listInstantlySubworkspaces("secret-key", {
+    const pending = listInstantlySubworkspaces({
       fetch: fetchStub,
       signal: controller.signal,
       sleep: () => Promise.resolve(),
@@ -962,7 +953,7 @@ describe("Instantly request deadlines", () => {
     };
 
     await assert.rejects(
-      listInstantlySubworkspaces("secret-key", {
+      listInstantlySubworkspaces({
         fetch: timeoutNamedFetch,
         sleep: () => Promise.resolve(),
       }),

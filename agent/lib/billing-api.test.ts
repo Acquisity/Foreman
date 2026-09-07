@@ -44,7 +44,7 @@ describe("Autumn billing API", () => {
       });
     };
 
-    const result = await readAutumnCustomer("secret-key", "org_123", {
+    const result = await readAutumnCustomer("org_123", {
       fetch: fetchStub,
     });
 
@@ -54,10 +54,7 @@ describe("Autumn billing API", () => {
     });
     assert.equal(calledUrl, "https://api.useautumn.com/v1/customers.get");
     assert.equal(calledInit?.method, "POST");
-    assert.equal(
-      new Headers(calledInit?.headers).get("Authorization"),
-      "Bearer secret-key"
-    );
+    assert.equal(new Headers(calledInit?.headers).get("Authorization"), null);
     assert.equal(
       new Headers(calledInit?.headers).get("x-api-version"),
       "2.3.0"
@@ -78,7 +75,7 @@ describe("Autumn billing API", () => {
       Promise.resolve(new Response("secret provider detail", { status: 403 }));
 
     await assert.rejects(
-      readAutumnCustomer("secret-key", "org_123", { fetch: fetchStub }),
+      readAutumnCustomer("org_123", { fetch: fetchStub }),
       (error) => {
         assert.ok(error instanceof BillingApiError);
         assert.equal(error.status, 403);
@@ -99,7 +96,7 @@ describe("Autumn billing API 404", () => {
       );
 
     await assert.rejects(
-      readAutumnCustomer("secret-key", "org_123", { fetch: fetchStub }),
+      readAutumnCustomer("org_123", { fetch: fetchStub }),
       AUTUMN_WRONG_ID
     );
   });
@@ -161,11 +158,9 @@ describe("Stripe billing API", () => {
       });
     };
 
-    const result = await readStripeCustomerBilling(
-      "restricted-key",
-      "cus_123",
-      { fetch: fetchStub }
-    );
+    const result = await readStripeCustomerBilling("cus_123", {
+      fetch: fetchStub,
+    });
 
     assert.equal(Object.keys(result).length, 6);
     assert.deepEqual(
@@ -181,10 +176,7 @@ describe("Stripe billing API", () => {
     );
     for (const { init } of calls) {
       assert.equal(init?.method, "GET");
-      assert.equal(
-        new Headers(init?.headers).get("Authorization"),
-        "Bearer restricted-key"
-      );
+      assert.equal(new Headers(init?.headers).get("Authorization"), null);
     }
     const serialized = JSON.stringify(result);
     assert.equal(serialized.includes("customer@example.com"), false);
@@ -202,11 +194,9 @@ describe("Stripe billing API", () => {
         ? json({ error: "permission denied" }, 403)
         : json({ data: [] });
 
-    const result = await readStripeCustomerBilling(
-      "restricted-key",
-      "cus_123",
-      { fetch: fetchStub }
-    );
+    const result = await readStripeCustomerBilling("cus_123", {
+      fetch: fetchStub,
+    });
 
     assert.equal(result.creditNotes.error, "Stripe read failed with HTTP 403.");
     assert.deepEqual(result.charges.data, { data: [] });
@@ -219,7 +209,7 @@ describe("Stripe billing API", () => {
       return json({ data: [] });
     };
 
-    await readStripePromotionCode("restricted-key", "SAVE & WIN", {
+    await readStripePromotionCode("SAVE & WIN", {
       fetch: fetchStub,
     });
 
@@ -236,13 +226,13 @@ describe("Stripe billing API", () => {
       return json({ id: "known" });
     };
 
-    await readStripeCharge("restricted-key", "ch_123", {
+    await readStripeCharge("ch_123", {
       fetch: fetchStub,
     });
-    await readStripeRefund("restricted-key", "re_123", {
+    await readStripeRefund("re_123", {
       fetch: fetchStub,
     });
-    await readStripeDispute("restricted-key", "du_123", {
+    await readStripeDispute("du_123", {
       fetch: fetchStub,
     });
 
@@ -260,7 +250,7 @@ describe("Stripe billing API", () => {
       Promise.reject(new DOMException("Canceled", "AbortError"));
 
     await assert.rejects(
-      readStripeCustomerBilling("restricted-key", "cus_123", {
+      readStripeCustomerBilling("cus_123", {
         fetch: fetchStub,
         signal: controller.signal,
       }),
@@ -273,7 +263,7 @@ describe("Stripe billing API", () => {
       json({ data: [{ description: "x".repeat(50 * 1024) }] });
 
     await assert.rejects(
-      readStripeCustomerBilling("restricted-key", "cus_123", {
+      readStripeCustomerBilling("cus_123", {
         fetch: fetchStub,
       }),
       STRIPE_TOO_MUCH_DATA
@@ -286,7 +276,7 @@ describe("billing response bounds", () => {
 
   it("rejects an oversized Autumn response while streaming", async () => {
     await assert.rejects(
-      readAutumnCustomer("secret-key", "org_123", {
+      readAutumnCustomer("org_123", {
         fetch: () => json(oversized),
       }),
       AUTUMN_TOO_MUCH_DATA
@@ -295,7 +285,7 @@ describe("billing response bounds", () => {
 
   it("rejects an oversized Stripe response while streaming", async () => {
     await assert.rejects(
-      readStripePromotionCode("restricted-key", "SAVE", {
+      readStripePromotionCode("SAVE", {
         fetch: () => json(oversized),
       }),
       STRIPE_TOO_MUCH_DATA
@@ -355,9 +345,9 @@ describe("billing read deadlines", () => {
     };
     const options = { fetch: fetchStub, signal: controller.signal };
 
-    await readAutumnCustomer("secret-key", "org_123", options);
-    await readStripeCharge("restricted-key", "ch_123", options);
-    await readStripeCustomerBilling("restricted-key", "cus_123", options);
+    await readAutumnCustomer("org_123", options);
+    await readStripeCharge("ch_123", options);
+    await readStripeCustomerBilling("cus_123", options);
 
     assert.equal(sent.length, 8);
     for (const signal of sent) {
@@ -378,7 +368,7 @@ describe("billing read deadlines", () => {
       return json({ id: "re_123" });
     };
 
-    await readStripeRefund("restricted-key", "re_123", { fetch: fetchStub });
+    await readStripeRefund("re_123", { fetch: fetchStub });
 
     assert.ok(sent instanceof AbortSignal);
     assert.equal(sent.aborted, false);
@@ -387,7 +377,7 @@ describe("billing read deadlines", () => {
   it("maps an expired deadline to the Autumn timeout message", async () => {
     await withDeadlineTimer(async (expire) => {
       const { pending, started } = startRead((fetchImpl) =>
-        readAutumnCustomer("secret-key", "org_123", { fetch: fetchImpl })
+        readAutumnCustomer("org_123", { fetch: fetchImpl })
       );
       await started;
 
@@ -400,7 +390,7 @@ describe("billing read deadlines", () => {
   it("maps an expired deadline to the Stripe timeout message", async () => {
     await withDeadlineTimer(async (expire) => {
       const { pending, started } = startRead((fetchImpl) =>
-        readStripeCharge("restricted-key", "ch_123", { fetch: fetchImpl })
+        readStripeCharge("ch_123", { fetch: fetchImpl })
       );
       await started;
 
@@ -414,7 +404,7 @@ describe("billing read deadlines", () => {
     await withDeadlineTimer(async (expire) => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
-        readStripeCharge("restricted-key", "ch_123", {
+        readStripeCharge("ch_123", {
           fetch: fetchImpl,
           signal: controller.signal,
         })
@@ -434,7 +424,7 @@ describe("billing read deadlines", () => {
     await withDeadlineTimer(async (expire) => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
-        readAutumnCustomer("secret-key", "org_123", {
+        readAutumnCustomer("org_123", {
           fetch: fetchImpl,
           signal: controller.signal,
         })
@@ -453,7 +443,7 @@ describe("billing read deadlines", () => {
     controller.abort();
 
     await assert.rejects(
-      readAutumnCustomer("secret-key", "org_123", {
+      readAutumnCustomer("org_123", {
         fetch: signalDrivenFetch(),
         signal: controller.signal,
       }),
@@ -466,7 +456,7 @@ describe("billing read deadlines", () => {
       Promise.reject(new DOMException("Upstream timed out.", "TimeoutError"));
 
     await assert.rejects(
-      readStripeCharge("restricted-key", "ch_123", {
+      readStripeCharge("ch_123", {
         fetch: timeoutNamedFetch,
       }),
       STRIPE_UNREACHABLE

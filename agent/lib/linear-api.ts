@@ -1,8 +1,6 @@
-/**
- * Direct Linear GraphQL access for authored tools, sharing the app-scoped
- * `linearAuth` installation with the MCP connection. The token is sent only
- * as a bearer header and never appears in errors or results.
- */
+import { requiredFetch } from "./executor/required-fetch.js";
+
+/** Fixed Linear GraphQL operations. The injected Executor transport supplies provider authentication; this module retains routing and document semantics. */
 
 const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -17,17 +15,15 @@ export interface LinearGraphqlOptions {
  * throws an Error carrying the messages and nothing else.
  */
 export async function linearGraphql<T>(
-  token: string,
   query: string,
   variables: Record<string, unknown>,
   opts?: LinearGraphqlOptions
 ): Promise<T> {
-  const fetchImpl = opts?.fetch ?? fetch;
+  const fetchImpl = requiredFetch(opts?.fetch);
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const response = await fetchImpl(LINEAR_GRAPHQL_URL, {
     body: JSON.stringify({ query, variables }),
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     method: "POST",
@@ -154,7 +150,6 @@ const toRelatedIssue = (node: IssueNode, phrase: string): RelatedIssue => ({
 
 /** Runs one phrase's query, following cursors, merging into `byId`. Returns whether pages were dropped. */
 async function searchPhrase(
-  token: string,
   phrase: string,
   filter: Record<string, unknown>,
   masters: boolean,
@@ -166,7 +161,6 @@ async function searchPhrase(
   do {
     // biome-ignore lint/performance/noAwaitInLoops: cursors are sequential.
     const data: IssuesData = await linearGraphql<IssuesData>(
-      token,
       ISSUES_QUERY,
       {
         after,
@@ -202,7 +196,6 @@ async function searchPhrase(
  * deduped by id, each carrying the phrases that matched it.
  */
 export async function findRelatedIssues(
-  token: string,
   input: FindRelatedIssuesInput,
   opts?: LinearGraphqlOptions & { now?: Date }
 ): Promise<FindRelatedIssuesResult> {
@@ -226,7 +219,7 @@ export async function findRelatedIssues(
         }
       : phraseFilter(phrase);
     // biome-ignore lint/performance/noAwaitInLoops: phrases run one at a time to keep Linear rate limits and result order predictable.
-    if (await searchPhrase(token, phrase, filter, masters, byId, opts)) {
+    if (await searchPhrase(phrase, filter, masters, byId, opts)) {
       truncated = true;
     }
   }
@@ -291,7 +284,6 @@ export interface SaveInvestigationDocumentResult {
  * the read-back value is the version pin the critic packet needs.
  */
 export async function saveInvestigationDocument(
-  token: string,
   input: { content: string; issue: string; lane: InvestigationLane },
   opts?: LinearGraphqlOptions
 ): Promise<SaveInvestigationDocumentResult> {
@@ -301,7 +293,7 @@ export async function saveInvestigationDocument(
       documents: { nodes: Array<{ id: string; title: string }> };
       id: string;
     };
-  }>(token, ISSUE_DOCUMENTS_QUERY, { id: input.issue, title }, opts);
+  }>(ISSUE_DOCUMENTS_QUERY, { id: input.issue, title }, opts);
 
   const matches = issue.documents.nodes.filter((node) => node.title === title);
   if (matches.length > 1) {
@@ -314,36 +306,30 @@ export async function saveInvestigationDocument(
     const { documentUpdate } = await linearGraphql<{
       documentUpdate: DocumentPayload;
     }>(
-      token,
       DOCUMENT_UPDATE,
       { id: existing.id, input: { content: input.content, title } },
       opts
     );
-    return { created: false, ...(await readBack(token, documentUpdate, opts)) };
+    return { created: false, ...(await readBack(documentUpdate, opts)) };
   }
   const { documentCreate } = await linearGraphql<{
     documentCreate: DocumentPayload;
   }>(
-    token,
     DOCUMENT_CREATE,
     { input: { content: input.content, issueId: issue.id, title } },
     opts
   );
-  return { created: true, ...(await readBack(token, documentCreate, opts)) };
+  return { created: true, ...(await readBack(documentCreate, opts)) };
 }
 
-async function readBack(
-  token: string,
-  payload: DocumentPayload,
-  opts?: LinearGraphqlOptions
-) {
+async function readBack(payload: DocumentPayload, opts?: LinearGraphqlOptions) {
   if (!payload.success) {
     throw new Error("Linear did not confirm the document write.");
   }
   try {
     const { document } = await linearGraphql<{
       document: { id: string; updatedAt: string; url: string };
-    }>(token, DOCUMENT_QUERY, { id: payload.document.id }, opts);
+    }>(DOCUMENT_QUERY, { id: payload.document.id }, opts);
     return {
       documentId: document.id,
       updatedAt: document.updatedAt,
@@ -621,12 +607,10 @@ async function buildUpdate(
  * a failed relation, link, or read-back becomes a warning.
  */
 export async function routeTicket(
-  token: string,
   input: RouteTicketInput,
   opts?: LinearGraphqlOptions
 ): Promise<RouteTicketResult> {
-  const gql: Gql = (query, variables) =>
-    linearGraphql(token, query, variables, opts);
+  const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
 
   const issue = await requireIssue(gql, input.issue);
 

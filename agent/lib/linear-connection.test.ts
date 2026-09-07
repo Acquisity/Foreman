@@ -5,19 +5,25 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ApprovalContext } from "eve/tools";
 import { AUTONOMOUS_PRINCIPAL, UNATTENDED_ATTRIBUTE } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??=
-  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
-const linear = (await import("../connections/linear.js")).default;
 
-const approve = (toolName: string, auth: Record<string, unknown> | null) =>
-  (linear.approval as (ctx: ApprovalContext) => unknown)({
-    session: { auth: { current: auth } },
-    toolName,
-  } as unknown as ApprovalContext);
+import type { SessionAuthContext } from "eve/context";
+import { providerAllowlist } from "./executor/policy.js";
+import { executorProfile } from "./executor/profiles.js";
+
+const approve = (toolName: string, auth: Record<string, unknown> | null) => {
+  const allowed = providerAllowlist(
+    "linear",
+    "root",
+    executorProfile(auth as SessionAuthContext | null)
+  );
+  const name = toolName.replace("linear__", "");
+  return allowed.includes("*") || allowed.includes(name)
+    ? "not-applicable"
+    : { type: "denied" };
+};
 
 const SCHEDULED = { attributes: { [UNATTENDED_ATTRIBUTE]: "true" } };
 const FACTORY = { attributes: {}, principalId: AUTONOMOUS_PRINCIPAL };

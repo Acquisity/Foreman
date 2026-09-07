@@ -453,21 +453,21 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ["Investigation memory", "root, bare"],
     ["Customer identity", "root, bare"],
     ["PlanetScale data", "root, bare"],
-    ["PlanetScale connection", "planetscale__"],
+    ["PlanetScale connection", "Executor: planetscale"],
     ["Instantly", "root, bare"],
     ["Linear searches and routing writes", "root, bare"],
-    ["Linear connection", "linear__"],
+    ["Linear connection", "Executor: linear"],
     ["Inngest runs", "root, bare"],
-    ["Inngest connection", "inngest__"],
-    ["Sentry", "sentry__"],
-    ["Axiom", "axiom__"],
-    ["PostHog", "posthog__"],
-    ["Lucent", "lucent__"],
-    ["Jam", "jam__"],
-    ["Vercel", "vercel__"],
-    ["Intercom", "intercom__"],
-    ["Resend", "resend__"],
-    ["Modem", "modem__"],
+    ["Inngest connection", "Executor: inngest"],
+    ["Sentry", "Executor: sentry"],
+    ["Axiom", "Executor: axiom"],
+    ["PostHog", "Executor: posthog"],
+    ["Lucent", "Executor: lucent"],
+    ["Jam", "Executor: jam"],
+    ["Vercel", "Executor: vercel"],
+    ["Intercom", "Executor: intercom"],
+    ["Resend", "Executor: resend"],
+    ["Modem", "Executor: modem"],
   ];
   assert.deepEqual(
     parsedRows,
@@ -478,9 +478,9 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     }))
   );
   for (const note of [
-    "Never invent a tool name from a service's REST API or CLI",
-    "with the `connection` argument naming one connection",
-    "never as `planetscale__planetscale_execute_read_query`",
+    "Never guess paths",
+    "with the `connection` argument set to the Executor connection",
+    "Authored Foreman helpers keep their bare names",
     "no allowlist",
     "kebab-case",
     "`truncated`",
@@ -798,7 +798,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
     "### A confirmed Bug: create the report, then hand off",
     "## Step 7:"
   );
-  const createReport = bugHandoff.indexOf("`linear__save_issue`");
+  const createReport = bugHandoff.indexOf("`save_issue`");
   const checkpoint = bugHandoff.indexOf(STAGE_4_CHECKPOINT);
   const handoff = bugHandoff.indexOf("load `triage-handling`");
 
@@ -806,7 +806,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   assert.ok(checkpoint > createReport);
   assert.ok(handoff > checkpoint);
   assert.ok(bugHandoff.includes("The report must exist before the handoff"));
-  // Both `linear__save_issue` sites inherit the title rule stated with the claim.
+  // Both `save_issue` sites inherit the title rule stated with the claim.
   assert.ok(
     intercomTriageSkill.includes(
       "This sentence, minus customer identifiers, is the title of any issue this skill creates."
@@ -816,9 +816,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   const titleRule = intercomTriageSkill.indexOf(
     "is the title of any issue this skill creates"
   );
-  const issueCreationCalls = [
-    ...intercomTriageSkill.matchAll(/`linear__save_issue`/g),
-  ];
+  const issueCreationCalls = [...intercomTriageSkill.matchAll(/`save_issue`/g)];
   assert.equal(issueCreationCalls.length, 2, "both issue-creation sites exist");
   assert.ok(
     issueCreationCalls.every(

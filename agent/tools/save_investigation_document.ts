@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { linearAuth } from "#lib/constants.js";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import { denyUnattendedWrites } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
@@ -59,8 +59,8 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(linearAuth);
-      const result = await saveInvestigationDocument(token, input, {
+      const result = await saveInvestigationDocument(input, {
+        fetch: executorProviderFetch(ctx, "linear"),
         signal: ctx.abortSignal,
       });
       return { saved: true as const, ...result };

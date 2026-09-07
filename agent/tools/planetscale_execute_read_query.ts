@@ -1,11 +1,9 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { planetscaleAuth } from "#lib/constants.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import {
   buildReadQueryResult,
   callPlanetscaleReadQuery,
-  PlanetscaleHttpError,
   parseReadQueryResult,
 } from "#lib/planetscale.js";
 
@@ -34,8 +32,6 @@ export default defineTool({
     "`envelopeTooLarge` is true the server returned oversized metadata, so retry with a plain " +
     "query. When `raw` is present the result could not be parsed, so inspect it. Never run a write.",
   async execute(input, ctx) {
-    const { token } = await ctx.getToken(planetscaleAuth);
-
     // Production coordinates are fixed; the model only ever passes `query`.
     // Leaving them out used to fail the call and send the model hunting for
     // them through the raw PlanetScale list tools (seen 2026-08-28).
@@ -61,17 +57,8 @@ export default defineTool({
 
     let text: string;
     try {
-      text = await callPlanetscaleReadQuery(token, args);
+      text = await callPlanetscaleReadQuery(ctx, args);
     } catch (error) {
-      // A grant revoked mid-flight surfaces as a downstream 401/403; re-challenge
-      // so eve evicts the dead bearer and mints a fresh token instead of handing
-      // the model a dead-token error.
-      if (
-        error instanceof PlanetscaleHttpError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        ctx.requireAuth(planetscaleAuth);
-      }
       return {
         error: error instanceof Error ? error.message : "Read query failed.",
         success: false as const,

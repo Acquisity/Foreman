@@ -23,7 +23,7 @@ import {
  * @remarks
  * This is not customer data and not production evidence. PlanetScale remains
  * the only production database a triage investigation reads, and the
- * user-scoped `neon__*` MCP connection is unrelated to this and must not be
+ * Neon service reached through Executor is unrelated to this and must not be
  * used for memory.
  *
  * The tenant is a module constant. It is never taken from model input, never

@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { linearAuth } from "#lib/constants.js";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import { denyUnattendedWrites } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
@@ -19,8 +19,8 @@ export default defineTool({
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     try {
-      const { token } = await ctx.getToken(linearAuth);
-      const ticket = await routeTicket(token, input, {
+      const ticket = await routeTicket(input, {
+        fetch: executorProviderFetch(ctx, "linear"),
         signal: ctx.abortSignal,
       });
       return { routed: true as const, ...ticket };

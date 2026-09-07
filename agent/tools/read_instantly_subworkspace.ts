@@ -1,10 +1,10 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import {
   InstantlyApiError,
   readInstantlySubworkspace,
 } from "#lib/instantly-api.js";
-import { instantlyApiAuth } from "#lib/instantly-api-auth.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 const cursor = z.string().trim().min(1).max(512).optional();
@@ -108,18 +108,19 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(instantlyApiAuth);
       const { resource, workspaceId, workspaceName, ...query } = input;
       return {
         available: true as const,
         data: await readInstantlySubworkspace(
-          token,
           workspaceId === undefined
             ? { name: workspaceName }
             : { id: workspaceId },
           resource,
           query,
-          { signal: ctx.abortSignal }
+          {
+            fetch: executorProviderFetch(ctx, "instantly"),
+            signal: ctx.abortSignal,
+          }
         ),
       };
     } catch (error) {

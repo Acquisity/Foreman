@@ -20,7 +20,7 @@ The goal is to explain what happened, find an unblock, and create durable Linear
 
 Require exactly one conversation URL or reference in the supplied Slack context. If it is missing or more than one conversation could be the source, ask one focused question and stop.
 
-Pass a conversation URL directly to `intercom__fetch`, or resolve a known id with `intercom__get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into the later customer-report issue and investigation document so another session can resume without the Slack transcript.
+Pass a conversation URL directly to intercom `fetch` , or resolve a known id with intercom `get_conversation` . Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into the later customer-report issue and investigation document so another session can resume without the Slack transcript.
 
 When the conversation carries screenshots, route each to the `vision` subagent to read it. Intercom lists attachments but does not interpret images, so a screenshot left unread is an evidence lane skipped. Hand the image and a specific question, and take the answer back as evidence rather than the filename or alt text.
 
@@ -47,7 +47,7 @@ Every returned case identifies its `primaryFeatureKey`. Treat it as a historical
 
 Project-free cluster signals are returned per product area. A signal from one area says nothing about another area, and reports from different areas must never be added together. A `possibleWiderIncident` value is only a reason to check current telemetry. It cannot declare an incident, select a project, set priority, mark a duplicate, or create a master.
 
-When memory returns `available: false`, continue from current evidence. Do not inspect its database, try `neon__*`, mention memory availability in Slack, or weaken the investigation.
+When memory returns `available: false`, continue from current evidence. Do not inspect its database, try neon `*` , mention memory availability in Slack, or weaken the investigation.
 
 ## Step 4: Pin identity and check existing evidence
 
@@ -71,7 +71,7 @@ Work every applicable lane and record `Not applicable: <reason>` or `Could not r
 4. Runtime: use the axes the system supports. Call `find_function_runs` with the function slug from the code path for background work, Sentry and Axiom for errors, Resend for email delivery, Instantly for accepted subworkspace membership plus sending-account, campaign, and Unibox state, PostHog or Jam for user behavior, Vercel for deployment failures, Intercom for similar conversations, and Modem for related feedback when applicable. For Instantly, call the root `list_instantly_subworkspaces` tool first, select by workspace ID when possible, then page `read_instantly_subworkspace` by passing each returned `nextStartingAfter` value back as `startingAfter` until it is null.
 5. Unblock: find the safest action that gets the customer working now, who performs it, and whether it costs data or money. Propose production or billing mutations for a human; never perform them.
 
-Keep PlanetScale, investigation memory, and the unrelated `neon__*` connection separate. Current customer and production truth comes only from PlanetScale and current runtime evidence.
+Keep PlanetScale, investigation memory, and the unrelated neon `*`  connection separate. Current customer and production truth comes only from PlanetScale and current runtime evidence.
 
 ## Step 6: Classify and apply the bug quality bar
 
@@ -95,13 +95,13 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 ### A confirmed Bug: create the report, then hand off
 
-The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one `linear__save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
+The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue`  with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
 Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. It runs Stages 5 to 7 unchanged: the incident hotlane, exactly one critic pass, the document, comment, project, roster, the ticket's one `route_ticket` call, `engineering-handoff` for the master, and the memory record. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
 
 ## Step 7: Decide whether a follow-up is warranted
 
-For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one `linear__save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
+For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one linear `save_issue`  with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
 
 ## Step 8: Record the case
 

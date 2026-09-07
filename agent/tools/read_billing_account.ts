@@ -5,35 +5,20 @@ import {
   organizationIdSchema,
   readBillingAccount,
 } from "#lib/billing-account.js";
-import { planetscaleAuth } from "#lib/constants.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
-import {
-  callPlanetscaleReadQuery,
-  PlanetscaleHttpError,
-} from "#lib/planetscale.js";
+import { callPlanetscaleReadQuery } from "#lib/planetscale.js";
 
 export default defineTool({
   description:
     "The production system-of-record read for a billing ticket, by the organization id pinned by lookup_customer: the organization with its partnerId and partnerGoverned flag, the billing account with provider, subscription status and plan, trial dates, and every wallet (credits, domains, inboxes, website credits, each with balance and lifetime purchased, granted, used), the credit_balance rows, and the last 20 credit transactions and manual credits. " +
     "Read organization.partnerGoverned before routing on provider: true means a partner other than Acquisity governs billing and the partner rule applies; a null partnerId or Acquisity's default partner id 00000000-0000-0000-0000-000000000001 is a native Autumn organization. billingAccount.id is the Autumn customer id for read_autumn_billing; the organization id is not. Read-only, fixed queries; truncated flags say a history list hit its cap; unavailable names a list whose read failed, so treat it as unverified rather than empty. error means the organization read itself could not run.",
-  async execute({ organizationId }, ctx) {
-    const { token } = await ctx.getToken(planetscaleAuth);
-    return readBillingAccount(organizationId, async (query) => {
-      try {
-        return await callPlanetscaleReadQuery(token, {
-          ...PRODUCTION_READ_QUERY_ARGS,
-          query,
-        });
-      } catch (error) {
-        if (
-          error instanceof PlanetscaleHttpError &&
-          (error.status === 401 || error.status === 403)
-        ) {
-          ctx.requireAuth(planetscaleAuth);
-        }
-        throw error;
-      }
-    });
+  execute({ organizationId }, ctx) {
+    return readBillingAccount(organizationId, (query) =>
+      callPlanetscaleReadQuery(ctx, {
+        ...PRODUCTION_READ_QUERY_ARGS,
+        query,
+      })
+    );
   },
   inputSchema: z.object({
     organizationId: organizationIdSchema.describe(

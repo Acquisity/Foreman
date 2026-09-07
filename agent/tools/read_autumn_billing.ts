@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { readAutumnCustomer } from "#lib/billing-api.js";
-import { autumnApiAuth } from "#lib/billing-api-auth.js";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import { canUseBillingApiRead } from "#lib/trust.js";
 
 export default defineTool({
@@ -15,10 +15,10 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(autumnApiAuth);
       return {
         available: true as const,
-        data: await readAutumnCustomer(token, customerId, {
+        data: await readAutumnCustomer(customerId, {
+          fetch: executorProviderFetch(ctx, "autumn"),
           signal: ctx.abortSignal,
         }),
       };

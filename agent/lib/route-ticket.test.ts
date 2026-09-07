@@ -4,7 +4,6 @@ import { routeTicket } from "./linear-api.js";
 import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const { default: tool } = await import("../tools/route_ticket.js");
 
@@ -136,7 +135,6 @@ describe("routeTicket", () => {
   it("unions labels, resolves names, inherits the assignee, and writes one update", async () => {
     const linear = fakeLinear();
     const result = await routeTicket(
-      "t",
       {
         addLabels: ["customer reported"],
         duplicateOf: "ENG-9",
@@ -182,7 +180,6 @@ describe("routeTicket", () => {
   it("reports a failed link as a warning on a routed ticket", async () => {
     const linear = fakeLinear();
     const result = await routeTicket(
-      "t",
       {
         addLabels: ["Customer reported"],
         issue: "ENG-1",
@@ -201,7 +198,6 @@ describe("routeTicket", () => {
     const linear = fakeLinear();
     await assert.rejects(
       routeTicket(
-        "t",
         {
           issue: "ENG-1",
           links: [{ title: "Broken", url: "https://broken.example/1" }],
@@ -216,7 +212,6 @@ describe("routeTicket", () => {
   it("stays routed with a warning when a links-only call lands and the read-back fails", async () => {
     const linear = fakeLinear({ readBackFails: true });
     const result = await routeTicket(
-      "t",
       {
         issue: "ENG-1",
         links: [{ title: "Intercom", url: "https://app.intercom.com/c/1" }],
@@ -231,7 +226,6 @@ describe("routeTicket", () => {
   it("stays routed with a warning when the read-back after the update fails", async () => {
     const linear = fakeLinear({ readBackFails: true });
     const result = await routeTicket(
-      "t",
       { issue: "ENG-1", priority: 3 },
       { fetch: linear.fetchStub }
     );
@@ -255,7 +249,6 @@ describe("routeTicket", () => {
     };
     await assert.rejects(
       routeTicket(
-        "t",
         { issue: "ENG-1", priority: 3 },
         { fetch: fetchStub, signal: controller.signal }
       ),
@@ -267,7 +260,6 @@ describe("routeTicket", () => {
   it("inherits an assigned master and falls back to assignee for an unassigned one", async () => {
     const inherited = fakeLinear();
     await routeTicket(
-      "t",
       { assignee: "Grace", inheritAssigneeFrom: "ENG-9", issue: "ENG-1" },
       { fetch: inherited.fetchStub }
     );
@@ -277,7 +269,6 @@ describe("routeTicket", () => {
 
     const fallback = fakeLinear();
     await routeTicket(
-      "t",
       { assignee: "Grace", inheritAssigneeFrom: "ENG-1", issue: "ENG-1" },
       { fetch: fallback.fetchStub }
     );
@@ -289,7 +280,6 @@ describe("routeTicket", () => {
     const linear = fakeLinear();
     await assert.rejects(
       routeTicket(
-        "t",
         { duplicateOf: "ENG-999999", issue: "ENG-1", state: "Done" },
         { fetch: linear.fetchStub }
       ),
@@ -302,7 +292,6 @@ describe("routeTicket", () => {
     const linear = fakeLinear();
     await assert.rejects(
       routeTicket(
-        "t",
         { addLabels: ["Nope"], issue: "ENG-1", state: "Done" },
         { fetch: linear.fetchStub }
       ),

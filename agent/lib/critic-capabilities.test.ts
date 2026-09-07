@@ -38,6 +38,8 @@ const load = async (path: string): Promise<Connection> =>
   ((await import(path)) as { default: Connection }).default;
 
 // Every child connection beside its root, loaded once for the tests below.
+process.env.EXECUTOR_BASE_URL = "https://executor.acquisity.ai";
+
 const pairs = await Promise.all(
   list("connections/").map(async (file) => {
     const name = file.replace(TS_EXTENSION, "");
@@ -103,23 +105,16 @@ const FORBIDDEN_SOURCE = [
 
 describe("critic evidence surface", () => {
   it("mounts every triage evidence connection", () => {
-    assert.deepEqual(list("connections/"), [
-      "autumn.ts",
-      "axiom.ts",
-      "inngest.ts",
-      "intercom.ts",
-      "jam.ts",
-      "linear.ts",
-      "lucent.ts",
-      "modem.ts",
-      "neon.ts",
-      "planetscale.ts",
-      "posthog.ts",
-      "resend.ts",
-      "sentry.ts",
-      "stripe.ts",
-      "vercel.ts",
-    ]);
+    assert.deepEqual(
+      list("connections/"),
+      [
+        "executor.ts",
+        "executor-factory.ts",
+        "executor-limited.ts",
+        "executor-scheduled.ts",
+        "executor-scheduled-internal.ts",
+      ].sort()
+    );
   });
 
   it("never authors a credential path of its own", () => {
@@ -147,38 +142,13 @@ describe("critic evidence surface", () => {
     }
   });
 
-  it("reuses each root connection's credential path, url, and approval", () => {
-    // eve re-wraps `auth` when a definition is spread, but the token
-    // resolver and evictor are the root's own functions: same connector,
-    // same managedConnect / userConnect, same autoProvision: false.
-    for (const { child, name, root } of pairs) {
-      assert.ok(root.auth?.getToken, `${name}: root has auth`);
-      if (root.auth.principalType === "app") {
-        assert.equal(
-          child.auth?.getToken,
-          root.auth.getToken,
-          `${name}: getToken`
-        );
-      } else {
-        // A task-mode child never parks on consent: user-scoped getToken is
-        // the withoutConsent wrapper (behavior covered in user-connect.test),
-        // and the delegated credential beneath it is the root's, checked by
-        // the evict / principalType / Connect config assertions below.
-        assert.notEqual(
-          child.auth?.getToken,
-          root.auth.getToken,
-          `${name}: getToken must be wrapped`
-        );
-      }
-      assert.equal(child.auth?.evict, root.auth.evict, `${name}: evict`);
-      assert.equal(child.auth?.principalType, root.auth.principalType, name);
-      assert.deepEqual(
-        child.auth?.vercelConnect,
-        root.auth.vercelConnect,
-        name
-      );
-      assert.equal(child.url, root.url, `${name}: url must match the root`);
-      assert.equal(child.approval, root.approval, `${name}: approval`);
+  it("uses separate critic toolkits and context-gated authentication", () => {
+    for (const { child, root, name } of pairs) {
+      assert.equal(typeof child.auth, "function", name);
+      assert.equal(typeof root.auth, "function", name);
+      assert.notEqual(child.url, root.url, name);
+      assert.ok(String(child.url).includes("/foreman-critic-"), name);
+      assert.deepEqual(child.tools, { allow: ["execute", "skills"] });
     }
   });
 

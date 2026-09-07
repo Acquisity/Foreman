@@ -1,10 +1,10 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import {
   InstantlyApiError,
   listInstantlySubworkspaces,
 } from "#lib/instantly-api.js";
-import { instantlyApiAuth } from "#lib/instantly-api-auth.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 const unavailableReason = (error: unknown): string =>
@@ -24,10 +24,10 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(instantlyApiAuth);
       return {
         available: true as const,
-        data: await listInstantlySubworkspaces(token, {
+        data: await listInstantlySubworkspaces({
+          fetch: executorProviderFetch(ctx, "instantly"),
           signal: ctx.abortSignal,
         }),
       };

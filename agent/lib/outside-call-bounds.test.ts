@@ -89,10 +89,10 @@ describe("authored outside calls stay bounded", () => {
   });
 
   it("inspected the call sites the inventory records", () => {
-    // Nine HTTP requests, four Blob operations, one Neon client. A rule that
+    // Provider descriptors, the Executor transport, Blob, and Neon. A rule that
     // stopped matching anything would pass the sweep above in silence.
     assert.ok(
-      authoredSurface().inspected >= 14,
+      authoredSurface().inspected >= 11,
       `only ${authoredSurface().inspected} call sites were inspected`
     );
   });

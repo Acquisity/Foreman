@@ -110,7 +110,7 @@ describe("sign_in tool", () => {
         const { ctx, requested } = fakeCtx(() => {
           throw new Error("must not request a token");
         }, auth);
-        const result = await signIn.execute({ connection: "stripe" }, ctx);
+        const result = await signIn.execute({ connection: "supermemory" }, ctx);
         assert.deepEqual(result, {
           connected: false,
           error:
@@ -125,7 +125,7 @@ describe("sign_in tool", () => {
     const { ctx, requested } = fakeCtx(() =>
       Promise.resolve({ token: "live-grant" })
     );
-    const result = await signIn.execute({ connection: "stripe" }, ctx);
+    const result = await signIn.execute({ connection: "supermemory" }, ctx);
     assert.deepEqual(result, { connected: true });
     assert.equal(requested.length, 1);
     // The token must never reach the model-visible output.
@@ -136,7 +136,7 @@ describe("sign_in tool", () => {
     const { ctx, requested } = fakeCtx(() => {
       if (requested.length === 1) {
         return Promise.reject(
-          new ConnectionAuthorizationFailedError("stripe", {
+          new ConnectionAuthorizationFailedError("supermemory", {
             reason: SLACK_SIGN_IN_REASON,
             retryable: false,
           })
@@ -144,16 +144,18 @@ describe("sign_in tool", () => {
       }
       // The consent probe raises "authorization required"; the real runtime
       // turns it into the parked consent flow, so the tool lets it through.
-      return Promise.reject(new ConnectionAuthorizationRequiredError("stripe"));
+      return Promise.reject(
+        new ConnectionAuthorizationRequiredError("supermemory")
+      );
     });
     await assert.rejects(
       async () => {
-        await signIn.execute({ connection: "stripe" }, ctx);
+        await signIn.execute({ connection: "supermemory" }, ctx);
       },
       (error: unknown) => isConnectionAuthorizationRequiredError(error)
     );
     assert.equal(requested.length, 2);
-    const entry = signInAuth("stripe");
+    const entry = signInAuth("supermemory");
     assert.ok(entry);
     assert.equal(requested[0], entry.wrapped);
     assert.equal(requested[1], entry.consent);
@@ -163,7 +165,7 @@ describe("sign_in tool", () => {
     const { ctx, requested } = fakeCtx(() => {
       if (requested.length === 1) {
         return Promise.reject(
-          new ConnectionAuthorizationFailedError("stripe", {
+          new ConnectionAuthorizationFailedError("supermemory", {
             reason: SLACK_SIGN_IN_REASON,
             retryable: false,
           })
@@ -171,7 +173,7 @@ describe("sign_in tool", () => {
       }
       return Promise.resolve({ token: "fresh-grant" });
     });
-    const result = await signIn.execute({ connection: "stripe" }, ctx);
+    const result = await signIn.execute({ connection: "supermemory" }, ctx);
     assert.deepEqual(result, { connected: true });
     assert.equal(requested.length, 2);
     assert.equal(JSON.stringify(result).includes("fresh-grant"), false);
@@ -179,19 +181,19 @@ describe("sign_in tool", () => {
 
   it("propagates unrelated errors without invoking consent", async () => {
     const failures = [
-      new ConnectionAuthorizationFailedError("stripe", {
+      new ConnectionAuthorizationFailedError("supermemory", {
         reason: "access_denied",
         retryable: false,
       }),
       new Error("mcp server unreachable"),
-      new ConnectionAuthorizationRequiredError("stripe"),
+      new ConnectionAuthorizationRequiredError("supermemory"),
     ];
     await Promise.all(
       failures.map(async (failure) => {
         const { ctx, requested } = fakeCtx(() => Promise.reject(failure));
         await assert.rejects(
           async () => {
-            await signIn.execute({ connection: "stripe" }, ctx);
+            await signIn.execute({ connection: "supermemory" }, ctx);
           },
           (error: unknown) => error === failure
         );

@@ -39,6 +39,8 @@ export default defineHook({
         return;
       }
       logOpsEvent("action.result", {
+        // Executor is the outer connection; provider diagnosis belongs in its
+        // invocation records. Never inspect generated code or provider results here.
         connection: connectionOf(result.toolName),
         // No duration: neither actions.requested nor action.result carries a
         // timestamp or elapsed time, and a hook must not keep its own state.

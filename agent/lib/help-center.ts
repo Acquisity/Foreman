@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredFetch } from "./executor/required-fetch.js";
 
 /** Help-center host; overridable so staging can be searched. */
 export const HELP_CENTER_BASE_URL =
@@ -49,7 +50,7 @@ export async function findHelpArticles(
   opts?: { baseUrl?: string; fetch?: typeof fetch; signal?: AbortSignal }
 ): Promise<FindHelpArticleResult> {
   const baseUrl = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
-  const fetchImpl = opts?.fetch ?? fetch;
+  const fetchImpl = requiredFetch(opts?.fetch);
   try {
     const url = new URL("/api/search", baseUrl);
     url.searchParams.set("query", query);

@@ -9,8 +9,6 @@ import { z } from "zod";
 // load (constants.ts). Nothing is contacted; `pnpm validate` runs `eve info`
 // under the same environment.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
-process.env.PLANETSCALE_MCP_CONNECTOR =
-  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const { admitDynamicTools, dynamicToolCacheKey } = await import(
   "./eve-dynamic-tools.js"

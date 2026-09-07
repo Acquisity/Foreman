@@ -1,6 +1,6 @@
 # Billing investigation tools
 
-Exact tool names for the systems of record. Every name below was read from this repository's `tools.allow` list in `agent/connections/<name>.ts`, from the tool's own definition in `agent/tools/`, or from eve's own built-in tool surface.
+Company-service tools use Executor. Use `connection_search` with the `connection` argument set to the Executor connection named in this turn's access instructions. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and an invented call fails in a way that reads like the customer has no data.
 
@@ -8,17 +8,13 @@ Never guess a tool name. A service's REST API, its CLI, and its MCP server rarel
 
 Two kinds of tool appear below, and they are called differently.
 
-**Connection tools** live on an MCP server wired up in `agent/connections/`. The model calls them by their qualified name, `<connection>__<tool>`, where the connection name is the filename: `linear__list_issues`, `inngest__get_run_trace`, `planetscale__planetscale_list_databases`. The bare names listed under each heading below are the server-side names as they appear in that connection's `tools.allow`; prefix them with the heading's connection name when you call one.
-
 **Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `read_billing_account`, `describe_table`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 
-`planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as `planetscale__planetscale_execute_read_query`.
+`planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never invoke the raw provider query through Executor.
 
-Use the built-in `connection_search` with the `connection` argument naming one connection to discover what it actually exposes; never search without it, because that queries every connection at once. When a tool you want is not listed here, search before calling. If you cannot, record the lane as `Could not run` rather than trying names until one sticks.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the approved provider MCP reads through Executor are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the user-scoped MCP tools are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
-
-## PlanetScale (`planetscale__`)
+## PlanetScale (Executor: planetscale)
 
 `lookup_customer` is the identity gate: one fixed production query from a customer email to the user, live memberships, and `pinnedOrganizationId`. It is a root tool, called bare. Use it instead of writing the identity join yourself.
 
@@ -40,17 +36,17 @@ Use these only when the financial ask also turns on Instantly provisioning or li
 
 The tools use an app-scoped IBG credential, require no requester OAuth, and expose only fixed GET routes. They can prove provider state but cannot prove payment, entitlement, or refund amount. `available: false` is `Could not run`, never an empty account and never a prompt for the Slack requester to sign in. No tool can invite or remove a workspace, change an account or campaign, send an email, reply, forward, pause, resume, or call an arbitrary path.
 
-## Autumn (`autumn__`)
+## Autumn (Executor: autumn)
 
 Use the root tool `read_autumn_billing` first, on every surface. Pass `billingAccount.id` from `read_billing_account`: Acquisity keys Autumn customers by billing account id, and the organization id answers `customer_not_found`. A 404 reason is a wrong id, never an outage or an empty account; re-resolve before recording anything. The one expected 404 is a partner-governed organization, `organization.partnerGoverned` true, which is on Whop and has no customer in Acquisity's own Autumn; that is the partner rule, not an id problem. The record's `stripe_id` is the `cus_` id Stripe needs. Its only provider call is Autumn's `customers.get` read route with plans and balances expanded; it cannot create a missing customer or call a write route. `available: false` means `Could not run`, never an empty account.
 
-The `autumn__` connection below is the fallback when the root tool answers `available: false`, for users who have personally connected Autumn.
+The Autumn MCP reads below are available through the shared company Executor profile when the root tool answers `available: false`. They require no requester provider login.
 
 `getCustomer`, keyed by the same billing account id, for this customer's plan, add-ons, active subscriptions, and feature balances. `getPlan` and `listPlans` for the catalog behind them. `listFeatures` for what a feature id means. `getEntity` and `listEntities` for per-entity balances. `listCustomers` finds a customer id and `getCurrentOrganization` identifies the org the token is scoped to.
 
 Also allowlisted: `dateToEpochMilliseconds`, `epochMillisecondsToDate`. That is the whole surface.
 
-The MCP connection is user-scoped, so a teammate who has never consented gets a sign-in failure rather than data. That is `Could not run`, not an empty result: never read it as the customer having no Autumn account.
+An unavailable Executor connection or denied provider read is `Could not run`, not an empty result: never read it as the customer having no Autumn account or ask the ticket requester to sign in.
 
 The server also exposes write tools that attach a plan, create a balance, grant a reward, or update a subscription. None are allowlisted, and the connection's OAuth grant carries no write scope, so none can move money or grant entitlement from here regardless of what a ticket asks for. This skill proposes; a human executes.
 
@@ -58,11 +54,11 @@ The server also exposes write tools that attach a plan, create a balance, grant 
 
 Line items for domains and inboxes are both named generically. The identifier is in the metadata, shaped `xxxxxxxxx{domain.co}`. Read metadata on every line item before counting or matching.
 
-## Stripe (`stripe__`)
+## Stripe (Executor: stripe)
 
 Use the root tool `read_stripe_billing` first, on every surface. Its `customer` lookup takes the `cus_` id from the Autumn record's `stripe_id` and reads at most 20 recent subscriptions, invoices, charges, credit notes, and customer balance transactions alongside the customer. Use `charge` to read a known charge and its attached refund history, or `refund` and `dispute` for known object ids. Its `promotion_code` lookup finds an exact customer-facing code, and `coupon` reads a known coupon id. A per-section error means that section is unverified; keep the successful sections without asserting why the failed read failed. When a returned list says `has_more: true`, its history is incomplete. Do not make an amount or refund verdict until the exact relevant object is read. The tool has fixed GET routes and cannot write.
 
-The `stripe__` connection below is the fallback when the root tool answers `available: false`, for users who have personally connected Stripe.
+The Stripe MCP reads below are available through the shared company Executor profile when the root tool answers `available: false`. They require no requester provider login.
 
 `stripe_api_read` for a known object, `stripe_api_search` to find one, `stripe_api_details` when a call shape is unclear. `search_stripe_documentation` for API semantics. `get_stripe_account_info` and `list_available_accounts_or_orgs` for account context.
 
@@ -72,7 +68,7 @@ Amounts are in the smallest currency unit. A charge of `7200` is $72.00. Read `a
 
 Docs: <https://docs.stripe.com/mcp>.
 
-## Linear (`linear__`)
+## Linear (Executor: linear)
 
 `get_issue`, `list_comments`, `save_comment`, `save_issue`, `save_document`.
 

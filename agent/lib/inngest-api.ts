@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { requiredFetch } from "./executor/required-fetch.js";
 import { redact } from "./investigation-memory/case.js";
 
-/** Inngest REST v2. The same API key the MCP connector holds authenticates it. */
+/** Inngest REST v2. Executor supplies the app credential behind the injected transport. */
 export const INNGEST_API_BASE = "https://api.inngest.com/v2";
 const REQUEST_TIMEOUT_MS = 15_000;
 /** A trace with output can be large; anything past this is refused, not buffered. */
@@ -106,16 +107,15 @@ const spanRow = z.looseObject({
 });
 
 async function getJson(
-  token: string,
   path: string,
   opts?: InngestApiOptions
 ): Promise<unknown> {
-  const fetchImpl = opts?.fetch ?? fetch;
+  const fetchImpl = requiredFetch(opts?.fetch);
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetchImpl(`${INNGEST_API_BASE}${path}`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      headers: { Accept: "application/json" },
       signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
     });
   } catch (error) {
@@ -194,7 +194,6 @@ const runPage = z.looseObject({
  * route answers 404, or 200 with no `data` list (seen 2026-08-28).
  */
 async function runsInApp(
-  token: string,
   appId: string,
   functionId: string,
   params: URLSearchParams,
@@ -203,7 +202,7 @@ async function runsInApp(
   const path = `/apps/${encodeURIComponent(appId)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
   let body: unknown;
   try {
-    body = await getJson(token, path, opts);
+    body = await getJson(path, opts);
   } catch (error) {
     if (
       !opts?.signal?.aborted &&
@@ -226,15 +225,12 @@ async function runsInApp(
  * accepts a dotted function id), so a function id first lists the apps.
  */
 async function listRuns(
-  token: string,
   functionId: string | undefined,
   params: URLSearchParams,
   opts?: InngestApiOptions
 ): Promise<z.infer<typeof runPage>> {
   if (!functionId) {
-    return runPage.parse(
-      await getJson(token, `/runs?${params.toString()}`, opts)
-    );
+    return runPage.parse(await getJson(`/runs?${params.toString()}`, opts));
   }
   const appIds: string[] = [];
   let cursor: string | null = null;
@@ -244,7 +240,7 @@ async function listRuns(
       appParams.set("cursor", cursor);
     }
     // biome-ignore lint/performance/noAwaitInLoops: app pages are sequential cursors.
-    const body = await getJson(token, `/apps?${appParams.toString()}`, opts);
+    const body = await getJson(`/apps?${appParams.toString()}`, opts);
     const apps: z.infer<typeof appPage> = appPage.parse(body);
     appIds.push(...apps.data.map((app) => app.id));
     cursor = apps.page?.hasMore ? (apps.page.cursor ?? null) : null;
@@ -261,7 +257,7 @@ async function listRuns(
   let hasMore = false;
   for (const appId of appIds) {
     // biome-ignore lint/performance/noAwaitInLoops: one app at a time; there is one app today.
-    const page = await runsInApp(token, appId, functionId, params, opts);
+    const page = await runsInApp(appId, functionId, params, opts);
     if (!page) {
       continue;
     }
@@ -283,19 +279,18 @@ async function listRuns(
 
 /** The trace with step output; when Inngest refuses that, the trace without it. */
 async function getTrace(
-  token: string,
   runId: string,
   opts?: InngestApiOptions
 ): Promise<unknown> {
   const path = `/runs/${encodeURIComponent(runId)}/trace`;
   try {
-    return await getJson(token, `${path}?includeOutput=true`, opts);
+    return await getJson(`${path}?includeOutput=true`, opts);
   } catch (withOutput) {
     if (opts?.signal?.aborted) {
       throw withOutput;
     }
     try {
-      return await getJson(token, path, opts);
+      return await getJson(path, opts);
     } catch (withoutOutput) {
       if (opts?.signal?.aborted) {
         throw withoutOutput;
@@ -345,7 +340,6 @@ function flattenSteps(
  * one function when an id is given), then the trace of the newest run.
  */
 export async function findFunctionRuns(
-  token: string,
   input: FindFunctionRunsInput,
   opts?: InngestApiOptions
 ): Promise<FindFunctionRunsResult> {
@@ -359,7 +353,7 @@ export async function findFunctionRuns(
       status: input.status.toUpperCase(),
       timeField: "queuedAt",
     });
-    const listed = await listRuns(token, input.functionId, params, opts);
+    const listed = await listRuns(input.functionId, params, opts);
 
     const runs = listed.data.map((row) => {
       const run = runRow.parse(row);
@@ -388,7 +382,7 @@ export async function findFunctionRuns(
         .looseObject({
           data: z.looseObject({ rootSpan: loose.optional() }).optional(),
         })
-        .parse(await getTrace(token, newest.runId, opts));
+        .parse(await getTrace(newest.runId, opts));
       const steps: TraceStep[] = [];
       const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
       return {

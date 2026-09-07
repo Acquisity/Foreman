@@ -19,14 +19,18 @@ It does not see anything else, and none of these are gaps to be closed by growin
 
 ## HTTP requests
 
+Company API URLs in the billing, Instantly, Inngest, Linear, and help-center helpers are request descriptors passed to an injected Executor adapter, never directly fetched by production Foreman. Their existing provider deadlines and response filters remain active around the adapter. Only `agent/lib/executor/transport.ts` performs their outbound HTTP requests. The bounded PlanetScale query uses that same transport, then applies its existing result truncation. All helper invocations use a fresh MCP session, reject redirects, cap the transport response at 8 MiB, and reject paused executions instead of resuming approvals.
+
+
 | Call | Bound | Notes |
+| `agent/lib/executor/transport.ts` | 50s for handshake and invocation, composed with the caller and provider deadline | Covers body streaming; 8 MiB cap; redirects refused. Provider helpers below impose their tighter existing deadlines. |
 | --- | --- | --- |
 | `agent/lib/billing-api.ts` (Stripe, Autumn) | 20s per request | ENG-13315. Composed with the caller's signal; the failure is classified from the composed signal's first abort reason, so a late caller abort cannot turn a timeout into a cancellation. |
 | `agent/lib/instantly-api.ts` | 15s per request | ENG-13316. The deadline stays armed through the body read and response disposal, so a stalled stream is bounded too. |
 | `agent/lib/linear-api.ts` | 15s per request | Composed with the caller's signal. |
 | `agent/lib/inngest-api.ts` | 15s per request | Composed with the caller's signal; a caller abort rethrows unwrapped. |
 | `agent/lib/help-center.ts` | 10s per request | Composed with the caller's signal. A failure returns `error` rather than throwing, because search is advisory. |
-| `agent/lib/planetscale.ts` | 50s per request, three requests per read | Matched to the PlanetScale MCP server's own 50s query deadline, so the bound never fires before the upstream's does. |
+| `agent/lib/planetscale.ts` | 50s via Executor | Result parsing and truncation remain local; oversized transport responses fail with a bounded error. |
 | `agent/subagents/vision/tools/read_image.ts` | 20s | Covers the body read; the signal is passed to `fetch`, so a stalled download aborts with it. One 20s reader deadline covers the whole read, armed once and raced by every chunk, and the same reader bounds the sandbox path branch, which no signal reaches (see the sandbox file I/O note below). |
 
 ## Other clients

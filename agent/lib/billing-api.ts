@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredFetch } from "./executor/required-fetch.js";
 
 const AUTUMN_API_URL = "https://api.useautumn.com/v1";
 const STRIPE_API_URL = "https://api.stripe.com/v1";
@@ -195,7 +196,6 @@ const call = async (
 
 /** Reads one existing Autumn customer without creating or changing anything. */
 export const readAutumnCustomer = (
-  token: string,
   customerId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
@@ -213,14 +213,13 @@ export const readAutumnCustomer = (
         ],
       }),
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         "x-api-version": "2.3.0",
       },
       method: "POST",
       signal: options.signal,
     },
-    options.fetch ?? fetch,
+    requiredFetch(options.fetch),
     new Set(["name"])
   ).catch((error: unknown) => {
     // Acquisity keys Autumn customers by billing_account.id. A 404 here is a
@@ -236,7 +235,6 @@ export const readAutumnCustomer = (
   });
 
 const stripeGet = (
-  token: string,
   path: string,
   options: {
     fetch?: Fetcher;
@@ -248,16 +246,14 @@ const stripeGet = (
     "Stripe",
     `${STRIPE_API_URL}${path}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
       method: "GET",
       signal: options.signal,
     },
-    options.fetch ?? fetch,
+    requiredFetch(options.fetch),
     options.rootSensitiveKeys
   );
 
 const safeStripeGet = async (
-  token: string,
   path: string,
   options: {
     fetch?: Fetcher;
@@ -266,7 +262,7 @@ const safeStripeGet = async (
   }
 ): Promise<{ data?: unknown; error?: string }> => {
   try {
-    return { data: await stripeGet(token, path, options) };
+    return { data: await stripeGet(path, options) };
   } catch (error) {
     if (
       options.signal?.aborted ||
@@ -339,7 +335,6 @@ export type StripeLookupInput = z.infer<typeof stripeLookupSchema>;
 
 /** Reads the bounded Stripe history needed for one known customer. */
 export async function readStripeCustomerBilling(
-  token: string,
   customerId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<Record<string, { data?: unknown; error?: string }>> {
@@ -357,7 +352,6 @@ export async function readStripeCustomerBilling(
     Object.entries(lookups).map(async ([name, path]) => [
       name,
       await safeStripeGet(
-        token,
         path,
         name === "customer"
           ? { ...options, rootSensitiveKeys: new Set(["name"]) }
@@ -370,48 +364,41 @@ export async function readStripeCustomerBilling(
 
 /** Reads one known Stripe charge, including its attached refund history. */
 export const readStripeCharge = (
-  token: string,
   chargeId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
   stripeGet(
-    token,
     `/charges/${encodeURIComponent(chargeId)}?expand[]=refunds`,
     options
   );
 
 /** Reads one known Stripe refund. */
 export const readStripeRefund = (
-  token: string,
   refundId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(token, `/refunds/${encodeURIComponent(refundId)}`, options);
+  stripeGet(`/refunds/${encodeURIComponent(refundId)}`, options);
 
 /** Reads one known Stripe dispute. */
 export const readStripeDispute = (
-  token: string,
   disputeId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(token, `/disputes/${encodeURIComponent(disputeId)}`, options);
+  stripeGet(`/disputes/${encodeURIComponent(disputeId)}`, options);
 
 /** Finds Stripe promotion codes by the exact customer-facing code. */
 export const readStripePromotionCode = (
-  token: string,
   code: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
   stripeGet(
-    token,
     `/promotion_codes?code=${encodeURIComponent(code)}&limit=20`,
     options
   );
 
 /** Reads one known Stripe coupon. */
 export const readStripeCoupon = (
-  token: string,
   couponId: string,
   options: { fetch?: Fetcher; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(token, `/coupons/${encodeURIComponent(couponId)}`, options);
+  stripeGet(`/coupons/${encodeURIComponent(couponId)}`, options);

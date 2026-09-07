@@ -39,19 +39,19 @@ const page = (ids: string[], endCursor: string | null) => ({
 });
 
 describe("linearGraphql", () => {
-  it("sends a bearer header and turns GraphQL errors into a thrown message", async () => {
+  it("keeps provider credentials out of the request descriptor and turns GraphQL errors into a thrown message", async () => {
     let header = "";
     const fetchStub: typeof fetch = (_url, init) => {
       header = new Headers(init?.headers).get("Authorization") ?? "";
       return json({ errors: [{ message: "Field nope not found" }] });
     };
     await assert.rejects(
-      linearGraphql("secret-token", "{ x }", {}, { fetch: fetchStub }),
+      linearGraphql("{ x }", {}, { fetch: fetchStub }),
       (error: Error) =>
         error.message.includes("Field nope not found") &&
         !error.message.includes("secret-token")
     );
-    assert.equal(header, "Bearer secret-token");
+    assert.equal(header, "");
   });
 });
 
@@ -68,7 +68,6 @@ describe("findRelatedIssues", () => {
         : json(page(["3"], null));
     };
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["billed twice"], scope: "masters", windowed: true },
       { fetch: fetchStub, now: new Date("2026-08-31T00:00:00.000Z") }
     );
@@ -96,7 +95,6 @@ describe("findRelatedIssues", () => {
       return json(page([], null));
     };
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
       { fetch: fetchStub }
     );
@@ -116,7 +114,6 @@ describe("findRelatedIssues", () => {
       });
     };
     await findRelatedIssues(
-      "t",
       { phrases: ["empty  sections"], scope: "duplicates", windowed: false },
       { fetch: fetchStub }
     );
@@ -141,7 +138,6 @@ describe("findRelatedIssues", () => {
   it("runs a repeated phrase once", async () => {
     let calls = 0;
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["same", "same"], scope: "duplicates", windowed: false },
       {
         fetch: () => {
@@ -157,7 +153,6 @@ describe("findRelatedIssues", () => {
   it("stops masters at the page cap and flags it", async () => {
     let calls = 0;
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
       {
         fetch: () => {
@@ -173,7 +168,6 @@ describe("findRelatedIssues", () => {
   it("caps the merged result at 100 issues and flags it", async () => {
     const ids = Array.from({ length: 101 }, (_, i) => String(i));
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
       { fetch: () => json(page(ids, null)) }
     );
@@ -194,7 +188,6 @@ describe("findRelatedIssues", () => {
         : json(page(["2", "3"], "more"));
     };
     const result = await findRelatedIssues(
-      "t",
       {
         phrases: ["billed twice", "double charge"],
         scope: "duplicates",
@@ -260,7 +253,6 @@ describe("saveInvestigationDocument", () => {
   it("creates the lane's document when the issue has none with that title", async () => {
     const { calls, fetchStub } = respond("Some other doc");
     const result = await saveInvestigationDocument(
-      "t",
       { content: "# Triage investigation", issue: "ENG-1", lane: "triage" },
       { fetch: fetchStub }
     );
@@ -298,7 +290,6 @@ describe("saveInvestigationDocument", () => {
       });
     await assert.rejects(
       saveInvestigationDocument(
-        "t",
         { content: "x", issue: "ENG-1", lane: "triage" },
         { fetch: fetchStub }
       ),
@@ -320,7 +311,6 @@ describe("saveInvestigationDocument", () => {
       return json({ message: "down" }, 503);
     };
     const result = await saveInvestigationDocument(
-      "t",
       { content: "x", issue: "ENG-1", lane: "triage" },
       { fetch: fetchStub }
     );
@@ -334,7 +324,6 @@ describe("saveInvestigationDocument", () => {
   it("rewrites the existing document instead of creating a second", async () => {
     const { calls, fetchStub } = respond("Billing investigation");
     const result = await saveInvestigationDocument(
-      "t",
       { content: "# Billing investigation", issue: "ENG-1", lane: "billing" },
       { fetch: fetchStub }
     );

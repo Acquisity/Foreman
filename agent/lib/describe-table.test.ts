@@ -7,7 +7,6 @@ import {
 } from "./describe-table.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const { PRODUCTION_READ_QUERY_ARGS } = await import("./lookup-customer.js");
 

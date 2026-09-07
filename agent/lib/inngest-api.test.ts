@@ -86,7 +86,6 @@ describe("find_function_runs", () => {
       return json(trace);
     };
     const result = await findFunctionRuns(
-      "t",
       { functionId: FN, sinceHours: 24, status: "Failed" },
       { fetch: fetchStub, now: NOW }
     );
@@ -151,7 +150,6 @@ describe("find_function_runs", () => {
       return json(trace);
     };
     const result = await findFunctionRuns(
-      "t",
       { functionId: FN, sinceHours: 24, status: "Failed" },
       { fetch: fetchStub, now: NOW }
     );
@@ -175,7 +173,6 @@ describe("find_function_runs", () => {
     };
     await assert.rejects(
       findFunctionRuns(
-        "t",
         { functionId: FN, sinceHours: 24, status: "Failed" },
         { fetch: fetchStub, now: NOW, signal: controller.signal }
       )
@@ -200,7 +197,6 @@ describe("find_function_runs", () => {
       return json(trace);
     };
     const result = await findFunctionRuns(
-      "t",
       { functionId: FN, sinceHours: 24, status: "Failed" },
       { fetch: fetchStub, now: NOW }
     );
@@ -220,7 +216,6 @@ describe("find_function_runs", () => {
       return json({ error: "function not found" });
     };
     const result = await findFunctionRuns(
-      "t",
       { functionId: "no.such.function", sinceHours: 24, status: "Failed" },
       { fetch: fetchStub, now: NOW }
     );
@@ -230,7 +225,6 @@ describe("find_function_runs", () => {
   it("lists across every function without an id, and returns latestTrace null without a second request when nothing ran", async () => {
     const urls: string[] = [];
     const result = await findFunctionRuns(
-      "t",
       { sinceHours: 24, status: "Cancelled" },
       {
         fetch: (url) => {
@@ -259,14 +253,12 @@ describe("find_function_runs", () => {
           ? json({ data: { rootSpan: { children: spans(n), name: "Run" } } })
           : json({ data: [run("run-2", "evt-2")] });
     const exact = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       { fetch: stub(200), now: NOW }
     );
     assert.equal(exact.latestTrace?.steps.length, 200);
     assert.equal(exact.latestTrace?.truncated, false);
     const over = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       { fetch: stub(201), now: NOW }
     );
@@ -299,7 +291,6 @@ describe("find_function_runs", () => {
       "org [id] failed"
     );
     const result = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       { fetch: () => json({ message: "nope" }, 401), now: NOW }
     );
@@ -309,7 +300,6 @@ describe("find_function_runs", () => {
 
   it("refuses a response larger than the byte cap", async () => {
     const result = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       {
         fetch: () =>
@@ -327,7 +317,6 @@ describe("find_function_runs", () => {
 
   it("fails closed when the app list exceeds the page cap", async () => {
     const result = await findFunctionRuns(
-      "t",
       { functionId: FN, sinceHours: 1, status: "Failed" },
       {
         fetch: () =>
@@ -356,7 +345,6 @@ describe("find_function_runs", () => {
       return json({ data: [run("run-2", "evt-2")] });
     };
     const recovered = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       { fetch: withRetry, now: NOW }
     );
@@ -369,7 +357,6 @@ describe("find_function_runs", () => {
         ? json({ message: "boom" }, 500)
         : json({ data: [run("run-2", "evt-2")] });
     const kept = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       { fetch: bothFail, now: NOW }
     );
@@ -379,7 +366,6 @@ describe("find_function_runs", () => {
     assert.match(kept.traceError ?? "", HTTP_500);
 
     const malformed = await findFunctionRuns(
-      "t",
       { sinceHours: 1, status: "Failed" },
       {
         fetch: (url) =>
@@ -407,7 +393,6 @@ describe("find_function_runs", () => {
     };
     await assert.rejects(
       findFunctionRuns(
-        "t",
         { sinceHours: 1, status: "Failed" },
         { fetch: fetchStub, now: NOW, signal: controller.signal }
       ),

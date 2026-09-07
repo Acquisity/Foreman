@@ -2,24 +2,23 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
 
-process.env.INSTANTLY_API_CONNECTOR ??= "api.instantly.ai/acquisity-foreman";
+process.env.EXECUTOR_MCP_CONNECTOR ??= "api.instantly.ai/acquisity-foreman";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const [
-  { instantlyApiAuth },
+  { executorAuth },
   { default: listWorkspaces },
   { default: readWorkspace },
 ] = await Promise.all([
-  import("./instantly-api-auth.js"),
+  import("./executor/auth.js"),
   import("../tools/list_instantly_subworkspaces.js"),
   import("../tools/read_instantly_subworkspace.js"),
 ]);
 
 describe("Instantly tool authorization", () => {
   it("uses a non-interactive app-scoped connector", () => {
-    assert.equal(instantlyApiAuth.principalType, "app");
-    assert.equal("startAuthorization" in instantlyApiAuth, false);
+    assert.equal(executorAuth().principalType, "app");
+    assert.equal("startAuthorization" in executorAuth(), false);
   });
 
   it("denies both tools before requesting a token on an unstamped session", async () => {

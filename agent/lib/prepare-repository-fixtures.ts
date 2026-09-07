@@ -6,7 +6,7 @@ import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
 process.env.FOREMAN_BOT_NAME ??= "Foreman";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
+process.env.EXECUTOR_MCP_CONNECTOR ??= "executor/test";
 
 export const REPOSITORY = "Acquisity/Foreman";
 export const DISCARD = "rm -rf /workspace/repo";

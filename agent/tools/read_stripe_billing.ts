@@ -9,7 +9,7 @@ import {
   readStripeRefund,
   stripeLookupSchema,
 } from "#lib/billing-api.js";
-import { stripeApiAuth } from "#lib/billing-api-auth.js";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import { canUseBillingApiRead } from "#lib/trust.js";
 
 export default defineTool({
@@ -23,26 +23,24 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(stripeApiAuth);
-      const options = { signal: ctx.abortSignal };
+      const options = {
+        fetch: executorProviderFetch(ctx, "stripe"),
+        signal: ctx.abortSignal,
+      };
       // stripeLookupSchema guarantees the id field for the chosen lookup.
       let data: unknown;
       if (input.lookup === "customer") {
-        data = await readStripeCustomerBilling(
-          token,
-          input.customerId ?? "",
-          options
-        );
+        data = await readStripeCustomerBilling(input.customerId ?? "", options);
       } else if (input.lookup === "promotion_code") {
-        data = await readStripePromotionCode(token, input.code ?? "", options);
+        data = await readStripePromotionCode(input.code ?? "", options);
       } else if (input.lookup === "coupon") {
-        data = await readStripeCoupon(token, input.couponId ?? "", options);
+        data = await readStripeCoupon(input.couponId ?? "", options);
       } else if (input.lookup === "charge") {
-        data = await readStripeCharge(token, input.chargeId ?? "", options);
+        data = await readStripeCharge(input.chargeId ?? "", options);
       } else if (input.lookup === "refund") {
-        data = await readStripeRefund(token, input.refundId ?? "", options);
+        data = await readStripeRefund(input.refundId ?? "", options);
       } else {
-        data = await readStripeDispute(token, input.disputeId ?? "", options);
+        data = await readStripeDispute(input.disputeId ?? "", options);
       }
       return { available: true as const, data };
     } catch (error) {

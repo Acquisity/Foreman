@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import { z } from "zod";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const {
   default: tool,

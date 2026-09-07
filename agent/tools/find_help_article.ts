@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { executorProviderFetch } from "#lib/executor/client.js";
 import {
   findHelpArticleResultSchema,
   findHelpArticles,
@@ -12,7 +13,10 @@ export default defineTool({
     "repository path of the article source under apps/web/content/docs in Acquisity/Acquisity, which you can read after prepare_repository. " +
     "An empty list is a valid answer; error set means the search could not run.",
   execute({ query }, ctx) {
-    return findHelpArticles(query, { signal: ctx.abortSignal });
+    return findHelpArticles(query, {
+      fetch: executorProviderFetch(ctx, "help"),
+      signal: ctx.abortSignal,
+    });
   },
   inputSchema: z.object({
     query: z

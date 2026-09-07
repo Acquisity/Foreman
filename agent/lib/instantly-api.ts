@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredFetch } from "./executor/required-fetch.js";
 
 const INSTANTLY_API_URL = "https://api.instantly.ai/api/v2";
 const IBG_ADMIN_WORKSPACE_ID = "24f5c554-bf6c-4f51-a909-d25d9617cff9";
@@ -406,10 +407,8 @@ const disposeResponse = async (
 };
 
 const requestHeaders = (
-  token: string,
   workspaceId: string | undefined
 ): Record<string, string> => ({
-  Authorization: `Bearer ${token}`,
   ...(workspaceId === undefined ? {} : { "x-as-workspace": workspaceId }),
 });
 
@@ -421,12 +420,11 @@ const retryDelayMs = (response: Response, attempt: number): number | null => {
 };
 
 const callPage = async (
-  token: string,
   path: string,
   workspaceId: string | undefined,
   options: InstantlyApiOptions
 ): Promise<z.infer<typeof pageSchema>> => {
-  const fetchImpl = options.fetch ?? fetch;
+  const fetchImpl = requiredFetch(options.fetch);
   const sleep = options.sleep ?? defaultSleep;
   let attempt = 0;
 
@@ -436,7 +434,7 @@ const callPage = async (
     try {
       // biome-ignore lint/performance/noAwaitInLoops: retries are intentionally sequential.
       response = await fetchImpl(`${INSTANTLY_API_URL}${path}`, {
-        headers: requestHeaders(token, workspaceId),
+        headers: requestHeaders(workspaceId),
         method: "GET",
         signal: deadline.signal,
       });
@@ -548,7 +546,6 @@ const enforceOutputBudget = <T>(value: T): T => {
 
 /** Lists accepted subworkspaces from a complete, safety-bounded group result. */
 export async function listInstantlySubworkspaces(
-  token: string,
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyWorkspaceGroup> {
   const members: z.infer<typeof workspaceGroupMemberSchema>[] = [];
@@ -562,7 +559,6 @@ export async function listInstantlySubworkspaces(
     }
     // biome-ignore lint/performance/noAwaitInLoops: Workspace Group cursors are sequential.
     const page = await callPage(
-      token,
       `/workspace-group-members?${query.toString()}`,
       undefined,
       options
@@ -640,11 +636,10 @@ export async function listInstantlySubworkspaces(
 }
 
 const resolveWorkspace = async (
-  token: string,
   selector: InstantlyWorkspaceSelector,
   options: InstantlyApiOptions
 ): Promise<InstantlyWorkspace> => {
-  const group = await listInstantlySubworkspaces(token, options);
+  const group = await listInstantlySubworkspaces(options);
   const matches = group.subworkspaces.filter((workspace) =>
     selector.id === undefined
       ? workspace.name !== null &&
@@ -749,15 +744,14 @@ const resourcePath = (
 
 /** Reads one bounded resource page as an accepted subworkspace. */
 export async function readInstantlySubworkspace(
-  token: string,
   selector: InstantlyWorkspaceSelector,
   resource: InstantlyResource,
   query: InstantlyResourceQuery = {},
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyResourcePage> {
   const path = resourcePath(resource, query);
-  const workspace = await resolveWorkspace(token, selector, options);
-  const page = await callPage(token, path, workspace.id, options);
+  const workspace = await resolveWorkspace(selector, options);
+  const page = await callPage(path, workspace.id, options);
   return enforceOutputBudget({
     items: sanitizeItems(resource, page.items),
     nextStartingAfter: page.next_starting_after ?? null,

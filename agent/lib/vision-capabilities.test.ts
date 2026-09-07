@@ -7,8 +7,6 @@ import { z } from "zod";
 // variables at module load (constants.ts). Nothing is contacted; the values
 // only have to exist.
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??=
-  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const { COMPILE_METADATA_PATH, COMPILED_MANIFEST_PATH, readCompiledManifest } =
   await import("./capability-budget.js");
