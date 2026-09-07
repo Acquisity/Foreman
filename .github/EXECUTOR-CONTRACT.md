@@ -4,7 +4,7 @@ Foreman uses one shared company toolkit, `Foreman`, at `https://executor.acquisi
 
 ## What controls behavior
 
-Skills and agent instructions define the workflow. Critic instructions require read-only review even though it shares the same connection. Linear writes and OpenRouter requests are available. Vercel deployments and toolbar actions are intended capabilities once its downstream connection is installed. Resend retains the selected read operations. Provider credentials and their existing scopes stay in Executor.
+Skills and agent instructions define the workflow. Critic instructions require read-only review even though it shares the same connection. Linear writes and OpenRouter requests are available. Vercel deployments and toolbar actions are intended capabilities once its downstream connection is installed. Resend retains the selected read operations. Provider credentials and their existing scopes stay in Executor. Autumn includes all 18 read-only API operations and all 20 MCP reads, date utilities, and non-mutating previews in the installed catalog. Customer, subscription, balance, plan, catalog, and organization-rule mutations remain excluded from the read-only Autumn surface.
 
 The single operation list in `executor/toolkit-manifest.json` records the selected company operations and known missing coverage. Its default-deny policy excludes operations outside that list, including Executor administration. It does not divide permissions by workflow, requester, or subagent. The connection exposes `execute` and `skills`; it does not offer approval resume or artifacts. Personal Supermemory stays on its existing personal connection and sign-in path.
 
