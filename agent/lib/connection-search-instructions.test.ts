@@ -34,7 +34,7 @@ const sources: Record<string, string> = {
 const REMOVED_CONNECTION_CALL =
   /\b(?:autumn|stripe|neon|instantly|axiom|intercom|inngest|jam|linear|lucent|modem|openrouter|planetscale|posthog|resend|sentry|vercel)__/u;
 
-test("active instructions route company discovery through the session's Executor profile", () => {
+test("active instructions route company discovery through the shared Executor connection", () => {
   for (const [name, source] of Object.entries(sources)) {
     assert.doesNotMatch(source, REMOVED_CONNECTION_CALL, name);
     if (name === "critic skill") {

@@ -4,7 +4,7 @@ description: "Test a named integration, critic, vision, or the full Foreman prev
 
 # Integration testing
 
-Treat a request such as "test Linear" as a request for a small real read through the active connection. Use the current Executor access instructions to select the connection. Discover the installed path, inspect its schema, and invoke the operation. Never invent a provider path or select a different access profile. Provider authorization errors are operator configuration failures, not a reason to ask the requester to sign in.
+Treat a request such as "test Linear" as a request for a small real read through the active connection. Use the shared executor connection. Discover the installed path, inspect its schema, and invoke the operation. Never invent a provider path. Provider authorization errors are operator configuration failures, not a reason to ask the requester to sign in.
 
 A passing connection search proves discovery only. Report PASS only after a real read succeeds. An empty successful response is PASS with no matching results; an error or unavailable connection is BLOCKED or FAIL, never empty data. If an MCP result has isError set, the read failed even when Executor's outer call completed. Never report an integration as fully tested after one read; identify which parts remain untested.
 
@@ -23,7 +23,7 @@ Default to read-only tests. Use a supplied test identifier when one is needed. O
 
 ## Critic
 
-Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify that the critic follows its read-only instructions; Linear deliberately shares root access. Backend denials for other-provider writes, raw helper APIs, administration, remaining factory/schedule restrictions, and reused sessions are operator acceptance checks; discovery alone cannot establish them.
+Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify that the critic follows its read-only instructions while sharing root company access. Check expected writes only on designated test records. Executor administration remains excluded; helper API operations are part of the shared toolkit.
 
 ## Vision
 

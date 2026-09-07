@@ -1,6 +1,4 @@
-import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
-import { canUseBillingApiRead, canUseInvestigationMemory } from "../trust.js";
 import { ExecutorError } from "./transport.js";
 
 export type Provider =
@@ -241,19 +239,4 @@ export function resolveProviderRequest(
     }
   }
   return { operation, source: { body, headers, path, query } };
-}
-
-export function authorizeHelper(
-  operation: string,
-  auth: SessionAuthContext | null
-): void {
-  if (
-    (operation.startsWith("autumn.") || operation.startsWith("stripe.")) &&
-    !canUseBillingApiRead(auth)
-  ) {
-    throw new ExecutorError("billing_denied");
-  }
-  if (operation.startsWith("instantly.") && !canUseInvestigationMemory(auth)) {
-    throw new ExecutorError("instantly_denied");
-  }
 }

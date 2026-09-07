@@ -1,6 +1,6 @@
 # Executor preview acceptance
 
-Status: preview testing is in progress. This branch is not cleared for production.
+Status: preview testing is in progress. This branch is not cleared for production. The current design is one shared `Foreman` toolkit. Earlier role/profile evidence below is historical and superseded by the consolidation section.
 
 ## Configuration
 
@@ -105,3 +105,12 @@ Regression fixtures cover search matches on later pages, ambiguous names, empty 
 ## Linear access policy clarification
 
 The user clarified that Foreman should have normal Linear read/write access in every execution mode. All root and critic profiles now share the attended Linear catalog, and all helper profiles include the existing Linear read and write operations. Removed factory/schedule Linear transport denials and unattended approval denials on document/routing helpers. Critic instructions still prohibit writes; its shared Linear connection is not an enforcement boundary. Earlier factory/critic/schedule Linear denial probes above document the superseded policy and are no longer acceptance criteria. Other provider, raw-helper, management, and session-profile boundaries remain in place.
+
+
+## Shared toolkit consolidation
+
+One `Foreman` toolkit (`/mcp/toolkits/foreman?artifacts=false`) replaces the fifteen execution profiles and the obsolete four-service proof toolkit. Root and critic use the same app connection, and authored helpers invoke that same endpoint. All selected platform and helper operations are represented once in the manifest. No new workflow or subagent requires a toolkit.
+
+Workflow behavior is defined by skills; critic remains instructed to review without writing. Provider credentials and scopes are unchanged. Helpers retain their validation, membership checks, pagination, filtering, deadlines, and result formats, while their underlying operations are discoverable in the shared toolkit. Previous checks expecting per-profile denials or hidden helper operations no longer describe the intended policy.
+
+The two remaining catalog gaps are Vercel connection setup and the retired Stripe account-info operation. The new toolkit should pass the live exact-catalog check independently of those coverage gaps. Deployment-specific acceptance and retirement evidence are recorded on PR #118. Restore the previous toolkit configuration before rolling back to a deployment that references its old URLs.

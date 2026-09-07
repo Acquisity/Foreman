@@ -204,23 +204,6 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
 }
 
 /**
- * Whether this session may use the fixed, read-only Autumn and Stripe API
- * lookups. Every surface may: terminal, Slack (DMs, channels, intake
- * channels), Linear Agent Sessions, schedules, and factory runs are all
- * investigations. The one exception is a GitHub session that is neither a
- * trusted collaborator's nor the factory's, because there outside text on a
- * public pull request would be steering an app-scoped billing key.
- */
-export function canUseBillingApiRead(auth: SessionAuthContext | null): boolean {
-  return (
-    auth === null ||
-    isTrusted(auth) ||
-    isAutonomous(auth) ||
-    !auth.principalId.startsWith("github:")
-  );
-}
-
-/**
  * Auth attribute marking a session authorized to read and write investigation
  * memory.
  *

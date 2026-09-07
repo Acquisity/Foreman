@@ -1,6 +1,5 @@
-import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
-import { executorProfile, toolkitUrl } from "./profiles.js";
+import { toolkitUrl } from "./endpoint.js";
 
 const envelopeSchema = z.object({
   error: z.unknown().optional(),
@@ -33,7 +32,6 @@ const outcomeSchema = z.discriminatedUnion("ok", [
 ]);
 
 export interface ExecutorRequestContext {
-  auth: SessionAuthContext | null;
   signal: AbortSignal;
   token: string;
 }
@@ -126,7 +124,7 @@ function rpcMessage(body: string, id: number) {
   throw new ExecutorError("invalid_rpc_response");
 }
 
-/** Fresh MCP session per helper call. No cross-lane session cache or approval resume. */
+/** Fresh MCP session per helper call. No session cache or approval resume. */
 export async function invokeExecutor(
   ctx: ExecutorRequestContext,
   path: string,
@@ -141,7 +139,7 @@ export async function invokeExecutor(
     AbortSignal.timeout(options.timeoutMs ?? 50_000),
   ]);
   signal.throwIfAborted();
-  const endpoint = toolkitUrl("helpers", executorProfile(ctx.auth));
+  const endpoint = toolkitUrl();
   const fetchImpl = options.fetch ?? fetch;
   const headers: Record<string, string> = {
     Accept: "application/json, text/event-stream",

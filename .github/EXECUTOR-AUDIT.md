@@ -1,6 +1,6 @@
 # Foreman to Executor implementation audit
 
-The source audit started from current remote main, 119bb01. It found eighteen root MCP definitions, fifteen critic definitions, and fourteen authored provider tools. Company-service connection definitions are now replaced by gated Executor profiles; personal Supermemory remains direct.
+The source audit started from current remote main, 119bb01. It found eighteen root MCP definitions, fifteen critic definitions, and fourteen authored provider tools. Company-service connection definitions are now replaced by one shared Executor toolkit; personal Supermemory remains direct.
 
 The fourteen helpers retain their public inputs/results and domain logic: five PlanetScale-backed tools (query, customer lookup, schema description, billing-account lookup, weekly AI SDR report), two billing readers, two Instantly readers, Inngest run search, three Linear search/document/routing tools, and help-center search. Provider calls now use an injected Executor transport. Provider credentials no longer enter those domain helpers.
 
@@ -10,4 +10,6 @@ The previous account-by-requester and only-Linear-writes assumptions were supers
 
 Deployment configuration is deliberately separate. The existing personal proof toolkit covers four services and is not a complete production endpoint. See [EXECUTOR-CONTRACT.md](./EXECUTOR-CONTRACT.md) for profile policies, exact operation bindings, connector provisioning, and release verification. Local tests do not establish live Executor policy enforcement or provider availability.
 
-Linear access follows the user's clarified policy: root, critic, factory, and scheduled profiles share the same Linear catalog, and authored Linear reads/writes carry no execution-mode denial. The critic remains instructed to review read-only; its shared Linear connection is not a separate technical write restriction. Other provider restrictions remain unchanged.
+Linear access follows the user's clarified policy: all Foreman workflows share the company catalog, and authored provider helpers carry no execution-mode denial. The critic remains instructed to review read-only; its shared Linear connection is not a separate technical write restriction. Other provider restrictions remain unchanged.
+
+The toolkit consolidation supersedes the original fifteen-profile design. One `Foreman` toolkit contains the selected platform operations and helper API operations. Skills define workflow behavior, including critic read-only review; helper validation and result bounds remain intact. The former role catalogs and profile-selection machinery were removed.

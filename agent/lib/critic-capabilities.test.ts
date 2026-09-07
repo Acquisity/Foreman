@@ -67,28 +67,6 @@ const WRITE_TOOL_NAMES = new Set([
   "write_file",
 ]);
 
-/**
- * Connections whose read-only boundary is the OAuth grant itself rather than
- * a tool allowlist: PostHog exposes one `exec` tool and requests only `:read`
- * scopes, so writes fail at the API.
- */
-const READ_ONLY_BY_SCOPE = new Set(["posthog"]);
-
-/** Connection tools that mutate provider state, by connection. */
-const WRITE_CONNECTION_TOOLS: Record<string, readonly string[]> = {
-  lucent: ["update_issue"],
-  planetscale: ["planetscale_execute_write_query"],
-  sentry: ["update_issue", "create_project", "create_team", "create_dsn"],
-  supermemory: ["add_memory"],
-  vercel: [
-    "deploy_to_vercel",
-    "change_toolbar_thread_resolve_status",
-    "reply_to_toolbar_thread",
-    "edit_toolbar_message",
-    "add_toolbar_reaction",
-  ],
-};
-
 // Anything that would give the child its own credential path. PR #55 was a
 // full connection outage caused by auto-provisioning; the child must reuse
 // the root's managedConnect / userConnect objects and nothing else.
@@ -105,16 +83,7 @@ const FORBIDDEN_SOURCE = [
 
 describe("critic evidence surface", () => {
   it("mounts every triage evidence connection", () => {
-    assert.deepEqual(
-      list("connections/"),
-      [
-        "executor.ts",
-        "executor-factory.ts",
-        "executor-limited.ts",
-        "executor-scheduled.ts",
-        "executor-scheduled-internal.ts",
-      ].sort()
-    );
+    assert.deepEqual(list("connections/"), ["executor.ts"]);
   });
 
   it("never authors a credential path of its own", () => {
@@ -142,40 +111,19 @@ describe("critic evidence surface", () => {
     }
   });
 
-  it("uses separate critic toolkits and context-gated authentication", () => {
+  it("shares root company authentication and its toolkit", () => {
     for (const { child, root, name } of pairs) {
       assert.equal(typeof child.auth, "function", name);
       assert.equal(typeof root.auth, "function", name);
-      assert.notEqual(child.url, root.url, name);
-      assert.ok(String(child.url).includes("/foreman-critic-"), name);
+      assert.equal(child.url, root.url, name);
+      assert.ok(String(child.url).includes("/foreman?"), name);
       assert.deepEqual(child.tools, { allow: ["execute", "skills"] });
     }
   });
 
-  it("only narrows tool allowlists and excludes every write", () => {
-    for (const { child, name, root } of pairs) {
-      if (READ_ONLY_BY_SCOPE.has(name)) {
-        assert.equal(child.tools, root.tools, `${name}: tools unchanged`);
-        continue;
-      }
-      const childAllow = child.tools?.allow;
-      assert.ok(childAllow, `${name}: the critic must have an allowlist`);
-      const rootAllow = root.tools?.allow;
-      if (rootAllow) {
-        for (const tool of childAllow) {
-          assert.ok(
-            rootAllow.includes(tool),
-            `${name}: ${tool} is not on the root allowlist`
-          );
-        }
-      }
-      for (const write of WRITE_CONNECTION_TOOLS[name] ?? []) {
-        assert.ok(
-          !childAllow.includes(write),
-          `${name}: ${write} must be excluded`
-        );
-      }
-    }
+  it("retains read-only critic instructions with shared provider access", () => {
+    const source = readFileSync(new URL("agent.ts", criticRoot), "utf8");
+    assert.ok(source.includes("Read-only: never writes to Linear"));
   });
 
   it("mounts no write-capable tool", () => {

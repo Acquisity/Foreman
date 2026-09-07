@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
+import { InstantlyApiError } from "./instantly-api.js";
 
 process.env.EXECUTOR_MCP_CONNECTOR ??= "api.instantly.ai/acquisity-foreman";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
@@ -21,29 +22,49 @@ describe("Instantly tool authorization", () => {
     assert.equal("startAuthorization" in executorAuth(), false);
   });
 
-  it("denies both tools before requesting a token on an unstamped session", async () => {
-    let requestedToken = false;
+  it("both helpers use shared app access without an investigation stamp", async () => {
+    const previous = process.env.EXECUTOR_OPERATION_BINDINGS;
+    process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
+      "instantly.workspace-group-members": {
+        arguments: {},
+        path: "instantly.org.test.listMembers",
+      },
+    });
+    let requestedToken = 0;
     const context = {
+      abortSignal: new AbortController().signal,
       getToken: () => {
-        requestedToken = true;
-        throw new Error("should not request a token");
+        requestedToken += 1;
+        throw new InstantlyApiError("test credential unavailable", {
+          kind: "authorization",
+        });
       },
       session: { auth: { current: null } },
     } as unknown as Parameters<typeof listWorkspaces.execute>[1];
 
-    const listResult = await listWorkspaces.execute({}, context);
-    const readResult = await readWorkspace.execute(
-      {
-        limit: 20,
-        resource: "accounts",
-        workspaceId: "e05cbe7b-67db-4b07-b712-46b9365dc83f",
-      },
-      context as Parameters<typeof readWorkspace.execute>[1]
-    );
+    try {
+      const listResult = await listWorkspaces.execute({}, context);
+      const requestsAfterList = requestedToken;
+      assert.ok(requestsAfterList > 0);
+      const readResult = await readWorkspace.execute(
+        {
+          limit: 20,
+          resource: "accounts",
+          workspaceId: "e05cbe7b-67db-4b07-b712-46b9365dc83f",
+        },
+        context as Parameters<typeof readWorkspace.execute>[1]
+      );
 
-    assert.equal((listResult as { available: boolean }).available, false);
-    assert.equal((readResult as { available: boolean }).available, false);
-    assert.equal(requestedToken, false);
+      assert.equal((listResult as { available: boolean }).available, false);
+      assert.equal((readResult as { available: boolean }).available, false);
+      assert.ok(requestedToken > requestsAfterList);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.EXECUTOR_OPERATION_BINDINGS;
+      } else {
+        process.env.EXECUTOR_OPERATION_BINDINGS = previous;
+      }
+    }
   });
 });
 

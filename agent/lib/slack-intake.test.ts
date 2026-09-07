@@ -12,14 +12,8 @@ import {
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
   slackIntakeContext,
-  stampSlackIntakeAuth,
 } from "./slack-intake.js";
-import {
-  canUseBillingApiRead,
-  isIntakeOnly,
-  stampIntakeOnly,
-  stampTrusted,
-} from "./trust.js";
+import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
 import { SLACK_SIGN_IN_REASON, slackSignInDenial } from "./user-connect.js";
 
 const auth: SessionAuthContext = {
@@ -71,18 +65,6 @@ describe("intake-only channels", () => {
       "clarify-with-requester",
       "slack-wording",
     ]);
-  });
-
-  it("billing API reads run on every surface except an untrusted GitHub session", () => {
-    const intake = stampSlackIntakeAuth(auth);
-    assert.equal(isIntakeOnly(intake), true);
-    assert.equal(canUseBillingApiRead(intake), true);
-    assert.equal(canUseBillingApiRead(auth), true);
-    assert.equal(canUseBillingApiRead(stampIntakeOnly(auth)), true);
-    assert.equal(canUseBillingApiRead(null), true);
-    const github = { ...auth, principalId: "github:12345" };
-    assert.equal(canUseBillingApiRead(github), false);
-    assert.equal(canUseBillingApiRead(stampTrusted(github)), true);
   });
 
   it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {

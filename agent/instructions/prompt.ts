@@ -1,5 +1,4 @@
 import { defineDynamic, defineInstructions } from "eve/instructions";
-import { executorSessionInstructions } from "../lib/executor/instructions.js";
 import { selectPrompt } from "../lib/prompts.js";
 
 // The agent's system prompt, resolved by caller: unattended factory runs (an issue labeled
@@ -16,7 +15,7 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, ctx) =>
       defineInstructions({
-        content: `${selectPrompt(ctx.session.auth.current?.principalId)}\n\n${executorSessionInstructions(ctx.session.auth.current)}`,
+        content: selectPrompt(ctx.session.auth.current?.principalId),
       }),
   },
 });

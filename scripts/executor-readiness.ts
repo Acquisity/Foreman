@@ -6,13 +6,11 @@ import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/requests.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
 const manifestSchema = z.object({
-  toolkits: z.array(
-    z.object({
-      missing: z.record(z.string(), z.array(z.string())),
-      paths: z.array(z.string()),
-      slug: z.string(),
-    })
-  ),
+  toolkit: z.object({
+    missing: z.record(z.string(), z.array(z.string())),
+    paths: z.array(z.string()),
+    slug: z.string(),
+  }),
 });
 const manifest = manifestSchema.parse(
   JSON.parse(await readFile(new URL("toolkit-manifest.json", root), "utf8"))
@@ -29,7 +27,8 @@ for (const operation of REQUIRED_HELPER_OPERATIONS) {
     failures += 1;
   }
 }
-for (const toolkit of manifest.toolkits) {
+{
+  const { toolkit } = manifest;
   for (const [provider, missing] of Object.entries(toolkit.missing)) {
     if (missing.length) {
       console.log(
@@ -107,7 +106,7 @@ if (process.argv.includes("--live")) {
     return response.json();
   };
   const installed = toolkitListSchema.parse(await api("/toolkits")).toolkits;
-  for (const expected of manifest.toolkits) {
+  for (const expected of [manifest.toolkit]) {
     const actual = installed.find((item) => item.slug === expected.slug);
     if (actual?.owner !== "user") {
       console.log(

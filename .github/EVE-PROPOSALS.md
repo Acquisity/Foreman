@@ -61,4 +61,4 @@ Proposal: put a framework-measured elapsed time, or a start timestamp, on `Actio
 
 ## Per-session MCP connection URL selection
 
-Eve 0.44's `McpClientConnectionDefinition.url` is a string; auth and headers can resolve by caller, but the endpoint cannot. Foreman needs distinct Executor toolkit URLs for root, critic, factory, and scheduled privileges. The implementation mounts static slots with auth and approval gates and stamps the correct slot into each turn's instructions. A future URL resolver must also partition MCP sessions, caches, and resumed executions by the resolved authority. Changing only headers or filtering names cannot enforce a different toolkit policy.
+Resolved for Foreman's current requirements: all workflows use one shared Executor toolkit, so a caller-dependent connection URL is no longer needed. Eve 0.44 still requires a static `McpClientConnectionDefinition.url`; no framework workaround or profile slots remain.

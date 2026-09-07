@@ -5,18 +5,13 @@ import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { bindOperation } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
-import { providerAllowlist } from "./executor/policy.js";
-import { EXECUTOR_PROFILES, executorProfile } from "./executor/profiles.js";
-import {
-  authorizeHelper,
-  resolveProviderRequest,
-} from "./executor/requests.js";
+import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";
+import { resolveProviderRequest } from "./executor/requests.js";
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
 import { ExecutorError, invokeExecutor } from "./executor/transport.js";
 import {
   AUTONOMOUS_PRINCIPAL,
   stampInvestigationMemory,
-  stampTrusted,
   stampUnattended,
 } from "./trust.js";
 
@@ -117,81 +112,31 @@ const context = (current: SessionAuthContext | null = internal) => ({
 
 process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
 
-test("profile selection follows channel stamps and preserves unattended authority", () => {
-  assert.equal(executorProfile(internal), "attended");
-  assert.equal(executorProfile(auth), "limited");
-  assert.equal(executorProfile(factory), "factory");
-  assert.equal(executorProfile(stampUnattended(internal)), "scheduled");
-  assert.equal(
-    executorProfile(stampUnattended(stampTrusted(auth))),
-    "scheduled-internal"
-  );
-  assert.equal(executorProfile(null), "limited");
-});
-
-test("a requester other than Aaron can use shared attended auth without provider consent", () => {
-  const connection = executorConnection("root", "attended");
-  assert.equal(typeof connection.auth, "function");
-  const resolve = connection.auth as (ctx: SessionContext) => {
-    principalType?: string;
-  };
-  const resolved = resolve({
-    session: { auth: { current: internal } },
-  } as SessionContext);
-  assert.equal(resolved.principalType, "app");
-  assert.equal("startAuthorization" in resolved, false);
-});
-
-test("wrong-profile discovery and direct calls are both denied", () => {
-  for (const profile of EXECUTOR_PROFILES) {
-    if (profile === "attended") {
-      continue;
-    }
-    const connection = executorConnection("root", profile);
-    const ctx = {
-      session: { auth: { current: internal } },
-      toolInput: { profile },
-      toolName: "execute",
-    };
-    assert.throws(() =>
-      (connection.auth as (ctx: SessionContext) => unknown)(
-        ctx as unknown as SessionContext
-      )
-    );
-    const result = (
-      connection.approval as (ctx: ApprovalContext) => { type: string }
-    )(ctx as unknown as ApprovalContext);
-    assert.equal(result.type, "denied");
-  }
-});
-
-test("critic and unattended policy contracts retain their narrower provider operations", () => {
-  assert.ok(
-    providerAllowlist("vercel", "root", "attended").includes("deploy_to_vercel")
-  );
-  assert.ok(
-    providerAllowlist("openrouter", "root", "attended").includes("send-message")
-  );
-  assert.ok(
-    !providerAllowlist("vercel", "critic", "attended").includes(
-      "deploy_to_vercel"
-    )
-  );
-  assert.ok(
-    !providerAllowlist("openrouter", "root", "factory").includes("send-message")
-  );
-  for (const role of ["root", "critic"] as const) {
-    for (const profile of EXECUTOR_PROFILES) {
-      assert.deepEqual(providerAllowlist("linear", role, profile), ["*"]);
+test("every execution context shares company auth and the same toolkit", () => {
+  const connection = executorConnection();
+  assert.equal(connection.url, toolkitUrl());
+  for (const current of [
+    null,
+    auth,
+    internal,
+    factory,
+    stampUnattended(auth),
+  ]) {
+    const resolved = (
+      connection.auth as (ctx: SessionContext) => { principalType?: string }
+    )({ session: { auth: { current } } } as SessionContext);
+    assert.equal(resolved.principalType, "app");
+    assert.equal("startAuthorization" in resolved, false);
+    for (const toolName of ["execute", "skills", "executor__execute"]) {
+      assert.equal(
+        (connection.approval as (ctx: ApprovalContext) => unknown)({
+          session: { auth: { current } },
+          toolName,
+        } as ApprovalContext),
+        "not-applicable"
+      );
     }
   }
-  assert.deepEqual(providerAllowlist("intercom", "root", "limited"), []);
-  assert.ok(
-    providerAllowlist("intercom", "root", "factory").includes(
-      "get_conversation"
-    )
-  );
-  assert.deepEqual(providerAllowlist("supermemory", "root", "attended"), []);
 });
 
 test("helper request mapping preserves billing expansions and excludes credentials", () => {
@@ -243,35 +188,6 @@ test("Instantly routing retains workspace provenance and bounded query flags", (
   assert.deepEqual(request.source.headers, { "x-as-workspace": "member-id" });
 });
 
-test("helper runtime denials apply before any transport", () => {
-  assert.doesNotThrow(() => authorizeHelper("linear.RelatedIssues", factory));
-  for (const current of [
-    null,
-    auth,
-    internal,
-    factory,
-    stampUnattended(auth),
-  ]) {
-    for (const operation of [
-      "linear.RelatedIssues",
-      "linear.CreateDocument",
-      "linear.RouteIssueUpdate",
-    ]) {
-      assert.doesNotThrow(() => authorizeHelper(operation, current));
-    }
-  }
-  assert.throws(() => authorizeHelper("instantly.accounts", auth));
-  assert.throws(() =>
-    authorizeHelper("stripe.customers.get", {
-      ...auth,
-      principalId: "github:outsider",
-    })
-  );
-  assert.doesNotThrow(() =>
-    authorizeHelper("linear.RouteIssueUpdate", internal)
-  );
-});
-
 test("operation bindings map exact argument fields and fail closed on unknown mappings", () => {
   const old = process.env.EXECUTOR_OPERATION_BINDINGS;
   try {
@@ -316,9 +232,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   );
   assert.deepEqual(result, { data: { id: "cus_1" }, ok: true });
   assert.equal(seen.length, 3);
-  assert.ok(
-    seen.every((call) => call.url.includes("/foreman-helpers-attended?"))
-  );
+  assert.ok(seen.every((call) => call.url.includes("/foreman?")));
   assert.ok(
     seen.every(
       (call) =>
@@ -431,7 +345,7 @@ test("cancellation during a stalled response cancels the reader and stops the ca
 });
 
 test("the active connection rejects guessed resume and management tools", () => {
-  const connection = executorConnection("root", "attended");
+  const connection = executorConnection();
   for (const toolName of [
     "resume",
     "executor__resume",
@@ -449,7 +363,7 @@ test("the active connection rejects guessed resume and management tools", () => 
   }
 });
 
-test("a fresh invocation cannot reuse another profile's MCP session", async () => {
+test("helper invocations use fresh sessions on the same shared toolkit", async () => {
   const initialHeaders: Headers[] = [];
   const endpoints: string[] = [];
   const responder = rpc(completed({}));
@@ -464,8 +378,8 @@ test("a fresh invocation cannot reuse another profile's MCP session", async () =
   await invokeExecutor(context(factory), OPERATION, {}, { fetch: fetchStub });
   assert.equal(initialHeaders.length, 2);
   assert.ok(initialHeaders.every((headers) => !headers.has("mcp-session-id")));
-  assert.ok(endpoints[0].includes("helpers-attended"));
-  assert.ok(endpoints[1].includes("helpers-factory"));
+  assert.equal(endpoints[0], toolkitUrl());
+  assert.equal(endpoints[1], toolkitUrl());
 });
 
 test("the deadline cancels a stalled response body without a caller cancellation", async () => {
@@ -530,36 +444,38 @@ test("critic Sentry helper refuses arbitrary nested operations before authentica
   );
 });
 
-test("installed toolkit manifest shares Linear access across every execution profile", () => {
+test("one toolkit contains platform operations and every helper binding", () => {
   const manifest = JSON.parse(
     readFileSync(
       new URL("../../.github/executor/toolkit-manifest.json", import.meta.url),
       "utf8"
     )
-  ) as {
-    toolkits: Array<{ slug: string; role: string; paths: string[] }>;
-  };
-  const linearPaths = (paths: string[]) =>
-    paths.filter(
-      (path) => path.startsWith("linear.") || path.startsWith("foreman_linear_")
-    );
-  const root = manifest.toolkits.find(
-    (toolkit) => toolkit.slug === "foreman-root-attended"
-  );
-  const helpers = manifest.toolkits.find(
-    (toolkit) => toolkit.slug === "foreman-helpers-attended"
-  );
-  assert.ok(root);
-  assert.ok(helpers);
-  assert.ok(root.paths.some((path) => path.endsWith(".save_issue")));
-  assert.ok(
-    helpers.paths.some((path) => path.startsWith("foreman_linear_write_api."))
-  );
-  for (const toolkit of manifest.toolkits) {
-    assert.deepEqual(
-      linearPaths(toolkit.paths),
-      linearPaths(toolkit.role === "helpers" ? helpers.paths : root.paths),
-      toolkit.slug
+  ) as { toolkit: { slug: string; paths: string[] } };
+  const bindings = JSON.parse(
+    readFileSync(
+      new URL(
+        "../../.github/executor/operation-bindings.json",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  ) as Record<string, { path: string }>;
+  const { toolkit } = manifest;
+  assert.equal(toolkit.slug, FOREMAN_TOOLKIT_SLUG);
+  assert.equal(new Set(toolkit.paths).size, toolkit.paths.length);
+  for (const binding of Object.values(bindings)) {
+    assert.ok(toolkit.paths.includes(binding.path), binding.path);
+  }
+  for (const suffix of [".save_issue", ".send_message", ".get_conversation"]) {
+    assert.ok(
+      toolkit.paths.some((path) => path.endsWith(suffix)),
+      suffix
     );
   }
+  assert.ok(
+    toolkit.paths.every(
+      (path) =>
+        !(path.startsWith("supermemory.") || path.startsWith("executor."))
+    )
+  );
 });

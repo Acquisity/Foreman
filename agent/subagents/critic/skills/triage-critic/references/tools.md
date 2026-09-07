@@ -2,7 +2,7 @@
 
 Company-service tools use Executor. Use `connection_search` with the `connection` argument set to the Executor connection named in this turn's access instructions. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
 
-Every source a triage investigation can cite, and how the critic reaches it. Authored helpers reuse root definitions. Company services use separate critic Executor toolkits with the shared app credential and narrower read policies. The critic cannot write.
+Every source a triage investigation can cite, and how the critic reaches it. Authored helpers reuse root definitions. Company services use the same Foreman Executor toolkit and app credential as root. Critic instructions require read-only review.
 
 ## Repository (root tools)
 
@@ -50,7 +50,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 ## Billing and Instantly (root tools)
 
-`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They retain their session authorization checks. `available: false` is an evidence gap, not a reason to retry.
+`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They retain their input validation and bounded result handling. `available: false` is an evidence gap, not a reason to retry.
 
 ## Fixed evidence reads (root tools)
 
@@ -69,4 +69,4 @@ The same fixed reads Foreman used to produce the evidence, all bare, so a claim 
 
 ## Unavailable sources
 
-Company evidence uses the critic's app-scoped Executor profile. A missing connector, unavailable binding, or denied provider is an unavailable source for this review, not a request for the ticket requester to sign in. Record it once, decide whether the missing evidence is material, and continue without retrying or substituting another source.
+Company evidence uses the shared app-scoped Foreman Executor connection. A missing connector, unavailable binding, or denied provider is an unavailable source for this review, not a request for the ticket requester to sign in. Record it once, decide whether the missing evidence is material, and continue without retrying or substituting another source.

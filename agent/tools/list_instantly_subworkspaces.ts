@@ -6,7 +6,6 @@ import {
   instantlyWorkspaceDiscoverySchema,
   listInstantlySubworkspaces,
 } from "#lib/instantly-api.js";
-import { canUseInvestigationMemory } from "#lib/trust.js";
 
 const unavailableReason = (error: unknown): string =>
   error instanceof InstantlyApiError
@@ -15,15 +14,8 @@ const unavailableReason = (error: unknown): string =>
 
 export default defineTool({
   description:
-    "Find accepted Instantly subworkspaces by a partial name, or browse bounded pages. No workspace ID is needed to search. Validates all Workspace Group pages up to a 100-page safety cap before returning matches; excludes pending and rejected memberships. Returns workspace names and IDs, match totals, and nextStartingAfter for continuation with the same search. Default 20 results, maximum 100 within 256 KiB. Use the matching returned ID with read_instantly_subworkspace; do not guess between ambiguous candidates. Available only on attended investigation surfaces. It never changes Instantly.",
+    "Find accepted Instantly subworkspaces by a partial name, or browse bounded pages. No workspace ID is needed to search. Validates all Workspace Group pages up to a 100-page safety cap before returning matches; excludes pending and rejected memberships. Returns workspace names and IDs, match totals, and nextStartingAfter for continuation with the same search. Default 20 results, maximum 100 within 256 KiB. Use the matching returned ID with read_instantly_subworkspace; do not guess between ambiguous candidates. It never changes Instantly.",
   async execute(input, ctx) {
-    if (!canUseInvestigationMemory(ctx.session.auth.current)) {
-      return {
-        available: false as const,
-        reason:
-          "This session is not authorized for Instantly investigation reads.",
-      };
-    }
     try {
       return {
         available: true as const,

@@ -1,6 +1,6 @@
 # Foreman architecture
 
-Company-service transport is Executor. `agent/lib/executor/` owns fixed helper invocation, exact deployment bindings, and access-profile selection. Root and critic mount separate static toolkit slots because eve 0.44 cannot resolve a connection URL by caller. Both authentication and approval reject the wrong profile, and each turn names its admitted connection. Toolkit invocation policy must preserve the generated provider allowlists, not merely hide discovery results. Personal Supermemory, inbound channels, GitHub delivery, vision attachment reads, and runtime/storage APIs remain separate. See [EXECUTOR-CONTRACT.md](./EXECUTOR-CONTRACT.md).
+Company MCPs and authored provider helpers use one app-scoped Executor toolkit, `Foreman`. Root, critic, factory, and schedules share the same provider access; skills define workflow behavior and the critic remains instructed to review read-only. The toolkit manifest and exact operation bindings live under `.github/executor/`. Personal Supermemory and inbound delivery, storage, models, and sandbox infrastructure remain separate.
 
 Foreman is a repository-neutral eve agent with a general execution path and an optional factory path.
 
@@ -43,7 +43,7 @@ Readiness requires all of: internal approval for the current head, passing requi
 
 Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
 
-Billing API access is another independent stamp. Slack applies it to every configured intake-only channel, whatever workflow the channel maps to: the channel is not a reliable classifier of the ask, and an Acquisity Asks thread runs under a service principal where no user-scoped connection can work. The fixed Autumn and Stripe read tools use the shared company account through Executor and recheck the existing billing-read policy on each call. They expose fixed read operations and no billing writes. Authorized attended surfaces also retain the approved provider MCP reads through their Executor toolkit, without requester-specific provider consent.
+Autumn and Stripe billing helpers use the shared company account through Executor on every workflow. They retain fixed read operations, identifier validation, bounded history, and field filtering; they expose no billing writes and require no requester-specific provider consent.
 
 ## Storage
 

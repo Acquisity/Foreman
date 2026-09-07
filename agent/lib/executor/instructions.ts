@@ -1,11 +1,2 @@
-import type { SessionAuthContext } from "eve/context";
-import { connectionName, executorProfile } from "./profiles.js";
-
 export const EXECUTOR_DISCOVERY =
-  "Company-service tools are discovered through Executor. Use connection_search with the connection argument set to the Executor connection named in this session's access instructions; never search every connection. Within execute, search one provider namespace with tools.search({ namespace, query }), inspect the returned path with tools.describe.tool({ path }), then call tools[path](input). Branch on result.ok and use result.data for provider evidence. Use only paths returned by discovery, never translate an old qualified name into a guessed path. Do not call Executor management, artifact, or resume tools. A denied or unavailable source is terminal for this turn. Authored Foreman helpers are called by their bare names without discovery; use them for bounded queries, billing, Instantly, run searches, and routing. Personal Supermemory keeps its separate connection and sign_in.";
-
-export function executorSessionInstructions(
-  auth: SessionAuthContext | null
-): string {
-  return `Executor access for this turn: use connection_search with connection set to ${connectionName(executorProfile(auth))}. Other Executor profiles are unavailable. ${EXECUTOR_DISCOVERY}`;
-}
+  "Company-service tools are discovered through Executor. Use connection_search with connection set to executor; never search every connection. Within execute, search one provider namespace with tools.search({ namespace, query }), inspect the returned path with tools.describe.tool({ path }), then call tools[path](input). Branch on result.ok and use result.data for provider evidence. Use only paths returned by discovery, never translate an old qualified name into a guessed path. Do not call Executor management, artifact, or resume tools. A denied or unavailable source is terminal for this turn. Authored Foreman helpers are called by their bare names without discovery; use them for bounded queries, billing, Instantly, run searches, and routing. Personal Supermemory keeps its separate connection and sign_in.";

@@ -1,11 +1,7 @@
 import type { ToolContext } from "eve/tools";
 import { executorAuth } from "./auth.js";
 import { bindOperation } from "./bindings.js";
-import {
-  authorizeHelper,
-  type Provider,
-  resolveProviderRequest,
-} from "./requests.js";
+import { type Provider, resolveProviderRequest } from "./requests.js";
 import { ExecutorError, invokeExecutor } from "./transport.js";
 
 /** An injected request adapter keeps the domain helpers' response handling intact. */
@@ -22,7 +18,6 @@ export function executorProviderFetch(
       String(address),
       init
     );
-    authorizeHelper(operation, ctx.session.auth.current);
     const binding = bindOperation(operation, source);
     const signal = init.signal
       ? AbortSignal.any([ctx.abortSignal, init.signal])
@@ -30,7 +25,7 @@ export function executorProviderFetch(
     signal.throwIfAborted();
     const { token } = await ctx.getToken(executorAuth());
     const outcome = await invokeExecutor(
-      { auth: ctx.session.auth.current, signal, token },
+      { signal, token },
       binding.path,
       binding.input
     );
@@ -64,7 +59,7 @@ export async function executorReadQuery(
   const binding = bindOperation("planetscale.readQuery", { args });
   const { token } = await ctx.getToken(executorAuth());
   const outcome = await invokeExecutor(
-    { auth: ctx.session.auth.current, signal: ctx.abortSignal, token },
+    { signal: ctx.abortSignal, token },
     binding.path,
     binding.input
   );
