@@ -8,6 +8,8 @@ description: "Use only after triage-investigate explicitly records its Stage 4 c
 
 Before this skill was loaded, working context must have contained `STAGE 4 COMPLETE: evidence record ready`. If not, read no references or decide handling; resume unfinished Stage 4. This load does not create the checkpoint.
 
+Duplicates still need handling.
+
 ## Stage 5: Decide handling
 
 Purpose: either stop with the missing confirmation explicit when the claim remains unproven, or turn the completed evidence record into one classification, unblock, handling path, final state, priority, and label set.

@@ -4,7 +4,7 @@ description: "Engineering Triage intake and evidence, Stages 1 through 4. Load f
 
 # Triage investigate
 
-Goal: find the root cause without spending a developer's time, record the investigation where the next agent can read it, and hand engineering one master ticket per root cause. Write for the colleagues who filed these tickets: name workspaces, quote evidence, keep customer data off shared engineering tickets.
+Goal: find the cause, preserve evidence, and hand engineering one master per root cause. Keep customer details on their own ticket.
 
 ## Rules for every stage
 
@@ -15,6 +15,8 @@ Start skeptical. Rule out before any bug call: setup, configuration, permissions
 - `Bug`: internal failure that settings, configuration, and platform limits do not explain.
 
 A suspicion is never a confirmed `Bug`. When the missing confirmation needs a person and has not landed, hand back what is known with the confirmation named, no ticket, nothing that reads as settled.
+
+Read-only walkthroughs still cover all seven stages, including duplicate handling after Stage 4. Describe writes; do not perform them. Report omitted or unavailable work honestly.
 
 ## Stage 1: Establish the case
 
@@ -65,7 +67,7 @@ Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and 
 
 ### Check for an existing investigation
 
-Look for Intercom links, pasted summaries, prior sessions, Finding/Evidence comments, and an attached `Triage investigation` document; never redo work that already happened.
+Reuse existing investigations where current evidence supports them. Existing Duplicate state does not skip handling after Stage 4; explain which actions are already satisfied.
 
 ### Check duplicates
 
@@ -123,11 +125,11 @@ Results are sanitized past investigations: no customer identity, no production r
 Pick the lanes the symptom points at; naming one not applicable is an answer, guessing is not. Search each system on the axis it uses: identity (the Stage 2 org id, user id, or email, never a display name), symptom (the product's own words for the behavior), or time (the window the claim names). One empty search closes nothing; vary the axis. A lane you could not search is `Could not run`, not evidence of absence.
 
 - Background work: AI SDR runs, syncs, scrapes, imports, provisioning. `find_function_runs` with the function slug; `latestTrace.steps` shows the step that broke.
-- Errors, crashes, stack traces: Sentry `find_issues` first, `search_issues` only when that finds nothing, then `get_issue_details` for the stacktrace and first/last seen to date the failure against the claim.
+- Errors, crashes, stack traces: Sentry `search_issues`, then the nested `get_issue_details` read for stacktrace and first/last seen, using the catalog discovery instructions.
 - Anything the other lanes do not carry: Axiom `queryDataset` with APL (<https://axiom.co/docs/apl/introduction>); `listDatasets` and `getDatasetFields` first for real names; metrics via `queryMetrics`.
-- Email delivery, bounces, spam placement: Resend `list-emails`, `get-email`, `list-logs`, `list-suppressions` (kebab-case).
-- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` first: it follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces; a cap error is `Could not run`, never a complete list; a name must resolve exactly once and zero, ambiguous, pending, or rejected matches fail closed. `read_instantly_subworkspace` paginates with `startingAfter` until null. This lane does not replace PlanetScale as current production truth.
-- What the user actually did: the Jam link on the ticket when there is one. PostHog `exec`: `persons` on the Stage 2 email or distinct id (never a display name), then `session-recording`. Lucent is indexed by symptom, not customer; search the behavior (`responses not displaying`), never who reported it.
+- Email delivery, bounces, spam placement: discover Resend `list_emails`, `get_email`, `list_logs`, and `list_suppressions` through Executor and inspect their current schemas.
+- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces`: it follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces; a cap error is `Could not run`, never a complete list; a name must resolve exactly once and zero, ambiguous, pending, or rejected matches fail closed. `read_instantly_subworkspace` paginates with `startingAfter` until null. This lane does not replace PlanetScale as current production truth. For output-cap and unmatched-name handling, follow the catalog; an unresolved name proves no provider state.
+- What the user actually did: read the ticket's Jam link when present. PostHog `persons_list` on the Stage 2 email or distinct id, then session recordings via the catalog. Lucent searches symptoms, never customer names.
 - Deployment or edge failures: Vercel `get_runtime_errors` and `get_runtime_logs` around the reported time.
 - The conversation behind the report, and whether others hit it: Intercom. A conversation link goes straight to `fetch`, which accepts a URL; otherwise `search_contacts` on the Stage 2 email, `search_conversations` with `contact_ids`, `get_conversation` for the thread; `get_contact` returns the profile only and is not a step on this path. `search` prefixes ids (`contact_<uuid>`); `contact_ids` wants them raw: strip the prefix or the filter matches nothing. Others hit: `search` with a DSL query like `object_type:conversations q:"campaign stopped sending"`, not `search_conversations`, which filters structured fields and has no free-text. Modem `search_modem` for feedback beyond support threads.
 
