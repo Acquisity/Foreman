@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { toolkitPolicyMatches } from "./toolkit-policy.js";
 
@@ -136,4 +137,32 @@ describe("toolkit policy audit", () => {
       false
     );
   });
+});
+
+it("blocks destructive Vercel operations whose names do not start with delete/remove/revoke", () => {
+  const { toolkit } = JSON.parse(
+    readFileSync(
+      new URL(
+        "../../../.github/executor/toolkit-manifest.json",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  );
+  const scope = toolkit.connectionPolicies.find(
+    (item: { pattern: string }) =>
+      item.pattern === "foreman_vercel_api.user.foremanVercel.*"
+  );
+  assert.ok(scope);
+  for (const operation of [
+    "user.requestDelete",
+    "edgeCache.dangerouslyDeleteBySrcImages",
+    "edgeCache.dangerouslyDeleteByTags",
+    "vcr.clearRepositoryPermissions",
+    "projects.batchRemoveProjectEnv",
+  ]) {
+    const path = `foreman_vercel_api.user.foremanVercel.${operation}`;
+    assert.ok(scope.blocked.includes(path), path);
+    assert.ok(!toolkit.paths.includes(path), path);
+  }
 });
