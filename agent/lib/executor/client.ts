@@ -83,7 +83,9 @@ function providerResult(
     throw new ExecutorError("provider_operation_failed");
   }
   const retryAfter = outcome.ok
-    ? outcome.http?.headers?.["retry-after"]
+    ? Object.entries(outcome.http?.headers ?? {}).find(
+        ([name]) => name.toLowerCase() === "retry-after"
+      )?.[1]
     : outcome.error.retryAfter;
   const data = outcome.ok ? outcome.data : null;
   return { data, status, ...(retryAfter ? { retryAfter } : {}) };

@@ -6,7 +6,7 @@ Never guess a tool name. A service's REST API, its CLI, and its MCP server rarel
 
 ## How tool names work
 
-Two kinds of tool appear below, and they are called differently.
+Call authored root tools by their bare names; call company provider tools by the Executor paths discovered above.
 
 **Root tools** are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `lookup_customer`, `read_billing_account`, `describe_table`, `save_investigation_document`, `route_ticket`, `planetscale_execute_read_query`.
 

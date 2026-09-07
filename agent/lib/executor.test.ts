@@ -101,13 +101,28 @@ test("every execution context shares company auth and the same toolkit", () => {
   }
 });
 
-test("deployment bindings select paths and cannot modify typed arguments", () => {
+test("deployment bindings select paths and cannot modify typed arguments", async () => {
   const previous = process.env.EXECUTOR_OPERATION_BINDINGS;
   try {
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
       read: { arguments: { secret: "other" }, path: OPERATION },
     });
     assert.equal(operationPath("read"), OPERATION);
+    const seen: { url: string; init: RequestInit }[] = [];
+    await invokeExecutor(
+      context(),
+      operationPath("read"),
+      { customer: "cus_1" },
+      { fetch: rpc(completed({}), seen) }
+    );
+    const invocation = JSON.parse(String(seen[2].init.body));
+    assert.ok(
+      invocation.params.arguments.code.includes(
+        JSON.stringify({ customer: "cus_1" })
+      )
+    );
+    assert.ok(!invocation.params.arguments.code.includes("secret"));
+    assert.ok(!invocation.params.arguments.code.includes("other"));
     for (const invalid of [
       "{",
       JSON.stringify({ read: { path: "invalid" } }),

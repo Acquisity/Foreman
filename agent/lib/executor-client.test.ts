@@ -246,7 +246,14 @@ test("PlanetScale rejects failed and malformed results and preserves rate-limit 
     "fetch",
     rpcFetch(() => outcome, [])
   );
-  for (const candidate of outcomes) {
+  const codes = [
+    "planetscale_read_failed",
+    "planetscale_read_failed",
+    "planetscale_read_failed",
+    "invalid_planetscale_result",
+    "invalid_planetscale_result",
+  ];
+  for (const [index, candidate] of outcomes.entries()) {
     outcome = candidate;
     // biome-ignore lint/performance/noAwaitInLoops: each fixture installs its own response.
     await assert.rejects(
@@ -258,6 +265,7 @@ test("PlanetScale rejects failed and malformed results and preserves rate-limit 
       }),
       (error) =>
         error instanceof ExecutorError &&
+        error.code === codes[index] &&
         (candidate.ok || (error.status === 429 && error.retryAfter === "60"))
     );
   }
@@ -314,4 +322,31 @@ test("Instantly never retries a terminal company authorization failure", async (
     (error) => error === failure
   );
   assert.equal(calls, 1);
+});
+
+test("provider retry headers are case insensitive", async (t) => {
+  configure(t);
+  let header = "Retry-After";
+  t.mock.method(
+    globalThis,
+    "fetch",
+    rpcFetch(
+      () => ({
+        data: null,
+        http: { headers: { [header]: "60" }, status: 429 },
+        ok: true,
+      }),
+      []
+    )
+  );
+  for (const name of ["Retry-After", "retry-after", "RETRY-AFTER"]) {
+    header = name;
+    // biome-ignore lint/performance/noAwaitInLoops: each fixture installs its own response.
+    const result = await executorClient(ctx)({
+      input: { refund_id: "re_1" },
+      operation: "stripe.refunds.get",
+    });
+    assert.equal(result.retryAfter, "60");
+    assert.equal(result.status, 429);
+  }
 });

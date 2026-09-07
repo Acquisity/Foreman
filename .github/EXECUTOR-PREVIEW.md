@@ -2,7 +2,7 @@
 
 Status: preview testing is in progress. This branch is not cleared for production. The current design is one shared `Foreman` toolkit. Earlier role/profile evidence below is historical and superseded by the consolidation section.
 
-## Configuration
+## Configuration (historical, before shared-toolkit consolidation)
 
 - PR: https://github.com/Acquisity/Foreman/pull/118 (draft).
 - Preview bot channel: C0BUF4GU8C8. Bot: U0BTGKF57T7.
@@ -34,7 +34,7 @@ These are scoped results, not full provider certification. The transport probes 
 - Resend was reauthorized with its original `full_access` grant on the existing AI Acquisition team. `list_domains` passed. OpenRouter's stale unused dynamic client registration was replaced; its account credit read passed and only the original ten reads plus attended `send_message` are mounted.
 - Stripe no longer publishes `get_stripe_account_info`. Account identity discovery succeeds with `list_available_accounts_or_orgs`, but full compatibility for the retired operation remains an explicit coverage gap. Sentry issue details and event search are available through the strict critic `read_sentry_issue` helper; `find_issues` is covered by the installed `search_issues` read. Both nested reads were exercised, and the provider rejected a guessed `update_issue` as unavailable in the session.
 
-Local validation: `pnpm validate` passed 681 tests in 95 suites with zero errors or warnings. The fresh capability report keeps ordinary Slack at 72.9% and 73.2% of the repository and factory catalogs. All 15 installed toolkits pass the exact-catalog/default-deny configuration audit; Vercel and the retired Stripe operation keep the overall readiness gate red.
+Historical pre-consolidation validation (recorded in `963754d`): `pnpm validate` passed 681 tests in 95 suites with zero errors or warnings. The fresh capability report keeps ordinary Slack at 72.9% and 73.2% of the repository and factory catalogs. All 15 installed toolkits pass the exact-catalog/default-deny configuration audit; Vercel and the retired Stripe operation keep the overall readiness gate red.
 
 ## Repeatable manual tests
 
@@ -118,7 +118,7 @@ The two remaining catalog gaps are Vercel connection setup and the retired Strip
 
 ## Typed helper transport review follow-up (2026-09-07)
 
-The review follow-up replaces simulated provider HTTP with typed operation calls, generates both Linear specs from canonical documents, preserves available retry metadata, and splits Instantly's tests by responsibility. Local `pnpm validate` passes 648 tests in 93 suites with zero errors or warnings. Tests for removed HTTP reconstruction and domain body readers were replaced with typed-client fixtures; Executor's actual body streaming, byte cap, deadline, and cancellation tests remain. The end-to-end fixture covers MCP error parsing through the client and Instantly retry behavior.
+The review follow-up replaces simulated provider HTTP with typed operation calls, generates both Linear specs from canonical documents, preserves available retry metadata, and splits Instantly's tests by responsibility. At typed-helper commit `f4df20c`, local `pnpm validate` passed 648 tests in 93 suites with zero errors or warnings. Tests for removed HTTP reconstruction and domain body readers were replaced with typed-client fixtures; Executor's actual body streaming, byte cap, deadline, and cancellation tests remain. The end-to-end fixture covers MCP error parsing through the client and Instantly retry behavior.
 
 All eight read and five write Linear documents match the installed Executor enums exactly. The live toolkit's exact catalog and policy audit passes; the existing Vercel and Stripe coverage gaps remain. The custom Inngest API definition now passes its optional `includeOutput` boolean, preserving the trace fallback, with no tools added or removed. This branch's Preview bindings now contain operation paths only. Root compiles with Executor plus personal Supermemory; critic compiles with Executor.
 

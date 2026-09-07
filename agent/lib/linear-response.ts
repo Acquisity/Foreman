@@ -4,10 +4,13 @@ import type { LinearOperation } from "./linear-operations.js";
 const named = z.looseObject({ id: z.string(), name: z.string() });
 const nodes = <T extends z.ZodType>(item: T) =>
   z.looseObject({ nodes: z.array(item) });
-const pageInfo = z.looseObject({
-  endCursor: z.string().nullish(),
-  hasNextPage: z.boolean(),
-});
+const pageInfo = z.discriminatedUnion("hasNextPage", [
+  z.looseObject({ endCursor: z.string().min(1), hasNextPage: z.literal(true) }),
+  z.looseObject({
+    endCursor: z.string().nullish(),
+    hasNextPage: z.literal(false),
+  }),
+]);
 const document = z.looseObject({
   id: z.string(),
   updatedAt: z.string(),
