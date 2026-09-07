@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseReadQueryResult, truncateRows } from "./planetscale.js";
+import {
+  buildReadQueryResult,
+  parseReadQueryResult,
+  truncateRows,
+} from "./planetscale.js";
 
 const NON_JSON_ERROR = /non-JSON/;
 const UNRECOGNIZED_SHAPE_ERROR = /unrecognized result shape/;
@@ -108,5 +112,47 @@ describe("parseReadQueryResult", () => {
       () => parseReadQueryResult('{"foo":"bar"}'),
       UNRECOGNIZED_SHAPE_ERROR
     );
+  });
+});
+
+describe("buildReadQueryResult", () => {
+  it("preserves small metadata and drops an oversized envelope", () => {
+    const cap = 256 * 1024;
+    const small = buildReadQueryResult([{ n: 1 }], { columns: ["n"] }, cap);
+    assert.deepEqual(small.columns, ["n"]);
+    assert.deepEqual(small.rows, [{ n: 1 }]);
+    const large = buildReadQueryResult(
+      [{ n: 1 }],
+      { metadata: "x".repeat(cap) },
+      cap
+    );
+    assert.equal(large.envelopeTooLarge, true);
+    assert.equal(large.metadata, undefined);
+    assert.deepEqual(large.rows, []);
+    assert.ok(Buffer.byteLength(JSON.stringify(large)) <= cap);
+    assert.equal(truncateRows([1], cap, cap).envelopeTooLarge, true);
+  });
+  it("bounds the complete serialized result at the 256 KiB boundary", () => {
+    const cap = 256 * 1024;
+    for (const padding of [
+      cap - 144,
+      cap - 150,
+      cap - 153,
+      cap - 154,
+      cap,
+      cap + 1,
+    ]) {
+      const result = buildReadQueryResult(
+        [{ value: "x".repeat(padding) }],
+        {},
+        cap
+      );
+      assert.ok(Buffer.byteLength(JSON.stringify(result), "utf8") <= cap);
+    }
+    const rows = Array.from({ length: 10_000 }, () => ({
+      value: "é".repeat(20),
+    }));
+    const result = buildReadQueryResult(rows, { columns: ["value"] }, cap);
+    assert.ok(Buffer.byteLength(JSON.stringify(result), "utf8") <= cap);
   });
 });

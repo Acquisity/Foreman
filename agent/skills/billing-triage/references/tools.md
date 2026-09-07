@@ -12,7 +12,7 @@ Two kinds of tool appear below, and they are called differently.
 
 `planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never invoke the raw provider query through Executor.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface except an untrusted GitHub session; the approved provider MCP reads through Executor are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface through the shared Executor connection; the approved provider MCP reads through Executor are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
 
 ## PlanetScale (Executor: planetscale)
 

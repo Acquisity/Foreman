@@ -20,6 +20,25 @@ import {
 } from "./instantly-fixtures.js";
 
 describe("Instantly subworkspace reads", () => {
+  it("rejects duplicate accepted workspace IDs before a resource read", async () => {
+    let calls = 0;
+    await assert.rejects(
+      readInstantlySubworkspace(
+        { id: WORKSPACE_ID },
+        "accounts",
+        {},
+        {
+          client: () => {
+            calls += 1;
+            return json({ items: [member(), member()] });
+          },
+        }
+      ),
+      (error) =>
+        error instanceof InstantlyApiError && error.kind === "invalid-response"
+    );
+    assert.equal(calls, 1);
+  });
   it("rejects invalid direct-call limits before contacting Instantly", async () => {
     await Promise.all(
       [0, 101, Number.NaN, 1.5].map(async (limit) => {

@@ -35,10 +35,33 @@ const page = (ids: string[], endCursor: string | null) => ({
 });
 
 describe("linearGraphql", () => {
+  it("rejects malformed successful payloads before helpers consume them", async () => {
+    const cases = [
+      ["Document", null],
+      ["Document", { data: null }],
+      ["RelatedIssues", { data: { issues: {} } }],
+      ["IssueDocuments", { data: { issue: { documents: {}, id: "issue" } } }],
+      ["RouteIssueUpdate", { data: { issueUpdate: {} } }],
+    ] as const;
+    await Promise.all(
+      cases.map(([operation, data]) =>
+        assert.rejects(
+          linearGraphql(operation, {}, { client: () => json(data) }),
+          (error) =>
+            (error instanceof Error &&
+              error.message.startsWith("Linear GraphQL returned invalid")) ||
+            (error instanceof Error &&
+              error.message ===
+                "Linear GraphQL returned an invalid response envelope.")
+        )
+      )
+    );
+  });
+
   it("keeps provider credentials out of the request descriptor and turns GraphQL errors into a thrown message", async () => {
-    let header = "";
-    const fetchStub: ProviderClient = (_request) => {
-      header = "";
+    let captured: unknown;
+    const fetchStub: ProviderClient = (request) => {
+      captured = request;
       return json({ errors: [{ message: "Field nope not found" }] });
     };
     await assert.rejects(
@@ -47,7 +70,10 @@ describe("linearGraphql", () => {
         error.message.includes("Field nope not found") &&
         !error.message.includes("secret-token")
     );
-    assert.equal(header, "");
+    assert.deepEqual(captured, {
+      input: { variables: {} },
+      operation: "linear.Document",
+    });
   });
 });
 

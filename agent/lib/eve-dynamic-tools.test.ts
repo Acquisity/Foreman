@@ -5,7 +5,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 
 // Resolving a dynamic tool evaluates every authored module through eve's
-// bundled module map, and prompts.ts reads both connector variables at module
+// bundled module map, and prompts.ts reads the Linear connector variable at module
 // load (constants.ts). Nothing is contacted; `pnpm validate` runs `eve info`
 // under the same environment.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";

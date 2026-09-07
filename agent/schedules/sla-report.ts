@@ -24,9 +24,9 @@ const FEATURE_CHANNELS = [
 
 /**
  * Preserve the existing Slack principal for thread delivery and state identity.
- * Company evidence now uses the app-scoped Executor scheduled profile, so it
+ * Company evidence now uses the shared app-scoped Foreman Executor toolkit, so it
  * no longer depends on the owner's personal provider grants. The unattended
- * stamp still denies provider writes and prevents approval parking.
+ * stamp still denies shared-configuration and personal-memory writes.
  */
 const OWNER_AUTH = stampUnattended({
   attributes: {

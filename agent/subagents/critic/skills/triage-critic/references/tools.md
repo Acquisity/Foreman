@@ -10,7 +10,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 ## Production data (root tool)
 
-`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` does not exist. The PlanetScale surface through Executor also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
+`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` is available through Executor for full-schema reads; filter and summarize its result inside Executor before returning it. The PlanetScale surface through Executor also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
 
 ## Investigation memory (root tool)
 
@@ -24,14 +24,14 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | Intercom conversations and contacts | Executor: intercom | app, shared | root allowlist, reads only |
 | Inngest runs, traces, functions | Executor: inngest | app, shared | root allowlist, reads only |
 | Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |
-| Sentry issues and events | Executor: sentry | app, shared | child allowlist: the seven confirmed read tools |
+| Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
 | Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
-| Vercel deployments, logs, errors, analytics | Executor: vercel | app, shared | root allowlist minus the five write tools |
-| PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | one `exec` tool; read-only by OAuth scope, so any write command fails at the API |
+| Vercel deployments, logs, errors, analytics | Executor: vercel | app, shared | shared catalog; use reads only; downstream setup remains an availability gap |
+| PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
 | Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
 | Modem customer feedback search | Executor: modem | app, shared | root allowlist: `search_modem` |
-| Neon, only when the code path uses a Neon database | Executor: neon | app, shared | read-only endpoint plus root allowlist; never customer data, never memory |
+| Neon, only when the code path uses a Neon database | Executor: neon | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
 | Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
 | Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
 
@@ -42,8 +42,8 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 - Inngest: `find_function_runs` with the function id from the code path covers the runs and the newest trace; the connection tools stay for a specific event's runs or an older run's trace.
 - Sentry: `get_issue_details` returns the stacktrace for one issue id; the natural-language search tools can be unavailable while the rest works.
 - Axiom: `queryDataset` takes APL (`Dataset | where ... | summarize ...`); call `listDatasets` and `getDatasetFields` first for real names. Metrics go through `queryMetrics`, not APL.
-- PostHog: one `exec` tool; the `command` parameter's own description carries the syntax. Resolve a person through `persons` before reading recordings.
-- Resend: tool names are kebab-case (`list-emails`, not `list_emails`).
+- PostHog: discover individual operations such as `persons_list`, `query_trends`, and `execute_sql`, then inspect the selected schema. Resolve a person before reading recordings.
+- Resend: discover snake_case operations such as `list_emails`, `get_email`, and `list_logs`.
 - Jam: only useful when the ticket carries a Jam link; `getConsoleLogs` and `getNetworkRequests` beat the video.
 - Vercel: query around the time the claim names; check `list_deployments` for a deployment just before the reported window.
 - Neon: only when the code path actually uses a Neon database. Never customer data, never memory.

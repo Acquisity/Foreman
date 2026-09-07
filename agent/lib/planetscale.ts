@@ -132,19 +132,22 @@ export function buildReadQueryResult(
   passthrough: Record<string, unknown>,
   capBytes: number
 ): Record<string, unknown> {
-  const overheadBytes = Buffer.byteLength(
-    JSON.stringify({
-      ...passthrough,
-      envelopeTooLarge: false,
-      oversizedRow: true,
-      resultBytes: capBytes,
-      returnedRows: rows.length,
-      success: true,
-      totalRows: rows.length,
-      truncated: true,
-    }),
-    "utf8"
-  );
+  // Reserve the rows member and worst-case flag widths; truncateRows counts the array brackets.
+  const overheadBytes =
+    Buffer.byteLength(
+      JSON.stringify({
+        ...passthrough,
+        envelopeTooLarge: false,
+        oversizedRow: false,
+        resultBytes: capBytes,
+        returnedRows: rows.length,
+        rows: [],
+        success: true,
+        totalRows: rows.length,
+        truncated: false,
+      }),
+      "utf8"
+    ) - 2;
   const truncated = truncateRows(rows, capBytes, overheadBytes);
   if (truncated.envelopeTooLarge) {
     // The passthrough fields alone consumed the budget; drop them so the

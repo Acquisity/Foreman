@@ -90,7 +90,7 @@ function providerResult(
 }
 
 export async function executorReadQuery(
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, "abortSignal" | "getToken">,
   args: Record<string, unknown>
 ): Promise<string> {
   const path = operationPath("planetscale.readQuery");
@@ -101,10 +101,13 @@ export async function executorReadQuery(
     path,
     input
   );
-  if (!outcome.ok) {
-    throw new ExecutorError("planetscale_read_failed", outcome.error.status);
+  const normalized = providerResult(outcome);
+  if (normalized.status < 200 || normalized.status >= 300) {
+    throw new ExecutorError("planetscale_read_failed", normalized.status, {
+      retryAfter: normalized.retryAfter,
+    });
   }
-  const result = outcome.data as {
+  const result = normalized.data as {
     isError?: boolean;
     content?: { type?: string; text?: string }[];
   } | null;

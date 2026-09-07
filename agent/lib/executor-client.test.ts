@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { type TestContext, test } from "node:test";
-import { executorClient } from "./executor/client.js";
+import { ConnectionAuthorizationFailedError } from "eve/connections";
+import { executorClient, executorReadQuery } from "./executor/client.js";
 import { operationInputs } from "./executor/operations.js";
+import { readSentryIssue } from "./executor/sentry.js";
+import { ExecutorError } from "./executor/transport.js";
 import {
   InstantlyApiError,
   listInstantlySubworkspaces,
@@ -219,4 +222,96 @@ test("typed client preserves provider errors and enforces helper payload bounds"
       { maxBytes: 100 }
     )
   );
+});
+
+test("PlanetScale rejects failed and malformed results and preserves rate-limit metadata", async (t) => {
+  configure(t);
+  const outcomes = [
+    {
+      error: { code: "rate_limited", retryAfter: "60", status: 429 },
+      ok: false,
+    },
+    {
+      data: { content: [{ text: "private", type: "text" }] },
+      http: { status: 503 },
+      ok: true,
+    },
+    { data: { content: [], isError: true }, ok: true },
+    { data: { content: "invalid" }, ok: true },
+    { data: null, ok: true },
+  ];
+  let outcome: unknown;
+  t.mock.method(
+    globalThis,
+    "fetch",
+    rpcFetch(() => outcome, [])
+  );
+  for (const candidate of outcomes) {
+    outcome = candidate;
+    // biome-ignore lint/performance/noAwaitInLoops: each fixture installs its own response.
+    await assert.rejects(
+      executorReadQuery(ctx, {
+        branch: "main",
+        database: "test",
+        organization: "test",
+        query: "SELECT 1",
+      }),
+      (error) =>
+        error instanceof ExecutorError &&
+        (candidate.ok || (error.status === 429 && error.retryAfter === "60"))
+    );
+  }
+});
+
+test("Sentry preserves a provider retry hint", async (t) => {
+  configure(t);
+  t.mock.method(
+    globalThis,
+    "fetch",
+    rpcFetch(
+      () => ({
+        error: { code: "rate_limited", retryAfter: "60", status: 429 },
+        ok: false,
+      }),
+      []
+    )
+  );
+  await assert.rejects(
+    readSentryIssue(
+      {
+        issueId: "TEST-1",
+        operation: "get_issue_details",
+        organizationSlug: "test",
+      },
+      ctx
+    ),
+    (error) => error instanceof ExecutorError && error.retryAfter === "60"
+  );
+});
+
+test("Instantly never retries a terminal company authorization failure", async (t) => {
+  configure(t);
+  let calls = 0;
+  const failure = new ConnectionAuthorizationFailedError("executor", {
+    message: "Source unavailable",
+    reason: "executor_not_configured",
+    retryable: false,
+  });
+  const client = executorClient({
+    ...ctx,
+    getToken: () => {
+      calls += 1;
+      throw failure;
+    },
+  });
+  await assert.rejects(
+    listInstantlySubworkspaces({
+      client,
+      sleep: () => {
+        assert.fail("must not retry");
+      },
+    }),
+    (error) => error === failure
+  );
+  assert.equal(calls, 1);
 });

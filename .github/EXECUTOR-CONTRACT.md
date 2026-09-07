@@ -8,13 +8,13 @@ Skills and agent instructions define the workflow. Critic instructions require r
 
 The [tool availability audit](./EXECUTOR-TOOL-AVAILABILITY.md) lists restored reads and every remaining provider-tool exclusion.
 
-The single operation list in `executor/toolkit-manifest.json` records the selected company operations and known missing coverage. Its default-deny policy excludes operations outside that list, including Executor administration. It does not divide permissions by workflow, requester, or subagent. The connection exposes `execute` and `skills`; it does not offer approval resume or artifacts. Personal Supermemory stays on its existing personal connection and sign-in path.
+The single operation list in `.github/executor/toolkit-manifest.json` records the selected company operations and known missing coverage. Its default-deny policy excludes operations outside that list, including Executor administration. It does not divide permissions by workflow, requester, or subagent. The connection exposes `execute` and `skills`; it does not offer approval resume or artifacts. Personal Supermemory stays on its existing personal connection and sign-in path.
 
 ## Helpers and mappings
 
 Authored helpers retain their public names, validation, fixed routes, pagination, workspace membership checks, field filtering, deadlines, and result formats. Their underlying API operations are included in the same toolkit and can be discovered directly. Helper use is instructed rather than enforced by a separate hidden catalog.
 
-`executor/operation-bindings.json` maps each helper operation to its installed tool path. Deployment configuration supplies paths only; validated typed arguments are owned by `agent/lib/executor/operations.ts` and the domain helpers. The client sends operation inputs directly, with no URL reconstruction, HTTP-response fabrication, regex dispatch, or deployment coercions. The API definitions under `executor/specs/` describe the custom connections.
+`.github/executor/operation-bindings.json` maps each helper operation to its installed tool path. Deployment configuration supplies paths only; validated typed arguments are owned by `agent/lib/executor/operations.ts` and the domain helpers. The client sends operation inputs directly, with no URL reconstruction, HTTP-response fabrication, regex dispatch, or deployment coercions. The API definitions under `.github/executor/specs/` describe the custom connections.
 
 Linear documents live in `agent/lib/linear-operations.ts`. `pnpm executor:specs` generates the read/write OpenAPI specs from those definitions; `pnpm validate` checks for generated-file drift. Query edits also require installing the updated spec in Executor before deploying the consuming Foreman revision.
 
@@ -24,6 +24,7 @@ All provider helpers authenticate through `EXECUTOR_MCP_CONNECTOR`, an app-scope
 
 ## Configuration and verification
 
+- Set `EXECUTOR_OPERATION_BINDINGS` to the compact JSON contents of `.github/executor/operation-bindings.json` after verifying the installed catalog; the empty `.env.example` placeholder is not runnable provider configuration.
 - `EXECUTOR_BASE_URL` defaults to `https://executor.acquisity.ai` and must be an HTTPS origin. The toolkit slug is `foreman`.
 - The existing Executor account holds the company connections. The toolkit remains account-owned because this Executor version excludes personal connections from workspace-owned toolkits. Consolidation does not move credentials or change their ownership.
 - `LINEAR_CONNECTOR` remains for inbound Agent Sessions and vision attachment downloads. Slack delivery, GitHub, Blob, investigation memory, models, and sandbox infrastructure remain separate.

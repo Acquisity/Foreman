@@ -21,6 +21,8 @@ Default to read-only tests. Use a supplied test identifier when one is needed. O
 - Sentry, Axiom, Exa, Intercom, Jam, Lucent, Modem, Neon, PostHog, Resend, OpenRouter, Vercel: discover and use one small read within the existing grant. OpenRouter inference and Vercel writes are separate attended tests.
 - Personal Supermemory: test only on the requester's explicit personal-memory test request. It remains separate from shared company integrations.
 
+For workspace discovery pagination, pass the returned `nextStartingAfter` value as the next call's `startingAfter`, keeping the same search.
+
 ## Critic
 
 Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify that the critic follows its read-only instructions while sharing root company access. Check expected writes only on designated test records. Executor administration remains excluded; helper API operations are part of the shared toolkit.

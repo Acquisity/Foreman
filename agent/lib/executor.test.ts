@@ -108,6 +108,21 @@ test("deployment bindings select paths and cannot modify typed arguments", () =>
       read: { arguments: { secret: "other" }, path: OPERATION },
     });
     assert.equal(operationPath("read"), OPERATION);
+    for (const invalid of [
+      "{",
+      JSON.stringify({ read: { path: "invalid" } }),
+    ]) {
+      process.env.EXECUTOR_OPERATION_BINDINGS = invalid;
+      assert.throws(
+        () => operationPath("read"),
+        (error) =>
+          error instanceof ExecutorError &&
+          error.code === "invalid_operation_bindings"
+      );
+    }
+    process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
+      read: { path: OPERATION },
+    });
     assert.throws(() => operationPath("missing"));
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
       read: { path: "executor.coreTools.policies.delete" },

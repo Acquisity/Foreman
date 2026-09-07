@@ -16,7 +16,7 @@ import { repositoryFromAuth } from "./repository.js";
 import { githubFactoryAuth, slackSessionAuth } from "./session-auth.js";
 
 // The skill's markdown comes from prompts.ts, which reads these at module load
-// (both auth providers live in constants.ts).
+// (the Linear auth provider lives in constants.ts).
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 const { default: factoryPipeline } = await import(

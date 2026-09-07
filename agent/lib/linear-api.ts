@@ -1,5 +1,6 @@
 import { type ProviderClient, requiredClient } from "./executor/operations.js";
 import type { LinearOperation } from "./linear-operations.js";
+import { parseLinearResponse } from "./linear-response.js";
 
 /** Fixed Linear GraphQL operations. The injected Executor transport supplies provider authentication; this module retains routing and document semantics. */
 
@@ -30,20 +31,7 @@ export async function linearGraphql<T>(
   if (response.status < 200 || response.status >= 300) {
     throw new Error(`Linear GraphQL request failed: HTTP ${response.status}.`);
   }
-  const body = response.data as {
-    data?: T;
-    errors?: Array<{ message?: string }>;
-  };
-  if (body.errors?.length) {
-    const messages = body.errors
-      .map((error) => error.message ?? "unknown error")
-      .join("; ");
-    throw new Error(`Linear GraphQL error: ${messages}`);
-  }
-  if (body.data === undefined) {
-    throw new Error("Linear GraphQL response carried no data.");
-  }
-  return body.data;
+  return parseLinearResponse(operation, response.data) as T;
 }
 
 /** Engineering Team id. The name alone silently returns nothing. */

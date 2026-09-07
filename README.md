@@ -15,7 +15,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, critic, factory, and scheduled work use separate gated toolkits. Personal Supermemory remains a separate user-scoped connection. Provider credentials stay in Executor; Vercel Connect brokers only Foreman's Executor credential. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for required toolkits, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, critic, factory, and scheduled work use one shared Foreman toolkit. Personal Supermemory remains a separate user-scoped connection. Provider credentials stay in Executor; Vercel Connect brokers only Foreman's Executor credential. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
@@ -105,7 +105,7 @@ The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agen
 
 Foreman reads Instantly through the Acquisity admin workspace `IBG` (`24f5c554-bf6c-4f51-a909-d25d9617cff9`). The runtime lists Workspace Group pages up to a 100-page safety cap, keeps only accepted memberships, and applies `x-as-workspace` only after resolving the selected subworkspace against that complete bounded result. Reaching the cap fails closed instead of returning a partial list. Every resource page returns the selected workspace name and ID.
 
-Keep the existing IBG admin-workspace connection in Executor with read-only workspace-group, account, campaign, and email scopes. Bind those operations to the internal helper toolkit. Foreman still resolves complete workspace membership before selecting `x-as-workspace` and filters the returned account, campaign, and email fields. Do not expose these raw helper operations in the model-facing toolkits.
+Keep the existing IBG admin-workspace connection in Executor with read-only workspace-group, account, campaign, and email scopes. Include those operations in the shared Foreman toolkit. Foreman still resolves complete workspace membership before selecting `x-as-workspace` and filters the returned account, campaign, and email fields. The underlying operations remain discoverable in that same toolkit; skills prefer the bounded helpers.
 
 To rotate the credential, create a replacement key with the same read-only scopes, replace the credential in the existing connector, verify that `list_instantly_subworkspaces` and one bounded resource read succeed, then revoke the old key. The key must not enter source control, app environment variables, browser responses, logs, tickets, or tool results.
 

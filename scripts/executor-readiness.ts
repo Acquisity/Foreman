@@ -22,8 +22,13 @@ const bindings = z
   );
 let failures = 0;
 for (const operation of REQUIRED_HELPER_OPERATIONS) {
-  if (!bindings[operation]) {
-    console.log(`MISSING helper binding: ${operation}`);
+  if (
+    !(
+      bindings[operation] &&
+      manifest.toolkit.paths.includes(bindings[operation].path)
+    )
+  ) {
+    console.log(`MISSING or unselected helper binding: ${operation}`);
     failures += 1;
   }
 }
@@ -138,6 +143,8 @@ if (process.argv.includes("--live")) {
       policies.length === approved.length + 1 &&
       approved.every((rule) => rule.position < denied[0].position) &&
       connections.length === prefixes.size &&
+      new Set(connections.map((connection) => connection.pattern)).size ===
+        prefixes.size &&
       connections.every((connection) => prefixes.has(connection.pattern));
     console.log(
       `${valid ? "PASS" : "FAIL"} ${expected.slug}: exact catalog and default-deny policy`

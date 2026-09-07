@@ -1,3 +1,4 @@
+import { isConnectionAuthorizationFailedError } from "eve/connections";
 import { z } from "zod";
 import {
   type OperationRequest,
@@ -274,6 +275,9 @@ function classifyTransportFailure(
   deadline: RequestDeadline,
   signal?: AbortSignal
 ): void {
+  if (isConnectionAuthorizationFailedError(error) && !error.retryable) {
+    throw error;
+  }
   // A request that ran out of its own time is reported, never retried.
   const expired = deadline.expiry(error);
   if (expired !== null) {
@@ -470,6 +474,16 @@ async function loadWorkspaceGroup(
     );
   }
 
+  const accepted = members.filter((member) => member.status === "accepted");
+  if (
+    new Set(accepted.map((member) => member.sub_workspace_id)).size !==
+    accepted.length
+  ) {
+    throw new InstantlyApiError(
+      "Instantly returned duplicate accepted workspace IDs.",
+      { kind: "invalid-response" }
+    );
+  }
   return {
     adminWorkspace: {
       id: first.admin_workspace_id,
@@ -479,12 +493,10 @@ async function loadWorkspaceGroup(
       pending: members.filter((member) => member.status === "pending").length,
       rejected: members.filter((member) => member.status === "rejected").length,
     },
-    subworkspaces: members
-      .filter((member) => member.status === "accepted")
-      .map((member) => ({
-        id: member.sub_workspace_id,
-        name: member.sub_workspace_name,
-      })),
+    subworkspaces: accepted.map((member) => ({
+      id: member.sub_workspace_id,
+      name: member.sub_workspace_name,
+    })),
   };
 }
 
@@ -540,13 +552,6 @@ export async function listInstantlySubworkspaces(
     );
   }
   const group = await loadWorkspaceGroup(options);
-  const ids = new Set(group.subworkspaces.map((workspace) => workspace.id));
-  if (ids.size !== group.subworkspaces.length) {
-    throw new InstantlyApiError(
-      "Instantly returned duplicate accepted workspace IDs.",
-      { kind: "invalid-response" }
-    );
-  }
   const { search, limit = 20, startingAfter } = parsed.data;
   const fragment = search === undefined ? undefined : normalizeName(search);
   const matches = group.subworkspaces

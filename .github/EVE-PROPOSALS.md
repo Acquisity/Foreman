@@ -58,7 +58,8 @@ Shipped: one bounded line per tool call with no duration, naming the tool, the c
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
 
+## Per-session MCP connection URL selection (resolved)
 
-## Per-session MCP connection URL selection
+Checked against eve 0.44.0.
 
-Resolved for Foreman's current requirements: all workflows use one shared Executor toolkit, so a caller-dependent connection URL is no longer needed. Eve 0.44 still requires a static `McpClientConnectionDefinition.url`; no framework workaround or profile slots remain.
+Resolved for Foreman's current requirements: all workflows use one shared Executor toolkit, so a caller-dependent connection URL is no longer needed. Eve 0.44 still requires a static `McpClientConnectionDefinition.url`; no framework workaround or separate per-workflow connections remain.

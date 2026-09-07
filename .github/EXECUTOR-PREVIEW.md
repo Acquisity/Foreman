@@ -25,7 +25,7 @@ Status: preview testing is in progress. This branch is not cleared for productio
 
 These are scoped results, not full provider certification. The transport probes used the official Executor operator OAuth session; the authored helpers also need verification through the deployed preview bot and its app connector.
 
-## Current gaps
+## Pre-consolidation gaps (historical)
 
 - The original 35 helper bindings now have verified installed paths; a 36th binding supports the bounded critic Sentry helper. Linear GraphQL uses dedicated API keys because its MCP OAuth token was rejected by GraphQL. A real read passed, and a guessed mutation through the scheduled read connection returned Linear FORBIDDEN. Full authored-helper preview acceptance remains required.
 - The unmounted `foremanLinearReadApi` connection anchors the encrypted credential referenced by `foremanLinearWriteApi`; do not delete it without migrating that reference. Actual read bindings use `foremanLinearReadOnlyApi`.
@@ -68,7 +68,7 @@ Deployment `dpl_Vk7ghqnsLMMBuqgCifQf6nVMFnc4`, commit `6a5b6dd1d8fb836ed442b44fb
 - Local `pnpm dev` live conversation checks remain unavailable: the checkout has no development environment and Vercel's environment runner does not supply the Connect-injected Linear/Supermemory IDs or model credentials. Compilation/unit validation and deployed Slack execution are recorded separately; no production credentials were copied into local files.
 
 
-## Latest preview acceptance
+## Pre-consolidation preview acceptance (historical)
 
 Deployment `dpl_73cHX27u4Xtw9YhQxDK34mAiZDVK`, commit `2e4fbb2` is ready; GitHub validation passed.
 
@@ -79,14 +79,14 @@ Deployment `dpl_73cHX27u4Xtw9YhQxDK34mAiZDVK`, commit `2e4fbb2` is ready; GitHub
 
 - [Corrected critic source pin](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791868643359): SAN-64 used the supported product repository. Critic independently checked out `d7c4e45d0ce276b995d0591665c52c17791da0e6` and verified the dependency fact. All twelve criteria were returned. The parent supplied the document creation timestamp instead of its current update timestamp; critic correctly returned CHALLENGE for stale evidence. Exact source pinning and stale-document rejection passed; a successful current-document review remains unproven.
 
-## Why fifteen toolkits
+## Fifteen-toolkit design (superseded by shared toolkit consolidation)
 
 Toolkits are permission lists over existing connections. They do not duplicate provider credentials. Three groups (root, critic, helper transport) each have five trusted-session profiles (attended, limited, factory, scheduled, scheduled-internal). Foreman selects the profile from dispatch-owned state; the model cannot select it through tool arguments. Separate static connection URLs fit eve 0.44 and let Executor enforce exact operation policies. Root and critic cannot discover raw helper operations.
 
 Fifteen is a consistent mapping, not a minimum platform requirement. The two scheduled helper profiles currently have identical operation lists and could share a toolkit in a later simplification; the other installed lists differ. The security requirement is preserving the effective permissions and hidden helper boundary, not maintaining a particular toolkit count.
 
 
-## Read-only duplicate walkthrough regression
+## Read-only duplicate walkthrough regression (historical topology)
 
 [Aaron's ENG-13531 test](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788792413142509) returned concrete provider evidence but omitted handling Stages 5 through 7, then incorrectly said triage-handling only applies to fresh investigations. The authored handling skill includes Duplicate outcomes; only critic is skipped for a duplicate. An explicit every-step read-only walkthrough must describe the inherited priority/assignee, proposed project/labels, existing master link, document/comment actions and skipped memory writes without applying them.
 
@@ -102,7 +102,7 @@ The selected-resource fix above still required a known provider ID or exact name
 Regression fixtures cover search matches on later pages, ambiguous names, empty matches, invalid later membership data, oversized combined results, byte-bounded continuation across reordered provider pages, and invalid inputs/cursors. Preview acceptance should search by a partial name without a supplied ID, then use the returned candidate ID for an authored resource read. Live results for this follow-up are recorded on PR #118 after deployment.
 
 
-## Linear access policy clarification
+## Linear access policy clarification (historical topology)
 
 The user clarified that Foreman should have normal Linear read/write access in every execution mode. All root and critic profiles now share the attended Linear catalog, and all helper profiles include the existing Linear read and write operations. Removed factory/schedule Linear transport denials and unattended approval denials on document/routing helpers. Critic instructions still prohibit writes; its shared Linear connection is not an enforcement boundary. Earlier factory/critic/schedule Linear denial probes above document the superseded policy and are no longer acceptance criteria. Other provider, raw-helper, management, and session-profile boundaries remain in place.
 

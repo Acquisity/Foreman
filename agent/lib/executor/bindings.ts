@@ -17,7 +17,14 @@ export function operationPath(operation: string): string {
   if (!raw || raw.length > 64_000) {
     throw new ExecutorError("operation_bindings_missing");
   }
-  const binding = bindingsSchema.parse(JSON.parse(raw))[operation];
+  let bindings: z.infer<typeof bindingsSchema>;
+  try {
+    bindings = bindingsSchema.parse(JSON.parse(raw));
+  } catch {
+    // biome-ignore lint/style/useErrorCause: configuration parser diagnostics can echo deployment values.
+    throw new ExecutorError("invalid_operation_bindings");
+  }
+  const binding = bindings[operation];
   if (!binding || binding.path.startsWith("executor.")) {
     throw new ExecutorError("operation_not_bound");
   }

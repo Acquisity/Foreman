@@ -22,7 +22,10 @@ export const sentryIssueInput = z.strictObject({
 });
 
 /** Only these two catalog reads can cross the Sentry dispatcher boundary. */
-export async function readSentryIssue(input: unknown, ctx: ToolContext) {
+export async function readSentryIssue(
+  input: unknown,
+  ctx: Pick<ToolContext, "abortSignal" | "getToken">
+) {
   const parsed = sentryIssueInput.parse(input);
   const args =
     parsed.operation === "get_issue_details"
@@ -43,7 +46,9 @@ export async function readSentryIssue(input: unknown, ctx: ToolContext) {
     inputArgs
   );
   if (!outcome.ok) {
-    throw new ExecutorError("sentry_read_failed", outcome.error.status);
+    throw new ExecutorError("sentry_read_failed", outcome.error.status, {
+      retryAfter: outcome.error.retryAfter,
+    });
   }
   const result = z
     .object({

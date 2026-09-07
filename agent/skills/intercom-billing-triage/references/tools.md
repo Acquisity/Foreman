@@ -10,7 +10,7 @@ Two kinds of tool appear below, and they are called differently.
 
 Root tools are authored in `agent/tools/` or provided by the eve framework. They are called by their bare name with no prefix: `prepare_repository`, `grep`, `glob`, `read_file`, `bash`, `planetscale_execute_read_query`.
 
-`planetscale_execute_read_query` is the trap: it is a root tool, called bare, and it shadows a connection tool of the same name that is deliberately excluded from the allowlist. Never call it as planetscale `planetscale_execute_read_query` .
+`planetscale_execute_read_query` is an authored helper: it is a root tool, called bare, and the provider operation of the same name is also discoverable through Executor but does not apply the helper's result bounds. Prefer the bare helper for bounded production queries.
 
 Read them in flow order: Intercom, then PlanetScale, then Autumn, then Stripe. Autumn and Stripe use app-scoped root tools in this intake workflow, not the requester's personal MCP grants.
 

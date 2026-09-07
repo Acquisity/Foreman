@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { type ProviderClient, requiredClient } from "./executor/operations.js";
 
-/** Help-center host; overridable so staging can be searched. */
+/** Base for relative article links. The search backend is selected by the Executor binding. */
 export const HELP_CENTER_BASE_URL =
   process.env.ACQUISITY_WEB_BASE_URL ?? "https://app.acquisity.ai";
 
@@ -47,11 +47,11 @@ const stripMarks = (text: string) => text.replace(MARK_TAG, "");
  */
 export async function findHelpArticles(
   query: string,
-  opts?: { baseUrl?: string; client?: ProviderClient; signal?: AbortSignal }
+  opts?: { linkBaseUrl?: string; client?: ProviderClient; signal?: AbortSignal }
 ): Promise<FindHelpArticleResult> {
-  const baseUrl = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
-  const client = requiredClient(opts?.client);
+  const baseUrl = opts?.linkBaseUrl ?? HELP_CENTER_BASE_URL;
   try {
+    const client = requiredClient(opts?.client);
     const articleBase = new URL(baseUrl);
     const response = await client(
       { input: { query }, operation: "help.search" },

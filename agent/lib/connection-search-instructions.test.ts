@@ -41,6 +41,11 @@ test("active instructions route company discovery through the shared Executor co
       continue;
     }
     assert.ok(source.includes("connection_search"), name);
+    assert.ok(
+      source.includes("`connection` argument") ||
+        source.includes("connection set to"),
+      name
+    );
     assert.ok(source.includes("tools.search({ namespace, query })"), name);
     assert.ok(source.includes("tools.describe.tool({ path })"), name);
     assert.ok(source.includes("tools[path](input)"), name);
