@@ -97,7 +97,7 @@ How to use it:
 - linear `get_issue` for every in-scope bug, always. linear `list_issues` returns a summary; the investigation below needs the full ticket, so read it even when the summary looks complete. `parentId` on the issue tells you whether it is a fresh bug or a customer report of a master; when it is set, read that parent too.
 - `id` is always returned and holds the `ENG-XXXX` identifier at this layer, so it does not need requesting and is not a UUID. `url` is the ticket link the report needs, so always request it; never write a bare `ENG-XXXX` with no link behind it.
 
-These two are the only Linear tools a scheduled run can reach; every other Linear tool is denied for it, so do not plan a comment or an update.
+Do not plan a comment or an update.
 
 ### Acquisity codebase (`prepare_repository`, `grep`, `read_file`)
 
