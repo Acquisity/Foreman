@@ -544,8 +544,8 @@ const enforceOutputBudget = <T>(value: T): T => {
   return value;
 };
 
-/** Lists accepted subworkspaces from a complete, safety-bounded group result. */
-export async function listInstantlySubworkspaces(
+/** Complete membership validation is internal; only returned tool results use the output cap. */
+async function loadWorkspaceGroup(
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyWorkspaceGroup> {
   const members: z.infer<typeof workspaceGroupMemberSchema>[] = [];
@@ -617,7 +617,7 @@ export async function listInstantlySubworkspaces(
     );
   }
 
-  return enforceOutputBudget({
+  return {
     adminWorkspace: {
       id: first.admin_workspace_id,
       name: first.admin_workspace_name,
@@ -632,14 +632,28 @@ export async function listInstantlySubworkspaces(
         id: member.sub_workspace_id,
         name: member.sub_workspace_name,
       })),
-  });
+  };
+}
+
+/** Lists accepted subworkspaces without relaxing the public result-size bound. */
+export async function listInstantlySubworkspaces(
+  options: InstantlyApiOptions = {}
+): Promise<InstantlyWorkspaceGroup> {
+  const group = await loadWorkspaceGroup(options);
+  if (Buffer.byteLength(JSON.stringify(group), "utf8") > MAX_RESPONSE_BYTES) {
+    throw new InstantlyApiError(
+      "The complete Instantly workspace list exceeds the 256 KiB output limit. Use a known workspace ID or exact name with read_instantly_subworkspace; that helper still validates the complete membership set.",
+      { kind: "too-much-data" }
+    );
+  }
+  return group;
 }
 
 const resolveWorkspace = async (
   selector: InstantlyWorkspaceSelector,
   options: InstantlyApiOptions
 ): Promise<InstantlyWorkspace> => {
-  const group = await listInstantlySubworkspaces(options);
+  const group = await loadWorkspaceGroup(options);
   const matches = group.subworkspaces.filter((workspace) =>
     selector.id === undefined
       ? workspace.name !== null &&

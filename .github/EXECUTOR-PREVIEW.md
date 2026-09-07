@@ -55,3 +55,15 @@ Mention the preview bot in a fresh thread with `test Linear`, `test Instantly`, 
 3. Deploy the exact reviewed branch with its verified binding JSON and rerun the acceptance cases above. Record deployment ID, commit and test thread links.
 4. After user approval and merge, attach the intended app connector and the same verified configuration to Production, deploy, and repeat small smoke reads. Preview environment values do not automatically become production values on merge.
 5. Retain the previous deployment/configuration for rollback. Retire old outbound references only after observation; retain inbound Slack/Linear, GitHub, personal Supermemory, Blob, investigation memory, models, and sandbox infrastructure.
+
+
+## Follow-up on the deployed helpers
+
+Deployment `dpl_Vk7ghqnsLMMBuqgCifQf6nVMFnc4`, commit `6a5b6dd1d8fb836ed442b44fb4c4b61b61301b43`:
+
+- [Separate bot requester](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790584376709): Acquisity Asks Sandbox triggered successful Linear and Intercom reads without provider sign-in. This is a bot principal check; the human employee case remains distinct.
+- [Authored helper reads](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790759107279): PlanetScale SELECT 1, help filtering, Inngest runs with trace and correct truncation, and Linear related-issue search passed.
+- [Critic Sentry helper](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790759694779): independent issue details and event reads passed with declared INSUFFICIENT_EVIDENCE output for the incomplete packet.
+- [PostHog, Resend and OpenRouter](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790771432579): real reads passed; Resend passed on the fresh retry after its initial stale authorization result.
+- [Instantly failure](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790758442489): the complete 3,372-workspace result is 269,862 characters and exceeds the 256 KiB output cap. Operator verification completed all 35 pages with unique memberships. The bot's claim that this was the 100-page cap was incorrect. Internal membership validation now stays separate from the public list output budget, so a selected workspace resource read can finish without emitting the oversized list. Both the 100-page membership limit and 256 KiB output limits remain unchanged.
+- Local `pnpm dev` live conversation checks remain unavailable: the checkout has no development environment and Vercel's environment runner does not supply the Connect-injected Linear/Supermemory IDs or model credentials. Compilation/unit validation and deployed Slack execution are recorded separately; no production credentials were copied into local files.

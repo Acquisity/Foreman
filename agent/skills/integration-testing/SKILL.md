@@ -13,7 +13,7 @@ Default to read-only tests. Use a supplied test identifier when one is needed. O
 ## Provider checks
 
 - Linear: one small issue/team read. For full helper coverage, separately test find_related_issues and the investigation-document/routing helpers on designated test tickets.
-- Instantly: use the authored workspace and resource helpers. Resolve accepted workspace membership completely before a bounded account, campaign, or email read. Preserve workspace ID/name provenance and filtered output. A workspace listing alone does not pass the resource helpers.
+- Instantly: use the authored workspace and resource helpers. Resolve accepted workspace membership completely before a bounded account, campaign, or email read. Preserve workspace ID/name provenance and filtered output. A workspace listing alone does not pass the resource helpers. If the complete list exceeds its output cap, use a known workspace ID or exact name supplied by the ticket or operator for the resource helper; it still validates all membership pages. Do not confuse an output-size error with the 100-page limit or use a partial membership list.
 - PlanetScale: use planetscale_execute_read_query with SELECT 1 AS foreman_preview_probe. Test customer and billing lookups only with a supplied test identifier.
 - Autumn and Stripe: make one catalog/account read and separately exercise the authored billing helper with a designated billing-account or Stripe identifier. A wrong identifier is distinct from unavailable credentials.
 - Inngest: a small health/list read, then find_function_runs for a supplied function/window when full helper coverage is requested. Preserve partial results when a trace is unavailable.

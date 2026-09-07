@@ -967,3 +967,57 @@ describe("Instantly request deadlines", () => {
     assert.equal(calls, 3);
   });
 });
+
+describe("Instantly large membership sets", () => {
+  it("validates every membership page for a selected resource while preserving the list output cap", async () => {
+    const calls: string[] = [];
+    const fetchStub: typeof fetch = (address, init) => {
+      const url = new URL(String(address));
+      calls.push(url.pathname + url.search);
+      if (url.pathname.endsWith("/workspace-group-members")) {
+        const second = url.searchParams.has("starting_after");
+        return json({
+          items: Array.from({ length: 100 }, (_, index) =>
+            member({
+              id: uuidFor(index + (second ? 100 : 0) + 1),
+              sub_workspace_id: uuidFor(index + (second ? 100 : 0) + 1),
+              sub_workspace_name: "x".repeat(1400),
+            })
+          ),
+          next_starting_after: second ? null : "second-page",
+        });
+      }
+      assert.equal(
+        new Headers(init?.headers).get("x-as-workspace"),
+        uuidFor(1)
+      );
+      return json({
+        items: [
+          { id: "campaign-1", name: "Preview", smtp_password: "private" },
+        ],
+      });
+    };
+    await assert.rejects(
+      listInstantlySubworkspaces({ fetch: fetchStub }),
+      (error) => {
+        assert.ok(error instanceof InstantlyApiError);
+        assert.equal(error.kind, "too-much-data");
+        return true;
+      }
+    );
+    calls.length = 0;
+    const result = await readInstantlySubworkspace(
+      { id: uuidFor(1) },
+      "campaigns",
+      { limit: 1 },
+      { fetch: fetchStub }
+    );
+    assert.equal(calls.length, 3);
+    assert.ok(calls[1]?.includes("starting_after=second-page"));
+    assert.equal(result.workspace.id, uuidFor(1));
+    assert.deepEqual(result.items, [{ id: "campaign-1", name: "Preview" }]);
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(result)) < MAX_TEST_RESPONSE_BYTES
+    );
+  });
+});
