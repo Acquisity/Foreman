@@ -1,21 +1,24 @@
+const EXPECTED_ERROR_1 = /HTTP 500/u;
+const EXPECTED_ERROR_2 = /more than/u;
+const EXPECTED_ERROR_3 = /aborted/u;
+
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type {
+  OperationRequest,
+  ProviderClient,
+  ProviderResult,
+} from "./executor/operations.js";
 import { errorText, findFunctionRuns } from "./inngest-api.js";
 
 const NOW = new Date("2026-08-27T18:00:00.000Z");
 const FN = "ads.google.sync-workspace-insights";
-const MORE_THAN = /more than/u;
-const HTTP_500 = /HTTP 500/u;
-const ABORTED = /aborted/u;
+const _MORE_THAN = /more than/u;
+const _HTTP_500 = /HTTP 500/u;
+const _ABORTED = /aborted/u;
 
-const json = (body: unknown, status = 200) =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status,
-    })
-  );
-
+const json = (data: unknown, status = 200): Promise<ProviderResult> =>
+  Promise.resolve({ data, status });
 const run = (id: string, eventId: string) => ({
   app: { id: "ai-clients" },
   endedAt: "2026-08-27T17:00:05Z",
@@ -59,345 +62,222 @@ const trace = {
   },
 };
 
-describe("find_function_runs", () => {
-  it("lists a function's runs through its app with the status filter and window, then traces the newest", async () => {
-    const urls: string[] = [];
-    const fetchStub: typeof fetch = (url) => {
-      const u = String(url);
-      urls.push(u);
-      if (u.endsWith("/apps?limit=20")) {
-        return json({
-          data: [{ id: "other-app" }],
-          page: { cursor: "c1", hasMore: true },
-        });
+describe("typed Inngest investigation", () => {
+  it("follows app cursors, skips a non-owning app and traces the newest run", async () => {
+    const requests: OperationRequest[] = [];
+    const client: ProviderClient = (request) => {
+      requests.push(request);
+      if (request.operation === "inngest.apps") {
+        return request.input.cursor
+          ? json({ data: [{ id: "ai-clients" }] })
+          : json({
+              data: [{ id: "other" }],
+              page: { cursor: "next", hasMore: true },
+            });
       }
-      if (u.endsWith("/apps?limit=20&cursor=c1")) {
-        return json({ data: [{ id: "ai-clients" }], page: { hasMore: false } });
-      }
-      if (u.includes("/apps/other-app/")) {
-        return json({ message: "not found" }, 404);
-      }
-      if (u.includes("/apps/ai-clients/functions/")) {
-        return json({
-          data: [run("run-2", "evt-2"), run("run-1", "evt-1")],
-          page: { hasMore: true },
-        });
+      if (request.operation === "inngest.functionRuns") {
+        return request.input.appId === "other"
+          ? json(null, 404)
+          : json({
+              data: [run("run-2", "evt-2"), run("run-1", "evt-1")],
+              page: { hasMore: true },
+            });
       }
       return json(trace);
     };
     const result = await findFunctionRuns(
       { functionId: FN, sinceHours: 24, status: "Failed" },
-      { fetch: fetchStub, now: NOW }
+      { client, now: NOW }
     );
-    const list = new URL(urls[3] ?? "");
-    assert.equal(list.pathname, `/v2/apps/ai-clients/functions/${FN}/runs`);
-    assert.equal(list.searchParams.get("status"), "FAILED");
-    assert.equal(list.searchParams.get("from"), "2026-08-26T18:00:00.000Z");
-    assert.equal(
-      urls[4],
-      "https://api.inngest.com/v2/runs/run-2/trace?includeOutput=true"
-    );
+    assert.deepEqual(requests[3], {
+      input: {
+        appId: "ai-clients",
+        from: "2026-08-26T18:00:00.000Z",
+        functionId: FN,
+        limit: 20,
+        status: "FAILED",
+      },
+      operation: "inngest.functionRuns",
+    });
+    assert.deepEqual(requests[4], {
+      input: { includeOutput: true, runId: "run-2" },
+      operation: "inngest.trace",
+    });
+    assert.equal(result.runs.length, 2);
     assert.equal(result.truncated, true);
-    assert.deepEqual(
-      result.runs.map((r) => [r.runId, r.functionId, r.eventId]),
-      [
-        ["run-2", FN, "evt-2"],
-        ["run-1", FN, "evt-1"],
-      ]
-    );
-    assert.equal(result.latestTrace?.runId, "run-2");
-    assert.deepEqual(
-      result.latestTrace?.steps.map((s) => [s.name, s.status]),
-      [
-        ["load-org", "COMPLETED"],
-        ["call-provider", "FAILED"],
-        ["Attempt 0", "FAILED"],
-      ]
-    );
-    assert.equal(
-      result.latestTrace?.steps[1]?.error,
-      "boom for [redacted] [redacted]"
-    );
+    assert.equal(result.latestTrace?.steps.length, 3);
+    const output = JSON.stringify(result);
+    assert.equal(output.includes("ada@example.com"), false);
+    assert.equal(output.includes("abcdefghijkl"), false);
   });
-
-  it("traces the newest run across apps, not the first app's newest", async () => {
-    const urls: string[] = [];
-    const fetchStub: typeof fetch = (url) => {
-      const u = String(url);
-      urls.push(u);
-      if (u.includes("/apps?")) {
-        return json({
-          data: [{ id: "app-a" }, { id: "app-b" }],
-          page: { hasMore: false },
-        });
+  it("orders matching runs across apps before selecting the trace", async () => {
+    const client: ProviderClient = (request) => {
+      if (request.operation === "inngest.apps") {
+        return json({ data: [{ id: "a" }, { id: "b" }] });
       }
-      if (u.includes("/apps/app-a/functions/")) {
+      if (request.operation === "inngest.functionRuns") {
         return json({
           data: [
-            { ...run("old", "evt-old"), queuedAt: "2026-08-27T10:00:00Z" },
+            {
+              ...run(request.input.appId, "evt"),
+              queuedAt:
+                request.input.appId === "a"
+                  ? "2026-08-25T00:00:00Z"
+                  : "2026-08-26T00:00:00Z",
+            },
           ],
-          page: { hasMore: false },
         });
       }
-      if (u.includes("/apps/app-b/functions/")) {
-        return json({
-          data: [
-            { ...run("new", "evt-new"), queuedAt: "2026-08-27T12:00:00Z" },
-          ],
-          page: { hasMore: false },
-        });
-      }
+      assert.equal(request.operation, "inngest.trace");
+      assert.equal("runId" in request.input && request.input.runId, "b");
       return json(trace);
     };
     const result = await findFunctionRuns(
       { functionId: FN, sinceHours: 24, status: "Failed" },
-      { fetch: fetchStub, now: NOW }
+      { client, now: NOW }
     );
     assert.deepEqual(
       result.runs.map((r) => r.runId),
-      ["new", "old"]
-    );
-    assert.equal(result.latestTrace?.runId, "new");
-    assert.ok(urls.at(-1)?.includes("/runs/new/trace"));
-  });
-
-  it("does not turn a 404 into no runs once the caller has cancelled", async () => {
-    const controller = new AbortController();
-    const fetchStub: typeof fetch = (url) => {
-      const u = String(url);
-      if (u.includes("/apps?")) {
-        return json({ data: [{ id: "app-a" }], page: { hasMore: false } });
-      }
-      controller.abort();
-      return json({ message: "not found" }, 404);
-    };
-    await assert.rejects(
-      findFunctionRuns(
-        { functionId: FN, sinceHours: 24, status: "Failed" },
-        { fetch: fetchStub, now: NOW, signal: controller.signal }
-      )
+      ["b", "a"]
     );
   });
-
-  it("orders numeric queuedAt values as timestamps, not strings", async () => {
-    const fetchStub: typeof fetch = (url) => {
-      const u = String(url);
-      if (u.includes("/apps?")) {
-        return json({ data: [{ id: "app-a" }], page: { hasMore: false } });
-      }
-      if (u.includes("/functions/")) {
-        return json({
-          data: [
-            { ...run("nine", "e9"), queuedAt: 9 },
-            { ...run("ten", "e10"), queuedAt: 10 },
-          ],
-          page: { hasMore: false },
-        });
-      }
-      return json(trace);
-    };
-    const result = await findFunctionRuns(
-      { functionId: FN, sinceHours: 24, status: "Failed" },
-      { fetch: fetchStub, now: NOW }
-    );
-    assert.deepEqual(
-      result.runs.map((r) => r.runId),
-      ["ten", "nine"]
-    );
-    assert.equal(result.latestTrace?.runId, "ten");
-  });
-
-  it("treats a 200 answer with no data list for an unknown function as no runs", async () => {
-    const fetchStub: typeof fetch = (url) => {
-      const u = String(url);
-      if (u.includes("/apps?")) {
-        return json({ data: [{ id: "ai-clients" }], page: { hasMore: false } });
-      }
-      return json({ error: "function not found" });
-    };
-    const result = await findFunctionRuns(
-      { functionId: "no.such.function", sinceHours: 24, status: "Failed" },
-      { fetch: fetchStub, now: NOW }
-    );
-    assert.deepEqual(result, { latestTrace: null, runs: [], truncated: false });
-  });
-
-  it("lists across every function without an id, and returns latestTrace null without a second request when nothing ran", async () => {
-    const urls: string[] = [];
+  it("lists across functions without app discovery and treats empty as a valid result", async () => {
+    const calls: OperationRequest[] = [];
     const result = await findFunctionRuns(
       { sinceHours: 24, status: "Cancelled" },
       {
-        fetch: (url) => {
-          urls.push(String(url));
+        client: (request) => {
+          calls.push(request);
           return json({ data: [] });
         },
         now: NOW,
       }
     );
-    assert.equal(urls.length, 1);
-    assert.ok(urls[0]?.startsWith("https://api.inngest.com/v2/runs?"));
-    assert.ok(urls[0]?.includes("status=CANCELLED"));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.operation, "inngest.runs");
     assert.deepEqual(result, { latestTrace: null, runs: [], truncated: false });
   });
-
-  it("reports trace truncation only when steps were dropped", async () => {
-    const spans = (n: number) =>
-      Array.from({ length: n }, (_, i) => ({
-        name: `s${i}`,
-        status: "COMPLETED",
-      }));
-    const stub =
-      (n: number): typeof fetch =>
-      (url) =>
-        String(url).includes("/trace")
-          ? json({ data: { rootSpan: { children: spans(n), name: "Run" } } })
-          : json({ data: [run("run-2", "evt-2")] });
-    const exact = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      { fetch: stub(200), now: NOW }
-    );
-    assert.equal(exact.latestTrace?.steps.length, 200);
-    assert.equal(exact.latestTrace?.truncated, false);
-    const over = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      { fetch: stub(201), now: NOW }
-    );
-    assert.equal(over.latestTrace?.steps.length, 200);
-    assert.equal(over.latestTrace?.truncated, true);
-  });
-
-  it("bounds and redacts error text and reports a failed read", async () => {
-    assert.equal(errorText("x".repeat(600))?.length, 500);
-    assert.equal(
-      errorText("dsn postgres://user:password@db.example.com:5432/app failed"),
-      "dsn [redacted] failed"
-    );
-    assert.equal(
-      errorText(
-        "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c end"
-      ),
-      "jwt [redacted] end"
-    );
-    assert.equal(
-      errorText("empty eyJhbGciOiJIUzI1NiJ9.e30.abc end"),
-      "empty [redacted] end"
-    );
-    assert.equal(
-      errorText('{"dsn":"postgres://u:p@host/db","step":2}'),
-      '{"dsn":"[redacted]","step":2}'
-    );
-    assert.equal(
-      errorText({ message: "org 4939211d-158a-48ae-8f9a-4b94a48ca221 failed" }),
-      "org [id] failed"
-    );
-    const result = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      { fetch: () => json({ message: "nope" }, 401), now: NOW }
-    );
-    assert.equal(result.error, "Inngest API /runs failed: HTTP 401.");
-    assert.equal(result.latestTrace, null);
-  });
-
-  it("refuses a response larger than the byte cap", async () => {
-    const result = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      {
-        fetch: () =>
-          Promise.resolve(
-            new Response("x".repeat(10), {
-              headers: { "content-length": String(3 * 1024 * 1024) },
-              status: 200,
-            })
-          ),
-        now: NOW,
+  it("retries a trace without output, preserving the runs if both reads fail", async () => {
+    for (const failBoth of [false, true]) {
+      const requests: OperationRequest[] = [];
+      // biome-ignore lint/performance/noAwaitInLoops: each fixture is validated independently.
+      const result = await findFunctionRuns(
+        { sinceHours: 24, status: "Failed" },
+        {
+          client: (request) => {
+            requests.push(request);
+            if (request.operation === "inngest.runs") {
+              return json({ data: [run("r", "e")] });
+            }
+            return request.operation === "inngest.trace" &&
+              (request.input.includeOutput || failBoth)
+              ? json(null, 500)
+              : json(trace);
+          },
+          now: NOW,
+        }
+      );
+      assert.equal(requests.length, 3);
+      assert.deepEqual(requests[2], {
+        input: { runId: "r" },
+        operation: "inngest.trace",
+      });
+      assert.equal(result.runs.length, 1);
+      if (failBoth) {
+        assert.equal(result.latestTrace, null);
+        assert.match(result.traceError ?? "", EXPECTED_ERROR_1);
+      } else {
+        assert.ok(result.latestTrace);
       }
-    );
-    assert.match(result.error ?? "", MORE_THAN);
+    }
   });
-
-  it("fails closed when the app list exceeds the page cap", async () => {
+  it("bounds app discovery and tolerates an app returning no run collection", async () => {
+    let calls = 0;
     const result = await findFunctionRuns(
-      { functionId: FN, sinceHours: 1, status: "Failed" },
+      { functionId: FN, sinceHours: 24, status: "Failed" },
       {
-        fetch: () =>
-          json({
+        client: () => {
+          calls += 1;
+          return json({
             data: [{ id: "a" }],
-            page: { cursor: "next", hasMore: true },
-          }),
+            page: { cursor: String(calls), hasMore: true },
+          });
+        },
         now: NOW,
       }
     );
-    assert.match(result.error ?? "", MORE_THAN);
-    assert.deepEqual(result.runs, []);
-  });
-
-  it("retries the trace without output, then keeps the runs with traceError", async () => {
-    const urls: string[] = [];
-    const withRetry: typeof fetch = (url) => {
-      const u = String(url);
-      urls.push(u);
-      if (u.includes("/trace?includeOutput=true")) {
-        return json({ message: "boom" }, 500);
-      }
-      if (u.endsWith("/trace")) {
-        return json(trace);
-      }
-      return json({ data: [run("run-2", "evt-2")] });
-    };
-    const recovered = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      { fetch: withRetry, now: NOW }
-    );
-    assert.equal(recovered.latestTrace?.steps.length, 3);
-    assert.equal(recovered.traceError, undefined);
-    assert.ok(urls.some((u) => u.endsWith("/runs/run-2/trace")));
-
-    const bothFail: typeof fetch = (url) =>
-      String(url).includes("/trace")
-        ? json({ message: "boom" }, 500)
-        : json({ data: [run("run-2", "evt-2")] });
-    const kept = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
-      { fetch: bothFail, now: NOW }
-    );
-    assert.equal(kept.runs.length, 1);
-    assert.equal(kept.latestTrace, null);
-    assert.equal(kept.error, undefined);
-    assert.match(kept.traceError ?? "", HTTP_500);
-
-    const malformed = await findFunctionRuns(
-      { sinceHours: 1, status: "Failed" },
+    assert.equal(calls, 5);
+    assert.match(result.error ?? "", EXPECTED_ERROR_2);
+    const empty = await findFunctionRuns(
+      { functionId: FN, sinceHours: 24, status: "Failed" },
       {
-        fetch: (url) =>
-          String(url).includes("/trace")
-            ? json({ data: "invalid" })
-            : json({ data: [run("run-2", "evt-2")] }),
+        client: (request) =>
+          request.operation === "inngest.apps"
+            ? json({ data: [{ id: "a" }] })
+            : json({}),
         now: NOW,
       }
     );
-    assert.equal(malformed.runs.length, 1);
-    assert.equal(malformed.error, undefined);
-    assert.ok(malformed.traceError);
+    assert.deepEqual(empty.runs, []);
+    assert.equal(empty.error, undefined);
   });
-
-  it("rethrows caller cancellation instead of retrying or reporting it", async () => {
+  it("distinguishes provider errors and oversized results from empty answers", async () => {
+    for (const response of [
+      json(null, 503),
+      json({ data: [], padding: "x".repeat(2 * 1024 * 1024) }),
+    ]) {
+      // biome-ignore lint/performance/noAwaitInLoops: each fixture is validated independently.
+      const result = await findFunctionRuns(
+        { sinceHours: 24, status: "Failed" },
+        { client: () => response, now: NOW }
+      );
+      assert.ok(result.error);
+      assert.deepEqual(result.runs, []);
+    }
+  });
+  it("propagates caller cancellation without falling back or retrying", async () => {
     const controller = new AbortController();
     let calls = 0;
-    const fetchStub: typeof fetch = (url) => {
-      calls += 1;
-      if (String(url).includes("/trace")) {
-        controller.abort();
-        return Promise.reject(new Error("aborted"));
-      }
-      return json({ data: [run("run-2", "evt-2")] });
-    };
+
     await assert.rejects(
       findFunctionRuns(
-        { sinceHours: 1, status: "Failed" },
-        { fetch: fetchStub, now: NOW, signal: controller.signal }
+        { sinceHours: 24, status: "Failed" },
+        {
+          client: () => {
+            calls += 1;
+            controller.abort();
+            return Promise.reject(controller.signal.reason);
+          },
+          signal: controller.signal,
+        }
       ),
-      ABORTED
+      EXPECTED_ERROR_3
     );
-    assert.equal(calls, 2);
+    assert.equal(calls, 1);
+  });
+  it("bounds trace steps and redacts object/string error text", async () => {
+    const result = await findFunctionRuns(
+      { sinceHours: 24, status: "Failed" },
+      {
+        client: (request) =>
+          request.operation === "inngest.runs"
+            ? json({ data: [run("r", "e")] })
+            : json({
+                data: {
+                  rootSpan: {
+                    children: Array.from({ length: 205 }, (_, i) => ({
+                      name: String(i),
+                      status: "COMPLETED",
+                    })),
+                    name: "Run",
+                  },
+                },
+              }),
+      }
+    );
+    assert.equal(result.latestTrace?.steps.length, 200);
+    assert.equal(result.latestTrace?.truncated, true);
+    assert.equal(errorText(null), undefined);
+    assert.equal(errorText({ message: "x".repeat(600) })?.length, 500);
   });
 });

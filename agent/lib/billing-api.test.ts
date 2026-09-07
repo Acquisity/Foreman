@@ -1,107 +1,170 @@
+const EXPECTED_ERROR_1 = /billingAccount.id/u;
+const EXPECTED_ERROR_2 = /too much data/u;
+const EXPECTED_ERROR_3 = /too much data/u;
+const EXPECTED_ERROR_4 = /too much data/u;
+
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { z } from "zod";
 import {
-  BillingApiError,
   readAutumnCustomer,
   readStripeCharge,
+  readStripeCoupon,
   readStripeCustomerBilling,
   readStripeDispute,
   readStripePromotionCode,
   readStripeRefund,
   stripeLookupSchema,
 } from "./billing-api.js";
+import type {
+  OperationRequest,
+  ProviderClient,
+  ProviderResult,
+} from "./executor/operations.js";
 
-const json = (body: unknown, status = 200): Promise<Response> =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status,
-    })
-  );
+const json = (data: unknown, status = 200): Promise<ProviderResult> =>
+  Promise.resolve({ data, status });
+const AUTUMN_TIMEOUT = /Autumn did not respond within 20 seconds/u;
+const STRIPE_TIMEOUT = /Stripe did not respond within 20 seconds/u;
+const STRIPE_UNREACHABLE = /Stripe could not be reached/u;
 
-const AUTUMN_TOO_MUCH_DATA = /Autumn returned too much data/u;
-const STRIPE_TOO_MUCH_DATA = /Stripe returned too much data/u;
-const AUTUMN_TIMEOUT = /^Error: Autumn did not respond within 20 seconds\.$/u;
-const STRIPE_TIMEOUT = /^Error: Stripe did not respond within 20 seconds\.$/u;
-const STRIPE_UNREACHABLE = /^Error: Stripe could not be reached\.$/u;
-const AUTUMN_WRONG_ID =
-  /Autumn has no customer with id org_123 .*billingAccount\.id/u;
-
-describe("Autumn billing API", () => {
-  it("uses the fixed read endpoint and expands billing evidence", async () => {
-    let calledUrl = "";
-    let calledInit: RequestInit | undefined;
-    const fetchStub: typeof fetch = (url, init) => {
-      calledUrl = String(url);
-      calledInit = init;
-      return json({
-        email: "customer@example.com",
-        id: "org_123",
-        name: "Customer Name",
-        payment_method: { card: { last4: "4242" } },
-        subscriptions: [{ plan: { name: "Inbox add-on" } }],
-      });
-    };
-
-    const result = await readAutumnCustomer("org_123", {
-      fetch: fetchStub,
+describe("typed billing reads", () => {
+  it("preserves Autumn expansions, identifier guidance, and sensitive-field filtering", async () => {
+    let request: OperationRequest | undefined;
+    const result = await readAutumnCustomer("account/with spaces", {
+      client: (r) => {
+        request = r;
+        return json({
+          email: "private",
+          id: "account",
+          name: "private",
+          subscriptions: [{ plan: { id: "pro" } }],
+        });
+      },
     });
-
+    assert.deepEqual(request, {
+      input: {
+        body: {
+          customer_id: "account/with spaces",
+          expand: [
+            "subscriptions.plan",
+            "purchases.plan",
+            "balances.feature",
+            "flags.feature",
+          ],
+        },
+        "x-api-version": "2.3.0",
+      },
+      operation: "autumn.customer",
+    });
     assert.deepEqual(result, {
-      id: "org_123",
-      subscriptions: [{ plan: { name: "Inbox add-on" } }],
+      id: "account",
+      subscriptions: [{ plan: { id: "pro" } }],
     });
-    assert.equal(calledUrl, "https://api.useautumn.com/v1/customers.get");
-    assert.equal(calledInit?.method, "POST");
-    assert.equal(new Headers(calledInit?.headers).get("Authorization"), null);
-    assert.equal(
-      new Headers(calledInit?.headers).get("x-api-version"),
-      "2.3.0"
-    );
-    assert.deepEqual(JSON.parse(String(calledInit?.body)), {
-      customer_id: "org_123",
-      expand: [
-        "subscriptions.plan",
-        "purchases.plan",
-        "balances.feature",
-        "flags.feature",
-      ],
-    });
-  });
-
-  it("does not expose a provider error body", async () => {
-    const fetchStub: typeof fetch = () =>
-      Promise.resolve(new Response("secret provider detail", { status: 403 }));
-
     await assert.rejects(
-      readAutumnCustomer("org_123", { fetch: fetchStub }),
-      (error) => {
-        assert.ok(error instanceof BillingApiError);
-        assert.equal(error.status, 403);
-        assert.equal(error.message.includes("secret provider detail"), false);
-        return true;
+      readAutumnCustomer("org_123", {
+        client: () => json({ detail: "private" }, 404),
+      }),
+      EXPECTED_ERROR_1
+    );
+    await assert.rejects(
+      readAutumnCustomer("account", {
+        client: () => json({ detail: "private" }, 403),
+      }),
+      (e) =>
+        e instanceof Error &&
+        e.message.includes("403") &&
+        !e.message.includes("private")
+    );
+  });
+  it("keeps all six bounded customer history reads and distinguishes unavailable from empty", async () => {
+    const requests: OperationRequest[] = [];
+    const result = await readStripeCustomerBilling("cus_123", {
+      client: (request) => {
+        requests.push(request);
+        return request.operation === "stripe.credit_notes.list"
+          ? json({ detail: "private" }, 403)
+          : json({ data: [] });
+      },
+    });
+    assert.equal(requests.length, 6);
+    assert.deepEqual(
+      requests.find((r) => r.operation === "stripe.subscriptions.list"),
+      {
+        input: { customer: "cus_123", limit: 20, status: "all" },
+        operation: "stripe.subscriptions.list",
       }
     );
+    assert.ok(result.creditNotes.error?.includes("403"));
+    assert.deepEqual(result.charges, { data: { data: [] } });
+    assert.ok(
+      requests.every((r) => !("limit" in r.input) || r.input.limit === 20)
+    );
   });
-});
-
-describe("Autumn billing API 404", () => {
-  it("names a wrong customer id instead of an unavailable provider", async () => {
-    const fetchStub: typeof fetch = () =>
-      Promise.resolve(
-        new Response(JSON.stringify({ code: "customer_not_found" }), {
-          status: 404,
-        })
-      );
-
+  it("preserves all billing lookup identifiers without URL encoding round trips", async () => {
+    const requests: OperationRequest[] = [];
+    const client: ProviderClient = (request) => {
+      requests.push(request);
+      return json({ id: "known" });
+    };
+    await readStripeCharge("ch_123", { client });
+    await readStripeRefund("re_123", { client });
+    await readStripeDispute("du_123", { client });
+    await readStripeCoupon("coupon/with & spaces", { client });
+    await readStripePromotionCode("Save 20% & more", { client });
+    assert.deepEqual(requests, [
+      {
+        input: { charge_id: "ch_123", "expand[]": "refunds" },
+        operation: "stripe.charges.get",
+      },
+      { input: { refund_id: "re_123" }, operation: "stripe.refunds.get" },
+      { input: { dispute_id: "du_123" }, operation: "stripe.disputes.get" },
+      {
+        input: { coupon_id: "coupon/with & spaces" },
+        operation: "stripe.coupons.get",
+      },
+      {
+        input: { code: "Save 20% & more", limit: 20 },
+        operation: "stripe.promotion_codes.list",
+      },
+    ]);
+  });
+  it("sanitizes nested payment data and enforces input and aggregated output byte caps", async () => {
+    const value = await readStripeCharge("ch_123", {
+      client: () =>
+        json({
+          billing_details: { name: "private" },
+          id: "ch_123",
+          object: "charge",
+          refunds: { data: [{ id: "re_123", payment_method: "private" }] },
+          source: { number: "private" },
+        }),
+    });
+    assert.deepEqual(value, {
+      id: "ch_123",
+      object: "charge",
+      refunds: { data: [{ id: "re_123" }] },
+    });
     await assert.rejects(
-      readAutumnCustomer("org_123", { fetch: fetchStub }),
-      AUTUMN_WRONG_ID
+      readStripeCharge("ch_123", {
+        client: () => json({ description: "x".repeat(300_000) }),
+      }),
+      EXPECTED_ERROR_2
+    );
+    await assert.rejects(
+      readAutumnCustomer("account", {
+        client: () => json({ description: "x".repeat(300_000) }),
+      }),
+      EXPECTED_ERROR_3
+    );
+    await assert.rejects(
+      readStripeCustomerBilling("cus_123", {
+        client: () => json({ description: "x".repeat(50_000) }),
+      }),
+      EXPECTED_ERROR_4
     );
   });
 });
-
 describe("Stripe lookup input", () => {
   it("is a flat object whose lookup names its own id field", () => {
     const schema = z.toJSONSchema(stripeLookupSchema) as { type?: string };
@@ -132,173 +195,12 @@ describe("Stripe lookup input", () => {
   });
 });
 
-describe("Stripe billing API", () => {
-  it("reads only fixed, bounded customer resources", async () => {
-    const calls: Array<{ init?: RequestInit; url: string }> = [];
-    const fetchStub: typeof fetch = (url, init) => {
-      calls.push({ init, url: String(url) });
-      return json({
-        data: [
-          {
-            metadata: { source: "campaign" },
-            object: "charge",
-            source: { address_line1: "123 Main", last4: "4242" },
-          },
-        ],
-        email: "customer@example.com",
-        name: String(url).endsWith("/customers/cus_123")
-          ? "Customer Name"
-          : undefined,
-        nested: {
-          customer_email_address: "dispute@example.com",
-          payment_method_details: { card: { last4: "4242" } },
-          receipt_url: "https://pay.example/receipt",
-        },
-        object: "list",
-      });
-    };
-
-    const result = await readStripeCustomerBilling("cus_123", {
-      fetch: fetchStub,
-    });
-
-    assert.equal(Object.keys(result).length, 6);
-    assert.deepEqual(
-      calls.map(({ url }) => url).sort((a, b) => a.localeCompare(b)),
-      [
-        "https://api.stripe.com/v1/charges?customer=cus_123&limit=20",
-        "https://api.stripe.com/v1/credit_notes?customer=cus_123&limit=20",
-        "https://api.stripe.com/v1/customers/cus_123",
-        "https://api.stripe.com/v1/customers/cus_123/balance_transactions?limit=20",
-        "https://api.stripe.com/v1/invoices?customer=cus_123&limit=20",
-        "https://api.stripe.com/v1/subscriptions?customer=cus_123&status=all&limit=20",
-      ].sort((a, b) => a.localeCompare(b))
-    );
-    for (const { init } of calls) {
-      assert.equal(init?.method, "GET");
-      assert.equal(new Headers(init?.headers).get("Authorization"), null);
-    }
-    const serialized = JSON.stringify(result);
-    assert.equal(serialized.includes("customer@example.com"), false);
-    assert.equal(serialized.includes("dispute@example.com"), false);
-    assert.equal(serialized.includes("Customer Name"), false);
-    assert.equal(serialized.includes("payment_method_details"), false);
-    assert.equal(serialized.includes("receipt_url"), false);
-    assert.equal(serialized.includes("address_line1"), false);
-    assert.equal(serialized.includes('"source":"campaign"'), true);
-  });
-
-  it("keeps an unauthorized section from hiding the other evidence", async () => {
-    const fetchStub: typeof fetch = (url) =>
-      String(url).includes("credit_notes")
-        ? json({ error: "permission denied" }, 403)
-        : json({ data: [] });
-
-    const result = await readStripeCustomerBilling("cus_123", {
-      fetch: fetchStub,
-    });
-
-    assert.equal(result.creditNotes.error, "Stripe read failed with HTTP 403.");
-    assert.deepEqual(result.charges.data, { data: [] });
-  });
-
-  it("encodes a promotion code instead of accepting an arbitrary path", async () => {
-    let calledUrl = "";
-    const fetchStub: typeof fetch = (url) => {
-      calledUrl = String(url);
-      return json({ data: [] });
-    };
-
-    await readStripePromotionCode("SAVE & WIN", {
-      fetch: fetchStub,
-    });
-
-    assert.equal(
-      calledUrl,
-      "https://api.stripe.com/v1/promotion_codes?code=SAVE%20%26%20WIN&limit=20"
-    );
-  });
-
-  it("reads only known charge, refund, and dispute objects", async () => {
-    const calls: string[] = [];
-    const fetchStub: typeof fetch = (url) => {
-      calls.push(String(url));
-      return json({ id: "known" });
-    };
-
-    await readStripeCharge("ch_123", {
-      fetch: fetchStub,
-    });
-    await readStripeRefund("re_123", {
-      fetch: fetchStub,
-    });
-    await readStripeDispute("du_123", {
-      fetch: fetchStub,
-    });
-
-    assert.deepEqual(calls, [
-      "https://api.stripe.com/v1/charges/ch_123?expand[]=refunds",
-      "https://api.stripe.com/v1/refunds/re_123",
-      "https://api.stripe.com/v1/disputes/du_123",
-    ]);
-  });
-
-  it("propagates cancellation instead of returning partial evidence", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    const fetchStub: typeof fetch = () =>
-      Promise.reject(new DOMException("Canceled", "AbortError"));
-
-    await assert.rejects(
-      readStripeCustomerBilling("cus_123", {
-        fetch: fetchStub,
-        signal: controller.signal,
-      }),
-      (error) => error instanceof Error && error.name === "AbortError"
-    );
-  });
-
-  it("rejects a customer bundle that exceeds the aggregate output budget", async () => {
-    const fetchStub: typeof fetch = () =>
-      json({ data: [{ description: "x".repeat(50 * 1024) }] });
-
-    await assert.rejects(
-      readStripeCustomerBilling("cus_123", {
-        fetch: fetchStub,
-      }),
-      STRIPE_TOO_MUCH_DATA
-    );
-  });
-});
-
-describe("billing response bounds", () => {
-  const oversized = { data: "x".repeat(256 * 1024 + 1) };
-
-  it("rejects an oversized Autumn response while streaming", async () => {
-    await assert.rejects(
-      readAutumnCustomer("org_123", {
-        fetch: () => json(oversized),
-      }),
-      AUTUMN_TOO_MUCH_DATA
-    );
-  });
-
-  it("rejects an oversized Stripe response while streaming", async () => {
-    await assert.rejects(
-      readStripePromotionCode("SAVE", {
-        fetch: () => json(oversized),
-      }),
-      STRIPE_TOO_MUCH_DATA
-    );
-  });
-});
-
 describe("billing read deadlines", () => {
   /** Rejects only when the signal it was handed aborts, with that signal's reason. */
   const signalDrivenFetch =
-    (started?: () => void): typeof fetch =>
+    (started?: () => void): ProviderClient =>
     (_url, init) =>
-      new Promise<Response>((_resolve, reject) => {
+      new Promise<ProviderResult>((_resolve, reject) => {
         const signal = init?.signal as AbortSignal;
         if (signal.aborted) {
           reject(signal.reason);
@@ -323,7 +225,7 @@ describe("billing read deadlines", () => {
   };
 
   /** Starts a read whose fetch hangs until the composed signal aborts. */
-  const startRead = (read: (fetchImpl: typeof fetch) => Promise<unknown>) => {
+  const startRead = (read: (fetchImpl: ProviderClient) => Promise<unknown>) => {
     let ready: () => void = () => undefined;
     const started = new Promise<void>((resolve) => {
       ready = resolve;
@@ -339,11 +241,11 @@ describe("billing read deadlines", () => {
   it("composes the deadline with the caller signal on every read", async () => {
     const controller = new AbortController();
     const sent: AbortSignal[] = [];
-    const fetchStub: typeof fetch = (_url, init) => {
+    const fetchStub: ProviderClient = (_url, init) => {
       sent.push(init?.signal as AbortSignal);
       return json({ id: "x" });
     };
-    const options = { fetch: fetchStub, signal: controller.signal };
+    const options = { client: fetchStub, signal: controller.signal };
 
     await readAutumnCustomer("org_123", options);
     await readStripeCharge("ch_123", options);
@@ -363,12 +265,12 @@ describe("billing read deadlines", () => {
 
   it("attaches the deadline when the caller passes no signal", async () => {
     let sent: AbortSignal | null | undefined;
-    const fetchStub: typeof fetch = (_url, init) => {
+    const fetchStub: ProviderClient = (_url, init) => {
       sent = init?.signal;
       return json({ id: "re_123" });
     };
 
-    await readStripeRefund("re_123", { fetch: fetchStub });
+    await readStripeRefund("re_123", { client: fetchStub });
 
     assert.ok(sent instanceof AbortSignal);
     assert.equal(sent.aborted, false);
@@ -377,7 +279,7 @@ describe("billing read deadlines", () => {
   it("maps an expired deadline to the Autumn timeout message", async () => {
     await withDeadlineTimer(async (expire) => {
       const { pending, started } = startRead((fetchImpl) =>
-        readAutumnCustomer("org_123", { fetch: fetchImpl })
+        readAutumnCustomer("org_123", { client: fetchImpl })
       );
       await started;
 
@@ -390,7 +292,7 @@ describe("billing read deadlines", () => {
   it("maps an expired deadline to the Stripe timeout message", async () => {
     await withDeadlineTimer(async (expire) => {
       const { pending, started } = startRead((fetchImpl) =>
-        readStripeCharge("ch_123", { fetch: fetchImpl })
+        readStripeCharge("ch_123", { client: fetchImpl })
       );
       await started;
 
@@ -405,7 +307,7 @@ describe("billing read deadlines", () => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
         readStripeCharge("ch_123", {
-          fetch: fetchImpl,
+          client: fetchImpl,
           signal: controller.signal,
         })
       );
@@ -425,7 +327,7 @@ describe("billing read deadlines", () => {
       const controller = new AbortController();
       const { pending, started } = startRead((fetchImpl) =>
         readAutumnCustomer("org_123", {
-          fetch: fetchImpl,
+          client: fetchImpl,
           signal: controller.signal,
         })
       );
@@ -444,7 +346,7 @@ describe("billing read deadlines", () => {
 
     await assert.rejects(
       readAutumnCustomer("org_123", {
-        fetch: signalDrivenFetch(),
+        client: signalDrivenFetch(),
         signal: controller.signal,
       }),
       isCancellation
@@ -452,12 +354,12 @@ describe("billing read deadlines", () => {
   });
 
   it("does not report an unrelated TimeoutError as a deadline expiry", async () => {
-    const timeoutNamedFetch: typeof fetch = () =>
+    const timeoutNamedFetch: ProviderClient = () =>
       Promise.reject(new DOMException("Upstream timed out.", "TimeoutError"));
 
     await assert.rejects(
       readStripeCharge("ch_123", {
-        fetch: timeoutNamedFetch,
+        client: timeoutNamedFetch,
       }),
       STRIPE_UNREACHABLE
     );

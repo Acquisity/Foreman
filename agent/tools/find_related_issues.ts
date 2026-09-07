@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
 import { isAutonomous, isIntakeOnly } from "#lib/trust.js";
 
@@ -36,7 +36,7 @@ export default defineTool({
     try {
       return await findRelatedIssues(
         { ...input, windowed: isIntakeOnly(auth) },
-        { fetch: executorProviderFetch(ctx, "linear"), signal: ctx.abortSignal }
+        { client: executorClient(ctx), signal: ctx.abortSignal }
       );
     } catch (error) {
       if (ctx.abortSignal.aborted) {

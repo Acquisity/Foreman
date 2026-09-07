@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import {
   findFunctionRuns,
   findFunctionRunsResultSchema,
@@ -19,7 +19,7 @@ export default defineTool({
         sinceHours: input.sinceHours ?? 24,
         status: input.status ?? "Failed",
       },
-      { fetch: executorProviderFetch(ctx, "inngest"), signal: ctx.abortSignal }
+      { client: executorClient(ctx), signal: ctx.abortSignal }
     );
   },
   inputSchema: z.object({

@@ -9,7 +9,7 @@ import {
   readStripeRefund,
   stripeLookupSchema,
 } from "#lib/billing-api.js";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 
 export default defineTool({
   description:
@@ -17,7 +17,7 @@ export default defineTool({
   async execute(input, ctx) {
     try {
       const options = {
-        fetch: executorProviderFetch(ctx, "stripe"),
+        client: executorClient(ctx),
         signal: ctx.abortSignal,
       };
       // stripeLookupSchema guarantees the id field for the chosen lookup.

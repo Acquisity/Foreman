@@ -1,12 +1,12 @@
-import { requiredFetch } from "./executor/required-fetch.js";
+import { type ProviderClient, requiredClient } from "./executor/operations.js";
+import type { LinearOperation } from "./linear-operations.js";
 
 /** Fixed Linear GraphQL operations. The injected Executor transport supplies provider authentication; this module retains routing and document semantics. */
 
-const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export interface LinearGraphqlOptions {
-  fetch?: typeof fetch;
+  client?: ProviderClient;
   signal?: AbortSignal;
 }
 
@@ -15,24 +15,22 @@ export interface LinearGraphqlOptions {
  * throws an Error carrying the messages and nothing else.
  */
 export async function linearGraphql<T>(
-  query: string,
+  operation: LinearOperation,
   variables: Record<string, unknown>,
   opts?: LinearGraphqlOptions
 ): Promise<T> {
-  const fetchImpl = requiredFetch(opts?.fetch);
+  const client = requiredClient(opts?.client);
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const response = await fetchImpl(LINEAR_GRAPHQL_URL, {
-    body: JSON.stringify({ query, variables }),
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-    signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
-  });
-  if (!response.ok) {
+  const response = await client(
+    { input: { variables }, operation: `linear.${operation}` },
+    {
+      signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    }
+  );
+  if (response.status < 200 || response.status >= 300) {
     throw new Error(`Linear GraphQL request failed: HTTP ${response.status}.`);
   }
-  const body = (await response.json()) as {
+  const body = response.data as {
     data?: T;
     errors?: Array<{ message?: string }>;
   };
@@ -58,19 +56,6 @@ const DUPLICATES_PAGE_SIZE = 50;
 const MASTERS_PAGE_SIZE = 250;
 const MAX_PAGES = 20;
 const MAX_ISSUES = 100;
-
-const ISSUES_QUERY = `query RelatedIssues($filter: IssueFilter!, $first: Int!, $after: String, $includeArchived: Boolean!) {
-  issues(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived, orderBy: createdAt) {
-    nodes {
-      id identifier title url createdAt
-      state { name type }
-      assignee { name }
-      parent { identifier }
-      labels { nodes { name } }
-    }
-    pageInfo { hasNextPage endCursor }
-  }
-}`;
 
 interface IssueNode {
   assignee: { name: string } | null;
@@ -161,7 +146,7 @@ async function searchPhrase(
   do {
     // biome-ignore lint/performance/noAwaitInLoops: cursors are sequential.
     const data: IssuesData = await linearGraphql<IssuesData>(
-      ISSUES_QUERY,
+      "RelatedIssues",
       {
         after,
         filter,
@@ -243,25 +228,6 @@ export type InvestigationLane = keyof typeof DOCUMENT_TITLES;
 /** Upper bound on document content, matching the skills' 20 KB handoff rule. */
 export const DOCUMENT_MAX_CHARS = 20_000;
 
-const ISSUE_DOCUMENTS_QUERY = `query IssueDocuments($id: String!, $title: String!) {
-  issue(id: $id) {
-    id identifier
-    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }
-  }
-}`;
-
-const DOCUMENT_CREATE = `mutation CreateDocument($input: DocumentCreateInput!) {
-  documentCreate(input: $input) { success document { id updatedAt url } }
-}`;
-
-const DOCUMENT_UPDATE = `mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {
-  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }
-}`;
-
-const DOCUMENT_QUERY = `query Document($id: String!) {
-  document(id: $id) { id updatedAt url }
-}`;
-
 interface DocumentPayload {
   document: { id: string; updatedAt: string; url: string };
   success: boolean;
@@ -293,7 +259,7 @@ export async function saveInvestigationDocument(
       documents: { nodes: Array<{ id: string; title: string }> };
       id: string;
     };
-  }>(ISSUE_DOCUMENTS_QUERY, { id: input.issue, title }, opts);
+  }>("IssueDocuments", { id: input.issue, title }, opts);
 
   const matches = issue.documents.nodes.filter((node) => node.title === title);
   if (matches.length > 1) {
@@ -306,7 +272,7 @@ export async function saveInvestigationDocument(
     const { documentUpdate } = await linearGraphql<{
       documentUpdate: DocumentPayload;
     }>(
-      DOCUMENT_UPDATE,
+      "UpdateDocument",
       { id: existing.id, input: { content: input.content, title } },
       opts
     );
@@ -315,7 +281,7 @@ export async function saveInvestigationDocument(
   const { documentCreate } = await linearGraphql<{
     documentCreate: DocumentPayload;
   }>(
-    DOCUMENT_CREATE,
+    "CreateDocument",
     { input: { content: input.content, issueId: issue.id, title } },
     opts
   );
@@ -329,7 +295,7 @@ async function readBack(payload: DocumentPayload, opts?: LinearGraphqlOptions) {
   try {
     const { document } = await linearGraphql<{
       document: { id: string; updatedAt: string; url: string };
-    }>(DOCUMENT_QUERY, { id: payload.document.id }, opts);
+    }>("Document", { id: payload.document.id }, opts);
     return {
       documentId: document.id,
       updatedAt: document.updatedAt,
@@ -349,60 +315,13 @@ async function readBack(payload: DocumentPayload, opts?: LinearGraphqlOptions) {
 /* ----------------------------- route_ticket ----------------------------- */
 
 /** Read before the update and again after it; both reads share one shape. */
-const ROUTE_ISSUE_QUERY = `query RouteIssue($id: String!) {
-  issue(id: $id) {
-    id identifier url priority
-    team { id }
-    state { name }
-    labels { nodes { id name } }
-    project { id name }
-    assignee { id name }
-    parent { identifier }
-  }
-}`;
 
-const TEAM_LABELS_QUERY = `query TeamLabels($teamId: ID!, $after: String) {
-  issueLabels(first: 250, after: $after, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {
-    nodes { id name }
-    pageInfo { hasNextPage endCursor }
-  }
-}`;
 const MAX_LABEL_PAGES = 8;
 
 interface LabelPage {
   nodes: Named[];
   pageInfo: { endCursor: string | null; hasNextPage: boolean };
 }
-
-const WORKFLOW_STATES_QUERY = `query WorkflowStates($teamId: ID!, $name: String!) {
-  workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {
-    nodes { id name }
-  }
-}`;
-
-const PROJECTS_QUERY = `query Projects($name: String!, $teamId: ID!) {
-  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {
-    nodes { id name }
-  }
-}`;
-
-const USERS_QUERY = `query Users($name: String!) {
-  users(first: 5, filter: { or: [{ email: { eq: $name } }, { name: { eqIgnoreCase: $name } }, { displayName: { eqIgnoreCase: $name } }] }) {
-    nodes { id name }
-  }
-}`;
-
-const ISSUE_UPDATE = `mutation RouteIssueUpdate($id: String!, $input: IssueUpdateInput!) {
-  issueUpdate(id: $id, input: $input) { success }
-}`;
-
-const RELATION_CREATE = `mutation RouteRelation($input: IssueRelationCreateInput!) {
-  issueRelationCreate(input: $input) { success }
-}`;
-
-const ATTACHMENT_LINK = `mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {
-  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
-}`;
 
 interface Named {
   id: string;
@@ -438,7 +357,7 @@ export interface RouteTicketResult {
 
 /** Reads one issue by identifier, throwing when Linear has no such issue. */
 async function requireIssue(gql: Gql, identifier: string): Promise<RouteIssue> {
-  const { issue } = await gql<{ issue: RouteIssue | null }>(ROUTE_ISSUE_QUERY, {
+  const { issue } = await gql<{ issue: RouteIssue | null }>("RouteIssue", {
     id: identifier,
   });
   if (!issue) {
@@ -460,7 +379,10 @@ function exactlyOne(kind: string, name: string, nodes: Named[]): string {
   );
 }
 
-type Gql = <T>(query: string, variables: Record<string, unknown>) => Promise<T>;
+type Gql = <T>(
+  operation: LinearOperation,
+  variables: Record<string, unknown>
+) => Promise<T>;
 
 interface RouteIssue {
   assignee: Named | null;
@@ -503,7 +425,7 @@ async function resolveLabelIds(
     // biome-ignore lint/performance/noAwaitInLoops: label pages are sequential cursors.
     const { issueLabels }: { issueLabels: LabelPage } = await gql<{
       issueLabels: LabelPage;
-    }>(TEAM_LABELS_QUERY, { after, teamId: issue.team.id });
+    }>("TeamLabels", { after, teamId: issue.team.id });
     labels.push(...issueLabels.nodes);
     after = issueLabels.pageInfo.hasNextPage
       ? issueLabels.pageInfo.endCursor
@@ -548,7 +470,7 @@ async function resolveAssigneeId(
     }
   }
   if (input.assignee !== undefined) {
-    const { users } = await gql<{ users: { nodes: Named[] } }>(USERS_QUERY, {
+    const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {
       name: input.assignee,
     });
     return exactlyOne("user", input.assignee, users.nodes);
@@ -569,7 +491,7 @@ async function buildUpdate(
   if (input.state !== undefined) {
     const { workflowStates } = await gql<{
       workflowStates: { nodes: Named[] };
-    }>(WORKFLOW_STATES_QUERY, { name: input.state, teamId: issue.team.id });
+    }>("WorkflowStates", { name: input.state, teamId: issue.team.id });
     update.stateId = exactlyOne("state", input.state, workflowStates.nodes);
   }
   if (input.priority !== undefined) {
@@ -577,7 +499,7 @@ async function buildUpdate(
   }
   if (input.project !== undefined) {
     const { projects } = await gql<{ projects: { nodes: Named[] } }>(
-      PROJECTS_QUERY,
+      "Projects",
       { name: input.project, teamId: issue.team.id }
     );
     update.projectId = exactlyOne(
@@ -626,7 +548,7 @@ export async function routeTicket(
   let wrote = Object.keys(update).length > 0;
   if (wrote) {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
-      ISSUE_UPDATE,
+      "RouteIssueUpdate",
       { id: issue.id, input: update }
     );
     if (!issueUpdate.success) {
@@ -651,7 +573,7 @@ export async function routeTicket(
     try {
       const { issueRelationCreate } = await gql<{
         issueRelationCreate: { success: boolean };
-      }>(RELATION_CREATE, {
+      }>("RouteRelation", {
         input: {
           issueId: issue.id,
           relatedIssueId: master.id,
@@ -675,7 +597,7 @@ export async function routeTicket(
       // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
       const { attachmentLinkURL } = await gql<{
         attachmentLinkURL: { success: boolean };
-      }>(ATTACHMENT_LINK, {
+      }>("RouteAttachment", {
         issueId: issue.id,
         title: link.title,
         url: link.url,

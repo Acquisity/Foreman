@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
 
@@ -19,7 +19,7 @@ export default defineTool({
   async execute(input, ctx) {
     try {
       const ticket = await routeTicket(input, {
-        fetch: executorProviderFetch(ctx, "linear"),
+        client: executorClient(ctx),
         signal: ctx.abortSignal,
       });
       return { routed: true as const, ...ticket };

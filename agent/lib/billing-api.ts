@@ -1,8 +1,12 @@
 import { z } from "zod";
-import { requiredFetch } from "./executor/required-fetch.js";
+import {
+  type OperationRequest,
+  type ProviderClient,
+  type ProviderResult,
+  requiredClient,
+} from "./executor/operations.js";
+import { ExecutorError } from "./executor/transport.js";
 
-const AUTUMN_API_URL = "https://api.useautumn.com/v1";
-const STRIPE_API_URL = "https://api.stripe.com/v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const REQUEST_TIMEOUT_MS = 20_000;
 const SENSITIVE_RESPONSE_KEYS = new Set([
@@ -27,8 +31,6 @@ const SENSITIVE_RESPONSE_KEYS = new Set([
   "shipping_address",
   "sources",
 ]);
-
-type Fetcher = typeof fetch;
 
 const sanitize = (
   value: unknown,
@@ -61,38 +63,6 @@ const tooMuchData = (provider: "Autumn" | "Stripe"): Error =>
     `${provider} returned too much data. Narrow the lookup before concluding.`
   );
 
-const readBoundedText = async (
-  provider: "Autumn" | "Stripe",
-  response: Response
-): Promise<string> => {
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-    throw tooMuchData(provider);
-  }
-  if (response.body === null) {
-    return "";
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: the stream's done flag terminates the loop.
-  while (true) {
-    // biome-ignore lint/performance/noAwaitInLoops: stream chunks must be read sequentially to enforce the byte cap.
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    totalBytes += value.byteLength;
-    if (totalBytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined);
-      throw tooMuchData(provider);
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, totalBytes).toString("utf8");
-};
-
 const enforceOutputBudget = <T>(provider: "Autumn" | "Stripe", value: T): T => {
   if (Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_RESPONSE_BYTES) {
     throw tooMuchData(provider);
@@ -120,32 +90,25 @@ export class BillingApiError extends Error {
   }
 }
 
-const parseResponse = async (
+const parseResponse = (
   provider: "Autumn" | "Stripe",
-  response: Response,
+  response: ProviderResult,
   rootSensitiveKeys: ReadonlySet<string>
-): Promise<unknown> => {
-  if (!response.ok) {
+): unknown => {
+  if (response.status < 200 || response.status >= 300) {
     throw new BillingApiError(provider, response.status);
   }
-  const text = await readBoundedText(provider, response);
-  try {
-    return sanitize(JSON.parse(text) as unknown, rootSensitiveKeys);
-  } catch (error) {
-    throw new Error(`${provider} returned an unreadable response.`, {
-      cause: error,
-    });
-  }
+  enforceOutputBudget(provider, response.data);
+  return sanitize(response.data, rootSensitiveKeys);
 };
 
 const call = async (
   provider: "Autumn" | "Stripe",
-  url: string,
-  init: RequestInit,
-  fetchImpl: Fetcher,
+  request: OperationRequest,
+  options: { client?: ProviderClient; signal?: AbortSignal },
   rootSensitiveKeys: ReadonlySet<string> = new Set()
 ): Promise<unknown> => {
-  // The caller's signal stays on `init` so cancellation is still recognized
+  // The caller's signal stays in `options` so cancellation is still recognized
   // after the deadline is composed in; only the request carries both. The
   // failure is classified from the composed signal's first abort reason, which
   // never changes once set: a caller that aborts after the deadline fired
@@ -160,13 +123,16 @@ const call = async (
       ),
     REQUEST_TIMEOUT_MS
   );
-  const signal = init.signal
-    ? AbortSignal.any([init.signal, deadline.signal])
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline.signal])
     : deadline.signal;
   try {
     return await parseResponse(
       provider,
-      await fetchImpl(url, { ...init, signal }),
+      await requiredClient(options.client)(request, {
+        maxBytes: MAX_RESPONSE_BYTES,
+        signal,
+      }),
       rootSensitiveKeys
     );
   } catch (error) {
@@ -181,6 +147,9 @@ const call = async (
       (error instanceof Error && error.name === "AbortError")
     ) {
       throw error;
+    }
+    if (error instanceof ExecutorError && error.code === "response_too_large") {
+      throw tooMuchData(provider);
     }
     if (error instanceof BillingApiError || error instanceof SyntaxError) {
       throw error;
@@ -197,29 +166,26 @@ const call = async (
 /** Reads one existing Autumn customer without creating or changing anything. */
 export const readAutumnCustomer = (
   customerId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
   call(
     "Autumn",
-    `${AUTUMN_API_URL}/customers.get`,
     {
-      body: JSON.stringify({
-        customer_id: customerId,
-        expand: [
-          "subscriptions.plan",
-          "purchases.plan",
-          "balances.feature",
-          "flags.feature",
-        ],
-      }),
-      headers: {
-        "Content-Type": "application/json",
+      input: {
+        body: {
+          customer_id: customerId,
+          expand: [
+            "subscriptions.plan",
+            "purchases.plan",
+            "balances.feature",
+            "flags.feature",
+          ],
+        },
         "x-api-version": "2.3.0",
       },
-      method: "POST",
-      signal: options.signal,
+      operation: "autumn.customer",
     },
-    requiredFetch(options.fetch),
+    options,
     new Set(["name"])
   ).catch((error: unknown) => {
     // Acquisity keys Autumn customers by billing_account.id. A 404 here is a
@@ -235,34 +201,25 @@ export const readAutumnCustomer = (
   });
 
 const stripeGet = (
-  path: string,
+  request: OperationRequest,
   options: {
-    fetch?: Fetcher;
+    client?: ProviderClient;
     rootSensitiveKeys?: ReadonlySet<string>;
     signal?: AbortSignal;
   }
 ): Promise<unknown> =>
-  call(
-    "Stripe",
-    `${STRIPE_API_URL}${path}`,
-    {
-      method: "GET",
-      signal: options.signal,
-    },
-    requiredFetch(options.fetch),
-    options.rootSensitiveKeys
-  );
+  call("Stripe", request, options, options.rootSensitiveKeys);
 
 const safeStripeGet = async (
-  path: string,
+  request: OperationRequest,
   options: {
-    fetch?: Fetcher;
+    client?: ProviderClient;
     rootSensitiveKeys?: ReadonlySet<string>;
     signal?: AbortSignal;
   }
 ): Promise<{ data?: unknown; error?: string }> => {
   try {
-    return { data: await stripeGet(path, options) };
+    return { data: await stripeGet(request, options) };
   } catch (error) {
     if (
       options.signal?.aborted ||
@@ -336,23 +293,40 @@ export type StripeLookupInput = z.infer<typeof stripeLookupSchema>;
 /** Reads the bounded Stripe history needed for one known customer. */
 export async function readStripeCustomerBilling(
   customerId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<Record<string, { data?: unknown; error?: string }>> {
-  const encoded = encodeURIComponent(customerId);
   const lookups = {
-    balanceTransactions: `/customers/${encoded}/balance_transactions?limit=20`,
-    charges: `/charges?customer=${encoded}&limit=20`,
-    creditNotes: `/credit_notes?customer=${encoded}&limit=20`,
-    customer: `/customers/${encoded}`,
-    invoices: `/invoices?customer=${encoded}&limit=20`,
-    subscriptions: `/subscriptions?customer=${encoded}&status=all&limit=20`,
+    balanceTransactions: {
+      input: { customer_id: customerId, limit: 20 },
+      operation: "stripe.customers.balance_transactions",
+    },
+    charges: {
+      input: { customer: customerId, limit: 20 },
+      operation: "stripe.charges.list",
+    },
+    creditNotes: {
+      input: { customer: customerId, limit: 20 },
+      operation: "stripe.credit_notes.list",
+    },
+    customer: {
+      input: { customer_id: customerId },
+      operation: "stripe.customers.get",
+    },
+    invoices: {
+      input: { customer: customerId, limit: 20 },
+      operation: "stripe.invoices.list",
+    },
+    subscriptions: {
+      input: { customer: customerId, limit: 20, status: "all" },
+      operation: "stripe.subscriptions.list",
+    },
   } as const;
 
   const entries = await Promise.all(
-    Object.entries(lookups).map(async ([name, path]) => [
+    Object.entries(lookups).map(async ([name, request]) => [
       name,
       await safeStripeGet(
-        path,
+        request,
         name === "customer"
           ? { ...options, rootSensitiveKeys: new Set(["name"]) }
           : options
@@ -365,40 +339,52 @@ export async function readStripeCustomerBilling(
 /** Reads one known Stripe charge, including its attached refund history. */
 export const readStripeCharge = (
   chargeId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
   stripeGet(
-    `/charges/${encodeURIComponent(chargeId)}?expand[]=refunds`,
+    {
+      input: { charge_id: chargeId, "expand[]": "refunds" },
+      operation: "stripe.charges.get",
+    },
     options
   );
 
 /** Reads one known Stripe refund. */
 export const readStripeRefund = (
   refundId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(`/refunds/${encodeURIComponent(refundId)}`, options);
+  stripeGet(
+    { input: { refund_id: refundId }, operation: "stripe.refunds.get" },
+    options
+  );
 
 /** Reads one known Stripe dispute. */
 export const readStripeDispute = (
   disputeId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(`/disputes/${encodeURIComponent(disputeId)}`, options);
+  stripeGet(
+    { input: { dispute_id: disputeId }, operation: "stripe.disputes.get" },
+    options
+  );
 
 /** Finds Stripe promotion codes by the exact customer-facing code. */
 export const readStripePromotionCode = (
   code: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
   stripeGet(
-    `/promotion_codes?code=${encodeURIComponent(code)}&limit=20`,
+    { input: { code, limit: 20 }, operation: "stripe.promotion_codes.list" },
     options
   );
 
 /** Reads one known Stripe coupon. */
 export const readStripeCoupon = (
   couponId: string,
-  options: { fetch?: Fetcher; signal?: AbortSignal } = {}
+  options: { client?: ProviderClient; signal?: AbortSignal } = {}
 ): Promise<unknown> =>
-  stripeGet(`/coupons/${encodeURIComponent(couponId)}`, options);
+  stripeGet(
+    { input: { coupon_id: couponId }, operation: "stripe.coupons.get" },
+    options
+  );

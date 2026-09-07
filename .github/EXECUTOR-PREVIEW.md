@@ -114,3 +114,12 @@ One `Foreman` toolkit (`/mcp/toolkits/foreman?artifacts=false`) replaces the fif
 Workflow behavior is defined by skills; critic remains instructed to review without writing. Provider credentials and scopes are unchanged. Helpers retain their validation, membership checks, pagination, filtering, deadlines, and result formats, while their underlying operations are discoverable in the shared toolkit. Previous checks expecting per-profile denials or hidden helper operations no longer describe the intended policy.
 
 The two remaining catalog gaps are Vercel connection setup and the retired Stripe account-info operation. The new toolkit should pass the live exact-catalog check independently of those coverage gaps. Deployment-specific acceptance and retirement evidence are recorded on PR #118. Restore the previous toolkit configuration before rolling back to a deployment that references its old URLs.
+
+
+## Typed helper transport review follow-up (2026-09-07)
+
+The review follow-up replaces simulated provider HTTP with typed operation calls, generates both Linear specs from canonical documents, preserves available retry metadata, and splits Instantly's tests by responsibility. Local `pnpm validate` passes 648 tests in 93 suites with zero errors or warnings. Tests for removed HTTP reconstruction and domain body readers were replaced with typed-client fixtures; Executor's actual body streaming, byte cap, deadline, and cancellation tests remain. The end-to-end fixture covers MCP error parsing through the client and Instantly retry behavior.
+
+All eight read and five write Linear documents match the installed Executor enums exactly. The live toolkit's exact catalog and policy audit passes; the existing Vercel and Stripe coverage gaps remain. The custom Inngest API definition now passes its optional `includeOutput` boolean, preserving the trace fallback, with no tools added or removed. This branch's Preview bindings now contain operation paths only. Root compiles with Executor plus personal Supermemory; critic compiles with Executor.
+
+No Executor server code or server deployment was changed. The unapplied server-owner patch and its remaining verification are recorded in [EXECUTOR-RETRY-AFTER.md](./EXECUTOR-RETRY-AFTER.md). Foreman stops after one rate-limited invocation when the currently deployed server supplies no retry interval. Fresh deployed-preview results for this follow-up are recorded on PR #118; earlier acceptance above is not evidence for this refactor.

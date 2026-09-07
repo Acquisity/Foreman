@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { readAutumnCustomer } from "#lib/billing-api.js";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 
 export default defineTool({
   description:
@@ -11,7 +11,7 @@ export default defineTool({
       return {
         available: true as const,
         data: await readAutumnCustomer(customerId, {
-          fetch: executorProviderFetch(ctx, "autumn"),
+          client: executorClient(ctx),
           signal: ctx.abortSignal,
         }),
       };

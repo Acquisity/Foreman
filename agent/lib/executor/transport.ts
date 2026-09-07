@@ -26,7 +26,11 @@ const outcomeSchema = z.discriminatedUnion("ok", [
     ok: z.literal(true),
   }),
   z.object({
-    error: z.object({ code: z.string(), status: z.number().optional() }),
+    error: z.object({
+      code: z.string(),
+      retryAfter: z.string().max(200).optional(),
+      status: z.number().optional(),
+    }),
     ok: z.literal(false),
   }),
 ]);
@@ -38,7 +42,12 @@ export interface ExecutorRequestContext {
 export class ExecutorError extends Error {
   readonly code: string;
   readonly status: number | undefined;
-  constructor(code: string, status?: number, options?: ErrorOptions) {
+  readonly retryAfter: string | undefined;
+  constructor(
+    code: string,
+    status?: number,
+    options?: ErrorOptions & { retryAfter?: string }
+  ) {
     super(
       `Executor operation failed (${code}${status === undefined ? "" : `, HTTP ${status}`}).`,
       options
@@ -46,6 +55,7 @@ export class ExecutorError extends Error {
     this.name = "ExecutorError";
     this.code = code;
     this.status = status;
+    this.retryAfter = options?.retryAfter;
   }
 }
 const SSE_BLOCK = /\r?\n\r?\n/u;
@@ -156,7 +166,9 @@ export async function invokeExecutor(
     });
     if (!response.ok) {
       response.body?.cancel().catch(() => undefined);
-      throw new ExecutorError("http_error", response.status);
+      throw new ExecutorError("http_error", response.status, {
+        retryAfter: response.headers.get("retry-after") ?? undefined,
+      });
     }
     const sessionId = response.headers.get("mcp-session-id");
     if (sessionId && !headers["mcp-session-id"]) {

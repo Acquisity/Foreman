@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/requests.js";
+import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
 const manifestSchema = z.object({

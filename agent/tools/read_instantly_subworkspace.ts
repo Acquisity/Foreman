@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import {
   InstantlyApiError,
   readInstantlySubworkspace,
@@ -110,7 +110,7 @@ export default defineTool({
           resource,
           query,
           {
-            fetch: executorProviderFetch(ctx, "instantly"),
+            client: executorClient(ctx),
             signal: ctx.abortSignal,
           }
         ),

@@ -1,67 +1,105 @@
 import type { ToolContext } from "eve/tools";
+import { z } from "zod";
+import {
+  LINEAR_OPERATIONS,
+  type LinearOperation,
+} from "../linear-operations.js";
 import { executorAuth } from "./auth.js";
-import { bindOperation } from "./bindings.js";
-import { type Provider, resolveProviderRequest } from "./requests.js";
+import { operationPath } from "./bindings.js";
+import {
+  operationInputs,
+  type ProviderClient,
+  type ProviderResult,
+} from "./operations.js";
 import { ExecutorError, invokeExecutor } from "./transport.js";
 
-/** An injected request adapter keeps the domain helpers' response handling intact. */
-export function executorProviderFetch(
-  ctx: ToolContext,
-  provider: Provider
-): typeof fetch {
-  return async (address, init = {}) => {
-    if (address instanceof Request) {
-      throw new ExecutorError("unsupported_helper_request");
-    }
-    const { operation, source } = resolveProviderRequest(
-      provider,
-      String(address),
-      init
-    );
-    const binding = bindOperation(operation, source);
-    const signal = init.signal
-      ? AbortSignal.any([ctx.abortSignal, init.signal])
+const linearInput = z.object({ variables: z.record(z.string(), z.unknown()) });
+
+/** Typed arguments cross one transport boundary; no simulated provider HTTP request. */
+export function executorClient(
+  ctx: Pick<ToolContext, "abortSignal" | "getToken">
+): ProviderClient {
+  return async (request, options = {}) => {
+    const path = operationPath(request.operation);
+    const input = request.operation.startsWith("linear.")
+      ? {
+          body: {
+            query:
+              LINEAR_OPERATIONS[request.operation.slice(7) as LinearOperation]
+                .document,
+            ...linearInput.parse(request.input),
+          },
+        }
+      : operationInputs[
+          request.operation as keyof typeof operationInputs
+        ].parse(request.input);
+    const signal = options.signal
+      ? AbortSignal.any([ctx.abortSignal, options.signal])
       : ctx.abortSignal;
     signal.throwIfAborted();
     const { token } = await ctx.getToken(executorAuth());
-    const outcome = await invokeExecutor(
-      { signal, token },
-      binding.path,
-      binding.input
-    );
-    if (!outcome.ok) {
-      // Preserve provider HTTP status for fixed fallback and retry branches, without error bodies.
+    let outcome: Awaited<ReturnType<typeof invokeExecutor>>;
+    try {
+      outcome = await invokeExecutor({ signal, token }, path, input);
+    } catch (error) {
       if (
-        outcome.error.status &&
-        outcome.error.status >= 400 &&
-        outcome.error.status <= 599
+        error instanceof ExecutorError &&
+        error.code === "http_error" &&
+        error.status === 429
       ) {
-        return new Response(null, { status: outcome.error.status });
+        return {
+          data: null,
+          status: 429,
+          ...(error.retryAfter ? { retryAfter: error.retryAfter } : {}),
+        };
       }
-      throw new ExecutorError("provider_operation_failed");
+      throw error;
     }
-    const headers = new Headers({ "Content-Type": "application/json" });
-    const retryAfter = outcome.http?.headers?.["retry-after"];
-    if (retryAfter) {
-      headers.set("retry-after", retryAfter);
+    const result = providerResult(outcome);
+    const { data } = result;
+    if (
+      options.maxBytes !== undefined &&
+      Buffer.byteLength(JSON.stringify(data), "utf8") > options.maxBytes
+    ) {
+      throw new ExecutorError("response_too_large");
     }
-    return new Response(JSON.stringify(outcome.data), {
-      headers,
-      status: outcome.http?.status ?? 200,
-    });
+    return result;
   };
+}
+
+function providerResult(
+  outcome: Awaited<ReturnType<typeof invokeExecutor>>
+): ProviderResult {
+  const status = outcome.ok
+    ? (outcome.http?.status ?? 200)
+    : outcome.error.status;
+  if (
+    status === undefined ||
+    !Number.isInteger(status) ||
+    status < 200 ||
+    status > 599 ||
+    (!outcome.ok && status < 300)
+  ) {
+    throw new ExecutorError("provider_operation_failed");
+  }
+  const retryAfter = outcome.ok
+    ? outcome.http?.headers?.["retry-after"]
+    : outcome.error.retryAfter;
+  const data = outcome.ok ? outcome.data : null;
+  return { data, status, ...(retryAfter ? { retryAfter } : {}) };
 }
 
 export async function executorReadQuery(
   ctx: ToolContext,
   args: Record<string, unknown>
 ): Promise<string> {
-  const binding = bindOperation("planetscale.readQuery", { args });
+  const path = operationPath("planetscale.readQuery");
+  const input = operationInputs["planetscale.readQuery"].parse(args);
   const { token } = await ctx.getToken(executorAuth());
   const outcome = await invokeExecutor(
     { signal: ctx.abortSignal, token },
-    binding.path,
-    binding.input
+    path,
+    input
   );
   if (!outcome.ok) {
     throw new ExecutorError("planetscale_read_failed", outcome.error.status);

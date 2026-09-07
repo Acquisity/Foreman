@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
-import { bindOperation } from "./executor/bindings.js";
+import { operationPath } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
 import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";
-import { resolveProviderRequest } from "./executor/requests.js";
+
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
 import { ExecutorError, invokeExecutor } from "./executor/transport.js";
 import {
@@ -31,45 +31,7 @@ const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json", ...headers },
   });
-const INVALID_ARGUMENT = /invalid_binding_argument/u;
 const OPERATION = "stripe.org.foreman.customer";
-test("verified catalog coercions preserve bounded query values and reject ambiguous inputs", () => {
-  const previous = process.env.EXECUTOR_OPERATION_BINDINGS;
-  process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
-    probe: {
-      arguments: {
-        expand: "query.expand",
-        limit: "query.limit",
-        preview_only: "query.preview_only",
-      },
-      coercions: { expand: "single", limit: "number", preview_only: "boolean" },
-      path: OPERATION,
-    },
-  });
-  try {
-    assert.deepEqual(
-      bindOperation("probe", {
-        query: { expand: ["refunds"], limit: "20", preview_only: "true" },
-      }).input,
-      { expand: "refunds", limit: 20, preview_only: true }
-    );
-    for (const query of [
-      { limit: "" },
-      { limit: "Infinity" },
-      { limit: "20garbage" },
-      { preview_only: "yes" },
-      { expand: ["refunds", "customer"] },
-    ]) {
-      assert.throws(() => bindOperation("probe", { query }), INVALID_ARGUMENT);
-    }
-  } finally {
-    if (previous === undefined) {
-      delete process.env.EXECUTOR_OPERATION_BINDINGS;
-    } else {
-      process.env.EXECUTOR_OPERATION_BINDINGS = previous;
-    }
-  }
-});
 const rpc =
   (
     toolResult: unknown,
@@ -139,85 +101,23 @@ test("every execution context shares company auth and the same toolkit", () => {
   }
 });
 
-test("helper request mapping preserves billing expansions and excludes credentials", () => {
-  const request = resolveProviderRequest(
-    "autumn",
-    "https://api.useautumn.com/v1/customers.get",
-    {
-      body: JSON.stringify({
-        customer_id: "account",
-        expand: ["subscriptions.plan"],
-      }),
-      headers: { authorization: "never-forward", "x-api-version": "2.3.0" },
-      method: "POST",
-    }
-  );
-  assert.equal(request.operation, "autumn.customer");
-  assert.deepEqual(request.source.body, {
-    customer_id: "account",
-    expand: ["subscriptions.plan"],
-  });
-  assert.deepEqual(request.source.headers, { "x-api-version": "2.3.0" });
-});
-
-test("fixed request mapping refuses arbitrary endpoints and mutation routes", () => {
-  assert.throws(() =>
-    resolveProviderRequest("stripe", "https://attacker.invalid/v1/charges", {})
-  );
-  assert.throws(() =>
-    resolveProviderRequest("stripe", "https://api.stripe.com/v1/refunds", {
-      method: "POST",
-    })
-  );
-  assert.throws(() =>
-    resolveProviderRequest("linear", "https://api.linear.app/graphql", {
-      body: JSON.stringify({ query: "mutation DeleteEverything { delete }" }),
-      method: "POST",
-    })
-  );
-});
-
-test("Instantly routing retains workspace provenance and bounded query flags", () => {
-  const request = resolveProviderRequest(
-    "instantly",
-    "https://api.instantly.ai/api/v2/emails?limit=20&preview_only=true",
-    { headers: { "x-as-workspace": "member-id" } }
-  );
-  assert.equal(request.operation, "instantly.emails");
-  assert.deepEqual(request.source.query, { limit: "20", preview_only: "true" });
-  assert.deepEqual(request.source.headers, { "x-as-workspace": "member-id" });
-});
-
-test("operation bindings map exact argument fields and fail closed on unknown mappings", () => {
-  const old = process.env.EXECUTOR_OPERATION_BINDINGS;
+test("deployment bindings select paths and cannot modify typed arguments", () => {
+  const previous = process.env.EXECUTOR_OPERATION_BINDINGS;
   try {
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
-      "stripe.customers.get": {
-        arguments: { "path.customer": "path.id", query: "query" },
-        path: OPERATION,
-      },
+      read: { arguments: { secret: "other" }, path: OPERATION },
     });
-    assert.deepEqual(
-      bindOperation("stripe.customers.get", {
-        path: { id: "cus_1" },
-        query: { limit: "20" },
-      }),
-      {
-        input: { path: { customer: "cus_1" }, query: { limit: "20" } },
-        path: OPERATION,
-      }
-    );
-    assert.throws(() => bindOperation("stripe.refunds.get", {}));
+    assert.equal(operationPath("read"), OPERATION);
+    assert.throws(() => operationPath("missing"));
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
-      bad: { arguments: { "__proto__.polluted": "body" }, path: OPERATION },
+      read: { path: "executor.coreTools.policies.delete" },
     });
-    assert.throws(() => bindOperation("bad", { body: true }));
-    assert.equal(({} as Record<string, unknown>).polluted, undefined);
+    assert.throws(() => operationPath("read"));
   } finally {
-    if (old === undefined) {
+    if (previous === undefined) {
       delete process.env.EXECUTOR_OPERATION_BINDINGS;
     } else {
-      process.env.EXECUTOR_OPERATION_BINDINGS = old;
+      process.env.EXECUTOR_OPERATION_BINDINGS = previous;
     }
   }
 });

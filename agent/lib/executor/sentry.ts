@@ -1,7 +1,7 @@
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { executorAuth } from "./auth.js";
-import { bindOperation } from "./bindings.js";
+import { operationPath } from "./bindings.js";
 import { ExecutorError, invokeExecutor } from "./transport.js";
 
 export const sentryIssueInput = z.strictObject({
@@ -34,15 +34,13 @@ export async function readSentryIssue(input: unknown, ctx: ToolContext) {
           period: parsed.period ?? "24h",
           query: parsed.query ?? "",
         };
-  const binding = bindOperation("sentry.issueRead", {
-    args,
-    name: parsed.operation,
-  });
+  const path = operationPath("sentry.issueRead");
+  const inputArgs = { arguments: args, name: parsed.operation };
   const { token } = await ctx.getToken(executorAuth());
   const outcome = await invokeExecutor(
     { signal: ctx.abortSignal, token },
-    binding.path,
-    binding.input
+    path,
+    inputArgs
   );
   if (!outcome.ok) {
     throw new ExecutorError("sentry_read_failed", outcome.error.status);

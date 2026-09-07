@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import {
   findHelpArticleResultSchema,
   findHelpArticles,
@@ -14,7 +14,7 @@ export default defineTool({
     "An empty list is a valid answer; error set means the search could not run.",
   execute({ query }, ctx) {
     return findHelpArticles(query, {
-      fetch: executorProviderFetch(ctx, "help"),
+      client: executorClient(ctx),
       signal: ctx.abortSignal,
     });
   },

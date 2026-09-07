@@ -1,74 +1,74 @@
 {
-  "openapi": "3.0.3",
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
   "info": {
     "title": "Foreman Linear write API",
     "version": "1.0.0"
   },
-  "servers": [
-    {
-      "url": "https://api.linear.app"
-    }
-  ],
+  "openapi": "3.0.3",
   "paths": {
     "/graphql": {
       "post": {
         "operationId": "executeForemanWrite",
-        "summary": "Only exact authored Foreman write operations. No arbitrary GraphQL.",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["query", "variables"],
                 "additionalProperties": false,
                 "properties": {
                   "query": {
-                    "type": "string",
                     "enum": [
                       "mutation CreateDocument($input: DocumentCreateInput!) {\n  documentCreate(input: $input) { success document { id updatedAt url } }\n}",
-                      "mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {\n  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }\n}",
+                      "mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {\n  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }\n}",
                       "mutation RouteIssueUpdate($id: String!, $input: IssueUpdateInput!) {\n  issueUpdate(id: $id, input: $input) { success }\n}",
                       "mutation RouteRelation($input: IssueRelationCreateInput!) {\n  issueRelationCreate(input: $input) { success }\n}",
-                      "mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {\n  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }\n}"
-                    ]
+                      "mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {\n  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }\n}"
+                    ],
+                    "type": "string"
                   },
                   "variables": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": true,
+                    "type": "object"
                   }
-                }
+                },
+                "required": ["query", "variables"],
+                "type": "object"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Linear GraphQL response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "additionalProperties": true,
+                  "type": "object"
                 }
               }
-            }
+            },
+            "description": "Linear GraphQL response"
           }
-        }
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearer": {
-        "type": "http",
-        "scheme": "bearer"
+        },
+        "summary": "Only exact authored Foreman write operations. No arbitrary GraphQL."
       }
     }
   },
   "security": [
     {
       "bearer": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.linear.app"
     }
   ]
 }

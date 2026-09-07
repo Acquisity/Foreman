@@ -215,6 +215,14 @@
               "type": "string",
               "maxLength": 2048
             }
+          },
+          {
+            "name": "includeOutput",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

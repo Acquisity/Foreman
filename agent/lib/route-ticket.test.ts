@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
 import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
 
@@ -12,13 +13,7 @@ const NO_ISSUE = /No issue ENG-999999/u;
 const UNKNOWN_LABEL =
   /Unknown label "Nope"\. Valid labels: Bug, Customer reported/u;
 
-const json = (body: unknown) =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
-    })
-  );
+const json = (body: unknown) => Promise.resolve({ data: body, status: 200 });
 
 interface Call {
   query: string;
@@ -45,18 +40,28 @@ const labelsFor = (master: boolean, readBack: boolean) => {
 
 const fakeLinear = ({ readBackFails = false } = {}) => {
   const calls: Call[] = [];
-  const fetchStub: typeof fetch = (_url, init) => {
-    const body = JSON.parse(String(init?.body)) as Call;
+  const fetchStub: ProviderClient = (request) => {
+    const body = {
+      query: request.operation,
+      variables: "variables" in request.input ? request.input.variables : {},
+    } as Call;
     calls.push(body);
     const q = body.query;
-    if (q.startsWith("query RouteIssue")) {
+    if (q === "linear.RouteIssue") {
       if (body.variables.id === "ENG-999999") {
         return json({ data: { issue: null } });
       }
       const master = body.variables.id === "ENG-9";
       // A read of ENG-1 after any write is the read-back.
       const readBack =
-        !master && calls.some((c) => c.query.startsWith("mutation Route"));
+        !master &&
+        calls.some((c) =>
+          [
+            "linear.RouteIssueUpdate",
+            "linear.RouteRelation",
+            "linear.RouteAttachment",
+          ].includes(c.query)
+        );
       if (readBack && readBackFails) {
         return json({ errors: [{ message: "Linear is busy" }] });
       }
@@ -77,7 +82,7 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
         },
       });
     }
-    if (q.startsWith("query TeamLabels")) {
+    if (q === "linear.TeamLabels") {
       // Two pages: the second carries the label the union needs.
       return body.variables.after === null
         ? json({
@@ -97,29 +102,29 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
             },
           });
     }
-    if (q.startsWith("query WorkflowStates")) {
+    if (q === "linear.WorkflowStates") {
       return json({
         data: { workflowStates: { nodes: [{ id: "s-done", name: "Done" }] } },
       });
     }
-    if (q.startsWith("query Projects")) {
+    if (q === "linear.Projects") {
       assert.equal(body.variables.teamId, "t-eng");
       return json({
         data: { projects: { nodes: [{ id: "p-support", name: "Support" }] } },
       });
     }
-    if (q.startsWith("query Users")) {
+    if (q === "linear.Users") {
       return json({
         data: { users: { nodes: [{ id: "u-grace", name: "Grace" }] } },
       });
     }
-    if (q.startsWith("mutation RouteIssueUpdate")) {
+    if (q === "linear.RouteIssueUpdate") {
       return json({ data: { issueUpdate: { success: true } } });
     }
-    if (q.startsWith("mutation RouteRelation")) {
+    if (q === "linear.RouteRelation") {
       return json({ data: { issueRelationCreate: { success: true } } });
     }
-    if (q.startsWith("mutation RouteAttachment")) {
+    if (q === "linear.RouteAttachment") {
       return String(body.variables.url).includes("broken")
         ? json({ errors: [{ message: "Unable to fetch url information" }] })
         : json({ data: { attachmentLinkURL: { success: true } } });
@@ -127,7 +132,7 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
     throw new Error(`Unexpected query: ${q.slice(0, 40)}`);
   };
   const updates = () =>
-    calls.filter((c) => c.query.startsWith("mutation RouteIssueUpdate"));
+    calls.filter((c) => c.query === "linear.RouteIssueUpdate");
   return { calls, fetchStub, updates };
 };
 
@@ -150,7 +155,7 @@ describe("routeTicket", () => {
         project: "Support",
         state: "Done",
       },
-      { fetch: linear.fetchStub }
+      { client: linear.fetchStub }
     );
     const [update] = linear.updates();
     assert.equal(linear.updates().length, 1);
@@ -161,16 +166,16 @@ describe("routeTicket", () => {
       projectId: "p-support",
       stateId: "s-done",
     });
-    const relation = linear.calls.find((c) =>
-      c.query.startsWith("mutation RouteRelation")
+    const relation = linear.calls.find(
+      (c) => c.query === "linear.RouteRelation"
     );
     assert.deepEqual(relation?.variables.input, {
       issueId: "i-1",
       relatedIssueId: "i-9",
       type: "duplicate",
     });
-    const attachment = linear.calls.find((c) =>
-      c.query.startsWith("mutation RouteAttachment")
+    const attachment = linear.calls.find(
+      (c) => c.query === "linear.RouteAttachment"
     );
     assert.equal(attachment?.variables.url, "https://app.intercom.com/c/1");
     assert.equal(result.projectId, "p-support");
@@ -187,7 +192,7 @@ describe("routeTicket", () => {
           { title: "Intercom conversation", url: "https://broken.example/1" },
         ],
       },
-      { fetch: linear.fetchStub }
+      { client: linear.fetchStub }
     );
     assert.equal(linear.updates().length, 1);
     assert.equal(result.warnings.length, 1);
@@ -202,7 +207,7 @@ describe("routeTicket", () => {
           issue: "ENG-1",
           links: [{ title: "Broken", url: "https://broken.example/1" }],
         },
-        { fetch: linear.fetchStub }
+        { client: linear.fetchStub }
       ),
       NOTHING_WRITTEN
     );
@@ -216,7 +221,7 @@ describe("routeTicket", () => {
         issue: "ENG-1",
         links: [{ title: "Intercom", url: "https://app.intercom.com/c/1" }],
       },
-      { fetch: linear.fetchStub }
+      { client: linear.fetchStub }
     );
     assert.equal(linear.updates().length, 0);
     assert.equal(result.warnings.length, 1);
@@ -227,7 +232,7 @@ describe("routeTicket", () => {
     const linear = fakeLinear({ readBackFails: true });
     const result = await routeTicket(
       { issue: "ENG-1", priority: 3 },
-      { fetch: linear.fetchStub }
+      { client: linear.fetchStub }
     );
     assert.equal(linear.updates().length, 1);
     assert.equal(result.identifier, "ENG-1");
@@ -240,17 +245,20 @@ describe("routeTicket", () => {
   it("rethrows caller cancellation during the read-back instead of reporting routed", async () => {
     const linear = fakeLinear({ readBackFails: true });
     const controller = new AbortController();
-    const fetchStub: typeof fetch = (url, init) => {
-      const body = JSON.parse(String(init?.body)) as Call;
-      if (body.query.startsWith("mutation RouteIssueUpdate")) {
+    const fetchStub: ProviderClient = (request, init) => {
+      const body = {
+        query: request.operation,
+        variables: "variables" in request.input ? request.input.variables : {},
+      } as Call;
+      if (body.query === "linear.RouteIssueUpdate") {
         controller.abort();
       }
-      return linear.fetchStub(url, init);
+      return linear.fetchStub(request, init);
     };
     await assert.rejects(
       routeTicket(
         { issue: "ENG-1", priority: 3 },
-        { fetch: fetchStub, signal: controller.signal }
+        { client: fetchStub, signal: controller.signal }
       ),
       LINEAR_BUSY
     );
@@ -261,7 +269,7 @@ describe("routeTicket", () => {
     const inherited = fakeLinear();
     await routeTicket(
       { assignee: "Grace", inheritAssigneeFrom: "ENG-9", issue: "ENG-1" },
-      { fetch: inherited.fetchStub }
+      { client: inherited.fetchStub }
     );
     assert.deepEqual(inherited.updates()[0]?.variables.input, {
       assigneeId: "u-ada",
@@ -270,7 +278,7 @@ describe("routeTicket", () => {
     const fallback = fakeLinear();
     await routeTicket(
       { assignee: "Grace", inheritAssigneeFrom: "ENG-1", issue: "ENG-1" },
-      { fetch: fallback.fetchStub }
+      { client: fallback.fetchStub }
     );
     const [update] = fallback.updates();
     assert.deepEqual(update?.variables.input, { assigneeId: "u-grace" });
@@ -281,7 +289,7 @@ describe("routeTicket", () => {
     await assert.rejects(
       routeTicket(
         { duplicateOf: "ENG-999999", issue: "ENG-1", state: "Done" },
-        { fetch: linear.fetchStub }
+        { client: linear.fetchStub }
       ),
       NO_ISSUE
     );
@@ -293,7 +301,7 @@ describe("routeTicket", () => {
     await assert.rejects(
       routeTicket(
         { addLabels: ["Nope"], issue: "ENG-1", state: "Done" },
-        { fetch: linear.fetchStub }
+        { client: linear.fetchStub }
       ),
       UNKNOWN_LABEL
     );

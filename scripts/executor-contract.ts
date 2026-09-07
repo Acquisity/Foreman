@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { toolkitUrl } from "../agent/lib/executor/endpoint.js";
-import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/requests.js";
+import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js";
 
 const manifest = JSON.parse(
   await readFile(

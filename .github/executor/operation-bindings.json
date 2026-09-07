@@ -1,314 +1,110 @@
 {
   "autumn.customer": {
-    "path": "foreman_autumn_api.org.foremanAutumnApi.customersGet.readAutumnCustomer",
-    "arguments": {
-      "body": "body",
-      "x-api-version": "headers.x-api-version"
-    }
+    "path": "foreman_autumn_api.org.foremanAutumnApi.customersGet.readAutumnCustomer"
   },
   "stripe.customers.get": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.customers.readCustomer",
-    "arguments": {
-      "customer_id": "path.id"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.customers.readCustomer"
   },
   "stripe.customers.balance_transactions": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.customers.listCustomerBalanceTransactions",
-    "arguments": {
-      "customer_id": "path.id",
-      "limit": "query.limit"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.customers.listCustomerBalanceTransactions"
   },
   "stripe.charges.get": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.charges.readCharge",
-    "arguments": {
-      "charge_id": "path.id",
-      "expand[]": "query.expand[]"
-    },
-    "coercions": {
-      "expand[]": "single"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.charges.readCharge"
   },
   "stripe.refunds.get": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.refunds.readRefund",
-    "arguments": {
-      "refund_id": "path.id"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.refunds.readRefund"
   },
   "stripe.disputes.get": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.disputes.readDispute",
-    "arguments": {
-      "dispute_id": "path.id"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.disputes.readDispute"
   },
   "stripe.coupons.get": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.coupons.readCoupon",
-    "arguments": {
-      "coupon_id": "path.id"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.coupons.readCoupon"
   },
   "stripe.subscriptions.list": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.subscriptions.listCustomerSubscriptions",
-    "arguments": {
-      "customer": "query.customer",
-      "limit": "query.limit",
-      "status": "query.status"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.subscriptions.listCustomerSubscriptions"
   },
   "stripe.invoices.list": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.invoices.listCustomerInvoices",
-    "arguments": {
-      "customer": "query.customer",
-      "limit": "query.limit"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.invoices.listCustomerInvoices"
   },
   "stripe.charges.list": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.charges.listCustomerCharges",
-    "arguments": {
-      "customer": "query.customer",
-      "limit": "query.limit"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.charges.listCustomerCharges"
   },
   "stripe.credit_notes.list": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.creditNotes.listCustomerCreditNotes",
-    "arguments": {
-      "customer": "query.customer",
-      "limit": "query.limit"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.creditNotes.listCustomerCreditNotes"
   },
   "stripe.promotion_codes.list": {
-    "path": "foreman_stripe_api.org.foremanStripeApi.promotionCodes.findPromotionCode",
-    "arguments": {
-      "code": "query.code",
-      "limit": "query.limit"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_stripe_api.org.foremanStripeApi.promotionCodes.findPromotionCode"
   },
   "instantly.workspace-group-members": {
-    "path": "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers",
-    "arguments": {
-      "limit": "query.limit",
-      "starting_after": "query.starting_after"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers"
   },
   "instantly.accounts": {
-    "path": "foreman_instantly_api.org.foremanInstantlyApi.accounts.listAccounts",
-    "arguments": {
-      "limit": "query.limit",
-      "starting_after": "query.starting_after",
-      "x-as-workspace": "headers.x-as-workspace",
-      "search": "query.search",
-      "status": "query.status",
-      "provider_code": "query.provider_code"
-    },
-    "coercions": {
-      "limit": "number",
-      "status": "number",
-      "provider_code": "number"
-    }
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.accounts.listAccounts"
   },
   "instantly.campaigns": {
-    "path": "foreman_instantly_api.org.foremanInstantlyApi.campaigns.listCampaigns",
-    "arguments": {
-      "limit": "query.limit",
-      "starting_after": "query.starting_after",
-      "x-as-workspace": "headers.x-as-workspace",
-      "search": "query.search",
-      "status": "query.status"
-    },
-    "coercions": {
-      "limit": "number",
-      "status": "number"
-    }
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.campaigns.listCampaigns"
   },
   "instantly.emails": {
-    "path": "foreman_instantly_api.org.foremanInstantlyApi.emails.listEmails",
-    "arguments": {
-      "limit": "query.limit",
-      "starting_after": "query.starting_after",
-      "x-as-workspace": "headers.x-as-workspace",
-      "search": "query.search",
-      "status": "query.status",
-      "preview_only": "query.preview_only",
-      "latest_of_thread": "query.latest_of_thread",
-      "campaign_id": "query.campaign_id",
-      "eaccount": "query.eaccount",
-      "email_type": "query.email_type",
-      "lead": "query.lead",
-      "max_timestamp_created": "query.max_timestamp_created",
-      "min_timestamp_created": "query.min_timestamp_created"
-    },
-    "coercions": {
-      "limit": "number",
-      "status": "number",
-      "preview_only": "boolean",
-      "latest_of_thread": "boolean"
-    }
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.emails.listEmails"
   },
   "inngest.apps": {
-    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listApps",
-    "arguments": {
-      "limit": "query.limit",
-      "cursor": "query.cursor",
-      "from": "query.from",
-      "status": "query.status"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listApps"
   },
   "inngest.runs": {
-    "path": "foreman_inngest_api.org.foremanInngestApi.runs.listRuns",
-    "arguments": {
-      "limit": "query.limit",
-      "cursor": "query.cursor",
-      "from": "query.from",
-      "status": "query.status"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_inngest_api.org.foremanInngestApi.runs.listRuns"
   },
   "inngest.functionRuns": {
-    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listFunctionRuns",
-    "arguments": {
-      "appId": "path.appId",
-      "functionId": "path.functionId",
-      "limit": "query.limit",
-      "cursor": "query.cursor",
-      "from": "query.from",
-      "status": "query.status"
-    },
-    "coercions": {
-      "limit": "number"
-    }
+    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listFunctionRuns"
   },
   "inngest.trace": {
-    "path": "foreman_inngest_api.org.foremanInngestApi.runs.getRunTrace",
-    "arguments": {
-      "runId": "path.runId"
-    }
+    "path": "foreman_inngest_api.org.foremanInngestApi.runs.getRunTrace"
   },
   "help.search": {
-    "path": "foreman_help_api.org.foremanHelpApi.search.searchHelpCenter",
-    "arguments": {
-      "query": "query.query"
-    }
+    "path": "foreman_help_api.org.foremanHelpApi.search.searchHelpCenter"
   },
   "planetscale.readQuery": {
-    "path": "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
-    "arguments": {
-      "query": "args.query",
-      "branch": "args.branch",
-      "database": "args.database",
-      "use_replica": "args.use_replica",
-      "organization": "args.organization",
-      "postgres_database_name": "args.postgres_database_name"
-    }
+    "path": "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
   },
   "linear.RelatedIssues": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.IssueDocuments": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.Document": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.RouteIssue": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.TeamLabels": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.WorkflowStates": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.Projects": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.Users": {
-    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
   },
   "linear.CreateDocument": {
-    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
   },
   "linear.UpdateDocument": {
-    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
   },
   "linear.RouteIssueUpdate": {
-    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
   },
   "linear.RouteRelation": {
-    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
   },
   "linear.RouteAttachment": {
-    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite",
-    "arguments": {
-      "body": "body"
-    }
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
   },
   "sentry.issueRead": {
-    "path": "sentry.user.personalSentry.execute_sentry_tool",
-    "arguments": {
-      "name": "name",
-      "arguments": "args"
-    }
+    "path": "sentry.user.personalSentry.execute_sentry_tool"
   }
 }

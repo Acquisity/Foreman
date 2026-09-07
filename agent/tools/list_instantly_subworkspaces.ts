@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import {
   InstantlyApiError,
   instantlyWorkspaceDiscoverySchema,
@@ -21,7 +21,7 @@ export default defineTool({
         available: true as const,
         data: await listInstantlySubworkspaces(
           {
-            fetch: executorProviderFetch(ctx, "instantly"),
+            client: executorClient(ctx),
             signal: ctx.abortSignal,
           },
           input

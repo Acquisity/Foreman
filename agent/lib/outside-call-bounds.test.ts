@@ -66,12 +66,11 @@ const MUTATIONS: Array<{
     what: "a Blob head losing its bound while the calls around it keep one",
   },
   {
-    file: "agent/lib/linear-api.ts",
+    file: "agent/lib/executor/transport.ts",
     into: "",
-    remove:
-      "    signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,\n",
+    remove: "      signal,\n",
     rule: /fetch call has no signal/u,
-    what: "the Linear GraphQL request losing its signal",
+    what: "the Executor HTTP request losing its signal",
   },
   {
     file: "agent/lib/investigation-memory/store.ts",
@@ -89,10 +88,10 @@ describe("authored outside calls stay bounded", () => {
   });
 
   it("inspected the call sites the inventory records", () => {
-    // Provider descriptors, the Executor transport, Blob, and Neon. A rule that
+    // Executor and vision HTTP, Blob, and Neon. A rule that
     // stopped matching anything would pass the sweep above in silence.
     assert.ok(
-      authoredSurface().inspected >= 11,
+      authoredSurface().inspected >= 7,
       `only ${authoredSurface().inspected} call sites were inspected`
     );
   });

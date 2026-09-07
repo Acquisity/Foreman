@@ -1,77 +1,77 @@
 {
-  "openapi": "3.0.3",
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
   "info": {
     "title": "Foreman Linear read API",
     "version": "1.0.0"
   },
-  "servers": [
-    {
-      "url": "https://api.linear.app"
-    }
-  ],
+  "openapi": "3.0.3",
   "paths": {
     "/graphql": {
       "post": {
         "operationId": "executeForemanRead",
-        "summary": "Only exact authored Foreman read operations. No arbitrary GraphQL.",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["query", "variables"],
                 "additionalProperties": false,
                 "properties": {
                   "query": {
-                    "type": "string",
                     "enum": [
-                      "query RelatedIssues($filter: IssueFilter!, $first: Int!, $after: String, $includeArchived: Boolean!) {\n  issues(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived, orderBy: createdAt) {\n    nodes {\n      id identifier title url createdAt\n      state { name type }\n      assignee { name }\n      parent { identifier }\n      labels { nodes { name } }\n    }\n    pageInfo { hasNextPage endCursor }\n  }\n}",
-                      "query IssueDocuments($id: String!, $title: String!) {\n  issue(id: $id) {\n    id identifier\n    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }\n  }\n}",
                       "query Document($id: String!) {\n  document(id: $id) { id updatedAt url }\n}",
+                      "query IssueDocuments($id: String!, $title: String!) {\n  issue(id: $id) {\n    id identifier\n    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }\n  }\n}",
+                      "query Projects($name: String!, $teamId: ID!) {\n  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {\n    nodes { id name }\n  }\n}",
+                      "query RelatedIssues($filter: IssueFilter!, $first: Int!, $after: String, $includeArchived: Boolean!) {\n  issues(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived, orderBy: createdAt) {\n    nodes {\n      id identifier title url createdAt\n      state { name type }\n      assignee { name }\n      parent { identifier }\n      labels { nodes { name } }\n    }\n    pageInfo { hasNextPage endCursor }\n  }\n}",
                       "query RouteIssue($id: String!) {\n  issue(id: $id) {\n    id identifier url priority\n    team { id }\n    state { name }\n    labels { nodes { id name } }\n    project { id name }\n    assignee { id name }\n    parent { identifier }\n  }\n}",
                       "query TeamLabels($teamId: ID!, $after: String) {\n  issueLabels(first: 250, after: $after, filter: { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }) {\n    nodes { id name }\n    pageInfo { hasNextPage endCursor }\n  }\n}",
-                      "query WorkflowStates($teamId: ID!, $name: String!) {\n  workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {\n    nodes { id name }\n  }\n}",
-                      "query Projects($name: String!, $teamId: ID!) {\n  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {\n    nodes { id name }\n  }\n}",
-                      "query Users($name: String!) {\n  users(first: 5, filter: { or: [{ email: { eq: $name } }, { name: { eqIgnoreCase: $name } }, { displayName: { eqIgnoreCase: $name } }] }) {\n    nodes { id name }\n  }\n}"
-                    ]
+                      "query Users($name: String!) {\n  users(first: 5, filter: { or: [{ email: { eq: $name } }, { name: { eqIgnoreCase: $name } }, { displayName: { eqIgnoreCase: $name } }] }) {\n    nodes { id name }\n  }\n}",
+                      "query WorkflowStates($teamId: ID!, $name: String!) {\n  workflowStates(first: 5, filter: { team: { id: { eq: $teamId } }, name: { eqIgnoreCase: $name } }) {\n    nodes { id name }\n  }\n}"
+                    ],
+                    "type": "string"
                   },
                   "variables": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": true,
+                    "type": "object"
                   }
-                }
+                },
+                "required": ["query", "variables"],
+                "type": "object"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Linear GraphQL response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "additionalProperties": true,
+                  "type": "object"
                 }
               }
-            }
+            },
+            "description": "Linear GraphQL response"
           }
-        }
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearer": {
-        "type": "http",
-        "scheme": "bearer"
+        },
+        "summary": "Only exact authored Foreman read operations. No arbitrary GraphQL."
       }
     }
   },
   "security": [
     {
       "bearer": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.linear.app"
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { executorProviderFetch } from "#lib/executor/client.js";
+import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
   DOCUMENT_MAX_CHARS,
@@ -59,7 +59,7 @@ export default defineTool({
     }
     try {
       const result = await saveInvestigationDocument(input, {
-        fetch: executorProviderFetch(ctx, "linear"),
+        client: executorClient(ctx),
         signal: ctx.abortSignal,
       });
       return { saved: true as const, ...result };
