@@ -48,6 +48,19 @@ describe("Instantly tool authorization", () => {
 });
 
 describe("Instantly tool inputs", () => {
+  it("allows name discovery without IDs and rejects unbounded or empty searches", () => {
+    assert.ok(listWorkspaces.inputSchema instanceof z.ZodType);
+    const schema = listWorkspaces.inputSchema;
+    assert.equal(schema.safeParse({}).success, true);
+    assert.equal(
+      schema.safeParse({ limit: 5, search: "New onboarding" }).success,
+      true
+    );
+    assert.equal(schema.safeParse({ search: "   " }).success, false);
+    assert.equal(schema.safeParse({ limit: 101 }).success, false);
+    assert.equal(schema.safeParse({ startingAfter: "invalid" }).success, false);
+  });
+
   it("requires exactly one workspace selector", () => {
     assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
     const schema = readWorkspace.inputSchema;

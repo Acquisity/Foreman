@@ -635,18 +635,109 @@ async function loadWorkspaceGroup(
   };
 }
 
-/** Lists accepted subworkspaces without relaxing the public result-size bound. */
+export const instantlyWorkspaceDiscoverySchema = z.object({
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Maximum results, default 20. The byte limit may return fewer."),
+  search: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(
+      "Literal case-insensitive workspace name fragment. Omit to browse accepted workspaces."
+    ),
+  startingAfter: z
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "The previous nextStartingAfter cursor. Keep the same search when continuing."
+    ),
+});
+
+type InstantlyWorkspaceDiscovery = z.infer<
+  typeof instantlyWorkspaceDiscoverySchema
+>;
+
+interface InstantlyWorkspacePage extends InstantlyWorkspaceGroup {
+  membershipComplete: true;
+  nextStartingAfter: string | null;
+  totalAcceptedSubworkspaces: number;
+  totalMatches: number;
+}
+
+/** Search/page only after complete membership validation, within the public byte cap. */
 export async function listInstantlySubworkspaces(
-  options: InstantlyApiOptions = {}
-): Promise<InstantlyWorkspaceGroup> {
-  const group = await loadWorkspaceGroup(options);
-  if (Buffer.byteLength(JSON.stringify(group), "utf8") > MAX_RESPONSE_BYTES) {
+  options: InstantlyApiOptions = {},
+  query: InstantlyWorkspaceDiscovery = {}
+): Promise<InstantlyWorkspacePage> {
+  const parsed = instantlyWorkspaceDiscoverySchema.safeParse(query);
+  if (!parsed.success) {
     throw new InstantlyApiError(
-      "The complete Instantly workspace list exceeds the 256 KiB output limit. Use a known workspace ID or exact name with read_instantly_subworkspace; that helper still validates the complete membership set.",
-      { kind: "too-much-data" }
+      "Invalid Instantly workspace search or pagination input.",
+      {
+        kind: "invalid-input",
+      }
     );
   }
-  return group;
+  const group = await loadWorkspaceGroup(options);
+  const ids = new Set(group.subworkspaces.map((workspace) => workspace.id));
+  if (ids.size !== group.subworkspaces.length) {
+    throw new InstantlyApiError(
+      "Instantly returned duplicate accepted workspace IDs.",
+      { kind: "invalid-response" }
+    );
+  }
+  const { search, limit = 20, startingAfter } = parsed.data;
+  const fragment = search === undefined ? undefined : normalizeName(search);
+  const matches = group.subworkspaces
+    .filter(
+      (workspace) =>
+        fragment === undefined ||
+        (workspace.name !== null &&
+          normalizeName(workspace.name).includes(fragment))
+    )
+    .sort((left, right) => left.id.localeCompare(right.id, "en-US"));
+  const cursorIndex =
+    startingAfter === undefined
+      ? -1
+      : matches.findIndex((workspace) => workspace.id === startingAfter);
+  if (startingAfter !== undefined && cursorIndex === -1) {
+    throw new InstantlyApiError(
+      "The Instantly workspace cursor no longer matches this search. Restart discovery with the same name fragment.",
+      { kind: "invalid-input" }
+    );
+  }
+  const start = cursorIndex + 1;
+  const page: InstantlyWorkspacePage = {
+    adminWorkspace: group.adminWorkspace,
+    excludedMemberships: group.excludedMemberships,
+    membershipComplete: true,
+    nextStartingAfter: null,
+    subworkspaces: matches.slice(start, start + limit),
+    totalAcceptedSubworkspaces: group.subworkspaces.length,
+    totalMatches: matches.length,
+  };
+  // Names can be large. Trim the public page without discarding internal membership evidence.
+  for (;;) {
+    page.nextStartingAfter =
+      start + page.subworkspaces.length < matches.length
+        ? (page.subworkspaces.at(-1)?.id ?? null)
+        : null;
+    if (Buffer.byteLength(JSON.stringify(page), "utf8") <= MAX_RESPONSE_BYTES) {
+      return page;
+    }
+    if (page.subworkspaces.length <= 1) {
+      throw tooMuchData();
+    }
+    page.subworkspaces.pop();
+  }
 }
 
 const resolveWorkspace = async (
