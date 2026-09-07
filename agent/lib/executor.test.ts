@@ -10,6 +10,7 @@ import {
   authorizeHelper,
   resolveProviderRequest,
 } from "./executor/requests.js";
+import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
 import { ExecutorError, invokeExecutor } from "./executor/transport.js";
 import {
   AUTONOMOUS_PRINCIPAL,
@@ -34,7 +35,45 @@ const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json", ...headers },
   });
+const INVALID_ARGUMENT = /invalid_binding_argument/u;
 const OPERATION = "stripe.org.foreman.customer";
+test("verified catalog coercions preserve bounded query values and reject ambiguous inputs", () => {
+  const previous = process.env.EXECUTOR_OPERATION_BINDINGS;
+  process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
+    probe: {
+      arguments: {
+        expand: "query.expand",
+        limit: "query.limit",
+        preview_only: "query.preview_only",
+      },
+      coercions: { expand: "single", limit: "number", preview_only: "boolean" },
+      path: OPERATION,
+    },
+  });
+  try {
+    assert.deepEqual(
+      bindOperation("probe", {
+        query: { expand: ["refunds"], limit: "20", preview_only: "true" },
+      }).input,
+      { expand: "refunds", limit: 20, preview_only: true }
+    );
+    for (const query of [
+      { limit: "" },
+      { limit: "Infinity" },
+      { limit: "20garbage" },
+      { preview_only: "yes" },
+      { expand: ["refunds", "customer"] },
+    ]) {
+      assert.throws(() => bindOperation("probe", { query }), INVALID_ARGUMENT);
+    }
+  } finally {
+    if (previous === undefined) {
+      delete process.env.EXECUTOR_OPERATION_BINDINGS;
+    } else {
+      process.env.EXECUTOR_OPERATION_BINDINGS = previous;
+    }
+  }
+});
 const rpc =
   (
     toolResult: unknown,
@@ -444,4 +483,36 @@ test("the deadline cancels a stalled response body without a caller cancellation
   } finally {
     clearTimeout(keepAlive);
   }
+});
+
+test("critic Sentry helper refuses arbitrary nested operations before authentication", async () => {
+  await Promise.all(
+    ["update_issue", "create_project", "analyze_issue_with_seer"].map(
+      (operation) =>
+        assert.rejects(
+          readSentryIssue(
+            { issueId: "TEST-1", operation, organizationSlug: "acquisity-ai" },
+            {} as never
+          )
+        )
+    )
+  );
+  assert.equal(
+    sentryIssueInput.safeParse({
+      arguments: { name: "update_issue" },
+      issueId: "TEST-1",
+      operation: "get_issue_details",
+      organizationSlug: "acquisity-ai",
+    }).success,
+    false
+  );
+  assert.equal(
+    sentryIssueInput.safeParse({
+      issueId: "TEST-1",
+      limit: 101,
+      operation: "search_issue_events",
+      organizationSlug: "acquisity-ai",
+    }).success,
+    false
+  );
 });

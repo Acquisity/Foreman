@@ -166,6 +166,7 @@ export const REQUIRED_HELPER_OPERATIONS = [
   ...ROUTES.map((route) => route.operation),
   ...[...LINEAR_READS, ...LINEAR_WRITES].map((name) => `linear.${name}`),
   "planetscale.readQuery",
+  "sentry.issueRead",
 ];
 
 function identifyOperation(

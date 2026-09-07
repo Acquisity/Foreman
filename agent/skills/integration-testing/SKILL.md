@@ -1,0 +1,34 @@
+---
+description: "Test a named integration, critic, vision, or the full Foreman preview setup when asked to test Linear, Instantly, Sentry, another service, or all integrations."
+---
+
+# Integration testing
+
+Treat a request such as "test Linear" as a request for a small real read through the active connection. Use the current Executor access instructions to select the connection. Discover the installed path, inspect its schema, and invoke the operation. Never invent a provider path or select a different access profile. Provider authorization errors are operator configuration failures, not a reason to ask the requester to sign in.
+
+A passing connection search proves discovery only. Report PASS only after a real read succeeds. An empty successful response is PASS with no matching results; an error or unavailable connection is BLOCKED or FAIL, never empty data. If an MCP result has isError set, the read failed even when Executor's outer call completed. Never report an integration as fully tested after one read; identify which parts remain untested.
+
+Default to read-only tests. Use a supplied test identifier when one is needed. Otherwise perform a bounded list, search, or health call. Return service, exact operation or authored helper, PASS/FAIL/BLOCKED, and one short reason. Do not return raw customer rows, messages, provider error bodies, arguments, credentials, or authentication headers. Do not write memory, route tickets, create documents, send email, deploy, or run paid test inference as a side effect of a generic test request. Write tests need an explicit test-record instruction and a designated test target, then read the result back.
+
+## Provider checks
+
+- Linear: one small issue/team read. For full helper coverage, separately test find_related_issues and the investigation-document/routing helpers on designated test tickets.
+- Instantly: use the authored workspace and resource helpers. Resolve accepted workspace membership completely before a bounded account, campaign, or email read. Preserve workspace ID/name provenance and filtered output. A workspace listing alone does not pass the resource helpers.
+- PlanetScale: use planetscale_execute_read_query with SELECT 1 AS foreman_preview_probe. Test customer and billing lookups only with a supplied test identifier.
+- Autumn and Stripe: make one catalog/account read and separately exercise the authored billing helper with a designated billing-account or Stripe identifier. A wrong identifier is distinct from unavailable credentials.
+- Inngest: a small health/list read, then find_function_runs for a supplied function/window when full helper coverage is requested. Preserve partial results when a trace is unavailable.
+- Help center: find_help_article with a short ordinary query; verify article filtering and an explicit advisory error on failure.
+- Sentry, Axiom, Exa, Intercom, Jam, Lucent, Modem, Neon, PostHog, Resend, OpenRouter, Vercel: discover and use one small read within the existing grant. OpenRouter inference and Vercel writes are separate attended tests.
+- Personal Supermemory: test only on the requester's explicit personal-memory test request. It remains separate from shared company integrations.
+
+## Critic
+
+Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify its read-only catalog. Backend denials for guessed writes, raw helper APIs, administration, factory/schedule restrictions, and reused sessions are operator acceptance checks; discovery alone cannot establish them.
+
+## Vision
+
+Use an actual image attachment. Find the staged attachment path supplied by the channel and delegate that path and a precise visual question to vision. Report its answer, visible_text, and uncertainties. Do not fill in missing details from the message or alt text. Vision must open the image with read_image; it does not need company-service connections. A missing or unreadable image must produce an explicit limitation, never a claimed successful pixel read. Linear-hosted attachments also need a separate test because their download authorization differs from Slack's staging.
+
+## Full preview test
+
+Test providers, authored helpers, critic, and vision separately. Record failures and untested cases explicitly. Do not equate this conversational smoke test with production readiness. The release checklist also requires a real second requester, allowed attended writes on test records, backend negative policy checks, factory/schedule lanes, cancellation/timeouts, and deployment-specific configuration verification.

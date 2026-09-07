@@ -16,6 +16,7 @@
     "dev": "eve dev",
     "eval": "eve eval",
     "executor:contract": "tsx scripts/executor-contract.ts",
+    "executor:readiness": "tsx scripts/executor-readiness.ts",
     "fix": "ultracite fix",
     "report:capabilities": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/capability-budget.ts",
     "start": "eve start",

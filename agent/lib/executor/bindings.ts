@@ -3,6 +3,9 @@ import { ExecutorError } from "./transport.js";
 
 const bindingSchema = z.object({
   arguments: z.record(z.string(), z.string().max(200)),
+  coercions: z
+    .record(z.string(), z.enum(["number", "boolean", "single"]))
+    .optional(),
   path: z
     .string()
     .max(500)
@@ -40,10 +43,11 @@ export function bindOperation(
   }
   const input: Record<string, unknown> = {};
   for (const [target, from] of Object.entries(binding.arguments)) {
-    const value = readSource(source, from);
+    let value = readSource(source, from);
     if (value === undefined) {
       continue;
     }
+    value = coerceArgument(value, binding.coercions?.[target]);
     const keys = parts(target);
     let cursor = input;
     for (const key of keys.slice(0, -1)) {
@@ -69,6 +73,37 @@ function readSource(source: Record<string, unknown>, from: string): unknown {
       value !== null && typeof value === "object" && Object.hasOwn(value, key)
         ? (value as Record<string, unknown>)[key]
         : undefined;
+  }
+  return value;
+}
+
+const DECIMAL = /^-?\d+(?:\.\d+)?$/u;
+function coerceArgument(
+  value: unknown,
+  coercion: "number" | "boolean" | "single" | undefined
+): unknown {
+  if (coercion === "single") {
+    if (!Array.isArray(value) || value.length !== 1) {
+      throw new ExecutorError("invalid_binding_argument");
+    }
+    const [single] = value;
+    return single;
+  }
+  if (coercion === "number") {
+    if (
+      typeof value !== "string" ||
+      !DECIMAL.test(value) ||
+      !Number.isFinite(Number(value))
+    ) {
+      throw new ExecutorError("invalid_binding_argument");
+    }
+    return Number(value);
+  }
+  if (coercion === "boolean") {
+    if (value !== "true" && value !== "false") {
+      throw new ExecutorError("invalid_binding_argument");
+    }
+    return value === "true";
   }
   return value;
 }

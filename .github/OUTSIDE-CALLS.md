@@ -83,3 +83,9 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 ### Agent browser install
 
 `installAgentBrowser` in `agent/sandbox.ts` bootstrap is third-party (`@agent-browser/eve`) and runs during eve's own sandbox bootstrap, not inside a turn. It exposes no deadline parameter, and a bootstrap that never finishes fails template creation rather than holding a Slack thread open.
+
+### Executor preview configuration audit
+
+`scripts/executor-readiness.ts --live` makes operator-only GET requests to the fixed Acquisity Executor API for toolkit, policy, and connection-pattern metadata. Every request has a 20-second deadline and rejects redirects. It reads the explicitly selected official Executor CLI OAuth profile locally; it never requests provider credentials or prints tokens, arguments, or results. It is not part of the deployed agent.
+
+The critic `read_sentry_issue` helper uses the existing Executor transport deadline (50 seconds, bounded response, parent cancellation). Its strict runtime input allows only issue details and issue event search. The Sentry provider grant remains inspect-only; the general dispatcher is absent from the critic model toolkit.
