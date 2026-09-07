@@ -34,7 +34,7 @@ These are scoped results, not full provider certification. The transport probes 
 - Resend was reauthorized with its original `full_access` grant on the existing AI Acquisition team. `list_domains` passed. OpenRouter's stale unused dynamic client registration was replaced; its account credit read passed and only the original ten reads plus attended `send_message` are mounted.
 - Stripe no longer publishes `get_stripe_account_info`. Account identity discovery succeeds with `list_available_accounts_or_orgs`, but full compatibility for the retired operation remains an explicit coverage gap. Sentry issue details and event search are available through the strict critic `read_sentry_issue` helper; `find_issues` is covered by the installed `search_issues` read. Both nested reads were exercised, and the provider rejected a guessed `update_issue` as unavailable in the session.
 
-Local validation: `pnpm validate` passed 680 tests in 94 suites with zero errors or warnings. The fresh capability report keeps ordinary Slack at 72.9% and 73.2% of the repository and factory catalogs. All 15 installed toolkits pass the exact-catalog/default-deny configuration audit; Vercel and the retired Stripe operation keep the overall readiness gate red.
+Local validation: `pnpm validate` passed 681 tests in 95 suites with zero errors or warnings. The fresh capability report keeps ordinary Slack at 72.9% and 73.2% of the repository and factory catalogs. All 15 installed toolkits pass the exact-catalog/default-deny configuration audit; Vercel and the retired Stripe operation keep the overall readiness gate red.
 
 ## Repeatable manual tests
 
@@ -56,7 +56,6 @@ Mention the preview bot in a fresh thread with `test Linear`, `test Instantly`, 
 4. After user approval and merge, attach the intended app connector and the same verified configuration to Production, deploy, and repeat small smoke reads. Preview environment values do not automatically become production values on merge.
 5. Retain the previous deployment/configuration for rollback. Retire old outbound references only after observation; retain inbound Slack/Linear, GitHub, personal Supermemory, Blob, investigation memory, models, and sandbox infrastructure.
 
-
 ## Follow-up on the deployed helpers
 
 Deployment `dpl_Vk7ghqnsLMMBuqgCifQf6nVMFnc4`, commit `6a5b6dd1d8fb836ed442b44fb4c4b61b61301b43`:
@@ -67,3 +66,21 @@ Deployment `dpl_Vk7ghqnsLMMBuqgCifQf6nVMFnc4`, commit `6a5b6dd1d8fb836ed442b44fb
 - [PostHog, Resend and OpenRouter](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790771432579): real reads passed; Resend passed on the fresh retry after its initial stale authorization result.
 - [Instantly failure](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788790758442489): the complete 3,372-workspace result is 269,862 characters and exceeds the 256 KiB output cap. Operator verification completed all 35 pages with unique memberships. The bot's claim that this was the 100-page cap was incorrect. Internal membership validation now stays separate from the public list output budget, so a selected workspace resource read can finish without emitting the oversized list. Both the 100-page membership limit and 256 KiB output limits remain unchanged.
 - Local `pnpm dev` live conversation checks remain unavailable: the checkout has no development environment and Vercel's environment runner does not supply the Connect-injected Linear/Supermemory IDs or model credentials. Compilation/unit validation and deployed Slack execution are recorded separately; no production credentials were copied into local files.
+
+
+## Latest preview acceptance
+
+Deployment `dpl_73cHX27u4Xtw9YhQxDK34mAiZDVK`, commit `2e4fbb2` is ready; GitHub validation passed.
+
+- [Instantly selected-resource retry](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791706473749): accounts, campaigns and emails each returned valid empty results for the designated test workspace with complete membership validation and correct workspace provenance. The oversized global list remains bounded and unavailable; resource reads do not return that list.
+- [Linear attended writes and critic challenge](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791209097539): SAN-63 retained one investigation document across create and update; priority 4 read back correctly. Critic returned all twelve results and CHALLENGE because the fixture cited Foreman code. Its existing checkout tool only permits `Acquisity/Acquisity`, so this demonstrates the mismatched-source failure, not successful commit pinning. Positive complete-packet fixtures must use that supported repository; this migration does not widen its repository restriction.
+- [Missing vision image](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791343393679): vision explicitly reported the missing file and returned no invented content.
+- [Private Linear-hosted vision image](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791801795729): the URL download through the retained Linear app authentication succeeded; vision independently reported the synthetic code, shapes, count, queue value and environment label correctly. The attachment lives only on the SAN-63 synthetic fixture.
+
+- [Corrected critic source pin](https://acquisityworkspace.slack.com/archives/C0BUF4GU8C8/p1788791868643359): SAN-64 used the supported product repository. Critic independently checked out `d7c4e45d0ce276b995d0591665c52c17791da0e6` and verified the dependency fact. All twelve criteria were returned. The parent supplied the document creation timestamp instead of its current update timestamp; critic correctly returned CHALLENGE for stale evidence. Exact source pinning and stale-document rejection passed; a successful current-document review remains unproven.
+
+## Why fifteen toolkits
+
+Toolkits are permission lists over existing connections. They do not duplicate provider credentials. Three groups (root, critic, helper transport) each have five trusted-session profiles (attended, limited, factory, scheduled, scheduled-internal). Foreman selects the profile from dispatch-owned state; the model cannot select it through tool arguments. Separate static connection URLs fit eve 0.44 and let Executor enforce exact operation policies. Root and critic cannot discover raw helper operations.
+
+Fifteen is a consistent mapping, not a minimum platform requirement. The two scheduled helper profiles currently have identical operation lists and could share a toolkit in a later simplification; the other installed lists differ. The security requirement is preserving the effective permissions and hidden helper boundary, not maintaining a particular toolkit count.
