@@ -26,7 +26,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |
 | Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
 | Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
-| Vercel deployments, logs, errors, analytics | Executor: vercel | app, shared | shared catalog; use reads only; downstream setup remains an availability gap |
+| Vercel projects, deployments and logs | Executor: foreman_vercel_api | app, shared | Foreman-scoped credential; shared catalog; use reads only |
 | PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
 | Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
@@ -45,7 +45,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 - PostHog: discover individual operations such as `persons_list`, `query_trends`, and `execute_sql`, then inspect the selected schema. Resolve a person before reading recordings.
 - Resend: discover snake_case operations such as `list_emails`, `get_email`, and `list_logs`.
 - Jam: only useful when the ticket carries a Jam link; `getConsoleLogs` and `getNetworkRequests` beat the video.
-- Vercel: query around the time the claim names; check `list_deployments` for a deployment just before the reported window.
+- Vercel: query around the time the claim names; discover `getDeployments` for a deployment just before the reported window.
 - Neon: only when the code path actually uses a Neon database. Never customer data, never memory.
 
 ## Billing and Instantly (root tools)

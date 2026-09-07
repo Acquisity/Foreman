@@ -3,10 +3,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js";
+import { toolkitPolicyMatches } from "../agent/lib/executor/toolkit-policy.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
 const manifestSchema = z.object({
   toolkit: z.object({
+    connectionPolicies: z
+      .array(z.object({ blocked: z.array(z.string()), pattern: z.string() }))
+      .default([]),
     missing: z.record(z.string(), z.array(z.string())),
     paths: z.array(z.string()),
     slug: z.string(),
@@ -128,26 +132,9 @@ if (process.argv.includes("--live")) {
     ]);
     const { policies } = policiesSchema.parse(policyData);
     const { connections } = connectionsSchema.parse(connectionData);
-    const approved = policies.filter((rule) => rule.action === "approve");
-    const denied = policies.filter(
-      (rule) => rule.action === "block" && rule.pattern === "*"
-    );
-    const prefixes = new Set(
-      expected.paths.map((path) => `${path.split(".").slice(0, 3).join(".")}.*`)
-    );
-    const valid =
-      approved.length === expected.paths.length &&
-      approved.every((rule) => expected.paths.includes(rule.pattern)) &&
-      new Set(approved.map((rule) => rule.pattern)).size === approved.length &&
-      denied.length === 1 &&
-      policies.length === approved.length + 1 &&
-      approved.every((rule) => rule.position < denied[0].position) &&
-      connections.length === prefixes.size &&
-      new Set(connections.map((connection) => connection.pattern)).size ===
-        prefixes.size &&
-      connections.every((connection) => prefixes.has(connection.pattern));
+    const valid = toolkitPolicyMatches(expected, policies, connections);
     console.log(
-      `${valid ? "PASS" : "FAIL"} ${expected.slug}: exact catalog and default-deny policy`
+      `${valid ? "PASS" : "FAIL"} ${expected.slug}: selected catalog, declared connection policies and default deny`
     );
     if (!valid) {
       failures += 1;

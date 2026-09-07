@@ -18,7 +18,7 @@ console.log(
         "Root, critic, factory, schedules, and authored helpers share one toolkit and the same provider accounts.",
         "Skills define workflow responsibilities; critic instructions require read-only review.",
         "Prefer authored helpers for validation, bounded results, and provenance. Their underlying operations share this toolkit and are not hidden from discovery.",
-        "The selected operation list preserves existing provider access, including Linear writes and OpenRouter requests; Vercel operations remain pending connection setup.",
+        "The selected operation list preserves existing provider access, including Linear writes and OpenRouter requests; Vercel REST uses the Foreman-scoped connection with declared destructive-operation blocks.",
         "Personal Supermemory remains separate. Executor management, artifacts, and approval resume are not offered.",
       ],
     },
