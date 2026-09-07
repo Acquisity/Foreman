@@ -1,21 +1,13 @@
 --- a/packages/core/sdk/src/tool-result.ts
 +++ b/packages/core/sdk/src/tool-result.ts
-@@ -13,6 +13,8 @@
-   status: Schema.optional(Schema.Number),
-   details: Schema.optional(Schema.Unknown),
+@@ -15,2 +15,4 @@
    retryable: Schema.optional(Schema.Boolean),
 +  /** Raw Retry-After header: delta seconds or an HTTP date. */
 +  retryAfter: Schema.optional(Schema.String),
  });
- 
- export type ToolError = typeof ToolErrorSchema.Type;
 --- a/packages/plugins/openapi/src/sdk/backing.ts
 +++ b/packages/plugins/openapi/src/sdk/backing.ts
-@@ -787,6 +787,7 @@
-       return ToolResult.fail({
-         code: "upstream_http_error",
+@@ -789,2 +789,3 @@
          status: result.status,
 +        ...(result.headers["retry-after"] ? { retryAfter: result.headers["retry-after"] } : {}),
          message: extractOpenApiUpstreamMessage(result.error, result.status),
-         details: result.error,
-       });
