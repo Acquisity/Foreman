@@ -26,13 +26,13 @@ The Intercom connection is read-only for this workflow. Article mutations, feedb
 
 ## PlanetScale (Executor: planetscale)
 
-`planetscale_execute_read_query`, an authored tool in `agent/tools/`, not the MCP tool of the same name. The MCP original is excluded from the allowlist because it returns rows unbounded; the authored wrapper truncates.
+Prefer the bare authored `planetscale_execute_read_query` helper for production queries. Executor also exposes the provider operation of the same name, but it does not apply the authored helper's result bounds.
 
 Check the result flags before trusting rows: `truncated` means rows are missing, `oversizedRow` means a single row exceeded the cap so select fewer columns, `envelopeTooLarge` means oversized server metadata, and `raw` means the result could not be parsed. A refund amount computed from a truncated result is wrong.
 
 Scope every query to the organization pinned by the identity gate. Nothing binds it for you.
 
-Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. That is the whole surface; there is no write tool to reach even by accident.
+Also allowlisted, from the connection: `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation`. Additional reads, including full schema and documentation, are discoverable through Executor; this list is not exhaustive. SQL writes and payment-method changes are excluded.
 
 Connection coordinates, confirmed live: organization `acquisity`, database `acquisity`, branch `main`, and `postgres_database_name` is `postgres`.
 

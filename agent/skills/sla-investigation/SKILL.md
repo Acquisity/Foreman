@@ -115,7 +115,7 @@ What it's for: blast radius when the bug is wrong or missing data. Counting affe
 
 How to use it: pass `query` with read-only SQL. Never a write; the connection exposes no write tool and the connected role holds no write grants, so there is no write path to reach for. `postgres_database_name` is `postgres` when a call needs it. Prefer `information_schema.columns` for bounded table and column definitions. The full-schema `planetscale_get_branch_schema` operation is also available through Executor; filter its result inside Executor before returning it to avoid oversized output. Prefer a bounded `COUNT` or a small `SELECT` over a full scan. Results are capped at 256 KB; when `truncated` is true the rows are partial, so narrow the query and re-run rather than concluding from what came back. When `oversizedRow` is true select fewer columns; when `envelopeTooLarge` is true the server returned oversized metadata, so retry with a plain query; when `raw` is present the result could not be parsed, so inspect it.
 
-The planetscale `*` connection tools are a different surface and only list organizations, databases, branches, and insights. They cannot run a query, so reaching for one when this tool fails will not get you a number.
+Executor also exposes PlanetScale metadata, schema, documentation, and the underlying read-query operation. Prefer the bare authored query helper for its result bounds. Metadata and documentation reads cannot establish an affected-row count.
 
 ### PostHog (individual reads through Executor)
 
