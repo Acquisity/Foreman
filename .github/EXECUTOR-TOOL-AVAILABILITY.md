@@ -1,0 +1,47 @@
+# Executor tool availability audit
+
+Audited the live installed catalog on 2026-09-07 against the shared `foreman` toolkit and the pre-migration connection definitions at `119bb01`. The earlier lists were snapshots of selected tools, not a complete inventory of provider reads. This audit adds 90 operations across 11 connections, bringing the shared toolkit to 720 selected operations after the Autumn expansion. No provider credential, grant, or endpoint was changed.
+
+## Restored operations
+
+| Connection | Added | Operations |
+| --- | ---: | --- |
+| axiom | 4 | `getmonitor`, `services_getchanges`, `services_getedgehistory`, `services_getmap` |
+| inngest | 16 | `fetch_account`, `get_experiment`, `get_sandbox`, `get_sandbox_process`, `get_sandbox_process_output`, `list_experiments`, `list_sandbox_processes`, `list_sandboxes`, `list_session_keys`, `list_session_runs`, `list_sessions`, `query_insights_prompt`, `read_sandbox_file`, `stream_sandbox_logs`, `stream_sandbox_process_output`, `wait_sandbox_process` |
+| intercom | 3 | `get_article`, `list_articles`, `search_articles` |
+| jam | 1 | `getvideochapters` |
+| modem | 1 | `modem_agent_get_run` |
+| neon | 31 | `fetch`, `get_ai_gateway`, `get_auth`, `get_branch`, `get_data_api`, `get_default_branch`, `get_doc_resource`, `get_function`, `get_neon_auth_config`, `get_operation`, `get_postgres_database`, `get_postgres_endpoint`, `get_postgres_role`, `get_snapshot_schedule`, `get_storage`, `list_auth_trusted_domains`, `list_branches`, `list_docs_resources`, `list_functions`, `list_functions_custom_domains`, `list_operations`, `list_postgres_databases`, `list_postgres_endpoints`, `list_postgres_roles`, `list_project_members`, `list_project_permissions`, `list_regions`, `list_snapshots`, `list_storage_buckets`, `list_storage_objects`, `search` |
+| openrouter | 10 | `generate_image`, `generate_speech`, `get_endpoint_uptime_history`, `get_preset`, `install_ori_harness`, `list_presets`, `list_task_classifications`, `ping`, `spawn_ori_eval`, `transcribe_audio` |
+| planetscale | 13 | `planetscale_get_branch_schema`, `planetscale_get_invoice_line_items`, `planetscale_get_organization_billing_payment_method`, `planetscale_get_payment_method_setup`, `planetscale_get_postgres_logs`, `planetscale_get_query_tag`, `planetscale_list_cluster_sizes`, `planetscale_list_invoices`, `planetscale_list_query_error_executions`, `planetscale_list_query_error_patterns`, `planetscale_list_query_tag_summaries`, `planetscale_list_query_tags`, `planetscale_list_regions_for_organization` |
+| posthog | 4 | `characterize_metric_anomaly`, `conversations_views_retrieve`, `metric_names_list`, `query_metrics` |
+| resend | 6 | `get_email_metrics`, `get_webhook_event`, `list_broadcast_clicked_links`, `list_broadcast_recipients`, `list_webhook_event_attempts`, `list_webhook_events` |
+| stripe | 1 | `stripe_analytics` |
+
+OpenRouter image generation, speech generation, and transcription follow the accepted model-inference capability; they can consume credits. Its Ori tools return instructions and do not install software or run evaluations merely by being invoked. Inngest session keys name application grouping fields, not authentication secrets, as described in [Inngest Sessions](https://www.inngest.com/docs/features/events-triggers/sessions). Account event/signing keys are different and remain excluded.
+
+Intercom article reads are available alongside the existing help-center helper. PlanetScale full-schema reads are available; callers should filter and summarize inside Executor before returning results, because full schemas can exceed the output limit. The existing bounded query and schema helpers remain preferred for ordinary triage.
+
+## Remaining exclusions from connected providers
+
+These 135 operations remain excluded under the previously retained read-only provider surfaces and credential handling. They are documented here for review; this table does not assert that the user personally selected every individual exclusion. Linear remains fully available, and existing selected writes on other connections are unchanged.
+
+| Connection | Reason | Excluded operations |
+| --- | --- | --- |
+| autumn | Billing and catalog mutations; customer creation; organization-rule changes. Autumn remains read-only as requested. | `attach`, `createbalance`, `createentity`, `createplan`, `createreward`, `createschedule`, `getorcreatecustomer`, `updateagentrules`, `updatecatalog`, `updatecustomer`, `updateplan`, `updatesubscription` |
+| axiom | Dashboard, monitor, and notifier mutations; feedback submission. | `createdashboard`, `createmonitor`, `createnotifier`, `deletedashboard`, `deletemonitor`, `deletenotifier`, `sendfeedback`, `updatedashboard`, `updatedashboardchart`, `updatemonitor`, `updatenotifier` |
+| inngest | Function execution, events, reruns, cancellation, environment/webhook/score changes, sandbox commands or writes, and account event/signing credentials. | `cancel_run`, `create_env`, `create_sandbox`, `create_score`, `create_webhook`, `destroy_sandbox`, `exec_sandbox`, `fetch_account_event_keys`, `fetch_account_signing_keys`, `invoke_function`, `patch_env`, `rerun`, `send_event`, `signal_sandbox_process`, `start_sandbox_process`, `sync_app`, `write_sandbox_file` |
+| intercom | Internal-note writes, article creation/update, and feedback submission. | `add_internal_note`, `create_article`, `submit_mcp_feedback`, `update_article` |
+| jam | Comments, reactions, recording/folder/link changes and deletion. | `addreaction`, `createcomment`, `createfolder`, `createrecordinglink`, `deletecomment`, `deletefolder`, `deletejam`, `deleterecordinglink`, `editcomment`, `removereaction`, `updatefolder`, `updatejam`, `updaterecordinglink` |
+| lucent | Issue status changes; the retained provider grant is read-only. | `update_issue` |
+| modem | CRM changes and agent invocation, messaging, or cancellation; the retained grant is for data reads. | `add_people_to_company`, `bulk_update_topics`, `create_companies`, `merge_companies`, `merge_people`, `merge_topics`, `modem_agent_cancel_run`, `modem_agent_invoke`, `modem_agent_send_message`, `update_companies`, `update_people`, `update_topic` |
+| openrouter | Feedback submission. Inference, generation, transcription, and instruction-only tools are enabled. | `send_feedback` |
+| planetscale | SQL writes and billing payment-method changes. | `planetscale_execute_write_query`, `planetscale_update_payment_method` |
+| resend | Email sending, contact/campaign/template changes, automation, credential/connector changes, suppression changes, webhook replay, and editor/share actions. The agreed Resend surface remains read-only. | `add_contact_to_segment`, `add_suppression`, `batch_add_suppressions`, `batch_remove_suppressions`, `cancel_broadcast`, `cancel_email`, `compose_broadcast`, `compose_template`, `connect_to_editor`, `create_api_key`, `create_automation`, `create_broadcast`, `create_contact`, `create_contact_import`, `create_contact_property`, `create_domain`, `create_domain_claim`, `create_segment`, `create_template`, `create_topic`, `create_webhook`, `disconnect_from_editor`, `duplicate_automation`, `duplicate_template`, `manage_events`, `publish_template`, `remove_api_key`, `remove_automation`, `remove_broadcast`, `remove_contact`, `remove_contact_from_segment`, `remove_contact_property`, `remove_domain`, `remove_segment`, `remove_suppression`, `remove_template`, `remove_topic`, `remove_webhook`, `replay_webhook_event`, `revoke_oauth_grant`, `send_batch_emails`, `send_broadcast`, `send_email`, `send_event`, `share_email`, `update_api_key`, `update_automation`, `update_broadcast`, `update_contact`, `update_contact_property`, `update_contact_topics`, `update_domain`, `update_email`, `update_segment`, `update_template`, `update_topic`, `update_webhook`, `verify_domain`, `verify_domain_claim` |
+| stripe | Stripe API writes, account/permission management, and feedback submission. | `manage_stripe_accounts`, `send_stripe_mcp_feedback`, `stripe_api_write` |
+
+Exa, Sentry, and the authored helper API connections have no excluded operations. Neon and PostHog now include their full currently installed catalogs; their existing provider-side scope/configuration still applies. Vercel is not installed as a downstream provider, which is an availability gap rather than a disabled-tool policy. Personal Supermemory remains separate as requested. Executor administration and an unused duplicate Linear connection remain outside the company toolkit.
+
+## Verification
+
+The live policy comparison must match the manifest exactly. Representative provider calls verify actual dispatch separately from catalog inclusion; a provider authorization failure or unavailable schema is not evidence of a toolkit denial. Enabling a tool does not expand its provider grant. `pnpm validate` passed all 672 tests, and the live policy and connection comparison passed. Representative calls passed for Neon region listing, PostHog metric-name listing, OpenRouter health, Inngest session-key listing, and Intercom article listing. Resend email metrics reached the connection but failed with `oauth_reauth_required`: no refresh token is stored, so its account connection needs reauthorization. Other restored operations were catalog-reviewed rather than individually exercised. The pre-existing Stripe account-info and downstream Vercel coverage gaps remain.
