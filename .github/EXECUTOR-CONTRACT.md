@@ -6,14 +6,14 @@ Foreman now routes company MCPs and the fourteen authored provider tools through
 
 Use the existing connected company accounts for authorized Acquisity investigations, irrespective of the ticket requester. The Foreman-to-Executor credential is app-scoped in Vercel Connect. Executor 1.6.8 personal API keys still act as their owning Executor account; choosing app scope in Vercel does not change that ownership. Keep personal Supermemory out of this shared account surface.
 
-`pnpm executor:contract` emits the required toolkit URLs, retained upstream tool lists, and all helper operation identifiers without reading credentials or contacting Executor. Resolve those upstream names to the actual catalog addresses; do not generate lowercased or guessed paths. The captured provider lists preserve the source catalogs from Foreman 119bb01, including the narrower critic lists and existing attended Vercel/OpenRouter actions. Wildcards retain the original provider-side read grant, not permission to broaden consent.
+`pnpm executor:contract` emits the required toolkit URLs, retained upstream tool lists, and all helper operation identifiers without reading credentials or contacting Executor. Resolve those upstream names to the actual catalog addresses; do not generate lowercased or guessed paths. The captured provider lists preserve the source catalogs from Foreman 119bb01, including the narrower critic lists for other providers and existing attended Vercel/OpenRouter actions. Linear uses the same catalog for root and critic in every profile; the critic remains read-only by instruction, without a separate Linear permission boundary. Wildcards retain the original provider-side read grant, not permission to broaden consent.
 
 Eve 0.44 requires static connection URLs. Both root and critic therefore mount five connection slots: `executor`, `executor-limited`, `executor-factory`, `executor-scheduled`, and `executor-scheduled-internal`. Runtime auth and approval gates admit exactly the profile selected from channel-owned stamps. The prompt names that active connection each turn. The critic uses separate `foreman-critic-*` endpoints. No slot admits MCP `resume` or artifact/management tools.
 
 - `attended`: trusted or investigation-authorized interactive work. Preserve existing allowed writes.
 - `limited`: sessions without operational authority. Do not grant them shared personal-service access. Retain Exa and the existing Inngest, Linear, Lucent, and PlanetScale app surfaces; Intercom remains unavailable.
-- `factory`: explicitly authorized autonomous factory work. No Linear calls or attended-only provider writes; preserve Intercom factory reads.
-- `scheduled`: unattended, without internal trust. Linear allows only `list_issues` and `get_issue`; Intercom is unavailable; no provider writes.
+- `factory`: explicitly authorized autonomous factory work. Linear reads and writes are available; exclude other attended-only provider writes and preserve Intercom factory reads.
+- `scheduled`: unattended, without internal trust. Linear reads and writes are available; Intercom is unavailable and other provider writes remain restricted.
 - `scheduled-internal`: the same scheduled restrictions, with the existing trusted Intercom read allowance.
 
 Configure these rules in each toolkit's actual invocation policy, including nested calls through `execute`; discovery filtering alone is insufficient. Do not assume workspace policies are automatically added to toolkit policies. Test guessed denied operations as well as visible tools. Exclude raw PlanetScale query/full-schema tools and all helper-only APIs from model toolkits. Bind root/critic/profile identity to MCP sessions and reject cross-profile reuse. The internal helper client starts a fresh session per invocation and never resumes an approval.
@@ -30,7 +30,7 @@ The fixed source descriptors include:
 - Stripe: `path.id` for object reads; `query` for bounded lists and expansions.
 - Instantly: `query`, plus `headers.x-as-workspace` only after the helper verifies complete group membership.
 - Inngest: `path.appId`, `path.functionId`, `path.runId`, and `query` for app/run/trace operations.
-- Linear: `body.query` and `body.variables` for thirteen fixed named GraphQL operations. A generic GraphQL integration, if used internally, must not be exposed through a model toolkit. Document creation/update and routing retain their existing authored guards.
+- Linear: `body.query` and `body.variables` for thirteen fixed named GraphQL operations. A generic GraphQL integration, if used internally, must not be exposed through a model toolkit. Document creation/update and routing allow every execution profile while retaining content validation, freshness checks, and routing rules.
 - Help-center search: `query.query` for Acquisity's `/api/search`.
 - PlanetScale: the complete authored query arguments in `args`, mapped to the verified MCP operation's individual fields.
 

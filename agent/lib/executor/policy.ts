@@ -38,16 +38,6 @@ export function providerAllowlist(
   ) {
     return [];
   }
-  if (provider === "linear") {
-    if (profile === "factory") {
-      return [];
-    }
-    if (profile.startsWith("scheduled")) {
-      return ["list_issues", "get_issue"].filter(
-        (tool) => allowed.includes("*") || allowed.includes(tool)
-      );
-    }
-  }
   if (profile === "factory" || profile.startsWith("scheduled")) {
     return allowed.filter((tool) => !WRITES[provider]?.includes(tool));
   }

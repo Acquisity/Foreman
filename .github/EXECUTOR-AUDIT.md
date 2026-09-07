@@ -9,3 +9,5 @@ The migration also updates root and critic discovery instructions, triage/billin
 The previous account-by-requester and only-Linear-writes assumptions were superseded by the user's explicit decisions: shared company-service access for authorized investigations, existing attended provider writes preserved, and Supermemory kept personal. No new requester login flow is required for company evidence.
 
 Deployment configuration is deliberately separate. The existing personal proof toolkit covers four services and is not a complete production endpoint. See [EXECUTOR-CONTRACT.md](./EXECUTOR-CONTRACT.md) for profile policies, exact operation bindings, connector provisioning, and release verification. Local tests do not establish live Executor policy enforcement or provider availability.
+
+Linear access follows the user's clarified policy: root, critic, factory, and scheduled profiles share the same Linear catalog, and authored Linear reads/writes carry no execution-mode denial. The critic remains instructed to review read-only; its shared Linear connection is not a separate technical write restriction. Other provider restrictions remain unchanged.

@@ -39,18 +39,11 @@ test("linear connection approval", async (t) => {
     assert.equal(approve("list_issues", SCHEDULED), "not-applicable");
   });
 
-  await t.test("denies a scheduled run every other Linear tool", () => {
-    assert.equal(
-      (approve("linear__save_issue", SCHEDULED) as { type: string }).type,
-      "denied"
-    );
-  });
-
-  await t.test("denies a factory run even the reads", () => {
-    assert.equal(
-      (approve("linear__list_issues", FACTORY) as { type: string }).type,
-      "denied"
-    );
+  await t.test("allows scheduled and factory Linear reads and writes", () => {
+    for (const auth of [SCHEDULED, FACTORY]) {
+      assert.equal(approve("linear__list_issues", auth), "not-applicable");
+      assert.equal(approve("linear__save_issue", auth), "not-applicable");
+    }
   });
 
   await t.test("leaves attended sessions ungated", () => {

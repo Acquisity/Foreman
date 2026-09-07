@@ -82,7 +82,7 @@ The budget was measured with that report before and after the repository-lane ga
 - Every interpolated branch passes `validateBranch`, which rejects protected branches, refs, `HEAD`, traversal, and unsafe characters. That is the whole branch gate: `push_branch` delivers any validated name, including a human branch such as `afragahaha/eng-13319`. `FOREMAN_BRANCH_PREFIX` marks the factory's own branches so the GitHub channel can recognize them for red-CI stabilization, which is ownership, not permission.
 - Merge tools remain excluded. A feature branch and pull request are the delivery boundary in both execution paths.
 - Factory label intake verifies the labeler's repository permission. Trusted comments use signed association data.
-- Autonomous runs cannot write repository knowledge, global model settings, or write-capable non-GitHub connections.
+- Autonomous runs cannot write repository knowledge, global model settings, or write-capable non-GitHub connections other than Linear. Linear shares normal read/write access across root, critic, factory, and schedule profiles. Critic instructions still require read-only review; there is no separate Linear write permission boundary for it.
 - All Blob prefixes are registered in `agent/lib/blob.ts`. General Blob tools must consult the registry.
 - Repository knowledge keys derive from the explicit or signed selected repository. Reads may fall back to the matching legacy document; trusted writes always use `repository-knowledge/`.
 - Pipeline state is repository-and-scope bound. It stores current head, processed feedback, readiness signals, and blocker history. Ignore stale events, deduplicate stable ids, and escalate on the third unchanged blocker set.

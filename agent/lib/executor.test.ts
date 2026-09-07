@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
@@ -179,11 +180,11 @@ test("critic and unattended policy contracts retain their narrower provider oper
   assert.ok(
     !providerAllowlist("openrouter", "root", "factory").includes("send-message")
   );
-  assert.deepEqual(providerAllowlist("linear", "root", "factory"), []);
-  assert.deepEqual(providerAllowlist("linear", "root", "scheduled"), [
-    "list_issues",
-    "get_issue",
-  ]);
+  for (const role of ["root", "critic"] as const) {
+    for (const profile of EXECUTOR_PROFILES) {
+      assert.deepEqual(providerAllowlist("linear", role, profile), ["*"]);
+    }
+  }
   assert.deepEqual(providerAllowlist("intercom", "root", "limited"), []);
   assert.ok(
     providerAllowlist("intercom", "root", "factory").includes(
@@ -243,10 +244,22 @@ test("Instantly routing retains workspace provenance and bounded query flags", (
 });
 
 test("helper runtime denials apply before any transport", () => {
-  assert.throws(() => authorizeHelper("linear.RelatedIssues", factory));
-  assert.throws(() =>
-    authorizeHelper("linear.RouteIssueUpdate", stampUnattended(auth))
-  );
+  assert.doesNotThrow(() => authorizeHelper("linear.RelatedIssues", factory));
+  for (const current of [
+    null,
+    auth,
+    internal,
+    factory,
+    stampUnattended(auth),
+  ]) {
+    for (const operation of [
+      "linear.RelatedIssues",
+      "linear.CreateDocument",
+      "linear.RouteIssueUpdate",
+    ]) {
+      assert.doesNotThrow(() => authorizeHelper(operation, current));
+    }
+  }
   assert.throws(() => authorizeHelper("instantly.accounts", auth));
   assert.throws(() =>
     authorizeHelper("stripe.customers.get", {
@@ -515,4 +528,38 @@ test("critic Sentry helper refuses arbitrary nested operations before authentica
     }).success,
     false
   );
+});
+
+test("installed toolkit manifest shares Linear access across every execution profile", () => {
+  const manifest = JSON.parse(
+    readFileSync(
+      new URL("../../.github/executor/toolkit-manifest.json", import.meta.url),
+      "utf8"
+    )
+  ) as {
+    toolkits: Array<{ slug: string; role: string; paths: string[] }>;
+  };
+  const linearPaths = (paths: string[]) =>
+    paths.filter(
+      (path) => path.startsWith("linear.") || path.startsWith("foreman_linear_")
+    );
+  const root = manifest.toolkits.find(
+    (toolkit) => toolkit.slug === "foreman-root-attended"
+  );
+  const helpers = manifest.toolkits.find(
+    (toolkit) => toolkit.slug === "foreman-helpers-attended"
+  );
+  assert.ok(root);
+  assert.ok(helpers);
+  assert.ok(root.paths.some((path) => path.endsWith(".save_issue")));
+  assert.ok(
+    helpers.paths.some((path) => path.startsWith("foreman_linear_write_api."))
+  );
+  for (const toolkit of manifest.toolkits) {
+    assert.deepEqual(
+      linearPaths(toolkit.paths),
+      linearPaths(toolkit.role === "helpers" ? helpers.paths : root.paths),
+      toolkit.slug
+    );
+  }
 });

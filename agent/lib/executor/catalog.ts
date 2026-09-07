@@ -181,15 +181,9 @@ export const PROVIDER_CATALOG = {
     ],
   },
   linear: {
-    critic: [
-      "get_issue",
-      "list_issues",
-      "list_comments",
-      "list_issue_labels",
-      "get_document",
-      "list_documents",
-    ],
-    description: "Linear workspace: issues, projects, cycles, and comments.",
+    critic: ["*"],
+    description:
+      "Linear workspace: issues, projects, cycles, and comments. Shared access across execution profiles; the critic remains read-only by instruction.",
     root: ["*"],
   },
   lucent: {

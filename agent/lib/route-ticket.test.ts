@@ -302,7 +302,7 @@ describe("routeTicket", () => {
 });
 
 describe("route_ticket tool", () => {
-  it("denies an autonomous run with a plain reason", async () => {
+  it("allows an autonomous run through the Linear approval policy", async () => {
     const { approval } = tool;
     const status = await (approval as (ctx: unknown) => unknown)({
       session: {
@@ -317,9 +317,6 @@ describe("route_ticket tool", () => {
       },
       toolName: "route_ticket",
     });
-    assert.deepEqual(status, {
-      reason: "Unattended runs do not write to Linear.",
-      type: "denied",
-    });
+    assert.equal(status, "not-applicable");
   });
 });

@@ -20,7 +20,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 | Source | Connection | Auth class | Read boundary |
 | --- | --- | --- | --- |
-| Linear issues, comments, labels, documents | Executor: linear | app, shared | child allowlist: `get_issue`, `list_issues`, `list_comments`, `list_issue_labels`, `get_document`, `list_documents` |
+| Linear issues, comments, labels, documents | Executor: linear | app, shared | same Linear access as root; use reads only as required by the critic instructions |
 | Intercom conversations and contacts | Executor: intercom | app, shared | root allowlist, reads only |
 | Inngest runs, traces, functions | Executor: inngest | app, shared | root allowlist, reads only |
 | Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |

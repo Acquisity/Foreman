@@ -35,7 +35,7 @@ console.log(
         "These are upstream operation names, not guessed Executor paths. Resolve exact paths and schemas from the installed catalog.",
         "A wildcard preserves the existing provider grant restriction; do not widen provider consent.",
         "Model toolkits must exclude helper-only APIs, raw PlanetScale query/schema tools, Executor management, artifacts, and resume.",
-        "Helper endpoints are private to authored code. Retain billing, Instantly, Linear and unattended guards; guessed nested operations must be denied by Executor policy.",
+        "Helper endpoints are private to authored code. Retain billing, Instantly and other-provider unattended guards; Linear access is shared across profiles; guessed nested operations must be denied by Executor policy.",
         "Create the Vercel connector and verified operation bindings before enabling traffic.",
       ],
       toolkits,

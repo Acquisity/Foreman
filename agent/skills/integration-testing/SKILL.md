@@ -23,7 +23,7 @@ Default to read-only tests. Use a supplied test identifier when one is needed. O
 
 ## Critic
 
-Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify its read-only catalog. Backend denials for guessed writes, raw helper APIs, administration, factory/schedule restrictions, and reused sessions are operator acceptance checks; discovery alone cannot establish them.
+Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify that the critic follows its read-only instructions; Linear deliberately shares root access. Backend denials for other-provider writes, raw helper APIs, administration, remaining factory/schedule restrictions, and reused sessions are operator acceptance checks; discovery alone cannot establish them.
 
 ## Vision
 

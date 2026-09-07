@@ -1,11 +1,6 @@
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
-import {
-  canUseBillingApiRead,
-  canUseInvestigationMemory,
-  isAutonomous,
-  isUnattended,
-} from "../trust.js";
+import { canUseBillingApiRead, canUseInvestigationMemory } from "../trust.js";
 import { ExecutorError } from "./transport.js";
 
 export type Provider =
@@ -260,12 +255,5 @@ export function authorizeHelper(
   }
   if (operation.startsWith("instantly.") && !canUseInvestigationMemory(auth)) {
     throw new ExecutorError("instantly_denied");
-  }
-  if (
-    operation.startsWith("linear.") &&
-    (isAutonomous(auth) ||
-      (isUnattended(auth) && LINEAR_WRITES.includes(operation.slice(7))))
-  ) {
-    throw new ExecutorError("linear_denied");
   }
 }
