@@ -17,7 +17,7 @@ This is more automated than a normal review-follow-up pass:
 
 ## Linear Ticket
 
-A Linear ticket gates only the write path, not read-only runs. A fetch-and-classify run never needs one. Before the first push or PR reply, confirm the PR has an associated Linear ticket. In an attended session, if none exists, create and link one by following the `github-linear-bridging` skill, which owns team selection; do not guess a project or team here. In an unattended (autonomous) run, Linear writes are denied, so confirm the ticket from the durable pipeline run or the PR body and escalate when there is none.
+A Linear ticket gates only the write path, not read-only runs. A fetch-and-classify run never needs one. Before the first push or PR reply, confirm the PR has an associated Linear ticket. In an attended session, if none exists, create and link one by following the `github-linear-bridging` skill, which owns team selection; do not guess a project or team here. In an unattended factory run, follow the factory procedure: confirm the ticket from the durable pipeline run or PR body and escalate when there is none. This is a workflow requirement; the shared Executor catalog does not deny Linear writes by execution mode.
 
 ## Invocation
 
@@ -238,7 +238,9 @@ Do not claim a disagreement was resolved.
 
 ### 10. Polling Loop
 
-For monitor mode:
+Only an explicit attended monitoring request uses this loop. Unattended factory stabilization handles the current webhook once, records progress in the durable pipeline run, and returns; it never polls or sleeps for a clean window.
+
+For attended monitor mode:
 
 1. Initialize the last-activity timestamp to the current time for this invocation.
 2. Fetch live in-scope AI bot feedback.

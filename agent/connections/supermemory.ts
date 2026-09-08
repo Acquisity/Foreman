@@ -4,7 +4,7 @@ import { denyUnattendedWrites } from "../lib/github/approval.js";
 import { userConnect } from "../lib/user-connect.js";
 
 /**
- * Supermemory MCP connection for recalling and saving team context.
+ * Personal Supermemory MCP connection for attended-session recall.
  *
  * @remarks
  * User-scoped via Vercel Connect. Supermemory's MCP rejects machine

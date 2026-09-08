@@ -8,9 +8,9 @@ import type { SessionAuthContext } from "eve/context";
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
  * dispatch; the remaining approval policies (repositoryKnowledgePolicy,
- * modelSwapPolicy, denyUnattendedWrites) deny it non-GitHub writes
- * (repository knowledge, model swaps, connection writes), because an
- * unattended turn has nobody to answer an approval card and would park
+ * modelSwapPolicy, denyUnattendedWrites) deny it repository knowledge,
+ * model overrides, and personal Supermemory writes, because an unattended
+ * turn has nobody to answer an approval card and would park
  * forever.
  */
 export const AUTONOMOUS_PRINCIPAL = "github:foreman-factory";

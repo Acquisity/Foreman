@@ -31,6 +31,7 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | `agent/lib/inngest-api.ts` | 15s per request | Composed with the caller's signal; a caller abort rethrows unwrapped. |
 | `agent/lib/help-center.ts` | 10s per request | Composed with the caller's signal. A failure returns `error` rather than throwing, because search is advisory. |
 | `agent/lib/planetscale.ts` | 50s via Executor | Result parsing and truncation remain local; oversized transport responses fail with a bounded error. |
+| `agent/lib/executor/sentry.ts` (`read_sentry_issue`) | 50s via Executor | Strict input permits issue details and event search only; output is capped at 100,000 characters after transport parsing. The underlying dispatcher is also available through the shared toolkit; critic instructions require read-only review. |
 | `agent/subagents/vision/tools/read_image.ts` | 20s | Covers the body read; the signal is passed to `fetch`, so a stalled download aborts with it. One 20s reader deadline covers the whole read, armed once and raced by every chunk, and the same reader bounds the sandbox path branch, which no signal reaches (see the sandbox file I/O note below). |
 
 ## Other clients
@@ -62,7 +63,7 @@ Each of these is a call Foreman makes with no deadline, for a stated reason.
 
 ### Vercel Connect
 
-`mintInstallationToken`, `getConnectorMetadata` in `agent/lib/github/bot-name.ts`, and the `userConnect` path in `agent/lib/user-connect.ts` all go through `@vercel/connect`.
+`mintInstallationToken`, `getConnectorMetadata` in `agent/lib/github/bot-name.ts`, the `userConnect` path in `agent/lib/user-connect.ts`, and Executor app authorization through `agent/lib/executor/auth.ts` and `agent/lib/managed-connect.ts` all go through `@vercel/connect`. The Executor transport's 50-second deadline starts after authorization. Provider-specific timers may already be running, but their signals cannot cancel that SDK token lookup.
 
 `ConnectOptions` (`@vercel/connect@0.8.0`, `dist/token.d.ts:92`) carries only `vercelToken` and `forceRefresh`. There is no signal, no timeout, and no other cancellation surface, so there is nothing to bound. Racing a timer against the promise would report a failure while the request kept running, which is worse than waiting. Revisit when Connect exposes a signal.
 
@@ -72,7 +73,7 @@ Foreman authors four file-I/O calls: `readTextFile` on the repository marker in 
 
 The abort signal does not reach them. eve's `bindSandboxAbortSignal` does compose the turn's signal into every file call (`eve@0.44.0`, `dist/src/execution/sandbox/abort-bound-session.js`), and the session layer forwards it to the backend (`dist/src/execution/sandbox/session.js`), but the production Vercel backend drops it: `readFile` calls the SDK as `readFile({ path })` and `writeFile` calls `writeFiles([{ content, path }])`, neither passing a signal, and `removePath` is the only file operation that forwards one (`dist/src/execution/sandbox/bindings/vercel.js`). Foreman calls no `removePath`. `@vercel/sandbox@3.0.1` does accept `opts.signal` on these operations and sets no timeout of its own (`dist/api-client/base-client.js` passes only the caller's signal to `fetch`), so the capability exists and is simply never handed a signal. An earlier revision of this document claimed a cancelled turn unwinds these reads and writes. It does not, on the platform Foreman deploys to.
 
-The two marker calls stay exempt, with the real bound stated rather than assumed: one read and one write of a JSON document of a few hundred bytes, on a path Foreman controls, whose only deadline is the Vercel function's own invocation ceiling. eve's abort plumbing does not shorten that. Bounding them would mean re-plumbing eve's sandbox adapter, which is out of scope here; revisit if the adapter starts forwarding the signal, or if a marker read is ever seen to hang.
+The three marker call sites stay exempt, with the real bound stated rather than assumed: reads and a write of a JSON document of a few hundred bytes, on a path Foreman controls, whose only deadline is the Vercel function's own invocation ceiling. eve's abort plumbing does not shorten that. Bounding them would mean re-plumbing eve's sandbox adapter, which is out of scope here; revisit if the adapter starts forwarding the signal, or if a marker read is ever seen to hang.
 
 The image read is split in two, because it is the one that reads an arbitrary path for an arbitrary number of bytes.
 
@@ -83,9 +84,3 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 ### Agent browser install
 
 `installAgentBrowser` in `agent/sandbox.ts` bootstrap is third-party (`@agent-browser/eve`) and runs during eve's own sandbox bootstrap, not inside a turn. It exposes no deadline parameter, and a bootstrap that never finishes fails template creation rather than holding a Slack thread open.
-
-### Executor preview configuration audit
-
-`scripts/executor-readiness.ts --live` makes operator-only GET requests to the fixed Acquisity Executor API for toolkit, policy, and connection-pattern metadata. Every request has a 20-second deadline and rejects redirects. It reads the explicitly selected official Executor CLI OAuth profile locally; it never requests provider credentials or prints tokens, arguments, or results. It is not part of the deployed agent.
-
-The critic `read_sentry_issue` helper uses the existing Executor transport deadline (50 seconds, bounded response, parent cancellation). Its strict runtime input allows only issue details and issue event search. The Sentry provider grant remains inspect-only; the underlying dispatcher is also available in the shared company toolkit; critic instructions require read-only review.

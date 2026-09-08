@@ -33,3 +33,5 @@ All provider helpers authenticate through `EXECUTOR_MCP_CONNECTOR`, an app-scope
 - Logs record only outer tool/connection names, outcome, and session/turn identifiers. Use Executor invocation records for provider diagnosis; never log tool arguments, results, credentials, or provider error bodies.
 
 Preview evidence and remaining release gates are in `EXECUTOR-PREVIEW.md`. Production connector attachment and deployment still require the release procedure. To roll back across toolkit consolidation, restore the previous revision's toolkit configuration before selecting a deployment that references the retired URLs.
+
+Neon must retain its `https://mcp.neon.tech/mcp?readonly=true` endpoint and read-only MCP OAuth grant. On reconnect, leave Full access unchecked; do not add the `write` scope. The selected SQL tools depend on Neon enforcing read-only transactions. Resource mutations remain outside the exact Neon allowlist and are denied by default. This restriction does not change the separate direct investigation-memory connection.

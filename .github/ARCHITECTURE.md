@@ -6,7 +6,7 @@ Foreman is a repository-neutral eve agent with a general execution path and an o
 
 ## Routing
 
-General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and Linear sessions (including assigned issues) remain general by default. The `factory-pipeline` skill is advertised by task characteristics: explicit factory requests, complexity, uncertainty, risk, or requested review depth.
+General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and Linear sessions (including assigned issues) remain general by default. `agent/lib/factory-lane.ts` advertises the `factory-pipeline` skill when a session has explicit factory intent or a repository stamped by the channel; intake-only Slack additionally requires trusted explicit intent. Complexity, uncertainty, risk, and requested review depth guide whether the model loads an available skill. Autonomous factory turns carry the same procedure inline instead.
 
 Factory mode activates deterministically only for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
 
@@ -39,7 +39,7 @@ Readiness requires all of: internal approval for the current head, passing requi
 - Slack mentions are trusted by channel membership and have no factory default.
 - The Eve HTTP channel uses local dev or Vercel OIDC auth, and stamps factory intent and a single URL-named repository from the delivered message like the other interactive channels.
 
-`agent/lib/trust.ts` is the sole caller-trust authority. Autonomous runs are denied writes to shared repository knowledge, global model configuration, and write-capable non-GitHub connections. Trusted attended callers write directly; other callers receive approval prompts.
+`agent/lib/trust.ts` is the sole caller-trust authority. Unattended runs are denied writes to shared repository knowledge, global model configuration, and personal Supermemory. For repository knowledge and model configuration, trusted attended callers write directly; other attended callers receive approval prompts. Company services share the same Executor catalog across attended and unattended workflows; workflow instructions govern their use.
 
 Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
 
@@ -61,4 +61,4 @@ Investigation memory is a private Foreman-owned Postgres database, separate from
 
 ## Verification
 
-Every Foreman-authored call that leaves the process is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md), with its deadline or its exemption. `pnpm validate` runs Ultracite, TypeScript, unit tests, and `eve info`. Unit tests cover repository parsing and webhook authority, protected branches and literal remotes, stale events, feedback deduplication, third-repeat escalation, readiness, and scoped run keys. Routing and safety evals cover the direct path, explicit factory selection, ordinary conversation, station order, knowledge and model approvals, and the human merge boundary. The full pipeline eval requires an explicit scratch repository.
+Every Foreman-authored call that leaves the process is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md), with its deadline or its exemption. `pnpm validate` checks generated Linear-spec drift, then runs Ultracite, TypeScript, `eve info`, and unit tests in that order. Unit tests cover repository parsing and webhook authority, protected branches and literal remotes, stale events, feedback deduplication, third-repeat escalation, readiness, and scoped run keys. Routing and safety evals cover the direct path, explicit factory selection, ordinary conversation, station order, knowledge and model approvals, and the human merge boundary. The full pipeline eval requires an explicit scratch repository.

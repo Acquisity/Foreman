@@ -1,6 +1,6 @@
 # Executor tool availability audit
 
-Audited the live installed catalog on 2026-09-07 against the shared `foreman` toolkit and the pre-migration connection definitions at `119bb01`. The earlier lists were snapshots of selected tools, not a complete inventory of provider reads. This audit adds 90 operations across 11 connections, bringing the shared toolkit to 720 selected operations after the Autumn expansion. No provider credential, grant, or endpoint was changed.
+Audited the live installed catalog on 2026-09-07 against the shared `foreman` toolkit and the pre-migration connection definitions at `119bb01`. The earlier lists were snapshots of selected tools, not a complete inventory of provider reads. This audit adds 90 operations across 11 connections, bringing the shared toolkit to 720 selected operations at that audit, after the Autumn expansion. The later Vercel REST addition below brings the checked-in manifest to 1,072 selected operations. No provider credential, grant, or endpoint was changed.
 
 ## Restored operations
 
@@ -24,7 +24,7 @@ Intercom article reads are available alongside the existing help-center helper. 
 
 ## Remaining exclusions from connected providers
 
-These 135 operations remain excluded under the previously retained read-only provider surfaces and credential handling. They are documented here for review; this table does not assert that the user personally selected every individual exclusion. Linear remains fully available, and existing selected writes on other connections are unchanged.
+These 135 non-Vercel operations remain excluded under the previously retained read-only provider surfaces and credential handling. They are documented here for review; this table does not assert that the user personally selected every individual exclusion. Linear remains fully available, and existing selected writes on other connections are unchanged. The 65 Vercel REST exclusions are counted separately below.
 
 | Connection | Reason | Excluded operations |
 | --- | --- | --- |
@@ -44,7 +44,7 @@ Exa, Sentry, and the authored helper API connections have no excluded operations
 
 ## Verification
 
-The live policy comparison must match the manifest exactly. Representative provider calls verify actual dispatch separately from catalog inclusion; a provider authorization failure or unavailable schema is not evidence of a toolkit denial. Enabling a tool does not expand its provider grant. At catalog-audit commit `14e3850`, `pnpm validate` passed all 672 tests (before the typed-helper refactor changed the suite), and the live policy and connection comparison passed. Representative calls passed for Neon region listing, PostHog metric-name listing, OpenRouter health, Inngest session-key listing, and Intercom article listing. Resend email metrics reached the connection but failed with `oauth_reauth_required`: no refresh token is stored, so its account connection needs reauthorization. Other restored operations were catalog-reviewed rather than individually exercised. That audit predates the Vercel REST setup below. Stripe account discovery uses `list_available_accounts_or_orgs`; the retired `get_stripe_account_info` is no longer an expected operation.
+The live policy comparison must match the manifest exactly. Representative provider calls verify actual dispatch separately from catalog inclusion; a provider authorization failure or unavailable schema is not evidence of a toolkit denial. Enabling a tool does not expand its provider grant. At catalog-audit commit `14e3850`, `pnpm validate` passed all 672 tests (before the typed-helper refactor changed the suite), and the live policy and connection comparison passed. Representative calls passed for Neon region listing, PostHog metric-name listing, OpenRouter health, Inngest session-key listing, and Intercom article listing. Resend email metrics reached the connection but failed with `oauth_reauth_required`: no refresh token is stored, so it needed reauthorization at that audit; this is historical failure evidence, not a fresh check of its current grant. Other restored operations were catalog-reviewed rather than individually exercised. That audit predates the Vercel REST setup below. Stripe account discovery uses `list_available_accounts_or_orgs`; the retired `get_stripe_account_info` is no longer an expected operation.
 
 ## Vercel REST connection (2026-09-07)
 

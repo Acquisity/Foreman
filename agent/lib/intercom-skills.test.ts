@@ -135,7 +135,7 @@ test("Intercom billing skill preserves evidence order and human-only action", ()
     "expected future subscription or one-off invoice",
     "read_autumn_billing",
     "read_stripe_billing",
-    "shared app-scoped Connect credentials",
+    "shared app-scoped Executor connection",
   ]) {
     assert.ok(billingSkill.includes(phrase), phrase);
   }

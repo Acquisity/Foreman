@@ -10,7 +10,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 ## Production data (root tool)
 
-`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` is available through Executor for full-schema reads; filter and summarize its result inside Executor before returning it. The PlanetScale surface through Executor also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
+`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` is available through Executor for full-schema reads; filter and summarize its result inside Executor before returning it. The PlanetScale surface through Executor also exposes the organization, database, branch, insights, and documentation reads; SQL writes and payment-method changes are excluded by the shared toolkit.
 
 ## Investigation memory (root tool)
 
@@ -30,7 +30,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
 | Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
-| Modem customer feedback search | Executor: modem | app, shared | root allowlist: `search_modem` |
+| Modem customer feedback and run reads | Executor: modem | app, shared | shared catalog; discover `search_modem` and `modem_agent_get_run` |
 | Neon, only when the code path uses a Neon database | Executor: neon | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
 | Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
 | Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
