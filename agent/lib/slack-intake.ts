@@ -119,7 +119,7 @@ export function resolveSlackIntakeWorkflow(
 /**
  * Applies the hard intake boundary: push and pull-request creation are
  * denied and delivery goes to Linear. Billing reads need no stamp; the
- * app-key root tools run on every surface (see `canUseBillingApiRead`).
+ * app-key root tools use the shared company Executor connection.
  */
 export function stampSlackIntakeAuth(
   auth: SessionAuthContext

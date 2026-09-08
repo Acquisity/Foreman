@@ -1,0 +1,110 @@
+{
+  "autumn.customer": {
+    "path": "foreman_autumn_api.org.foremanAutumnApi.customersGet.readAutumnCustomer"
+  },
+  "stripe.customers.get": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.customers.readCustomer"
+  },
+  "stripe.customers.balance_transactions": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.customers.listCustomerBalanceTransactions"
+  },
+  "stripe.charges.get": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.charges.readCharge"
+  },
+  "stripe.refunds.get": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.refunds.readRefund"
+  },
+  "stripe.disputes.get": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.disputes.readDispute"
+  },
+  "stripe.coupons.get": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.coupons.readCoupon"
+  },
+  "stripe.subscriptions.list": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.subscriptions.listCustomerSubscriptions"
+  },
+  "stripe.invoices.list": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.invoices.listCustomerInvoices"
+  },
+  "stripe.charges.list": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.charges.listCustomerCharges"
+  },
+  "stripe.credit_notes.list": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.creditNotes.listCustomerCreditNotes"
+  },
+  "stripe.promotion_codes.list": {
+    "path": "foreman_stripe_api.org.foremanStripeApi.promotionCodes.findPromotionCode"
+  },
+  "instantly.workspace-group-members": {
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers"
+  },
+  "instantly.accounts": {
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.accounts.listAccounts"
+  },
+  "instantly.campaigns": {
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.campaigns.listCampaigns"
+  },
+  "instantly.emails": {
+    "path": "foreman_instantly_api.org.foremanInstantlyApi.emails.listEmails"
+  },
+  "inngest.apps": {
+    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listApps"
+  },
+  "inngest.runs": {
+    "path": "foreman_inngest_api.org.foremanInngestApi.runs.listRuns"
+  },
+  "inngest.functionRuns": {
+    "path": "foreman_inngest_api.org.foremanInngestApi.apps.listFunctionRuns"
+  },
+  "inngest.trace": {
+    "path": "foreman_inngest_api.org.foremanInngestApi.runs.getRunTrace"
+  },
+  "help.search": {
+    "path": "foreman_help_api.org.foremanHelpApi.search.searchHelpCenter"
+  },
+  "planetscale.readQuery": {
+    "path": "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
+  },
+  "linear.RelatedIssues": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.IssueDocuments": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.Document": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.RouteIssue": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.TeamLabels": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.WorkflowStates": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.Projects": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.Users": {
+    "path": "foreman_linear_read_api.org.foremanLinearReadOnlyApi.graphql.executeForemanRead"
+  },
+  "linear.CreateDocument": {
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
+  },
+  "linear.UpdateDocument": {
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
+  },
+  "linear.RouteIssueUpdate": {
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
+  },
+  "linear.RouteRelation": {
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
+  },
+  "linear.RouteAttachment": {
+    "path": "foreman_linear_write_api.org.foremanLinearWriteApi.graphql.executeForemanWrite"
+  },
+  "sentry.issueRead": {
+    "path": "sentry.user.personalSentry.execute_sentry_tool"
+  }
+}

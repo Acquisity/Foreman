@@ -8,9 +8,9 @@ import type { SessionAuthContext } from "eve/context";
  * Real GitHub actors project as numeric `github:<id>` principals, so this
  * fixed login can never collide with one. The GitHub channel stamps it at
  * dispatch; the remaining approval policies (repositoryKnowledgePolicy,
- * modelSwapPolicy, denyUnattendedWrites) deny it non-GitHub writes
- * (repository knowledge, model swaps, connection writes), because an
- * unattended turn has nobody to answer an approval card and would park
+ * modelSwapPolicy, denyUnattendedWrites) deny it repository knowledge,
+ * model overrides, and personal Supermemory writes, because an unattended
+ * turn has nobody to answer an approval card and would park
  * forever.
  */
 export const AUTONOMOUS_PRINCIPAL = "github:foreman-factory";
@@ -201,23 +201,6 @@ export function stampIntakeOnly(auth: SessionAuthContext): SessionAuthContext {
  */
 export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
   return auth !== null && auth.attributes[INTAKE_ONLY_ATTRIBUTE] === "true";
-}
-
-/**
- * Whether this session may use the fixed, read-only Autumn and Stripe API
- * lookups. Every surface may: terminal, Slack (DMs, channels, intake
- * channels), Linear Agent Sessions, schedules, and factory runs are all
- * investigations. The one exception is a GitHub session that is neither a
- * trusted collaborator's nor the factory's, because there outside text on a
- * public pull request would be steering an app-scoped billing key.
- */
-export function canUseBillingApiRead(auth: SessionAuthContext | null): boolean {
-  return (
-    auth === null ||
-    isTrusted(auth) ||
-    isAutonomous(auth) ||
-    !auth.principalId.startsWith("github:")
-  );
 }
 
 /**

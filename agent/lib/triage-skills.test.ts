@@ -331,73 +331,60 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ],
     "PlanetScale data": ["planetscale_execute_read_query", "describe_table"],
     PostHog: [
-      "exec",
-      "persons",
-      "session-recording",
-      "error-tracking",
-      "query",
-      "execute-sql",
-      "insight",
-      "event-definition",
-      "heatmaps",
+      "persons_list",
+      "query_session_recordings_list",
+      "session_recording_get",
+      "read_data_schema",
+      "query_trends",
+      "query_web_stats",
+      "execute_sql",
     ],
     Repository: ["prepare_repository", "grep", "glob", "read_file", "bash"],
     Resend: [
-      "list-emails",
-      "get-email",
-      "list-logs",
-      "get-log",
-      "list-domains",
-      "get-domain",
-      "list-suppressions",
-      "get-suppression",
-      "list-contacts",
-      "get-contact",
-      "list-broadcasts",
-      "get-broadcast",
-      "list-templates",
-      "get-template",
-      "list-webhooks",
-      "get-webhook",
-      "list-segments",
-      "get-segment",
-      "list-topics",
-      "get-topic",
-      "list-received-emails",
-      "get-received-email",
-      "list-received-email-attachments",
-      "get-received-email-attachment",
-      "list-sent-email-attachments",
-      "get-sent-email-attachment",
+      "list_emails",
+      "get_email",
+      "list_logs",
+      "get_log",
+      "list_domains",
+      "get_domain",
+      "list_suppressions",
+      "get_suppression",
+      "list_contacts",
+      "get_contact",
+      "list_broadcasts",
+      "get_broadcast",
+      "list_templates",
+      "get_template",
+      "list_webhooks",
+      "get_webhook",
+      "list_segments",
+      "get_segment",
+      "list_topics",
+      "get_topic",
+      "list_received_emails",
+      "get_received_email",
+      "list_received_email_attachments",
+      "get_received_email_attachment",
+      "list_sent_email_attachments",
+      "get_sent_email_attachment",
     ],
     Sentry: [
       "find_organizations",
       "find_projects",
-      "find_issues",
       "search_issues",
-      "get_issue_details",
       "search_events",
+      "search_sentry_tools",
+      "execute_sentry_tool",
+      "get_issue_details",
       "search_issue_events",
     ],
     Vercel: [
-      "get_runtime_errors",
-      "get_runtime_logs",
-      "list_deployments",
-      "get_deployment",
-      "get_deployment_build_logs",
-      "list_projects",
-      "get_project",
-      "list_teams",
-      "get_web_analytics",
-      "search_vercel_documentation",
-      "web_fetch_vercel_url",
-      "get_access_to_vercel_url",
-      "list_agent_runs",
-      "get_agent_run",
-      "get_agent_run_trace",
-      "list_agent_run_projects",
-      "list_toolbar_threads",
-      "get_toolbar_thread",
+      "getProject",
+      "getProjects",
+      "getDeployments",
+      "getDeployment",
+      "getDeploymentEvents",
+      "getRuntimeLogs",
     ],
   };
 
@@ -415,7 +402,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "strip the prefix or the filter matches nothing",
     "filters structured fields and has no free-text",
     "title, description, attachments, links, comments, labels, priority, project, assignee, requester",
-    "`search_issues` only when that finds nothing",
+    "Sentry `search_issues`, then the nested `get_issue_details` read",
     "Prefer a bounded `COUNT` or narrow `SELECT`",
   ]) {
     assert.ok(triageSkill.includes(laneRule), laneRule);
@@ -453,21 +440,21 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ["Investigation memory", "root, bare"],
     ["Customer identity", "root, bare"],
     ["PlanetScale data", "root, bare"],
-    ["PlanetScale connection", "planetscale__"],
+    ["PlanetScale connection", "Executor: planetscale"],
     ["Instantly", "root, bare"],
     ["Linear searches and routing writes", "root, bare"],
-    ["Linear connection", "linear__"],
+    ["Linear connection", "Executor: linear"],
     ["Inngest runs", "root, bare"],
-    ["Inngest connection", "inngest__"],
-    ["Sentry", "sentry__"],
-    ["Axiom", "axiom__"],
-    ["PostHog", "posthog__"],
-    ["Lucent", "lucent__"],
-    ["Jam", "jam__"],
-    ["Vercel", "vercel__"],
-    ["Intercom", "intercom__"],
-    ["Resend", "resend__"],
-    ["Modem", "modem__"],
+    ["Inngest connection", "Executor: inngest"],
+    ["Sentry", "Executor: sentry"],
+    ["Axiom", "Executor: axiom"],
+    ["PostHog", "Executor: posthog"],
+    ["Lucent", "Executor: lucent"],
+    ["Jam", "Executor: jam"],
+    ["Vercel", "Executor: foreman_vercel_api"],
+    ["Intercom", "Executor: intercom"],
+    ["Resend", "Executor: resend"],
+    ["Modem", "Executor: modem"],
   ];
   assert.deepEqual(
     parsedRows,
@@ -478,11 +465,11 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     }))
   );
   for (const note of [
-    "Never invent a tool name from a service's REST API or CLI",
-    "with the `connection` argument naming one connection",
-    "never as `planetscale__planetscale_execute_read_query`",
-    "no allowlist",
-    "kebab-case",
+    "Never guess paths",
+    "with the `connection` argument set to the Executor connection",
+    "Authored Foreman helpers keep their bare names",
+    "constrained by the active Executor toolkit allowlist",
+    "Resend currently publishes snake_case names",
     "`truncated`",
     "`oversizedRow`",
     "`envelopeTooLarge`",
@@ -798,7 +785,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
     "### A confirmed Bug: create the report, then hand off",
     "## Step 7:"
   );
-  const createReport = bugHandoff.indexOf("`linear__save_issue`");
+  const createReport = bugHandoff.indexOf("`save_issue`");
   const checkpoint = bugHandoff.indexOf(STAGE_4_CHECKPOINT);
   const handoff = bugHandoff.indexOf("load `triage-handling`");
 
@@ -806,7 +793,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   assert.ok(checkpoint > createReport);
   assert.ok(handoff > checkpoint);
   assert.ok(bugHandoff.includes("The report must exist before the handoff"));
-  // Both `linear__save_issue` sites inherit the title rule stated with the claim.
+  // Both `save_issue` sites inherit the title rule stated with the claim.
   assert.ok(
     intercomTriageSkill.includes(
       "This sentence, minus customer identifiers, is the title of any issue this skill creates."
@@ -816,9 +803,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   const titleRule = intercomTriageSkill.indexOf(
     "is the title of any issue this skill creates"
   );
-  const issueCreationCalls = [
-    ...intercomTriageSkill.matchAll(/`linear__save_issue`/g),
-  ];
+  const issueCreationCalls = [...intercomTriageSkill.matchAll(/`save_issue`/g)];
   assert.equal(issueCreationCalls.length, 2, "both issue-creation sites exist");
   assert.ok(
     issueCreationCalls.every(

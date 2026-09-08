@@ -57,3 +57,9 @@ A tool-call duration is not expressible from a hook. `ActionResultStreamEvent.da
 Shipped: one bounded line per tool call with no duration, naming the tool, the connection, and `ok` or `error`. The hook keeps no state and starts no timer. Timing the call from a hook would mean carrying the `actions.requested` event's `meta.at`, keyed by call ID, and reading it back at `action.result`, which is hook-owned state that outlives the event that created it: it leaks whenever a call never returns, it is wrong under a resumed or replayed turn, and it invents a number eve never measured. That is exactly the unsafe approximation this file exists to avoid, so the line reports reach and failure and stays silent about latency.
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
+
+## Per-session MCP connection URL selection (resolved)
+
+Checked against eve 0.44.0.
+
+Resolved for Foreman's current requirements: all workflows use one shared Executor toolkit, so a caller-dependent connection URL is no longer needed. Eve 0.44 still requires a static `McpClientConnectionDefinition.url`; no framework workaround or separate per-workflow connections remain.

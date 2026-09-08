@@ -1,0 +1,9 @@
+# Executor server retry metadata follow-up
+
+Foreman now accepts provider failures with `error.retryAfter` (raw delta seconds or HTTP date), preserves outer Executor HTTP `Retry-After`, and stops immediately on an Instantly 429 with no usable interval. This prevents the old 500 ms / 1,000 ms retry pattern even while the deployed Executor omits headers.
+
+The separately managed Executor 1.6.8 server still drops upstream failure headers in `packages/plugins/openapi/src/sdk/backing.ts`. Its owner must release the small [patch](./executor/patches/executor-1.6.8-retry-after.patch) to expose the actual provider interval. The patch adds one optional SDK error field and forwards only Retry-After; it does not forward arbitrary headers. No server code, server deployment, or provider credentials were changed as part of this Foreman PR. The patch is prepared against the inspected 1.6.8 source and is not represented as tested or deployed upstream.
+
+Server-owner verification before release: run the SDK and OpenAPI package checks, then exercise an OpenAPI operation returning HTTP 429 with `Retry-After: 60`. The `execute` result must contain `ok: false`, `error.status: 429`, and `error.retryAfter: "60"`. Repeat with an HTTP-date value and no header. Ensure unrelated headers such as Set-Cookie and authentication headers are not added to the error. Apply the patch to the matching Executor source revision, not Foreman's codebase.
+
+Foreman's `executor-client.test.ts` exercises MCP failure parsing, the typed client, and Instantly together: a 60-second hint yields one invocation and reports 60 seconds; a one-second hint waits 1,000 ms before retrying; an absent hint yields one invocation and a bounded rate-limit error. Separate tests cover an outer HTTP 429. These fixtures validate Foreman compatibility, not the running server's implementation.

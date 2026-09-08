@@ -1,7 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { linearAuth } from "#lib/constants.js";
-import { denyUnattendedWrites } from "#lib/github/approval.js";
+import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
 
@@ -9,7 +8,7 @@ const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
 
 export default defineTool({
-  approval: denyUnattendedWrites("Linear"),
+  approval: () => "not-applicable",
   description:
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
@@ -19,8 +18,8 @@ export default defineTool({
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     try {
-      const { token } = await ctx.getToken(linearAuth);
-      const ticket = await routeTicket(token, input, {
+      const ticket = await routeTicket(input, {
+        client: executorClient(ctx),
         signal: ctx.abortSignal,
       });
       return { routed: true as const, ...ticket };

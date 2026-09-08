@@ -1,8 +1,8 @@
 # Critic evidence surface
 
-Every source a triage investigation can cite, and how the critic reaches it. Each entry is the root Foreman definition mounted into the child; the credential path is the root's own `managedConnect` or `userConnect` object, reused as is. The critic holds no connector, token, or credential of its own and can never write.
+Company-service tools use Executor. Use `connection_search` with the `connection` argument set to the Executor connection named in this turn's access instructions. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
 
-Connection tools are called as `<connection>__<tool>`; use `connection_search` with the `connection` argument naming one connection to discover what it exposes before calling one. Root tools are called by their bare name and are always present without any search: never report one as unavailable unless you called it and it failed or answered `available: false`.
+Every source a triage investigation can cite, and how the critic reaches it. Authored helpers reuse root definitions. Company services use the same Foreman Executor toolkit and app credential as root. Critic instructions require read-only review.
 
 ## Repository (root tools)
 
@@ -10,7 +10,7 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` w
 
 ## Production data (root tool)
 
-`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` does not exist. The `planetscale__` connection also exposes the organization, database, branch, insights, and documentation reads; its write tool is excluded at the root.
+`planetscale_execute_read_query`, bare. Coordinates, confirmed live: `organization` `acquisity`, `database` `acquisity`, `branch` `main`, and `postgres_database_name` `postgres` (not `acquisity`; passing the wrong one fails with "database does not exist"). Truncates rather than returning unbounded rows; read the `truncated`, `oversizedRow`, `envelopeTooLarge`, and `raw` flags before trusting a result. Read schema through `information_schema.columns` with `postgres_database_name` set; `planetscale_get_branch_schema` is available through Executor for full-schema reads; filter and summarize its result inside Executor before returning it. The PlanetScale surface through Executor also exposes the organization, database, branch, insights, and documentation reads; SQL writes and payment-method changes are excluded by the shared toolkit.
 
 ## Investigation memory (root tool)
 
@@ -20,20 +20,20 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` w
 
 | Source | Connection | Auth class | Read boundary |
 | --- | --- | --- | --- |
-| Linear issues, comments, labels, documents | `linear__` | app, managed | child allowlist: `get_issue`, `list_issues`, `list_comments`, `list_issue_labels`, `get_document`, `list_documents` |
-| Intercom conversations and contacts | `intercom__` | app, managed | root allowlist, reads only |
-| Inngest runs, traces, functions | `inngest__` | app, managed | root allowlist, reads only |
-| Lucent issues and insights | `lucent__` | app, managed | root allowlist, reads only |
-| Sentry issues and events | `sentry__` | user | child allowlist: the seven confirmed read tools |
-| Axiom datasets, metrics, monitors | `axiom__` | user | root allowlist, reads only |
-| Vercel deployments, logs, errors, analytics | `vercel__` | user | root allowlist minus the five write tools |
-| PostHog persons, recordings, errors, queries | `posthog__` | user | one `exec` tool; read-only by OAuth scope, so any write command fails at the API |
-| Resend emails, logs, domains | `resend__` | user | root allowlist, reads only |
-| Jam recordings, console, network | `jam__` | user | root allowlist, reads only |
-| Modem customer feedback search | `modem__` | user | root allowlist: `search_modem` |
-| Neon, only when the code path uses a Neon database | `neon__` | user | read-only endpoint plus root allowlist; never customer data, never memory |
-| Autumn provisioning | `autumn__` | user | root allowlist, reads only |
-| Stripe billing | `stripe__` | user | root allowlist, reads only |
+| Linear issues, comments, labels, documents | Executor: linear | app, shared | same Linear access as root; use reads only as required by the critic instructions |
+| Intercom conversations and contacts | Executor: intercom | app, shared | root allowlist, reads only |
+| Inngest runs, traces, functions | Executor: inngest | app, shared | root allowlist, reads only |
+| Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |
+| Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
+| Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
+| Vercel projects, deployments and logs | Executor: foreman_vercel_api | app, shared | Foreman-scoped credential; shared catalog; use reads only |
+| PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
+| Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
+| Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
+| Modem customer feedback and run reads | Executor: modem | app, shared | shared catalog; discover `search_modem` and `modem_agent_get_run` |
+| Neon, only when the code path uses a Neon database | Executor: neon | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
+| Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
+| Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
 
 ## Call notes for the connections
 
@@ -42,15 +42,15 @@ Connection tools are called as `<connection>__<tool>`; use `connection_search` w
 - Inngest: `find_function_runs` with the function id from the code path covers the runs and the newest trace; the connection tools stay for a specific event's runs or an older run's trace.
 - Sentry: `get_issue_details` returns the stacktrace for one issue id; the natural-language search tools can be unavailable while the rest works.
 - Axiom: `queryDataset` takes APL (`Dataset | where ... | summarize ...`); call `listDatasets` and `getDatasetFields` first for real names. Metrics go through `queryMetrics`, not APL.
-- PostHog: one `exec` tool; the `command` parameter's own description carries the syntax. Resolve a person through `persons` before reading recordings.
-- Resend: tool names are kebab-case (`list-emails`, not `list_emails`).
+- PostHog: discover individual operations such as `persons_list`, `query_trends`, and `execute_sql`, then inspect the selected schema. Resolve a person before reading recordings.
+- Resend: discover snake_case operations such as `list_emails`, `get_email`, and `list_logs`.
 - Jam: only useful when the ticket carries a Jam link; `getConsoleLogs` and `getNetworkRequests` beat the video.
-- Vercel: query around the time the claim names; check `list_deployments` for a deployment just before the reported window.
+- Vercel: query around the time the claim names; discover `getDeployments` for a deployment just before the reported window.
 - Neon: only when the code path actually uses a Neon database. Never customer data, never memory.
 
 ## Billing and Instantly (root tools)
 
-`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They run on every surface. `available: false` is an evidence gap, not a reason to retry.
+`read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, all bare and app-scoped. Call `list_instantly_subworkspaces` first and prefer the selected subworkspace id; `read_instantly_subworkspace` takes `accounts`, `campaigns`, or `emails` and pages with `startingAfter`. They retain their input validation and bounded result handling. `available: false` is an evidence gap, not a reason to retry.
 
 ## Fixed evidence reads (root tools)
 
@@ -69,4 +69,4 @@ The same fixed reads Foreman used to produce the evidence, all bare, so a claim 
 
 ## Unavailable sources
 
-A user-scoped connection fails with `principal_required` under a service principal, which is normal for Slack intake, and with `task_mode_sign_in_unavailable` when the session's user has not authorized it. You are never shown a sign-in link and never wait for one. A managed connection can fail on operator configuration. Either way: record the lane as unavailable once, decide whether the missing evidence is material, and never ask for authorization, retry the same source, or substitute another for it.
+Company evidence uses the shared app-scoped Foreman Executor connection. A missing connector, unavailable binding, or denied provider is an unavailable source for this review, not a request for the ticket requester to sign in. Record it once, decide whether the missing evidence is material, and continue without retrying or substituting another source.

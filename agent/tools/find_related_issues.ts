@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { linearAuth } from "#lib/constants.js";
+import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
 import { isAutonomous, isIntakeOnly } from "#lib/trust.js";
 
@@ -34,11 +34,9 @@ export default defineTool({
       };
     }
     try {
-      const { token } = await ctx.getToken(linearAuth);
       return await findRelatedIssues(
-        token,
         { ...input, windowed: isIntakeOnly(auth) },
-        { signal: ctx.abortSignal }
+        { client: executorClient(ctx), signal: ctx.abortSignal }
       );
     } catch (error) {
       if (ctx.abortSignal.aborted) {

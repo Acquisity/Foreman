@@ -1,0 +1,13 @@
+--- a/packages/core/sdk/src/tool-result.ts
++++ b/packages/core/sdk/src/tool-result.ts
+@@ -15,2 +15,4 @@
+   retryable: Schema.optional(Schema.Boolean),
++  /** Raw Retry-After header: delta seconds or an HTTP date. */
++  retryAfter: Schema.optional(Schema.String),
+ });
+--- a/packages/plugins/openapi/src/sdk/backing.ts
++++ b/packages/plugins/openapi/src/sdk/backing.ts
+@@ -789,2 +789,3 @@
+         status: result.status,
++        ...(result.headers["retry-after"] ? { retryAfter: result.headers["retry-after"] } : {}),
+         message: extractOpenApiUpstreamMessage(result.error, result.status),

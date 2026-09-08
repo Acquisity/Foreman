@@ -6,7 +6,7 @@ Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). I
 
 ## Surfaces
 
-Foreman runs on four channels, with a couple of extensions and a set of mostly read-only service connections:
+Foreman runs on four channels, with GitHub and browser extensions, one shared company-service Executor connection, and a personal Supermemory connection:
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions; a trusted `factory` label hands an issue to the pipeline unattended; red CI on a Foreman pull request triggers a fix loop.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues stay general by default; the factory loads on demand.
@@ -15,7 +15,7 @@ Foreman runs on four channels, with a couple of extensions and a set of mostly r
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman also connects to mostly read-only services through MCP: Autumn, Stripe, Sentry, Axiom, PostHog, PlanetScale (read-only, with a size-capped authored read-query tool), Neon, Resend, Intercom, Jam, Lucent, Modem, Exa, OpenRouter, Supermemory, Vercel, Inngest, and Linear. Configured intake-only channels use separate fixed read-only Autumn and Stripe API tools so they do not depend on the Slack requester's personal OAuth grant. Instantly investigation uses fixed GET-only API tools backed by the IBG admin workspace, and Intercom uses its private Acquisity workspace app. Both credentials live in app-scoped API-key connectors, so Slack callers are never asked to authorize them. Connection UIDs are in [.env.example](.env.example); tokens are brokered by Vercel Connect and never reach the model.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, critic, factory, and scheduled work use one shared Foreman toolkit. Personal Supermemory remains a separate user-scoped connection. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
@@ -41,7 +41,7 @@ After internal review, Foreman opens a normal pull request and stabilizes the sa
 
 ## Trust and safety
 
-`agent/lib/trust.ts` is the single trust authority. Unattended runs (GitHub factory-label intake, CI fix, and schedules) are denied shared-config writes (repository knowledge, model overrides, connection writes) because nobody is watching to answer an approval card. Trusted attended callers write directly; other callers park on a card. Merge tools are absent; the delivery boundary is a feature branch and pull request in both paths. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
+`agent/lib/trust.ts` is the single trust authority. Unattended runs (GitHub factory-label intake, CI fix, and schedules) are denied shared-config writes (repository knowledge and model overrides), plus personal Supermemory writes because nobody is watching to answer an approval card. For repository knowledge and model settings, trusted attended callers write directly; other attended callers park on a card. Company services share the Executor catalog across workflows. Merge tools are absent; the delivery boundary is a feature branch and pull request in both paths. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
 
 ## Repository targeting
 
@@ -76,22 +76,27 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 
 ## Configuration
 
+| Executor setting | Purpose |
+| --- | --- |
+| `EXECUTOR_MCP_CONNECTOR` | App-scoped Vercel Connect UID for the Executor bearer credential |
+| `EXECUTOR_BASE_URL` | HTTPS origin; defaults to `https://executor.acquisity.ai` |
+| `EXECUTOR_OPERATION_BINDINGS` | Verified operation paths only; argument schemas live in source; no provider tokens |
+
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GITHUB_CONNECTOR` | `github/foreman-agent` | GitHub channel, API, and brokered git credentials |
-| `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and MCP |
+| `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and vision attachment reads |
+| `SLACK_CONNECTOR` | `slack/acquisity-foreman` | Slack inbound delivery and replies |
 | `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
 | `FOREMAN_BRANCH_PREFIX` | `foreman/` | Factory-owned feature branches, recognized for red-CI stabilization |
 | `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
-| `AUTUMN_API_CONNECTOR` | `api.useautumn.com/acquisity-foreman-autumn-api` (required) | App-scoped API-key connector for fixed Autumn reads in every configured intake-only channel |
-| `STRIPE_API_CONNECTOR` | `api.stripe.com/acquisity-foreman-stripe-api` (required) | App-scoped restricted-key connector for fixed Stripe reads in every configured intake-only channel |
-| `INSTANTLY_API_CONNECTOR` | `api.instantly.ai/acquisity-foreman` (required) | App-scoped API-key connector for fixed Instantly Workspace Group, account, campaign, and email-preview reads |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
 
-See [.env.example](.env.example) for all MCP connection UIDs. No repository or setup command is configured through the environment.
+See [.env.example](.env.example) for the Executor and retained channel/personal connection settings. No repository or setup command is configured through the environment.
 
 ### Session limits
 
@@ -101,7 +106,7 @@ The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agen
 
 Foreman reads Instantly through the Acquisity admin workspace `IBG` (`24f5c554-bf6c-4f51-a909-d25d9617cff9`). The runtime lists Workspace Group pages up to a 100-page safety cap, keeps only accepted memberships, and applies `x-as-workspace` only after resolving the selected subworkspace against that complete bounded result. Reaching the cap fails closed instead of returning a partial list. Every resource page returns the selected workspace name and ID.
 
-Create an API Key connector in Vercel Connect with UID `api.instantly.ai/acquisity-foreman`, link it to the Foreman project environments that need the integration, and store a fresh IBG admin-workspace API key inside it. Prefer the narrow scopes `workspace_group_members:read`, `accounts:read`, `campaigns:read`, and `emails:read`; `all:read` is acceptable when operationally simpler. Never grant create, update, delete, send, or any `*:all` scope. Set `INSTANTLY_API_CONNECTOR` to the connector UID, never to the API key.
+Keep the existing IBG admin-workspace connection in Executor with read-only workspace-group, account, campaign, and email scopes. Include those operations in the shared Foreman toolkit. Foreman still resolves complete workspace membership before selecting `x-as-workspace` and filters the returned account, campaign, and email fields. The underlying operations remain discoverable in that same toolkit; skills prefer the bounded helpers.
 
 To rotate the credential, create a replacement key with the same read-only scopes, replace the credential in the existing connector, verify that `list_instantly_subworkspaces` and one bounded resource read succeed, then revoke the old key. The key must not enter source control, app environment variables, browser responses, logs, tickets, or tool results.
 
@@ -117,6 +122,6 @@ pnpm eval --tag fast
 pnpm report:capabilities
 ```
 
-`pnpm validate` runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. The `validate` GitHub Actions workflow runs the same `pnpm validate` on every pull request to `main`, with placeholder connector UIDs as plain workflow environment variables so `eve info` compiles the manifest and the manifest-dependent tests run for real; it references no secret. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
+`pnpm validate` checks generated Linear-spec drift, then runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. The `validate` GitHub Actions workflow runs the same `pnpm validate` on every pull request to `main`, with placeholder connector UIDs as plain workflow environment variables so `eve info` compiles the manifest and the manifest-dependent tests run for real; it references no secret. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
 
-Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Autumn, Stripe, Instantly, and Intercom credentials; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.
+Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Executor credential; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.

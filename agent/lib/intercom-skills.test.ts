@@ -135,7 +135,7 @@ test("Intercom billing skill preserves evidence order and human-only action", ()
     "expected future subscription or one-off invoice",
     "read_autumn_billing",
     "read_stripe_billing",
-    "shared app-scoped Connect credentials",
+    "shared app-scoped Executor connection",
   ]) {
     assert.ok(billingSkill.includes(phrase), phrase);
   }
@@ -253,7 +253,7 @@ test("Intercom skills own their tool references", () => {
   );
 
   for (const phrase of [
-    "## Intercom (`intercom__`)",
+    "## Intercom (Executor: intercom)",
     "search_investigation_memory",
     "accepts no Linear project metadata",
     "known conversation id",
@@ -266,7 +266,7 @@ test("Intercom skills own their tool references", () => {
   }
 
   for (const phrase of [
-    "## Intercom (`intercom__`)",
+    "## Intercom (Executor: intercom)",
     "`fetch`, `get_conversation`",
     "planetscale_execute_read_query",
     "## Autumn (root tool)",

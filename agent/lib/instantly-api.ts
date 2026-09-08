@@ -1,6 +1,13 @@
+import { isConnectionAuthorizationFailedError } from "eve/connections";
 import { z } from "zod";
+import {
+  type OperationRequest,
+  type ProviderClient,
+  type ProviderResult,
+  requiredClient,
+} from "./executor/operations.js";
+import { ExecutorError } from "./executor/transport.js";
 
-const INSTANTLY_API_URL = "https://api.instantly.ai/api/v2";
 const IBG_ADMIN_WORKSPACE_ID = "24f5c554-bf6c-4f51-a909-d25d9617cff9";
 const PAGE_LIMIT = 100;
 const MAX_GROUP_PAGES = 100;
@@ -9,7 +16,6 @@ const MAX_RETRY_DELAY_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
-type Fetcher = typeof fetch;
 type Sleeper = (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 
 const workspaceGroupMemberSchema = z.object({
@@ -36,7 +42,7 @@ export interface InstantlyWorkspace {
 export type InstantlyAdminWorkspace = InstantlyWorkspace;
 
 interface InstantlyApiOptions {
-  fetch?: Fetcher;
+  client?: ProviderClient;
   signal?: AbortSignal;
   sleep?: Sleeper;
 }
@@ -130,120 +136,9 @@ const defaultSleep: Sleeper = (milliseconds, signal) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
-/** Bounds a disposal by abort and removes its listener whichever settles first. */
-const settleBeforeAbort = (
-  settling: Promise<unknown> | undefined,
-  signal?: AbortSignal
-): Promise<void> => {
-  if (settling === undefined) {
-    return Promise.resolve();
-  }
-  if (signal === undefined) {
-    return settling.then(() => undefined);
-  }
-  return new Promise((resolve) => {
-    const onAbort = (): void => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-    settling.then(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    });
-  });
-};
-
-const discardResponseBody = async (
-  response: Response,
-  signal?: AbortSignal
-): Promise<void> => {
-  const discarded = response.body?.cancel().catch(() => undefined);
-  await settleBeforeAbort(discarded, signal);
-};
-
-const readBeforeAbort = <T>(
-  reader: ReadableStreamDefaultReader<T>,
-  signal?: AbortSignal
-): Promise<ReadableStreamReadResult<T> | null> => {
-  if (signal === undefined) {
-    return reader.read();
-  }
-  return new Promise((resolve, reject) => {
-    const onAbort = (): void => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(null);
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-    reader.read().then(
-      (result) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(result);
-      },
-      (error: unknown) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
-      }
-    );
-  });
-};
-
-const readBoundedText = async (
-  response: Response,
-  signal?: AbortSignal
-): Promise<string> => {
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-    await discardResponseBody(response, signal);
-    if (signal?.aborted) {
-      throw signal.reason;
-    }
-    throw tooMuchData();
-  }
-  if (response.body === null) {
-    return "";
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: stream completion terminates the loop.
-  while (true) {
-    // biome-ignore lint/performance/noAwaitInLoops: chunks must be read sequentially to enforce the cap.
-    const result = await readBeforeAbort(reader, signal);
-    if (result === null) {
-      reader.cancel().catch(() => undefined);
-      throw signal?.reason;
-    }
-    const { done, value } = result;
-    if (done) {
-      break;
-    }
-    totalBytes += value.byteLength;
-    if (totalBytes > MAX_RESPONSE_BYTES) {
-      const cancelled = reader.cancel().catch(() => undefined);
-      await settleBeforeAbort(cancelled, signal);
-      if (signal?.aborted) {
-        throw signal.reason;
-      }
-      throw tooMuchData();
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, totalBytes).toString("utf8");
-};
-
-const retryAfterSeconds = (response: Response): number | null => {
-  const value = response.headers.get("retry-after");
-  if (value === null) {
+const retryAfterSeconds = (response: ProviderResult): number | null => {
+  const value = response.retryAfter;
+  if (value === undefined) {
     return null;
   }
   const seconds = Number(value);
@@ -261,7 +156,7 @@ const isAbortError = (error: unknown, signal?: AbortSignal): boolean =>
   signal?.aborted === true ||
   (error instanceof Error && error.name === "AbortError");
 
-const statusError = (response: Response): InstantlyApiError => {
+const statusError = (response: ProviderResult): InstantlyApiError => {
   const { status } = response;
   if (status === 401) {
     return new InstantlyApiError(
@@ -300,25 +195,19 @@ const statusError = (response: Response): InstantlyApiError => {
   });
 };
 
-const parsePage = async (
-  response: Response,
-  signal?: AbortSignal
-): Promise<z.infer<typeof pageSchema>> => {
-  if (!response.ok) {
-    const error = statusError(response);
-    await discardResponseBody(response, signal);
-    if (signal?.aborted) {
-      throw signal.reason;
-    }
-    throw error;
+const parsePage = (response: ProviderResult): z.infer<typeof pageSchema> => {
+  if (response.status < 200 || response.status >= 300) {
+    throw statusError(response);
   }
-  const text = await readBoundedText(response, signal);
+  if (
+    Buffer.byteLength(JSON.stringify(response.data), "utf8") >
+    MAX_RESPONSE_BYTES
+  ) {
+    throw tooMuchData();
+  }
   try {
-    return pageSchema.parse(JSON.parse(text) as unknown);
+    return pageSchema.parse(response.data);
   } catch (error) {
-    if (error instanceof InstantlyApiError) {
-      throw error;
-    }
     throw new InstantlyApiError("Instantly returned an unreadable response.", {
       cause: error,
       kind: "invalid-response",
@@ -367,89 +256,62 @@ const startDeadline = (callerSignal?: AbortSignal): RequestDeadline => {
   };
 };
 
-/** Runs one deadline-covered step, reporting an expiry as a timeout. */
-const withDeadline = async <T>(
-  deadline: RequestDeadline,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw deadline.expiry(error) ?? error;
-  }
-};
-
-/**
- * Disposes a retryable response inside the attempt's own deadline, so a body
- * whose cancellation never settles cannot outlive the request's own time. The
- * deadline is disarmed only once the attempt is finished with the response.
- *
- * Because that bound is an abort, disposal can end without having finished.
- * The composed signal's first abort reason, which never changes once set,
- * decides what the attempt does next: this request's own expiry is reported as
- * a timeout and never retried, a caller's cancellation propagates unchanged,
- * and a disposal that genuinely finished leaves the retry untouched.
- */
-const disposeResponse = async (
-  response: Response,
-  deadline: RequestDeadline
-): Promise<void> => {
-  try {
-    await discardResponseBody(response, deadline.signal);
-  } finally {
-    deadline.clear();
-  }
-  if (deadline.signal.aborted) {
-    const reason: unknown = deadline.signal.reason;
-    throw deadline.expiry(reason) ?? reason;
-  }
-};
-
-const requestHeaders = (
-  token: string,
-  workspaceId: string | undefined
-): Record<string, string> => ({
-  Authorization: `Bearer ${token}`,
-  ...(workspaceId === undefined ? {} : { "x-as-workspace": workspaceId }),
-});
-
 /** The backoff for a retryable status, or null when it exceeds the wait cap. */
-const retryDelayMs = (response: Response, attempt: number): number | null => {
+const retryDelayMs = (
+  response: ProviderResult,
+  attempt: number
+): number | null => {
   const retryAfter = retryAfterSeconds(response);
+  // Older Executor versions discard failure headers. Never guess a short wait after 429.
+  if (response.status === 429 && retryAfter === null) {
+    return null;
+  }
   const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;
   return delay > MAX_RETRY_DELAY_MS ? null : delay;
 };
 
+function classifyTransportFailure(
+  error: unknown,
+  deadline: RequestDeadline,
+  signal?: AbortSignal
+): void {
+  if (isConnectionAuthorizationFailedError(error) && !error.retryable) {
+    throw error;
+  }
+  // A request that ran out of its own time is reported, never retried.
+  const expired = deadline.expiry(error);
+  if (expired !== null) {
+    throw expired;
+  }
+  if (isAbortError(error, signal)) {
+    throw error;
+  }
+  if (error instanceof ExecutorError && error.code === "response_too_large") {
+    throw tooMuchData();
+  }
+}
+
 const callPage = async (
-  token: string,
-  path: string,
-  workspaceId: string | undefined,
+  request: OperationRequest,
   options: InstantlyApiOptions
 ): Promise<z.infer<typeof pageSchema>> => {
-  const fetchImpl = options.fetch ?? fetch;
+  const client = requiredClient(options.client);
   const sleep = options.sleep ?? defaultSleep;
   let attempt = 0;
 
   while (attempt < 3) {
     const deadline = startDeadline(options.signal);
-    let response: Response;
+    let response: ProviderResult;
     try {
       // biome-ignore lint/performance/noAwaitInLoops: retries are intentionally sequential.
-      response = await fetchImpl(`${INSTANTLY_API_URL}${path}`, {
-        headers: requestHeaders(token, workspaceId),
-        method: "GET",
+      response = await client(request, {
+        maxBytes: MAX_RESPONSE_BYTES,
         signal: deadline.signal,
       });
+      deadline.signal.throwIfAborted();
     } catch (error) {
       deadline.clear();
-      // A request that ran out of its own time is reported, never retried.
-      const expired = deadline.expiry(error);
-      if (expired !== null) {
-        throw expired;
-      }
-      if (isAbortError(error, options.signal)) {
-        throw error;
-      }
+      classifyTransportFailure(error, deadline, options.signal);
       if (attempt < 2) {
         const delay = 500 * 2 ** attempt;
         attempt += 1;
@@ -462,19 +324,11 @@ const callPage = async (
       });
     }
 
+    deadline.clear();
     if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) {
-      try {
-        // The deadline still covers the response body this request is reading.
-        return await withDeadline(deadline, () =>
-          parsePage(response, deadline.signal)
-        );
-      } finally {
-        deadline.clear();
-      }
+      return parsePage(response);
     }
-
     const delay = retryDelayMs(response, attempt);
-    await disposeResponse(response, deadline);
     if (delay === null) {
       throw statusError(response);
     }
@@ -546,9 +400,8 @@ const enforceOutputBudget = <T>(value: T): T => {
   return value;
 };
 
-/** Lists accepted subworkspaces from a complete, safety-bounded group result. */
-export async function listInstantlySubworkspaces(
-  token: string,
+/** Complete membership validation is internal; only returned tool results use the output cap. */
+async function loadWorkspaceGroup(
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyWorkspaceGroup> {
   const members: z.infer<typeof workspaceGroupMemberSchema>[] = [];
@@ -556,15 +409,15 @@ export async function listInstantlySubworkspaces(
   let cursor: string | null = null;
 
   for (let pageNumber = 0; pageNumber < MAX_GROUP_PAGES; pageNumber += 1) {
-    const query = new URLSearchParams({ limit: String(PAGE_LIMIT) });
-    if (cursor !== null) {
-      query.set("starting_after", cursor);
-    }
     // biome-ignore lint/performance/noAwaitInLoops: Workspace Group cursors are sequential.
     const page = await callPage(
-      token,
-      `/workspace-group-members?${query.toString()}`,
-      undefined,
+      {
+        input: {
+          limit: PAGE_LIMIT,
+          ...(cursor === null ? {} : { starting_after: cursor }),
+        },
+        operation: "instantly.workspace-group-members",
+      },
       options
     );
     try {
@@ -621,7 +474,17 @@ export async function listInstantlySubworkspaces(
     );
   }
 
-  return enforceOutputBudget({
+  const accepted = members.filter((member) => member.status === "accepted");
+  if (
+    new Set(accepted.map((member) => member.sub_workspace_id)).size !==
+    accepted.length
+  ) {
+    throw new InstantlyApiError(
+      "Instantly returned duplicate accepted workspace IDs.",
+      { kind: "invalid-response" }
+    );
+  }
+  return {
     adminWorkspace: {
       id: first.admin_workspace_id,
       name: first.admin_workspace_name,
@@ -630,21 +493,116 @@ export async function listInstantlySubworkspaces(
       pending: members.filter((member) => member.status === "pending").length,
       rejected: members.filter((member) => member.status === "rejected").length,
     },
-    subworkspaces: members
-      .filter((member) => member.status === "accepted")
-      .map((member) => ({
-        id: member.sub_workspace_id,
-        name: member.sub_workspace_name,
-      })),
-  });
+    subworkspaces: accepted.map((member) => ({
+      id: member.sub_workspace_id,
+      name: member.sub_workspace_name,
+    })),
+  };
+}
+
+export const instantlyWorkspaceDiscoverySchema = z.object({
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Maximum results, default 20. The byte limit may return fewer."),
+  search: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(
+      "Literal case-insensitive workspace name fragment. Omit to browse accepted workspaces."
+    ),
+  startingAfter: z
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "The previous nextStartingAfter cursor. Keep the same search when continuing."
+    ),
+});
+
+type InstantlyWorkspaceDiscovery = z.infer<
+  typeof instantlyWorkspaceDiscoverySchema
+>;
+
+interface InstantlyWorkspacePage extends InstantlyWorkspaceGroup {
+  membershipComplete: true;
+  nextStartingAfter: string | null;
+  totalAcceptedSubworkspaces: number;
+  totalMatches: number;
+}
+
+/** Search/page only after complete membership validation, within the public byte cap. */
+export async function listInstantlySubworkspaces(
+  options: InstantlyApiOptions = {},
+  query: InstantlyWorkspaceDiscovery = {}
+): Promise<InstantlyWorkspacePage> {
+  const parsed = instantlyWorkspaceDiscoverySchema.safeParse(query);
+  if (!parsed.success) {
+    throw new InstantlyApiError(
+      "Invalid Instantly workspace search or pagination input.",
+      {
+        kind: "invalid-input",
+      }
+    );
+  }
+  const group = await loadWorkspaceGroup(options);
+  const { search, limit = 20, startingAfter } = parsed.data;
+  const fragment = search === undefined ? undefined : normalizeName(search);
+  const matches = group.subworkspaces
+    .filter(
+      (workspace) =>
+        fragment === undefined ||
+        (workspace.name !== null &&
+          normalizeName(workspace.name).includes(fragment))
+    )
+    .sort((left, right) => left.id.localeCompare(right.id, "en-US"));
+  const cursorIndex =
+    startingAfter === undefined
+      ? -1
+      : matches.findIndex((workspace) => workspace.id === startingAfter);
+  if (startingAfter !== undefined && cursorIndex === -1) {
+    throw new InstantlyApiError(
+      "The Instantly workspace cursor no longer matches this search. Restart discovery with the same name fragment.",
+      { kind: "invalid-input" }
+    );
+  }
+  const start = cursorIndex + 1;
+  const page: InstantlyWorkspacePage = {
+    adminWorkspace: group.adminWorkspace,
+    excludedMemberships: group.excludedMemberships,
+    membershipComplete: true,
+    nextStartingAfter: null,
+    subworkspaces: matches.slice(start, start + limit),
+    totalAcceptedSubworkspaces: group.subworkspaces.length,
+    totalMatches: matches.length,
+  };
+  // Names can be large. Trim the public page without discarding internal membership evidence.
+  for (;;) {
+    page.nextStartingAfter =
+      start + page.subworkspaces.length < matches.length
+        ? (page.subworkspaces.at(-1)?.id ?? null)
+        : null;
+    if (Buffer.byteLength(JSON.stringify(page), "utf8") <= MAX_RESPONSE_BYTES) {
+      return page;
+    }
+    if (page.subworkspaces.length <= 1) {
+      throw tooMuchData();
+    }
+    page.subworkspaces.pop();
+  }
 }
 
 const resolveWorkspace = async (
-  token: string,
   selector: InstantlyWorkspaceSelector,
   options: InstantlyApiOptions
 ): Promise<InstantlyWorkspace> => {
-  const group = await listInstantlySubworkspaces(token, options);
+  const group = await loadWorkspaceGroup(options);
   const matches = group.subworkspaces.filter((workspace) =>
     selector.id === undefined
       ? workspace.name !== null &&
@@ -693,71 +651,69 @@ const sanitizeItems = (
     return safe;
   });
 
-const appendEmailQuery = (
-  params: URLSearchParams,
-  query: InstantlyResourceQuery
-): void => {
-  params.set("preview_only", "true");
-  const values = {
-    campaign_id: query.campaignId,
-    eaccount: query.emailAccount,
-    email_type: query.emailType,
-    latest_of_thread:
-      query.latestOfThread === undefined
-        ? undefined
-        : String(query.latestOfThread),
-    lead: query.lead,
-    max_timestamp_created: query.maxTimestampCreated,
-    min_timestamp_created: query.minTimestampCreated,
-  };
-  for (const [name, value] of Object.entries(values)) {
-    if (value !== undefined) {
-      params.set(name, value);
-    }
-  }
-};
-
-const resourcePath = (
-  resource: InstantlyResource,
-  query: InstantlyResourceQuery
-): string => {
-  const limit = query.limit ?? 20;
+const resourceLimit = (value: number | undefined): number => {
+  const limit = value ?? 20;
   if (!Number.isInteger(limit) || limit < 1 || limit > PAGE_LIMIT) {
     throw new InstantlyApiError(
       "Instantly resource limit must be an integer from 1 to 100.",
       { kind: "invalid-input" }
     );
   }
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (query.startingAfter !== undefined) {
-    params.set("starting_after", query.startingAfter);
+  return limit;
+};
+
+const resourceRequest = (
+  resource: InstantlyResource,
+  query: InstantlyResourceQuery,
+  workspaceId: string,
+  limit: number
+): OperationRequest => {
+  const input = {
+    limit,
+    search: query.search,
+    starting_after: query.startingAfter,
+    status: query.status,
+    "x-as-workspace": workspaceId,
+  };
+  if (resource === "accounts") {
+    return {
+      input: { ...input, provider_code: query.providerCode },
+      operation: "instantly.accounts",
+    };
   }
-  if (query.search !== undefined) {
-    params.set("search", query.search);
+  if (resource === "campaigns") {
+    return { input, operation: "instantly.campaigns" };
   }
-  if (query.status !== undefined) {
-    params.set("status", String(query.status));
-  }
-  if (resource === "accounts" && query.providerCode !== undefined) {
-    params.set("provider_code", String(query.providerCode));
-  }
-  if (resource === "emails") {
-    appendEmailQuery(params, query);
-  }
-  return `/${resource}?${params.toString()}`;
+  return {
+    input: {
+      ...input,
+      campaign_id: query.campaignId,
+      eaccount: query.emailAccount,
+      email_type: query.emailType,
+      latest_of_thread: query.latestOfThread,
+      lead: query.lead,
+      max_timestamp_created: query.maxTimestampCreated,
+      min_timestamp_created: query.minTimestampCreated,
+      preview_only: true,
+    },
+    operation: "instantly.emails",
+  };
 };
 
 /** Reads one bounded resource page as an accepted subworkspace. */
 export async function readInstantlySubworkspace(
-  token: string,
   selector: InstantlyWorkspaceSelector,
   resource: InstantlyResource,
   query: InstantlyResourceQuery = {},
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyResourcePage> {
-  const path = resourcePath(resource, query);
-  const workspace = await resolveWorkspace(token, selector, options);
-  const page = await callPage(token, path, workspace.id, options);
+  // Validate the query before any membership request.
+  const limit = resourceLimit(query.limit);
+  const workspace = await resolveWorkspace(selector, options);
+  const page = await callPage(
+    resourceRequest(resource, query, workspace.id, limit),
+    options
+  );
   return enforceOutputBudget({
     items: sanitizeItems(resource, page.items),
     nextStartingAfter: page.next_starting_after ?? null,

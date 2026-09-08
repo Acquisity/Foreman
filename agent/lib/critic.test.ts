@@ -149,7 +149,10 @@ describe("critic subagent", () => {
       execFileSync("npx", ["eve", "info", "--json"], {
         cwd: appRoot,
         encoding: "utf8",
-        env: stubEnv(),
+        env: {
+          ...stubEnv(),
+          EXECUTOR_BASE_URL: "https://executor.acquisity.ai",
+        },
         stdio: ["ignore", "pipe", "pipe"],
       })
     ) as {

@@ -1,3 +1,5 @@
+process.env.SUPERMEMORY_MCP_CONNECTOR ??= "placeholder/foreman-ci";
+
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
@@ -10,8 +12,6 @@ import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
 // map, which needs the rest of the connector environment `eve info` needs;
 // `pnpm validate` runs both under the same environment.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
-process.env.PLANETSCALE_MCP_CONNECTOR =
-  "planet-scale-read-only-foreman/acquisity-foreman-planet-scale";
 
 const {
   CAPABILITY_LANES,

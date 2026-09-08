@@ -1,10 +1,10 @@
 ---
-description: "Review GitHub Actions and automation PRs for workflow security, least-privilege permissions, PR trigger safety, secret exposure, third-party actions, script injection, caches/artifacts, and self-hosted runner risk. Use when reviewing another repository's CI, workflow, or automation changes; Foreman itself has no .github/workflows today, so this skill is for reviewing Actions in repositories being worked on."
+description: "Review GitHub Actions and automation PRs for workflow security, least-privilege permissions, PR trigger safety, secret exposure, third-party actions, script injection, caches/artifacts, and self-hosted runner risk. Use when reviewing CI, workflow, or automation changes in the selected repository, including Foreman's validation workflow when Foreman is the selected target."
 ---
 
 # Foreman GitHub Actions Review
 
-Review changed CI, workflow, and repository automation files for concrete workflow compromise or secret exposure risk. This skill reviews GitHub Actions in the repository under review, not Foreman's own CI (Foreman has no `.github/workflows` today).
+Review changed CI, workflow, and repository automation files for concrete workflow compromise or secret exposure risk. Apply it to the selected repository. Foreman's own PR validation is defined in `.github/workflows/validate.yml`.
 
 ## File Map
 

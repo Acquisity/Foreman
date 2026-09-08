@@ -1,8 +1,13 @@
 import { z } from "zod";
+import {
+  type OperationRequest,
+  type ProviderClient,
+  requiredClient,
+} from "./executor/operations.js";
+import { ExecutorError } from "./executor/transport.js";
 import { redact } from "./investigation-memory/case.js";
 
-/** Inngest REST v2. The same API key the MCP connector holds authenticates it. */
-export const INNGEST_API_BASE = "https://api.inngest.com/v2";
+/** Inngest REST v2. Executor supplies the app credential behind the injected transport. */
 const REQUEST_TIMEOUT_MS = 15_000;
 /** A trace with output can be large; anything past this is refused, not buffered. */
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -61,7 +66,7 @@ export type FindFunctionRunsResult = z.infer<
 type TraceStep = z.infer<typeof traceStepSchema>;
 
 export interface InngestApiOptions {
-  fetch?: typeof fetch;
+  client?: ProviderClient;
   now?: Date;
   signal?: AbortSignal;
 }
@@ -106,71 +111,42 @@ const spanRow = z.looseObject({
 });
 
 async function getJson(
-  token: string,
-  path: string,
+  request: OperationRequest,
   opts?: InngestApiOptions
 ): Promise<unknown> {
-  const fetchImpl = opts?.fetch ?? fetch;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  let response: Response;
+  const signal = opts?.signal
+    ? AbortSignal.any([opts.signal, timeout])
+    : timeout;
   try {
-    response = await fetchImpl(`${INNGEST_API_BASE}${path}`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-      signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    const response = await requiredClient(opts?.client)(request, {
+      maxBytes: MAX_RESPONSE_BYTES,
+      signal,
     });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        `Inngest API ${request.operation} failed: HTTP ${response.status}.`
+      );
+    }
+    if (
+      Buffer.byteLength(JSON.stringify(response.data), "utf8") >
+      MAX_RESPONSE_BYTES
+    ) {
+      throw new ExecutorError("response_too_large");
+    }
+    return response.data;
   } catch (error) {
-    if (opts?.signal?.aborted) {
+    if (signal.aborted) {
       throw error;
     }
-    throw new Error(
-      `Inngest API ${path.split("?")[0]} failed: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
-    );
-  }
-  if (!response.ok) {
-    throw new Error(
-      `Inngest API ${path.split("?")[0]} failed: HTTP ${response.status}.`
-    );
-  }
-  return JSON.parse(
-    await readBoundedText(response, path.split("?")[0] ?? path)
-  );
-}
-
-/** Reads a body up to {@link MAX_RESPONSE_BYTES}, cancelling the stream past it. */
-async function readBoundedText(
-  response: Response,
-  what: string
-): Promise<string> {
-  const tooBig = () =>
-    new Error(
-      `Inngest API ${what} returned more than ${MAX_RESPONSE_BYTES} bytes.`
-    );
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-    throw tooBig();
-  }
-  if (response.body === null) {
-    return "";
-  }
-  const reader = response.body.getReader();
-  const chunks: Buffer[] = [];
-  let total = 0;
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: the stream's done flag terminates the loop.
-  while (true) {
-    // biome-ignore lint/performance/noAwaitInLoops: chunks are read sequentially to enforce the cap.
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+    if (error instanceof ExecutorError && error.code === "response_too_large") {
+      throw new Error(
+        `Inngest API ${request.operation} returned more than ${MAX_RESPONSE_BYTES} bytes.`,
+        { cause: error }
+      );
     }
-    total += value.byteLength;
-    if (total > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => undefined);
-      throw tooBig();
-    }
-    chunks.push(Buffer.from(value));
+    throw error;
   }
-  return Buffer.concat(chunks, total).toString("utf8");
 }
 
 const MAX_APP_PAGES = 5;
@@ -194,16 +170,18 @@ const runPage = z.looseObject({
  * route answers 404, or 200 with no `data` list (seen 2026-08-28).
  */
 async function runsInApp(
-  token: string,
   appId: string,
   functionId: string,
-  params: URLSearchParams,
+  params: { limit: number; from: string; status: string },
   opts?: InngestApiOptions
 ): Promise<z.infer<typeof runPage> | null> {
-  const path = `/apps/${encodeURIComponent(appId)}/functions/${encodeURIComponent(functionId)}/runs?${params.toString()}`;
+  const request = {
+    input: { ...params, appId, functionId },
+    operation: "inngest.functionRuns",
+  } as const;
   let body: unknown;
   try {
-    body = await getJson(token, path, opts);
+    body = await getJson(request, opts);
   } catch (error) {
     if (
       !opts?.signal?.aborted &&
@@ -226,25 +204,26 @@ async function runsInApp(
  * accepts a dotted function id), so a function id first lists the apps.
  */
 async function listRuns(
-  token: string,
   functionId: string | undefined,
-  params: URLSearchParams,
+  params: { limit: number; from: string; status: string },
   opts?: InngestApiOptions
 ): Promise<z.infer<typeof runPage>> {
   if (!functionId) {
     return runPage.parse(
-      await getJson(token, `/runs?${params.toString()}`, opts)
+      await getJson({ input: params, operation: "inngest.runs" }, opts)
     );
   }
   const appIds: string[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < MAX_APP_PAGES; page += 1) {
-    const appParams = new URLSearchParams({ limit: "20" });
-    if (cursor) {
-      appParams.set("cursor", cursor);
-    }
     // biome-ignore lint/performance/noAwaitInLoops: app pages are sequential cursors.
-    const body = await getJson(token, `/apps?${appParams.toString()}`, opts);
+    const body = await getJson(
+      {
+        input: { limit: 20, ...(cursor ? { cursor } : {}) },
+        operation: "inngest.apps",
+      },
+      opts
+    );
     const apps: z.infer<typeof appPage> = appPage.parse(body);
     appIds.push(...apps.data.map((app) => app.id));
     cursor = apps.page?.hasMore ? (apps.page.cursor ?? null) : null;
@@ -261,7 +240,7 @@ async function listRuns(
   let hasMore = false;
   for (const appId of appIds) {
     // biome-ignore lint/performance/noAwaitInLoops: one app at a time; there is one app today.
-    const page = await runsInApp(token, appId, functionId, params, opts);
+    const page = await runsInApp(appId, functionId, params, opts);
     if (!page) {
       continue;
     }
@@ -283,19 +262,23 @@ async function listRuns(
 
 /** The trace with step output; when Inngest refuses that, the trace without it. */
 async function getTrace(
-  token: string,
   runId: string,
   opts?: InngestApiOptions
 ): Promise<unknown> {
-  const path = `/runs/${encodeURIComponent(runId)}/trace`;
   try {
-    return await getJson(token, `${path}?includeOutput=true`, opts);
+    return await getJson(
+      { input: { includeOutput: true, runId }, operation: "inngest.trace" },
+      opts
+    );
   } catch (withOutput) {
     if (opts?.signal?.aborted) {
       throw withOutput;
     }
     try {
-      return await getJson(token, path, opts);
+      return await getJson(
+        { input: { runId }, operation: "inngest.trace" },
+        opts
+      );
     } catch (withoutOutput) {
       if (opts?.signal?.aborted) {
         throw withoutOutput;
@@ -345,21 +328,18 @@ function flattenSteps(
  * one function when an id is given), then the trace of the newest run.
  */
 export async function findFunctionRuns(
-  token: string,
   input: FindFunctionRunsInput,
   opts?: InngestApiOptions
 ): Promise<FindFunctionRunsResult> {
   try {
     const now = opts?.now ?? new Date();
     const from = new Date(now.getTime() - input.sinceHours * 60 * 60 * 1000);
-    const params = new URLSearchParams({
+    const params = {
       from: from.toISOString(),
-      limit: String(RUN_LIMIT),
-      order: "DESC",
+      limit: RUN_LIMIT,
       status: input.status.toUpperCase(),
-      timeField: "queuedAt",
-    });
-    const listed = await listRuns(token, input.functionId, params, opts);
+    };
+    const listed = await listRuns(input.functionId, params, opts);
 
     const runs = listed.data.map((row) => {
       const run = runRow.parse(row);
@@ -388,7 +368,7 @@ export async function findFunctionRuns(
         .looseObject({
           data: z.looseObject({ rootSpan: loose.optional() }).optional(),
         })
-        .parse(await getTrace(token, newest.runId, opts));
+        .parse(await getTrace(newest.runId, opts));
       const steps: TraceStep[] = [];
       const overflow = flattenSteps(trace.data?.rootSpan ?? {}, steps, true);
       return {

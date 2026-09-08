@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { ProviderClient } from "./executor/operations.js";
 import {
   ENGINEERING_TEAM_ID,
   findRelatedIssues,
@@ -10,12 +11,7 @@ import {
 const WAS_WRITTEN = /was written/u;
 
 const json = (body: unknown, status = 200) =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status,
-    })
-  );
+  Promise.resolve({ data: body, status });
 
 const node = (id: string) => ({
   assignee: null,
@@ -39,27 +35,56 @@ const page = (ids: string[], endCursor: string | null) => ({
 });
 
 describe("linearGraphql", () => {
-  it("sends a bearer header and turns GraphQL errors into a thrown message", async () => {
-    let header = "";
-    const fetchStub: typeof fetch = (_url, init) => {
-      header = new Headers(init?.headers).get("Authorization") ?? "";
+  it("rejects malformed successful payloads before helpers consume them", async () => {
+    const cases = [
+      ["Document", null],
+      ["Document", { data: null }],
+      ["RelatedIssues", { data: { issues: {} } }],
+      ["IssueDocuments", { data: { issue: { documents: {}, id: "issue" } } }],
+      ["RouteIssueUpdate", { data: { issueUpdate: {} } }],
+    ] as const;
+    await Promise.all(
+      cases.map(([operation, data]) =>
+        assert.rejects(
+          linearGraphql(operation, {}, { client: () => json(data) }),
+          (error) =>
+            (error instanceof Error &&
+              error.message.startsWith("Linear GraphQL returned invalid")) ||
+            (error instanceof Error &&
+              error.message ===
+                "Linear GraphQL returned an invalid response envelope.")
+        )
+      )
+    );
+  });
+
+  it("keeps provider credentials out of the request descriptor and turns GraphQL errors into a thrown message", async () => {
+    let captured: unknown;
+    const fetchStub: ProviderClient = (request) => {
+      captured = request;
       return json({ errors: [{ message: "Field nope not found" }] });
     };
     await assert.rejects(
-      linearGraphql("secret-token", "{ x }", {}, { fetch: fetchStub }),
+      linearGraphql("Document", {}, { client: fetchStub }),
       (error: Error) =>
         error.message.includes("Field nope not found") &&
         !error.message.includes("secret-token")
     );
-    assert.equal(header, "Bearer secret-token");
+    assert.deepEqual(captured, {
+      input: { variables: {} },
+      operation: "linear.Document",
+    });
   });
 });
 
 describe("findRelatedIssues", () => {
   it("paginates masters until hasNextPage is false, windowed to the team", async () => {
     const variables: Record<string, unknown>[] = [];
-    const fetchStub: typeof fetch = (_url, init) => {
-      const body = JSON.parse(String(init?.body)) as {
+    const fetchStub: ProviderClient = (request) => {
+      const body = {
+        query: request.operation,
+        variables: "variables" in request.input ? request.input.variables : {},
+      } as {
         variables: Record<string, unknown>;
       };
       variables.push(body.variables);
@@ -68,9 +93,8 @@ describe("findRelatedIssues", () => {
         : json(page(["3"], null));
     };
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["billed twice"], scope: "masters", windowed: true },
-      { fetch: fetchStub, now: new Date("2026-08-31T00:00:00.000Z") }
+      { client: fetchStub, now: new Date("2026-08-31T00:00:00.000Z") }
     );
     assert.equal(variables.length, 2);
     assert.equal(variables[1]?.after, "c1");
@@ -88,17 +112,16 @@ describe("findRelatedIssues", () => {
 
   it("leaves masters unbounded when not windowed", async () => {
     const filters: Record<string, unknown>[] = [];
-    const fetchStub: typeof fetch = (_url, init) => {
-      const { variables } = JSON.parse(String(init?.body)) as {
-        variables: { filter: Record<string, unknown> };
+    const fetchStub: ProviderClient = (request) => {
+      const { variables } = {
+        variables: "variables" in request.input ? request.input.variables : {},
       };
-      filters.push(variables.filter);
+      filters.push(variables.filter as Record<string, unknown>);
       return json(page([], null));
     };
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.equal(filters[0]?.createdAt, undefined);
     assert.equal(result.createdAfter, null);
@@ -106,19 +129,19 @@ describe("findRelatedIssues", () => {
 
   it("requires every word of a phrase, each in title or description", async () => {
     let filter: Record<string, unknown> | undefined;
-    const fetchStub: typeof fetch = (_url, init) => {
-      const body = JSON.parse(String(init?.body)) as {
-        variables: { filter: Record<string, unknown> };
+    const fetchStub: ProviderClient = (request) => {
+      const body = {
+        query: request.operation,
+        variables: "variables" in request.input ? request.input.variables : {},
       };
-      ({ filter } = body.variables);
+      filter = body.variables.filter as Record<string, unknown>;
       return json({
         data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
       });
     };
     await findRelatedIssues(
-      "t",
       { phrases: ["empty  sections"], scope: "duplicates", windowed: false },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.deepEqual(filter, {
       and: [
@@ -141,10 +164,9 @@ describe("findRelatedIssues", () => {
   it("runs a repeated phrase once", async () => {
     let calls = 0;
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["same", "same"], scope: "duplicates", windowed: false },
       {
-        fetch: () => {
+        client: () => {
           calls += 1;
           return json(page(["1"], null));
         },
@@ -157,10 +179,9 @@ describe("findRelatedIssues", () => {
   it("stops masters at the page cap and flags it", async () => {
     let calls = 0;
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
       {
-        fetch: () => {
+        client: () => {
           calls += 1;
           return json(page([String(calls)], `c${calls}`));
         },
@@ -173,9 +194,8 @@ describe("findRelatedIssues", () => {
   it("caps the merged result at 100 issues and flags it", async () => {
     const ids = Array.from({ length: 101 }, (_, i) => String(i));
     const result = await findRelatedIssues(
-      "t",
       { phrases: ["x"], scope: "masters", windowed: false },
-      { fetch: () => json(page(ids, null)) }
+      { client: () => json(page(ids, null)) }
     );
     assert.equal(result.issues.length, 100);
     assert.equal(result.truncated, true);
@@ -183,10 +203,10 @@ describe("findRelatedIssues", () => {
 
   it("dedupes duplicates across phrases, includes archived, and flags a second page", async () => {
     let calls = 0;
-    const fetchStub: typeof fetch = (_url, init) => {
+    const fetchStub: ProviderClient = (request) => {
       calls += 1;
-      const { variables } = JSON.parse(String(init?.body)) as {
-        variables: { includeArchived: boolean };
+      const { variables } = {
+        variables: "variables" in request.input ? request.input.variables : {},
       };
       assert.equal(variables.includeArchived, true);
       return calls === 1
@@ -194,13 +214,12 @@ describe("findRelatedIssues", () => {
         : json(page(["2", "3"], "more"));
     };
     const result = await findRelatedIssues(
-      "t",
       {
         phrases: ["billed twice", "double charge"],
         scope: "duplicates",
         windowed: true,
       },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.equal(calls, 2);
     assert.equal(result.createdAfter, null);
@@ -225,10 +244,13 @@ describe("saveInvestigationDocument", () => {
   const respond = (existingTitle: string | null) => {
     const calls: Array<{ query: string; variables: Record<string, unknown> }> =
       [];
-    const fetchStub: typeof fetch = (_url, init) => {
-      const body = JSON.parse(String(init?.body)) as (typeof calls)[number];
+    const fetchStub: ProviderClient = (request) => {
+      const body = {
+        query: request.operation,
+        variables: "variables" in request.input ? request.input.variables : {},
+      } as (typeof calls)[number];
       calls.push(body);
-      if (body.query.startsWith("query IssueDocuments")) {
+      if (body.query.startsWith("linear.IssueDocuments")) {
         return json({
           data: {
             issue: {
@@ -242,14 +264,14 @@ describe("saveInvestigationDocument", () => {
           },
         });
       }
-      if (body.query.startsWith("query Document")) {
+      if (body.query.startsWith("linear.Document")) {
         return json({
           data: {
             document: { ...document, updatedAt: "2026-08-27T10:00:05.000Z" },
           },
         });
       }
-      if (body.query.startsWith("mutation CreateDocument")) {
+      if (body.query.startsWith("linear.CreateDocument")) {
         return json({ data: { documentCreate: { document, success: true } } });
       }
       return json({ data: { documentUpdate: { document, success: true } } });
@@ -260,20 +282,19 @@ describe("saveInvestigationDocument", () => {
   it("creates the lane's document when the issue has none with that title", async () => {
     const { calls, fetchStub } = respond("Some other doc");
     const result = await saveInvestigationDocument(
-      "t",
       { content: "# Triage investigation", issue: "ENG-1", lane: "triage" },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.equal(result.created, true);
     // The mutation payload reports the pre-write timestamp; the pin comes from the read-back.
     assert.equal(result.updatedAt, "2026-08-27T10:00:05.000Z");
-    assert.ok(calls[2]?.query.startsWith("query Document"));
+    assert.ok(calls[2]?.query.startsWith("linear.Document"));
     assert.equal(calls[2]?.variables.id, "doc1");
     assert.deepEqual(calls[0]?.variables, {
       id: "ENG-1",
       title: "Triage investigation",
     });
-    assert.ok(calls[1]?.query.startsWith("mutation CreateDocument"));
+    assert.ok(calls[1]?.query.startsWith("linear.CreateDocument"));
     assert.deepEqual(calls[1]?.variables.input, {
       content: "# Triage investigation",
       issueId: "issue-uuid",
@@ -282,7 +303,7 @@ describe("saveInvestigationDocument", () => {
   });
 
   it("refuses to write when the issue already carries two documents with the title", async () => {
-    const fetchStub: typeof fetch = () =>
+    const fetchStub: ProviderClient = () =>
       json({
         data: {
           issue: {
@@ -298,9 +319,8 @@ describe("saveInvestigationDocument", () => {
       });
     await assert.rejects(
       saveInvestigationDocument(
-        "t",
         { content: "x", issue: "ENG-1", lane: "triage" },
-        { fetch: fetchStub }
+        { client: fetchStub }
       ),
       (error: Error) => error.message.includes("already carries 2 documents")
     );
@@ -308,21 +328,23 @@ describe("saveInvestigationDocument", () => {
 
   it("reports a written document with no pin when the read-back fails", async () => {
     let calls = 0;
-    const fetchStub: typeof fetch = (_url, init) => {
+    const fetchStub: ProviderClient = (request) => {
       calls += 1;
-      const { query } = JSON.parse(String(init?.body)) as { query: string };
-      if (query.startsWith("query IssueDocuments")) {
+      const { query } = {
+        query: request.operation,
+        variables: "variables" in request.input ? request.input.variables : {},
+      } as { query: string };
+      if (query.startsWith("linear.IssueDocuments")) {
         return json({ data: { issue: { documents: { nodes: [] }, id: "i" } } });
       }
-      if (query.startsWith("mutation CreateDocument")) {
+      if (query.startsWith("linear.CreateDocument")) {
         return json({ data: { documentCreate: { document, success: true } } });
       }
       return json({ message: "down" }, 503);
     };
     const result = await saveInvestigationDocument(
-      "t",
       { content: "x", issue: "ENG-1", lane: "triage" },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.equal(calls, 3);
     assert.equal(result.created, true);
@@ -334,13 +356,12 @@ describe("saveInvestigationDocument", () => {
   it("rewrites the existing document instead of creating a second", async () => {
     const { calls, fetchStub } = respond("Billing investigation");
     const result = await saveInvestigationDocument(
-      "t",
       { content: "# Billing investigation", issue: "ENG-1", lane: "billing" },
-      { fetch: fetchStub }
+      { client: fetchStub }
     );
     assert.equal(result.created, false);
     assert.equal(result.documentId, "doc1");
-    assert.ok(calls[1]?.query.startsWith("mutation UpdateDocument"));
+    assert.ok(calls[1]?.query.startsWith("linear.UpdateDocument"));
     assert.equal(calls[1]?.variables.id, "doc1");
   });
 });

@@ -23,21 +23,10 @@ const FEATURE_CHANNELS = [
 ] as const;
 
 /**
- * The schedule runs as the owner rather than as the app, because the
- * investigation reaches Sentry and Axiom, which are `principalType: "user"`
- * connections. eve keys stored grants by issuer and principal id, so both
- * must match what an inbound Slack message builds.
- * Delivery is unaffected: Slack posts always go out on the bot token.
- *
- * The user principal would otherwise make these turns look attended, so they
- * carry the unattended stamp: `isUnattended` denies shared-config, Linear, and
- * Supermemory writes outright rather than parking a card on a person who is
- * asleep when this runs.
- *
- * A lapsed user grant cannot park these runs: `userConnect` turns the sign-in
- * request into a terminal, non-retryable failure for every Slack-issued user
- * principal, including this schedule's, so the model works around the missing
- * evidence source instead of stalling until a person signs in.
+ * Preserve the existing Slack principal for thread delivery and state identity.
+ * Company evidence now uses the shared app-scoped Foreman Executor toolkit, so it
+ * no longer depends on the owner's personal provider grants. The unattended
+ * stamp still denies shared-configuration and personal-memory writes.
  */
 const OWNER_AUTH = stampUnattended({
   attributes: {

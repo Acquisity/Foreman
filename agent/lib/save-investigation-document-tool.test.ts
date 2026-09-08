@@ -6,7 +6,6 @@ import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
 const CARD_OR_BANK = /card or bank/u;
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.PLANETSCALE_MCP_CONNECTOR ??= "planet-scale-read-only-foreman/test";
 
 const { default: tool, hasCardNumber } = await import(
   "../tools/save_investigation_document.js"
@@ -48,7 +47,7 @@ describe("save_investigation_document tool", () => {
     }
   });
 
-  it("denies an autonomous run before any request", async () => {
+  it("allows an autonomous run through the Linear approval policy", async () => {
     const { approval } = tool;
     assert.equal(typeof approval, "function");
     const status = await (approval as (ctx: unknown) => unknown)({
@@ -64,10 +63,7 @@ describe("save_investigation_document tool", () => {
       },
       toolName: "save_investigation_document",
     });
-    assert.deepEqual(status, {
-      reason: "Unattended runs do not write to Linear.",
-      type: "denied",
-    });
+    assert.equal(status, "not-applicable");
   });
 
   it("refuses a billing document carrying a card or bank number without a token", async () => {

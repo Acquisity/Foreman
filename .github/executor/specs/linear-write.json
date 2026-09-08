@@ -1,0 +1,74 @@
+{
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Foreman Linear write API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/graphql": {
+      "post": {
+        "operationId": "executeForemanWrite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "query": {
+                    "enum": [
+                      "mutation CreateDocument($input: DocumentCreateInput!) {\n  documentCreate(input: $input) { success document { id updatedAt url } }\n}",
+                      "mutation RouteAttachment($issueId: String!, $url: String!, $title: String!) {\n  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }\n}",
+                      "mutation RouteIssueUpdate($id: String!, $input: IssueUpdateInput!) {\n  issueUpdate(id: $id, input: $input) { success }\n}",
+                      "mutation RouteRelation($input: IssueRelationCreateInput!) {\n  issueRelationCreate(input: $input) { success }\n}",
+                      "mutation UpdateDocument($id: String!, $input: DocumentUpdateInput!) {\n  documentUpdate(id: $id, input: $input) { success document { id updatedAt url } }\n}"
+                    ],
+                    "type": "string"
+                  },
+                  "variables": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  }
+                },
+                "required": ["query", "variables"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Linear GraphQL response"
+          }
+        },
+        "summary": "Only exact authored Foreman write operations. No arbitrary GraphQL."
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.linear.app"
+    }
+  ]
+}

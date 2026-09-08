@@ -38,6 +38,8 @@ const load = async (path: string): Promise<Connection> =>
   ((await import(path)) as { default: Connection }).default;
 
 // Every child connection beside its root, loaded once for the tests below.
+process.env.EXECUTOR_BASE_URL = "https://executor.acquisity.ai";
+
 const pairs = await Promise.all(
   list("connections/").map(async (file) => {
     const name = file.replace(TS_EXTENSION, "");
@@ -65,28 +67,6 @@ const WRITE_TOOL_NAMES = new Set([
   "write_file",
 ]);
 
-/**
- * Connections whose read-only boundary is the OAuth grant itself rather than
- * a tool allowlist: PostHog exposes one `exec` tool and requests only `:read`
- * scopes, so writes fail at the API.
- */
-const READ_ONLY_BY_SCOPE = new Set(["posthog"]);
-
-/** Connection tools that mutate provider state, by connection. */
-const WRITE_CONNECTION_TOOLS: Record<string, readonly string[]> = {
-  lucent: ["update_issue"],
-  planetscale: ["planetscale_execute_write_query"],
-  sentry: ["update_issue", "create_project", "create_team", "create_dsn"],
-  supermemory: ["add_memory"],
-  vercel: [
-    "deploy_to_vercel",
-    "change_toolbar_thread_resolve_status",
-    "reply_to_toolbar_thread",
-    "edit_toolbar_message",
-    "add_toolbar_reaction",
-  ],
-};
-
 // Anything that would give the child its own credential path. PR #55 was a
 // full connection outage caused by auto-provisioning; the child must reuse
 // the root's managedConnect / userConnect objects and nothing else.
@@ -103,23 +83,7 @@ const FORBIDDEN_SOURCE = [
 
 describe("critic evidence surface", () => {
   it("mounts every triage evidence connection", () => {
-    assert.deepEqual(list("connections/"), [
-      "autumn.ts",
-      "axiom.ts",
-      "inngest.ts",
-      "intercom.ts",
-      "jam.ts",
-      "linear.ts",
-      "lucent.ts",
-      "modem.ts",
-      "neon.ts",
-      "planetscale.ts",
-      "posthog.ts",
-      "resend.ts",
-      "sentry.ts",
-      "stripe.ts",
-      "vercel.ts",
-    ]);
+    assert.deepEqual(list("connections/"), ["executor.ts"]);
   });
 
   it("never authors a credential path of its own", () => {
@@ -147,65 +111,19 @@ describe("critic evidence surface", () => {
     }
   });
 
-  it("reuses each root connection's credential path, url, and approval", () => {
-    // eve re-wraps `auth` when a definition is spread, but the token
-    // resolver and evictor are the root's own functions: same connector,
-    // same managedConnect / userConnect, same autoProvision: false.
-    for (const { child, name, root } of pairs) {
-      assert.ok(root.auth?.getToken, `${name}: root has auth`);
-      if (root.auth.principalType === "app") {
-        assert.equal(
-          child.auth?.getToken,
-          root.auth.getToken,
-          `${name}: getToken`
-        );
-      } else {
-        // A task-mode child never parks on consent: user-scoped getToken is
-        // the withoutConsent wrapper (behavior covered in user-connect.test),
-        // and the delegated credential beneath it is the root's, checked by
-        // the evict / principalType / Connect config assertions below.
-        assert.notEqual(
-          child.auth?.getToken,
-          root.auth.getToken,
-          `${name}: getToken must be wrapped`
-        );
-      }
-      assert.equal(child.auth?.evict, root.auth.evict, `${name}: evict`);
-      assert.equal(child.auth?.principalType, root.auth.principalType, name);
-      assert.deepEqual(
-        child.auth?.vercelConnect,
-        root.auth.vercelConnect,
-        name
-      );
-      assert.equal(child.url, root.url, `${name}: url must match the root`);
-      assert.equal(child.approval, root.approval, `${name}: approval`);
+  it("shares root company authentication and its toolkit", () => {
+    for (const { child, root, name } of pairs) {
+      assert.equal(typeof child.auth, "function", name);
+      assert.equal(typeof root.auth, "function", name);
+      assert.equal(child.url, root.url, name);
+      assert.ok(String(child.url).includes("/foreman?"), name);
+      assert.deepEqual(child.tools, { allow: ["execute", "skills"] });
     }
   });
 
-  it("only narrows tool allowlists and excludes every write", () => {
-    for (const { child, name, root } of pairs) {
-      if (READ_ONLY_BY_SCOPE.has(name)) {
-        assert.equal(child.tools, root.tools, `${name}: tools unchanged`);
-        continue;
-      }
-      const childAllow = child.tools?.allow;
-      assert.ok(childAllow, `${name}: the critic must have an allowlist`);
-      const rootAllow = root.tools?.allow;
-      if (rootAllow) {
-        for (const tool of childAllow) {
-          assert.ok(
-            rootAllow.includes(tool),
-            `${name}: ${tool} is not on the root allowlist`
-          );
-        }
-      }
-      for (const write of WRITE_CONNECTION_TOOLS[name] ?? []) {
-        assert.ok(
-          !childAllow.includes(write),
-          `${name}: ${write} must be excluded`
-        );
-      }
-    }
+  it("retains read-only critic instructions with shared provider access", () => {
+    const source = readFileSync(new URL("agent.ts", criticRoot), "utf8");
+    assert.ok(source.includes("Read-only: never writes to Linear"));
   });
 
   it("mounts no write-capable tool", () => {

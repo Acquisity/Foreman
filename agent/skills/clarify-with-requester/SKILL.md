@@ -6,13 +6,13 @@ description: "When and how to involve the requester in a triage decision — the
 
 Triage is a dialogue with the requester, not a report written about them. Two decisions bracket every investigation: whether you can start without them, and whether you can decide without them. When either is in doubt, ask.
 
-Both gates use the same ask flow: batch the questions into one message, post it in the Slack thread or as a Linear comment, and wait for the reply before continuing. A parked question is part of the investigation, not a verdict.
+Both gates use the same ask flow: batch the questions into one message and post it in the Slack thread or as a Linear comment. Continue checking available evidence while awaiting the reply. Withhold any verdict that depends on the unanswered question; an open question is not a verdict.
 
 ## Gate 1 — before investigating
 
-Investigate now when the ticket carries observed behavior, expected behavior, and enough identifying detail. Ask first and park when the symptom is vague, the account/workspace cannot be identified, or the report is second-hand.
+Investigate now when the ticket carries observed behavior, expected behavior, and enough identifying detail. Ask when the symptom is vague, the account/workspace cannot be identified, or the report is second-hand, then continue with evidence that does not depend on the answer. Unresolved identity blocks customer-specific lookups, not safe code or runtime checks.
 
-Asking rules: one message, two or three questions never more. Each question names the fact it discriminates. Then wait. Do not run a speculative investigation in parallel.
+Asking rules: one message, two or three questions never more. Each question names the fact it discriminates. State any working assumption and test it against available evidence; never present it as confirmed or guess a customer scope.
 
 ## Reproduction — always asked, never a blocker
 

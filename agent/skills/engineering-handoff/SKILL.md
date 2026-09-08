@@ -1,10 +1,10 @@
 ---
-description: "Turn an approved, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch."
+description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch."
 ---
 
 # Engineering handoff
 
-Create durable engineering work from an approved diagnosis without turning every customer report into its own investigation. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps.
+Create durable engineering work from a diagnosis settled by approval or adjudication without turning every customer report into its own investigation. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps.
 
 `triage-investigate` still owns the investigation, and `triage-handling` owns classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, the area-routing roster, and the customer ticket's final state, labels, priority, and project. This skill owns finding or creating the master, the customer ticket's `parentId` and `assignee` that link it to the master, the content boundary between report and master, and proving the writes landed.
 

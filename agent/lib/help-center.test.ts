@@ -12,30 +12,27 @@ const hit = (n: number) => ({
 });
 
 const json = (body: unknown, status = 200) =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status,
-    })
-  );
+  Promise.resolve({ data: body, status });
 
 describe("find_help_article", () => {
-  it("URL-encodes the query, caps at 5, strips marks, and maps paths", async () => {
+  it("reports a missing client as an advisory error", async () => {
+    const result = await findHelpArticles("inbox");
+    assert.deepEqual(result.articles, []);
+    assert.ok(result.error);
+  });
+  it("passes the typed query, caps at 5, strips marks, and maps paths", async () => {
     let calledUrl = "";
     const result = await findHelpArticles("connect Google inbox & calendar", {
-      baseUrl: "https://example.test",
-      fetch: (url) => {
-        calledUrl = String(url);
+      client: (request) => {
+        calledUrl = "query" in request.input ? request.input.query : "";
         return json([
           { ...hit(0), type: "heading" },
           ...[1, 2, 3, 4, 5, 6].map(hit),
         ]);
       },
+      linkBaseUrl: "https://example.test",
     });
-    assert.equal(
-      calledUrl,
-      "https://example.test/api/search?query=connect+Google+inbox+%26+calendar"
-    );
+    assert.equal(calledUrl, "connect Google inbox & calendar");
     assert.equal(result.error, undefined);
     assert.equal(result.articles.length, 5);
     assert.ok(
@@ -50,8 +47,8 @@ describe("find_help_article", () => {
 
   it("returns error rather than throwing on a non-2xx response", async () => {
     const result = await findHelpArticles("inbox", {
-      baseUrl: "https://example.test",
-      fetch: () => json({ message: "nope" }, 503),
+      client: () => json({ message: "nope" }, 503),
+      linkBaseUrl: "https://example.test",
     });
     assert.deepEqual(result.articles, []);
     assert.match(result.error ?? "", HTTP_503);
@@ -59,8 +56,8 @@ describe("find_help_article", () => {
 
   it("returns error for a malformed base url instead of throwing", async () => {
     const result = await findHelpArticles("inbox", {
-      baseUrl: "not a url",
-      fetch: () => json([]),
+      client: () => json([]),
+      linkBaseUrl: "not a url",
     });
     assert.deepEqual(result.articles, []);
     assert.ok(result.error);
@@ -68,8 +65,8 @@ describe("find_help_article", () => {
 
   it("treats an empty hit list as a valid answer", async () => {
     const result = await findHelpArticles("zzz", {
-      baseUrl: "https://example.test",
-      fetch: () => json([]),
+      client: () => json([]),
+      linkBaseUrl: "https://example.test",
     });
     assert.deepEqual(result, { articles: [] });
   });

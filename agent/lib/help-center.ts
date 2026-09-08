@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { type ProviderClient, requiredClient } from "./executor/operations.js";
 
-/** Help-center host; overridable so staging can be searched. */
+/** Base for relative article links. The search backend is selected by the Executor binding. */
 export const HELP_CENTER_BASE_URL =
   process.env.ACQUISITY_WEB_BASE_URL ?? "https://app.acquisity.ai";
 
@@ -46,29 +47,30 @@ const stripMarks = (text: string) => text.replace(MARK_TAG, "");
  */
 export async function findHelpArticles(
   query: string,
-  opts?: { baseUrl?: string; fetch?: typeof fetch; signal?: AbortSignal }
+  opts?: { linkBaseUrl?: string; client?: ProviderClient; signal?: AbortSignal }
 ): Promise<FindHelpArticleResult> {
-  const baseUrl = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
-  const fetchImpl = opts?.fetch ?? fetch;
+  const baseUrl = opts?.linkBaseUrl ?? HELP_CENTER_BASE_URL;
   try {
-    const url = new URL("/api/search", baseUrl);
-    url.searchParams.set("query", query);
-    const response = await fetchImpl(url, {
-      headers: { Accept: "application/json" },
-      signal: opts?.signal
-        ? AbortSignal.any([
-            opts.signal,
-            AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-          ])
-        : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) {
+    const client = requiredClient(opts?.client);
+    const articleBase = new URL(baseUrl);
+    const response = await client(
+      { input: { query }, operation: "help.search" },
+      {
+        signal: opts?.signal
+          ? AbortSignal.any([
+              opts.signal,
+              AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            ])
+          : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      }
+    );
+    if (response.status < 200 || response.status >= 300) {
       return {
         articles: [],
         error: `Help-center search failed: HTTP ${response.status}.`,
       };
     }
-    const hits = z.array(hitSchema).parse(await response.json());
+    const hits = z.array(hitSchema).parse(response.data);
     return {
       articles: hits
         .filter((hit) => hit.type === undefined || hit.type === "page")
@@ -76,7 +78,7 @@ export async function findHelpArticles(
         .map((hit) => ({
           path: `apps/web/content/docs${hit.id.replace(DOCS_PREFIX, "")}.mdx`,
           title: stripMarks(hit.content),
-          url: new URL(hit.url, baseUrl).toString(),
+          url: new URL(hit.url, articleBase).toString(),
         })),
     };
   } catch (error) {
