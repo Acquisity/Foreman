@@ -1,4 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
+import { logOpsEvent } from "../ops-log.js";
 import { type SupportClaim, supportAuth } from "./auth.js";
 import {
   type SupportScheduleMode,
@@ -52,6 +53,7 @@ export async function runSupportSchedule(
       try {
         await send(claim, supportAuth(appAuth, claim));
       } catch {
+        logOpsEvent("support.dispatch.failed", { outcome: "error" });
         await settleSupport(claim);
       }
     })
