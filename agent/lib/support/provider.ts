@@ -22,20 +22,7 @@ export async function matchSupportIssue(
   if (!result.ok) {
     throw new Error("Could not read the existing Linear record.");
   }
-  const issue = z
-    .object({ description: z.string() })
-    .passthrough()
-    .parse(providerData(result.data));
-  const sourceIds = intercomConversationIds(issue.description);
-  const matches =
-    role === "engineering-master"
-      ? issue.description.includes(supportIssueMarker(claim, role))
-      : sourceIds.length === 1 && sourceIds[0] === claim.conversation;
-  if (!matches) {
-    throw new SupportRefusal(
-      "The existing issue does not identify this Intercom source unambiguously."
-    );
-  }
+  assertSupportIssueSource(result.data, claim, role);
   const recorded = await recordMatchedSupportIssue(
     claim,
     `create-issue:${role}`,
@@ -43,6 +30,28 @@ export async function matchSupportIssue(
   );
   await trackSupportIssue(claim, writtenIssueId(result.data));
   return recorded;
+}
+
+export function assertSupportIssueSource(
+  data: unknown,
+  claim: SupportClaim,
+  role: CreationRole
+) {
+  const issue = z
+    .object({ description: z.string().nullish() })
+    .passthrough()
+    .parse(providerData(data));
+  const description = issue.description ?? "";
+  const sourceIds = intercomConversationIds(description);
+  const matches =
+    role === "engineering-master"
+      ? description.includes(supportIssueMarker(claim, role))
+      : sourceIds.length === 1 && sourceIds[0] === claim.conversation;
+  if (!matches) {
+    throw new SupportRefusal(
+      "The existing issue does not identify this Intercom source unambiguously."
+    );
+  }
 }
 
 function supportIssueMarker(claim: SupportClaim, role: CreationRole) {
