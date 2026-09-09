@@ -6,6 +6,7 @@ import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js"
 import { toolkitPolicyMatches } from "../agent/lib/executor/toolkit-policy.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
+const support = process.argv.includes("--support");
 const manifestSchema = z.object({
   toolkit: z.object({
     connectionPolicies: z
@@ -17,7 +18,15 @@ const manifestSchema = z.object({
   }),
 });
 const manifest = manifestSchema.parse(
-  JSON.parse(await readFile(new URL("toolkit-manifest.json", root), "utf8"))
+  JSON.parse(
+    await readFile(
+      new URL(
+        support ? "support-toolkit-manifest.json" : "toolkit-manifest.json",
+        root
+      ),
+      "utf8"
+    )
+  )
 );
 const bindings = z
   .record(z.string(), z.object({ path: z.string() }))

@@ -1,24 +1,22 @@
-import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import {
   LINEAR_OPERATIONS,
   type LinearOperation,
 } from "../linear-operations.js";
-import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
+import type { ExecutorOutcome } from "./dispatch.js";
+import { invokeProvider, type ProviderContext } from "./dispatch.js";
 import {
   operationInputs,
   type ProviderClient,
   type ProviderResult,
 } from "./operations.js";
-import { ExecutorError, invokeExecutor } from "./transport.js";
+import { ExecutorError } from "./transport.js";
 
 const linearInput = z.object({ variables: z.record(z.string(), z.unknown()) });
 
 /** Typed arguments cross one transport boundary; no simulated provider HTTP request. */
-export function executorClient(
-  ctx: Pick<ToolContext, "abortSignal" | "getToken">
-): ProviderClient {
+export function executorClient(ctx: ProviderContext): ProviderClient {
   return async (request, options = {}) => {
     const path = operationPath(request.operation);
     const input = request.operation.startsWith("linear.")
@@ -37,10 +35,17 @@ export function executorClient(
       ? AbortSignal.any([ctx.abortSignal, options.signal])
       : ctx.abortSignal;
     signal.throwIfAborted();
-    const { token } = await ctx.getToken(executorAuth());
-    let outcome: Awaited<ReturnType<typeof invokeExecutor>>;
+    let outcome: ExecutorOutcome;
     try {
-      outcome = await invokeExecutor({ signal, token }, path, input);
+      outcome = await invokeProvider(
+        {
+          abortSignal: signal,
+          getToken: (definition) => ctx.getToken(definition),
+          session: ctx.session,
+        },
+        path,
+        input
+      );
     } catch (error) {
       if (
         error instanceof ExecutorError &&
@@ -67,9 +72,7 @@ export function executorClient(
   };
 }
 
-function providerResult(
-  outcome: Awaited<ReturnType<typeof invokeExecutor>>
-): ProviderResult {
+function providerResult(outcome: ExecutorOutcome): ProviderResult {
   const status = outcome.ok
     ? (outcome.http?.status ?? 200)
     : outcome.error.status;
@@ -92,17 +95,12 @@ function providerResult(
 }
 
 export async function executorReadQuery(
-  ctx: Pick<ToolContext, "abortSignal" | "getToken">,
+  ctx: ProviderContext,
   args: Record<string, unknown>
 ): Promise<string> {
   const path = operationPath("planetscale.readQuery");
   const input = operationInputs["planetscale.readQuery"].parse(args);
-  const { token } = await ctx.getToken(executorAuth());
-  const outcome = await invokeExecutor(
-    { signal: ctx.abortSignal, token },
-    path,
-    input
-  );
+  const outcome = await invokeProvider(ctx, path, input);
   const normalized = providerResult(outcome);
   if (normalized.status < 200 || normalized.status >= 300) {
     throw new ExecutorError("planetscale_read_failed", normalized.status, {

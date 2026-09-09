@@ -146,15 +146,25 @@ describe("critic subagent", () => {
     // Real discovery, not a source-string check: PR #53 shipped a child whose
     // skill eve could not find because the test only looked at filenames.
     const info = JSON.parse(
-      execFileSync("npx", ["eve", "info", "--json"], {
-        cwd: appRoot,
-        encoding: "utf8",
-        env: {
-          ...stubEnv(),
-          EXECUTOR_BASE_URL: "https://executor.acquisity.ai",
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      })
+      execFileSync(
+        process.execPath,
+        [
+          fileURLToPath(
+            new URL("../../node_modules/eve/bin/eve.js", import.meta.url)
+          ),
+          "info",
+          "--json",
+        ],
+        {
+          cwd: appRoot,
+          encoding: "utf8",
+          env: {
+            ...stubEnv(),
+            EXECUTOR_BASE_URL: "https://executor.acquisity.ai",
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        }
+      )
     ) as {
       artifacts: { compiledManifest: string; discoveryManifest: string };
       subagents: string[];

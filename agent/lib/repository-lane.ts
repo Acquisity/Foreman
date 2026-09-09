@@ -2,6 +2,7 @@ import type { SessionAuthContext } from "eve/context";
 import { factorySkillAvailable } from "./factory-lane.js";
 import { repositoryFromAuth } from "./repository.js";
 import { selectedRepositorySlug } from "./repository-selection.js";
+import { sessionLane } from "./session-lane.js";
 
 /**
  * Whether a session lane carries the repository tools and the GitHub tool
@@ -58,8 +59,13 @@ import { selectedRepositorySlug } from "./repository-selection.js";
  * repository, and needs none.
  */
 export const repositoryCapabilitiesAvailable = (
-  auth: SessionAuthContext | null
+  auth: SessionAuthContext | null,
+  {
+    initiator = auth,
+    readOnly = false,
+  }: { initiator?: SessionAuthContext | null; readOnly?: boolean } = {}
 ): boolean =>
-  repositoryFromAuth(auth) !== null ||
-  factorySkillAvailable(auth) ||
-  selectedRepositorySlug() !== null;
+  (readOnly || sessionLane(initiator).repository) &&
+  (repositoryFromAuth(auth) !== null ||
+    factorySkillAvailable(auth) ||
+    selectedRepositorySlug() !== null);

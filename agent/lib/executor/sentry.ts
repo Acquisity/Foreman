@@ -1,8 +1,7 @@
-import type { ToolContext } from "eve/tools";
 import { z } from "zod";
-import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
-import { ExecutorError, invokeExecutor } from "./transport.js";
+import { invokeProvider, type ProviderContext } from "./dispatch.js";
+import { ExecutorError } from "./transport.js";
 
 export const sentryIssueInput = z.strictObject({
   issueId: z
@@ -22,10 +21,7 @@ export const sentryIssueInput = z.strictObject({
 });
 
 /** Only these two catalog reads can cross the Sentry dispatcher boundary. */
-export async function readSentryIssue(
-  input: unknown,
-  ctx: Pick<ToolContext, "abortSignal" | "getToken">
-) {
+export async function readSentryIssue(input: unknown, ctx: ProviderContext) {
   const parsed = sentryIssueInput.parse(input);
   const args =
     parsed.operation === "get_issue_details"
@@ -39,12 +35,7 @@ export async function readSentryIssue(
         };
   const path = operationPath("sentry.issueRead");
   const inputArgs = { arguments: args, name: parsed.operation };
-  const { token } = await ctx.getToken(executorAuth());
-  const outcome = await invokeExecutor(
-    { signal: ctx.abortSignal, token },
-    path,
-    inputArgs
-  );
+  const outcome = await invokeProvider(ctx, path, inputArgs);
   if (!outcome.ok) {
     throw new ExecutorError("sentry_read_failed", outcome.error.status, {
       retryAfter: outcome.error.retryAfter,

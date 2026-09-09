@@ -1,3 +1,10 @@
-import { defineInstructions } from "eve/instructions";
-import { EXECUTOR_DISCOVERY } from "../../../lib/executor/instructions.js";
-export default defineInstructions({ content: EXECUTOR_DISCOVERY });
+import { defineDynamic, defineInstructions } from "eve/instructions";
+import { sessionLane } from "../../../lib/session-lane.js";
+export default defineDynamic({
+  events: {
+    "turn.started": (_event, ctx) =>
+      defineInstructions({
+        content: sessionLane(ctx.session.auth.initiator).discovery,
+      }),
+  },
+});

@@ -38,7 +38,11 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
 export default defineDynamic({
   events: {
     "step.started": async (event, ctx) => {
-      if (!repositoryCapabilitiesAvailable(ctx.session.auth.current)) {
+      if (
+        !repositoryCapabilitiesAvailable(ctx.session.auth.current, {
+          initiator: ctx.session.auth.initiator,
+        })
+      ) {
         return null;
       }
       const resolve = github.events["step.started"];

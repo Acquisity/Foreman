@@ -8,7 +8,7 @@ import { executorConnection } from "./executor/connection.js";
 import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";
 
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
-import { ExecutorError, invokeExecutor } from "./executor/transport.js";
+import { ExecutorError, executorTransport } from "./executor/transport.js";
 import {
   AUTONOMOUS_PRINCIPAL,
   stampInvestigationMemory,
@@ -32,6 +32,67 @@ const json = (body: unknown, headers: Record<string, string> = {}) =>
     headers: { "content-type": "application/json", ...headers },
   });
 const OPERATION = "stripe.org.foreman.customer";
+test("only failures before the execute request are confirmed undispatched", async () => {
+  for (const failedMethod of [
+    "initialize",
+    "notifications/initialized",
+    "tools/call",
+  ]) {
+    const seen: string[] = [];
+    const failure = new Error("response lost");
+    const fetcher: typeof fetch = (_url, init) => {
+      const request = JSON.parse(String(init?.body)) as {
+        id?: number;
+        method: string;
+      };
+      seen.push(request.method);
+      if (request.method === failedMethod) {
+        return Promise.reject(failure);
+      }
+      return Promise.resolve(
+        request.method === "initialize"
+          ? json({ id: request.id, result: { protocolVersion: "2025-06-18" } })
+          : new Response(null, { status: 202 })
+      );
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each independent transport phase is checked in order.
+    await assert.rejects(
+      executorTransport.call(context(), OPERATION, {}, { fetch: fetcher }),
+      (error: unknown) => {
+        if (failedMethod === "tools/call") {
+          assert.equal(error, failure);
+        } else {
+          assert.ok(error instanceof ExecutorError);
+          assert.equal(error.dispatched, false);
+          assert.equal(error.cause, failure);
+          assert.ok(!seen.includes("tools/call"));
+        }
+        return true;
+      }
+    );
+  }
+});
+
+test("a cancellation before initialization is confirmed undispatched", async () => {
+  const signal = AbortSignal.abort();
+  await assert.rejects(
+    executorTransport.call(
+      { ...context(), signal },
+      OPERATION,
+      {},
+      {
+        fetch: () => {
+          throw new Error("must not send a request");
+        },
+      }
+    ),
+    (error: unknown) =>
+      error instanceof ExecutorError &&
+      error.dispatched === false &&
+      error.cause === signal.reason
+  );
+});
+
 const rpc =
   (
     toolResult: unknown,
@@ -109,7 +170,7 @@ test("deployment bindings select paths and cannot modify typed arguments", async
     });
     assert.equal(operationPath("read"), OPERATION);
     const seen: { url: string; init: RequestInit }[] = [];
-    await invokeExecutor(
+    await executorTransport.call(
       context(),
       operationPath("read"),
       { customer: "cus_1" },
@@ -154,7 +215,7 @@ test("deployment bindings select paths and cannot modify typed arguments", async
 
 test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns the structured provider payload", async () => {
   const seen: { url: string; init: RequestInit }[] = [];
-  const result = await invokeExecutor(
+  const result = await executorTransport.call(
     context(),
     OPERATION,
     { customer: 'value"; throw new Error("injection"); //' },
@@ -182,7 +243,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
 });
 
 test("SSE responses and provider HTTP failures are handled without exposing provider error bodies", async () => {
-  const outcome = await invokeExecutor(
+  const outcome = await executorTransport.call(
     context(),
     OPERATION,
     {},
@@ -221,13 +282,18 @@ test("paused, malformed, and management calls fail without resuming or retrying"
     const seen: { url: string; init: RequestInit }[] = [];
     // biome-ignore lint/performance/noAwaitInLoops: each fixture verifies its own complete handshake.
     await assert.rejects(
-      invokeExecutor(context(), OPERATION, {}, { fetch: rpc(result, seen) }),
+      executorTransport.call(
+        context(),
+        OPERATION,
+        {},
+        { fetch: rpc(result, seen) }
+      ),
       ExecutorError
     );
     assert.equal(seen.length, 3);
   }
   await assert.rejects(
-    invokeExecutor(
+    executorTransport.call(
       context(),
       "executor.coreTools.policies.create",
       {},
@@ -239,7 +305,7 @@ test("paused, malformed, and management calls fail without resuming or retrying"
 
 test("size limits reject oversized transport payloads before parsing", async () => {
   await assert.rejects(
-    invokeExecutor(
+    executorTransport.call(
       context(),
       OPERATION,
       {},
@@ -264,7 +330,7 @@ test("cancellation during a stalled response cancels the reader and stops the ca
       })
     );
   await assert.rejects(
-    invokeExecutor(
+    executorTransport.call(
       { ...context(), signal: abort.signal },
       OPERATION,
       {},
@@ -304,8 +370,13 @@ test("helper invocations use fresh sessions on the same shared toolkit", async (
     }
     return responder(url, init);
   };
-  await invokeExecutor(context(), OPERATION, {}, { fetch: fetchStub });
-  await invokeExecutor(context(factory), OPERATION, {}, { fetch: fetchStub });
+  await executorTransport.call(context(), OPERATION, {}, { fetch: fetchStub });
+  await executorTransport.call(
+    context(factory),
+    OPERATION,
+    {},
+    { fetch: fetchStub }
+  );
   assert.equal(initialHeaders.length, 2);
   assert.ok(initialHeaders.every((headers) => !headers.has("mcp-session-id")));
   assert.equal(endpoints[0], toolkitUrl());
@@ -317,7 +388,7 @@ test("the deadline cancels a stalled response body without a caller cancellation
   const keepAlive = setTimeout(() => undefined, 1000);
   try {
     await assert.rejects(
-      invokeExecutor(
+      executorTransport.call(
         context(),
         OPERATION,
         {},
@@ -334,7 +405,10 @@ test("the deadline cancels a stalled response body without a caller cancellation
         }
       ),
       (error: unknown) =>
-        error instanceof Error && error.name === "TimeoutError"
+        error instanceof ExecutorError &&
+        error.dispatched === false &&
+        error.cause instanceof Error &&
+        error.cause.name === "TimeoutError"
     );
     assert.equal(cancelled, true);
   } finally {

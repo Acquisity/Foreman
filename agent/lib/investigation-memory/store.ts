@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { type NeonQueryFunction, neon } from "@neondatabase/serverless";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
+import { privateDatabase } from "../private-postgres.js";
 import type {
   CasePayload,
   CaseProjection,
@@ -88,9 +89,7 @@ function db(): NeonQueryFunction<false, false> {
       "FOREMAN_MEMORY_DATABASE_URL is not set, so investigation memory is unavailable."
     );
   }
-  return neon(url, {
-    fetchOptions: { signal: AbortSignal.timeout(MEMORY_QUERY_TIMEOUT_MS) },
-  });
+  return privateDatabase(MEMORY_QUERY_TIMEOUT_MS);
 }
 
 /** Whether the deployment has an investigation-memory database configured. */

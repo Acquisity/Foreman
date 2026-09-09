@@ -19,7 +19,7 @@ It does not see anything else, and none of these are gaps to be closed by growin
 
 ## HTTP requests
 
-Billing, Instantly, Inngest, Linear, and help-center helpers call an injected typed Executor client with operation identifiers and validated arguments. Their existing provider deadlines, result-size caps, and response filters remain active around that client. Only `agent/lib/executor/transport.ts` performs their outbound HTTP requests. The bounded PlanetScale query uses that same transport, then applies its existing result truncation. All helper invocations use a fresh MCP session, reject redirects, cap the transport response at 8 MiB, and reject paused executions instead of resuming approvals.
+Billing, Instantly, Inngest, Linear, and help-center helpers call an injected typed Executor client with operation identifiers and validated arguments. Their existing provider deadlines, result-size caps, and response filters remain active around that client. Every authored operation enters `agent/lib/executor/dispatch.ts`; only its internal `agent/lib/executor/transport.ts` wire adapter performs their outbound HTTP requests. The bounded PlanetScale query uses that same transport, then applies its existing result truncation. All helper invocations use a fresh MCP session, reject redirects, cap the transport response at 8 MiB, and reject paused executions instead of resuming approvals.
 
 | Call | Bound | Notes |
 | --- | --- | --- |
@@ -40,6 +40,14 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | --- | --- | --- |
 | `agent/lib/investigation-memory/store.ts` | 15s per operation | ENG-13318. The Neon serverless driver sends each query as its own HTTP request and enforces no deadline. The client is built per operation, not cached: a cached one would hold an already-fired signal and refuse every later query. Several queries inside one exported function share the bound. |
 | `agent/lib/blob.ts` | 20s per operation | ENG-13318. `@vercel/blob` retries internally but sets no overall deadline. |
+
+## Intercom support schedules
+
+| Call | Bound | Notes |
+| --- | --- | --- |
+| `agent/lib/support/store.ts` | 15s per query | Private operational tables, atomic leases and write journal. No customer database or investigation-memory reads. |
+| `agent/lib/support/slack.ts` | 20s per HTTP request; at most 10 history pages per tick | Fixed Slack channel and methods. Intake checkpoints descending timestamp bounds after discoveries, advancing the oldest watermark only when the gap is complete. Thread reconciliation requires a complete bounded scan. Slack token resolution uses the Connect exemption below. |
+| `agent/lib/executor/dispatch.ts`, `agent/lib/executor/transport.ts` | 50s after authorization | Support operations and schema discovery reuse the existing bounded Executor transport. Lease is checked before dispatch. |
 
 ## Sandbox commands
 
@@ -84,3 +92,9 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 ### Agent browser install
 
 `installAgentBrowser` in `agent/sandbox.ts` bootstrap is third-party (`@agent-browser/eve`) and runs during eve's own sandbox bootstrap, not inside a turn. It exposes no deadline parameter, and a bootstrap that never finishes fails template creation rather than holding a Slack thread open.
+
+### Linked Linear follow-up reads
+
+`agent/lib/support/linear-followup.ts` uses the existing support provider dispatch and its 50-second Executor deadline per call, including each issue read and comment page. Each case has at most ten tracked issues; each discussion scan stops at ten pages or one MB. The support lease is checked before each provider dispatch. No additional credentials or direct Linear transport are introduced.
+
+`agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.

@@ -22,7 +22,10 @@ import {
 function attendedWritePolicy(unattendedReason: string) {
   return (ctx: ApprovalContext): ApprovalStatus => {
     const auth = ctx.session.auth.current;
-    if (isUnattended(auth)) {
+    if (
+      isUnattended(auth) ||
+      isUnattended(ctx.session.auth.initiator ?? null)
+    ) {
       return { reason: unattendedReason, type: "denied" };
     }
     return isTrusted(auth) || isScheduleAppAuth(auth)
@@ -137,7 +140,8 @@ export function denyUnattendedWrites(
  * internal delivery boundary into the user-facing answer.
  */
 export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
-  isIntakeOnly(ctx.session.auth.current)
+  isIntakeOnly(ctx.session.auth.current) ||
+  isIntakeOnly(ctx.session.auth.initiator ?? null)
     ? {
         reason:
           "Do not deliver code from this session. Finish the intake workflow already provided and answer with the finding and next step only. Do not mention this delivery restriction, channel policy, repository tooling, or internal routing in the reply.",
