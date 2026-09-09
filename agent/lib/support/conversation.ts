@@ -3,7 +3,7 @@ import { z } from "zod";
 import { conversationId, INTERCOM_WORKSPACE } from "./config.js";
 import type { SupportSlackMessage } from "./slack.js";
 
-const CONVERSATION_PATH = /\/(?:conversation|conversations)\/(\d+)(?:\/|$)/;
+const CONVERSATION_PATH = /\/(?:conversation|conversations)\/(\d+)(?=\/|$)/g;
 const intercomLink = /https:\/\/app\.intercom\.com\/[^\s<>"|]+/g;
 
 export function notificationConversation(
@@ -38,10 +38,17 @@ export function intercomConversationIds(content: string): string[] {
     if (!url.pathname.includes(`/${INTERCOM_WORKSPACE}/`)) {
       continue;
     }
-    const match = CONVERSATION_PATH.exec(url.pathname);
-    const id = match?.[1] ?? url.searchParams.get("conversation");
-    if (conversationId.safeParse(id).success) {
-      ids.add(id as string);
+    const references = [
+      ...Array.from(
+        url.pathname.matchAll(CONVERSATION_PATH),
+        (match) => match[1]
+      ),
+      ...url.searchParams.getAll("conversation"),
+    ];
+    for (const id of references) {
+      if (conversationId.safeParse(id).success) {
+        ids.add(id);
+      }
     }
   }
   return [...ids];

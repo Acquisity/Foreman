@@ -3,6 +3,7 @@ import { type SupportClaim, supportAuth } from "./auth.js";
 import {
   type SupportScheduleMode,
   supportConfig,
+  supportInitialTimestamp,
   supportScheduleEnabled,
 } from "./config.js";
 import { notificationConversation } from "./conversation.js";
@@ -28,7 +29,7 @@ export async function runSupportSchedule(
     return;
   }
   if (mode === "intake") {
-    const initial = `${Math.floor(Date.parse(config.since) / 1000)}.000000`;
+    const initial = supportInitialTimestamp(config.since);
     const checkpoint = await supportCursor(initial);
     const batch = await readSupportIntake(checkpoint);
     // Sequential inserts preserve the watermark on any partial failure.
