@@ -121,12 +121,17 @@ try {
     )
   );
   assert.deepEqual(
-    await claimHandoffs(["999999"]),
+    await claimHandoffs("intake", ["999999"]),
     [],
     "Test selection also excludes previously tracked cases"
   );
+  assert.deepEqual(
+    await claimHandoffs("followups"),
+    [],
+    "Followups leave initial investigations to intake"
+  );
   const claims = (
-    await Promise.all(Array.from({ length: 8 }, () => claimHandoffs()))
+    await Promise.all(Array.from({ length: 8 }, () => claimHandoffs("intake")))
   ).flat();
   assert.equal(
     claims.length,
@@ -172,7 +177,12 @@ try {
   await psql(
     "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
   );
-  const [next] = await claimHandoffs();
+  assert.deepEqual(
+    await claimHandoffs("intake"),
+    [],
+    "Completed cases are excluded from intake"
+  );
+  const [next] = await claimHandoffs("followups");
   assert.ok(next);
   assert.notEqual(next.lease, claim.lease);
   assert.equal(
@@ -196,7 +206,7 @@ try {
   await psql(
     "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
   );
-  const [retry] = await claimHandoffs();
+  const [retry] = await claimHandoffs("followups");
   assert.ok(retry);
   assert.equal(
     (await requireSupportLease(retry)).processed_version,
@@ -337,7 +347,12 @@ try {
     await psql(
       "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
     );
-    const [claimed] = await claimHandoffs();
+    assert.deepEqual(
+      await claimHandoffs("intake"),
+      [],
+      "Intake never reclaims a completed investigation"
+    );
+    const [claimed] = await claimHandoffs("followups");
     assert.ok(claimed);
     const nextAuth = supportAuth(
       {

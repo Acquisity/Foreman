@@ -57,7 +57,10 @@ Linear creation roles are stable per case: customer report, billing, engineering
 
 ## Configuration and activation gates
 
-- `FOREMAN_SUPPORT_ENABLED`: exact value `true` enables both schedules; absent or `false` disables both, including subsequent provider calls from existing support sessions.
+Initial rollout: intake only. Intake claims new handoffs and retries unfinished initial investigations. Once a case has a processed version, only the separately enabled follow-up schedule can reclaim it. Both cron entries remain registered, but disabled follow-up ticks return before configuration parsing, database access or provider calls.
+
+- `FOREMAN_SUPPORT_ENABLED`: exact value `true` enables intake; absent or `false` disables both schedules, including subsequent provider calls from existing support sessions.
+- `FOREMAN_SUPPORT_FOLLOWUPS_ENABLED`: follow-ups additionally require exact value `true`. Leave unset or `false` for the initial intake-only rollout. Turning this off stops new follow-up dispatches; the master switch stops subsequent provider calls in already dispatched sessions too.
 - `FOREMAN_SUPPORT_HANDOFF_APP_ID`: verified Slack app ID producing Intercom handoff notifications. Do not substitute a user ID, channel ID or Foreman's app ID.
 - `FOREMAN_SUPPORT_SINCE`: explicit ISO timestamp for the first deployment watermark. Later deploys retain the persisted watermark.
 - `FOREMAN_SUPPORT_TEST_CONVERSATIONS`: optional comma-separated conversation IDs, at most ten, to limit both notification discovery and tracked-case claims during controlled tests. Set the initial watermark before the selected notifications for those tests. Do not reuse an old test watermark to enable a broad production backlog.

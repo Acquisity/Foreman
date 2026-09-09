@@ -12,6 +12,11 @@ export const creationRole = z.enum([
 export type CreationRole = z.infer<typeof creationRole>;
 export const supportEnabled = () =>
   process.env.FOREMAN_SUPPORT_ENABLED === "true";
+export type SupportScheduleMode = "intake" | "followups";
+export const supportScheduleEnabled = (mode: SupportScheduleMode) =>
+  supportEnabled() &&
+  (mode === "intake" ||
+    process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED === "true");
 export const conversationId = z.string().regex(/^\d{1,30}$/);
 export const slackTimestamp = z.string().regex(/^\d{10,16}\.\d{6}$/);
 

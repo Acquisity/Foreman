@@ -20,7 +20,7 @@ import { sessionLane } from "../session-lane.js";
 import { isIntakeOnly, isUnattended } from "../trust.js";
 import { claimFromContext, supportAuth } from "./auth.js";
 import { SUPPORT_PATHS } from "./catalog.js";
-import { supportConfig } from "./config.js";
+import { supportConfig, supportScheduleEnabled } from "./config.js";
 import {
   inspectConversation,
   notificationConversation,
@@ -303,17 +303,36 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
   assert.throws(() => toolkitUrl("arbitrary-toolkit" as never));
 });
 
-test("schedules are disabled unless explicitly configured", () => {
-  const previous = process.env.FOREMAN_SUPPORT_ENABLED;
+test("master switch enables intake only; followups require separate opt-in", () => {
+  const names = [
+    "FOREMAN_SUPPORT_ENABLED",
+    "FOREMAN_SUPPORT_FOLLOWUPS_ENABLED",
+  ] as const;
+  const previous = names.map((name) => process.env[name]);
   try {
+    delete process.env.FOREMAN_SUPPORT_ENABLED;
+    delete process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED;
+    assert.equal(supportConfig(), null);
+    assert.equal(supportScheduleEnabled("intake"), false);
+    process.env.FOREMAN_SUPPORT_ENABLED = "true";
+    assert.equal(supportScheduleEnabled("intake"), true);
+    assert.equal(supportScheduleEnabled("followups"), false);
+    process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED = "false";
+    assert.equal(supportScheduleEnabled("followups"), false);
+    process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED = "true";
+    assert.equal(supportScheduleEnabled("followups"), true);
     process.env.FOREMAN_SUPPORT_ENABLED = "false";
     assert.equal(supportConfig(), null);
+    assert.equal(supportScheduleEnabled("intake"), false);
+    assert.equal(supportScheduleEnabled("followups"), false);
   } finally {
-    if (previous === undefined) {
-      delete process.env.FOREMAN_SUPPORT_ENABLED;
-    } else {
-      process.env.FOREMAN_SUPPORT_ENABLED = previous;
-    }
+    names.forEach((name, index) => {
+      if (previous[index] === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = previous[index];
+      }
+    });
   }
 });
 

@@ -1,6 +1,10 @@
 import type { SessionAuthContext } from "eve/context";
 import { type SupportClaim, supportAuth } from "./auth.js";
-import { supportConfig } from "./config.js";
+import {
+  type SupportScheduleMode,
+  supportConfig,
+  supportScheduleEnabled,
+} from "./config.js";
 import { notificationConversation } from "./conversation.js";
 import { readSupportMessages } from "./slack.js";
 import {
@@ -12,10 +16,13 @@ import {
 } from "./store.js";
 
 export async function runSupportSchedule(
-  mode: "intake" | "followups",
+  mode: SupportScheduleMode,
   appAuth: SessionAuthContext,
   send: (claim: SupportClaim, auth: SessionAuthContext) => Promise<unknown>
 ) {
+  if (!supportScheduleEnabled(mode)) {
+    return;
+  }
   const config = supportConfig();
   if (!config) {
     return;
@@ -42,7 +49,7 @@ export async function runSupportSchedule(
     );
     await saveSupportCursor(newest);
   }
-  const claims = await claimHandoffs(config.testConversations);
+  const claims = await claimHandoffs(mode, config.testConversations);
   await Promise.all(
     claims.map(async (claim) => {
       try {
