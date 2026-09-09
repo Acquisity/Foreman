@@ -1,0 +1,68 @@
+# Intercom support trial
+
+ENG-13601 adds two disabled-by-default Eve schedules. `intercom-handoffs` runs every ten minutes and discovers notifications in `C0C0DV1AR8T`. `intercom-followups` runs at minutes 5, 15, 25, 35, 45 and 55 and checks tracked cases without needing another notification. Both claim from the same private processing tables, at most three cases per tick. They never change Fin's handoff workflow.
+
+## Eve contract
+
+Implementation was checked against the installed, lockfile-pinned Eve 0.44.0 documentation: `node_modules/eve/docs/schedules.mdx`, `patterns/dynamic-scheduling.md`, `patterns/durable-cross-channel-notifications.md`, `channels/custom.mdx`, and `concepts/state.md`.
+
+Schedules are root files discovered at build time. Each supplies a five-field UTC cron and a `run` handler; asynchronous work is registered with `waitUntil`. `to(...).send(...)` starts an agent session, not a Slack API post. The internal `support` channel has no HTTP route and starts task-mode sessions, which cannot park for consent. The root uses the existing Intercom product/billing skills and delegates their existing review and vision work. The scheduled adaptation skips attended-only investigation memory, reports missing details to Aaron instead of waiting, and replaces only the final Slack wording. Ordinary interactive skills are unchanged.
+
+`eve dev` does not run schedules on a clock. Use its one-shot schedule dispatch endpoints for local testing. Production Vercel builds register the cron entries in the Build Output configuration; verify discovery in the deployed project's Cron Jobs view.
+
+## Existing access first
+
+Do not rotate keys, request new provider grants, or reduce investigation reads merely because this is a schedule. Reuse each existing restriction and change only a demonstrated gap. On September 9, the read-only `pnpm executor:readiness --live` audit passed for the shared Foreman toolkit. This verifies mounts and toolkit policies, not every upstream credential's effective scopes, the deployed Foreman revision, or scheduled authentication. A metadata/read probe also confirmed Intercom's conversation schema and read the ticket's example conversation, which was closed.
+
+The candidate `support-toolkit-manifest.json` selects existing operations and connections without provisioning credentials. Ordinary Foreman keeps `foreman`; this job uses `foreman-support`. It is intentionally not installed or enabled by a build.
+
+| Evidence source | Existing boundary reused | Remaining activation check |
+| --- | --- | --- |
+| Acquisity codebase | Existing repository preparation and sandbox source reads; support does not carry the GitHub mutation surface | Read `Acquisity/Acquisity` under the scheduled identity and in the critic |
+| Instantly | Existing fixed GET helpers and workspace membership/provenance checks | Verify membership and paginated account/campaign evidence |
+| Autumn | Existing selected API/MCP reads and non-mutating previews | Verify the correct billing-account ID and entitlements |
+| Stripe | Existing billing reads; API writes and account administration already excluded | Verify customer and exact billing object reads |
+| PlanetScale production | Existing read-query, schema and investigation operations | Verify production access and cross-workspace aggregate queries remain available |
+| Sentry | Existing top-level searches and catalog dispatcher | Verify provider-side read restrictions; reviewed nested reads include issue events, stacktraces, breadcrumbs, traces, profiles, replays, releases and attachments |
+| Inngest | Existing run, trace, function, session and sandbox inspection operations | Verify app/run detail and trace reads |
+| Axiom | Existing query, dataset, metric and service reads | Verify relevant production dataset access |
+| Intercom | Existing eleven read operations; supplied key restrictions retained | Verify full conversation, contact and company reads under the actual scheduled identity |
+| Linear | Existing reads and required issue/document/comment writes plus fixed GraphQL helper documents | Verify required writes without approval; support excludes deletion, merge and unrelated administration |
+
+The candidate also retains existing help, Exa, Jam, Modem and Resend evidence reads. PostHog's shared catalog includes its entire installed surface; its effective provider scope must be audited before adding it to this restricted toolkit. Do not describe an omitted evidence lane as verified or silently substitute another customer. Access failures are evidence gaps, not permission to fall back to broader credentials.
+
+Root and delegated authored helpers inspect the framework-owned initiator stamp and select the support endpoint. The broad MCP `execute` connection is denied for that identity. `support_provider` offers operation search, live input-schema description, and a single operation call, never arbitrary Executor source code. Its Linear writes are journaled, and delegated writes are denied. This additional boundary supports retry bookkeeping as well as access control. No provider credential is embedded in a prompt or sandbox.
+
+## Processing and delivery
+
+Migration `0003_support_handoffs.sql` creates operational tables in Foreman's private Postgres, using the existing `FOREMAN_MEMORY_DATABASE_URL`. These tables are separate from investigation cases; their existence does not grant schedules access to investigation memory or customer databases. Migration is manual through `pnpm db:migrate`, never part of deploy.
+
+Notifications must be top-level messages from the configured Intercom Slack app and contain exactly one conversation reference in Intercom workspace `ls8uffkp`. Product Area and customer text cannot select the job's permissions. A persistent watermark advances only after the complete bounded scan and all inserts succeed. The processing key is conversation ID plus Slack parent timestamp.
+
+Channel lifecycle checks stop work after eighteen minutes or 150 action batches; silent calls remain subject to their own provider deadlines and the documented Eve/Connect limitations. Atomic twenty-minute leases prevent overlapping ticks claiming the same row. Every provider call and delivery checks the lease; expired sessions cannot keep writing through these paths. Unchanged customer content produces no reply. Human comments change the final revision check but do not independently trigger another investigation. A human reply or an explicit human assignment after the latest customer message turns any useful response into internal context. Closed or snoozed conversations stop processing.
+
+The root must finish through `support_investigation`. That tool re-reads the conversation, rejects stale findings, and records the Slack outbox before delivery. Slack methods and the destination channel are fixed in authored code. Delivery uses the parent timestamp, a stable client message ID and a metadata marker. An atomic delivery reservation prevents parallel sends. Overall success is recorded only after posting. An incomplete report can retain retry eligibility.
+
+Linear creation roles are stable per case: customer report, billing, engineering master. Successful write results are persisted immediately. An interrupted write whose outcome is unknown stays reserved; it is not recreated because a Slack post failed. This deliberately requires reconciliation when neither provider success nor failure can be established. It is not an exactly-once claim: Slack or Linear may accept a request whose response is lost. A found Slack marker closes that delivery; an absent marker does not prove failure. The match-issue action can reconcile a source-matched customer issue or an engineering master carrying the operation marker. Document and comment creation use stable per-issue keys even if retry wording changes. An operator must reconcile other unresolved writes before releasing their reservation. Never delete a reservation merely to make a retry proceed.
+
+## Configuration and activation gates
+
+- `FOREMAN_SUPPORT_ENABLED`: exact value `true` enables both schedules; absent or `false` disables both, including subsequent provider calls from existing support sessions.
+- `FOREMAN_SUPPORT_HANDOFF_APP_ID`: verified Slack app ID producing Intercom handoff notifications. Do not substitute a user ID, channel ID or Foreman's app ID.
+- `FOREMAN_SUPPORT_SINCE`: explicit ISO timestamp for the first deployment watermark. Later deploys retain the persisted watermark.
+- `FOREMAN_SUPPORT_TEST_CONVERSATIONS`: optional comma-separated conversation IDs, at most ten, to limit both notification discovery and tracked-case claims during controlled tests. Set the initial watermark before the selected notifications for those tests. Do not reuse an old test watermark to enable a broad production backlog.
+- Existing `EXECUTOR_MCP_CONNECTOR`, `EXECUTOR_OPERATION_BINDINGS`, `SLACK_CONNECTOR`, repository credentials and private database configuration are reused. Authentication ownership remains with the existing authorized company Executor account and Foreman app connection. Do not expand scopes automatically.
+
+Use a separate private Postgres database for Preview tests; the cursor and operational queue are deployment-independent within a database. Never point an enabled Preview at the production queue.
+
+Before activation, install the reviewed support toolkit using existing grants; run `pnpm executor:readiness --support --live` with the existing operator setup profile. This compares metadata only. Separately exercise the actual scheduled identity and deployed revision for the complete product and billing investigation paths, critic/vision access, fixed helper routing, allowed Linear writes, and Slack history/reply access to this private channel. A successful interactive read is not a substitute. Keep the schedule disabled until these checks pass.
+
+## Validation
+
+Run `pnpm validate` and `pnpm build`. The support unit tests cover notification provenance, conversation revisions, closed/incomplete cases, required-provider coverage, restricted dispatch and ordinary Executor behavior.
+
+The store smoke test runs the actual migration and store queries against disposable local PostgreSQL, without a production URL or provider write. Start a network-isolated container named `codex-support-test-<suffix>` from `postgres:18-alpine`, set `SUPPORT_TEST_POSTGRES_CONTAINER` to that name, and run `pnpm exec tsx scripts/test-support-store.ts`. It verifies concurrent claims, cursor monotonicity, ambiguous-write reservations, recorded results, stale leases and success only after delivery. Stop that disposable container afterward. The script supports Docker on Linux and Docker through the Ubuntu WSL distribution on Windows.
+
+With the development server running, POST `/eve/v1/dev/schedules/intercom-handoffs` and `/eve/v1/dev/schedules/intercom-followups`. With the switch disabled, both should start no agent sessions. Enabled tests require the preview toolkit, Slack target, database migration and explicitly selected conversations. Verify an ordinary escalation, billing, ambiguous identity, vague bug, missing area, unavailable tool, teammate reply, closed case, new customer reply, repeated tick, overlapping tick, and interrupted external write. No Intercom or product/billing mutations are part of these tests.
+
+To stop the trial, set `FOREMAN_SUPPORT_ENABLED=false` in the deployed environment and redeploy. Confirm the new deployment is active. Already dispatched provider requests cannot be recalled; subsequent support calls fail closed. Fin's workflow and the existing "I found a bug" route remain unchanged.

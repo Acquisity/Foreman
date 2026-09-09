@@ -58,8 +58,15 @@ Shipped: one bounded line per tool call with no duration, naming the tool, the c
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
 
-## Per-session MCP connection URL selection (resolved)
+## Per-session MCP connection URL selection
 
 Checked against eve 0.44.0.
 
-Resolved for Foreman's current requirements: all workflows use one shared Executor toolkit, so a caller-dependent connection URL is no longer needed. Eve 0.44 still requires a static `McpClientConnectionDefinition.url`; no framework workaround or separate per-workflow connections remain.
+Ordinary Foreman workflows retain one shared Executor toolkit. ENG-13601 introduces an explicit scheduled-support exception. Eve 0.44 requires a static `McpClientConnectionDefinition.url`, so that job denies the general MCP connection and uses an authored operation dispatcher to the support toolkit. Its helpers select the same endpoint from the framework-owned initiator identity. This preserves existing interactive discovery and gives support Linear writes a durable journal; it does not pretend that the MCP URL is dynamic.
+
+
+## Durable per-run cancellation for support schedules
+
+Checked against Eve 0.44.0 for ENG-13601. A custom channel can fail a turn from lifecycle callbacks, but its `SessionHandle` exposes identity and continuation rekeying, not cancellation or a durable timer. The cross-channel send options also do not accept per-run resource limits. Support therefore applies an eighteen-minute deadline at reasoning/action checkpoints, a ceiling of 150 action batches, twenty-minute provider-write leases, and the existing provider/sandbox deadlines. This bounds work at the available boundaries; it is not a promise to interrupt one silent model call or the Connect SDK exactly at eighteen minutes. No detached timeout or polling workflow is used to simulate that guarantee.
+
+Proposal: expose a runtime-owned per-run deadline on channel sends that cancels model calls, delegated work and token resolution durably.

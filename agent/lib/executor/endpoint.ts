@@ -18,5 +18,9 @@ export function executorOrigin(): string {
 }
 
 export const FOREMAN_TOOLKIT_SLUG = "foreman";
-export const toolkitUrl = (): string =>
-  `${executorOrigin()}/mcp/toolkits/${FOREMAN_TOOLKIT_SLUG}?artifacts=false`;
+export const toolkitUrl = (slug = FOREMAN_TOOLKIT_SLUG): string => {
+  if (slug !== FOREMAN_TOOLKIT_SLUG && slug !== "foreman-support") {
+    throw new Error("Unknown Foreman toolkit.");
+  }
+  return `${executorOrigin()}/mcp/toolkits/${slug}?artifacts=false`;
+};

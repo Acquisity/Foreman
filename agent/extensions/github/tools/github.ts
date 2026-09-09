@@ -1,6 +1,7 @@
 import { github } from "@github-tools/eve-extension/tools";
 import { defineDynamic } from "eve/tools";
 import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js";
+import { isSupportAuth } from "../../../lib/support/auth.js";
 
 /**
  * Keeps the 31-tool GitHub surface out of a lane that has no repository
@@ -38,6 +39,9 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
 export default defineDynamic({
   events: {
     "step.started": async (event, ctx) => {
+      if (isSupportAuth(ctx.session.auth.initiator)) {
+        return null;
+      }
       if (!repositoryCapabilitiesAvailable(ctx.session.auth.current)) {
         return null;
       }

@@ -628,7 +628,12 @@ describe("capability report", () => {
         (tool) => capabilitySource(tool.sourceId) === "tools/"
       ).length +
       manifest.dynamicTools.filter(
-        (tool) => capabilitySource(tool.sourceId) === "tools/"
+        (tool) =>
+          capabilitySource(tool.sourceId) === "tools/" &&
+          ![
+            "tools/support_investigation.ts",
+            "tools/support_provider.ts",
+          ].includes(tool.sourceId)
       ).length;
     for (const lane of REPOSITORY_LANES) {
       assert.equal(entries(lane, "tool", "tools/"), authoredToolModules, lane);

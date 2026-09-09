@@ -1,5 +1,7 @@
 import { defineDynamic, defineInstructions } from "eve/instructions";
 import { selectPrompt } from "../lib/prompts.js";
+import { isSupportAuth } from "../lib/support/auth.js";
+import { supportSystemPrompt } from "../lib/support/instructions.js";
 
 // The agent's system prompt, resolved by caller: unattended factory runs (an issue labeled
 // `factory`, red CI on a factory PR) run under the autonomous principal and get the full
@@ -15,7 +17,11 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, ctx) =>
       defineInstructions({
-        content: selectPrompt(ctx.session.auth.current?.principalId),
+        content: isSupportAuth(ctx.session.auth.initiator)
+          ? supportSystemPrompt(
+              selectPrompt(ctx.session.auth.current?.principalId)
+            )
+          : selectPrompt(ctx.session.auth.current?.principalId),
       }),
   },
 });

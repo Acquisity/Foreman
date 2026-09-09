@@ -41,6 +41,14 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | `agent/lib/investigation-memory/store.ts` | 15s per operation | ENG-13318. The Neon serverless driver sends each query as its own HTTP request and enforces no deadline. The client is built per operation, not cached: a cached one would hold an already-fired signal and refuse every later query. Several queries inside one exported function share the bound. |
 | `agent/lib/blob.ts` | 20s per operation | ENG-13318. `@vercel/blob` retries internally but sets no overall deadline. |
 
+## Intercom support schedules
+
+| Call | Bound | Notes |
+| --- | --- | --- |
+| `agent/lib/support/store.ts` | 15s per query | Private operational tables, atomic leases and write journal. No customer database or investigation-memory reads. |
+| `agent/lib/support/slack.ts` | 20s per HTTP request; at most 10 history pages | Fixed Slack channel and methods. A partial scan never advances the cursor. Slack token resolution uses the Connect exemption below. |
+| `agent/lib/support/provider.ts`, `agent/lib/executor/transport.ts` | 50s after authorization | Support operations and schema discovery reuse the existing bounded Executor transport. Lease is checked before dispatch. |
+
 ## Sandbox commands
 
 All of these run through `boundedRun` in `agent/lib/sandbox-deadline.ts`, which returns exit code 124 rather than throwing, so each caller's existing non-zero branch handles a deadline. A cancelled turn still throws, which is what keeps cancellation distinguishable from a timeout.

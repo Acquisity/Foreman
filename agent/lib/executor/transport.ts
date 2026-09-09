@@ -38,6 +38,7 @@ const outcomeSchema = z.discriminatedUnion("ok", [
 export interface ExecutorRequestContext {
   signal: AbortSignal;
   token: string;
+  toolkit?: "foreman" | "foreman-support";
 }
 export class ExecutorError extends Error {
   readonly code: string;
@@ -144,12 +145,30 @@ export async function invokeExecutor(
   if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
     throw new ExecutorError("invalid_operation_binding");
   }
+  const result = await executeExecutor(
+    ctx,
+    `return await tools[${JSON.stringify(path)}](${JSON.stringify(input)});`,
+    options
+  );
+  const parsed = outcomeSchema.safeParse(result);
+  if (!parsed.success) {
+    throw new ExecutorError("invalid_operation_result");
+  }
+  return parsed.data;
+}
+
+/** Application-authored source only. Never expose source as a tool input. */
+async function executeExecutor(
+  ctx: ExecutorRequestContext,
+  code: string,
+  options: { fetch?: typeof fetch; timeoutMs?: number; maxBytes?: number } = {}
+): Promise<unknown> {
   const signal = AbortSignal.any([
     ctx.signal,
     AbortSignal.timeout(options.timeoutMs ?? 50_000),
   ]);
   signal.throwIfAborted();
-  const endpoint = toolkitUrl();
+  const endpoint = toolkitUrl(ctx.toolkit);
   const fetchImpl = options.fetch ?? fetch;
   const headers: Record<string, string> = {
     Accept: "application/json, text/event-stream",
@@ -206,7 +225,6 @@ export async function invokeExecutor(
   headers["MCP-Protocol-Version"] = "2025-06-18";
   await post({ method: "notifications/initialized" });
   // JSON quoting is for TypeScript source here, never for a shell command.
-  const code = `return await tools[${JSON.stringify(path)}](${JSON.stringify(input)});`;
   const result = await post(
     {
       id: 2,
@@ -218,9 +236,18 @@ export async function invokeExecutor(
   if (result?.isError || result?.structuredContent?.status !== "completed") {
     throw new ExecutorError("execution_unavailable");
   }
-  const parsed = outcomeSchema.safeParse(result.structuredContent.result);
-  if (!parsed.success) {
-    throw new ExecutorError("invalid_operation_result");
+  return result.structuredContent.result;
+}
+
+export function describeExecutorOperation(
+  ctx: ExecutorRequestContext,
+  path: string
+) {
+  if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
+    throw new ExecutorError("invalid_operation_binding");
   }
-  return parsed.data;
+  return executeExecutor(
+    ctx,
+    `return await tools.describe.tool({path:${JSON.stringify(path)}});`
+  );
 }

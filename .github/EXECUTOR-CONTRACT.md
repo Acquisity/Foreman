@@ -1,6 +1,6 @@
 # Foreman Executor connection
 
-Foreman uses one shared company toolkit, `Foreman`, at `https://executor.acquisity.ai/mcp/toolkits/foreman?artifacts=false`. Root, critic, factory work, schedules, and authored provider helpers use the same endpoint and company accounts. New workflows do not need new toolkits.
+Foreman uses one shared company toolkit, `Foreman`, at `https://executor.acquisity.ai/mcp/toolkits/foreman?artifacts=false`. Root, critic, factory work, schedules, and authored provider helpers use the same endpoint and company accounts. Ordinary workflows reuse this toolkit. ENG-13601 is a narrow exception: the explicitly stamped Intercom support schedules use `foreman-support`, including helpers and delegated reads, with journaled Linear writes. See [INTERCOM-SUPPORT-CRON.md](./INTERCOM-SUPPORT-CRON.md) for the existing-access audit, candidate policy and activation gates.
 
 ## What controls behavior
 
@@ -26,7 +26,7 @@ All provider helpers authenticate through `EXECUTOR_MCP_CONNECTOR`, an app-scope
 
 - Set `EXECUTOR_OPERATION_BINDINGS` to the compact JSON contents of `.github/executor/operation-bindings.json` after verifying the installed catalog; the empty `.env.example` placeholder is not runnable provider configuration.
 - `EXECUTOR_BASE_URL` defaults to `https://executor.acquisity.ai` and must be an HTTPS origin. The toolkit slug is `foreman`.
-- The existing Executor account holds the company connections. The toolkit remains account-owned because this Executor version excludes personal connections from workspace-owned toolkits. Consolidation does not move credentials or change their ownership.
+- The existing Executor account holds the company connections. Both toolkits remain account-owned because this Executor version excludes personal connections from workspace-owned toolkits. Consolidation does not move credentials or change their ownership.
 - `LINEAR_CONNECTOR` remains for inbound Agent Sessions and vision attachment downloads. Slack delivery, GitHub, Blob, investigation memory, models, and sandbox infrastructure remain separate.
 - `pnpm executor:contract` reports the endpoint, selected operations, and required helper mappings. `pnpm executor:readiness` checks coverage. Add `--live` with `EXECUTOR_SETUP_PROFILE` to compare the live toolkit's mounts and policies with the manifest; the command never resolves provider credentials or invokes tools.
 - Run `pnpm validate`, inspect compiled root/critic connections, and exercise platform reads, helper parity, expected writes on synthetic records, and critic read-only behavior on preview. Full-pipeline evaluations require a scratch repository.
