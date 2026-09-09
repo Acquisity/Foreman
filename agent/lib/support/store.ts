@@ -3,15 +3,20 @@ import { neon } from "@neondatabase/serverless";
 import { z } from "zod";
 import { type SupportClaim, supportClaim } from "./auth.js";
 import { conversationId, slackTimestamp } from "./config.js";
+import { type LinearSnapshot, linearSnapshot } from "./linear-state.js";
 
 const rowSchema = z.object({
   conversation: conversationId,
   delivery_attempted: z.boolean(),
   last_report_hash: z.string().nullable(),
+  linear_ids: z.array(z.string()).max(10),
+  linear_observed: linearSnapshot,
+  linear_processed: linearSnapshot,
   processed_version: z.string().nullable(),
   report: z.string().nullable(),
   report_key: z.string().nullable(),
   report_kind: z.enum(["final", "retry", "failure"]).nullable(),
+  report_revision: z.string().nullable(),
   thread: slackTimestamp,
   version: z.string().nullable(),
 });
@@ -85,11 +90,21 @@ export async function requireSupportLease(
   return rowSchema.parse(rows[0]);
 }
 
-export async function setSupportVersion(claim: SupportClaim, version: string) {
+export async function setSupportVersion(
+  claim: SupportClaim,
+  version: string,
+  snapshot: LinearSnapshot = {}
+) {
   await requireSupportLease(claim);
   await query(
-    "UPDATE support_handoffs SET version = $4 WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()",
-    [claim.conversation, claim.thread, claim.lease, version]
+    "UPDATE support_handoffs SET version = $4, linear_observed = $5::jsonb WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()",
+    [
+      claim.conversation,
+      claim.thread,
+      claim.lease,
+      version,
+      JSON.stringify(snapshot),
+    ]
   );
 }
 
@@ -101,7 +116,8 @@ export async function releaseSupport(
   await query(
     `UPDATE support_handoffs SET lease = NULL, lease_until = NULL,
     next_check = now() + interval '10 minutes', closed = $4,
-    processed_version = CASE WHEN $5 THEN version ELSE processed_version END
+    processed_version = CASE WHEN $5 THEN version ELSE processed_version END,
+    linear_processed = CASE WHEN $5 THEN linear_observed ELSE linear_processed END
     WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()`,
     [claim.conversation, claim.thread, claim.lease, closed, processed]
   );
@@ -111,12 +127,13 @@ export async function queueSupportReport(
   claim: SupportClaim,
   report: string,
   hash: string,
-  kind: "final" | "retry" | "failure" = "final"
+  kind: "final" | "retry" | "failure" = "final",
+  revision: string | null = null
 ) {
   await requireSupportLease(claim);
   await query(
     `UPDATE support_handoffs SET report = $4, report_key = $5, report_hash = $6, report_kind = $7,
-    delivery_attempted = false WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND report IS NULL`,
+    delivery_attempted = false, report_revision = $8 WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND report IS NULL`,
     [
       claim.conversation,
       claim.thread,
@@ -125,6 +142,7 @@ export async function queueSupportReport(
       randomUUID(),
       hash,
       kind,
+      revision,
     ]
   );
 }
@@ -148,10 +166,30 @@ export async function discardSupportReport(claim: SupportClaim) {
 export async function completeSupportDelivery(claim: SupportClaim, ts: string) {
   await query(
     `UPDATE support_handoffs SET posted_ts = $4, report = NULL, report_key = NULL,
-    last_report_hash = report_hash, processed_version = CASE WHEN report_kind = 'final' THEN version ELSE processed_version END, lease = NULL, lease_until = NULL, next_check = now() + interval '10 minutes'
+    last_report_hash = report_hash, processed_version = CASE WHEN report_kind = 'final' THEN version ELSE processed_version END,
+    linear_processed = CASE WHEN report_kind = 'final' THEN linear_observed ELSE linear_processed END,
+    lease = NULL, lease_until = NULL, next_check = now() + interval '10 minutes'
     WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()`,
     [claim.conversation, claim.thread, claim.lease, slackTimestamp.parse(ts)]
   );
+}
+
+/** Persist verified issue references immediately, independent of Slack success. */
+export async function trackSupportIssue(claim: SupportClaim, issueId: string) {
+  const id = z.string().min(1).max(100).parse(issueId);
+  await requireSupportLease(claim);
+  const rows = await query(
+    `UPDATE support_handoffs
+    SET linear_ids = CASE WHEN $4 = ANY(linear_ids) THEN linear_ids ELSE array_append(linear_ids, $4) END
+    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()
+    AND ($4 = ANY(linear_ids) OR cardinality(linear_ids) < 10) RETURNING conversation`,
+    [claim.conversation, claim.thread, claim.lease, id]
+  );
+  if (!rows.length) {
+    throw new Error(
+      "The support issue watch list is full or its lease expired."
+    );
+  }
 }
 
 /** Reserve before a write. An ambiguous write is never blindly replayed. */

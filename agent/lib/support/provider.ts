@@ -11,11 +11,13 @@ import { claimFromContext, type SupportClaim } from "./auth.js";
 import { SUPPORT_PATHS } from "./catalog.js";
 import { SUPPORT_TOOLKIT } from "./config.js";
 import { notificationConversation, providerData } from "./conversation.js";
+import { writtenIssueId } from "./linear-state.js";
 import {
   completeSupportOperation,
   recordMatchedSupportIssue,
   requireSupportLease,
   reserveSupportOperation,
+  trackSupportIssue,
 } from "./store.js";
 
 const paths: ReadonlySet<string> = new Set(SUPPORT_PATHS);
@@ -97,7 +99,13 @@ export async function matchSupportIssue(
       "The existing issue does not identify this Intercom source unambiguously."
     );
   }
-  return recordMatchedSupportIssue(claim, `create-issue:${role}`, result);
+  const recorded = await recordMatchedSupportIssue(
+    claim,
+    `create-issue:${role}`,
+    result
+  );
+  await trackSupportIssue(claim, writtenIssueId(result.data));
+  return recorded;
 }
 
 function supportIssueMarker(claim: SupportClaim, role: string) {
@@ -157,7 +165,7 @@ export async function invokeProvider(
   if (!(claim && supportMutation(path))) {
     return invokeExecutor(connection, path, input);
   }
-  return journalSupportWrite(
+  const result = await journalSupportWrite(
     claim,
     operationKey ??
       supportWriteKey(
@@ -167,6 +175,10 @@ export async function invokeProvider(
       ),
     () => invokeExecutor(connection, path, input)
   );
+  if (result.ok && path.endsWith(".save_issue")) {
+    await trackSupportIssue(claim, writtenIssueId(result.data));
+  }
+  return result;
 }
 
 export function supportWriteKey(

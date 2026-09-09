@@ -5,6 +5,12 @@ import { readFile } from "node:fs/promises";
 import { neonConfig } from "@neondatabase/serverless";
 import { supportAuth } from "../agent/lib/support/auth.js";
 import {
+  currentCase,
+  finishSupportQuietly,
+  openSupportInvestigation,
+} from "../agent/lib/support/investigation.js";
+import { readLinearFollowup } from "../agent/lib/support/linear-followup.js";
+import {
   invokeProvider,
   type ProviderContext,
 } from "../agent/lib/support/provider.js";
@@ -15,11 +21,13 @@ import {
   completeSupportOperation,
   discoverHandoff,
   queueSupportReport,
+  releaseSupport,
   requireSupportLease,
   reserveSupportOperation,
   saveSupportCursor,
   setSupportVersion,
   supportCursor,
+  trackSupportIssue,
 } from "../agent/lib/support/store.js";
 
 const CONTAINER_NAME = /^codex-support-test-[a-z0-9-]+$/;
@@ -115,10 +123,14 @@ neonConfig.fetchFunction = async (
   const fields = names.map((name) => ({
     dataTypeID:
       (
-        { closed: 16, delivery_attempted: 16, result: 3802 } as Record<
-          string,
-          number
-        >
+        {
+          closed: 16,
+          delivery_attempted: 16,
+          linear_ids: 1009,
+          linear_observed: 3802,
+          linear_processed: 3802,
+          result: 3802,
+        } as Record<string, number>
       )[name] ?? 25,
     name,
   }));
@@ -136,6 +148,15 @@ try {
   await psql(
     await readFile(
       new URL("../migrations/0003_support_handoffs.sql", import.meta.url),
+      "utf8"
+    )
+  );
+  await psql(
+    await readFile(
+      new URL(
+        "../migrations/0004_support_linear_followups.sql",
+        import.meta.url
+      ),
       "utf8"
     )
   );
@@ -173,12 +194,12 @@ try {
     reserveSupportOperation(claim, "create-issue:customer-report")
   );
   await completeSupportOperation(claim, "create-issue:customer-report", {
-    id: "ENG-TEST",
+    data: { id: "ENG-TEST" },
     ok: true,
   });
   assert.deepEqual(
     await reserveSupportOperation(claim, "create-issue:customer-report"),
-    { fresh: false, result: { id: "ENG-TEST", ok: true } }
+    { fresh: false, result: { data: { id: "ENG-TEST" }, ok: true } }
   );
   await queueSupportReport(claim, "Verified findings", "report-hash");
   assert.equal(
@@ -249,9 +270,33 @@ try {
   );
 
   const urls: string[] = [];
+  const intercom = {
+    conversation_parts: { conversation_parts: [], total_count: 0 },
+    created_at: 1,
+    id: retry.conversation,
+    source: { author: { type: "user" }, body: "Waiting for engineering" },
+    state: "snoozed",
+    updated_at: 2,
+  };
+  const issue = {
+    description: "Investigating",
+    id: "ENG-TEST",
+    status: "In Progress",
+  };
+  let incompleteComments = false;
+  const comments = [{ body: "Investigating the issue", id: "comment-test" }];
   globalThis.fetch = (url, init) => {
     urls.push(String(url));
     const rpc = JSON.parse(String(init?.body));
+    const code = String(rpc.params?.arguments?.code ?? "");
+    let data: unknown = {};
+    if (code.includes("get_conversation")) {
+      data = intercom;
+    } else if (code.includes("get_issue")) {
+      data = issue;
+    } else if (code.includes("list_comments")) {
+      data = { comments, hasNextPage: incompleteComments };
+    }
     if (rpc.method === "notifications/initialized") {
       return Promise.resolve(new Response(null, { status: 202 }));
     }
@@ -264,7 +309,7 @@ try {
             ? { protocolVersion: "2025-06-18" }
             : {
                 structuredContent: {
-                  result: { data: {}, ok: true },
+                  result: { data, ok: true },
                   status: "completed",
                 },
               },
@@ -282,7 +327,7 @@ try {
     retry
   );
   const ctx = {
-    abortSignal: AbortSignal.timeout(10_000),
+    abortSignal: AbortSignal.timeout(60_000),
     getToken: () => Promise.resolve({ token: "synthetic-support-test" }),
     session: { auth: { current: auth, initiator: auth }, id: "support-test" },
   } as unknown as ProviderContext;
@@ -302,6 +347,85 @@ try {
     })
   );
   assert.equal(urls.length, 6);
+  await completeSupportOperation(retry, "rejected-write", { ok: true });
+  const baseline = await currentCase(ctx, retry);
+  assert.deepEqual(
+    (await requireSupportLease(retry)).linear_ids,
+    [issue.id],
+    "A journaled creation recovers its watch registration after a crash"
+  );
+  await trackSupportIssue(retry, issue.id);
+  assert.deepEqual((await requireSupportLease(retry)).linear_ids, [issue.id]);
+  await setSupportVersion(retry, baseline.version, baseline.linear.snapshot);
+  await releaseSupport(retry, false, true);
+  const recheck = async () => {
+    await psql(
+      "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
+    );
+    const [claimed] = await claimHandoffs();
+    assert.ok(claimed);
+    const nextAuth = supportAuth(
+      {
+        attributes: {},
+        authenticator: "app",
+        principalId: "eve:app",
+        principalType: "runtime",
+      },
+      claimed
+    );
+    return {
+      claimed,
+      context: {
+        ...ctx,
+        session: {
+          ...ctx.session,
+          auth: { current: nextAuth, initiator: nextAuth },
+        },
+      } as ProviderContext,
+    };
+  };
+  const unchanged = await recheck();
+  assert.equal(
+    (await openSupportInvestigation(unchanged.context)).investigate,
+    false,
+    "Unchanged Intercom and Linear finish without reading or posting Slack"
+  );
+  const changed = await recheck();
+  issue.status = "Done";
+  const progress = await currentCase(changed.context, changed.claimed);
+  assert.notEqual(
+    progress.version,
+    baseline.version,
+    "Linear status alone triggers re-evaluation on a snoozed case"
+  );
+  assert.equal(progress.linear.changes.length, 1);
+  incompleteComments = true;
+  await assert.rejects(() =>
+    readLinearFollowup(changed.context, changed.claimed)
+  );
+  incompleteComments = false;
+  assert.deepEqual(
+    (await requireSupportLease(changed.claimed)).linear_processed,
+    baseline.linear.snapshot,
+    "Incomplete reads never consume a change"
+  );
+  const stale = await finishSupportQuietly(changed.context, baseline.revision);
+  assert.equal(
+    stale.revision,
+    progress.revision,
+    "Silent completion also checks for new engineering changes"
+  );
+  await finishSupportQuietly(changed.context, progress.revision);
+  const quiet = await recheck();
+  assert.deepEqual(
+    (await requireSupportLease(quiet.claimed)).linear_processed,
+    progress.linear.snapshot
+  );
+  assert.equal(
+    (await openSupportInvestigation(quiet.context)).investigate,
+    false,
+    "A reviewed non-actionable update stays quiet on the next tick"
+  );
   assert.ok(
     urls.every(
       (url) =>
@@ -310,7 +434,7 @@ try {
     )
   );
   console.log(
-    "PASS: real PostgreSQL migration, overlapping claims, watermark, write journal, stale leases, delivery and retry state."
+    "PASS: real PostgreSQL migrations, leases, outbox, linked Linear recovery, change detection, incomplete-read retry and silent follow-up completion."
   );
 } finally {
   neonConfig.fetchFunction = previousFetch;

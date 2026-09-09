@@ -135,11 +135,12 @@ export function inspectConversation(data: unknown, expectedId: string) {
     .update(JSON.stringify(conversation))
     .digest("hex");
   return {
-    closed: conversation.state !== "open",
+    closed: conversation.state === "closed",
     conversation,
     humanReplied,
     humanTookOwnership,
     revision,
+    snoozed: conversation.state === "snoozed",
     version,
   };
 }

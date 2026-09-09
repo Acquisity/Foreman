@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { claimFromContext, type SupportClaim } from "./auth.js";
 import { inspectConversation } from "./conversation.js";
+import { readLinearFollowup } from "./linear-followup.js";
+import { digest } from "./linear-state.js";
 import { invokeProvider, type ProviderContext } from "./provider.js";
 import { postSupportMessage, readSupportMessages } from "./slack.js";
 import {
@@ -48,6 +50,19 @@ export async function currentConversation(
   return inspectConversation(result.data, claim.conversation);
 }
 
+export async function currentCase(ctx: ProviderContext, claim: SupportClaim) {
+  const conversation = await currentConversation(ctx, claim);
+  const linear = conversation.closed
+    ? { changes: [], snapshot: {}, version: digest({}) }
+    : await readLinearFollowup(ctx, claim);
+  return {
+    ...conversation,
+    linear,
+    revision: digest([conversation.revision, linear.version]),
+    version: digest([conversation.version, linear.version]),
+  };
+}
+
 export async function openSupportInvestigation(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
@@ -55,11 +70,11 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
     await deliverSupportReport(ctx, claim);
     return { investigate: false, reason: "Pending access status handled." };
   }
-  const current = await currentConversation(ctx, claim);
+  const current = await currentCase(ctx, claim);
   if (current.closed) {
     await discardSupportReport(claim);
     await releaseSupport(claim, true);
-    return { investigate: false, reason: "Conversation is no longer open." };
+    return { investigate: false, reason: "Conversation is closed." };
   }
   if (row.report) {
     if (row.version === current.version) {
@@ -79,9 +94,20 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
   }
   if (current.version === row.processed_version) {
     await releaseSupport(claim);
-    return { investigate: false, reason: "No new customer content." };
+    return {
+      investigate: false,
+      reason: "No new customer content or linked Linear evidence.",
+    };
   }
-  await setSupportVersion(claim, current.version);
+  await setSupportVersion(claim, current.version, current.linear.snapshot);
+  if (current.snoozed && !Object.keys(current.linear.snapshot).length) {
+    await releaseSupport(claim, false, true);
+    return {
+      investigate: false,
+      reason:
+        "Snoozed case has no linked engineering work; keep checking quietly.",
+    };
+  }
   return {
     conversation: current.conversation,
     humanReplied: current.humanReplied,
@@ -89,6 +115,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
     instructions:
       "Load intercom-triage-investigate or intercom-billing-triage. Reuse the investigation and Linear workflow. Existing completed operations must be reused. A human reply means provide only additional useful internal context. Use support_provider for provider discovery and direct calls. Use authored helpers as usual. Finish through support_investigation; ordinary final text is not delivered.",
     investigate: true,
+    linearChanges: current.linear.changes,
     previousOperations: await supportOperations(claim),
     revision: current.revision,
     slackContext: (await readSupportMessages({ thread: claim.thread })).filter(
@@ -140,8 +167,12 @@ export async function deliverSupportReport(
     await completeSupportDelivery(claim, ts);
     return true;
   }
-  const current = await currentConversation(ctx, claim);
-  if (current.closed || current.version !== row.version) {
+  const current = await currentCase(ctx, claim);
+  if (
+    current.closed ||
+    current.version !== row.version ||
+    current.revision !== row.report_revision
+  ) {
     await discardSupportReport(claim);
     await releaseSupport(claim, current.closed);
     return false;
@@ -165,8 +196,8 @@ export async function finishSupportInvestigation(
 ) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
-  const current = await currentConversation(ctx, claim);
-  if (current.closed || current.version !== row.version) {
+  const current = await currentCase(ctx, claim);
+  if (current.closed) {
     await releaseSupport(claim, current.closed);
     return {
       posted: false,
@@ -174,11 +205,13 @@ export async function finishSupportInvestigation(
     };
   }
   if (revision !== current.revision) {
+    await setSupportVersion(claim, current.version, current.linear.snapshot);
     return {
       conversation: current.conversation,
+      linearChanges: current.linear.changes,
       posted: false,
       reason:
-        "Conversation changed during investigation. Read the new state, revise the findings, then finish again.",
+        "Intercom or Linear changed during investigation. Review the new state, including your own edits, then finish again with this revision.",
       revision: current.revision,
     };
   }
@@ -193,6 +226,7 @@ export async function finishSupportInvestigation(
       "A Linear write still needs retry or reconciliation. Do not mark this investigation complete."
     );
   }
+  await setSupportVersion(claim, current.version, current.linear.snapshot);
   const text = [
     `Issue: ${report.issue}`,
     `Already tried: ${report.alreadyTried}`,
@@ -212,13 +246,19 @@ export async function finishSupportInvestigation(
     await releaseSupport(claim, false, !report.retry);
     return { posted: false, reason: "Findings are unchanged." };
   }
-  await queueSupportReport(claim, text, hash, report.retry ? "retry" : "final");
+  await queueSupportReport(
+    claim,
+    text,
+    hash,
+    report.retry ? "retry" : "final",
+    current.revision
+  );
   return { posted: await deliverSupportReport(ctx, claim) };
 }
 
 export async function skipHandledSupport(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
-  const current = await currentConversation(ctx, claim);
+  const current = await currentCase(ctx, claim);
   const row = await requireSupportLease(claim);
   if (
     !(current.humanReplied || current.humanTookOwnership) ||
@@ -230,6 +270,42 @@ export async function skipHandledSupport(ctx: ProviderContext) {
   return {
     posted: false,
     reason: "Human-handled case needs no additional findings.",
+  };
+}
+
+export async function finishSupportQuietly(
+  ctx: ProviderContext,
+  revision: string
+) {
+  const claim = requireSupportContext(ctx);
+  const row = await requireSupportLease(claim);
+  const current = await currentCase(ctx, claim);
+  if (
+    row.report ||
+    !row.processed_version ||
+    (await supportOperations(claim)).some(
+      (operation) => operation.state !== "done"
+    )
+  ) {
+    throw new Error(
+      "Initial or unfinished investigation needs a report or retry, not silent completion."
+    );
+  }
+  if (revision !== current.revision) {
+    await setSupportVersion(claim, current.version, current.linear.snapshot);
+    return {
+      conversation: current.conversation,
+      linearChanges: current.linear.changes,
+      posted: false,
+      reason: "Evidence changed. Review it before deciding to stay quiet.",
+      revision: current.revision,
+    };
+  }
+  await setSupportVersion(claim, current.version, current.linear.snapshot);
+  await releaseSupport(claim, current.closed, true);
+  return {
+    posted: false,
+    reason: "Checked changes need no support action or message.",
   };
 }
 
