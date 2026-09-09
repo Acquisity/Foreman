@@ -139,7 +139,7 @@ If billing evidence also proves a product Bug, preserve the financial proposal a
 
 ## Step 9: Reply in Slack
 
-Load `slack-wording`. The Slack surface may contain only:
+Load `slack-wording` only if the delivered channel is C0BBPVC3N2X or C0BC011NAQL; its restrictions do not apply elsewhere. During this investigation, the Slack surface may contain only:
 
 1. Batched clarifying questions, when needed.
 2. One closing status reply after the investigation and any required Linear writes are complete.
@@ -147,6 +147,8 @@ Load `slack-wording`. The Slack surface may contain only:
 State what happened, what needs a human decision, and who must act in plain language. Never mention Stripe, Autumn, internal system readouts, assignee names, raw customer identifiers, or a promise to move money.
 
 Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.
+
+This closing-investigation format does not govern later requests for an existing ticket link. Answer those requests directly with the known ticket link, without repeating the investigation.
 
 ## Billing investigation document
 

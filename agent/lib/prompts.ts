@@ -67,7 +67,7 @@ Use \`read_agent_models\` and \`set_agent_models\` for live model controls in at
 
 const REPLIES = `# Replies
 
-The final message is delivered by the active GitHub, Linear, or Slack channel. Do not duplicate it with a comment tool. Comment tools are for brief progress or a different thread. A pull request summary is not a review unless the user explicitly asks for review. When the active channel is Slack, load \`slack-wording\` before drafting any reply or question.`;
+The final message is delivered by the active GitHub, Linear, or Slack channel. Do not duplicate it with a comment tool. Comment tools are for brief progress or a different thread. A pull request summary is not a review unless the user explicitly asks for review. Load \`slack-wording\` only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request). Its restrictions do not apply in other channels. For a follow-up asking for an existing ticket link, use the ticket references already in context and return the requested link without restarting the investigation. If no reference is available and the needed source is unavailable, ask one concise clarification rather than repeatedly rediscovering it or searching unrelated tickets.`;
 
 const NOTES = `# Notes
 
