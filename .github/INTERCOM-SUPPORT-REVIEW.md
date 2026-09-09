@@ -1,6 +1,6 @@
 # Support branch review response
 
-Review base: `92b663e..6a0c054`. All changes remain local; rollout verification and migrations are still required before enabling the schedules.
+Review base: `92b663e..6a0c054`. Rollout verification and migrations are still required before enabling the schedules.
 
 | Finding | Resolution |
 | --- | --- |
@@ -20,7 +20,7 @@ Review base: `92b663e..6a0c054`. All changes remain local; rollout verification 
 
 The meaningful behavioral corrections are that model-correctable refusals stay in the active investigation and stale state writes now report conflicts. Quiet follow-up semantics, shared investigative access, original-thread delivery and disabled-by-default rollout remain intact.
 
-Validation: `pnpm validate` passed with 682 tests, `pnpm build` passed, and the disposable PostgreSQL smoke test passed through the `pg` adapter. This includes refusal handling without Slack delivery, rejection of stale state writes, and reservation-owned late receipts. No production migration, live provider write, deployment, push or PR was performed.
+Historical validation of `6fe068e`: `pnpm validate` passed with 682 tests, `pnpm build` passed, and the disposable PostgreSQL smoke test passed through the `pg` adapter. This includes refusal handling without Slack delivery, rejection of stale state writes, and reservation-owned late receipts. No production migration, live provider write, deployment, push or PR was performed.
 
 The approval review's three follow-ups are also addressed:
 
@@ -28,4 +28,6 @@ The approval review's three follow-ups are also addressed:
 - Open loads the case and operation journal once and passes them through recovery and evidence helpers. Recovery returns the updated watch list for immediate use. Provider dispatch still checks the live lease, and state writes retain their atomic fences.
 - Authorization returns the case version explicitly to dispatch, which passes it into write-key calculation. The policy retains no mutable authorization state.
 
-Validation after these follow-ups: `pnpm validate` passed with 682 tests, `pnpm build` passed, and the real PostgreSQL smoke test passed. These are local checks; production rollout gates remain unchanged.
+Historical validation of `73e24c9` after these follow-ups: `pnpm validate` passed with 682 tests, `pnpm build` passed, and the real PostgreSQL smoke test passed. These are local checks; production rollout gates remain unchanged.
+
+Later bot-review fixes and their current validation are recorded on PR #119. The counts above describe those historical commits, not subsequent revisions.

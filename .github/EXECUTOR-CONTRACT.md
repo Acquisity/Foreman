@@ -25,10 +25,10 @@ All provider helpers authenticate through `EXECUTOR_MCP_CONNECTOR`, an app-scope
 ## Configuration and verification
 
 - Set `EXECUTOR_OPERATION_BINDINGS` to the compact JSON contents of `.github/executor/operation-bindings.json` after verifying the installed catalog; the empty `.env.example` placeholder is not runnable provider configuration.
-- `EXECUTOR_BASE_URL` defaults to `https://executor.acquisity.ai` and must be an HTTPS origin. The toolkit slug is `foreman`.
+- `EXECUTOR_BASE_URL` defaults to `https://executor.acquisity.ai` and must be an HTTPS origin. The ordinary toolkit slug is `foreman`; stamped Intercom support uses `foreman-support`.
 - The existing Executor account holds the company connections. Both toolkits remain account-owned because this Executor version excludes personal connections from workspace-owned toolkits. Consolidation does not move credentials or change their ownership.
 - `LINEAR_CONNECTOR` remains for inbound Agent Sessions and vision attachment downloads. Slack delivery, GitHub, Blob, investigation memory, models, and sandbox infrastructure remain separate.
-- `pnpm executor:contract` reports the endpoint, selected operations, and required helper mappings. `pnpm executor:readiness` checks coverage. Add `--live` with `EXECUTOR_SETUP_PROFILE` to compare the live toolkit's mounts and policies with the manifest; the command never resolves provider credentials or invokes tools.
+- `pnpm executor:contract` reports the endpoint, selected operations, and required helper mappings. `pnpm executor:readiness` checks ordinary coverage. For Intercom support, provision the reviewed `support-toolkit-manifest.json` and run `pnpm executor:readiness --support --live` against `foreman-support` before activation. Add `--live` with `EXECUTOR_SETUP_PROFILE` to compare the live toolkit's mounts and policies with the manifest; the command never resolves provider credentials or invokes tools.
 - Run `pnpm validate`, inspect compiled root/critic connections, and exercise platform reads, helper parity, expected writes on synthetic records, and critic read-only behavior on preview. Full-pipeline evaluations require a scratch repository.
 - Logs record only outer tool/connection names, outcome, and session/turn identifiers. Use Executor invocation records for provider diagnosis; never log tool arguments, results, credentials, or provider error bodies.
 

@@ -58,7 +58,7 @@ Shipped: one bounded line per tool call with no duration, naming the tool, the c
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
 
-## Per-session MCP connection URL selection
+## Per-session MCP connection URL selection (resolved in Foreman)
 
 Checked against eve 0.44.0.
 
