@@ -6,7 +6,7 @@ import {
   MockLanguageModelV4,
   simulateReadableStream,
 } from "ai/test";
-import { postSlackReply } from "./slack-post.js";
+import { postSlackReply, splitSlackReply } from "./slack-post.js";
 import { postSupportMessage } from "./support/slack.js";
 import { ticketLinkMiddleware } from "./ticket-link-model.js";
 import { linkTickets, ticketUrl } from "./ticket-links.js";
@@ -73,6 +73,28 @@ test("existing relative and non-HTTP Markdown links stay intact", () => {
   }
 });
 
+test("Slack conversion preserves nested URL parentheses and escapes label delimiters", () => {
+  const url = "https://example.com/help_(topic_(detail))";
+  const markdown = `[A < B & C > D](${url})`;
+  const slack = `<${url}|A &lt; B &amp; C &gt; D>`;
+  assert.equal(linkTickets(markdown), markdown);
+  assert.equal(linkTickets(markdown, "slack"), slack);
+  assert.equal(linkTickets(slack, "slack"), slack);
+  assert.equal(
+    linkTickets(`[ENG-13602](<${url}>)`, "slack"),
+    `<${url}|ENG-13602>`
+  );
+  const pipeLabel = `[A | B](${url})`;
+  assert.equal(linkTickets(pipeLabel, "slack"), pipeLabel);
+});
+
+test("over-limit links are hard-cut while retaining all text and the post limit", () => {
+  const text = `[ENG-13602](https://example.com/${"a".repeat(150)})`;
+  const chunks = splitSlackReply(text, 100);
+  assert.equal(chunks.join(""), text);
+  assert.ok(chunks.every((chunk) => chunk.length <= 100));
+});
+
 test("Slack chunking keeps expanded ticket links intact at the delivery limit", async () => {
   const chunks: string[] = [];
   await postSlackReply(
@@ -119,6 +141,7 @@ test("graceful stream closure retains text without a text-end event", async () =
 });
 
 test("model stream links split tokens before eve HTTP, Slack, Linear and GitHub delivery", async () => {
+  const providerMetadata = { gateway: { trace: "delta-trace" } };
   const model = wrapLanguageModel({
     middleware: ticketLinkMiddleware,
     model: new MockLanguageModelV4({
@@ -127,7 +150,12 @@ test("model stream links split tokens before eve HTTP, Slack, Linear and GitHub 
           chunkDelayInMs: null,
           chunks: [
             { id: "answer", type: "text-start" },
-            { delta: "See ENG-", id: "answer", type: "text-delta" },
+            {
+              delta: "See ENG-",
+              id: "answer",
+              providerMetadata,
+              type: "text-delta",
+            },
             { delta: "13602 and ENG-13257.", id: "answer", type: "text-delta" },
             { id: "answer", type: "text-end" },
           ],
@@ -140,11 +168,45 @@ test("model stream links split tokens before eve HTTP, Slack, Linear and GitHub 
   const parts = await convertReadableStreamToArray(result.stream);
   assert.deepEqual(parts, [
     { id: "answer", type: "text-start" },
+    { delta: "", id: "answer", providerMetadata, type: "text-delta" },
     {
       delta: linkTickets("See ENG-13602 and ENG-13257."),
       id: "answer",
       type: "text-delta",
     },
     { id: "answer", type: "text-end" },
+  ]);
+});
+
+test("buffered text arrives before finish when text-end is missing", async () => {
+  const finish = {
+    finishReason: { raw: "stop", unified: "stop" as const },
+    type: "finish" as const,
+    usage: {
+      inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
+      outputTokens: { reasoning: 0, text: 1, total: 1 },
+    },
+  };
+  const model = wrapLanguageModel({
+    middleware: ticketLinkMiddleware,
+    model: new MockLanguageModelV4({
+      doStream: {
+        stream: simulateReadableStream({
+          chunkDelayInMs: null,
+          chunks: [
+            { id: "answer", type: "text-start" },
+            { delta: "ENG-13602", id: "answer", type: "text-delta" },
+            finish,
+          ],
+          initialDelayInMs: null,
+        }),
+      },
+    }),
+  });
+  const result = await model.doStream({ prompt: [] });
+  assert.deepEqual(await convertReadableStreamToArray(result.stream), [
+    { id: "answer", type: "text-start" },
+    { delta: linkTickets("ENG-13602"), id: "answer", type: "text-delta" },
+    finish,
   ]);
 });

@@ -15,28 +15,36 @@ export const ticketLinkMiddleware: LanguageModelMiddleware = {
   },
   async wrapStream({ doStream }) {
     const result = await doStream();
+    type StreamPart =
+      typeof result.stream extends ReadableStream<infer Part> ? Part : never;
     const text = new Map<string, string>();
+    const flushText = (
+      controller: TransformStreamDefaultController<StreamPart>
+    ) => {
+      for (const [id, value] of text) {
+        if (value) {
+          controller.enqueue({
+            delta: linkTickets(value),
+            id,
+            type: "text-delta",
+          });
+        }
+      }
+      text.clear();
+    };
     return {
       ...result,
       stream: result.stream.pipeThrough(
         new TransformStream({
-          flush(controller) {
-            for (const [id, value] of text) {
-              if (value) {
-                controller.enqueue({
-                  delta: linkTickets(value),
-                  id,
-                  type: "text-delta",
-                });
-              }
-            }
-            text.clear();
-          },
+          flush: flushText,
           transform(part, controller) {
             if (part.type === "text-start") {
               text.set(part.id, "");
             } else if (part.type === "text-delta") {
               text.set(part.id, (text.get(part.id) ?? "") + part.delta);
+              if (part.providerMetadata) {
+                controller.enqueue({ ...part, delta: "" });
+              }
               return;
             } else if (part.type === "text-end") {
               const value = text.get(part.id);
@@ -48,6 +56,8 @@ export const ticketLinkMiddleware: LanguageModelMiddleware = {
                 });
               }
               text.delete(part.id);
+            } else if (part.type === "finish") {
+              flushText(controller);
             }
             controller.enqueue(part);
           },

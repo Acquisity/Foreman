@@ -18,6 +18,7 @@ export const SLACK_MARKDOWN_MAX_LENGTH = 12_000;
  * split a UTF-16 surrogate pair backs off one code unit, because the two
  * halves post as separate requests and each lone surrogate would arrive as
  * U+FFFD. Empty input yields no chunks.
+ * Links longer than the per-post limit are hard-cut to preserve that limit.
  */
 export const splitSlackReply = (
   text: string,
@@ -27,6 +28,9 @@ export const splitSlackReply = (
     throw new RangeError("limit must be an integer of at least 2");
   }
   const chunks: string[] = [];
+  const links = text.matchAll(/\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g);
+  let link = links.next().value;
+  let offset = 0;
   let rest = text;
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
@@ -41,17 +45,16 @@ export const splitSlackReply = (
       cut -= 1;
     }
     // Do not split a complete Markdown link across Slack posts.
-    for (const match of rest.matchAll(/\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g)) {
-      if (match.index >= cut) {
+    while (link && link.index < offset + cut) {
+      if (link.index + link[0].length > offset + cut && link.index > offset) {
+        cut = link.index - offset;
         break;
       }
-      if (match.index + match[0].length > cut && match.index > 0) {
-        cut = match.index;
-        break;
-      }
+      link = links.next().value;
     }
     chunks.push(rest.slice(0, cut));
     rest = rest.slice(cut);
+    offset += cut;
   }
   if (rest.length > 0) {
     chunks.push(rest);

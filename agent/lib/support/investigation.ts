@@ -367,7 +367,7 @@ export async function reportSupportFailureForClaim(claim: SupportClaim) {
     throw new Error("Pending support delivery requires reconciliation.");
   }
   const text =
-    "I couldn't complete this investigation because a required source or processing step was unavailable. Aaron can review the Intercom conversation manually. The case remains queued for a later check; no customer response or remediation was sent.";
+    "I couldn't complete this investigation. Aaron can review the Intercom conversation manually. The case remains queued for a later check; no customer response or remediation was sent.";
   const hash = createHash("sha256").update(text).digest("hex");
   if (row.last_report_hash === hash) {
     await settleSupport(claim);
