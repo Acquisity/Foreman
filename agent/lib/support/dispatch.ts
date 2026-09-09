@@ -6,8 +6,8 @@ import { readSupportMessages } from "./slack.js";
 import {
   claimHandoffs,
   discoverHandoff,
-  releaseSupport,
   saveSupportCursor,
+  settleSupport,
   supportCursor,
 } from "./store.js";
 
@@ -48,7 +48,7 @@ export async function runSupportSchedule(
       try {
         await send(claim, supportAuth(appAuth, claim));
       } catch {
-        await releaseSupport(claim);
+        await settleSupport(claim);
       }
     })
   );

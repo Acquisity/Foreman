@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { conversationId } from "./config.js";
+import { conversationId, INTERCOM_WORKSPACE } from "./config.js";
 import type { SupportSlackMessage } from "./slack.js";
 
 const CONVERSATION_PATH = /\/(?:conversation|conversations)\/(\d+)(?:\/|$)/;
@@ -24,10 +24,18 @@ export function notificationConversation(
   if (content.length > 100_000) {
     return null;
   }
+  const ids = intercomConversationIds(content);
+  return ids.length === 1 ? ids[0] : null;
+}
+
+export function intercomConversationIds(content: string): string[] {
+  if (content.length > 100_000) {
+    return [];
+  }
   const ids = new Set<string>();
   for (const link of content.match(intercomLink) ?? []) {
     const url = new URL(link);
-    if (!url.pathname.includes("/ls8uffkp/")) {
+    if (!url.pathname.includes(`/${INTERCOM_WORKSPACE}/`)) {
       continue;
     }
     const match = CONVERSATION_PATH.exec(url.pathname);
@@ -36,7 +44,7 @@ export function notificationConversation(
       ids.add(id as string);
     }
   }
-  return ids.size === 1 ? [...ids][0] : null;
+  return [...ids];
 }
 
 /** MCP content is data; reject incomplete or unrecognized status rather than guessing. */

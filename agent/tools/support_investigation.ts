@@ -2,12 +2,12 @@ import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { claimFromContext } from "../lib/support/auth.js";
+import { SupportRefusal } from "../lib/support/errors.js";
 import {
   finishSupportInvestigation,
   finishSupportQuietly,
   openSupportInvestigation,
   reportSupportFailure,
-  requireSupportContext,
   skipHandledSupport,
   supportReport,
 } from "../lib/support/investigation.js";
@@ -23,11 +23,7 @@ const tool = defineTool({
   async execute(input, ctx) {
     try {
       if (input.action === "track-issue") {
-        return await trackLinkedIssue(
-          ctx,
-          requireSupportContext(ctx),
-          input.issueId
-        );
+        return await trackLinkedIssue(ctx, input.issueId);
       }
       if (input.action === "finish-quietly") {
         return await finishSupportQuietly(ctx, input.revision);
@@ -39,6 +35,9 @@ const tool = defineTool({
         ? await openSupportInvestigation(ctx)
         : await finishSupportInvestigation(ctx, input.report, input.revision);
     } catch (error) {
+      if (error instanceof SupportRefusal) {
+        return { reason: error.message, refused: true };
+      }
       if (ctx.abortSignal.aborted) {
         throw error;
       }

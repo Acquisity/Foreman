@@ -5,7 +5,7 @@ import {
   supportClaim,
 } from "../lib/support/auth.js";
 import { reportSupportFailureForClaim } from "../lib/support/investigation.js";
-import { requireSupportLease } from "../lib/support/store.js";
+import { findSupportLease, requireSupportLease } from "../lib/support/store.js";
 
 /** Internal schedule handoff only. No public route and no automatic Slack delivery. */
 export default defineChannel({
@@ -26,13 +26,21 @@ export default defineChannel({
       const claim = claimFromContext(ctx);
       // A successful finish releases its lease. A model that forgot to finish is retryable.
       if (claim) {
-        await reportSupportFailureForClaim(claim).catch(() => undefined);
+        await findSupportLease(claim)
+          .then((row) =>
+            row ? reportSupportFailureForClaim(claim) : undefined
+          )
+          .catch(() => undefined);
       }
     },
     async "turn.failed"(_event, _channel, ctx) {
       const claim = claimFromContext(ctx);
       if (claim) {
-        await reportSupportFailureForClaim(claim).catch(() => undefined);
+        await findSupportLease(claim)
+          .then((row) =>
+            row ? reportSupportFailureForClaim(claim) : undefined
+          )
+          .catch(() => undefined);
       }
     },
   },

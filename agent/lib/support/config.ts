@@ -1,15 +1,24 @@
 import { z } from "zod";
+import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 
 export const SUPPORT_CHANNEL = "C0C0DV1AR8T";
-export const SUPPORT_TOOLKIT = "foreman-support";
-export const SUPPORT_TEAM = "8eaf95ab-56ac-4490-8253-f6a96793dc40";
+export const SUPPORT_TEAM = ENGINEERING_TEAM_ID;
+export const INTERCOM_WORKSPACE = "ls8uffkp";
+export const creationRole = z.enum([
+  "customer-report",
+  "billing",
+  "engineering-master",
+]);
+export type CreationRole = z.infer<typeof creationRole>;
+export const supportEnabled = () =>
+  process.env.FOREMAN_SUPPORT_ENABLED === "true";
 export const conversationId = z.string().regex(/^\d{1,30}$/);
 export const slackTimestamp = z.string().regex(/^\d{10,16}\.\d{6}$/);
 
 const APP_ID = /^A[A-Z0-9]+$/;
 
 export function supportConfig() {
-  if (process.env.FOREMAN_SUPPORT_ENABLED !== "true") {
+  if (!supportEnabled()) {
     return null;
   }
   return z

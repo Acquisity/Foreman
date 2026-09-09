@@ -43,7 +43,9 @@ export const readPipelineRunTool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      repositoryCapabilitiesAvailable(ctx.session.auth.current)
+      repositoryCapabilitiesAvailable(ctx.session.auth.current, {
+        readOnly: true,
+      })
         ? readPipelineRunTool
         : null,
   },

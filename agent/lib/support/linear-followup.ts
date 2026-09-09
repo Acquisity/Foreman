@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { SupportClaim } from "./auth.js";
+import { invokeProvider, type ProviderContext } from "../executor/dispatch.js";
+import { requireSupportContext, type SupportClaim } from "./auth.js";
 import { providerData } from "./conversation.js";
 import {
   digest,
@@ -8,7 +9,6 @@ import {
   linkedIssue,
   writtenIssueId,
 } from "./linear-state.js";
-import { invokeProvider, type ProviderContext } from "./provider.js";
 import {
   requireSupportLease,
   supportOperations,
@@ -38,14 +38,8 @@ export async function readLinkedIssue(ctx: ProviderContext, id: string) {
   );
 }
 
-export async function trackLinkedIssue(
-  ctx: ProviderContext,
-  claim: SupportClaim,
-  id: string
-) {
-  if (ctx.session?.parent) {
-    throw new Error("Only the support root can link an investigated issue.");
-  }
+export async function trackLinkedIssue(ctx: ProviderContext, id: string) {
+  const claim = requireSupportContext(ctx);
   const issue = await readLinkedIssue(ctx, id);
   await trackSupportIssue(claim, issue.id);
   return { issue, tracked: true };
@@ -93,25 +87,6 @@ export async function readLinearFollowup(
   claim: SupportClaim
 ) {
   const row = await requireSupportLease(claim);
-  // Recover a successful write journaled immediately before a crash in watch-list registration.
-  for (const operation of await supportOperations(claim)) {
-    const key = String(operation.operation_key);
-    if (
-      operation.state !== "done" ||
-      !(key.startsWith("create-issue:") || key.startsWith(`${PATH}save_issue:`))
-    ) {
-      continue;
-    }
-    const result = z
-      .object({ data: z.unknown(), ok: z.literal(true) })
-      .parse(operation.result);
-    const id = writtenIssueId(result.data);
-    if (!row.linear_ids.includes(id)) {
-      // biome-ignore lint/performance/noAwaitInLoops: persist each recovered reference before scanning it.
-      await trackSupportIssue(claim, id);
-      row.linear_ids.push(id);
-    }
-  }
   const snapshot: LinearSnapshot = {};
   const changes: unknown[] = [];
   for (const id of [...row.linear_ids].sort()) {
@@ -128,4 +103,29 @@ export async function readLinearFollowup(
     }
   }
   return { changes, snapshot, version: digest(snapshot) };
+}
+
+/** Recovery is an explicit open-time mutation, never part of evidence reads. */
+export async function recoverSupportIssues(claim: SupportClaim) {
+  const row = await requireSupportLease(claim);
+  const known = new Set(row.linear_ids);
+  // Recover a successful write journaled immediately before a crash in watch-list registration.
+  for (const operation of await supportOperations(claim)) {
+    const key = String(operation.operation_key);
+    if (
+      operation.state !== "done" ||
+      !(key.startsWith("create-issue:") || key.startsWith(`${PATH}save_issue:`))
+    ) {
+      continue;
+    }
+    const result = z
+      .object({ data: z.unknown(), ok: z.literal(true) })
+      .parse(operation.result);
+    const id = writtenIssueId(result.data);
+    if (!known.has(id)) {
+      // biome-ignore lint/performance/noAwaitInLoops: persist each recovered reference before scanning it.
+      await trackSupportIssue(claim, id);
+      known.add(id);
+    }
+  }
 }

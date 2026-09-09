@@ -73,12 +73,11 @@ const MUTATIONS: Array<{
     what: "the Executor HTTP request losing its signal",
   },
   {
-    file: "agent/lib/investigation-memory/store.ts",
+    file: "agent/lib/private-postgres.ts",
     into: "",
-    remove:
-      "    fetchOptions: { signal: AbortSignal.timeout(MEMORY_QUERY_TIMEOUT_MS) },\n",
+    remove: "    fetchOptions: { signal: AbortSignal.timeout(timeoutMs) },\n",
     rule: /neon client/u,
-    what: "the Neon memory client losing its request deadline",
+    what: "the shared private Postgres client losing its request deadline",
   },
 ];
 

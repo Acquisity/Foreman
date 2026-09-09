@@ -1,5 +1,5 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { isSupportAuth } from "../support/auth.js";
+import { sessionLane } from "../session-lane.js";
 import { executorAuth } from "./auth.js";
 import { toolkitUrl } from "./endpoint.js";
 
@@ -7,7 +7,7 @@ import { toolkitUrl } from "./endpoint.js";
 export const executorConnection = () =>
   defineMcpClientConnection({
     approval: (ctx) => {
-      if (isSupportAuth(ctx.session.auth.initiator)) {
+      if (!sessionLane(ctx.session.auth.initiator).broadExecutor) {
         return {
           reason:
             "Use support_provider for the support toolkit and durable Linear writes.",

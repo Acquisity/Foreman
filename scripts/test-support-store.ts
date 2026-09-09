@@ -1,143 +1,84 @@
 /** Runs the real store SQL against a disposable, network-isolated local Postgres. */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { neonConfig } from "@neondatabase/serverless";
+import pg from "pg";
+import {
+  invokeProvider,
+  type ProviderContext,
+} from "../agent/lib/executor/dispatch.js";
 import { supportAuth } from "../agent/lib/support/auth.js";
 import {
   currentCase,
   finishSupportQuietly,
   openSupportInvestigation,
 } from "../agent/lib/support/investigation.js";
-import { readLinearFollowup } from "../agent/lib/support/linear-followup.js";
 import {
-  invokeProvider,
-  type ProviderContext,
-} from "../agent/lib/support/provider.js";
+  readLinearFollowup,
+  recoverSupportIssues,
+} from "../agent/lib/support/linear-followup.js";
 import {
   attemptSupportDelivery,
   claimHandoffs,
   completeSupportDelivery,
   completeSupportOperation,
+  discardSupportReport,
   discoverHandoff,
   queueSupportReport,
-  releaseSupport,
+  recordMatchedSupportIssue,
   requireSupportLease,
   reserveSupportOperation,
   saveSupportCursor,
   setSupportVersion,
+  settleSupport,
   supportCursor,
   trackSupportIssue,
 } from "../agent/lib/support/store.js";
+import supportDefinition from "../agent/tools/support_investigation.js";
 
-const CONTAINER_NAME = /^codex-support-test-[a-z0-9-]+$/;
-const PARAMETERS = /\$(\d+)/g;
-const container = process.env.SUPPORT_TEST_POSTGRES_CONTAINER;
-if (!(container && CONTAINER_NAME.test(container))) {
+const connectionString = process.env.SUPPORT_TEST_DATABASE_URL;
+if (!connectionString) {
   throw new Error(
-    "Set SUPPORT_TEST_POSTGRES_CONTAINER to a disposable codex-support-test-* container."
+    "Set SUPPORT_TEST_DATABASE_URL to the disposable loopback Postgres database."
   );
 }
-
-function psql(sql: string): Promise<string> {
-  const args = [
-    "exec",
-    "-i",
-    container as string,
-    "psql",
-    "-X",
-    "-q",
-    "--csv",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "-U",
-    "postgres",
-  ];
-  const windows = process.platform === "win32";
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      windows ? "wsl.exe" : "docker",
-      windows ? ["-d", "Ubuntu", "--", "docker", ...args] : args,
-      { timeout: 20_000, windowsHide: true }
-    );
-    let output = "";
-    let error = "";
-    child.stdout.on("data", (chunk) => {
-      output += String(chunk);
-    });
-    child.stderr.on("data", (chunk) => {
-      error += String(chunk);
-    });
-    child.on("error", reject);
-    child.on("exit", (code) =>
-      code === 0 ? resolve(output) : reject(new Error(error))
-    );
-    child.stdin.end(sql);
-  });
+const databaseUrl = new URL(connectionString);
+if (
+  !["127.0.0.1", "localhost", "[::1]"].includes(databaseUrl.hostname) ||
+  databaseUrl.pathname !== "/foreman_support_test"
+) {
+  throw new Error(
+    "Support tests require a local foreman_support_test database."
+  );
 }
-
-function csv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (char === '"') {
-      if (quoted && text[i + 1] === '"') {
-        cell += '"';
-        i += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (!quoted && (char === "," || char === "\n")) {
-      row.push(cell);
-      cell = "";
-      if (char === "\n") {
-        rows.push(row);
-        row = [];
-      }
-    } else {
-      cell += char;
-    }
-  }
-  return rows;
-}
-
+const pool = new pg.Pool({
+  connectionString,
+  connectionTimeoutMillis: 5000,
+  query_timeout: 15_000,
+});
+const psql = (sql: string) => pool.query(sql);
 const previousFetch = neonConfig.fetchFunction;
 const previousGlobalFetch = globalThis.fetch;
+// Exercise production Neon call sites with real parameterized Postgres queries.
+// pg supplies wire field metadata and raw rows; Neon's normal decoding remains under test.
 neonConfig.fetchFunction = async (
   _url: RequestInfo | URL,
   options?: RequestInit
 ) => {
-  const { query, params } = JSON.parse(String(options?.body)) as {
+  const request = JSON.parse(String(options?.body)) as {
     query: string;
     params: unknown[];
   };
-  const sql = query.replace(PARAMETERS, (_match, index: string) => {
-    const value = params[Number(index) - 1];
-    return value === null ? "NULL" : `'${String(value).replaceAll("'", "''")}'`;
+  const result = await pool.query({
+    rowMode: "array",
+    text: request.query,
+    types: { getTypeParser: () => (value: string) => value },
+    values: request.params,
   });
-  const parsed = csv(await psql(sql));
-  const [names = [], ...rows] = parsed;
-  const fields = names.map((name) => ({
-    dataTypeID:
-      (
-        {
-          closed: 16,
-          delivery_attempted: 16,
-          linear_ids: 1009,
-          linear_observed: 3802,
-          linear_processed: 3802,
-          result: 3802,
-        } as Record<string, number>
-      )[name] ?? 25,
-    name,
-  }));
   return Response.json({
-    fields,
-    rowCount: rows.length,
-    rows: rows.map((row) => row.map((cell) => (cell === "" ? null : cell))),
+    fields: result.fields,
+    rowCount: result.rowCount,
+    rows: result.rows,
   });
 };
 process.env.FOREMAN_MEMORY_DATABASE_URL =
@@ -155,6 +96,15 @@ try {
     await readFile(
       new URL(
         "../migrations/0004_support_linear_followups.sql",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  );
+  await psql(
+    await readFile(
+      new URL(
+        "../migrations/0005_support_operation_receipts.sql",
         import.meta.url
       ),
       "utf8"
@@ -208,11 +158,11 @@ try {
     "Queuing is not successful delivery"
   );
   assert.equal((await requireSupportLease(claim)).last_report_hash, null);
-  const attempts = await Promise.all(
+  const attempts = await Promise.allSettled(
     Array.from({ length: 8 }, () => attemptSupportDelivery(claim))
   );
   assert.equal(
-    attempts.filter(Boolean).length,
+    attempts.filter((result) => result.status === "fulfilled").length,
     1,
     "Only one overlapping caller can send the outbox row"
   );
@@ -240,6 +190,7 @@ try {
     "retry-hash",
     "retry"
   );
+  await attemptSupportDelivery(next);
   await completeSupportDelivery(next, "1788959999.000002");
   await psql(
     "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
@@ -348,7 +299,25 @@ try {
   );
   assert.equal(urls.length, 6);
   await completeSupportOperation(retry, "rejected-write", { ok: true });
+  await recoverSupportIssues(retry);
   const baseline = await currentCase(ctx, retry);
+  const resolveSupportTool = supportDefinition.events[
+    "step.started"
+  ] as unknown as (
+    _event: unknown,
+    context: ProviderContext
+  ) => {
+    execute: (input: unknown, context: ProviderContext) => Promise<unknown>;
+  };
+  const refusal = await resolveSupportTool({}, ctx).execute(
+    { action: "skip-human-handled" },
+    ctx
+  );
+  assert.deepEqual(refusal, {
+    reason: "Cannot skip an unhandled or changed customer request.",
+    refused: true,
+  });
+  await requireSupportLease(retry);
   assert.deepEqual(
     (await requireSupportLease(retry)).linear_ids,
     [issue.id],
@@ -357,7 +326,7 @@ try {
   await trackSupportIssue(retry, issue.id);
   assert.deepEqual((await requireSupportLease(retry)).linear_ids, [issue.id]);
   await setSupportVersion(retry, baseline.version, baseline.linear.snapshot);
-  await releaseSupport(retry, false, true);
+  await settleSupport(retry, { processed: true });
   const recheck = async () => {
     await psql(
       "UPDATE support_handoffs SET next_check = now() - interval '1 minute';"
@@ -426,6 +395,38 @@ try {
     false,
     "A reviewed non-actionable update stays quiet on the next tick"
   );
+  const late = await recheck();
+  await reserveSupportOperation(late.claimed, "late-receipt");
+  await psql(
+    "UPDATE support_handoffs SET lease_until = now() - interval '1 minute';"
+  );
+  const staleWrites = await Promise.allSettled([
+    setSupportVersion(late.claimed, "stale"),
+    queueSupportReport(late.claimed, "stale", "stale"),
+    attemptSupportDelivery(late.claimed),
+    discardSupportReport(late.claimed),
+    completeSupportDelivery(late.claimed, "1788959999.000003"),
+    settleSupport(late.claimed),
+    trackSupportIssue(late.claimed, "ENG-STALE"),
+    recordMatchedSupportIssue(late.claimed, "stale-match", { ok: true }),
+  ]);
+  assert.ok(
+    staleWrites.every((result) => result.status === "rejected"),
+    "Every stale state mutation refuses instead of silently succeeding"
+  );
+  await completeSupportOperation(late.claimed, "late-receipt", {
+    data: { id: "receipt" },
+    ok: true,
+  });
+  const receipt = await recheck();
+  assert.deepEqual(
+    await reserveSupportOperation(receipt.claimed, "late-receipt"),
+    { fresh: false, result: { data: { id: "receipt" }, ok: true } },
+    "Late provider success remains available to the next run without another write"
+  );
+  await assert.rejects(() =>
+    completeSupportOperation(receipt.claimed, "late-receipt", { ok: false })
+  );
   assert.ok(
     urls.every(
       (url) =>
@@ -439,4 +440,5 @@ try {
 } finally {
   neonConfig.fetchFunction = previousFetch;
   globalThis.fetch = previousGlobalFetch;
+  await pool.end();
 }

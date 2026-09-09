@@ -58,7 +58,8 @@ export const MEMORY = `# Investigation memory
 
 Investigation memory is Foreman's own record of past investigations and of conclusions a colleague corrected. In an attended session, when someone asks how a customer does something, why the product behaved a certain way, or whether a problem has been seen before, restate the question and call \`search_investigation_memory\` before answering. What comes back is historical analogy, never current truth: offer a recorded resolution as the first thing to check, and verify anything that would change the answer against current evidence. When a colleague corrects a conclusion you gave in the thread, take the correction as final, reply with the corrected guidance, and record it: \`correct_investigation_case\` when that source already has an active case, otherwise \`record_investigation_case\` with your overturned conclusion in \`ruledOut\`. Store the pattern, never the customer. The reply carries only the corrected guidance: never say you logged, noted, recorded, or will remember it, and never mention memory reads, writes, or availability. When a memory tool answers \`available: false\` or a write fails, continue from current evidence.`;
 
-const CONNECTIONS = `# Connected services\n\n${EXECUTOR_DISCOVERY}`;
+const connections = (discovery: string) =>
+  `# Connected services\n\n${discovery}`;
 
 const MODEL_SWAPS = `# Model controls
 
@@ -72,29 +73,28 @@ const NOTES = `# Notes
 
 Do not fabricate links, issue numbers, quotes, statuses, or verification results. Persist only durable user preferences in the principal-scoped preference document. Never store a repository target as a preference.`;
 
-export const FACTORY_PROMPT = [
-  IDENTITY,
-  WRITING,
-  REPOSITORIES,
-  CONNECTIONS,
-  PIPELINE,
-  MODEL_SWAPS,
-  REPLIES,
-  NOTES,
-].join("\n\n");
-
-export const GENERAL_PROMPT = [
-  IDENTITY,
-  WRITING,
-  REPOSITORIES,
-  CONNECTIONS,
-  GENERAL_MODE,
-  MEMORY,
-  MODEL_SWAPS,
-  REPLIES,
-  NOTES,
-].join("\n\n");
-
-export function selectPrompt(principal: string | null | undefined): string {
-  return principal === AUTONOMOUS_PRINCIPAL ? FACTORY_PROMPT : GENERAL_PROMPT;
+export interface PromptOptions {
+  discovery?: string;
+  instructions?: string;
+}
+function composePrompt(factory: boolean, options: PromptOptions = {}) {
+  return [
+    IDENTITY,
+    WRITING,
+    REPOSITORIES,
+    connections(options.discovery ?? EXECUTOR_DISCOVERY),
+    ...(factory ? [PIPELINE] : [GENERAL_MODE, MEMORY]),
+    MODEL_SWAPS,
+    REPLIES,
+    NOTES,
+    ...(options.instructions ? [options.instructions] : []),
+  ].join("\n\n");
+}
+export const FACTORY_PROMPT = composePrompt(true);
+export const GENERAL_PROMPT = composePrompt(false);
+export function selectPrompt(
+  principal: string | null | undefined,
+  options: PromptOptions = {}
+): string {
+  return composePrompt(principal === AUTONOMOUS_PRINCIPAL, options);
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { invokeProvider, type ProviderContext } from "../support/provider.js";
 import { operationPath } from "./bindings.js";
+import { invokeProvider, type ProviderContext } from "./dispatch.js";
 import { ExecutorError } from "./transport.js";
 
 export const sentryIssueInput = z.strictObject({

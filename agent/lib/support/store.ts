@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { neon } from "@neondatabase/serverless";
 import { z } from "zod";
+import { privateDatabase } from "../private-postgres.js";
 import { type SupportClaim, supportClaim } from "./auth.js";
-import { conversationId, slackTimestamp } from "./config.js";
+import { conversationId, slackTimestamp, supportEnabled } from "./config.js";
+import {
+  SupportLeaseLost,
+  SupportRefusal,
+  SupportStateConflict,
+} from "./errors.js";
 import { type LinearSnapshot, linearSnapshot } from "./linear-state.js";
 
 const rowSchema = z.object({
@@ -24,13 +29,7 @@ export type SupportRow = z.infer<typeof rowSchema>;
 
 /** Private operational tables; never query customer data or memory cases here. */
 function query(text: string, values: unknown[] = []) {
-  const url = process.env.FOREMAN_MEMORY_DATABASE_URL;
-  if (!url) {
-    throw new Error("Support processing store is not configured.");
-  }
-  return neon(url, {
-    fetchOptions: { signal: AbortSignal.timeout(15_000) },
-  }).query(text, values);
+  return privateDatabase().query(text, values);
 }
 
 export async function supportCursor(since: string): Promise<string> {
@@ -73,21 +72,43 @@ export async function claimHandoffs(
   return z.array(supportClaim).parse(rows);
 }
 
+export async function findSupportLease(
+  claim: SupportClaim
+): Promise<SupportRow | null> {
+  if (!supportEnabled()) {
+    return null;
+  }
+  const rows = await query(
+    "SELECT * FROM support_handoffs WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()",
+    [claim.conversation, claim.thread, claim.lease]
+  );
+  return rows[0] ? rowSchema.parse(rows[0]) : null;
+}
+
 export async function requireSupportLease(
   claim: SupportClaim
 ): Promise<SupportRow> {
-  if (process.env.FOREMAN_SUPPORT_ENABLED !== "true") {
-    throw new Error("Support cron is disabled.");
+  const row = await findSupportLease(claim);
+  if (!row) {
+    throw new SupportLeaseLost(
+      "Support processing lease expired or the cron is disabled."
+    );
   }
-  const rows = await query(
-    `SELECT * FROM support_handoffs
-    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()`,
-    [claim.conversation, claim.thread, claim.lease]
-  );
-  if (!rows[0]) {
-    throw new Error("Support processing lease expired.");
+  return row;
+}
+
+/** Each ordinary state write fences its lease atomically; zero rows are never silent success. */
+async function guardedWrite(sql: string, values: unknown[]) {
+  if (!supportEnabled()) {
+    throw new SupportLeaseLost("Support cron is disabled.");
   }
-  return rowSchema.parse(rows[0]);
+  const rows = await query(sql, values);
+  if (!rows.length) {
+    throw new SupportStateConflict(
+      "Support state changed or its lease expired. Reopen the case before retrying."
+    );
+  }
+  return rows;
 }
 
 export async function setSupportVersion(
@@ -95,9 +116,8 @@ export async function setSupportVersion(
   version: string,
   snapshot: LinearSnapshot = {}
 ) {
-  await requireSupportLease(claim);
-  await query(
-    "UPDATE support_handoffs SET version = $4, linear_observed = $5::jsonb WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()",
+  await guardedWrite(
+    "UPDATE support_handoffs SET version = $4, linear_observed = $5::jsonb WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1",
     [
       claim.conversation,
       claim.thread,
@@ -108,17 +128,19 @@ export async function setSupportVersion(
   );
 }
 
-export async function releaseSupport(
+export async function settleSupport(
   claim: SupportClaim,
-  closed = false,
-  processed = false
+  {
+    closed = false,
+    processed = false,
+  }: { closed?: boolean; processed?: boolean } = {}
 ) {
-  await query(
+  await guardedWrite(
     `UPDATE support_handoffs SET lease = NULL, lease_until = NULL,
     next_check = now() + interval '10 minutes', closed = $4,
     processed_version = CASE WHEN $5 THEN version ELSE processed_version END,
     linear_processed = CASE WHEN $5 THEN linear_observed ELSE linear_processed END
-    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()`,
+    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1`,
     [claim.conversation, claim.thread, claim.lease, closed, processed]
   );
 }
@@ -130,10 +152,9 @@ export async function queueSupportReport(
   kind: "final" | "retry" | "failure" = "final",
   revision: string | null = null
 ) {
-  await requireSupportLease(claim);
-  await query(
+  await guardedWrite(
     `UPDATE support_handoffs SET report = $4, report_key = $5, report_hash = $6, report_kind = $7,
-    delivery_attempted = false, report_revision = $8 WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND report IS NULL`,
+    delivery_attempted = false, report_revision = $8 WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND report IS NULL RETURNING 1`,
     [
       claim.conversation,
       claim.thread,
@@ -148,28 +169,27 @@ export async function queueSupportReport(
 }
 
 export async function attemptSupportDelivery(claim: SupportClaim) {
-  await requireSupportLease(claim);
-  const rows = await query(
-    "UPDATE support_handoffs SET delivery_attempted = true WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND NOT delivery_attempted RETURNING report_key",
+  const rows = await guardedWrite(
+    "UPDATE support_handoffs SET delivery_attempted = true WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND NOT delivery_attempted AND report IS NOT NULL RETURNING report_key",
     [claim.conversation, claim.thread, claim.lease]
   );
-  return rows.length === 1;
+  return rows[0].report_key;
 }
 
 export async function discardSupportReport(claim: SupportClaim) {
-  await query(
-    "UPDATE support_handoffs SET report = NULL, report_key = NULL, delivery_attempted = false WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()",
+  await guardedWrite(
+    "UPDATE support_handoffs SET report = NULL, report_key = NULL, delivery_attempted = false WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1",
     [claim.conversation, claim.thread, claim.lease]
   );
 }
 
 export async function completeSupportDelivery(claim: SupportClaim, ts: string) {
-  await query(
+  await guardedWrite(
     `UPDATE support_handoffs SET posted_ts = $4, report = NULL, report_key = NULL,
     last_report_hash = report_hash, processed_version = CASE WHEN report_kind = 'final' THEN version ELSE processed_version END,
     linear_processed = CASE WHEN report_kind = 'final' THEN linear_observed ELSE linear_processed END,
     lease = NULL, lease_until = NULL, next_check = now() + interval '10 minutes'
-    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()`,
+    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1`,
     [claim.conversation, claim.thread, claim.lease, slackTimestamp.parse(ts)]
   );
 }
@@ -177,19 +197,13 @@ export async function completeSupportDelivery(claim: SupportClaim, ts: string) {
 /** Persist verified issue references immediately, independent of Slack success. */
 export async function trackSupportIssue(claim: SupportClaim, issueId: string) {
   const id = z.string().min(1).max(100).parse(issueId);
-  await requireSupportLease(claim);
-  const rows = await query(
+  await guardedWrite(
     `UPDATE support_handoffs
     SET linear_ids = CASE WHEN $4 = ANY(linear_ids) THEN linear_ids ELSE array_append(linear_ids, $4) END
     WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()
     AND ($4 = ANY(linear_ids) OR cardinality(linear_ids) < 10) RETURNING conversation`,
     [claim.conversation, claim.thread, claim.lease, id]
   );
-  if (!rows.length) {
-    throw new Error(
-      "The support issue watch list is full or its lease expired."
-    );
-  }
 }
 
 /** Reserve before a write. An ambiguous write is never blindly replayed. */
@@ -197,41 +211,62 @@ export async function reserveSupportOperation(
   claim: SupportClaim,
   key: string
 ) {
-  await requireSupportLease(claim);
+  if (!supportEnabled()) {
+    throw new SupportLeaseLost("Support cron is disabled.");
+  }
   const added = await query(
-    `INSERT INTO support_operations(conversation, thread, operation_key, state)
-    SELECT conversation, thread, $3, 'started' FROM support_handoffs
+    `INSERT INTO support_operations(conversation, thread, operation_key, state, reservation_lease)
+    SELECT conversation, thread, $3, 'started', $4 FROM support_handoffs
     WHERE conversation = $1 AND thread = $2 AND lease = $4 AND lease_until > now()
     ON CONFLICT (conversation, thread, operation_key)
-    DO UPDATE SET state = 'started', result = NULL WHERE support_operations.state = 'failed'
+    DO UPDATE SET state = 'started', result = NULL, reservation_lease = EXCLUDED.reservation_lease WHERE support_operations.state = 'failed'
     RETURNING operation_key`,
     [claim.conversation, claim.thread, key, claim.lease]
   );
   if (added.length) {
     return { fresh: true as const };
   }
+  // An existing completed result is an explicit replay, not a successful new write.
   const rows = await query(
-    "SELECT state, result FROM support_operations WHERE conversation = $1 AND thread = $2 AND operation_key = $3",
-    [claim.conversation, claim.thread, key]
+    `SELECT o.state, o.result FROM support_operations o JOIN support_handoffs h USING (conversation, thread)
+    WHERE o.conversation = $1 AND o.thread = $2 AND operation_key = $3 AND h.lease = $4 AND h.lease_until > now()`,
+    [claim.conversation, claim.thread, key, claim.lease]
   );
-  if (rows[0]?.state !== "done") {
-    throw new Error(
-      "A prior Linear write has an uncertain result. Reconcile that operation before retrying; do not create a replacement."
+  if (!rows.length) {
+    throw new SupportLeaseLost("Support processing lease expired.");
+  }
+  if (rows[0].state !== "done") {
+    throw new SupportRefusal(
+      "A prior Linear write is uncertain. Reconcile it before retrying; do not create a replacement."
     );
   }
   return { fresh: false as const, result: rows[0].result as unknown };
 }
 
+/** Late provider receipts are fenced by the operation reservation, not the now-expired case lease. */
 export async function completeSupportOperation(
   claim: SupportClaim,
   key: string,
   result: unknown,
   state: "done" | "failed" = "done"
 ) {
-  await query(
-    "UPDATE support_operations SET state = $5, result = $4::jsonb WHERE conversation = $1 AND thread = $2 AND operation_key = $3",
-    [claim.conversation, claim.thread, key, JSON.stringify(result), state]
+  const rows = await query(
+    `UPDATE support_operations SET state = $5, result = $4::jsonb
+    WHERE conversation = $1 AND thread = $2 AND operation_key = $3 AND reservation_lease = $6 AND state = 'started' RETURNING 1`,
+    [
+      claim.conversation,
+      claim.thread,
+      key,
+      JSON.stringify(result),
+      state,
+      claim.lease,
+    ]
   );
+  if (!rows.length) {
+    throw new SupportStateConflict(
+      "The Linear receipt does not own this operation reservation."
+    );
+  }
 }
 
 export async function supportOperations(claim: SupportClaim) {
@@ -247,14 +282,14 @@ export async function recordMatchedSupportIssue(
   key: string,
   result: unknown
 ) {
-  await requireSupportLease(claim);
-  await query(
+  const rows = await guardedWrite(
     `INSERT INTO support_operations(conversation, thread, operation_key, state, result)
     SELECT conversation, thread, $3, 'done', $4::jsonb FROM support_handoffs
     WHERE conversation = $1 AND thread = $2 AND lease = $5 AND lease_until > now()
-    ON CONFLICT (conversation, thread, operation_key) DO UPDATE SET state = 'done', result = EXCLUDED.result
-    WHERE support_operations.state <> 'done'`,
+    ON CONFLICT (conversation, thread, operation_key) DO UPDATE SET state = 'done',
+      result = CASE WHEN support_operations.state = 'done' THEN support_operations.result ELSE EXCLUDED.result END
+    RETURNING result`,
     [claim.conversation, claim.thread, key, JSON.stringify(result), claim.lease]
   );
-  return reserveSupportOperation(claim, key);
+  return { fresh: false as const, result: rows[0].result as unknown };
 }

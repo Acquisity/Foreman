@@ -2,6 +2,7 @@ import type { SessionAuthContext, SessionContext } from "eve/context";
 import { z } from "zod";
 import { stampIntakeOnly, stampUnattended } from "../trust.js";
 import { conversationId, slackTimestamp } from "./config.js";
+import { SupportRefusal } from "./errors.js";
 
 export const supportClaim = z.object({
   conversation: conversationId,
@@ -27,8 +28,20 @@ export function isSupportAuth(auth: SessionAuthContext | null | undefined) {
 
 /** Initiator identity survives delegation; per-session state does not. */
 export function claimFromContext(ctx: {
-  session: { auth: SessionContext["session"]["auth"] };
+  session?: { auth: SessionContext["session"]["auth"] };
 }): SupportClaim | null {
-  const auth = ctx.session.auth.initiator;
+  const auth = ctx.session?.auth.initiator;
   return isSupportAuth(auth) ? supportClaim.parse(auth?.attributes) : null;
+}
+
+export function requireSupportContext(ctx: {
+  session?: { auth: SessionContext["session"]["auth"]; parent?: unknown };
+}) {
+  const claim = claimFromContext(ctx);
+  if (!claim || ctx.session?.parent) {
+    throw new SupportRefusal(
+      "This action belongs to the scheduled support root."
+    );
+  }
+  return claim;
 }

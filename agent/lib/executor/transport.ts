@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { toolkitUrl } from "./endpoint.js";
+import { type ExecutorToolkit, toolkitUrl } from "./endpoint.js";
 
 const envelopeSchema = z.object({
   error: z.unknown().optional(),
@@ -38,7 +38,7 @@ const outcomeSchema = z.discriminatedUnion("ok", [
 export interface ExecutorRequestContext {
   signal: AbortSignal;
   token: string;
-  toolkit?: "foreman" | "foreman-support";
+  toolkit?: ExecutorToolkit;
 }
 export class ExecutorError extends Error {
   readonly code: string;
@@ -136,7 +136,7 @@ function rpcMessage(body: string, id: number) {
 }
 
 /** Fresh MCP session per helper call. No session cache or approval resume. */
-export async function invokeExecutor(
+async function invokeExecutor(
   ctx: ExecutorRequestContext,
   path: string,
   input: Record<string, unknown>,
@@ -239,10 +239,7 @@ async function executeExecutor(
   return result.structuredContent.result;
 }
 
-export function describeExecutorOperation(
-  ctx: ExecutorRequestContext,
-  path: string
-) {
+function describeExecutorOperation(ctx: ExecutorRequestContext, path: string) {
   if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
     throw new ExecutorError("invalid_operation_binding");
   }
@@ -251,3 +248,9 @@ export function describeExecutorOperation(
     `return await tools.describe.tool({path:${JSON.stringify(path)}});`
   );
 }
+
+/** Internal wire adapter. Only dispatch.ts and transport tests may import this value. */
+export const executorTransport = {
+  call: invokeExecutor,
+  describe: describeExecutorOperation,
+};

@@ -12,7 +12,11 @@ import {
 import { executorConnection } from "../executor/connection.js";
 import { toolkitUrl } from "../executor/endpoint.js";
 import { EXECUTOR_DISCOVERY } from "../executor/instructions.js";
-import { invokeExecutor } from "../executor/transport.js";
+import { executorTransport } from "../executor/transport.js";
+import { selectPrompt } from "../prompts.js";
+import { stampRepository } from "../repository.js";
+import { repositoryCapabilitiesAvailable } from "../repository-lane.js";
+import { sessionLane } from "../session-lane.js";
 import { isIntakeOnly, isUnattended } from "../trust.js";
 import { claimFromContext, supportAuth } from "./auth.js";
 import { SUPPORT_PATHS } from "./catalog.js";
@@ -21,8 +25,8 @@ import {
   inspectConversation,
   notificationConversation,
 } from "./conversation.js";
-import { SUPPORT_DISCOVERY, supportSystemPrompt } from "./instructions.js";
-import { assertSupportOperation, supportWriteKey } from "./provider.js";
+import { SUPPORT_DISCOVERY } from "./instructions.js";
+import { assertSupportOperation, supportWriteKey } from "./policy.js";
 
 const INCOMPLETE = /incomplete/;
 const claim = {
@@ -176,6 +180,18 @@ test("support identity survives delegation and cannot use the broad Executor con
     session: { auth: { current: app, initiator: auth } },
   } as SessionContext;
   assert.deepEqual(claimFromContext(ctx), claim);
+  assert.equal(claimFromContext({}), null);
+  assert.equal(
+    repositoryCapabilitiesAvailable(
+      stampRepository(auth, "Acquisity/Acquisity", "explicit"),
+      { readOnly: true }
+    ),
+    true
+  );
+  assert.equal(
+    repositoryCapabilitiesAvailable(app, { initiator: auth }),
+    false
+  );
   const policy = executorConnection().approval as (
     ctx: ApprovalContext
   ) => unknown;
@@ -269,7 +285,7 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
     );
   };
   const malicious = '"}); await tools["executor.admin"]({}); //';
-  await invokeExecutor(
+  await executorTransport.call(
     {
       signal: AbortSignal.timeout(1000),
       token: "test-only",
@@ -284,7 +300,7 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
     code[0],
     `return await tools["intercom.org.foremanIntercom.get_conversation"](${JSON.stringify({ id: malicious })});`
   );
-  assert.throws(() => toolkitUrl("arbitrary-toolkit"));
+  assert.throws(() => toolkitUrl("arbitrary-toolkit" as never));
 });
 
 test("schedules are disabled unless explicitly configured", () => {
@@ -302,10 +318,9 @@ test("schedules are disabled unless explicitly configured", () => {
 });
 
 test("support instructions replace the ordinary discovery path without dropping the investigation procedure", () => {
-  const base = `Existing instructions\n${EXECUTOR_DISCOVERY}\nEvidence standards`;
-  const prompt = supportSystemPrompt(base);
+  const prompt = selectPrompt("eve:app", sessionLane(auth));
   assert.ok(prompt.includes(SUPPORT_DISCOVERY));
-  assert.ok(prompt.includes("Evidence standards"));
+  assert.ok(prompt.includes("# Identity"));
   assert.ok(prompt.includes("intercom-triage-investigate"));
   assert.ok(prompt.includes("intercom-billing-triage"));
   assert.ok(!prompt.includes(EXECUTOR_DISCOVERY));

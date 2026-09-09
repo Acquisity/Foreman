@@ -3,14 +3,15 @@ import {
   LINEAR_OPERATIONS,
   type LinearOperation,
 } from "../linear-operations.js";
-import { invokeProvider, type ProviderContext } from "../support/provider.js";
 import { operationPath } from "./bindings.js";
+import type { ExecutorOutcome } from "./dispatch.js";
+import { invokeProvider, type ProviderContext } from "./dispatch.js";
 import {
   operationInputs,
   type ProviderClient,
   type ProviderResult,
 } from "./operations.js";
-import { ExecutorError, type invokeExecutor } from "./transport.js";
+import { ExecutorError } from "./transport.js";
 
 const linearInput = z.object({ variables: z.record(z.string(), z.unknown()) });
 
@@ -34,7 +35,7 @@ export function executorClient(ctx: ProviderContext): ProviderClient {
       ? AbortSignal.any([ctx.abortSignal, options.signal])
       : ctx.abortSignal;
     signal.throwIfAborted();
-    let outcome: Awaited<ReturnType<typeof invokeExecutor>>;
+    let outcome: ExecutorOutcome;
     try {
       outcome = await invokeProvider(
         {
@@ -71,9 +72,7 @@ export function executorClient(ctx: ProviderContext): ProviderClient {
   };
 }
 
-function providerResult(
-  outcome: Awaited<ReturnType<typeof invokeExecutor>>
-): ProviderResult {
+function providerResult(outcome: ExecutorOutcome): ProviderResult {
   const status = outcome.ok
     ? (outcome.http?.status ?? 200)
     : outcome.error.status;

@@ -1,19 +1,21 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { claimFromContext, type SupportClaim } from "./auth.js";
+import { invokeProvider, type ProviderContext } from "../executor/dispatch.js";
+import { requireSupportContext, type SupportClaim } from "./auth.js";
 import { inspectConversation } from "./conversation.js";
-import { readLinearFollowup } from "./linear-followup.js";
+import { decideSupport } from "./decision.js";
+import { SupportRefusal, SupportStateConflict } from "./errors.js";
+import { readLinearFollowup, recoverSupportIssues } from "./linear-followup.js";
 import { digest } from "./linear-state.js";
-import { invokeProvider, type ProviderContext } from "./provider.js";
 import { postSupportMessage, readSupportMessages } from "./slack.js";
 import {
   attemptSupportDelivery,
   completeSupportDelivery,
   discardSupportReport,
   queueSupportReport,
-  releaseSupport,
   requireSupportLease,
   setSupportVersion,
+  settleSupport,
   supportOperations,
 } from "./store.js";
 
@@ -26,14 +28,6 @@ export const supportReport = z.object({
   nextStep: z.string().min(1).max(500),
   retry: z.boolean().default(false),
 });
-
-export function requireSupportContext(ctx: ProviderContext) {
-  const claim = ctx.session ? claimFromContext({ session: ctx.session }) : null;
-  if (!claim || ctx.session?.parent) {
-    throw new Error("This tool belongs to the scheduled support root.");
-  }
-  return claim;
-}
 
 export async function currentConversation(
   ctx: ProviderContext,
@@ -66,62 +60,68 @@ export async function currentCase(ctx: ProviderContext, claim: SupportClaim) {
 export async function openSupportInvestigation(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
-  if (row.report && row.report_kind === "failure") {
+  if (decideSupport(row, null).kind === "pending-delivery") {
     await deliverSupportReport(ctx, claim);
     return { investigate: false, reason: "Pending access status handled." };
   }
+  await recoverSupportIssues(claim);
   const current = await currentCase(ctx, claim);
-  if (current.closed) {
-    await discardSupportReport(claim);
-    await releaseSupport(claim, true);
-    return { investigate: false, reason: "Conversation is closed." };
-  }
-  if (row.report) {
-    if (row.version === current.version) {
-      await deliverSupportReport(ctx, claim);
+  const decision = decideSupport(row, {
+    ...current,
+    hasLinkedIssues: Object.keys(current.linear.snapshot).length > 0,
+  });
+  switch (decision.kind) {
+    case "closed":
+      await discardSupportReport(claim);
+      await settleSupport(claim, { closed: true });
+      return { investigate: false, reason: "Conversation is closed." };
+    case "pending-delivery":
+      await deliverSupportReport(ctx, claim, current);
       return { investigate: false, reason: "Pending delivery handled." };
-    }
-    // Reconcile an uncertain old delivery before dropping its outbox record.
-    if (row.delivery_attempted) {
+    case "reconcile":
       await reconcileSupportDelivery(claim);
       return {
         investigate: false,
         reason:
           "Prior delivery reconciled; a later run will check new content.",
       };
-    }
-    await discardSupportReport(claim);
+    case "unchanged":
+      if (decision.discardReport) {
+        await discardSupportReport(claim);
+      }
+      if (decision.processed) {
+        await setSupportVersion(
+          claim,
+          current.version,
+          current.linear.snapshot
+        );
+      }
+      await settleSupport(claim, { processed: decision.processed });
+      return { investigate: false, reason: "No new actionable case evidence." };
+    case "investigate":
+      if (decision.discardReport) {
+        await discardSupportReport(claim);
+      }
+      await setSupportVersion(claim, current.version, current.linear.snapshot);
+      return {
+        conversation: current.conversation,
+        humanReplied: current.humanReplied,
+        humanTookOwnership: current.humanTookOwnership,
+        instructions:
+          "Load intercom-triage-investigate or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
+        investigate: true,
+        linearChanges: current.linear.changes,
+        previousOperations: await supportOperations(claim),
+        revision: current.revision,
+        slackContext: (
+          await readSupportMessages({ thread: claim.thread })
+        ).filter(
+          (message) => message.metadata?.event_type !== "foreman_support"
+        ),
+      };
+    default:
+      throw new Error("Support decision requires current evidence.");
   }
-  if (current.version === row.processed_version) {
-    await releaseSupport(claim);
-    return {
-      investigate: false,
-      reason: "No new customer content or linked Linear evidence.",
-    };
-  }
-  await setSupportVersion(claim, current.version, current.linear.snapshot);
-  if (current.snoozed && !Object.keys(current.linear.snapshot).length) {
-    await releaseSupport(claim, false, true);
-    return {
-      investigate: false,
-      reason:
-        "Snoozed case has no linked engineering work; keep checking quietly.",
-    };
-  }
-  return {
-    conversation: current.conversation,
-    humanReplied: current.humanReplied,
-    humanTookOwnership: current.humanTookOwnership,
-    instructions:
-      "Load intercom-triage-investigate or intercom-billing-triage. Reuse the investigation and Linear workflow. Existing completed operations must be reused. A human reply means provide only additional useful internal context. Use support_provider for provider discovery and direct calls. Use authored helpers as usual. Finish through support_investigation; ordinary final text is not delivered.",
-    investigate: true,
-    linearChanges: current.linear.changes,
-    previousOperations: await supportOperations(claim),
-    revision: current.revision,
-    slackContext: (await readSupportMessages({ thread: claim.thread })).filter(
-      (message) => message.metadata?.event_type !== "foreman_support"
-    ),
-  };
 }
 
 async function reconcileSupportDelivery(claim: SupportClaim) {
@@ -145,7 +145,8 @@ async function reconcileSupportDelivery(claim: SupportClaim) {
 
 export async function deliverSupportReport(
   ctx: ProviderContext,
-  claim: SupportClaim
+  claim: SupportClaim,
+  observed?: Awaited<ReturnType<typeof currentCase>>
 ) {
   const row = await requireSupportLease(claim);
   if (!(row.report && row.report_key)) {
@@ -156,7 +157,7 @@ export async function deliverSupportReport(
     return true;
   }
   if (row.report_kind === "failure") {
-    if (!(await attemptSupportDelivery(claim))) {
+    if (!(await reserveDelivery(claim))) {
       return reconcileSupportDelivery(claim);
     }
     const ts = await postSupportMessage(
@@ -167,21 +168,21 @@ export async function deliverSupportReport(
     await completeSupportDelivery(claim, ts);
     return true;
   }
-  const current = await currentCase(ctx, claim);
+  const current = observed ?? (await currentCase(ctx, claim));
   if (
     current.closed ||
     current.version !== row.version ||
     current.revision !== row.report_revision
   ) {
     await discardSupportReport(claim);
-    await releaseSupport(claim, current.closed);
+    await settleSupport(claim, { closed: current.closed });
     return false;
   }
   const text =
     current.humanReplied || current.humanTookOwnership
       ? `Internal context; a teammate has replied or taken ownership.\n${row.report}`
       : row.report;
-  if (!(await attemptSupportDelivery(claim))) {
+  if (!(await reserveDelivery(claim))) {
     return reconcileSupportDelivery(claim);
   }
   const ts = await postSupportMessage(claim.thread, text, row.report_key);
@@ -198,7 +199,7 @@ export async function finishSupportInvestigation(
   const row = await requireSupportLease(claim);
   const current = await currentCase(ctx, claim);
   if (current.closed) {
-    await releaseSupport(claim, current.closed);
+    await settleSupport(claim, { closed: current.closed });
     return {
       posted: false,
       reason: "Conversation changed; a later run will recheck.",
@@ -222,7 +223,7 @@ export async function finishSupportInvestigation(
       (operation) => operation.state !== "done"
     )
   ) {
-    throw new Error(
+    throw new SupportRefusal(
       "A Linear write still needs retry or reconciliation. Do not mark this investigation complete."
     );
   }
@@ -243,7 +244,7 @@ export async function finishSupportInvestigation(
     .join("\n\n");
   const hash = createHash("sha256").update(text).digest("hex");
   if (hash === row.last_report_hash) {
-    await releaseSupport(claim, false, !report.retry);
+    await settleSupport(claim, { processed: !report.retry });
     return { posted: false, reason: "Findings are unchanged." };
   }
   await queueSupportReport(
@@ -253,7 +254,7 @@ export async function finishSupportInvestigation(
     report.retry ? "retry" : "final",
     current.revision
   );
-  return { posted: await deliverSupportReport(ctx, claim) };
+  return { posted: await deliverSupportReport(ctx, claim, current) };
 }
 
 export async function skipHandledSupport(ctx: ProviderContext) {
@@ -264,9 +265,11 @@ export async function skipHandledSupport(ctx: ProviderContext) {
     !(current.humanReplied || current.humanTookOwnership) ||
     current.version !== row.version
   ) {
-    throw new Error("Cannot skip an unhandled or changed customer request.");
+    throw new SupportRefusal(
+      "Cannot skip an unhandled or changed customer request."
+    );
   }
-  await releaseSupport(claim, current.closed, true);
+  await settleSupport(claim, { closed: current.closed, processed: true });
   return {
     posted: false,
     reason: "Human-handled case needs no additional findings.",
@@ -287,7 +290,7 @@ export async function finishSupportQuietly(
       (operation) => operation.state !== "done"
     )
   ) {
-    throw new Error(
+    throw new SupportRefusal(
       "Initial or unfinished investigation needs a report or retry, not silent completion."
     );
   }
@@ -302,7 +305,7 @@ export async function finishSupportQuietly(
     };
   }
   await setSupportVersion(claim, current.version, current.linear.snapshot);
-  await releaseSupport(claim, current.closed, true);
+  await settleSupport(claim, { closed: current.closed, processed: true });
   return {
     posted: false,
     reason: "Checked changes need no support action or message.",
@@ -324,7 +327,7 @@ export async function reportSupportFailureForClaim(claim: SupportClaim) {
     "I couldn't complete this investigation because a required source or processing step was unavailable. Aaron can review the Intercom conversation manually. The case remains queued for a later check; no customer response or remediation was sent.";
   const hash = createHash("sha256").update(text).digest("hex");
   if (row.last_report_hash === hash) {
-    await releaseSupport(claim);
+    await settleSupport(claim);
     return { investigate: false, retry: true };
   }
   await queueSupportReport(claim, text, hash, "failure");
@@ -332,7 +335,7 @@ export async function reportSupportFailureForClaim(claim: SupportClaim) {
   if (!(queued.report && queued.report_key)) {
     throw new Error("Failure status was not queued.");
   }
-  if (await attemptSupportDelivery(claim)) {
+  if (await reserveDelivery(claim)) {
     const ts = await postSupportMessage(
       claim.thread,
       queued.report,
@@ -341,4 +344,16 @@ export async function reportSupportFailureForClaim(claim: SupportClaim) {
     await completeSupportDelivery(claim, ts);
   }
   return { investigate: false, retry: true };
+}
+
+async function reserveDelivery(claim: SupportClaim) {
+  try {
+    await attemptSupportDelivery(claim);
+    return true;
+  } catch (error) {
+    if (error instanceof SupportStateConflict) {
+      return false;
+    }
+    throw error;
+  }
 }
