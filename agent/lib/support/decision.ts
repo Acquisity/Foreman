@@ -23,14 +23,14 @@ export function decideSupport(
   >,
   current: SupportObservation
 ): SupportDecision {
+  if (row.report && row.delivery_attempted) {
+    return { kind: "reconcile" };
+  }
   if (current.closed) {
     return { kind: "closed" };
   }
   if (row.report && row.version === current.version) {
     return { kind: "pending-delivery" };
-  }
-  if (row.report && row.delivery_attempted) {
-    return { kind: "reconcile" };
   }
   const discardReport = row.report !== null;
   if (current.version === row.processed_version) {

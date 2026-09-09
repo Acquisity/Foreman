@@ -172,7 +172,8 @@ export async function settleSupport(
     next_check = now() + interval '10 minutes', closed = $4,
     processed_version = CASE WHEN $5 THEN version ELSE processed_version END,
     linear_processed = CASE WHEN $5 THEN linear_observed ELSE linear_processed END
-    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1`,
+    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()
+      AND (NOT $4 OR report IS NULL OR NOT delivery_attempted) RETURNING 1`,
     [claim.conversation, claim.thread, claim.lease, closed, processed]
   );
 }
@@ -210,19 +211,29 @@ export async function attemptSupportDelivery(claim: SupportClaim) {
 
 export async function discardSupportReport(claim: SupportClaim) {
   await guardedWrite(
-    "UPDATE support_handoffs SET report = NULL, report_key = NULL, delivery_attempted = false WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1",
+    "UPDATE support_handoffs SET report = NULL, report_key = NULL, delivery_attempted = false WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() AND (report IS NULL OR NOT delivery_attempted) RETURNING 1",
     [claim.conversation, claim.thread, claim.lease]
   );
 }
 
-export async function completeSupportDelivery(claim: SupportClaim, ts: string) {
+export async function completeSupportDelivery(
+  claim: SupportClaim,
+  ts: string,
+  closed = false
+) {
   await guardedWrite(
-    `UPDATE support_handoffs SET posted_ts = $4, report = NULL, report_key = NULL,
+    `UPDATE support_handoffs SET posted_ts = $4, report = NULL, report_key = NULL, delivery_attempted = false,
     last_report_hash = report_hash, processed_version = CASE WHEN report_kind = 'final' THEN version ELSE processed_version END,
     linear_processed = CASE WHEN report_kind = 'final' THEN linear_observed ELSE linear_processed END,
-    lease = NULL, lease_until = NULL, next_check = now() + interval '10 minutes'
+    closed = closed OR $5, lease = NULL, lease_until = NULL, next_check = now() + interval '10 minutes'
     WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now() RETURNING 1`,
-    [claim.conversation, claim.thread, claim.lease, slackTimestamp.parse(ts)]
+    [
+      claim.conversation,
+      claim.thread,
+      claim.lease,
+      slackTimestamp.parse(ts),
+      closed,
+    ]
   );
 }
 

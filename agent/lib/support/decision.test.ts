@@ -43,7 +43,26 @@ test("support decision makes delivery, closure and retry precedence explicit", (
       { ...row, delivery_attempted: true, report: "old reply" },
       { ...current, closed: true }
     ).kind,
+    "reconcile"
+  );
+  assert.equal(
+    decideSupport(
+      { ...row, report: "unsent reply" },
+      { ...current, closed: true }
+    ).kind,
     "closed"
+  );
+  assert.equal(
+    decideSupport(
+      {
+        ...row,
+        delivery_attempted: true,
+        report: "attempted reply",
+        version: current.version,
+      },
+      current
+    ).kind,
+    "reconcile"
   );
   assert.equal(
     decideSupport({ ...row, report: "reply", version: "new" }, current).kind,

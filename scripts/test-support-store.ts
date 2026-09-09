@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { neonConfig } from "@neondatabase/serverless";
 import pg from "pg";
+import supportChannel from "../agent/channels/support.js";
+import { evePackageUrl } from "../agent/lib/eve-dynamic-tools.js";
 import {
   invokeProvider,
   type ProviderContext,
@@ -29,6 +31,7 @@ import {
   completeSupportOperation,
   discardSupportReport,
   discoverHandoff,
+  findSupportLease,
   queueSupportReport,
   recordMatchedSupportIssue,
   requireSupportLease,
@@ -627,6 +630,132 @@ try {
     () => trackSupportIssue(receipt.claimed, "ENG-OVERFLOW"),
     SupportStateConflict,
     "An expired lease remains a state conflict even when the watch list is full"
+  );
+  // Run the actual channel adapter inside Eve's own callback context.
+  const { ContextContainer, contextStorage } = (await import(
+    new URL("./dist/src/context/container.js", evePackageUrl()).href
+  )) as {
+    ContextContainer: new () => {
+      setVirtualContext: (key: unknown, value: unknown) => void;
+    };
+    contextStorage: { run: <T>(store: unknown, callback: () => T) => T };
+  };
+  const { SessionKey } = await import(
+    new URL("./dist/src/context/keys.js", evePackageUrl()).href
+  );
+  const completeTurn = (context: ProviderContext) => {
+    assert.ok(context.session);
+    const container = new ContextContainer();
+    container.setVirtualContext(SessionKey, {
+      auth: context.session.auth,
+      sessionId: "support-smoke-session",
+    });
+    const handler = (
+      supportChannel as unknown as {
+        adapter: {
+          "turn.completed": (event: unknown, context: unknown) => Promise<void>;
+        };
+      }
+    ).adapter["turn.completed"];
+    return contextStorage.run(container, () => handler({}, {}));
+  };
+  await discoverHandoff("999001", "1788959999.000010");
+  const [unfinished] = await claimHandoffs("intake", ["999001"]);
+  assert.ok(unfinished);
+  const unfinishedAuth = supportAuth(auth, unfinished);
+  const unfinishedContext = {
+    ...ctx,
+    session: {
+      ...ctx.session,
+      auth: { current: unfinishedAuth, initiator: unfinishedAuth },
+    },
+  } as ProviderContext;
+  intercom.id = unfinished.conversation;
+  assert.deepEqual(
+    await resolveSupportTool({}, unfinishedContext).execute(
+      { action: "skip-human-handled" },
+      unfinishedContext
+    ),
+    {
+      reason: "Cannot skip an unhandled or changed customer request.",
+      refused: true,
+    }
+  );
+  const callsBeforeCompletion = urls.length;
+  await completeTurn(unfinishedContext);
+  assert.equal(
+    urls.length,
+    callsBeforeCompletion,
+    "A completed refusal posts no generic failure status"
+  );
+  assert.equal(await findSupportLease(unfinished), null);
+  const unfinishedState = await pool.query(
+    "SELECT processed_version, report, closed FROM support_handoffs WHERE conversation=$1",
+    [unfinished.conversation]
+  );
+  assert.deepEqual(unfinishedState.rows[0], {
+    closed: false,
+    processed_version: null,
+    report: null,
+  });
+
+  await discoverHandoff("999002", "1788959999.000011");
+  const [pending] = await claimHandoffs("intake", ["999002"]);
+  assert.ok(pending);
+  await setSupportVersion(pending, "pending-version");
+  await queueSupportReport(pending, "Attempted finding", "pending-hash");
+  const pendingKey = await attemptSupportDelivery(pending);
+  const pendingAuth = supportAuth(auth, pending);
+  await completeTurn({
+    ...ctx,
+    session: {
+      ...ctx.session,
+      auth: { current: pendingAuth, initiator: pendingAuth },
+    },
+  } as ProviderContext);
+  assert.equal((await requireSupportLease(pending)).report_key, pendingKey);
+  await assert.rejects(
+    () => discardSupportReport(pending),
+    SupportStateConflict
+  );
+  await assert.rejects(
+    () => settleSupport(pending, { closed: true }),
+    SupportStateConflict
+  );
+  assert.equal(
+    (await requireSupportLease(pending)).report_key,
+    pendingKey,
+    "An ambiguous delivery cannot be discarded or closed before reconciliation"
+  );
+  await completeSupportDelivery(pending, "1788959999.000012", true);
+  const reconciled = await pool.query(
+    "SELECT closed, report, report_key, posted_ts, lease FROM support_handoffs WHERE conversation=$1",
+    [pending.conversation]
+  );
+  assert.deepEqual(reconciled.rows[0], {
+    closed: true,
+    lease: null,
+    posted_ts: "1788959999.000012",
+    report: null,
+    report_key: null,
+  });
+  await discoverHandoff("999003", "1788959999.000013");
+  const [deliveredEarlier] = await claimHandoffs("intake", ["999003"]);
+  assert.ok(deliveredEarlier);
+  await pool.query(
+    "UPDATE support_handoffs SET delivery_attempted=true WHERE conversation=$1",
+    [deliveredEarlier.conversation]
+  );
+  await discardSupportReport(deliveredEarlier);
+  await settleSupport(deliveredEarlier, { closed: true });
+  const legacyDelivery = await pool.query(
+    "SELECT closed, delivery_attempted FROM support_handoffs WHERE conversation=$1",
+    [deliveredEarlier.conversation]
+  );
+  assert.deepEqual(
+    legacyDelivery.rows[0],
+    { closed: true, delivery_attempted: false },
+    "A legacy completed delivery with no outbox can still close"
   );
   assert.ok(
     urls.every(

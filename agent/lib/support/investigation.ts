@@ -86,7 +86,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
       await deliverSupportReport(ctx, claim, current);
       return { investigate: false, reason: "Pending delivery handled." };
     case "reconcile":
-      await reconcileSupportDelivery(claim);
+      await reconcileSupportDelivery(claim, current.closed);
       return {
         investigate: false,
         reason:
@@ -129,7 +129,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
   }
 }
 
-async function reconcileSupportDelivery(claim: SupportClaim) {
+async function reconcileSupportDelivery(claim: SupportClaim, closed = false) {
   const row = await requireSupportLease(claim);
   const messages = await readSupportMessages({ thread: claim.thread });
   const existing = messages.find(
@@ -139,7 +139,7 @@ async function reconcileSupportDelivery(claim: SupportClaim) {
         m.metadata.event_payload.key === row.report_key)
   );
   if (existing) {
-    await completeSupportDelivery(claim, existing.ts);
+    await completeSupportDelivery(claim, existing.ts, closed);
     return true;
   }
   // Absence from a read is not a provider guarantee that a timed-out post failed.
@@ -158,7 +158,7 @@ export async function deliverSupportReport(
     return false;
   }
   if (row.delivery_attempted) {
-    await reconcileSupportDelivery(claim);
+    await reconcileSupportDelivery(claim, observed?.closed);
     return true;
   }
   if (row.report_kind === "failure") {

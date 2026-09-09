@@ -5,7 +5,11 @@ import {
   supportClaim,
 } from "../lib/support/auth.js";
 import { reportSupportFailureForClaim } from "../lib/support/investigation.js";
-import { findSupportLease, requireSupportLease } from "../lib/support/store.js";
+import {
+  findSupportLease,
+  requireSupportLease,
+  settleSupport,
+} from "../lib/support/store.js";
 
 /** Internal schedule handoff only. No public route and no automatic Slack delivery. */
 export default defineChannel({
@@ -24,11 +28,12 @@ export default defineChannel({
     },
     async "turn.completed"(_event, _channel, ctx) {
       const claim = claimFromContext(ctx);
-      // A successful finish releases its lease. A model that forgot to finish is retryable.
+      // Completion is not evidence of an infrastructure failure. Retry unfinished work quietly.
+      // Pending outboxes retain their lease and marker for delivery reconciliation.
       if (claim) {
         await findSupportLease(claim)
           .then((row) =>
-            row ? reportSupportFailureForClaim(claim) : undefined
+            row && !row.report ? settleSupport(claim) : undefined
           )
           .catch(() => undefined);
       }
