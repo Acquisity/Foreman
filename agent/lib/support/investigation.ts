@@ -76,6 +76,35 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
     ...current,
     hasLinkedIssues: Object.keys(current.linear.snapshot).length > 0,
   });
+  // The first intake always leaves a short Slack result, even when no work is needed.
+  if (
+    !row.processed_version &&
+    (decision.kind === "closed" || decision.kind === "unchanged")
+  ) {
+    await discardSupportReport(claim);
+    await setSupportVersion(claim, current.version, current.linear.snapshot);
+    const text = current.closed
+      ? "Initial check: the Intercom conversation is already closed. No action taken."
+      : "Initial check: the Intercom conversation is snoozed with no linked engineering issue to follow. No action taken.";
+    await queueSupportReport(
+      claim,
+      text,
+      digest(text),
+      "final",
+      current.revision
+    );
+    if (await reserveDelivery(claim)) {
+      const ts = await postSupportMessage(
+        claim.thread,
+        text,
+        z.string().parse((await requireSupportLease(claim)).report_key)
+      );
+      await completeSupportDelivery(claim, ts, current.closed);
+    } else {
+      await reconcileSupportDelivery(claim, current.closed);
+    }
+    return { investigate: false, posted: true };
+  }
   // biome-ignore lint/style/useDefaultSwitchClause: every decision kind returns; TypeScript checks exhaustiveness.
   switch (decision.kind) {
     case "closed":
@@ -114,6 +143,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
         conversation: current.conversation,
         humanReplied: current.humanReplied,
         humanTookOwnership: current.humanTookOwnership,
+        initialIntake: !row.processed_version,
         instructions:
           "Load intercom-triage-investigate or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
         investigate: true,
@@ -204,6 +234,9 @@ export async function finishSupportInvestigation(
   const row = await requireSupportLease(claim);
   const current = await currentCase(ctx, claim, row);
   if (current.closed) {
+    if (!row.processed_version) {
+      return openSupportInvestigation(ctx);
+    }
     await settleSupport(claim, { closed: current.closed });
     return {
       posted: false,
@@ -265,6 +298,11 @@ export async function finishSupportInvestigation(
 export async function skipHandledSupport(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
+  if (!row.processed_version) {
+    throw new SupportRefusal(
+      "The initial intake must post a concise Slack summary even when nothing was actioned. Use finish with a brief report explaining what was checked, the outcome and why no action was needed."
+    );
+  }
   const current = await currentCase(ctx, claim, row);
   if (
     !(current.humanReplied || current.humanTookOwnership) ||
@@ -329,7 +367,7 @@ export async function reportSupportFailureForClaim(claim: SupportClaim) {
     throw new Error("Pending support delivery requires reconciliation.");
   }
   const text =
-    "I couldn't complete this investigation because a required source or processing step was unavailable. Aaron can review the Intercom conversation manually. The case remains queued for a later check; no customer response or remediation was sent.";
+    "I couldn't complete this investigation. Aaron can review the Intercom conversation manually. The case remains queued for a later check; no customer response or remediation was sent.";
   const hash = createHash("sha256").update(text).digest("hex");
   if (row.last_report_hash === hash) {
     await settleSupport(claim);
