@@ -44,7 +44,18 @@ export async function invokeProvider(
     await policy.record(path, result);
     return result;
   }
-  const result = await executorTransport.call(wire, path, input);
+  const result = await executorTransport
+    .call(wire, path, input)
+    .catch(async (error: unknown) => {
+      if (error instanceof ExecutorError && error.dispatched === false) {
+        await policy.complete(
+          key,
+          { error: { code: error.code }, ok: false },
+          "failed"
+        );
+      }
+      throw error;
+    });
   if (result.ok) {
     const data = result.data as {
       isError?: boolean;

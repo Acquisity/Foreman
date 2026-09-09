@@ -44,10 +44,11 @@ export class ExecutorError extends Error {
   readonly code: string;
   readonly status: number | undefined;
   readonly retryAfter: string | undefined;
+  readonly dispatched: false | undefined;
   constructor(
     code: string,
     status?: number,
-    options?: ErrorOptions & { retryAfter?: string }
+    options?: ErrorOptions & { retryAfter?: string; dispatched?: false }
   ) {
     super(
       `Executor operation failed (${code}${status === undefined ? "" : `, HTTP ${status}`}).`,
@@ -57,6 +58,7 @@ export class ExecutorError extends Error {
     this.code = code;
     this.status = status;
     this.retryAfter = options?.retryAfter;
+    this.dispatched = options?.dispatched;
   }
 }
 const SSE_BLOCK = /\r?\n\r?\n/u;
@@ -163,6 +165,35 @@ async function executeExecutor(
   code: string,
   options: { fetch?: typeof fetch; timeoutMs?: number; maxBytes?: number } = {}
 ): Promise<unknown> {
+  let dispatched = false;
+  try {
+    return await executeExecutorRequest(ctx, code, options, () => {
+      dispatched = true;
+    });
+  } catch (cause) {
+    if (dispatched) {
+      throw cause;
+    }
+    // biome-ignore lint/style/useErrorCause: ExecutorError receives the original cause in its third argument.
+    throw new ExecutorError(
+      cause instanceof ExecutorError ? cause.code : "execution_not_dispatched",
+      cause instanceof ExecutorError ? cause.status : undefined,
+      {
+        cause,
+        dispatched: false,
+        retryAfter:
+          cause instanceof ExecutorError ? cause.retryAfter : undefined,
+      }
+    );
+  }
+}
+
+async function executeExecutorRequest(
+  ctx: ExecutorRequestContext,
+  code: string,
+  options: { fetch?: typeof fetch; timeoutMs?: number; maxBytes?: number },
+  markDispatched: () => void
+): Promise<unknown> {
   const signal = AbortSignal.any([
     ctx.signal,
     AbortSignal.timeout(options.timeoutMs ?? 50_000),
@@ -225,6 +256,8 @@ async function executeExecutor(
   headers["MCP-Protocol-Version"] = "2025-06-18";
   await post({ method: "notifications/initialized" });
   // JSON quoting is for TypeScript source here, never for a shell command.
+  // From this point onward, losing the response cannot prove the write failed.
+  markDispatched();
   const result = await post(
     {
       id: 2,

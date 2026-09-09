@@ -32,6 +32,67 @@ const json = (body: unknown, headers: Record<string, string> = {}) =>
     headers: { "content-type": "application/json", ...headers },
   });
 const OPERATION = "stripe.org.foreman.customer";
+test("only failures before the execute request are confirmed undispatched", async () => {
+  for (const failedMethod of [
+    "initialize",
+    "notifications/initialized",
+    "tools/call",
+  ]) {
+    const seen: string[] = [];
+    const failure = new Error("response lost");
+    const fetcher: typeof fetch = (_url, init) => {
+      const request = JSON.parse(String(init?.body)) as {
+        id?: number;
+        method: string;
+      };
+      seen.push(request.method);
+      if (request.method === failedMethod) {
+        return Promise.reject(failure);
+      }
+      return Promise.resolve(
+        request.method === "initialize"
+          ? json({ id: request.id, result: { protocolVersion: "2025-06-18" } })
+          : new Response(null, { status: 202 })
+      );
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each independent transport phase is checked in order.
+    await assert.rejects(
+      executorTransport.call(context(), OPERATION, {}, { fetch: fetcher }),
+      (error: unknown) => {
+        if (failedMethod === "tools/call") {
+          assert.equal(error, failure);
+        } else {
+          assert.ok(error instanceof ExecutorError);
+          assert.equal(error.dispatched, false);
+          assert.equal(error.cause, failure);
+          assert.ok(!seen.includes("tools/call"));
+        }
+        return true;
+      }
+    );
+  }
+});
+
+test("a cancellation before initialization is confirmed undispatched", async () => {
+  const signal = AbortSignal.abort();
+  await assert.rejects(
+    executorTransport.call(
+      { ...context(), signal },
+      OPERATION,
+      {},
+      {
+        fetch: () => {
+          throw new Error("must not send a request");
+        },
+      }
+    ),
+    (error: unknown) =>
+      error instanceof ExecutorError &&
+      error.dispatched === false &&
+      error.cause === signal.reason
+  );
+});
+
 const rpc =
   (
     toolResult: unknown,
@@ -344,7 +405,10 @@ test("the deadline cancels a stalled response body without a caller cancellation
         }
       ),
       (error: unknown) =>
-        error instanceof Error && error.name === "TimeoutError"
+        error instanceof ExecutorError &&
+        error.dispatched === false &&
+        error.cause instanceof Error &&
+        error.cause.name === "TimeoutError"
     );
     assert.equal(cancelled, true);
   } finally {
