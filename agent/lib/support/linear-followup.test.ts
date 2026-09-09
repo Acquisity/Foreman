@@ -87,6 +87,25 @@ test("relation ordering is quiet for flat and grouped lists without losing relat
   );
 });
 
+test("nested relation object key order is quiet while changed evidence remains observable", () => {
+  const snapshot = (relation: unknown) =>
+    issueSnapshot({ ...issue, relations: { blockedBy: [relation] } }, []);
+  const first = {
+    id: "relation-1",
+    issue: { id: "ENG-2", state: { name: "In Progress", type: "started" } },
+  };
+  const reordered = JSON.parse(
+    '{"issue":{"state":{"type":"started","name":"In Progress"},"id":"ENG-2"},"id":"relation-1"}'
+  ) as typeof first;
+  // The old serializer distinguishes these objects; formatting cannot erase the fixture difference.
+  assert.notEqual(JSON.stringify(first), JSON.stringify(reordered));
+  assert.deepEqual(snapshot(first), snapshot(reordered));
+  assert.notDeepEqual(
+    snapshot(first),
+    snapshot({ ...reordered, issue: { ...reordered.issue, id: "ENG-3" } })
+  );
+});
+
 test("a corrected Linear title changes the fingerprint and must be valid text", () => {
   const original = linkedIssue.parse({
     ...issue,

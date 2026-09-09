@@ -28,7 +28,17 @@ export function issueSnapshot(
 ) {
   const stable = (items: unknown) =>
     Array.isArray(items)
-      ? items.map((item) => JSON.stringify(item)).sort()
+      ? items
+          .map((item) =>
+            JSON.stringify(item, (_key, value: unknown) =>
+              value && typeof value === "object" && !Array.isArray(value)
+                ? Object.fromEntries(
+                    Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+                  )
+                : value
+            )
+          )
+          .sort()
       : items;
   return {
     fingerprint: digest({
