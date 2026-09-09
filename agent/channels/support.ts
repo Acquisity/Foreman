@@ -1,4 +1,4 @@
-import { defineChannel } from "eve/channels";
+import { defineChannel, GET } from "eve/channels";
 import {
   claimFromContext,
   isSupportAuth,
@@ -11,7 +11,7 @@ import {
   settleSupport,
 } from "../lib/support/store.js";
 
-/** Internal schedule handoff only. No public route and no automatic Slack delivery. */
+/** Internal schedule handoff only. HTTP requests cannot start sessions. */
 export default defineChannel({
   context: (state) => ({ state }),
   events: {
@@ -65,6 +65,12 @@ export default defineChannel({
       }
     );
   },
-  routes: [],
+  // Eve 0.44 registers channels by route and matches bundled imports by route shape.
+  // A route-less channel disappears from the runtime, including schedule targets.
+  routes: [
+    GET("/internal/support", () =>
+      Promise.resolve(new Response(null, { status: 404 }))
+    ),
+  ],
   state: { actions: 0, deadline: 0 },
 });

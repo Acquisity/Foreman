@@ -70,3 +70,9 @@ Ordinary Foreman workflows retain one shared Executor toolkit. ENG-13601 introdu
 Checked against Eve 0.44.0 for ENG-13601. A custom channel can fail a turn from lifecycle callbacks, but its `SessionHandle` exposes identity and continuation rekeying, not cancellation or a durable timer. The cross-channel send options also do not accept per-run resource limits. Support therefore applies an eighteen-minute deadline at reasoning/action checkpoints, a ceiling of 150 action batches, twenty-minute provider-write leases, and the existing provider/sandbox deadlines. This bounds work at the available boundaries; it is not a promise to interrupt one silent model call or the Connect SDK exactly at eighteen minutes. No detached timeout or polling workflow is used to simulate that guarantee.
 
 Proposal: expose a runtime-owned per-run deadline on channel sends that cancels model calls, delegated work and token resolution durably.
+
+## Register receive-only channels
+
+Checked against eve 0.44.0 after ENG-13601's first production intake tick. The compiler emits channel entries from HTTP routes, so `routes: []` omits a receive-only channel from the runtime catalog. Cross-channel dispatch also falls back to a route fingerprint when bundled module references differ. Foreman's support channel therefore carries one inert GET route that always returns 404, allowing registration without exposing session creation. A compiled-manifest regression test checks that the channel survives compilation.
+
+Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
