@@ -119,9 +119,9 @@ When a trusted colleague replies in the thread contradicting your conclusion, tr
 
 ## Step 9: Reply in Slack
 
-Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7. Follow the canonical final-post rule from the Slack channel boundary. After required Linear writes succeed, give the unblock, finding, and next action in one to three sentences.
+For ticket-link follow-ups, return the known link and stop. Skip investigation and the format below.
 
-For later ticket-link requests, return the known link without repeating this format or investigation.
+Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7. Follow the canonical final-post rule from the Slack channel boundary. After required Linear writes succeed, give the unblock, finding, and next action in one to three sentences.
 
 Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.
 
