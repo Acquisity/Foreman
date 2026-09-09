@@ -6,7 +6,7 @@ import {
   notificationConversation,
 } from "./conversation.js";
 
-test("test selections trim IDs without turning blank selections into unrestricted intake", () => {
+test("support configuration validates selected IDs and the watermark epoch range", () => {
   const keys = [
     "FOREMAN_SUPPORT_ENABLED",
     "FOREMAN_SUPPORT_HANDOFF_APP_ID",
@@ -28,6 +28,25 @@ test("test selections trim IDs without turning blank selections into unrestricte
     assert.deepEqual(supportConfig()?.testConversations, []);
     delete process.env.FOREMAN_SUPPORT_TEST_CONVERSATIONS;
     assert.deepEqual(supportConfig()?.testConversations, []);
+    for (const since of [
+      "2000-01-01T00:00:00Z",
+      "2001-09-09T01:46:39.999999Z",
+      "2001-09-08T21:46:39.999999-04:00",
+    ]) {
+      process.env.FOREMAN_SUPPORT_SINCE = since;
+      assert.throws(
+        () => supportConfig(),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message.includes("FOREMAN_SUPPORT_SINCE") &&
+          error.message.includes("epoch range")
+      );
+    }
+    for (const since of ["2001-09-09T01:46:40Z", "2001-09-08T21:46:40-04:00"]) {
+      process.env.FOREMAN_SUPPORT_SINCE = since;
+      assert.equal(supportConfig()?.since, since);
+      assert.equal(supportInitialTimestamp(since), "1000000000.000000");
+    }
   } finally {
     for (const [key, value] of previous) {
       if (value === undefined) {

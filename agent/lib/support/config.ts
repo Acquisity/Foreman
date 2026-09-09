@@ -22,10 +22,18 @@ export const slackTimestamp = z.string().regex(/^\d{10,16}\.\d{6}$/);
 
 const APP_ID = /^A[A-Z0-9]+$/;
 const ISO_FRACTION = /\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/;
+const supportSince = z.iso
+  .datetime({ offset: true })
+  .refine(
+    (iso) =>
+      slackTimestamp.safeParse(`${Math.floor(Date.parse(iso) / 1000)}.000000`)
+        .success,
+    "FOREMAN_SUPPORT_SINCE must fall within the supported Slack timestamp epoch range."
+  );
 
 /** Slack's exclusive lower bound retains the configured microseconds, including timezone offsets. */
 export function supportInitialTimestamp(since: string) {
-  const iso = z.iso.datetime({ offset: true }).parse(since);
+  const iso = supportSince.parse(since);
   const seconds = Math.floor(Date.parse(iso) / 1000);
   // Truncation is intentional: an exclusive bound still admits the next newer microsecond.
   const fraction = (ISO_FRACTION.exec(iso)?.[1] ?? "")
@@ -42,7 +50,7 @@ export function supportConfig() {
   return z
     .object({
       appId: z.string().regex(APP_ID),
-      since: z.iso.datetime({ offset: true }),
+      since: supportSince,
       testConversations: z
         .array(conversationId)
         .min(selection === "" ? 0 : 1)
