@@ -119,7 +119,7 @@ When a trusted colleague replies in the thread contradicting your conclusion, tr
 
 ## Step 9: Reply in Slack
 
-This is the one `triage-handling` Stage 7 calls for on a Bug included. Follow the canonical final-post rule from the Slack channel boundary. After required Linear writes succeed, give the unblock, finding, and next action in one to three sentences.
+Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7. Follow the canonical final-post rule from the Slack channel boundary. After required Linear writes succeed, give the unblock, finding, and next action in one to three sentences.
 
 For later ticket-link requests, return the known link without repeating this format or investigation.
 

@@ -112,7 +112,7 @@ test("Intercom non-Bug outcomes end in the skill without the shared stages", () 
   );
   assert.ok(
     productSkill.includes(
-      "the one `triage-handling` Stage 7 calls for on a Bug included"
+      "Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7."
     )
   );
 });
