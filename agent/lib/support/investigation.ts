@@ -3,7 +3,7 @@ import { z } from "zod";
 import { invokeProvider, type ProviderContext } from "../executor/dispatch.js";
 import { requireSupportContext, type SupportClaim } from "./auth.js";
 import { inspectConversation } from "./conversation.js";
-import { decideSupport } from "./decision.js";
+import { decideSupport, pendingFailureReport } from "./decision.js";
 import { SupportRefusal, SupportStateConflict } from "./errors.js";
 import { readLinearFollowup, recoverSupportIssues } from "./linear-followup.js";
 import { digest } from "./linear-state.js";
@@ -14,6 +14,7 @@ import {
   discardSupportReport,
   queueSupportReport,
   requireSupportLease,
+  type SupportRow,
   setSupportVersion,
   settleSupport,
   supportOperations,
@@ -44,11 +45,15 @@ export async function currentConversation(
   return inspectConversation(result.data, claim.conversation);
 }
 
-export async function currentCase(ctx: ProviderContext, claim: SupportClaim) {
+export async function currentCase(
+  ctx: ProviderContext,
+  claim: SupportClaim,
+  row: SupportRow
+) {
   const conversation = await currentConversation(ctx, claim);
   const linear = conversation.closed
     ? { changes: [], snapshot: {}, version: digest({}) }
-    : await readLinearFollowup(ctx, claim);
+    : await readLinearFollowup(ctx, row);
   return {
     ...conversation,
     linear,
@@ -60,16 +65,18 @@ export async function currentCase(ctx: ProviderContext, claim: SupportClaim) {
 export async function openSupportInvestigation(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
-  if (decideSupport(row, null).kind === "pending-delivery") {
+  if (pendingFailureReport(row)) {
     await deliverSupportReport(ctx, claim);
     return { investigate: false, reason: "Pending access status handled." };
   }
-  await recoverSupportIssues(claim);
-  const current = await currentCase(ctx, claim);
+  const operations = await supportOperations(row);
+  const recovered = await recoverSupportIssues(claim, row, operations);
+  const current = await currentCase(ctx, claim, recovered);
   const decision = decideSupport(row, {
     ...current,
     hasLinkedIssues: Object.keys(current.linear.snapshot).length > 0,
   });
+  // biome-ignore lint/style/useDefaultSwitchClause: every decision kind returns; TypeScript checks exhaustiveness.
   switch (decision.kind) {
     case "closed":
       await discardSupportReport(claim);
@@ -111,7 +118,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
           "Load intercom-triage-investigate or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
         investigate: true,
         linearChanges: current.linear.changes,
-        previousOperations: await supportOperations(claim),
+        previousOperations: operations,
         revision: current.revision,
         slackContext: (
           await readSupportMessages({ thread: claim.thread })
@@ -119,8 +126,6 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
           (message) => message.metadata?.event_type !== "foreman_support"
         ),
       };
-    default:
-      throw new Error("Support decision requires current evidence.");
   }
 }
 
@@ -168,7 +173,7 @@ export async function deliverSupportReport(
     await completeSupportDelivery(claim, ts);
     return true;
   }
-  const current = observed ?? (await currentCase(ctx, claim));
+  const current = observed ?? (await currentCase(ctx, claim, row));
   if (
     current.closed ||
     current.version !== row.version ||
@@ -197,7 +202,7 @@ export async function finishSupportInvestigation(
 ) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
-  const current = await currentCase(ctx, claim);
+  const current = await currentCase(ctx, claim, row);
   if (current.closed) {
     await settleSupport(claim, { closed: current.closed });
     return {
@@ -219,7 +224,7 @@ export async function finishSupportInvestigation(
   const report = supportReport.parse(input);
   if (
     !report.retry &&
-    (await supportOperations(claim)).some(
+    (await supportOperations(row)).some(
       (operation) => operation.state !== "done"
     )
   ) {
@@ -259,8 +264,8 @@ export async function finishSupportInvestigation(
 
 export async function skipHandledSupport(ctx: ProviderContext) {
   const claim = requireSupportContext(ctx);
-  const current = await currentCase(ctx, claim);
   const row = await requireSupportLease(claim);
+  const current = await currentCase(ctx, claim, row);
   if (
     !(current.humanReplied || current.humanTookOwnership) ||
     current.version !== row.version
@@ -282,11 +287,11 @@ export async function finishSupportQuietly(
 ) {
   const claim = requireSupportContext(ctx);
   const row = await requireSupportLease(claim);
-  const current = await currentCase(ctx, claim);
+  const current = await currentCase(ctx, claim, row);
   if (
     row.report ||
     !row.processed_version ||
-    (await supportOperations(claim)).some(
+    (await supportOperations(row)).some(
       (operation) => operation.state !== "done"
     )
   ) {

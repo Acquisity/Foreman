@@ -269,8 +269,10 @@ export async function completeSupportOperation(
   }
 }
 
-export async function supportOperations(claim: SupportClaim) {
-  await requireSupportLease(claim);
+/** The caller supplies its already fenced case row. */
+export function supportOperations(
+  claim: Pick<SupportRow, "conversation" | "thread">
+) {
   return query(
     "SELECT operation_key, state, result FROM support_operations WHERE conversation = $1 AND thread = $2 ORDER BY operation_key LIMIT 100",
     [claim.conversation, claim.thread]

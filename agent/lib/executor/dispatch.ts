@@ -14,8 +14,11 @@ async function connection(
   policy: ReturnType<typeof supportOperationPolicy>
 ) {
   const { token } = await ctx.getToken(executorAuth());
-  await policy?.authorize();
-  return { signal: ctx.abortSignal, token, toolkit: policy?.toolkit };
+  const authorization = policy ? { version: await policy.authorize() } : null;
+  return {
+    authorization,
+    wire: { signal: ctx.abortSignal, token, toolkit: policy?.toolkit },
+  };
 }
 
 /** The single authored operation entry: choose policy before authorizing or dispatching. */
@@ -27,8 +30,11 @@ export async function invokeProvider(
 ): Promise<ExecutorOutcome> {
   const policy = supportOperationPolicy(ctx);
   policy?.assert(path, input);
-  const wire = await connection(ctx, policy);
-  const key = policy?.writeKey(path, input, operationKey);
+  const { wire, authorization } = await connection(ctx, policy);
+  const key =
+    policy && authorization
+      ? policy.writeKey(path, input, authorization.version, operationKey)
+      : null;
   if (!(policy && key)) {
     return executorTransport.call(wire, path, input);
   }
@@ -61,5 +67,6 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
   const policy = supportOperationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
-  return executorTransport.describe(await connection(ctx, policy), path);
+  const { wire } = await connection(ctx, policy);
+  return executorTransport.describe(wire, path);
 }

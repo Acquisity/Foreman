@@ -32,6 +32,7 @@ import {
   setSupportVersion,
   settleSupport,
   supportCursor,
+  supportOperations,
   trackSupportIssue,
 } from "../agent/lib/support/store.js";
 import supportDefinition from "../agent/tools/support_investigation.js";
@@ -299,8 +300,13 @@ try {
   );
   assert.equal(urls.length, 6);
   await completeSupportOperation(retry, "rejected-write", { ok: true });
-  await recoverSupportIssues(retry);
-  const baseline = await currentCase(ctx, retry);
+  const retryRow = await requireSupportLease(retry);
+  const recovered = await recoverSupportIssues(
+    retry,
+    retryRow,
+    await supportOperations(retryRow)
+  );
+  const baseline = await currentCase(ctx, retry, recovered);
   const resolveSupportTool = supportDefinition.events[
     "step.started"
   ] as unknown as (
@@ -361,7 +367,12 @@ try {
   );
   const changed = await recheck();
   issue.status = "Done";
-  const progress = await currentCase(changed.context, changed.claimed);
+  const changedRow = await requireSupportLease(changed.claimed);
+  const progress = await currentCase(
+    changed.context,
+    changed.claimed,
+    changedRow
+  );
   assert.notEqual(
     progress.version,
     baseline.version,
@@ -369,9 +380,7 @@ try {
   );
   assert.equal(progress.linear.changes.length, 1);
   incompleteComments = true;
-  await assert.rejects(() =>
-    readLinearFollowup(changed.context, changed.claimed)
-  );
+  await assert.rejects(() => readLinearFollowup(changed.context, changedRow));
   incompleteComments = false;
   assert.deepEqual(
     (await requireSupportLease(changed.claimed)).linear_processed,

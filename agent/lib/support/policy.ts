@@ -101,7 +101,6 @@ export function supportOperationPolicy(ctx: ProviderContext) {
   if (!claim) {
     return null;
   }
-  let version: string | undefined;
   return {
     assert(path: string, input: Record<string, unknown>) {
       assertSupportOperation(path, input);
@@ -112,7 +111,7 @@ export function supportOperationPolicy(ctx: ProviderContext) {
       }
     },
     async authorize() {
-      version = (await requireSupportLease(claim)).version ?? "initial";
+      return (await requireSupportLease(claim)).version ?? "initial";
     },
     complete: (
       key: string,
@@ -130,15 +129,11 @@ export function supportOperationPolicy(ctx: ProviderContext) {
     writeKey(
       path: string,
       input: Record<string, unknown>,
+      version: string,
       operationKey?: string
     ) {
       if (!supportMutation(path)) {
         return null;
-      }
-      if (version === undefined) {
-        throw new Error(
-          "Support policy must authorize before computing a write key."
-        );
       }
       return operationKey ?? supportWriteKey(path, input, version);
     },

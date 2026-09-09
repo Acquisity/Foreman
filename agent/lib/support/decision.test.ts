@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decideSupport, type SupportObservation } from "./decision.js";
+import {
+  decideSupport,
+  pendingFailureReport,
+  type SupportObservation,
+} from "./decision.js";
 
 const row = {
   delivery_attempted: false,
@@ -17,13 +21,22 @@ const current: SupportObservation = {
 };
 
 test("support decision makes delivery, closure and retry precedence explicit", () => {
-  assert.equal(decideSupport(row, null).kind, "read");
+  assert.equal(pendingFailureReport(row), false);
   assert.equal(
-    decideSupport(
-      { ...row, report: "access failure", report_kind: "failure" },
-      null
-    ).kind,
-    "pending-delivery"
+    pendingFailureReport({
+      ...row,
+      report: "access failure",
+      report_kind: "failure",
+    }),
+    true
+  );
+  assert.equal(
+    pendingFailureReport({
+      ...row,
+      report: "final reply",
+      report_kind: "final",
+    }),
+    false
   );
   assert.equal(
     decideSupport(

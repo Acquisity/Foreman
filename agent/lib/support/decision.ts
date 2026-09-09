@@ -7,28 +7,22 @@ export interface SupportObservation {
   version: string;
 }
 export type SupportDecision =
-  | { kind: "read" | "closed" | "pending-delivery" | "reconcile" }
+  | { kind: "closed" | "pending-delivery" | "reconcile" }
   | { kind: "unchanged"; discardReport: boolean; processed: boolean }
   | { kind: "investigate"; discardReport: boolean };
+
+export const pendingFailureReport = (
+  row: Pick<SupportRow, "report" | "report_kind">
+) => Boolean(row.report) && row.report_kind === "failure";
 
 /** Pure precedence rules. Effects and provider reads belong to the orchestrator. */
 export function decideSupport(
   row: Pick<
     SupportRow,
-    | "report"
-    | "report_kind"
-    | "delivery_attempted"
-    | "version"
-    | "processed_version"
+    "report" | "delivery_attempted" | "version" | "processed_version"
   >,
-  current: SupportObservation | null
+  current: SupportObservation
 ): SupportDecision {
-  if (row.report && row.report_kind === "failure") {
-    return { kind: "pending-delivery" };
-  }
-  if (!current) {
-    return { kind: "read" };
-  }
   if (current.closed) {
     return { kind: "closed" };
   }

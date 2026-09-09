@@ -10,8 +10,8 @@ import {
   writtenIssueId,
 } from "./linear-state.js";
 import {
-  requireSupportLease,
-  supportOperations,
+  type SupportRow,
+  type supportOperations,
   trackSupportIssue,
 } from "./store.js";
 
@@ -84,9 +84,8 @@ async function readComments(ctx: ProviderContext, id: string) {
 
 export async function readLinearFollowup(
   ctx: ProviderContext,
-  claim: SupportClaim
+  row: SupportRow
 ) {
-  const row = await requireSupportLease(claim);
   const snapshot: LinearSnapshot = {};
   const changes: unknown[] = [];
   for (const id of [...row.linear_ids].sort()) {
@@ -106,11 +105,14 @@ export async function readLinearFollowup(
 }
 
 /** Recovery is an explicit open-time mutation, never part of evidence reads. */
-export async function recoverSupportIssues(claim: SupportClaim) {
-  const row = await requireSupportLease(claim);
+export async function recoverSupportIssues(
+  claim: SupportClaim,
+  row: SupportRow,
+  operations: Awaited<ReturnType<typeof supportOperations>>
+) {
   const known = new Set(row.linear_ids);
   // Recover a successful write journaled immediately before a crash in watch-list registration.
-  for (const operation of await supportOperations(claim)) {
+  for (const operation of operations) {
     const key = String(operation.operation_key);
     if (
       operation.state !== "done" ||
@@ -128,4 +130,5 @@ export async function recoverSupportIssues(claim: SupportClaim) {
       known.add(id);
     }
   }
+  return { ...row, linear_ids: [...known] };
 }
