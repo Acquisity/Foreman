@@ -17,6 +17,7 @@ export const linkedIssue = z
     description: z.string().nullable().optional(),
     id: z.string().min(1).max(100),
     status: z.string(),
+    title: z.string().optional(),
   })
   .passthrough();
 
@@ -45,9 +46,19 @@ export function issueSnapshot(
         })
         .sort((a, b) => a.localeCompare(b)),
       description: issue.description ?? "",
-      relations: issue.relations,
+      relations:
+        issue.relations &&
+        typeof issue.relations === "object" &&
+        !Array.isArray(issue.relations)
+          ? Object.fromEntries(
+              Object.entries(issue.relations)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([kind, items]) => [kind, stable(items)])
+            )
+          : stable(issue.relations),
       releases: stable(issue.releases),
       status: issue.status,
+      title: issue.title ?? "",
     }),
     status: issue.status,
   };

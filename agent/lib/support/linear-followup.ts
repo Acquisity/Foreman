@@ -45,6 +45,28 @@ export async function trackLinkedIssue(ctx: ProviderContext, id: string) {
   return { issue, tracked: true };
 }
 
+/** Normalize supported cursor aliases while refusing incomplete comment evidence. */
+export function parseLinearCommentPage(result: unknown, cursor?: string) {
+  const data = z
+    .object({
+      comments: z.array(z.unknown()),
+      cursor: z.string().nullable().optional(),
+      endCursor: z.string().nullable().optional(),
+      hasNextPage: z.boolean(),
+      nextCursor: z.string().nullable().optional(),
+    })
+    .parse(result);
+  const next = data.hasNextPage
+    ? [data.nextCursor, data.endCursor, data.cursor].find(
+        (value) => typeof value === "string" && value.trim().length > 0
+      )
+    : undefined;
+  if (data.hasNextPage && (!next || next === cursor)) {
+    throw new Error("Linear comment history is incomplete.");
+  }
+  return { comments: data.comments, next: next ?? undefined };
+}
+
 async function readComments(ctx: ProviderContext, id: string) {
   const comments: unknown[] = [];
   let bytes = 0;
@@ -57,27 +79,16 @@ async function readComments(ctx: ProviderContext, id: string) {
       orderBy: "updatedAt",
       ...(cursor ? { cursor } : {}),
     });
-    const data = z
-      .object({
-        comments: z.array(z.unknown()),
-        cursor: z.string().optional(),
-        hasNextPage: z.boolean(),
-        nextCursor: z.string().optional(),
-      })
-      .parse(result);
+    const data = parseLinearCommentPage(result, cursor);
     comments.push(...data.comments);
     bytes += Buffer.byteLength(JSON.stringify(data.comments), "utf8");
     if (bytes > 1_000_000) {
       throw new Error("Linear comment evidence exceeded its output bound.");
     }
-    if (!data.hasNextPage) {
+    if (!data.next) {
       return comments;
     }
-    const next = data.nextCursor ?? data.cursor;
-    if (!next || next === cursor) {
-      throw new Error("Linear comment history is incomplete.");
-    }
-    cursor = next;
+    cursor = data.next;
   }
   throw new Error("Linear comment history exceeded its scan bound.");
 }

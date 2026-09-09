@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { inspectConversation } from "./conversation.js";
-import { issueSnapshot } from "./linear-state.js";
+import { parseLinearCommentPage } from "./linear-followup.js";
+import { issueSnapshot, linkedIssue } from "./linear-state.js";
 
 const issue = {
   assignee: "Engineer A",
@@ -65,6 +66,62 @@ test("provider comment ordering does not produce repeated updates", () => {
   assert.deepEqual(
     issueSnapshot(issue, [comment, second]),
     issueSnapshot(issue, [second, comment])
+  );
+});
+
+test("relation ordering is quiet for flat and grouped lists without losing relation meaning", () => {
+  const first = { id: "ENG-2" };
+  const second = { id: "ENG-3" };
+  const snapshot = (relations: unknown) =>
+    issueSnapshot({ ...issue, relations }, []);
+  assert.deepEqual(snapshot([first, second]), snapshot([second, first]));
+  assert.deepEqual(
+    snapshot({ blockedBy: [first, second], relatedTo: [second] }),
+    snapshot({ blockedBy: [second, first], relatedTo: [second] })
+  );
+  assert.notDeepEqual(snapshot([first]), snapshot([second]));
+  assert.notDeepEqual(snapshot([first]), snapshot([first, second]));
+  assert.notDeepEqual(
+    snapshot({ blocks: [first] }),
+    snapshot({ blockedBy: [first] })
+  );
+});
+
+test("a corrected Linear title changes the fingerprint and must be valid text", () => {
+  const original = linkedIssue.parse({
+    ...issue,
+    title: "Account connection bug",
+  });
+  assert.notDeepEqual(
+    issueSnapshot(original, []),
+    issueSnapshot({ ...original, title: "Configuration error" }, [])
+  );
+  assert.throws(() => linkedIssue.parse({ ...issue, title: 123 }));
+  assert.ok(linkedIssue.safeParse(issue).success);
+});
+
+test("comment pages accept each nonempty cursor alias and refuse incomplete evidence", () => {
+  const page = { comments: [comment], hasNextPage: true };
+  for (const key of ["nextCursor", "endCursor", "cursor"]) {
+    assert.deepEqual(parseLinearCommentPage({ ...page, [key]: "page-2" }), {
+      comments: [comment],
+      next: "page-2",
+    });
+  }
+  assert.equal(
+    parseLinearCommentPage({ ...page, endCursor: "page-2", nextCursor: "" })
+      .next,
+    "page-2"
+  );
+  assert.equal(
+    parseLinearCommentPage({ ...page, endCursor: null, hasNextPage: false })
+      .next,
+    undefined
+  );
+  assert.throws(() => parseLinearCommentPage(page));
+  assert.throws(() => parseLinearCommentPage({ ...page, endCursor: " " }));
+  assert.throws(() =>
+    parseLinearCommentPage({ ...page, endCursor: "page-2" }, "page-2")
   );
 });
 
