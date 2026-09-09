@@ -14,15 +14,14 @@ import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 // either: a run is billed per session, not per line of output, and the cap
 // was blocking legitimate implementation runs.
 //
-// The model resolves at session start through resolveModel, so a live override saved with
-// set_agent_models applies to the next session without a redeploy; without one, the compiled
-// default from MODELS runs.
+// Wrapped model instances resolve at step start: Eve cannot serialize provider
+// objects into durable session/turn selections. resolveModel retains live overrides.
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "session.started": async () =>
+      "step.started": async () =>
         ticketLinkedModel(await resolveModel("orchestrator")),
     },
   }),
