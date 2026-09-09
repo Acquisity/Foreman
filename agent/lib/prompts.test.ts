@@ -68,12 +68,15 @@ describe("selectPrompt", () => {
     assert.ok(!CHANNEL_NAME.test(GENERAL_MODE));
   });
 
-  it("requires the Slack wording skill on both root paths", () => {
+  it("limits the Slack wording skill to the two intended channels on both root paths", () => {
     for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
       assert.ok(
         prompt.includes(
-          "When the active channel is Slack, load `slack-wording` before drafting any reply or question."
+          "Load `slack-wording` only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request)."
         )
+      );
+      assert.ok(
+        prompt.includes("Its restrictions do not apply in other channels.")
       );
     }
   });
