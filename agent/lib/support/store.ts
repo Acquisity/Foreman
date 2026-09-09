@@ -229,13 +229,19 @@ export async function completeSupportDelivery(claim: SupportClaim, ts: string) {
 /** Persist verified issue references immediately, independent of Slack success. */
 export async function trackSupportIssue(claim: SupportClaim, issueId: string) {
   const id = z.string().min(1).max(100).parse(issueId);
-  await guardedWrite(
+  const [row] = await guardedWrite(
     `UPDATE support_handoffs
-    SET linear_ids = CASE WHEN $4 = ANY(linear_ids) THEN linear_ids ELSE array_append(linear_ids, $4) END
+    SET linear_ids = CASE WHEN $4 = ANY(linear_ids) OR cardinality(linear_ids) >= 10
+      THEN linear_ids ELSE array_append(linear_ids, $4) END
     WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()
-    AND ($4 = ANY(linear_ids) OR cardinality(linear_ids) < 10) RETURNING conversation`,
+    RETURNING ($4 = ANY(linear_ids)) AS tracked`,
     [claim.conversation, claim.thread, claim.lease, id]
   );
+  if (!row.tracked) {
+    throw new SupportRefusal(
+      "This case already tracks 10 Linear issues. The additional issue was not added to follow-up monitoring. Do not retry it or create a replacement; operator reconciliation is required."
+    );
+  }
 }
 
 /** Reserve before a write. An ambiguous write is never blindly replayed. */

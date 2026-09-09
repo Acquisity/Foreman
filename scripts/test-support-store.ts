@@ -9,6 +9,10 @@ import {
 } from "../agent/lib/executor/dispatch.js";
 import { supportAuth } from "../agent/lib/support/auth.js";
 import {
+  SupportRefusal,
+  SupportStateConflict,
+} from "../agent/lib/support/errors.js";
+import {
   currentCase,
   finishSupportQuietly,
   openSupportInvestigation,
@@ -327,11 +331,22 @@ try {
     status: "In Progress",
   };
   let incompleteComments = false;
+  let wireFailure: "initialize" | "response" | null = null;
+  let writeDispatches = 0;
   const comments = [{ body: "Investigating the issue", id: "comment-test" }];
   globalThis.fetch = (url, init) => {
     urls.push(String(url));
     const rpc = JSON.parse(String(init?.body));
     const code = String(rpc.params?.arguments?.code ?? "");
+    if (rpc.method === "initialize" && wireFailure === "initialize") {
+      return Promise.reject(new Error("Synthetic initialization failure"));
+    }
+    if (code.includes("save_comment")) {
+      writeDispatches += 1;
+      if (wireFailure === "response") {
+        return Promise.reject(new Error("Synthetic lost write response"));
+      }
+    }
     let data: unknown = {};
     if (code.includes("get_conversation")) {
       data = intercom;
@@ -390,6 +405,41 @@ try {
     })
   );
   assert.equal(urls.length, 6);
+  const writePath = "linear.org.workspaceLinear.save_comment";
+  const writeInput = { body: "Synthetic comment", issueId: issue.id };
+  wireFailure = "initialize";
+  await assert.rejects(() =>
+    invokeProvider(ctx, writePath, writeInput, "before-dispatch")
+  );
+  assert.equal(writeDispatches, 0);
+  assert.equal(
+    (await supportOperations(retry)).find(
+      (row) => row.operation_key === "before-dispatch"
+    )?.state,
+    "failed"
+  );
+  wireFailure = null;
+  await invokeProvider(ctx, writePath, writeInput, "before-dispatch");
+  assert.equal(writeDispatches, 1, "An undispatched failure can retry once");
+  wireFailure = "response";
+  await assert.rejects(() =>
+    invokeProvider(ctx, writePath, writeInput, "lost-response")
+  );
+  assert.equal(writeDispatches, 2);
+  wireFailure = null;
+  await assert.rejects(
+    () => invokeProvider(ctx, writePath, writeInput, "lost-response"),
+    SupportRefusal
+  );
+  assert.equal(
+    writeDispatches,
+    2,
+    "An uncertain response never permits a duplicate write"
+  );
+  await completeSupportOperation(retry, "lost-response", {
+    data: {},
+    ok: true,
+  });
   await completeSupportOperation(retry, "rejected-write", { ok: true });
   const retryRow = await requireSupportLease(retry);
   const recovered = await recoverSupportIssues(
@@ -531,6 +581,52 @@ try {
   );
   await assert.rejects(() =>
     completeSupportOperation(receipt.claimed, "late-receipt", { ok: false })
+  );
+  await Promise.all(
+    Array.from({ length: 9 }, (_, index) =>
+      trackSupportIssue(receipt.claimed, `ENG-CAP-${index}`)
+    )
+  );
+  const fullWatch = await requireSupportLease(receipt.claimed);
+  assert.equal(fullWatch.linear_ids.length, 10);
+  await trackSupportIssue(receipt.claimed, issue.id);
+  const capacityRefusal = (error: unknown) =>
+    error instanceof SupportRefusal &&
+    !(error instanceof SupportStateConflict) &&
+    error.message.includes("already tracks 10 Linear issues");
+  await assert.rejects(
+    () => trackSupportIssue(receipt.claimed, "ENG-OVERFLOW"),
+    capacityRefusal
+  );
+  const overflowReceipt = { data: { id: "ENG-OVERFLOW" }, ok: true };
+  await reserveSupportOperation(receipt.claimed, "create-issue:overflow");
+  await completeSupportOperation(
+    receipt.claimed,
+    "create-issue:overflow",
+    overflowReceipt
+  );
+  const overflowOperations = await supportOperations(fullWatch);
+  await assert.rejects(
+    () => recoverSupportIssues(receipt.claimed, fullWatch, overflowOperations),
+    capacityRefusal
+  );
+  assert.deepEqual(
+    (await requireSupportLease(receipt.claimed)).linear_ids,
+    fullWatch.linear_ids,
+    "Duplicate registration and overflow leave the full watch list unchanged"
+  );
+  assert.deepEqual(
+    await reserveSupportOperation(receipt.claimed, "create-issue:overflow"),
+    { fresh: false, result: overflowReceipt },
+    "Capacity refusal preserves the successful receipt without replaying the write"
+  );
+  await psql(
+    "UPDATE support_handoffs SET lease_until = now() - interval '1 minute';"
+  );
+  await assert.rejects(
+    () => trackSupportIssue(receipt.claimed, "ENG-OVERFLOW"),
+    SupportStateConflict,
+    "An expired lease remains a state conflict even when the watch list is full"
   );
   assert.ok(
     urls.every(
