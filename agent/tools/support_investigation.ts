@@ -19,7 +19,7 @@ const tool = defineTool({
       ? "not-applicable"
       : { reason: "Scheduled support root only.", type: "denied" },
   description:
-    "Open the case and check Intercom plus its linked Linear tickets. Start with open and stop when investigate is false. Track an evidence-matched existing issue with track-issue. Use finish-quietly for checked follow-up changes needing no message, or finish for an actionable internal report; both require the latest revision. Rechecks both sources before delivery to the original notification thread.",
+    "Open the case and check Intercom plus its linked Linear tickets. Start with open and stop when investigate is false. Track an evidence-matched existing issue with track-issue. Use finish for a short initial Slack summary even when nothing was actioned. On later follow-ups, use finish-quietly for checked changes needing no message, or finish for an actionable internal report; both require the latest revision. Rechecks both sources before delivery to the original notification thread.",
   async execute(input, ctx) {
     try {
       if (input.action === "track-issue") {

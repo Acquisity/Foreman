@@ -16,8 +16,10 @@ import {
 } from "../agent/lib/support/errors.js";
 import {
   currentCase,
+  finishSupportInvestigation,
   finishSupportQuietly,
   openSupportInvestigation,
+  skipHandledSupport,
 } from "../agent/lib/support/investigation.js";
 import {
   readLinearFollowup,
@@ -320,6 +322,8 @@ try {
   );
 
   const urls: string[] = [];
+  const slackPosts: string[] = [];
+  process.env.VERCEL_OIDC_TOKEN = `test.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.test`;
   const intercom = {
     conversation_parts: { conversation_parts: [], total_count: 0 },
     created_at: 1,
@@ -339,6 +343,24 @@ try {
   const comments = [{ body: "Investigating the issue", id: "comment-test" }];
   globalThis.fetch = (url, init) => {
     urls.push(String(url));
+    if (String(url).startsWith("https://api.vercel.com/v1/connect/token/")) {
+      return Promise.resolve(
+        Response.json({
+          expiresAt: Date.now() + 3_600_000,
+          token: "synthetic-slack-test",
+        })
+      );
+    }
+    if (String(url) === "https://slack.com/api/chat.postMessage") {
+      const body = new URLSearchParams(String(init?.body));
+      slackPosts.push(body.get("text") ?? "");
+      return Promise.resolve(
+        Response.json({
+          ok: true,
+          ts: `1788959999.${String(100 + slackPosts.length).padStart(6, "0")}`,
+        })
+      );
+    }
     const rpc = JSON.parse(String(init?.body));
     const code = String(rpc.params?.arguments?.code ?? "");
     if (rpc.method === "initialize" && wireFailure === "initialize") {
@@ -677,16 +699,17 @@ try {
       unfinishedContext
     ),
     {
-      reason: "Cannot skip an unhandled or changed customer request.",
+      reason:
+        "The initial intake must post a concise Slack summary even when nothing was actioned. Use finish with a brief report explaining what was checked, the outcome and why no action was needed.",
       refused: true,
     }
   );
-  const callsBeforeCompletion = urls.length;
+  const postsBeforeCompletion = slackPosts.length;
   await completeTurn(unfinishedContext);
   assert.equal(
-    urls.length,
-    callsBeforeCompletion,
-    "A completed refusal posts no generic failure status"
+    slackPosts.length,
+    postsBeforeCompletion + 1,
+    "An unfinished initial intake posts one short incomplete status"
   );
   assert.equal(await findSupportLease(unfinished), null);
   const unfinishedState = await pool.query(
@@ -757,11 +780,111 @@ try {
     { closed: true, delivery_attempted: false },
     "A legacy completed delivery with no outbox can still close"
   );
+  await discoverHandoff("999004", "1788959999.000014");
+  const [initial] = await claimHandoffs("intake", ["999004"]);
+  assert.ok(initial);
+  intercom.id = initial.conversation;
+  intercom.state = "open";
+  Object.assign(intercom.conversation_parts, {
+    conversation_parts: [
+      {
+        author: { type: "admin" },
+        body: "Handled; no additional action needed.",
+        created_at: 3,
+        id: "human",
+        part_type: "comment",
+      },
+    ],
+    total_count: 1,
+  });
+  const initialAuth = supportAuth(auth, initial);
+  const initialContext = {
+    ...ctx,
+    session: {
+      ...ctx.session,
+      auth: { current: initialAuth, initiator: initialAuth },
+    },
+  } as ProviderContext;
+  const observed = await currentCase(
+    initialContext,
+    initial,
+    await requireSupportLease(initial)
+  );
+  await setSupportVersion(initial, observed.version, observed.linear.snapshot);
+  await assert.rejects(
+    () => skipHandledSupport(initialContext),
+    SupportRefusal
+  );
+  const beforeInitial = slackPosts.length;
+  await finishSupportInvestigation(
+    initialContext,
+    {
+      alreadyTried: "Read Intercom and ENG-13602.",
+      findings: "The teammate already verified the workaround in ENG-13602.",
+      issue: "Customer handoff",
+      nextStep: "No additional action needed.",
+      retry: false,
+    },
+    observed.revision
+  );
+  assert.equal(
+    slackPosts.length,
+    beforeInitial + 1,
+    "Human-handled initial intake still posts a summary"
+  );
+  assert.ok(
+    slackPosts
+      .at(-1)
+      ?.includes("<https://linear.app/acquisity/issue/ENG-13602|ENG-13602>")
+  );
+  await pool.query(
+    "UPDATE support_handoffs SET next_check=now() WHERE conversation=$1",
+    [initial.conversation]
+  );
+  const [followup] = await claimHandoffs("followups", [initial.conversation]);
+  assert.ok(followup);
+  const followupAuth = supportAuth(auth, followup);
+  await openSupportInvestigation({
+    ...ctx,
+    session: {
+      ...ctx.session,
+      auth: { current: followupAuth, initiator: followupAuth },
+    },
+  } as ProviderContext);
+  assert.equal(
+    slackPosts.length,
+    beforeInitial + 1,
+    "Unchanged later follow-up remains quiet"
+  );
+  for (const [id, state, thread] of [
+    ["999005", "closed", "1788959999.000015"],
+    ["999006", "snoozed", "1788959999.000016"],
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each fixture exercises a complete sequential intake.
+    await discoverHandoff(id, thread);
+    const [first] = await claimHandoffs("intake", [id]);
+    assert.ok(first);
+    intercom.id = id;
+    intercom.state = state;
+    const firstAuth = supportAuth(auth, first);
+    const before = slackPosts.length;
+    await openSupportInvestigation({
+      ...ctx,
+      session: {
+        ...ctx.session,
+        auth: { current: firstAuth, initiator: firstAuth },
+      },
+    } as ProviderContext);
+    assert.equal(slackPosts.length, before + 1);
+    assert.ok(slackPosts.at(-1)?.includes("No action taken."));
+  }
   assert.ok(
     urls.every(
       (url) =>
         url ===
-        "https://executor.acquisity.ai/mcp/toolkits/foreman-support?artifacts=false"
+          "https://executor.acquisity.ai/mcp/toolkits/foreman-support?artifacts=false" ||
+        url === "https://slack.com/api/chat.postMessage" ||
+        url.startsWith("https://api.vercel.com/v1/connect/token/")
     )
   );
   console.log(

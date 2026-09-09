@@ -1,5 +1,6 @@
 import { defineAgent, defineDynamic } from "eve";
 import { resolveModel } from "./lib/models.js";
+import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 
 // Root agent runtime configuration: the model for Foreman, Acquisity's
 // general-purpose agent; the rest of the surface (channels, connections,
@@ -21,7 +22,8 @@ export default defineAgent({
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "session.started": () => resolveModel("orchestrator"),
+      "session.started": async () =>
+        ticketLinkedModel(await resolveModel("orchestrator")),
     },
   }),
 });

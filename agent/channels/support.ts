@@ -28,13 +28,18 @@ export default defineChannel({
     },
     async "turn.completed"(_event, _channel, ctx) {
       const claim = claimFromContext(ctx);
-      // Completion is not evidence of an infrastructure failure. Retry unfinished work quietly.
+      // An unfinished initial intake still needs a short Slack status; later follow-ups stay quiet.
       // Pending outboxes retain their lease and marker for delivery reconciliation.
       if (claim) {
         await findSupportLease(claim)
-          .then((row) =>
-            row && !row.report ? settleSupport(claim) : undefined
-          )
+          .then(async (row) => {
+            if (!row || row.report) {
+              return;
+            }
+            await (row.processed_version
+              ? settleSupport(claim)
+              : reportSupportFailureForClaim(claim));
+          })
           .catch(() => undefined);
       }
     },

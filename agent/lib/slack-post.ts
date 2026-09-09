@@ -1,3 +1,5 @@
+import { linkTickets } from "./ticket-links.js";
+
 /**
  * Slack rejects a `markdown_text` field over 12,000 characters, and eve
  * swallows an event-handler throw, so one oversized or rejected post used
@@ -37,6 +39,16 @@ export const splitSlackReply = (
       cut = line + 1;
     } else if (cut > 1 && isSurrogatePairAt(rest, cut)) {
       cut -= 1;
+    }
+    // Do not split a complete Markdown link across Slack posts.
+    for (const match of rest.matchAll(/\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g)) {
+      if (match.index >= cut) {
+        break;
+      }
+      if (match.index + match[0].length > cut && match.index > 0) {
+        cut = match.index;
+        break;
+      }
     }
     chunks.push(rest.slice(0, cut));
     rest = rest.slice(cut);
@@ -99,7 +111,7 @@ export const postSlackReply = async (
   text: string
 ): Promise<void> => {
   try {
-    for (const chunk of splitSlackReply(text)) {
+    for (const chunk of splitSlackReply(linkTickets(text))) {
       // biome-ignore lint/performance/noAwaitInLoops: chunks must post sequentially so the reply arrives in order.
       await post(chunk);
     }
