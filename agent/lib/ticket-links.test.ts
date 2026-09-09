@@ -60,6 +60,19 @@ test("every repeated ticket renders as a Slack link, preserving correct existing
   );
 });
 
+test("existing relative and non-HTTP Markdown links stay intact", () => {
+  for (const target of [
+    "/issue/ENG-13602",
+    "mailto:support@example.com",
+    "#ENG-13602",
+    "",
+  ]) {
+    const existing = `[ENG-13602](${target})`;
+    assert.equal(linkTickets(existing), existing);
+    assert.equal(linkTickets(existing, "slack"), existing);
+  }
+});
+
 test("Slack chunking keeps expanded ticket links intact at the delivery limit", async () => {
   const chunks: string[] = [];
   await postSlackReply(
@@ -80,6 +93,29 @@ test("Slack chunking keeps expanded ticket links intact at the delivery limit", 
       chunk.includes(`[ENG-13257](${ticketUrl("ENG-13257")})`)
     )
   );
+});
+
+test("graceful stream closure retains text without a text-end event", async () => {
+  const model = wrapLanguageModel({
+    middleware: ticketLinkMiddleware,
+    model: new MockLanguageModelV4({
+      doStream: {
+        stream: simulateReadableStream({
+          chunkDelayInMs: null,
+          chunks: [
+            { id: "answer", type: "text-start" },
+            { delta: "See ENG-13602.", id: "answer", type: "text-delta" },
+          ],
+          initialDelayInMs: null,
+        }),
+      },
+    }),
+  });
+  const result = await model.doStream({ prompt: [] });
+  assert.deepEqual(await convertReadableStreamToArray(result.stream), [
+    { id: "answer", type: "text-start" },
+    { delta: linkTickets("See ENG-13602."), id: "answer", type: "text-delta" },
+  ]);
 });
 
 test("model stream links split tokens before eve HTTP, Slack, Linear and GitHub delivery", async () => {

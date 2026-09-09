@@ -20,6 +20,18 @@ export const ticketLinkMiddleware: LanguageModelMiddleware = {
       ...result,
       stream: result.stream.pipeThrough(
         new TransformStream({
+          flush(controller) {
+            for (const [id, value] of text) {
+              if (value) {
+                controller.enqueue({
+                  delta: linkTickets(value),
+                  id,
+                  type: "text-delta",
+                });
+              }
+            }
+            text.clear();
+          },
           transform(part, controller) {
             if (part.type === "text-start") {
               text.set(part.id, "");

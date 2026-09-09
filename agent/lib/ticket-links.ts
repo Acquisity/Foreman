@@ -4,7 +4,7 @@ export const ticketUrl = (id: string) =>
 
 const TICKET = /(?<![\w/-])ENG-[1-9]\d*(?![\w/-])/g;
 const TOKEN =
-  /```[\s\S]*?```|`[^`\n]+`|\[[^\]\n]*\]\(<?https?:\/\/[^\s)>]+>?\)|<https?:\/\/[^>\n]+>|https?:\/\/[^\s<>]+/g;
+  /```[\s\S]*?```|`[^`\n]+`|\[[^\]\n]*\]\(<?[^\s)>]*>?\)|<https?:\/\/[^>\n]+>|https?:\/\/[^\s<>]+/g;
 const MARKDOWN_LINK = /^\[([^\]\n]*)\]\(<?(https?:\/\/[^\s)>]+)>?\)$/;
 const SLACK_LINK = /^<(https?:\/\/[^|>]+)\|([^>]+)>$/;
 const CODE_TICKET = /^`ENG-[1-9]\d*`$/;
