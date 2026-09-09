@@ -17,6 +17,7 @@ import {
   readLinearFollowup,
   recoverSupportIssues,
 } from "../agent/lib/support/linear-followup.js";
+import { readSupportIntake } from "../agent/lib/support/slack.js";
 import {
   attemptSupportDelivery,
   claimHandoffs,
@@ -111,10 +112,90 @@ try {
       "utf8"
     )
   );
-  assert.equal(await supportCursor("1788959000.000000"), "1788959000.000000");
-  await saveSupportCursor("1788959001.000001");
-  await saveSupportCursor("1788959000.000000");
-  assert.equal(await supportCursor("1788950000.000000"), "1788959001.000001");
+  await psql(
+    await readFile(
+      new URL("../migrations/0006_support_intake_scan.sql", import.meta.url),
+      "utf8"
+    )
+  );
+  const initialCursor = await supportCursor("1788959000.000000");
+  const history = Array.from({ length: 1105 }, (_, index) => ({
+    ts: `1788959001.${String(index).padStart(6, "0")}`,
+  })).reverse();
+  const historyRequest: NonNullable<Parameters<typeof readSupportIntake>[1]> = (
+    _operation,
+    input
+  ) => {
+    const remaining = history.filter(
+      (message) =>
+        Number(message.ts) > Number(input.oldest) &&
+        (!input.latest || Number(message.ts) < Number(input.latest))
+    );
+    return Promise.resolve({
+      has_more: remaining.length > 100,
+      messages: remaining.slice(0, 100),
+      ok: true,
+    });
+  };
+  const firstBatch = await readSupportIntake(initialCursor, historyRequest);
+  assert.equal(
+    await saveSupportCursor(initialCursor, {
+      ...initialCursor,
+      oldest: "1788950000.000000",
+    }),
+    false,
+    "Even a current checkpoint cannot regress the watermark"
+  );
+  assert.equal(firstBatch.messages.length, 1000);
+  assert.equal(
+    firstBatch.checkpoint.oldest,
+    initialCursor.oldest,
+    "An incomplete scan must not skip its older gap"
+  );
+  assert.equal(
+    await saveSupportCursor(initialCursor, firstBatch.checkpoint),
+    true
+  );
+  assert.equal(
+    await saveSupportCursor(initialCursor, {
+      oldest: "1788959999.000000",
+      scan_latest: null,
+      scan_newest: null,
+    }),
+    false,
+    "Overlapping stale scans cannot skip or regress the checkpoint"
+  );
+  history.unshift({ ts: "1788959002.000000" });
+  const resumedCursor = await supportCursor("1788950000.000000");
+  const secondBatch = await readSupportIntake(resumedCursor, historyRequest);
+  assert.equal(secondBatch.messages.length, 105);
+  assert.equal(secondBatch.checkpoint.oldest, "1788959001.001104");
+  assert.equal(secondBatch.checkpoint.scan_latest, null);
+  assert.equal(
+    new Set(
+      [...firstBatch.messages, ...secondBatch.messages].map(
+        (message) => message.ts
+      )
+    ).size,
+    1105
+  );
+  assert.equal(
+    await saveSupportCursor(resumedCursor, secondBatch.checkpoint),
+    true
+  );
+  assert.equal(
+    await saveSupportCursor(initialCursor, firstBatch.checkpoint),
+    false
+  );
+  const thirdBatch = await readSupportIntake(
+    await supportCursor(initialCursor.oldest),
+    historyRequest
+  );
+  assert.deepEqual(
+    thirdBatch.messages,
+    [{ ts: "1788959002.000000" }],
+    "New arrivals above the frozen frontier wait for the next completed scan"
+  );
   await Promise.all(
     Array.from({ length: 8 }, () =>
       discoverHandoff("123456", "1788959233.418909")

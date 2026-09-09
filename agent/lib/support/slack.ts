@@ -2,6 +2,7 @@ import { connectSlackCredentials } from "@vercel/connect/eve";
 import { resolveSlackBotToken } from "eve/channels/slack";
 import { z } from "zod";
 import { SUPPORT_CHANNEL, slackTimestamp } from "./config.js";
+import type { SupportCursor } from "./store.js";
 
 const responseSchema = z.object({ ok: z.literal(true) }).passthrough();
 const messageSchema = z.object({
@@ -86,6 +87,68 @@ export async function readSupportMessages(
   throw new Error(
     "Support Slack history is incomplete; the cursor was not advanced."
   );
+}
+
+/** History is newest-first. Timestamp bounds survive between cron runs. */
+export async function readSupportIntake(
+  checkpoint: SupportCursor,
+  request = slackRequest
+): Promise<{ messages: SupportSlackMessage[]; checkpoint: SupportCursor }> {
+  const messages: SupportSlackMessage[] = [];
+  const oldest = slackTimestamp.parse(checkpoint.oldest);
+  let latest = checkpoint.scan_latest;
+  let newest = checkpoint.scan_newest ?? oldest;
+  for (let page = 0; page < 10; page += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: each exclusive upper bound follows the previous page.
+    const response = await request("conversations.history", {
+      oldest,
+      ...(latest ? { latest: slackTimestamp.parse(latest) } : {}),
+      include_all_metadata: "true",
+      inclusive: "false",
+      limit: "100",
+    });
+    const batch = z.array(messageSchema).parse(response.messages);
+    const more = Boolean(
+      response.has_more ||
+        z
+          .object({ next_cursor: z.string().optional() })
+          .optional()
+          .parse(response.response_metadata)?.next_cursor
+    );
+    if (
+      batch.some(
+        (message) =>
+          Number(message.ts) <= Number(oldest) ||
+          (latest !== null && Number(message.ts) >= Number(latest))
+      )
+    ) {
+      throw new Error("Support Slack history did not respect its scan bounds.");
+    }
+    messages.push(...batch);
+    newest = batch.reduce(
+      (value, message) =>
+        Number(message.ts) > Number(value) ? message.ts : value,
+      newest
+    );
+    if (!more) {
+      return {
+        checkpoint: { oldest: newest, scan_latest: null, scan_newest: null },
+        messages,
+      };
+    }
+    if (!batch.length) {
+      throw new Error("Support Slack history could not advance its scan.");
+    }
+    latest = batch.reduce(
+      (value, message) =>
+        Number(message.ts) < Number(value) ? message.ts : value,
+      batch[0].ts
+    );
+  }
+  return {
+    checkpoint: { oldest, scan_latest: latest, scan_newest: newest },
+    messages,
+  };
 }
 
 export async function postSupportMessage(

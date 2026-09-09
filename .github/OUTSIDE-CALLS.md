@@ -46,7 +46,7 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | Call | Bound | Notes |
 | --- | --- | --- |
 | `agent/lib/support/store.ts` | 15s per query | Private operational tables, atomic leases and write journal. No customer database or investigation-memory reads. |
-| `agent/lib/support/slack.ts` | 20s per HTTP request; at most 10 history pages | Fixed Slack channel and methods. A partial scan never advances the cursor. Slack token resolution uses the Connect exemption below. |
+| `agent/lib/support/slack.ts` | 20s per HTTP request; at most 10 history pages per tick | Fixed Slack channel and methods. Intake checkpoints descending timestamp bounds after discoveries, advancing the oldest watermark only when the gap is complete. Thread reconciliation requires a complete bounded scan. Slack token resolution uses the Connect exemption below. |
 | `agent/lib/executor/dispatch.ts`, `agent/lib/executor/transport.ts` | 50s after authorization | Support operations and schema discovery reuse the existing bounded Executor transport. Lease is checked before dispatch. |
 
 ## Sandbox commands

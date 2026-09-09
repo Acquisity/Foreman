@@ -37,20 +37,45 @@ function query(text: string, values: unknown[] = []) {
   return privateDatabase().query(text, values);
 }
 
-export async function supportCursor(since: string): Promise<string> {
+const cursorSchema = z.object({
+  oldest: slackTimestamp,
+  scan_latest: slackTimestamp.nullable(),
+  scan_newest: slackTimestamp.nullable(),
+});
+export type SupportCursor = z.infer<typeof cursorSchema>;
+
+export async function supportCursor(since: string): Promise<SupportCursor> {
   await query(
     "INSERT INTO support_cursor(id, oldest) VALUES (true, $1) ON CONFLICT DO NOTHING",
     [since]
   );
-  const rows = await query("SELECT oldest FROM support_cursor WHERE id = true");
-  return slackTimestamp.parse(rows[0]?.oldest);
+  const rows = await query(
+    "SELECT oldest, scan_latest, scan_newest FROM support_cursor WHERE id = true"
+  );
+  return cursorSchema.parse(rows[0]);
 }
 
-export async function saveSupportCursor(oldest: string) {
-  await query(
-    "UPDATE support_cursor SET oldest = GREATEST(oldest::numeric, $1::numeric)::text WHERE id = true",
-    [oldest]
+export async function saveSupportCursor(
+  previous: SupportCursor,
+  next: SupportCursor
+) {
+  const before = cursorSchema.parse(previous);
+  const after = cursorSchema.parse(next);
+  const rows = await query(
+    `UPDATE support_cursor SET oldest=$4, scan_latest=$5, scan_newest=$6
+     WHERE id=true AND oldest=$1 AND scan_latest IS NOT DISTINCT FROM $2::text
+       AND scan_newest IS NOT DISTINCT FROM $3::text
+       AND $4::numeric >= oldest::numeric RETURNING id`,
+    [
+      before.oldest,
+      before.scan_latest,
+      before.scan_newest,
+      after.oldest,
+      after.scan_latest,
+      after.scan_newest,
+    ]
   );
+  return rows.length === 1;
 }
 
 export async function discoverHandoff(conversation: string, thread: string) {

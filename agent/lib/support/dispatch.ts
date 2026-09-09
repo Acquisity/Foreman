@@ -6,7 +6,7 @@ import {
   supportScheduleEnabled,
 } from "./config.js";
 import { notificationConversation } from "./conversation.js";
-import { readSupportMessages } from "./slack.js";
+import { readSupportIntake } from "./slack.js";
 import {
   claimHandoffs,
   discoverHandoff,
@@ -29,10 +29,10 @@ export async function runSupportSchedule(
   }
   if (mode === "intake") {
     const initial = `${Math.floor(Date.parse(config.since) / 1000)}.000000`;
-    const oldest = await supportCursor(initial);
-    const messages = await readSupportMessages({ oldest });
+    const checkpoint = await supportCursor(initial);
+    const batch = await readSupportIntake(checkpoint);
     // Sequential inserts preserve the watermark on any partial failure.
-    for (const message of messages) {
+    for (const message of batch.messages) {
       const conversation = notificationConversation(message, config.appId);
       if (
         conversation &&
@@ -43,11 +43,7 @@ export async function runSupportSchedule(
         await discoverHandoff(conversation, message.ts);
       }
     }
-    const newest = messages.reduce(
-      (latest, m) => (Number(m.ts) > Number(latest) ? m.ts : latest),
-      oldest
-    );
-    await saveSupportCursor(newest);
+    await saveSupportCursor(checkpoint, batch.checkpoint);
   }
   const claims = await claimHandoffs(mode, config.testConversations);
   await Promise.all(
