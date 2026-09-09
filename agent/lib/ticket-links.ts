@@ -10,10 +10,13 @@ const SLACK_LINK = /^<(https?:\/\/[^|>]+)\|([^>]+)>$/;
 const CODE_TICKET = /^`ENG-[1-9]\d*`$/;
 
 // Find the complete destination instead of treating a URL's first ')' as its end.
-function markdownLinkEnd(text: string, start: number) {
+export function markdownLinkEnd(text: string, start: number) {
   let depth = 1;
   let angle = false;
-  for (let index = start; index < text.length; index += 1) {
+  // Destinations longer than a Slack post stay unconverted; malformed prefixes
+  // must never cause repeated scans of an arbitrarily large remaining reply.
+  const limit = Math.min(text.length, start + 12_000);
+  for (let index = start; index < limit; index += 1) {
     const char = text[index];
     if (char === "\n") {
       break;

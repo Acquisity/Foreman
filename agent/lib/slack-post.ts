@@ -1,4 +1,4 @@
-import { linkTickets } from "./ticket-links.js";
+import { linkTickets, markdownLinkEnd } from "./ticket-links.js";
 
 /**
  * Slack rejects a `markdown_text` field over 12,000 characters, and eve
@@ -28,7 +28,7 @@ export const splitSlackReply = (
     throw new RangeError("limit must be an integer of at least 2");
   }
   const chunks: string[] = [];
-  const links = text.matchAll(/\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g);
+  const links = text.matchAll(/\[[^\]\n]*\]\(/g);
   let link = links.next().value;
   let offset = 0;
   let rest = text;
@@ -46,7 +46,8 @@ export const splitSlackReply = (
     }
     // Do not split a complete Markdown link across Slack posts.
     while (link && link.index < offset + cut) {
-      if (link.index + link[0].length > offset + cut && link.index > offset) {
+      const end = markdownLinkEnd(text, link.index + link[0].length);
+      if (end > offset + cut && link.index > offset) {
         cut = link.index - offset;
         break;
       }

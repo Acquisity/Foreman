@@ -95,6 +95,23 @@ test("over-limit links are hard-cut while retaining all text and the post limit"
   assert.ok(chunks.every((chunk) => chunk.length <= 100));
 });
 
+test("chunk boundaries preserve the full closing delimiter of nested links", () => {
+  const link = "[a](https://example.com/(x_(y)))";
+  const prefix = "z".repeat(100 - link.length + 1);
+  assert.deepEqual(splitSlackReply(`${prefix}${link} tail`, 100), [
+    prefix,
+    `${link} tail`,
+  ]);
+});
+
+test("malformed same-line link prefixes leave later prose ticket references linkable", () => {
+  const prefix = "[label](".repeat(2000);
+  assert.equal(
+    linkTickets(`${prefix} ENG-13602`),
+    `${prefix} ${linkTickets("ENG-13602")}`
+  );
+});
+
 test("Slack chunking keeps expanded ticket links intact at the delivery limit", async () => {
   const chunks: string[] = [];
   await postSlackReply(
