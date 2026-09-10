@@ -21,13 +21,15 @@ import {
 } from "./store.js";
 
 export const supportReport = z.object({
-  alreadyTried: z.string().min(1).max(500),
-  draftReply: z.string().max(700).optional(),
-  findings: z.string().min(1).max(1200),
-  issue: z.string().min(1).max(500),
-  missingInformation: z.string().max(500).optional(),
-  nextStep: z.string().min(1).max(500),
   retry: z.boolean().default(false),
+  summary: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1200)
+    .describe(
+      "Slack-ready summary: outcome, key impact, next action and owner, then relevant Linear links. Aim for 80–120 words in a few short paragraphs. No investigation log or customer draft."
+    ),
 });
 
 export async function currentConversation(
@@ -266,20 +268,7 @@ export async function finishSupportInvestigation(
     );
   }
   await setSupportVersion(claim, current.version, current.linear.snapshot);
-  const text = [
-    `Issue: ${report.issue}`,
-    `Already tried: ${report.alreadyTried}`,
-    `Findings: ${report.findings}`,
-    `Next step: ${report.nextStep}`,
-    report.missingInformation
-      ? `Missing information: ${report.missingInformation}`
-      : "",
-    report.draftReply
-      ? `Draft customer reply (not sent): ${report.draftReply}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const text = report.summary;
   const hash = createHash("sha256").update(text).digest("hex");
   if (hash === row.last_report_hash) {
     await settleSupport(claim, { processed: !report.retry });
