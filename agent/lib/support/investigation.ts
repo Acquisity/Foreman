@@ -19,6 +19,7 @@ import {
   settleSupport,
   supportOperations,
 } from "./store.js";
+import { requireCompletedSupportTriage } from "./triage-completion.js";
 
 export const supportReport = z.object({
   alreadyTried: z.string().min(1).max(500),
@@ -222,15 +223,22 @@ export async function finishSupportInvestigation(
     };
   }
   const report = supportReport.parse(input);
+  if (report.retry && !report.missingInformation?.trim()) {
+    throw new SupportRefusal(
+      "A retry report must name the specific blocker in missingInformation."
+    );
+  }
+  const operations = await supportOperations(row);
   if (
     !report.retry &&
-    (await supportOperations(row)).some(
-      (operation) => operation.state !== "done"
-    )
+    operations.some((operation) => operation.state !== "done")
   ) {
     throw new SupportRefusal(
       "A Linear write still needs retry or reconciliation. Do not mark this investigation complete."
     );
+  }
+  if (!report.retry) {
+    await requireCompletedSupportTriage(ctx, operations);
   }
   await setSupportVersion(claim, current.version, current.linear.snapshot);
   const text = [
@@ -274,6 +282,13 @@ export async function skipHandledSupport(ctx: ProviderContext) {
       "Cannot skip an unhandled or changed customer request."
     );
   }
+  const operations = await supportOperations(row);
+  if (operations.some((operation) => operation.state !== "done")) {
+    throw new SupportRefusal(
+      "A Linear write still needs retry or reconciliation."
+    );
+  }
+  await requireCompletedSupportTriage(ctx, operations);
   await settleSupport(claim, { closed: current.closed, processed: true });
   return {
     posted: false,
@@ -309,6 +324,7 @@ export async function finishSupportQuietly(
       revision: current.revision,
     };
   }
+  await requireCompletedSupportTriage(ctx, await supportOperations(row));
   await setSupportVersion(claim, current.version, current.linear.snapshot);
   await settleSupport(claim, { closed: current.closed, processed: true });
   return {

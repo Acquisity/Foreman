@@ -97,7 +97,7 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
-Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. It runs Stages 5 to 7 unchanged: the incident hotlane, exactly one critic pass, the document, comment, project, roster, the ticket's one `route_ticket` call, `engineering-handoff` for the master, and the memory record. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
+Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. Run Stages 5 to 7 in schedules too: the incident hotlane, exactly one critic pass, the document, comment, project, roster, the ticket's one `route_ticket` call, `engineering-handoff` for the master, and the memory record. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
 
 ## Step 7: Decide whether a follow-up is warranted
 

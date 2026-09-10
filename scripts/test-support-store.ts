@@ -329,14 +329,29 @@ try {
     updated_at: 2,
   };
   const issue = {
+    assignee: "Engineer A",
     description: "Investigating",
+    documents: [{ id: "triage-document", title: "Triage investigation" }],
     id: "ENG-TEST",
+    labels: ["Bug", "intercom-sourced", "Customer reported"],
+    parentId: "ENG-MASTER",
+    priority: { value: 2 },
+    project: "Core Platform",
     status: "In Progress",
+  };
+  const triageDocument = {
+    content: `**Classification**: Bug\n**Review**: Approved 2026-09-10T12:00:00Z at ${"a".repeat(40)}`,
+    url: "https://linear.app/acquisity/document/triage-test",
   };
   let incompleteComments = false;
   let wireFailure: "initialize" | "response" | null = null;
   let writeDispatches = 0;
-  const comments = [{ body: "Investigating the issue", id: "comment-test" }];
+  const comments = [
+    {
+      body: `Investigating the issue. ${triageDocument.url}`,
+      id: "comment-test",
+    },
+  ];
   globalThis.fetch = (url, init) => {
     urls.push(String(url));
     const rpc = JSON.parse(String(init?.body));
@@ -355,6 +370,10 @@ try {
       data = intercom;
     } else if (code.includes("get_issue")) {
       data = issue;
+    } else if (code.includes("get_document")) {
+      data = {
+        content: [{ text: JSON.stringify(triageDocument), type: "text" }],
+      };
     } else if (code.includes("list_comments")) {
       data = { comments, hasNextPage: incompleteComments };
     }
