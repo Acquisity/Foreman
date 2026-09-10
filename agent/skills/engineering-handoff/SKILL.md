@@ -44,6 +44,8 @@ Search on four axes: the cause, the Stage 4 code path, the provider failure, and
 
 The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. It narrows the candidate set only in that workflow. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
 
+A completed candidate needs the same cause and eligibility checks. Read its fix and deployment evidence against the current failure: Done alone proves neither that this customer is fixed nor that reopening is warranted. Reuse it only when it still owns this cause; otherwise relate it for history and create a master only for the distinct, proven actionable cause. If the deciding evidence is unavailable, record the precise blocker under the existing triage branch. The scheduled Slack recipient does not decide this in place of Foreman. `track-issue` only watches progress; apply and read back the actual Linear relation.
+
 ## Reuse an existing master
 
 If an eligible master already owns the cause:
