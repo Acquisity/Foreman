@@ -36,7 +36,7 @@ export const supportReport = z.object({
     .min(1)
     .max(1200)
     .describe(
-      "Slack-ready summary: outcome, key impact, next action and owner, then relevant Linear links. Aim for 80–120 words in a few short paragraphs. No investigation log or customer draft."
+      "Slack-ready summary: outcome, key impact, next action and owner, then relevant Linear links. Aim for 80–120 words in short paragraphs separated by a blank line; put the next action and owner in their own paragraph. No investigation log or customer draft."
     ),
 });
 
@@ -225,7 +225,7 @@ export async function deliverSupportReport(
   }
   const text =
     current.humanReplied || current.humanTookOwnership
-      ? `Internal context; a teammate has replied or taken ownership.\n${row.report}`
+      ? `Internal context; a teammate has replied or taken ownership.\n\n${row.report}`
       : row.report;
   if (!(await reserveDelivery(claim))) {
     return reconcileSupportDelivery(claim);
