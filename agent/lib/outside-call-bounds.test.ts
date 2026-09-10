@@ -114,7 +114,7 @@ describe("authored outside calls stay bounded", () => {
       const mutated = source.replace(mutation.remove, mutation.into);
       const { violations } = inspect(mutation.file, mutated);
       assert.equal(violations.length, 1, JSON.stringify(violations));
-      assert.match(violations[0]?.rule ?? "", mutation.rule);
+      assert.match(violations[0].rule, mutation.rule);
     });
   }
 });

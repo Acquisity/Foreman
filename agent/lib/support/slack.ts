@@ -1,6 +1,7 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
 import { resolveSlackBotToken } from "eve/channels/slack";
 import { z } from "zod";
+import { linkTickets } from "../ticket-links.js";
 import { SUPPORT_CHANNEL, slackTimestamp } from "./config.js";
 import type { SupportCursor } from "./store.js";
 
@@ -154,15 +155,16 @@ export async function readSupportIntake(
 export async function postSupportMessage(
   thread: string,
   text: string,
-  key: string
+  key: string,
+  request: typeof slackRequest = slackRequest
 ) {
-  const response = await slackRequest("chat.postMessage", {
+  const response = await request("chat.postMessage", {
     client_msg_id: key,
     metadata: JSON.stringify({
       event_payload: { key },
       event_type: "foreman_support",
     }),
-    text,
+    text: linkTickets(text, "slack"),
     thread_ts: slackTimestamp.parse(thread),
     unfurl_links: "false",
     unfurl_media: "false",

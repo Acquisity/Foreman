@@ -112,7 +112,7 @@ test("Intercom non-Bug outcomes end in the skill without the shared stages", () 
   );
   assert.ok(
     productSkill.includes(
-      "the one `triage-handling` Stage 7 calls for on a Bug included"
+      "Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7."
     )
   );
 });
@@ -148,6 +148,24 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
   assert.ok(productSkill.includes(linkAttachment));
   assert.ok(productSkill.includes("never the shared root-cause master"));
   assert.ok(billingSkill.includes(linkAttachment));
+});
+
+test("Intercom ticket-link follow-ups stop before the investigation reply format", () => {
+  const step = productSkill.indexOf("## Step 9: Reply in Slack");
+  const exception = productSkill.indexOf(
+    "For ticket-link follow-ups, return the known link and stop. Skip investigation and the format below.",
+    step
+  );
+  const ordinaryReply = productSkill.indexOf("Reply for every outcome", step);
+  const customerReply = productSkill.indexOf(
+    'Then add a short block headed "Reply you can send"',
+    step
+  );
+
+  assert.ok(step >= 0);
+  assert.ok(exception > step);
+  assert.ok(ordinaryReply > exception);
+  assert.ok(customerReply > ordinaryReply);
 });
 
 test("Intercom skills close with a customer-ready reply and the identifier", () => {

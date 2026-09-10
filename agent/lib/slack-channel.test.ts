@@ -350,7 +350,7 @@ describe("slack channel", () => {
       inboundContext(undefined),
       message("stop the deploy")
     );
-    assert.ok(result && "auth" in result && result.auth);
+    assert.ok(result?.auth);
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 

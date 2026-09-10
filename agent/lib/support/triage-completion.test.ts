@@ -490,6 +490,7 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
   };
   const handled = await currentCase(context, claim, row);
   row.version = handled.version;
+  row.processed_version = "prior-version";
   writes.length = 0;
   await assert.rejects(skipHandledSupport(context), SupportRefusal);
   assert.equal(

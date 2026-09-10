@@ -29,7 +29,6 @@ const INTERCOM_INTAKE_WORKFLOW: SlackIntakeWorkflow = {
     "intercom-triage-investigate",
     "intercom-billing-triage",
     "clarify-with-requester",
-    "slack-wording",
   ],
 };
 
@@ -99,7 +98,7 @@ const intercomIssueTask = (skills: readonly string[]): string =>
     "Require exactly one live Intercom conversation URL or reference from the Slack request and treat that conversation as the source. No Linear issue is expected at the start. If the conversation reference is missing or ambiguous, ask for it, then stop.",
     "Classify the predominant ask as product/feedback or billing. Both lanes are valid in this channel: follow the matching Intercom skill without redirecting the requester to another Slack channel.",
     "Investigate before creating Linear work. Non-bug product findings do not create engineering work. Confirmed bugs and actionable billing findings create the records and investigation documents required by their loaded procedures, retaining the Intercom conversation URL and bounded context.",
-    "Answer in the Slack thread using slack-wording only after the required Linear operations, honoring the final-post rule above, then stop before implementation.",
+    "Answer in the Slack thread only after the required Linear operations, honoring the final-post rule above, then stop before implementation.",
   ].join("\n\n");
 
 const existingIssueTask = (skills: readonly string[]): string =>
@@ -107,13 +106,20 @@ const existingIssueTask = (skills: readonly string[]): string =>
     `Use the existing-issue Linear workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
     "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures.",
     "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, ask the requester for its Linear link or identifier, then stop.",
-    "Answer in the Slack thread using slack-wording, honoring the final-post rule above, then stop.",
+    "Answer in the Slack thread, honoring the final-post rule above and the channel scope of any loaded wording skill, then stop.",
   ].join("\n\n");
 
 export function resolveSlackIntakeWorkflow(
   channelId: string
 ): SlackIntakeWorkflow | undefined {
-  return SLACK_INTAKE_WORKFLOWS[channelId];
+  const workflow = SLACK_INTAKE_WORKFLOWS[channelId];
+  if (!workflow || channelId === "C0BBPVC3N2X" || channelId === "C0BC011NAQL") {
+    return workflow;
+  }
+  return {
+    ...workflow,
+    skills: workflow.skills.filter((skill) => skill !== "slack-wording"),
+  };
 }
 
 /**

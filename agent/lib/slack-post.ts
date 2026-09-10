@@ -1,3 +1,5 @@
+import { linkTickets, markdownLinkEnd } from "./ticket-links.js";
+
 /**
  * Slack rejects a `markdown_text` field over 12,000 characters, and eve
  * swallows an event-handler throw, so one oversized or rejected post used
@@ -16,6 +18,7 @@ export const SLACK_MARKDOWN_MAX_LENGTH = 12_000;
  * split a UTF-16 surrogate pair backs off one code unit, because the two
  * halves post as separate requests and each lone surrogate would arrive as
  * U+FFFD. Empty input yields no chunks.
+ * Links longer than the per-post limit are hard-cut to preserve that limit.
  */
 export const splitSlackReply = (
   text: string,
@@ -25,6 +28,9 @@ export const splitSlackReply = (
     throw new RangeError("limit must be an integer of at least 2");
   }
   const chunks: string[] = [];
+  const links = text.matchAll(/\[[^\]\n]*\]\(/g);
+  let link = links.next().value;
+  let offset = 0;
   let rest = text;
   while (rest.length > limit) {
     const window = rest.slice(0, limit);
@@ -38,8 +44,18 @@ export const splitSlackReply = (
     } else if (cut > 1 && isSurrogatePairAt(rest, cut)) {
       cut -= 1;
     }
+    // Do not split a complete Markdown link across Slack posts.
+    while (link && link.index < offset + cut) {
+      const end = markdownLinkEnd(text, link.index + link[0].length);
+      if (end > offset + cut && link.index > offset) {
+        cut = link.index - offset;
+        break;
+      }
+      link = links.next().value;
+    }
     chunks.push(rest.slice(0, cut));
     rest = rest.slice(cut);
+    offset += cut;
   }
   if (rest.length > 0) {
     chunks.push(rest);
@@ -99,7 +115,7 @@ export const postSlackReply = async (
   text: string
 ): Promise<void> => {
   try {
-    for (const chunk of splitSlackReply(text)) {
+    for (const chunk of splitSlackReply(linkTickets(text))) {
       // biome-ignore lint/performance/noAwaitInLoops: chunks must post sequentially so the reply arrives in order.
       await post(chunk);
     }

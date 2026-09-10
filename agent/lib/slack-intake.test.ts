@@ -46,7 +46,10 @@ describe("intake-only channels", () => {
   it("maps product triage and its sandbox to the same existing-issue workflow", () => {
     const production = resolveSlackIntakeWorkflow("C0BBPVC3N2X");
     const sandbox = resolveSlackIntakeWorkflow("C0BLFDUN6Q7");
-    assert.deepEqual(production, sandbox);
+    assert.deepEqual(sandbox, {
+      ...production,
+      skills: production?.skills.filter((skill) => skill !== "slack-wording"),
+    });
     assert.equal(production?.mode, "existing-linear-issue");
     assert.deepEqual(production?.skills, [
       "triage-investigate",
@@ -58,7 +61,10 @@ describe("intake-only channels", () => {
   it("maps billing triage and its sandbox to the same workflow", () => {
     const production = resolveSlackIntakeWorkflow("C0BC011NAQL");
     const sandbox = resolveSlackIntakeWorkflow("C0BMXPV6EGJ");
-    assert.deepEqual(production, sandbox);
+    assert.deepEqual(sandbox, {
+      ...production,
+      skills: production?.skills.filter((skill) => skill !== "slack-wording"),
+    });
     assert.equal(production?.mode, "existing-linear-issue");
     assert.deepEqual(production?.skills, [
       "billing-triage",
@@ -76,8 +82,25 @@ describe("intake-only channels", () => {
       "intercom-triage-investigate",
       "intercom-billing-triage",
       "clarify-with-requester",
-      "slack-wording",
     ]);
+  });
+
+  it("requires restricted wording only in the two named intake channels", () => {
+    for (const channelId of ["C0BBPVC3N2X", "C0BC011NAQL"]) {
+      assert.ok(slackIntakeContext(channelId).includes("slack-wording"));
+    }
+    for (const channelId of [
+      "C0BCV1WBR42",
+      "C0BLFDUN6Q7",
+      "C0BMXPV6EGJ",
+      "C0BNCL031AQ",
+      "C0C0DV1AR8T",
+    ]) {
+      assert.equal(
+        slackIntakeContext(channelId).includes("slack-wording"),
+        false
+      );
+    }
   });
 
   it("instructs existing-issue channels not to create duplicates", () => {

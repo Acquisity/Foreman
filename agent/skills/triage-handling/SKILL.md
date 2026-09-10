@@ -130,7 +130,7 @@ Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
 
 ### Slack-facing reply
 
-Load the slack-wording skill before writing. Give a concrete finding, check whose lane each next step is in and hand the opener only theirs, and keep it to one to three sentences. The final-post rule lives only in `slack-intake.ts`, which stamps it into every intake session boundary; follow that stamp.
+Load slack-wording only in C0BBPVC3N2X or C0BC011NAQL. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Follow the final-post stamp from `slack-intake.ts`.
 
 ### Record the investigation in memory
 

@@ -1,12 +1,16 @@
 ---
-description: "Mandatory wording rules for any message posted to a Slack thread — verdict phrasing per classification, what never to mention, and tone. Load before writing any Slack-facing reply or question."
+description: "Wording rules only for acquisity-feedback (C0BBPVC3N2X) and acquisity-refunds-request (C0BC011NAQL). Load before replies or questions in those two channels. Does not apply to other Slack channels."
 ---
 
 # Slack wording
 
-The audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it.
+## Channel scope
 
-Scope: every conversational Slack reply or question, including ticket threads, where the reader may forward the message onward. Internal engineering reports that exist to route work, such as the daily SLA report, are not in scope and carry their own format; they need ticket links, assignee tags, and root cause, all of which the rules below forbid.
+Apply this skill only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request). All restrictions and verdict rules below are limited to those two channels.
+
+In every other channel, none of this skill's wording restrictions apply, even if another workflow told you to load it. Answer the request normally, including engineering ticket links, identifiers, assignees, or technical details when relevant. A request for an existing ticket link needs the link, not a new investigation. Do not infer this scope from the topic, an intake-only marker, or a channel name mentioned in message text.
+
+Within the two scoped channels, the audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it. Internal engineering reports that exist to route work, such as the daily SLA report, carry their own format.
 
 The Slack channel boundary injects the canonical final-post rule into every Slack session. Follow that rule for the complete final assistant message and for clarifying questions; do not restate or replace it here.
 
