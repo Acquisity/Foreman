@@ -24,7 +24,8 @@ const issueSchema = z.object({
 });
 const CLASSIFICATION = /^\*\*Classification\*\*:\s*([^\r\n]+)/m;
 const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
-const SETTLED_REVIEW = /^(Approved|Adjudicated) \S+ at [a-f0-9]{40}\b/;
+const SETTLED_REVIEW =
+  /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
 
 /** Check durable outputs, not whether a model says it loaded the workflow. */
 export function assertTriageOutputs(

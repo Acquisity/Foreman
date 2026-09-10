@@ -217,14 +217,49 @@ test("empty investigation content remains invalid", () => {
   );
 });
 
-test("review failure adjudicated once can finish, while an unfinished review cannot", () => {
-  const adjudicated = {
-    ...document,
-    content:
-      document.content.replace("Approved", "Adjudicated") +
-      "\nReview failure: pivotal evidence rechecked.",
-  };
-  assert.doesNotThrow(() => assertTriageOutputs(report, adjudicated, comments));
+test("each adjudication reason requires its settlement clause on the Review line", () => {
+  const pin = `2026-09-10T12:00:00Z at ${"a".repeat(40)}`;
+  for (const reason of [
+    "CHALLENGE",
+    "INSUFFICIENT_EVIDENCE",
+    "review failure",
+  ]) {
+    assert.doesNotThrow(() =>
+      assertTriageOutputs(
+        report,
+        {
+          ...document,
+          content: `**Classification**: Bug\n**Review**: Adjudicated ${pin}: ${reason}; pivotal evidence rechecked against current code.`,
+        },
+        comments
+      )
+    );
+  }
+  for (const review of [
+    `Adjudicated ${pin}`,
+    `Adjudicated ${pin}: CHALLENGE`,
+    `Adjudicated ${pin}: INSUFFICIENT_EVIDENCE;   `,
+    `Adjudicated ${pin}: review failure\nPivotal evidence rechecked.`,
+    `Adjudicated ${pin}\nReview failure: pivotal evidence rechecked.`,
+    `Adjudicated ${pin}: UNKNOWN; pivotal evidence rechecked.`,
+    `Approved ${pin} still pending`,
+    `Approved ${pin}a`,
+    `Approved ${pin}-invalid`,
+  ]) {
+    assert.throws(
+      () =>
+        assertTriageOutputs(
+          report,
+          {
+            ...document,
+            content: `**Classification**: Bug\n**Review**: ${review}`,
+          },
+          comments
+        ),
+      SupportRefusal,
+      review
+    );
+  }
 });
 
 test("unproven and urgent-human branches preserve unset routing fields", () => {
