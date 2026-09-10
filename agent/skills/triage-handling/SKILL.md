@@ -6,9 +6,9 @@ description: "Use only after triage-investigate explicitly records its Stage 4 c
 
 ## Entry gate
 
-Before this skill was loaded, working context must have contained `STAGE 4 COMPLETE: evidence record ready`. If not, read no references or decide handling; resume unfinished Stage 4. This load does not create the checkpoint.
+Before this skill was loaded, context must hold `STAGE 4 COMPLETE: evidence record ready`. If not, read no references or decide handling; resume unfinished Stage 4. This load does not create the checkpoint.
 
-Duplicates still need handling.
+Scheduled runs and duplicates still need handling.
 
 ## Stage 5: Decide handling
 

@@ -16,7 +16,7 @@ import {
 } from "./store.js";
 
 const PATH = "linear.org.workspaceLinear.";
-async function read(
+export async function readSupportLinear(
   ctx: ProviderContext,
   operation: string,
   input: Record<string, unknown>
@@ -30,7 +30,7 @@ async function read(
 
 export async function readLinkedIssue(ctx: ProviderContext, id: string) {
   return linkedIssue.parse(
-    await read(ctx, "get_issue", {
+    await readSupportLinear(ctx, "get_issue", {
       id,
       includeRelations: true,
       includeReleases: true,
@@ -67,13 +67,13 @@ export function parseLinearCommentPage(result: unknown, cursor?: string) {
   return { comments: data.comments, next: next ?? undefined };
 }
 
-async function readComments(ctx: ProviderContext, id: string) {
+export async function readSupportComments(ctx: ProviderContext, id: string) {
   const comments: unknown[] = [];
   let bytes = 0;
   let cursor: string | undefined;
   for (let page = 0; page < 10; page += 1) {
     // biome-ignore lint/performance/noAwaitInLoops: each cursor depends on the previous page.
-    const result = await read(ctx, "list_comments", {
+    const result = await readSupportLinear(ctx, "list_comments", {
       issueId: id,
       limit: 100,
       orderBy: "updatedAt",
@@ -102,7 +102,7 @@ export async function readLinearFollowup(
   for (const id of [...row.linear_ids].sort()) {
     // biome-ignore lint/performance/noAwaitInLoops: bound provider concurrency for the per-case watch list.
     const issue = await readLinkedIssue(ctx, id);
-    const comments = await readComments(ctx, id);
+    const comments = await readSupportComments(ctx, id);
     snapshot[id] = issueSnapshot(issue, comments);
     if (snapshot[id].fingerprint !== row.linear_processed[id]?.fingerprint) {
       changes.push({

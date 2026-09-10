@@ -95,6 +95,8 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 ### Linked Linear follow-up reads
 
+`agent/lib/support/triage-completion.ts` reads the journaled customer report, its one investigation document and bounded comment history before final completion, through the same support reads. It adds no writes or transport.
+
 `agent/lib/support/linear-followup.ts` uses the existing support provider dispatch and its 50-second Executor deadline per call, including each issue read and comment page. Each case has at most ten tracked issues; each discussion scan stops at ten pages or one MB. The support lease is checked before each provider dispatch. No additional credentials or direct Linear transport are introduced.
 
 `agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.
