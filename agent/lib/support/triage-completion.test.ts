@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { type TestContext, test } from "node:test";
 import { neonConfig } from "@neondatabase/serverless";
+import { ZodError } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
 import { supportAuth } from "./auth.js";
 import { SupportRefusal } from "./errors.js";
@@ -187,6 +188,32 @@ test("missing routing fields, comment and pending review each prevent completion
         comments
       ),
     SupportRefusal
+  );
+});
+
+test("large existing documents validate classification and review beyond the authored write limit", async (t) => {
+  const api = provider(t);
+  const prefix = `${"Investigation evidence. ".repeat(1000)}\n`;
+  assert.ok(prefix.length > 20_000);
+  api.responses.get_document = {
+    ...document,
+    content: prefix + document.content,
+  };
+  await requireCompletedSupportTriage(ctx, operations);
+  api.responses.get_document = {
+    ...document,
+    content: `${prefix}**Classification**: Bug\n**Review**: Pending critic`,
+  };
+  await assert.rejects(
+    requireCompletedSupportTriage(ctx, operations),
+    SupportRefusal
+  );
+});
+
+test("empty investigation content remains invalid", () => {
+  assert.throws(
+    () => assertTriageOutputs(report, { ...document, content: "" }, comments),
+    ZodError
   );
 });
 

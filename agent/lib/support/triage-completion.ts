@@ -10,7 +10,7 @@ import { writtenIssueId } from "./linear-state.js";
 import type { supportOperations } from "./store.js";
 
 const documentSchema = z.object({
-  content: z.string().min(1).max(20_000),
+  content: z.string().min(1),
   url: z.string().min(1),
 });
 const issueSchema = z.object({
