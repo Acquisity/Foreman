@@ -17,9 +17,9 @@ const issueSchema = z.object({
   assignee: z.string().nullish(),
   labels: z.array(z.string()).default([]),
   parentId: z.string().nullish(),
-  priority: z.object({ value: z.number() }).optional(),
+  priority: z.object({ value: z.number() }).nullish(),
   project: z.string().nullish(),
-  relations: z.object({ duplicateOf: z.unknown().optional() }).optional(),
+  relations: z.object({ duplicateOf: z.unknown().optional() }).nullish(),
   status: z.string(),
 });
 const CLASSIFICATION = /^\*\*Classification\*\*:\s*([^\r\n]+)/m;

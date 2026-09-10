@@ -164,6 +164,7 @@ test("missing routing fields, comment and pending review each prevent completion
     { assignee: null },
     { project: null },
     { priority: { value: 0 } },
+    { priority: null },
     { labels: ["intercom-sourced", "Customer reported"] },
     { parentId: null },
     { status: "Triage" },
@@ -263,7 +264,7 @@ test("each adjudication reason requires its settlement clause on the Review line
 });
 
 test("unproven and urgent-human branches preserve unset routing fields", () => {
-  const untouched = { status: "Backlog" };
+  const untouched = { priority: null, relations: null, status: "Backlog" };
   const unproven = {
     ...document,
     content:
@@ -287,6 +288,9 @@ test("unproven and urgent-human branches preserve unset routing fields", () => {
 });
 
 test("non-engineering, duplicate and unknown-ownership branches keep their existing routing", () => {
+  assert.doesNotThrow(() =>
+    assertTriageOutputs({ ...report, relations: null }, document, comments)
+  );
   for (const classification of ["User Error", "Platform Limitation"]) {
     assert.doesNotThrow(() =>
       assertTriageOutputs(
@@ -324,15 +328,13 @@ test("non-engineering, duplicate and unknown-ownership branches keep their exist
   assert.doesNotThrow(() =>
     assertTriageOutputs(duplicate, unreviewed, comments)
   );
-  assert.throws(
-    () =>
-      assertTriageOutputs(
-        { ...duplicate, relations: {} },
-        unreviewed,
-        comments
-      ),
-    SupportRefusal
-  );
+  for (const relations of [{}, null]) {
+    assert.throws(
+      () =>
+        assertTriageOutputs({ ...duplicate, relations }, unreviewed, comments),
+      SupportRefusal
+    );
+  }
 });
 
 test("no customer report and the existing Step 7 Support follow-up do not manufacture Bug work", async (t) => {
