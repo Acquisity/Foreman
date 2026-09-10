@@ -838,11 +838,9 @@ try {
   await finishSupportInvestigation(
     initialContext,
     {
-      alreadyTried: "Read Intercom and ENG-13602.",
-      findings: "The teammate already verified the workaround in ENG-13602.",
-      issue: "Customer handoff",
-      nextStep: "No additional action needed.",
       retry: false,
+      summary:
+        "The teammate already verified the workaround in ENG-13602.\n\nNo additional action needed.",
     },
     observed.revision
   );

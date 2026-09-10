@@ -10,6 +10,12 @@ Schedules are root files discovered at build time. Each supplies a five-field UT
 
 `eve dev` does not run schedules on a clock. Use its one-shot schedule dispatch endpoints for local testing. Production Vercel builds register the cron entries in the Build Output configuration; verify discovery in the deployed project's Cron Jobs view.
 
+## Slack report format
+
+Both support schedules finish with `report.summary`: an outcome-first Slack message targeting 80–120 words, with a 1,200-character schema limit including links. Include the decisive finding and impact when useful, the next action and owner (or why none is needed), and relevant Linear links. Full evidence and useful unsent customer drafts stay in the existing Linear investigation document. Do not create Linear work just to store omitted Slack detail. Work logs, function names, repeated findings and nonblocking missing details do not belong in the summary. The first-intake notification and quiet-follow-up rules are unchanged.
+
+Already queued outbox text retains its original format; the new contract applies to newly generated reports and requires no database migration.
+
 ## Existing access first
 
 Do not rotate keys, request new provider grants, or reduce investigation reads merely because this is a schedule. Reuse each existing restriction and change only a demonstrated gap. On September 9, the read-only `pnpm executor:readiness --live` audit passed for the shared Foreman toolkit. This verifies mounts and toolkit policies, not every upstream credential's effective scopes, the deployed Foreman revision, or scheduled authentication. A metadata/read probe also confirmed Intercom's conversation schema and read the ticket's example conversation, which was closed.

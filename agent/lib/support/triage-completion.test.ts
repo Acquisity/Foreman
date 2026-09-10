@@ -385,20 +385,12 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
     session: { auth: { current: auth, initiator: auth }, id: "triage-test" },
   } as unknown as ProviderContext;
   const input = {
-    alreadyTried: "Investigated",
-    findings: "Confirmed bug; completed master candidate found.",
-    issue: "Product failure",
     missingInformation: "Linear routing is temporarily unavailable.",
-    nextStep: "Aaron can review the blocker; Foreman will resume triage.",
     retry: false,
+    summary:
+      "Confirmed bug; completed master candidate found. Foreman will resume routing when Linear is available; Aaron can review the blocker.",
   };
-  const text = [
-    `Issue: ${input.issue}`,
-    `Already tried: ${input.alreadyTried}`,
-    `Findings: ${input.findings}`,
-    `Next step: ${input.nextStep}`,
-    `Missing information: ${input.missingInformation}`,
-  ].join("\n\n");
+  const text = input.summary;
   const row: SupportRow = {
     conversation: claim.conversation,
     delivery_attempted: false,
