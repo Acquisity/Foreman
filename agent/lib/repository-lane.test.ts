@@ -11,15 +11,14 @@ import {
   loadCompiledDynamicToolResolvers,
   openDynamicToolTurn,
 } from "./eve-dynamic-tools.js";
-import { stampFactoryIntent } from "./factory-lane.js";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import { repositoryFromAuth, stampRepository } from "./repository.js";
 import { repositoryCapabilitiesAvailable } from "./repository-lane.js";
 import { selectedRepositorySlug } from "./repository-selection.js";
-import { githubFactoryAuth, slackSessionAuth } from "./session-auth.js";
+import { slackSessionAuth } from "./session-auth.js";
 
-// prompts.ts, reached through the factory-pipeline skill, reads both connector
-// variables at module load (constants.ts). Nothing is contacted. Measuring the
+// constants.ts reads connector variables at module load. Nothing is contacted.
+// Measuring the
 // compiled manifest evaluates every authored module through eve's bundled
 // module map, which needs the rest of the connector environment `eve info`
 // needs; `pnpm validate` runs both under the same environment.
@@ -64,7 +63,6 @@ const GITHUB_AUTH: SessionAuthContext = {
 };
 
 const slack = (options: {
-  readonly factoryIntent?: boolean;
   readonly intakeOnly: boolean;
   readonly repository?: string;
 }) => slackSessionAuth(SLACK_AUTH, options);
@@ -73,9 +71,7 @@ const slack = (options: {
 const GATED_TOOLS = [
   "checkout_branch",
   "push_branch",
-  "read_pipeline_run",
   "read_repository_knowledge",
-  "record_pipeline_run",
   "update_repository_knowledge",
 ];
 
@@ -107,34 +103,10 @@ describe("repositoryCapabilitiesAvailable", () => {
     }
   });
 
-  it("carries the surface for a signed unattended factory run", () => {
+  it("carries the surface for a signed GitHub repository", () => {
     assert.ok(
       repositoryCapabilitiesAvailable(
-        githubFactoryAuth(GITHUB_AUTH, REPOSITORY, 7)
-      )
-    );
-  });
-
-  it("carries the surface for an explicit factory request", () => {
-    assert.ok(
-      repositoryCapabilitiesAvailable(
-        slack({ factoryIntent: true, intakeOnly: false })
-      )
-    );
-  });
-
-  it("needs trust as well as intent in an intake-only channel", () => {
-    // slackSessionAuth stamps trust for every admitted Slack caller, so the
-    // untrusted case is built by hand: the intake rule is the one place where
-    // intent alone is not enough.
-    const untrusted = stampFactoryIntent({
-      ...SLACK_AUTH,
-      attributes: { ...SLACK_AUTH.attributes, intakeOnly: "true" },
-    });
-    assert.ok(!repositoryCapabilitiesAvailable(untrusted));
-    assert.ok(
-      repositoryCapabilitiesAvailable(
-        slack({ factoryIntent: true, intakeOnly: true })
+        stampRepository(GITHUB_AUTH, REPOSITORY, "github-webhook")
       )
     );
   });
@@ -438,10 +410,7 @@ describe("runtime lane matrix", () => {
       const names = byLane.get(lane)?.dynamicTools.map((tool) => tool.name);
       assert.deepEqual(names, [], `${lane} carries no gated capability`);
     }
-    for (const lane of [
-      "repository-interactive",
-      "autonomous-factory",
-    ] as const) {
+    for (const lane of ["repository-interactive"] as const) {
       const names = new Set(
         byLane.get(lane)?.dynamicTools.map((tool) => tool.name) ?? []
       );

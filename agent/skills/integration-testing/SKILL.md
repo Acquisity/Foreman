@@ -37,4 +37,4 @@ A request to walk every triage step is broader than a connection smoke test. Fol
 
 ## Full preview test
 
-Test providers, authored helpers, critic, and vision separately. Record failures and untested cases explicitly. Do not equate this conversational smoke test with production readiness. The release checklist also requires a real second requester, allowed attended writes on test records, backend negative policy checks, factory/schedule lanes, cancellation/timeouts, and deployment-specific configuration verification.
+Test providers, authored helpers, critic, and vision separately. Record failures and untested cases explicitly. Do not equate this conversational smoke test with production readiness. The release checklist also requires a real second requester, allowed attended writes on test records, backend negative policy checks, native delegation and schedule lanes, cancellation/timeouts, and deployment-specific configuration verification.

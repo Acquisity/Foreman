@@ -150,7 +150,7 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("no dedicated channel skill yet"), false);
     assert.equal(context.includes("stop before implementation"), true);
     assert.equal(
-      context.includes("start the factory implementation pipeline"),
+      context.includes("Do not implement a fix or make local code changes"),
       true
     );
   });

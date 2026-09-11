@@ -83,7 +83,7 @@ export function slackAttachmentContext(
 
 const INTAKE_ONLY_BOUNDARY = [
   "This message came from a Slack channel that is intake-only. You may answer questions, investigate, clarify with the requester, and create or update Linear records.",
-  "Do not implement a fix or make local code changes. Do not commit, push a branch, open a pull request, or start the factory implementation pipeline. Push and pull-request creation are denied independently of these instructions.",
+  "Do not implement a fix or make local code changes. Do not commit, push a branch, or open a pull request. Push and pull-request creation are denied independently of these instructions.",
   FINAL_SLACK_POST_RULE,
 ].join("\n\n");
 

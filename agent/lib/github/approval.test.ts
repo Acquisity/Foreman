@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import {
-  stampAutonomous,
   stampIntakeOnly,
   stampTrusted,
   UNATTENDED_ATTRIBUTE,
@@ -35,6 +34,13 @@ const unattendedAuth: SessionAuthContext = {
   attributes: { [UNATTENDED_ATTRIBUTE]: "true" },
 };
 
+// Historical durable auth must keep its old denials after removal.
+const retiredAuth: SessionAuthContext = {
+  ...auth,
+  principalId: "github:foreman-factory",
+  principalType: "service",
+};
+
 const approvalFor = (current: SessionAuthContext, toolName = "push_branch") =>
   ({
     session: { auth: { current } },
@@ -53,8 +59,8 @@ describe("deliveryPolicy", () => {
     );
   });
 
-  it("denies an autonomous principal", () => {
-    const status = deliveryPolicy(approvalFor(stampAutonomous(auth, 123)));
+  it("denies a retired unattended principal", () => {
+    const status = deliveryPolicy(approvalFor(retiredAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
@@ -90,10 +96,8 @@ describe("repositoryKnowledgePolicy", () => {
     assert.equal(repositoryKnowledgePolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies an autonomous principal", () => {
-    const status = repositoryKnowledgePolicy(
-      approvalFor(stampAutonomous(auth, 123))
-    );
+  it("denies a retired unattended principal", () => {
+    const status = repositoryKnowledgePolicy(approvalFor(retiredAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -110,8 +114,8 @@ describe("modelSwapPolicy", () => {
     assert.equal(modelSwapPolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies an autonomous principal", () => {
-    const status = modelSwapPolicy(approvalFor(stampAutonomous(auth, 123)));
+  it("denies a retired unattended principal", () => {
+    const status = modelSwapPolicy(approvalFor(retiredAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -119,18 +123,14 @@ describe("modelSwapPolicy", () => {
 describe("denyUnattendedWrites", () => {
   const policy = denyUnattendedWrites("Supermemory", ["add_memory"]);
 
-  it("denies an autonomous write", () => {
-    const status = policy(
-      approvalFor(stampAutonomous(auth, 123), "supermemory__add_memory")
-    );
+  it("denies a retired unattended write", () => {
+    const status = policy(approvalFor(retiredAuth, "supermemory__add_memory"));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
-  it("leaves an autonomous non-write ungated", () => {
+  it("leaves a retired unattended non-write ungated", () => {
     assert.equal(
-      policy(
-        approvalFor(stampAutonomous(auth, 123), "supermemory__search_memory")
-      ),
+      policy(approvalFor(retiredAuth, "supermemory__search_memory")),
       "not-applicable"
     );
   });
@@ -149,10 +149,8 @@ describe("userPreferencesDeletionPolicy", () => {
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
-  it("denies an autonomous run", () => {
-    const status = userPreferencesDeletionPolicy(
-      approvalFor(stampAutonomous(auth, 7))
-    );
+  it("denies a retired unattended run", () => {
+    const status = userPreferencesDeletionPolicy(approvalFor(retiredAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 

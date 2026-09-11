@@ -24,8 +24,13 @@ const appRoot = new URL("../", import.meta.url);
 const COMPILE_TIMEOUT_MS = 120_000;
 
 execFileSync(
-  fileURLToPath(new URL("node_modules/.bin/eve", appRoot)),
-  ["info"],
+  process.execPath,
+  [
+    fileURLToPath(
+      new URL("./bin/eve.js", import.meta.resolve("eve/package.json"))
+    ),
+    "info",
+  ],
   {
     cwd: fileURLToPath(appRoot),
     stdio: ["ignore", "ignore", "inherit"],

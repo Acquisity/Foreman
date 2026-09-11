@@ -1,11 +1,11 @@
 import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
 
 /**
- * The factory's shared Blob layer: the reserved-namespace registry and the document helpers
+ * Foreman's shared Blob layer: the reserved-namespace registry and the document helpers
  * every Blob-backed tool reads and writes through.
  *
  * @remarks
- * Everything the factory stores lives in one Blob store, so the path layout is a shared concern
+ * Everything Foreman stores lives in one Blob store, so the path layout is a shared concern
  * rather than a per-feature one. This module owns that layout: the reserved prefixes, what each
  * holds, and which tool owns it. Any general-purpose Blob tool added later must consult
  * {@link reservedNamespaceForPath} / {@link reservedNamespaceForUrl} before acting, so a managed
@@ -26,13 +26,10 @@ import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
 export const USER_PREFERENCES_PREFIX = "user-preferences/";
 
 /** Legacy Blob prefix retained only for repository-knowledge read migration. */
-export const FACTORY_BRAIN_PREFIX = "factory-brain/";
+export const LEGACY_REPOSITORY_KNOWLEDGE_PREFIX = "factory-brain/";
 
 /** Blob path prefix holding verified, repository-scoped knowledge. */
 export const REPOSITORY_KNOWLEDGE_PREFIX = "repository-knowledge/";
-
-/** Blob path prefix holding handoff artifacts passed between stations. */
-export const ARTIFACTS_PREFIX = "artifacts/";
 
 /**
  * Wall-clock bound on one Blob operation.
@@ -45,14 +42,11 @@ export const ARTIFACTS_PREFIX = "artifacts/";
  */
 const BLOB_TIMEOUT_MS = 20_000;
 
-/** Blob path prefix holding the live station model overrides. */
+/** Blob path prefix holding the live agent model overrides. */
 export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 
 /** Blob path prefix holding the daily SLA report's last successful dispatch marker. */
 export const SLA_REPORT_PREFIX = "sla-report/";
-
-/** Blob path prefix holding durable repository and pull-request pipeline runs. */
-export const PIPELINE_RUNS_PREFIX = "pipeline-runs/";
 
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
@@ -65,9 +59,9 @@ interface ReservedNamespace {
   /** Human-readable description of what the namespace holds. */
   readonly label: string;
   /** Tool that reads this namespace. */
-  readonly readTool: string;
+  readonly readTool?: string;
   /** Tool that owns writes to this namespace. */
-  readonly writeTool: string;
+  readonly writeTool?: string;
 }
 
 /**
@@ -78,13 +72,12 @@ interface ReservedNamespace {
  * call sites.
  */
 const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
-  [ARTIFACTS_PREFIX]: {
-    label: "handoff artifacts",
-    readTool: "read_artifact",
-    writeTool: "save_artifact",
+  // Retired data stays protected from generic Blob tools; no execution path remains.
+  "artifacts/": {
+    label: "retired handoff records",
   },
-  [FACTORY_BRAIN_PREFIX]: {
-    label: "legacy factory knowledge",
+  [LEGACY_REPOSITORY_KNOWLEDGE_PREFIX]: {
+    label: "legacy repository knowledge",
     readTool: "read_repository_knowledge",
     writeTool: "update_repository_knowledge",
   },
@@ -93,10 +86,8 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     readTool: "read_agent_models",
     writeTool: "set_agent_models",
   },
-  [PIPELINE_RUNS_PREFIX]: {
-    label: "factory pipeline run state",
-    readTool: "read_pipeline_run",
-    writeTool: "record_pipeline_run",
+  "pipeline-runs/": {
+    label: "retired run records",
   },
   [SLA_REPORT_PREFIX]: {
     label: "the daily SLA report dispatch marker",
@@ -168,7 +159,9 @@ export const reservedNamespaceForUrl = (
  * @returns A message naming the owning tool, for the model to act on.
  */
 export const reservedWriteMessage = (namespace: ReservedNamespace): string =>
-  `That path is reserved for ${namespace.label}: use ${namespace.writeTool} instead.`;
+  namespace.writeTool
+    ? `That path is reserved for ${namespace.label}: use ${namespace.writeTool} instead.`
+    : `That path is reserved for ${namespace.label} and cannot be changed.`;
 
 /**
  * Build the refusal message for a read blocked by a reserved namespace.
@@ -177,7 +170,9 @@ export const reservedWriteMessage = (namespace: ReservedNamespace): string =>
  * @returns A message naming the owning read tool.
  */
 export const reservedReadMessage = (namespace: ReservedNamespace): string =>
-  `That path holds ${namespace.label}: use ${namespace.readTool} instead.`;
+  namespace.readTool
+    ? `That path holds ${namespace.label}: use ${namespace.readTool} instead.`
+    : `That path holds ${namespace.label} and is not available through agent tools.`;
 
 /**
  * Read a Markdown document from the store by its exact key.
@@ -217,8 +212,7 @@ export const readDocument = async (
  * Carries the store's shared write posture: public access (the store is provisioned public;
  * unguessability comes from the hashed or suffixed keys the feature modules derive), no random
  * suffix (the key is the identity), Markdown content type. Overwrite is the caller's decision:
- * the singleton documents (brain, preferences) replace themselves, while artifacts are
- * write-once.
+ * the singleton documents (repository knowledge, preferences) replace themselves.
  *
  * @param key - The exact Blob pathname, derived by the owning feature module.
  * @param contents - The full document (Markdown unless `contentType` says otherwise).

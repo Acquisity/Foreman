@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
-import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
+import { stampUnattended } from "./trust.js";
 
 const CARD_OR_BANK = /card or bank/u;
 
@@ -47,18 +47,19 @@ describe("save_investigation_document tool", () => {
     }
   });
 
-  it("allows an autonomous run through the Linear approval policy", async () => {
+  it("allows an unattended schedule through the Linear approval policy", async () => {
     const { approval } = tool;
     assert.equal(typeof approval, "function");
     const status = await (approval as (ctx: unknown) => unknown)({
       session: {
         auth: {
-          current: {
+          current: stampUnattended({
             attributes: {},
-            authenticator: "github",
-            principalId: AUTONOMOUS_PRINCIPAL,
-            principalType: "service",
-          },
+            authenticator: "app",
+            issuer: "eve",
+            principalId: "eve:app",
+            principalType: "runtime",
+          }),
         },
       },
       toolName: "save_investigation_document",

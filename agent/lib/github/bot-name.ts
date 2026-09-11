@@ -16,7 +16,7 @@ const MAX_BOT_NAME_LENGTH = 80;
 let resolvedFromConnector: string | undefined;
 
 /**
- * The name the factory answers to in `@mentions`, resolved without setup.
+ * The name Foreman answers to in `@mentions`, resolved without setup.
  *
  * @remarks
  * Resolution order:

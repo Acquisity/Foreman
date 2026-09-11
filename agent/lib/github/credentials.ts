@@ -1,7 +1,7 @@
 import { connectGitHubCredentials } from "@vercel/connect/eve";
 
 /**
- * Vercel Connect connector UID for the factory's GitHub App installation.
+ * Vercel Connect connector UID for Foreman's GitHub App installation.
  *
  * @remarks
  * One connector serves every GitHub surface: the channel (webhooks, replies),

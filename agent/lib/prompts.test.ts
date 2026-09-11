@@ -4,135 +4,91 @@ import { describe, it } from "node:test";
 // The retained Linear attachment credential is initialized by constants.ts.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
-const { FACTORY_PROMPT, GENERAL_MODE, GENERAL_PROMPT, PIPELINE, selectPrompt } =
-  await import("./prompts.js");
-const { AUTONOMOUS_PRINCIPAL } = await import("./trust.js");
-const { FOREMAN_BRANCH_PREFIX } = await import("./constants.js");
+const { GENERAL_PROMPT, composePrompt } = await import("./prompts.js");
 
-const CHANNEL_NAME = /Linear|Slack/;
-
-/**
- * The full clauses the repository guidance has to keep, not fragments of
- * them: a substring match still passes when the attended condition or one of
- * the three protected checkouts drops out of the sentence.
- */
 const REPLACEMENT_CLAUSE =
   "In an attended session you may name a different repository later and `prepare_repository` replaces the prepared one, reporting `previous` and `current` so you can say which repository the work moved to.";
 const NEVER_REPLACED_CLAUSE =
   "A signed GitHub checkout, an unattended run, and a checkout at `/workspace` are never replaced; the tool explains the refusal and leaves the session on the checkout it had.";
-const PROTECTED_CHECKOUTS = [
-  "A signed GitHub checkout",
-  "an unattended run",
-  "a checkout at `/workspace`",
-];
 
-/**
- * `github__` tools take `owner` and `repo` from the model, and nothing in
- * `agent/extensions/github/extension.ts` rebinds them to the signed repository, so the
- * prompt must ask for the binding rather than promise it is enforced. The
- * clause names the two tools the model drives directly and stays silent about
- * the rest: `read_repository_knowledge`, `update_repository_knowledge`,
- * `read_pipeline_run`, and `record_pipeline_run` also refuse a retarget
- * through `resolveRepositoryInput`, so the wording must not claim the check
- * lives only in those two.
- */
+// GitHub API tools do not rebind model-supplied owner/repo to the signed repository.
+// The prompt must request that binding without claiming it is enforced for them.
 const SIGNED_BINDING_CLAUSE =
   "pass it as the `owner` and `repo` of every `github__` call. `prepare_repository` and `push_branch` check that binding at runtime, but the `github__` tools do not: they act on whatever repository they are handed, so naming another one there is a mistake nothing catches.";
 
-describe("selectPrompt", () => {
-  it("selects FACTORY_PROMPT for the autonomous principal and inlines the pipeline", () => {
-    const prompt = selectPrompt(AUTONOMOUS_PRINCIPAL);
-    assert.equal(prompt, FACTORY_PROMPT);
-    assert.ok(prompt.includes(PIPELINE));
+describe("composePrompt", () => {
+  it("uses the general prompt by default", () => {
+    assert.equal(composePrompt(), GENERAL_PROMPT);
   });
 
-  it("selects GENERAL_PROMPT for a null or absent principal and omits the pipeline", () => {
-    for (const principal of [null, undefined]) {
-      const prompt = selectPrompt(principal);
-      assert.equal(prompt, GENERAL_PROMPT);
-      assert.ok(!prompt.includes(PIPELINE));
-    }
+  it("identifies delegated support work and passes its evidence context without root delivery responsibilities", () => {
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        'For scheduled support delegation, begin the child message with "Delegated support evidence task", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent.'
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "The root keeps the investigation journal, Linear writes, and Slack delivery."
+      )
+    );
   });
 
-  it("selects GENERAL_PROMPT for trusted and ordinary principals and omits the pipeline", () => {
-    // A trusted principal is a real GitHub actor (numeric `github:<id>`); an
-    // ordinary principal is any other non-autonomous caller.
-    for (const principal of ["github:12345", "github:some-user", "eve:app"]) {
-      const prompt = selectPrompt(principal);
-      assert.equal(prompt, GENERAL_PROMPT);
-      assert.ok(!prompt.includes(PIPELINE));
-    }
-  });
-
-  it("does not name any channel in general-mode routing", () => {
-    assert.ok(!CHANNEL_NAME.test(GENERAL_MODE));
-  });
-
-  it("limits the Slack wording skill to the two intended channels on both root paths", () => {
-    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
-      assert.ok(
-        prompt.includes(
-          "Load `slack-wording` only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request)."
-        )
-      );
-      assert.ok(
-        prompt.includes("Its restrictions do not apply in other channels.")
-      );
-    }
+  it("limits the Slack wording skill to the two intended channels", () => {
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "Load `slack-wording` only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request)."
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "Its restrictions do not apply in other channels."
+      )
+    );
   });
 });
 
 describe("repository guidance", () => {
+  it("prepares a delegated repository before declaring its gated GitHub tools missing", () => {
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "Call `prepare_repository` before repository work, including in a delegated child even when the parent already prepared the shared checkout."
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "Only if none are available on the next model step after `prepare_repository` succeeds, report that the GitHub extension failed to resolve"
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "For repository work, include the selected `owner/repo` and tell the child to call `prepare_repository` before working."
+      )
+    );
+    assert.ok(!GENERAL_PROMPT.includes("When a turn has none of them"));
+  });
+
   it("describes attended replacement and the checkouts that are never replaced", () => {
-    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
-      assert.ok(prompt.includes(REPLACEMENT_CLAUSE));
-      assert.ok(prompt.includes(NEVER_REPLACED_CLAUSE));
-      for (const checkout of PROTECTED_CHECKOUTS) {
-        assert.ok(prompt.includes(checkout));
-      }
-    }
+    assert.ok(GENERAL_PROMPT.includes(REPLACEMENT_CLAUSE));
+    assert.ok(GENERAL_PROMPT.includes(NEVER_REPLACED_CLAUSE));
   });
 
   it("asks for the signed repository on every github__ call, without promising a runtime gate", () => {
-    for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
-      assert.ok(prompt.includes(SIGNED_BINDING_CLAUSE));
-      assert.ok(!prompt.includes("every repository tool to refuse"));
-    }
+    assert.ok(GENERAL_PROMPT.includes(SIGNED_BINDING_CLAUSE));
+    assert.ok(!GENERAL_PROMPT.includes("every repository tool to refuse"));
   });
 
   it("asks direct work for a feature branch without a required prefix", () => {
-    // `push_branch` validates the name and nothing else, so the general path
-    // must not send the model renaming a branch it can already deliver.
-    assert.ok(!GENERAL_PROMPT.includes(FOREMAN_BRANCH_PREFIX));
     assert.ok(GENERAL_PROMPT.includes("create a feature branch"));
+    assert.ok(GENERAL_PROMPT.includes("No prefix is required"));
   });
 
   it("summarizes what validateBranch actually accepts", () => {
-    // A plain-looking name such as `feature/release.lock` is refused, so the
-    // prompt has to carry the component rules and not just "any plain name".
+    // A component like release.lock is refused, even when the name looks plain.
     assert.ok(
       GENERAL_PROMPT.includes(
         "No prefix is required, and `push_branch` accepts exactly the names `validateBranch` approves: letters, digits, `.`, `_`, `-`, and `/`, starting and ending with a letter or digit, with no `..` or `//`, and no slash-separated component that starts with `.`, ends with `.`, or ends with `.lock`. Protected branches, `refs/` names, and `HEAD` are refused."
       )
-    );
-  });
-
-  it("says what the factory's branch prefix marks, so the model cannot guess", () => {
-    // Removing the prefix instruction without saying what the prefix means
-    // left the model inventing one: it called it a convention for Foreman's
-    // own direct changes, which is backwards.
-    assert.ok(
-      GENERAL_PROMPT.includes(
-        "`FOREMAN_BRANCH_PREFIX` marks the factory's own branches so the GitHub channel can recognize them for red-CI stabilization, which is ownership rather than permission, and a direct change does not need it."
-      )
-    );
-  });
-
-  it("keeps the factory's own branch prefix on the implementer", () => {
-    // Ownership, not permission: the GitHub channel recognizes the factory's
-    // pull requests by this prefix for red-CI stabilization.
-    assert.ok(
-      PIPELINE.includes(`pushes a \`${FOREMAN_BRANCH_PREFIX}\` feature branch`)
     );
   });
 });

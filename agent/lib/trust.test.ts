@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import {
-  AUTONOMOUS_PRINCIPAL,
   isUnattended,
   stampUnattended,
   UNATTENDED_ATTRIBUTE,
@@ -25,9 +24,9 @@ test("isUnattended", async (t) => {
     assert.equal(isUnattended(auth()), false);
   });
 
-  await t.test("is true for the autonomous factory principal", () => {
+  await t.test("keeps retired unattended sessions denied", () => {
     assert.equal(
-      isUnattended(auth({ principalId: AUTONOMOUS_PRINCIPAL })),
+      isUnattended(auth({ principalId: "github:foreman-factory" })),
       true
     );
   });

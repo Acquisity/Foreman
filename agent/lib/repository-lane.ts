@@ -1,5 +1,4 @@
 import type { SessionAuthContext } from "eve/context";
-import { factorySkillAvailable } from "./factory-lane.js";
 import { repositoryFromAuth } from "./repository.js";
 import { selectedRepositorySlug } from "./repository-selection.js";
 import { sessionLane } from "./session-lane.js";
@@ -9,8 +8,7 @@ import { sessionLane } from "./session-lane.js";
  * surface.
  *
  * @remarks
- * This is capability composition, not authorization, and it is the same
- * distinction {@link factorySkillAvailable} draws. Every write these
+ * This is capability composition, not authorization. Every write these
  * capabilities perform stays gated where it already is: `agent/lib/trust.ts`
  * decides trust, `agent/lib/github/approval.ts` decides approval,
  * `intakeOnlyPolicy` denies push and pull-request creation whatever this
@@ -26,15 +24,8 @@ import { sessionLane } from "./session-lane.js";
  * delivery, so a later message naming a repository turns the catalog on for
  * the next turn without restarting the session.
  *
- * A lane qualifies when it has a selected repository, when it could take the
- * factory path at all, or when it has actually prepared a repository. The
- * second clause is not redundant: the factory skill is offered on explicit
- * intent alone, and a lane that can load the station procedure has to be able
- * to run it. Reusing {@link factorySkillAvailable} rather than restating its
- * conditions also keeps the intake-only rule in one place, where explicit
- * intent counts only from a trusted caller.
- *
- * The third clause is the one that makes the door worth leaving open. A bare
+ * A lane qualifies when the channel stamped a selected repository or when
+ * prepare_repository recorded one in durable session state. A bare
  * `owner/repo` slug in free text stamps no repository (see
  * `extractRepositoryUrls`), so a Slack request to open a pull request in a
  * repository named that way used to prepare the checkout and then find neither
@@ -42,7 +33,7 @@ import { sessionLane } from "./session-lane.js";
  * eve re-resolves dynamic tools per step with the context active, so the
  * recorded selection turns the catalog on for the next step of the same turn.
  * That holds only while every resolver behind this gate runs at
- * `step.started`, the six repository tools under `agent/tools/` as much as the
+ * `step.started`, the four repository tools under `agent/tools/` as much as the
  * GitHub surface: eve resolves `turn.started` once, before the turn's first
  * tool runs, which is before `prepare_repository` can have recorded anything.
  * A resolver moved back to `turn.started` would answer null for the whole turn
@@ -66,6 +57,4 @@ export const repositoryCapabilitiesAvailable = (
   }: { initiator?: SessionAuthContext | null; readOnly?: boolean } = {}
 ): boolean =>
   (readOnly || sessionLane(initiator).repository) &&
-  (repositoryFromAuth(auth) !== null ||
-    factorySkillAvailable(auth) ||
-    selectedRepositorySlug() !== null);
+  (repositoryFromAuth(auth) !== null || selectedRepositorySlug() !== null);

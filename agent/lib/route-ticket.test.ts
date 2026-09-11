@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
-import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
+import { stampUnattended } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
@@ -310,17 +310,18 @@ describe("routeTicket", () => {
 });
 
 describe("route_ticket tool", () => {
-  it("allows an autonomous run through the Linear approval policy", async () => {
+  it("allows an unattended schedule through the Linear approval policy", async () => {
     const { approval } = tool;
     const status = await (approval as (ctx: unknown) => unknown)({
       session: {
         auth: {
-          current: {
+          current: stampUnattended({
             attributes: {},
-            authenticator: "github",
-            principalId: AUTONOMOUS_PRINCIPAL,
-            principalType: "service",
-          },
+            authenticator: "app",
+            issuer: "eve",
+            principalId: "eve:app",
+            principalType: "runtime",
+          }),
         },
       },
       toolName: "route_ticket",

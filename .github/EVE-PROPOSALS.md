@@ -1,6 +1,6 @@
 # Eve proposals
 
-Gating and composition Foreman wants but eve cannot express today, with what was built instead. Each entry names the eve version it was checked against, the supported subset that shipped, and the bounded change that would remove the workaround. Nothing here is a reason to approximate a gate unsafely: where eve cannot express a bound, the authored subset ships and the remainder is written down.
+Gating and composition requests checked against the versions named below, with what was built instead. Each entry names the eve version it was checked against, the supported subset that shipped, and the bounded change that would remove the workaround. Nothing here is a reason to approximate a gate unsafely: where eve cannot express a bound, the authored subset ships and the remainder is written down.
 
 ## 1. Gate an extension as a whole, not one contribution at a time
 
@@ -18,7 +18,7 @@ Checked against eve 0.44.0.
 
 A dynamic tool whose name matches an authored one overrides it, but returning `null` does not remove the authored tool: the static definition stays in the catalog. So a static tool cannot be gated from a separate file; it has to become dynamic itself.
 
-Shipped: each gated repository tool exports its `defineTool` object as a named export and a `defineDynamic` wrapper as its default, in the same file. The tool object is unchanged, so its callbacks keep the durable descriptors eve stamped on the `defineTool` call, and the subagent copies that need the tool unconditionally import the named export.
+Shipped: each gated repository tool exports its `defineTool` object as a named export and a `defineDynamic` wrapper as its default, in the same file. The tool object is unchanged, so its callbacks keep the durable descriptors eve stamped on the `defineTool` call, and callers that need the definition directly import the named export.
 
 Proposal: let a dynamic resolver returning `null` for a name suppress a same-named authored tool, or accept `disableTool()` as a resolver result.
 
@@ -26,11 +26,9 @@ Proposal: let a dynamic resolver returning `null` for a name suppress a same-nam
 
 Checked against eve 0.44.0.
 
-`defineDynamic` in a subagent's `agent.ts` does support per-session availability, so this is expressible. It is recorded here only as the not-yet-done half of the same question: the eight subagents cost about 8,000 catalog characters in every lane, and the five factory stations are useless outside a factory lane. Doing it needs the child-session auth contract checked first, which is its own ticket.
+`defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
 
-The delegation input schema itself is not expressible. eve lowers one fixed schema onto every subagent tool, 579 characters each and 4,632 across the eight, read from `getSubagentToolInputJsonSchema` in eve's subagent registry. An authored subagent cannot shorten or replace it, so the only authored lever on that cost is gating the subagent.
-
-Proposal: let a subagent declare a narrower delegation schema, or let eve drop the optional fields a persistent-session-less agent never uses.
+Eve still lowers a fixed delegation schema onto each declared subagent. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
 
 ## 4. Gate a static extension tool per session without one slot per tool
 
@@ -44,7 +42,7 @@ Proposal: the mount-level availability resolver of section 1, which would gate a
 
 Checked against eve 0.44.0.
 
-eve's default tools (`bash`, `read_file`, `web_fetch`, and the rest) are gated only globally: a `disableTool()` sentinel in `agent/tools/<slug>.ts` removes one for every session, which is how `agent` and `ask_question` are removed today. There is no per-session form, and the built-in catalog is outside the compiled manifest, so `pnpm report:capabilities` does not measure it. Every lane carries the same built-in set by construction.
+eve's default tools (`bash`, `read_file`, `web_fetch`, and the rest) are gated only globally: a `disableTool()` sentinel in `agent/tools/<slug>.ts` removes one for every session, which is how `ask_question` is removed today. The native `agent` tool is enabled. There is no per-session form, and the built-in catalog is outside the compiled manifest, so `pnpm report:capabilities` does not measure it. Every lane carries the same built-in set by construction.
 
 Proposal: accept a `defineDynamic` in a built-in tool's slot that returns the default or `null` per session, matching what authored and extension slots already allow.
 
@@ -76,3 +74,7 @@ Proposal: expose a runtime-owned per-run deadline on channel sends that cancels 
 Checked against eve 0.44.0 after ENG-13601's first production intake tick. The compiler emits channel entries from HTTP routes, so `routes: []` omits a receive-only channel from the runtime catalog. Cross-channel dispatch also falls back to a route fingerprint when bundled module references differ. Foreman's support channel therefore carries one inert GET route that always returns 404, allowing registration without exposing session creation. A compiled-manifest regression test checks that the channel survives compilation.
 
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
+
+## Upgrade notes checked against eve 0.54.2
+
+These are target-version capabilities, not claims that this eve 0.44 revision uses them. The 0.54.2 connection docs support dynamic MCP definitions and per-session URL selection, so the URL-selection gap above has native support. Keep the support dispatcher during the upgrade because it also journals Linear writes. Eve 0.54.2 exposes session cancellation with `tasks: true`; that helps explicit stop handling but does not establish a durable per-run deadline for support. Keep the support bound until its exact replacement is proven. Keep the other proposal workarounds until a supported replacement is verified against the built artifact and deployed behavior.

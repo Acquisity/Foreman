@@ -2,66 +2,54 @@
 
 # Foreman
 
-Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). It answers questions, investigates connected systems, operates services, and makes well-scoped repository changes directly. Its software factory is an optional mode for work that benefits from deeper investigation, planning, implementation, independent review, and pull request stabilization.
+Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). It answers questions, investigates connected systems, operates services, and makes well-scoped repository changes directly. It uses eve's native delegation for independent subtasks and retains critic and vision for triage review and image analysis.
 
 ## Surfaces
 
 Foreman runs on four channels, with GitHub and browser extensions, one shared company-service Executor connection, and a personal Supermemory connection:
 
-- **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions; a trusted `factory` label hands an issue to the pipeline unattended; red CI on a Foreman pull request triggers a fix loop.
-- **Linear** — Agent Sessions trusted by workspace membership. Assigned issues stay general by default; the factory loads on demand.
+- **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions. Labels, PR opens, CI changes, reviews, and synchronizations do not launch work or automatic summaries.
+- **Linear** — Agent Sessions trusted by workspace membership. Assigned issues use the same general agent.
 - **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
 - **eve** — the HTTP channel for the local dev TUI and Vercel OIDC.
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, critic, factory, and scheduled work use one shared Foreman toolkit. Personal Supermemory remains a separate user-scoped connection. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Personal Supermemory remains a separate user-scoped connection. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
-Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include the factory pipeline, triage and billing investigation, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, clarification, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
+Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include triage and billing investigation, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, clarification, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
 
-## Execution paths
+## Execution
 
-General mode is the default for Slack, Linear, and ordinary interactive sessions. Small code and documentation changes stay direct: Foreman resolves the repository, prepares a workspace, creates a feature branch under any validated name, makes the change, runs proportionate checks, pushes, and opens a pull request when requested. It does not invoke factory stations merely because files change.
+Foreman handles conversation, investigation, service operations, and repository changes with one general prompt. For an authorized change it resolves the repository, prepares a workspace, creates a validated feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request. Foreman never merges.
 
-Factory mode runs these stations in order:
-
-1. Classifier: triage and clarification.
-2. Investigator: repository-grounded reproduction and root cause.
-3. Analyst: plan, risks, acceptance criteria, and verification strategy.
-4. Implementer: code, checks, commit, and feature-branch push.
-5. Reviewer: independent review of the exact pushed commit.
-
-A researcher station runs in parallel with the classifier when a work item turns on an outside fact.
-
-A trusted GitHub `factory` label activates factory mode deterministically. Interactive users can request it explicitly, and Foreman may select it when complexity, uncertainty, risk, or requested review depth warrants the full line. Linear and Slack have no factory default.
-
-After internal review, Foreman opens a normal pull request and stabilizes the same branch against current-head CI failures and actionable feedback from trusted collaborators or allowlisted review bots. It reports `ready to merge` only when internal review approves the current head, required checks pass, GitHub reports no conflict, and no actionable trusted feedback remains. Foreman never merges.
+The root can use eve's native `agent` tool for independent subtasks. On eve 0.44 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
 
 ## Trust and safety
 
-`agent/lib/trust.ts` is the single trust authority. Unattended runs (GitHub factory-label intake, CI fix, and schedules) are denied shared-config writes (repository knowledge and model overrides), plus personal Supermemory writes because nobody is watching to answer an approval card. For repository knowledge and model settings, trusted attended callers write directly; other attended callers park on a card. Company services share the Executor catalog across workflows. Merge tools are absent; the delivery boundary is a feature branch and pull request in both paths. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
+`agent/lib/trust.ts` is the single trust authority. Scheduled runs are denied shared-config writes (repository knowledge and model overrides), plus personal Supermemory writes because nobody is watching to answer an approval card. For repository knowledge and model settings, trusted attended callers write directly; other attended callers park on a card. Company services share the Executor catalog across workflows. Merge tools are absent; the delivery boundary is a feature branch and pull request for repository work. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
 
 ## Repository targeting
 
 There is no deployment-wide repository setting.
 
-- GitHub sessions use the repository from the signed webhook. Issue or comment text cannot redirect an unattended run.
+- GitHub sessions use the repository from the signed webhook. Issue or comment text cannot redirect that signed binding.
 - Linear, Slack, and eve requests involving repository work must include exactly one `owner/repo` or GitHub URL. Ordinary conversation does not require a repository target.
 - Missing or ambiguous targets require clarification.
-- Workspaces clone at runtime when a GitHub channel checkout is unavailable. Factory stations share the prepared parent workspace, and the reviewer fetches and resets to the exact pushed SHA.
+- Workspaces clone at runtime when a GitHub channel checkout is unavailable. Native delegates and vision share the prepared parent workspace; critic keeps its own sandbox for independent review.
 
 ## Durable state
 
 Durable documents live in one Vercel Blob store. Reserved prefixes are registered in `agent/lib/blob.ts`. Investigation memory is separate, in its own Postgres database.
 
 - `repository-knowledge/<repository-hash>.md` stores verified repository conventions and recurring build or review facts. Reads fall back to the matching legacy `factory-brain/` document until the next trusted write migrates it.
-- `pipeline-runs/` stores repository-and-source or repository-and-PR state, including Linear context, head SHA, stage, processed feedback, and blocker history.
 - `model-overrides/foreman.json` stores global agent model overrides.
 - `user-preferences/` is principal-scoped. Supermemory supports broader attended-session recall, but neither is repository authority.
-- `artifacts/` stores size-bounded, write-once handoff documents between stations.
 - `sla-report/` stores the daily SLA report dispatch marker.
+
+Retired `pipeline-runs/` and `artifacts/` data remain reserved and untouched; removing the factory does not delete stored documents.
 
 Settled investigations, including ticketless Intercom and Slack ones and conclusions a colleague corrected in a thread, are indexed in a private Foreman-owned Postgres database, reached through `FOREMAN_MEMORY_DATABASE_URL` and never through the read-only Neon MCP connection. The schema lives in `migrations/` and applies with `pnpm db:migrate`, a manual release step and never part of agent startup. Run a new migration against production before relying on the code that needs it: until `0002` runs, a ticketless write fails on the `NOT NULL` project column and the tool reports `recorded: false` without touching the verdict. It holds sanitized case patterns, not customer data: PlanetScale remains the only production database and the only source of current blast radius. Access is fail-closed and stamped per channel, so GitHub sessions and unattended runs cannot read or write it.
 
@@ -89,9 +77,6 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and vision attachment reads |
 | `SLACK_CONNECTOR` | `slack/acquisity-foreman` | Slack inbound delivery and replies |
 | `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
-| `FOREMAN_BRANCH_PREFIX` | `foreman/` | Factory-owned feature branches, recognized for red-CI stabilization |
-| `FOREMAN_FACTORY_LABEL` | `factory` | Trusted GitHub label activating unattended factory mode |
-| `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase review bot allowlist |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
@@ -122,6 +107,8 @@ pnpm eval --tag fast
 pnpm report:capabilities
 ```
 
-`pnpm validate` checks generated Linear-spec drift, then runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. The `validate` GitHub Actions workflow runs the same `pnpm validate` on every pull request to `main`, with placeholder connector UIDs as plain workflow environment variables so `eve info` compiles the manifest and the manifest-dependent tests run for real; it references no secret. Evals use real model calls. The full pipeline eval is opt-in and requires `PIPELINE_SCRATCH_REPO=owner/repo`; it pushes a real branch, so use a scratch repository only.
+`pnpm validate` checks generated Linear-spec drift, then runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. The `validate` GitHub Actions workflow runs the same `pnpm validate` on every pull request to `main`, with placeholder connector UIDs as plain workflow environment variables so `eve info` compiles the manifest and the manifest-dependent tests run for real; it references no secret. Evals use real model calls. `routing/native-delegation` dispatches two real read-only child tasks. `routing/direct-scratch-repository` is opt-in: set `FOREMAN_SCRATCH_REPO=owner/repo` and `FOREMAN_SCRATCH_TICKET` to an existing test ticket; it pushes a real branch and opens a PR, so use a scratch repository only. Follow [.github/UAT-BATTERY.md](.github/UAT-BATTERY.md) on each PR.
 
 Deployment uses Vercel Connect for GitHub, Linear, and the app-scoped Executor credential; Vercel Blob for durable documents; Vercel Sandbox for workspaces; and the Vercel AI Gateway for models.
+
+Production deploys from `main` through Vercel. Roll back by reverting the change on `main` and deploying that commit; never use `vercel rollback`. Aaron tests each PR before the next opens. Preview connector routing and Executor setup are in [.github/EXECUTOR-PREVIEW.md](.github/EXECUTOR-PREVIEW.md).

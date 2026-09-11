@@ -31,7 +31,7 @@ const ENTRY = {
   sourceKind: "module" as const,
 };
 
-const session = (lane: "slack" | "autonomous-factory") => ({
+const session = (lane: "slack" | "repository-interactive") => ({
   auth: laneAuth(lane),
   id: `capability-budget:${lane}`,
 });
@@ -71,7 +71,7 @@ describe("eve dynamic tool adapter", () => {
     const slack = dynamicToolCacheKey(ENTRY, APP_ROOT, session("slack").id);
     assert.notEqual(
       slack,
-      dynamicToolCacheKey(ENTRY, APP_ROOT, session("autonomous-factory").id)
+      dynamicToolCacheKey(ENTRY, APP_ROOT, session("repository-interactive").id)
     );
     assert.notEqual(
       slack,

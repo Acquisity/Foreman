@@ -4,11 +4,10 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import { investigationMemoryWritePolicy } from "../github/approval.js";
 import {
-  AUTONOMOUS_PRINCIPAL,
   canUseInvestigationMemory,
   stampInvestigationMemory,
   stampTrusted,
-  UNATTENDED_ATTRIBUTE,
+  stampUnattended,
 } from "../trust.js";
 
 const auth = (
@@ -50,17 +49,18 @@ test("canUseInvestigationMemory", async (t) => {
     assert.equal(canUseInvestigationMemory(github), false);
   });
 
-  await t.test("is false for an unattended factory run", () => {
-    const factory = stampInvestigationMemory(
-      auth({ principalId: AUTONOMOUS_PRINCIPAL })
-    );
-    assert.equal(canUseInvestigationMemory(factory), false);
-  });
+  await t.test(
+    "keeps retired unattended sessions denied after automatic dispatch is removed",
+    () => {
+      const retired = stampInvestigationMemory(
+        auth({ principalId: "github:foreman-factory" })
+      );
+      assert.equal(canUseInvestigationMemory(retired), false);
+    }
+  );
 
   await t.test("is false for a schedule dispatching under a user", () => {
-    const schedule = stampInvestigationMemory(
-      auth({ attributes: { [UNATTENDED_ATTRIBUTE]: "true" } })
-    );
+    const schedule = stampInvestigationMemory(stampUnattended(auth()));
     assert.equal(canUseInvestigationMemory(schedule), false);
   });
 
@@ -73,11 +73,9 @@ test("canUseInvestigationMemory", async (t) => {
 });
 
 test("investigationMemoryWritePolicy", async (t) => {
-  await t.test("denies an unattended run", () => {
+  await t.test("denies an unattended schedule", () => {
     const status = investigationMemoryWritePolicy(
-      approval(
-        stampInvestigationMemory(auth({ principalId: AUTONOMOUS_PRINCIPAL }))
-      )
+      approval(stampInvestigationMemory(stampUnattended(auth())))
     );
     assert.deepEqual(status, {
       reason: "Unattended runs may not write investigation memory.",

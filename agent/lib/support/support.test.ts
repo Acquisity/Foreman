@@ -13,7 +13,7 @@ import { executorConnection } from "../executor/connection.js";
 import { toolkitUrl } from "../executor/endpoint.js";
 import { EXECUTOR_DISCOVERY } from "../executor/instructions.js";
 import { executorTransport } from "../executor/transport.js";
-import { selectPrompt } from "../prompts.js";
+import { composePrompt } from "../prompts.js";
 import { stampRepository } from "../repository.js";
 import { repositoryCapabilitiesAvailable } from "../repository-lane.js";
 import { sessionLane } from "../session-lane.js";
@@ -25,7 +25,7 @@ import {
   inspectConversation,
   notificationConversation,
 } from "./conversation.js";
-import { SUPPORT_DISCOVERY } from "./instructions.js";
+import { SUPPORT_DISCOVERY, SUPPORT_PROMPT } from "./instructions.js";
 import { assertSupportOperation, supportWriteKey } from "./policy.js";
 
 const INCOMPLETE = /incomplete/;
@@ -337,12 +337,33 @@ test("master switch enables intake only; followups require separate opt-in", () 
 });
 
 test("support instructions replace the ordinary discovery path without dropping the investigation procedure", () => {
-  const prompt = selectPrompt("eve:app", sessionLane(auth));
+  const prompt = composePrompt(sessionLane(auth));
   assert.ok(prompt.includes(SUPPORT_DISCOVERY));
   assert.ok(prompt.includes("# Identity"));
   assert.ok(prompt.includes("intercom-triage-investigate"));
   assert.ok(prompt.includes("intercom-billing-triage"));
   assert.ok(!prompt.includes(EXECUTOR_DISCOVERY));
+});
+
+test("support prompt limits delegated evidence tasks and reserves the journal workflow for the root", () => {
+  const prompt = composePrompt(sessionLane(auth));
+  assert.ok(prompt.includes(SUPPORT_DISCOVERY));
+  assert.ok(prompt.includes(SUPPORT_PROMPT));
+  assert.ok(
+    prompt.includes(
+      'A message labeled "Delegated support evidence task" is read-only: investigate only the supplied question and return findings, source references, uncertainties, and required next actions to the parent.'
+    )
+  );
+  assert.ok(
+    prompt.includes(
+      "Do not call support_investigation, journal changes, write Linear changes, deliver Slack messages, perform repository writes, or wait for a person."
+    )
+  );
+  assert.ok(
+    prompt.includes(
+      "The remaining workflow applies only to the root handling the original intake or follow-up; delegated children never open or finish that investigation."
+    )
+  );
 });
 
 const manifestUrl = new URL(
