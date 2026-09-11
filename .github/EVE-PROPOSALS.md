@@ -74,7 +74,3 @@ Proposal: expose a runtime-owned per-run deadline on channel sends that cancels 
 Checked against eve 0.44.0 after ENG-13601's first production intake tick. The compiler emits channel entries from HTTP routes, so `routes: []` omits a receive-only channel from the runtime catalog. Cross-channel dispatch also falls back to a route fingerprint when bundled module references differ. Foreman's support channel therefore carries one inert GET route that always returns 404, allowing registration without exposing session creation. A compiled-manifest regression test checks that the channel survives compilation.
 
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
-
-## Upgrade notes checked against eve 0.54.2
-
-These are target-version capabilities, not claims that this eve 0.44 revision uses them. The 0.54.2 connection docs support dynamic MCP definitions and per-session URL selection, so the URL-selection gap above has native support. Keep the support dispatcher during the upgrade because it also journals Linear writes. Eve 0.54.2 exposes session cancellation with `tasks: true`; that helps explicit stop handling but does not establish a durable per-run deadline for support. Keep the support bound until its exact replacement is proven. Keep the other proposal workarounds until a supported replacement is verified against the built artifact and deployed behavior.

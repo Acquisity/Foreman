@@ -34,13 +34,6 @@ const unattendedAuth: SessionAuthContext = {
   attributes: { [UNATTENDED_ATTRIBUTE]: "true" },
 };
 
-// Historical durable auth must keep its old denials after removal.
-const retiredAuth: SessionAuthContext = {
-  ...auth,
-  principalId: "github:foreman-factory",
-  principalType: "service",
-};
-
 const approvalFor = (current: SessionAuthContext, toolName = "push_branch") =>
   ({
     session: { auth: { current } },
@@ -57,11 +50,6 @@ describe("deliveryPolicy", () => {
       deliveryPolicy(approvalFor(stampTrusted(auth))),
       "not-applicable"
     );
-  });
-
-  it("denies a retired unattended principal", () => {
-    const status = deliveryPolicy(approvalFor(retiredAuth));
-    assert.equal(typeof status === "object" && status.type, "denied");
   });
 
   it("denies a schedule dispatched under a real user, even when trusted", () => {
@@ -96,8 +84,8 @@ describe("repositoryKnowledgePolicy", () => {
     assert.equal(repositoryKnowledgePolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies a retired unattended principal", () => {
-    const status = repositoryKnowledgePolicy(approvalFor(retiredAuth));
+  it("denies an unattended schedule", () => {
+    const status = repositoryKnowledgePolicy(approvalFor(unattendedAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -114,8 +102,8 @@ describe("modelSwapPolicy", () => {
     assert.equal(modelSwapPolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies a retired unattended principal", () => {
-    const status = modelSwapPolicy(approvalFor(retiredAuth));
+  it("denies an unattended schedule", () => {
+    const status = modelSwapPolicy(approvalFor(unattendedAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -123,14 +111,16 @@ describe("modelSwapPolicy", () => {
 describe("denyUnattendedWrites", () => {
   const policy = denyUnattendedWrites("Supermemory", ["add_memory"]);
 
-  it("denies a retired unattended write", () => {
-    const status = policy(approvalFor(retiredAuth, "supermemory__add_memory"));
+  it("denies an unattended write", () => {
+    const status = policy(
+      approvalFor(unattendedAuth, "supermemory__add_memory")
+    );
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
-  it("leaves a retired unattended non-write ungated", () => {
+  it("leaves an unattended non-write ungated", () => {
     assert.equal(
-      policy(approvalFor(retiredAuth, "supermemory__search_memory")),
+      policy(approvalFor(unattendedAuth, "supermemory__search_memory")),
       "not-applicable"
     );
   });
@@ -146,11 +136,6 @@ describe("denyUnattendedWrites", () => {
 describe("userPreferencesDeletionPolicy", () => {
   it("denies a schedule dispatched under a real user", () => {
     const status = userPreferencesDeletionPolicy(approvalFor(unattendedAuth));
-    assert.equal(typeof status === "object" && status.type, "denied");
-  });
-
-  it("denies a retired unattended run", () => {
-    const status = userPreferencesDeletionPolicy(approvalFor(retiredAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 

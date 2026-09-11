@@ -1,4 +1,5 @@
 import { EXECUTOR_DISCOVERY } from "./executor/instructions.js";
+import { SUPPORT_DELEGATION_LABEL } from "./support/instructions.js";
 
 const IDENTITY = `# Identity
 
@@ -21,7 +22,7 @@ const REPOSITORIES = `# Repository selection and workspaces
 
 const DELEGATION = `# Delegation
 
-Give every delegated child a self-contained message because it does not see the parent conversation, and give parallel children non-overlapping write scopes in the shared sandbox. For repository work, include the selected \`owner/repo\` and tell the child to call \`prepare_repository\` before working. For scheduled support delegation, begin the child message with "Delegated support evidence task", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent. The root keeps the investigation journal, Linear writes, and Slack delivery.`;
+Give every delegated child a self-contained message because it does not see the parent conversation, and give parallel children non-overlapping write scopes in the shared sandbox. For repository work, include the selected \`owner/repo\` and tell the child to call \`prepare_repository\` before working. For scheduled support delegation, begin the child message with "${SUPPORT_DELEGATION_LABEL}", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent. The root keeps the investigation journal, Linear writes, and Slack delivery.`;
 
 export const MEMORY = `# Investigation memory
 

@@ -19,6 +19,7 @@ pnpm typecheck
 pnpm check
 pnpm fix
 pnpm build
+pnpm verify:built-github
 pnpm eval
 pnpm report:capabilities
 pnpm test
@@ -26,6 +27,8 @@ pnpm validate
 pnpm db:migrate
 npx eve info
 ```
+
+After loading `.env.example`, run `pnpm build` and `pnpm verify:built-github` to validate all 31 GitHub definitions from the built server and reject an unstamped callback. This checks the deployed bundle shape in addition to the source compilation covered by `pnpm validate`.
 
 Verify with `pnpm validate`, then exercise direct work and native delegation on the exact Preview deployment per `.github/UAT-BATTERY.md`. Evals cost real tokens. Run `routing/direct-scratch-repository` only with `FOREMAN_SCRATCH_REPO` set to a scratch repository and `FOREMAN_SCRATCH_TICKET` to an existing test ticket.
 
@@ -42,7 +45,7 @@ The report covers `slack`, `slack-intake-only`, and `repository-interactive`. `a
 - Authored capabilities live only under `agent/`; evals live beside it.
 - The root agent sets `limits: { maxInputTokensPerSession: false }` in `agent/agent.ts`. Cached prompt re-reads count as provider-reported input on every model call, so eve's default 40M per-session input budget can park a long Slack thread on an Approve/Stop budget card the channel cannot answer. Output stays on eve's existing uncapped default; keep it that way unless a billing decision says otherwise.
 - Declared subagents inherit no prompt, tools, connections, skills, or sandbox unless authored. Vision shares the parent sandbox; critic keeps its own sandbox and triage-critic skill. Native `agent` copies inherit root configuration and sandbox with fresh history and state, and cannot delegate recursively. Give them self-contained tasks and avoid concurrent edits to the same files.
-- On eve 0.44, native and declared child calls complete before the parent continues; cancelling the active parent turn cancels its children. Task-mode children cannot park, so approval-gated actions belong on the attended root. Recheck these semantics before the eve 0.54 upgrade.
+- On eve 0.44, native and declared child calls complete before the parent continues; cancelling the active parent turn cancels its children. Task-mode children cannot park, so approval-gated actions belong on the attended root.
 - Every callback handed to a dynamic tool needs a durable descriptor, and eve stamps one only on a callback authored inline inside a `defineTool({ ... })` call. The GitHub surface is a single dynamic tool returning all 31 entries, so one bare callback drops every `github__` tool from the session with nothing logged to the model. The extension's `overrides` accept only the stamped callbacks exported from `agent/lib/github/durable-callbacks.ts`, which is where the inline `defineTool` carriers live; the approval policies themselves stay in `agent/lib/github/approval.ts`. Never pass a callback to `overrides` from anywhere else.
 - Framework limits eve 0.44 cannot express, and what was implemented instead, are recorded in [EVE-PROPOSALS.md](./.github/EVE-PROPOSALS.md). Add a section there rather than approximating a gate unsafely.
 - Every Foreman-authored call that leaves the process has a deadline or a documented exemption, and each one is inventoried in [OUTSIDE-CALLS.md](./.github/OUTSIDE-CALLS.md) with the reason for its bound or exemption. Deadlines are per provider on purpose: there is no shared fetch wrapper, and one is not wanted. Sandbox commands do share `boundedRun` from `agent/lib/sandbox-deadline.ts`, which reports a deadline as exit code 124 so each caller's existing failure branch handles it while a cancelled turn still throws. A new outside call goes in that table.

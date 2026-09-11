@@ -49,8 +49,6 @@ Durable documents live in one Vercel Blob store. Reserved prefixes are registere
 - `user-preferences/` is principal-scoped. Supermemory supports broader attended-session recall, but neither is repository authority.
 - `sla-report/` stores the daily SLA report dispatch marker.
 
-Retired `pipeline-runs/` and `artifacts/` data remain reserved and untouched; removing the factory does not delete stored documents.
-
 Settled investigations, including ticketless Intercom and Slack ones and conclusions a colleague corrected in a thread, are indexed in a private Foreman-owned Postgres database, reached through `FOREMAN_MEMORY_DATABASE_URL` and never through the read-only Neon MCP connection. The schema lives in `migrations/` and applies with `pnpm db:migrate`, a manual release step and never part of agent startup. Run a new migration against production before relying on the code that needs it: until `0002` runs, a ticketless write fails on the `NOT NULL` project column and the tool reports `recorded: false` without touching the verdict. It holds sanitized case patterns, not customer data: PlanetScale remains the only production database and the only source of current blast radius. Access is fail-closed and stamped per channel, so GitHub sessions and unattended runs cannot read or write it.
 
 ## Operations logging

@@ -49,16 +49,6 @@ test("canUseInvestigationMemory", async (t) => {
     assert.equal(canUseInvestigationMemory(github), false);
   });
 
-  await t.test(
-    "keeps retired unattended sessions denied after automatic dispatch is removed",
-    () => {
-      const retired = stampInvestigationMemory(
-        auth({ principalId: "github:foreman-factory" })
-      );
-      assert.equal(canUseInvestigationMemory(retired), false);
-    }
-  );
-
   await t.test("is false for a schedule dispatching under a user", () => {
     const schedule = stampInvestigationMemory(stampUnattended(auth()));
     assert.equal(canUseInvestigationMemory(schedule), false);

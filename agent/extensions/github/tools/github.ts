@@ -4,7 +4,7 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
 
 /**
  * Keeps the 31-tool GitHub surface out of a lane that has no repository
- * selected and no factory path open to it.
+ * selected.
  *
  * @remarks
  * This file overrides the extension's own `tools/github.ts` slot, which is the

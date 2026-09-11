@@ -44,7 +44,7 @@ import { isIntakeOnly } from "../lib/trust.js";
  * Channels listed in SLACK_INTAKE_ONLY_CHANNELS are intake-only: their
  * mentions stay trusted, so conversation and investigation run as normal, but
  * the session is stamped intake-only and intakeOnlyPolicy denies every push,
- * on the direct path and inside the stations alike. The channel mapping tells
+ * on the direct path and inside delegated tasks alike. The channel mapping tells
  * the model which intake workflow and skills to use.
  *
  * Automatic Slack connection attempts never show a sign-in prompt: user-scoped

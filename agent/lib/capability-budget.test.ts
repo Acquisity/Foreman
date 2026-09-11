@@ -38,7 +38,7 @@ const { canUseInvestigationMemory, isIntakeOnly, isTrusted, isUnattended } =
   await import("./trust.js");
 const { repositoryFromAuth } = await import("./repository.js");
 
-const UNRESOLVED_SKILL = /unregistered-skill/u;
+const UNSUPPORTED_DYNAMIC_SKILLS = /does not support dynamic skills/u;
 const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
 
@@ -86,7 +86,6 @@ const MANIFEST_HEADER = {
 // every counted character is known by inspection.
 const FIXTURE = parseCapabilityManifest({
   ...MANIFEST_HEADER,
-  dynamicSkills: [],
   dynamicTools: [
     // The consumer's override of the extension's own `tools/github.ts` slot,
     // exactly as `eve info` compiles it: the mount namespace is still github,
@@ -123,14 +122,6 @@ const FIXTURE = parseCapabilityManifest({
 
 // One resolved set with known sizes, so the row arithmetic below is readable.
 const RESOLVED = {
-  dynamicSkills: [
-    {
-      description: "dd",
-      markdown: "mmm",
-      slug: "fixture-guidance",
-      source: "skills/",
-    },
-  ],
   // name 8 + description 2 + schema 3 characters.
   dynamicTools: [
     {
@@ -144,7 +135,6 @@ const RESOLVED = {
 };
 
 const NO_DYNAMIC = {
-  dynamicSkills: [],
   dynamicTools: [],
   subagentSchemaChars: 0,
 };
@@ -169,6 +159,27 @@ describe("capability source grouping", () => {
 });
 
 describe("manifest provenance", () => {
+  it("rejects unsupported dynamic skills before measuring the manifest", () => {
+    assert.throws(
+      () =>
+        parseCapabilityManifest({
+          ...MANIFEST_HEADER,
+          dynamicSkills: [
+            {
+              eventNames: ["turn.started"],
+              slug: "new-skill",
+              sourceId: "skills/new-skill.ts",
+            },
+          ],
+        }),
+      UNSUPPORTED_DYNAMIC_SKILLS
+    );
+    assert.deepEqual(
+      parseCapabilityManifest(MANIFEST_HEADER).dynamicSkills,
+      []
+    );
+  });
+
   it("rejects an artifact of another kind or revision", () => {
     assert.throws(() =>
       parseCapabilityManifest({ ...MANIFEST_HEADER, kind: "something-else" })
@@ -212,11 +223,11 @@ describe("lane measurement", () => {
         source: "tools/",
       },
       {
-        bodyChars: 7,
-        descriptionChars: 4,
-        entries: 2,
+        bodyChars: 4,
+        descriptionChars: 2,
+        entries: 1,
         kind: "skill",
-        nameChars: 18,
+        nameChars: 2,
         schemaChars: 0,
         source: "skills/",
       },
@@ -231,19 +242,7 @@ describe("lane measurement", () => {
         source: "subagents/",
       },
     ]);
-    assert.equal(budget.catalogChars, 49 + 14 + 7);
-    assert.equal(budget.bodyChars, 7);
-  });
-
-  it("drops the dynamic skill from its source row when unresolved", () => {
-    const budget = measureLane(FIXTURE, "repository-interactive", {
-      ...RESOLVED,
-      dynamicSkills: [],
-    });
-    assert.ok(
-      budget.rows.some((row) => row.source === "skills/" && row.entries === 1)
-    );
-    assert.equal(budget.catalogChars, 49 + 14 + 7 - 16 - 2);
+    assert.equal(budget.catalogChars, 2 + 14 + 21 + 4 + 11);
     assert.equal(budget.bodyChars, 4);
   });
 
@@ -270,23 +269,6 @@ describe("lane measurement", () => {
 });
 
 describe("dynamic capability resolution", () => {
-  it("refuses an unregistered dynamic skill rather than undercounting", async () => {
-    const manifest = parseCapabilityManifest({
-      ...MANIFEST_HEADER,
-      dynamicSkills: [
-        {
-          eventNames: ["turn.started"],
-          slug: "unregistered-skill",
-          sourceId: "skills/unregistered-skill.ts",
-        },
-      ],
-    });
-    await assert.rejects(
-      resolveLaneCapabilities(manifest, "slack"),
-      UNRESOLVED_SKILL
-    );
-  });
-
   it("refuses a dynamic tool whose module is not in the bundle", async () => {
     const manifest = parseCapabilityManifest({
       ...MANIFEST_HEADER,
@@ -414,7 +396,7 @@ describe("session lanes", () => {
 const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
 const TOTALS_LINE =
-  /catalog 70 characters \(about 18 tokens\), body 7 characters/u;
+  /catalog 52 characters \(about 13 tokens\), body 4 characters/u;
 const SHARE_LINE =
   /slack carries 50\.0% of the repository-interactive catalog/u;
 
@@ -561,7 +543,7 @@ describe("capability report", () => {
     }
     assert.equal(
       entries("repository-interactive", "skill", "skills/"),
-      manifest.skills.length + manifest.dynamicSkills.length
+      manifest.skills.length
     );
   });
 });

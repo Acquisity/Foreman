@@ -1,14 +1,6 @@
 import type { SessionAuthContext } from "eve/context";
 
 /**
- * Deny compatibility for durable sessions created before automatic GitHub
- * dispatch was removed. No channel creates this principal anymore.
- */
-export const isRetiredSessionAuth = (
-  auth: SessionAuthContext | null
-): boolean => auth?.principalId === "github:foreman-factory";
-
-/**
  * Auth attribute marking a caller the dispatching channel decided to trust.
  *
  * @remarks
@@ -54,12 +46,9 @@ export function stampUnattended(auth: SessionAuthContext): SessionAuthContext {
   };
 }
 
-/** Whether this is a scheduled dispatch or a retired unattended session. */
+/** Whether this is an unattended scheduled dispatch. */
 export function isUnattended(auth: SessionAuthContext | null): boolean {
-  return (
-    isRetiredSessionAuth(auth) ||
-    auth?.attributes[UNATTENDED_ATTRIBUTE] === "true"
-  );
+  return auth?.attributes[UNATTENDED_ATTRIBUTE] === "true";
 }
 
 /**

@@ -25,7 +25,11 @@ import {
   inspectConversation,
   notificationConversation,
 } from "./conversation.js";
-import { SUPPORT_DISCOVERY, SUPPORT_PROMPT } from "./instructions.js";
+import {
+  SUPPORT_DELEGATION_LABEL,
+  SUPPORT_DISCOVERY,
+  SUPPORT_PROMPT,
+} from "./instructions.js";
 import { assertSupportOperation, supportWriteKey } from "./policy.js";
 
 const INCOMPLETE = /incomplete/;
@@ -351,7 +355,7 @@ test("support prompt limits delegated evidence tasks and reserves the journal wo
   assert.ok(prompt.includes(SUPPORT_PROMPT));
   assert.ok(
     prompt.includes(
-      'A message labeled "Delegated support evidence task" is read-only: investigate only the supplied question and return findings, source references, uncertainties, and required next actions to the parent.'
+      `A message labeled "${SUPPORT_DELEGATION_LABEL}" is read-only: investigate only the supplied question and return findings, source references, uncertainties, and required next actions to the parent.`
     )
   );
   assert.ok(

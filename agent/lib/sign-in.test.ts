@@ -90,10 +90,9 @@ describe("sign_in registry", () => {
 });
 
 describe("sign_in tool", () => {
-  it("refuses unattended, retired, or non-user sessions before requesting any token", async () => {
+  it("refuses unattended or non-user sessions before requesting any token", async () => {
     const cases = [
       null,
-      { ...attendedAuth, principalId: "github:foreman-factory" },
       stampUnattended({ ...attendedAuth, issuer: "slack" }),
       {
         attributes: {},

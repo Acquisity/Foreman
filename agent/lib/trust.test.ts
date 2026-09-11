@@ -24,13 +24,6 @@ test("isUnattended", async (t) => {
     assert.equal(isUnattended(auth()), false);
   });
 
-  await t.test("keeps retired unattended sessions denied", () => {
-    assert.equal(
-      isUnattended(auth({ principalId: "github:foreman-factory" })),
-      true
-    );
-  });
-
   await t.test("is true for a stamped user principal", () => {
     assert.equal(isUnattended(stampUnattended(auth())), true);
   });

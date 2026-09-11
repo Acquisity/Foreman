@@ -67,12 +67,6 @@ export const CAPABILITY_LANES = [
 
 export type CapabilityLane = (typeof CAPABILITY_LANES)[number];
 
-const dynamicEntrySchema = z.object({
-  eventNames: z.array(z.string()).default([]),
-  slug: z.string(),
-  sourceId: z.string(),
-});
-
 const namedEntrySchema = z.object({
   description: z.string().default(""),
   name: z.string(),
@@ -108,7 +102,10 @@ export const capabilityManifestSchema = z.object({
         .optional(),
     })
     .optional(),
-  dynamicSkills: z.array(dynamicEntrySchema).default([]),
+  dynamicSkills: z
+    .array(z.unknown())
+    .max(0, "capability-budget.ts does not support dynamic skills.")
+    .default([]),
   dynamicTools: z.array(dynamicToolEntrySchema).default([]),
   kind: z.literal(MEASURED_MANIFEST_KIND),
   skills: z
@@ -242,14 +239,6 @@ const laneSession = (lane: CapabilityLane): DynamicToolSession => ({
   id: `capability-budget:${lane}`,
 });
 
-/** One dynamic skill a lane resolves. */
-interface ResolvedDynamicSkill {
-  readonly description: string;
-  readonly markdown: string;
-  readonly slug: string;
-  readonly source: string;
-}
-
 /** One model-visible tool a dynamic tool resolver returned, with its source. */
 interface ResolvedDynamicTool extends AdmittedDynamicTool {
   readonly source: string;
@@ -257,7 +246,6 @@ interface ResolvedDynamicTool extends AdmittedDynamicTool {
 
 /** Everything a lane carries that the compiled manifest cannot state. */
 export interface ResolvedLaneCapabilities {
-  readonly dynamicSkills: readonly ResolvedDynamicSkill[];
   readonly dynamicTools: readonly ResolvedDynamicTool[];
   /** Input schema characters on each subagent's delegation tool. */
   readonly subagentSchemaChars: number;
@@ -333,14 +321,6 @@ export async function resolveLaneCapabilities(
   manifest: CapabilityManifest,
   lane: CapabilityLane
 ): Promise<ResolvedLaneCapabilities> {
-  // Foreman has no dynamic skills. Reject a new resolver until this report
-  // can measure it, rather than silently publishing a partial total.
-  const [skill] = manifest.dynamicSkills;
-  if (skill) {
-    throw new Error(
-      `Dynamic skill '${skill.slug}' from ${skill.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
-    );
-  }
   const tools = await Promise.all(
     manifest.dynamicTools.map(async (entry) => {
       const admitted = await resolveCompiledDynamicTools(
@@ -353,7 +333,6 @@ export async function resolveLaneCapabilities(
     })
   );
   return {
-    dynamicSkills: [],
     dynamicTools: tools.flat(),
     subagentSchemaChars: await subagentDelegationSchemaChars(
       manifest.config?.experimental?.subagentPersistentSessions === true
@@ -425,22 +404,16 @@ export function measureLane(
       source: tool.source,
     })),
   ]);
-  const skillRows = groupRows("skill", [
-    ...manifest.skills.map((skill) => ({
+  const skillRows = groupRows(
+    "skill",
+    manifest.skills.map((skill) => ({
       bodyChars: skill.markdown.length,
       descriptionChars: skill.description.length,
       nameChars: skill.name.length,
       schemaChars: 0,
       source: capabilitySource(skill.sourceId),
-    })),
-    ...resolved.dynamicSkills.map((skill) => ({
-      bodyChars: skill.markdown.length,
-      descriptionChars: skill.description.length,
-      nameChars: skill.slug.length,
-      schemaChars: 0,
-      source: skill.source,
-    })),
-  ]);
+    }))
+  );
   const subagentRows = groupRows(
     "subagent",
     manifest.subagents.map((subagent) => ({

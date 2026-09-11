@@ -9,7 +9,7 @@ import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
  * rather than a per-feature one. This module owns that layout: the reserved prefixes, what each
  * holds, and which tool owns it. Any general-purpose Blob tool added later must consult
  * {@link reservedNamespaceForPath} / {@link reservedNamespaceForUrl} before acting, so a managed
- * document (repository knowledge, a user's preferences, a handoff artifact) can't be reached or
+ * document (repository knowledge or a user's preferences) can't be reached or
  * overwritten through a generic file operation.
  *
  * Feature modules import their prefix from here rather than declaring their own. The dependency
@@ -59,9 +59,9 @@ interface ReservedNamespace {
   /** Human-readable description of what the namespace holds. */
   readonly label: string;
   /** Tool that reads this namespace. */
-  readonly readTool?: string;
+  readonly readTool: string;
   /** Tool that owns writes to this namespace. */
-  readonly writeTool?: string;
+  readonly writeTool: string;
 }
 
 /**
@@ -72,10 +72,6 @@ interface ReservedNamespace {
  * call sites.
  */
 const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
-  // Retired data stays protected from generic Blob tools; no execution path remains.
-  "artifacts/": {
-    label: "retired handoff records",
-  },
   [LEGACY_REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "legacy repository knowledge",
     readTool: "read_repository_knowledge",
@@ -85,9 +81,6 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the live agent model overrides",
     readTool: "read_agent_models",
     writeTool: "set_agent_models",
-  },
-  "pipeline-runs/": {
-    label: "retired run records",
   },
   [SLA_REPORT_PREFIX]: {
     label: "the daily SLA report dispatch marker",
@@ -159,9 +152,7 @@ export const reservedNamespaceForUrl = (
  * @returns A message naming the owning tool, for the model to act on.
  */
 export const reservedWriteMessage = (namespace: ReservedNamespace): string =>
-  namespace.writeTool
-    ? `That path is reserved for ${namespace.label}: use ${namespace.writeTool} instead.`
-    : `That path is reserved for ${namespace.label} and cannot be changed.`;
+  `That path is reserved for ${namespace.label}: use ${namespace.writeTool} instead.`;
 
 /**
  * Build the refusal message for a read blocked by a reserved namespace.
@@ -170,9 +161,7 @@ export const reservedWriteMessage = (namespace: ReservedNamespace): string =>
  * @returns A message naming the owning read tool.
  */
 export const reservedReadMessage = (namespace: ReservedNamespace): string =>
-  namespace.readTool
-    ? `That path holds ${namespace.label}: use ${namespace.readTool} instead.`
-    : `That path holds ${namespace.label} and is not available through agent tools.`;
+  `That path holds ${namespace.label}: use ${namespace.readTool} instead.`;
 
 /**
  * Read a Markdown document from the store by its exact key.

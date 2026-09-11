@@ -43,7 +43,7 @@ Autumn and Stripe billing helpers use the shared company account through Executo
 
 ## Storage
 
-All Blob namespaces are registered in `agent/lib/blob.ts`. Retired `pipeline-runs/` and `artifacts/` prefixes remain reserved, with existing data untouched.
+Active Blob namespaces are registered in `agent/lib/blob.ts`.
 
 - `repository-knowledge/<repository-hash>.md`: verified shared facts. Reads fall back to legacy `factory-brain/<repository-hash>.md`; trusted writes always use the new namespace.
 - `model-overrides/foreman.json`: global model overrides used at session start.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { SUPPORT_DELEGATION_LABEL } from "./support/instructions.js";
 
 // The retained Linear attachment credential is initialized by constants.ts.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
@@ -24,7 +25,7 @@ describe("composePrompt", () => {
   it("identifies delegated support work and passes its evidence context without root delivery responsibilities", () => {
     assert.ok(
       GENERAL_PROMPT.includes(
-        'For scheduled support delegation, begin the child message with "Delegated support evidence task", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent.'
+        `For scheduled support delegation, begin the child message with "${SUPPORT_DELEGATION_LABEL}", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent.`
       )
     );
     assert.ok(
