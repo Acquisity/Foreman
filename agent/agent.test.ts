@@ -45,6 +45,7 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
     selection,
     state: { get: () => undefined, set: () => undefined },
   });
-  assert.equal(resolved.model, selection);
+  assert.equal(resolved.model, selection.model);
+  assert.deepEqual(resolved.modelOptions, selection.modelOptions);
   assert.equal(typeof resolved.model.doStream, "function");
 });

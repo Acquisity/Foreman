@@ -1,5 +1,6 @@
 import { defineAgent, defineDynamic } from "eve";
 import { resolveModel } from "./lib/models.js";
+import { previewProviderOptions } from "./lib/preview-provider.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 
 // Root agent runtime configuration: the model for Foreman, Acquisity's
@@ -21,8 +22,10 @@ export default defineAgent({
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "step.started": async () =>
-        ticketLinkedModel(await resolveModel("orchestrator")),
+      "step.started": async () => ({
+        model: ticketLinkedModel(await resolveModel("orchestrator")),
+        modelOptions: previewProviderOptions(),
+      }),
     },
   }),
 });
