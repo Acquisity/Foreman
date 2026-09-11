@@ -35,38 +35,53 @@ const eventTurnId = (event: MessageStreamEvent): string | null => {
   return event.data.turnId;
 };
 
-const readActiveTurn = async (
-  reader: ReadableStreamDefaultReader<MessageStreamEvent>,
-  remaining: number,
-  activeTurnId: string | null
-): Promise<string | null> => {
-  if (remaining === 0) {
-    return activeTurnId;
-  }
-  const { done, value } = await reader.read();
-  if (done) {
-    return null;
-  }
-  let nextActiveTurnId = activeTurnId;
-  if (value.type === "turn.started") {
-    nextActiveTurnId = value.data.turnId;
-  } else if (isCurrentTurnBoundaryEvent(value)) {
-    nextActiveTurnId = null;
-  }
-  return readActiveTurn(reader, remaining - 1, nextActiveTurnId);
-};
+const TURN_SNAPSHOT_WINDOW = 64;
+type SlackSession = NonNullable<
+  Awaited<ReturnType<SlackInboundMessageContext["resolveSession"]>>
+>;
 
-/** Reads the durable stream through an already-observed tail. */
+/** Read recent parent events first; child events do not identify the parent turn. */
 const activeTurnAtTail = async (
-  stream: ReadableStream<MessageStreamEvent>,
-  tailIndex: number
+  session: SlackSession,
+  tailIndex: number,
+  windowSize = 1
 ): Promise<string | null> => {
+  const startIndex = Math.max(0, tailIndex - windowSize + 1);
+  const stream = await session.getEventStream({ startIndex });
   const reader = stream.getReader();
+  let active: string | null | undefined;
   try {
-    return await readActiveTurn(reader, tailIndex + 1, null);
+    for (let index = startIndex; index <= tailIndex; index += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: consume only the snapshotted window in stream order.
+      const { done, value } = await reader.read();
+      if (done) {
+        return null;
+      }
+      if (
+        isCurrentTurnBoundaryEvent(value) ||
+        value.type === "turn.completed" ||
+        value.type === "turn.failed" ||
+        value.type === "turn.cancelled"
+      ) {
+        active = null;
+      } else {
+        const turnId = eventTurnId(value);
+        if (turnId !== null) {
+          active = turnId;
+        }
+      }
+    }
   } finally {
     await reader.cancel();
   }
+  if (active !== undefined) {
+    return active;
+  }
+  // A window containing only forwarded child events needs an earlier parent
+  // event. Do not use the child's nested turn id or guess the current turn.
+  return startIndex === 0
+    ? null
+    : activeTurnAtTail(session, startIndex - 1, TURN_SNAPSHOT_WINDOW);
 };
 
 const confirmsCancellation = async (
@@ -107,8 +122,7 @@ export const cancelActiveSlackTurn = async (
   if (tailIndex < 0) {
     return null;
   }
-  const snapshot = await session.getEventStream({ startIndex: 0 });
-  const turnId = await activeTurnAtTail(snapshot, tailIndex);
+  const turnId = await activeTurnAtTail(session, tailIndex);
   if (!turnId) {
     return null;
   }

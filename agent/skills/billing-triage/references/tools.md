@@ -12,7 +12,7 @@ Call authored root tools by their bare names; call company provider tools by the
 
 `planetscale_execute_read_query` is an authored helper, called bare. Executor also exposes the provider operation of the same name, which does not apply the helper's result bounds. Prefer the bare helper for bounded production queries.
 
-Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface through the shared Executor connection; the approved provider MCP reads through Executor are the fallback when a root tool could not run. A 404 reason is not that case: it is a wrong id, and a fallback with the same id fails the same way.
+Read them in flow order: PlanetScale, then Autumn, then Stripe. The app-scoped root tools `read_autumn_billing` and `read_stripe_billing` run on every surface through the shared Executor connection; the approved provider MCP reads through Executor cover questions beyond a successful helper result. They share the helper's provider access, so do not retry an unavailable or denied source through another tool this turn. A 404 is an identity finding: re-resolve the id as the billing skill directs, rather than repeating the same lookup through another tool.
 
 ## PlanetScale (Executor: planetscale)
 
