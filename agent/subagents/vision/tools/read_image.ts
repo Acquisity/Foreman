@@ -103,26 +103,30 @@ export default defineTool({
     }
     return { base64: bytes.toString("base64"), mediaType, source: what };
   },
-  inputSchema: z.union([
-    z.object({
-      url: z
-        .string()
-        .url()
-        .max(2048)
-        .refine(
-          (value) => {
-            const parsed = new URL(value);
-            return (
-              parsed.protocol === "https:" && parsed.host === LINEAR_UPLOAD_HOST
-            );
-          },
-          {
-            message: `Only https://${LINEAR_UPLOAD_HOST} urls can be read by url.`,
-          }
-        ),
-    }),
-    z.object({ path: z.string().min(1).max(1024) }),
-  ]),
+  // Strict providers require a top-level object type even for an object union.
+  inputSchema: z
+    .union([
+      z.object({
+        url: z
+          .string()
+          .url()
+          .max(2048)
+          .refine(
+            (value) => {
+              const parsed = new URL(value);
+              return (
+                parsed.protocol === "https:" &&
+                parsed.host === LINEAR_UPLOAD_HOST
+              );
+            },
+            {
+              message: `Only https://${LINEAR_UPLOAD_HOST} urls can be read by url.`,
+            }
+          ),
+      }),
+      z.object({ path: z.string().min(1).max(1024) }),
+    ])
+    .meta({ type: "object" }),
   toModelOutput: (output) =>
     toolOutput.content([
       toolOutputPart.text(`Image from ${output.source}:`),

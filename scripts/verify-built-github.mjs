@@ -45,6 +45,15 @@ async function verify() {
     scope: "step",
     sessionId: "built-github-proof",
   });
+  const expectedCallbacks = {
+    compareCommits: ["execute", "toModelOutput"],
+    createPullRequest: ["approvalRequest", "execute"],
+    getCommit: ["execute", "toModelOutput"],
+    getFileContent: ["execute", "toModelOutput"],
+    getPullRequestContext: ["execute", "toModelOutput"],
+    listPullRequestFiles: ["execute", "toModelOutput"],
+    updatePullRequest: ["approvalRequest", "execute"],
+  };
   const callbackPhases = {};
   for (const entryKey of names) {
     const identity = owner(entryKey);
@@ -53,6 +62,11 @@ async function verify() {
       identity.name,
       entries[entryKey],
       identity
+    );
+    assert.deepEqual(
+      Object.keys(callbacks).sort(),
+      [...(expectedCallbacks[entryKey] ?? ["execute"])].sort(),
+      `Unexpected durable callback phases for ${identity.name}.`
     );
     for (const phase of Object.keys(callbacks)) {
       callbackPhases[phase] = (callbackPhases[phase] ?? 0) + 1;

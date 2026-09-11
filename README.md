@@ -77,6 +77,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and vision attachment reads |
 | `SLACK_CONNECTOR` | `slack/acquisity-foreman` | Slack inbound delivery and replies |
 | `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
+| `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase bot logins for an explicitly requested AI review-bot loop; supply the chosen logins in the request because the sandbox cannot read this setting. It does not start automatic reviews. |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
 | `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |

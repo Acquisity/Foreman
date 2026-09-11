@@ -13,6 +13,8 @@ export default defineEval({
     t.noFailedActions();
     t.event("subagent.called", { count: 2, data: { toolName: "agent" } });
     t.event("subagent.completed", { count: 2 });
+    t.notEvent("subagent.called", { data: { toolName: "critic" } });
+    t.notEvent("subagent.called", { data: { toolName: "vision" } });
     t.messageIncludes("FIRST=42");
     t.messageIncludes("SECOND=nevar");
     for (const tool of WRITE_TOOLS) {

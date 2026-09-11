@@ -11,6 +11,7 @@ export default defineEval({
     );
     t.succeeded();
     t.notEvent("subagent.called");
+    t.notCalledTool("prepare_repository");
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }

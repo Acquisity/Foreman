@@ -18,8 +18,10 @@ export default defineEval({
     const turn = await t.send(
       `Work on ${ticket} in scratch repository ${repository}. Add a short Reporting bugs section to the README asking for the version and reproduction steps. Make the change directly, check it, push feature branch ${branch}, and open a normal pull request linked to that existing ticket. Do not merge.`
     );
-    // The default eval principal is untrusted. Approve only this run's exact
-    // push, after confirming the last successful preparation selected its repo.
+    // Eval targets authenticate the caller, so this delivery smoke supports
+    // either policy outcome. When a push requires approval, approve only this
+    // run's exact branch after checking its prepared repository. Approval
+    // policy itself is covered by agent/lib/github/approval.test.ts.
     if (turn.inputRequests.length > 0) {
       assert.equal(turn.inputRequests.length, 1);
       const request = await t.requireInputRequest({

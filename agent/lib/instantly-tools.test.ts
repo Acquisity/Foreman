@@ -69,6 +69,16 @@ describe("Instantly tool authorization", () => {
 });
 
 describe("Instantly tool inputs", () => {
+  it("publishes an object schema with all three resource branches", () => {
+    assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
+    const schema = z.toJSONSchema(readWorkspace.inputSchema, {
+      io: "input",
+      target: "draft-7",
+    });
+    assert.equal(schema.type, "object");
+    assert.equal(schema.oneOf?.length, 3);
+  });
+
   it("allows name discovery without IDs and rejects unbounded or empty searches", () => {
     assert.ok(listWorkspaces.inputSchema instanceof z.ZodType);
     const schema = listWorkspaces.inputSchema;

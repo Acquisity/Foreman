@@ -88,7 +88,9 @@ const inputSchema = z
         message: "Provide exactly one of workspaceId or workspaceName.",
       });
     }
-  });
+  })
+  // Preserve resource and selector validation while declaring the union's type.
+  .meta({ type: "object" });
 
 const unavailableReason = (error: unknown): string =>
   error instanceof InstantlyApiError
