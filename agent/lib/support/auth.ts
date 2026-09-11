@@ -1,6 +1,7 @@
 import type { SessionAuthContext, SessionContext } from "eve/context";
 import { z } from "zod";
 import { stampIntakeOnly, stampUnattended } from "../trust.js";
+import { SUPPORT_RUN_MS } from "./bound.js";
 import { conversationId, slackTimestamp } from "./config.js";
 import { SupportRefusal } from "./errors.js";
 
@@ -16,7 +17,11 @@ export function supportAuth(auth: SessionAuthContext, claim: SupportClaim) {
   return stampIntakeOnly(
     stampUnattended({
       ...auth,
-      attributes: { ...auth.attributes, ...supportClaim.parse(claim) },
+      attributes: {
+        ...auth.attributes,
+        ...supportClaim.parse(claim),
+        deadline: String(Date.now() + SUPPORT_RUN_MS),
+      },
       issuer: ISSUER,
     })
   );

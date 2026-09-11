@@ -11,21 +11,13 @@ import {
   settleSupport,
 } from "../lib/support/store.js";
 
-/** Internal schedule handoff only. HTTP requests cannot start sessions. */
+/**
+ * Internal schedule handoff only. HTTP requests cannot start sessions. The
+ * run bound lives in agent/hooks/support-bound.ts: eve swallows an error
+ * thrown by a channel event handler, while a thrown hook fails the turn.
+ */
 export default defineChannel({
-  context: (state) => ({ state }),
   events: {
-    "actions.requested"(_event, channel) {
-      channel.state.actions += 1;
-      if (channel.state.actions > 150 || Date.now() >= channel.state.deadline) {
-        throw new Error("Support investigation reached its run bound.");
-      }
-    },
-    "reasoning.appended"(_event, channel) {
-      if (Date.now() >= channel.state.deadline) {
-        throw new Error("Support investigation reached its run bound.");
-      }
-    },
     async "turn.completed"(_event, _channel, ctx) {
       const claim = claimFromContext(ctx);
       // An unfinished initial intake still needs a short Slack status; later follow-ups stay quiet.
@@ -65,7 +57,6 @@ export default defineChannel({
       {
         auth: input.auth,
         mode: "task",
-        state: { actions: 0, deadline: Date.now() + 18 * 60_000 },
         turnPolicy: "queue",
       }
     );
@@ -77,5 +68,4 @@ export default defineChannel({
       Promise.resolve(new Response(null, { status: 404 }))
     ),
   ],
-  state: { actions: 0, deadline: 0 },
 });
