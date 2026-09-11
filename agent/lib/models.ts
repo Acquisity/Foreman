@@ -96,6 +96,29 @@ export const writeModelOverrides = async (
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
 
+// Gateway routing for the root's DeepSeek calls. Every rejection found on ENG-13730 and
+// ENG-13732 was a baseten call on a mixed-provider history ("reasoning_content in the thinking
+// mode must be passed back", HTTP 400, no fallback), while fireworks accepts the same history,
+// so baseten and the DeepSeek native endpoint are left off the list and the order runs the
+// providers that tolerate the history, fastest first. Unlisted providers stay as fallback.
+export const gatewayRouting = (modelId: string) =>
+  modelId.startsWith("deepseek/")
+    ? {
+        providerOptions: {
+          gateway: {
+            order: [
+              "fireworks",
+              "wafer",
+              "alibaba",
+              "deepinfra",
+              "novita",
+              "modal",
+            ],
+          },
+        },
+      }
+    : undefined;
+
 // The gateway catalog, through the same authenticated provider eve's model calls use.
 // set_agent_models checks membership here before storing an id: a stored id the gateway
 // doesn't know would fail every future session at start, with no session left to undo it.

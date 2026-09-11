@@ -45,6 +45,12 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
     selection,
     state: { get: () => undefined, set: () => undefined },
   });
-  assert.equal(resolved.model, selection);
+  assert.equal(resolved.model, selection.model);
   assert.equal(typeof resolved.model.doStream, "function");
+  // The DeepSeek routing pin rides on the selection and eve forwards it as providerOptions.
+  assert.deepEqual(resolved.reference.providerOptions, {
+    gateway: {
+      order: ["fireworks", "wafer", "alibaba", "deepinfra", "novita", "modal"],
+    },
+  });
 });
