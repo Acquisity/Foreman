@@ -103,7 +103,7 @@ test("forwarded child events are searched past without using the child turn id",
         } as MessageStreamEvent)
   );
   assert.equal(await cancelActiveSlackTurn(f.ctx), "long-turn");
-  assert.deepEqual(f.starts, [130, 66, 2, 131]);
+  assert.deepEqual(f.starts, [130, 66, 0, 131]);
   assert.deepEqual(f.cancellations, [{ turnId: "long-turn" }]);
 });
 
@@ -122,5 +122,17 @@ test("a different turn cancellation cannot confirm a stale stop", async () => {
     event("session.waiting"),
   ]);
   assert.equal(await cancelActiveSlackTurn(f.ctx), null);
+  assert.deepEqual(f.cancellations, [{ turnId: "long-turn" }]);
+});
+
+test("a long child-only tail does not issue one remote read per small window", async () => {
+  const f = fixture(100_000, (index) =>
+    index === 0 ? event("turn.started", "long-turn") : event("subagent.started")
+  );
+  assert.equal(await cancelActiveSlackTurn(f.ctx), "long-turn");
+  assert.ok(
+    f.starts.length < 20,
+    "backward windows must grow for long child streams"
+  );
   assert.deepEqual(f.cancellations, [{ turnId: "long-turn" }]);
 });

@@ -81,7 +81,11 @@ const activeTurnAtTail = async (
   // event. Do not use the child's nested turn id or guess the current turn.
   return startIndex === 0
     ? null
-    : activeTurnAtTail(session, startIndex - 1, TURN_SNAPSHOT_WINDOW);
+    : activeTurnAtTail(
+        session,
+        startIndex - 1,
+        Math.max(TURN_SNAPSHOT_WINDOW, windowSize * 2)
+      );
 };
 
 const confirmsCancellation = async (
