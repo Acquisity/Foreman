@@ -1,5 +1,5 @@
 import { defineAgent, defineDynamic } from "eve";
-import { resolveModel } from "./lib/models.js";
+import { gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 
 // Root agent runtime configuration: the model for Foreman, Acquisity's
@@ -16,13 +16,19 @@ import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 //
 // Wrapped model instances resolve at step start: Eve cannot serialize provider
 // objects into durable session/turn selections. resolveModel retains live overrides.
+// The selection also carries the gateway routing for a DeepSeek id (see gatewayRouting).
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "step.started": async () =>
-        ticketLinkedModel(await resolveModel("orchestrator")),
+      "step.started": async () => {
+        const id = await resolveModel("orchestrator");
+        return {
+          model: ticketLinkedModel(id),
+          modelOptions: gatewayRouting(id),
+        };
+      },
     },
   }),
 });

@@ -1,7 +1,30 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { parseModelOverrides } = await import("./models.js");
+const { gatewayRouting, parseModelOverrides } = await import("./models.js");
+
+describe("gatewayRouting", () => {
+  it("orders a deepseek id onto the providers that accept a mixed history", () => {
+    assert.deepEqual(gatewayRouting("deepseek/deepseek-v4.1-flash"), {
+      providerOptions: {
+        gateway: {
+          order: [
+            "fireworks",
+            "wafer",
+            "alibaba",
+            "deepinfra",
+            "novita",
+            "modal",
+          ],
+        },
+      },
+    });
+  });
+
+  it("leaves every other id on the gateway default", () => {
+    assert.equal(gatewayRouting("anthropic/claude-opus-4.8"), undefined);
+  });
+});
 
 describe("parseModelOverrides", () => {
   it("strips a stale chat key", () => {
