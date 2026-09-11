@@ -69,14 +69,41 @@ describe("Instantly tool authorization", () => {
 });
 
 describe("Instantly tool inputs", () => {
-  it("publishes an object schema with all three resource branches", () => {
+  it("publishes a flat object schema and retains resource-specific validation", () => {
     assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
     const schema = z.toJSONSchema(readWorkspace.inputSchema, {
       io: "input",
       target: "draft-7",
     });
     assert.equal(schema.type, "object");
-    assert.equal(schema.oneOf?.length, 3);
+    assert.equal(schema.anyOf, undefined);
+    assert.equal(schema.oneOf, undefined);
+    assert.equal(schema.allOf, undefined);
+    const workspaceId = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
+    assert.equal(
+      readWorkspace.inputSchema.safeParse({
+        resource: "accounts",
+        status: 0,
+        workspaceId,
+      }).success,
+      false
+    );
+    assert.deepEqual(
+      readWorkspace.inputSchema.parse({
+        resource: "campaigns",
+        status: 0,
+        workspaceId,
+      }),
+      { limit: 20, resource: "campaigns", status: 0, workspaceId }
+    );
+    assert.deepEqual(
+      readWorkspace.inputSchema.parse({
+        emailType: "received",
+        resource: "accounts",
+        workspaceId,
+      }),
+      { limit: 20, resource: "accounts", workspaceId }
+    );
   });
 
   it("allows name discovery without IDs and rejects unbounded or empty searches", () => {

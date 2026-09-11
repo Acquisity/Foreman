@@ -22,14 +22,24 @@ const HTTP_401 = /HTTP 401 .*unauthorized/u;
 const STALLED = /did not finish reading within 0.005 seconds/u;
 
 describe("vision read_image", () => {
-  it("publishes an object schema while retaining both image input branches", () => {
+  it("publishes a flat object schema and preserves image source selection", () => {
     assert.ok(tool.inputSchema instanceof z.ZodType);
     const schema = z.toJSONSchema(tool.inputSchema, {
       io: "input",
       target: "draft-7",
     });
     assert.equal(schema.type, "object");
-    assert.equal(schema.anyOf?.length, 2);
+    assert.equal(schema.anyOf, undefined);
+    assert.equal(schema.oneOf, undefined);
+    assert.equal(schema.allOf, undefined);
+    assert.deepEqual(Object.keys(schema.properties ?? {}).sort(), [
+      "path",
+      "url",
+    ]);
+    const url = "https://uploads.linear.app/a/b/c";
+    assert.deepEqual(tool.inputSchema.parse({ path: "/tmp/shot.png", url }), {
+      url,
+    });
     assert.equal(tool.inputSchema.safeParse({}).success, false);
   });
 

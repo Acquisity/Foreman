@@ -23,7 +23,7 @@ const workspace = {
     ),
 };
 
-const inputSchema = z
+const resourceInputSchema = z
   .discriminatedUnion("resource", [
     z.object({
       ...workspace,
@@ -88,9 +88,22 @@ const inputSchema = z
         message: "Provide exactly one of workspaceId or workspaceName.",
       });
     }
+  });
+
+const [accountsInput, campaignsInput, emailsInput] =
+  resourceInputSchema.options;
+// Advertise one flat object while preserving resource-specific validation and
+// exactly one workspace selector. Fields from other resources are stripped by the pipe.
+const inputSchema = z
+  .object({
+    ...accountsInput.shape,
+    ...campaignsInput.shape,
+    ...emailsInput.shape,
+    limit: limit.unwrap().optional(),
+    resource: z.enum(["accounts", "campaigns", "emails"]),
+    status: z.number().int().optional(),
   })
-  // Preserve resource and selector validation while declaring the union's type.
-  .meta({ type: "object" });
+  .pipe(resourceInputSchema);
 
 const unavailableReason = (error: unknown): string =>
   error instanceof InstantlyApiError

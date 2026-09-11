@@ -78,6 +78,28 @@ const notAnImage = (what: string, bytes: Buffer) => {
  * straight from `uploads.linear.app` with the app token, so the parent never
  * downloads it and the 300-second url signature never matters.
  */
+const imageSourceSchema = z.union([
+  z.object({
+    url: z
+      .string()
+      .url()
+      .max(2048)
+      .refine(
+        (value) => {
+          const parsed = new URL(value);
+          return (
+            parsed.protocol === "https:" && parsed.host === LINEAR_UPLOAD_HOST
+          );
+        },
+        {
+          message: `Only https://${LINEAR_UPLOAD_HOST} urls can be read by url.`,
+        }
+      ),
+  }),
+  z.object({ path: z.string().min(1).max(1024) }),
+]);
+const [urlSource, pathSource] = imageSourceSchema.options;
+
 export default defineTool({
   description:
     "Look at an image. Pass url for a Linear screenshot (an uploads.linear.app link from the issue; read with Foreman's own Linear access, so it works after the link's signature has expired) or path for a PNG, JPEG, GIF, or WebP file already in the sandbox. The bytes are checked before you see them; a failure names why.",
@@ -103,30 +125,13 @@ export default defineTool({
     }
     return { base64: bytes.toString("base64"), mediaType, source: what };
   },
-  // Strict providers require a top-level object type even for an object union.
+  // Providers require a flat object; the pipe retains source selection and validation.
   inputSchema: z
-    .union([
-      z.object({
-        url: z
-          .string()
-          .url()
-          .max(2048)
-          .refine(
-            (value) => {
-              const parsed = new URL(value);
-              return (
-                parsed.protocol === "https:" &&
-                parsed.host === LINEAR_UPLOAD_HOST
-              );
-            },
-            {
-              message: `Only https://${LINEAR_UPLOAD_HOST} urls can be read by url.`,
-            }
-          ),
-      }),
-      z.object({ path: z.string().min(1).max(1024) }),
-    ])
-    .meta({ type: "object" }),
+    .object({
+      path: pathSource.shape.path.optional(),
+      url: urlSource.shape.url.optional(),
+    })
+    .pipe(imageSourceSchema),
   toModelOutput: (output) =>
     toolOutput.content([
       toolOutputPart.text(`Image from ${output.source}:`),
