@@ -6,7 +6,8 @@ import { GITHUB_TOOL_ALLOWLIST } from "../agent/lib/github/tool-allowlist.ts";
 
 // Run after sourcing .env.example and building. Importing the actual server in
 // this process registers extension configuration and compiled callback steps.
-// The proof only resolves definitions; it never calls a provider tool.
+// The proof resolves definitions and checks local approval predicates. It never
+// calls a provider tool.
 process.env.NITRO_HOST = "127.0.0.1";
 process.env.NITRO_PORT = "0";
 const UNSTAMPED_PROJECTION = /toModelOutput.*durable descriptor/u;
@@ -73,6 +74,30 @@ async function verify() {
     }
   }
 
+  // The two stamped gates must stay distinct even when their phases match.
+  const approvalContext = {
+    session: { auth: { current: null, initiator: null } },
+    toolInput: { draft: false },
+  };
+  assert.equal(
+    await entries.createPullRequest.approval({
+      ...approvalContext,
+      toolName: "github__createPullRequest",
+    }),
+    "not-applicable",
+    "Pull request creation must use the intake-only approval gate."
+  );
+  assert.equal(
+    (
+      await entries.updatePullRequest.approval({
+        ...approvalContext,
+        toolName: "github__updatePullRequest",
+      })
+    ).type,
+    "denied",
+    "Pull request updates must use the readiness approval gate."
+  );
+
   // Re-author just one projection without the compiler transform. This must
   // fail even though every other callback and all 31 tool names remain valid.
   const broken = defineTool({
@@ -87,6 +112,7 @@ async function verify() {
 
   return {
     allowlistMatches: true,
+    approvalPoliciesMatch: true,
     callbackPhases,
     count: names.length,
     unstampedCallbackRejected: true,
