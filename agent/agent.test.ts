@@ -47,10 +47,13 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
   });
   assert.equal(resolved.model, selection.model);
   assert.equal(typeof resolved.model.doStream, "function");
-  // The DeepSeek routing pin rides on the selection and eve forwards it as providerOptions.
-  assert.deepEqual(resolved.reference.providerOptions, {
-    gateway: {
-      order: ["fireworks", "wafer", "alibaba", "deepinfra", "novita", "modal"],
-    },
-  });
+  // The DeepSeek routing rides on the selection and eve forwards it as providerOptions.
+  // The order itself is pinned in models.test.ts; this only checks the forwarding.
+  const { gatewayRouting, MODELS } = await import("./lib/models.js");
+  const expected = gatewayRouting(MODELS.orchestrator);
+  assert.ok(expected);
+  assert.deepEqual(
+    resolved.reference.providerOptions,
+    expected.providerOptions
+  );
 });
