@@ -6,6 +6,8 @@ Pin Eve 0.54.2 and GitHub extension 0.7.1. Use an official browser extension rel
 
 Observed original-checkout typecheck failures: 12 removed glob/grep factories (four remain after PR1), removed ApprovalContext/ApprovalStatus exports, delta-only reasoningSoFar removal, new workflow-tool-call action variant, and sleep's WorkflowToolContext mismatch. Plain eve info first failed for missing LINEAR_CONNECTOR; after loading .env.example it failed on defineGlobTool. Do not report either as runtime validation. Full output is preserved.
 
+Review `agent/agent.test.ts` against the installed target runtime: its private `resolveRuntimeModelSelection` import and live-step assertions deliberately expose internal API drift. Verify the path and signature, preserve the wrapped-model and routing regression coverage, and update the 0.44.0 comment. A failure on 0.54.2 has not been observed for this newly added test.
+
 Read installed target docs for tools/HITL, dynamic capabilities, subagents, sandbox, Slack, hooks, skills, connections and evals before edits. Migrate glob/grep default imports; approval types from their current public exports; sleep to the supported workflow/tool contract. Extend Slack action narrowing for the actual event union, not an unchecked cast.
 
 Update capability reader from compiled manifest 41 to 48 and distinguish application/framework/extension ownership; preserve comparable catalog measurements and actual dynamic admission. Replace removed authored-module preparation helper with prepareAuthoredRuntimeModules and derive fixed delegation schema through current agent contract/schema exports. Remove experimental persistent-session branching and use fresh turnId/stepIndex in dispatch fixtures.

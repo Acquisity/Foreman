@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
-import { stampUnattended } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
@@ -310,22 +309,9 @@ describe("routeTicket", () => {
 });
 
 describe("route_ticket tool", () => {
-  it("allows an unattended schedule through the Linear approval policy", async () => {
+  it("never requires an approval card", async () => {
     const { approval } = tool;
-    const status = await (approval as (ctx: unknown) => unknown)({
-      session: {
-        auth: {
-          current: stampUnattended({
-            attributes: {},
-            authenticator: "app",
-            issuer: "eve",
-            principalId: "eve:app",
-            principalType: "runtime",
-          }),
-        },
-      },
-      toolName: "route_ticket",
-    });
+    const status = await (approval as () => unknown)();
     assert.equal(status, "not-applicable");
   });
 });
