@@ -25,7 +25,7 @@ const workspace = {
 
 const resourceInputSchema = z
   .discriminatedUnion("resource", [
-    z.object({
+    z.strictObject({
       ...workspace,
       limit,
       providerCode: z.number().int().min(1).max(8).optional(),
@@ -43,7 +43,7 @@ const resourceInputSchema = z
         ])
         .optional(),
     }),
-    z.object({
+    z.strictObject({
       ...workspace,
       limit,
       resource: z.literal("campaigns"),
@@ -62,7 +62,7 @@ const resourceInputSchema = z
         ])
         .optional(),
     }),
-    z.object({
+    z.strictObject({
       ...workspace,
       campaignId: uuid.optional(),
       emailAccount: z.string().email().max(320).optional(),
@@ -93,7 +93,7 @@ const resourceInputSchema = z
 const [accountsInput, campaignsInput, emailsInput] =
   resourceInputSchema.options;
 // Advertise one flat object while preserving resource-specific validation and
-// exactly one workspace selector. Fields from other resources are stripped by the pipe.
+// exactly one workspace selector. Reject filters belonging to another resource.
 const inputSchema = z
   .object({
     ...accountsInput.shape,

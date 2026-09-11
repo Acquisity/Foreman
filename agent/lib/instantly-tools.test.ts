@@ -96,13 +96,76 @@ describe("Instantly tool inputs", () => {
       }),
       { limit: 20, resource: "campaigns", status: 0, workspaceId }
     );
-    assert.deepEqual(
-      readWorkspace.inputSchema.parse({
-        emailType: "received",
-        resource: "accounts",
+    const accountFilters = {
+      providerCode: 1,
+      resource: "accounts",
+      status: 1,
+      workspaceId,
+    };
+    assert.deepEqual(readWorkspace.inputSchema.parse(accountFilters), {
+      ...accountFilters,
+      limit: 20,
+    });
+    const emailFilters = {
+      campaignId: workspaceId,
+      emailAccount: "sender@example.test",
+      emailType: "received",
+      latestOfThread: true,
+      lead: "lead@example.test",
+      maxTimestampCreated: "2026-09-11T12:00:00Z",
+      minTimestampCreated: "2026-09-10T12:00:00Z",
+      resource: "emails",
+      workspaceId,
+    };
+    assert.deepEqual(readWorkspace.inputSchema.parse(emailFilters), {
+      ...emailFilters,
+      limit: 20,
+    });
+  });
+
+  it("rejects filters that do not apply to the selected resource", () => {
+    assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
+    const workspaceId = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
+    const emailFilters = {
+      campaignId: workspaceId,
+      emailAccount: "sender@example.test",
+      emailType: "received",
+      latestOfThread: true,
+      lead: "lead@example.test",
+      maxTimestampCreated: "2026-09-11T12:00:00Z",
+      minTimestampCreated: "2026-09-10T12:00:00Z",
+    };
+    for (const resource of ["accounts", "campaigns"]) {
+      for (const [field, value] of Object.entries(emailFilters)) {
+        assert.equal(
+          readWorkspace.inputSchema.safeParse({
+            [field]: value,
+            resource,
+            workspaceId,
+          }).success,
+          false,
+          `${resource} must reject the email filter ${field}`
+        );
+      }
+    }
+    for (const resource of ["campaigns", "emails"]) {
+      assert.equal(
+        readWorkspace.inputSchema.safeParse({
+          providerCode: 1,
+          resource,
+          workspaceId,
+        }).success,
+        false,
+        `${resource} must reject the accounts filter providerCode`
+      );
+    }
+    assert.equal(
+      readWorkspace.inputSchema.safeParse({
+        resource: "emails",
+        status: 1,
         workspaceId,
-      }),
-      { limit: 20, resource: "accounts", workspaceId }
+      }).success,
+      false
     );
   });
 
