@@ -1,11 +1,11 @@
 import { connectGitHubCredentials } from "@vercel/connect/eve";
 
 /**
- * Vercel Connect connector UID for the factory's GitHub App installation.
+ * Vercel Connect connector UID for Foreman's GitHub App installation.
  *
  * @remarks
  * One connector serves every GitHub surface: the channel (webhooks, replies),
- * the `github` extension's tools, and the brokered git credential the station
+ * the `github` extension's tools, and the brokered git credential the repository tool
  * sandboxes clone, fetch, and push with. The fallback is this template's own
  * connector UID; deployments set `GITHUB_CONNECTOR` to their own.
  */

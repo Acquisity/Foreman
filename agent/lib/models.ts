@@ -7,15 +7,9 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
-  analyst: "deepseek/deepseek-v4-pro-0813",
-  classifier: "deepseek/deepseek-v4-pro-0813",
   // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
-  implementer: "deepseek/deepseek-v4-pro-0813",
-  investigator: "deepseek/deepseek-v4-pro-0813",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
-  researcher: "deepseek/deepseek-v4-pro-0813",
-  reviewer: "anthropic/claude-opus-4.8",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
 } as const;
@@ -63,7 +57,7 @@ export const loadModelOverrides = async (): Promise<ModelOverrides> => {
 };
 
 // The session-start read: fail open to the compiled defaults (a Blob outage must never take the
-// factory down) and memoize briefly so one session start resolves every agent slot from a single
+// agent down) and memoize briefly so one session start resolves every agent slot from a single
 // consistent snapshot instead of racing reads. The cache is per server instance, so a swap
 // saved on one warm instance reaches the others within the TTL; the swap tools tell the caller
 // to allow that window.

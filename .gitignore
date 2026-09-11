@@ -11,3 +11,4 @@ dist
 *.tsbuildinfo
 *-oauth-client*.json
 .context/
+.planning/

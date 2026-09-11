@@ -1,21 +1,6 @@
 import type { SessionAuthContext } from "eve/context";
 
 /**
- * Constructed principal for unattended factory runs (an issue labeled
- * `factory`).
- *
- * @remarks
- * Real GitHub actors project as numeric `github:<id>` principals, so this
- * fixed login can never collide with one. The GitHub channel stamps it at
- * dispatch; the remaining approval policies (repositoryKnowledgePolicy,
- * modelSwapPolicy, denyUnattendedWrites) deny it repository knowledge,
- * model overrides, and personal Supermemory writes, because an unattended
- * turn has nobody to answer an approval card and would park
- * forever.
- */
-export const AUTONOMOUS_PRINCIPAL = "github:foreman-factory";
-
-/**
  * Auth attribute marking a caller the dispatching channel decided to trust.
  *
  * @remarks
@@ -42,66 +27,12 @@ export function stampTrusted(auth: SessionAuthContext): SessionAuthContext {
 }
 
 /**
- * Auth attribute carrying the issue number an unattended run was dispatched
- * from.
- *
- * @remarks
- * Stamped by {@link stampAutonomous} at dispatch, on the signed webhook, so
- * the run can reference its own intake issue. Attribute values are strings;
- * read it back through {@link intakeIssueNumber}.
- */
-export const INTAKE_ISSUE_ATTRIBUTE = "intakeIssue";
-
-/**
- * Rewrites a channel auth into the unattended factory principal, carrying the
- * intake issue number.
- *
- * @remarks
- * The GitHub channel calls this when the factory label is applied: the
- * webhook sender's identity is replaced (the turn must never run as the
- * labeler), and the issue number is stamped so the run can reference its own
- * intake issue.
- */
-export function stampAutonomous(
-  auth: SessionAuthContext,
-  intakeIssue: number
-): SessionAuthContext {
-  return {
-    ...auth,
-    attributes: {
-      ...auth.attributes,
-      [INTAKE_ISSUE_ATTRIBUTE]: String(intakeIssue),
-    },
-    principalId: AUTONOMOUS_PRINCIPAL,
-    principalType: "service",
-  };
-}
-
-/**
- * The issue number an unattended run was dispatched from, or null when the
- * session is not an unattended run (or predates the stamp).
- */
-export function intakeIssueNumber(
-  auth: SessionAuthContext | null
-): number | null {
-  if (!isAutonomous(auth)) {
-    return null;
-  }
-  const stamped = auth?.attributes[INTAKE_ISSUE_ATTRIBUTE];
-  if (typeof stamped !== "string" || stamped === "") {
-    return null;
-  }
-  const issue = Number(stamped);
-  return Number.isSafeInteger(issue) && issue > 0 ? issue : null;
-}
-
-/**
  * Auth attribute marking a session that nobody is watching, even though it
  * carries a real user principal.
  *
  * @remarks
  * Schedules that reach `principalType: "user"` connections must dispatch under
- * the granting user, so they cannot use {@link AUTONOMOUS_PRINCIPAL}. Without
+ * the granting user. Without
  * this stamp such a turn would look attended: approval cards would park with
  * nobody to answer them, and the unattended write denials would not fire.
  */
@@ -115,23 +46,9 @@ export function stampUnattended(auth: SessionAuthContext): SessionAuthContext {
   };
 }
 
-/**
- * Whether nobody is watching this session, whether it runs under
- * {@link AUTONOMOUS_PRINCIPAL} or under a user principal a schedule stamped
- * with {@link UNATTENDED_ATTRIBUTE}. Write policies gate on this; anything
- * specific to factory intake keeps using {@link isAutonomous}.
- */
+/** Whether this is an unattended scheduled dispatch. */
 export function isUnattended(auth: SessionAuthContext | null): boolean {
-  return (
-    isAutonomous(auth) || auth?.attributes[UNATTENDED_ATTRIBUTE] === "true"
-  );
-}
-
-/**
- * Whether the session runs unattended under {@link AUTONOMOUS_PRINCIPAL}.
- */
-export function isAutonomous(auth: SessionAuthContext | null): boolean {
-  return auth !== null && auth.principalId === AUTONOMOUS_PRINCIPAL;
+  return auth?.attributes[UNATTENDED_ATTRIBUTE] === "true";
 }
 
 /**
@@ -216,7 +133,7 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
  *
  * Stamped only on operational surfaces that run triage: Linear Agent Sessions,
  * every Slack surface the app is invited into, and the local dev TUI. Never on GitHub
- * sessions, never on unattended factory runs, and never on schedules.
+ * sessions or schedules.
  */
 export const INVESTIGATION_MEMORY_ATTRIBUTE = "investigationMemory";
 

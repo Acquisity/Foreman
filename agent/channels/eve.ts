@@ -6,7 +6,6 @@ import {
   type EveMessageResult,
   eveChannel,
 } from "eve/channels/eve";
-import { isFactoryRequest, stampFactoryIntent } from "../lib/factory-lane.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { stampInvestigationMemory } from "../lib/trust.js";
 
@@ -37,24 +36,9 @@ const localDevUser: AuthFn<Request> = async (request) => {
 };
 
 /**
- * Reads explicit factory intent and repository selection out of the delivered
- * eve message.
- *
- * @remarks
- * eve is an interactive lane, so it can ask for the factory and name a
- * repository the same way Slack and Linear do, and this hook is the only place
- * that sees the delivered text: a dynamic resolver runs at `turn.started`,
- * where eve hands it an empty message snapshot. Route auth stays where it is;
- * this only adds the stamps, which is why it applies to the dev TUI and to a
- * production `vercelOidc()` session alike rather than being a dev-only shim.
- *
- * URLs only, and exactly one, matching `agent/channels/slack.ts` and
- * `agent/channels/linear.ts`: a bare `owner/repo` token cannot be told apart
- * from a file path like `channels/github.ts`, and stamping one would bind the
- * session to a repository that does not exist. Without this stamp the eve lane
- * would have no way to select a repository at all, and
- * `repositoryCapabilitiesAvailable` would leave it permanently without the
- * repository and GitHub catalogs rather than until it asked for them.
+ * Stamps exactly one full GitHub URL from the delivered text. A bare slug may
+ * be a file path, so only prepare_repository can deliberately select one.
+ * Route authentication remains unchanged for local and production sessions.
  */
 const messageText = (message: string | UserContent): string =>
   typeof message === "string"
@@ -79,9 +63,7 @@ export const onMessage = (
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
   return {
-    auth: isFactoryRequest(message)
-      ? stampFactoryIntent(withRepository)
-      : withRepository,
+    auth: withRepository,
   };
 };
 

@@ -12,7 +12,7 @@ const PROTECTED_BRANCHES = new Set(["main", "master"]);
 const BRANCH_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$/;
 
 /**
- * Where the station sandboxes keep the factory repository checkout.
+ * The default location of the prepared repository checkout.
  */
 export const REPO_DIR = "/workspace/repo";
 
@@ -23,7 +23,7 @@ export const REPO_DIR = "/workspace/repo";
  * @remarks
  * `refs/heads/main` and `HEAD` would reach a protected branch under another
  * name, so only plain branch names are accepted, and the protected branches
- * themselves are refused outright: the factory delivers pull requests, never
+ * themselves are refused outright: Foreman delivers pull requests, never
  * direct pushes to the default branch.
  */
 export function validateBranch(branch: string): string | null {

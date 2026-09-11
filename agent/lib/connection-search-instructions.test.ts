@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
-const { FACTORY_PROMPT, GENERAL_PROMPT } = await import("./prompts.js");
+const { GENERAL_PROMPT } = await import("./prompts.js");
 
 const readSource = (path: string) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
@@ -17,7 +17,6 @@ const sources: Record<string, string> = {
   "critic tools": readSource(
     "../subagents/critic/skills/triage-critic/references/tools.md"
   ),
-  "factory prompt": FACTORY_PROMPT,
   "general prompt": GENERAL_PROMPT,
   "intercom billing skill": readSource(
     "../skills/intercom-billing-triage/references/tools.md"
@@ -52,11 +51,9 @@ test("active instructions route company discovery through the shared Executor co
   }
 });
 test("root prompts keep authored helpers separate from provider discovery", () => {
-  for (const prompt of [GENERAL_PROMPT, FACTORY_PROMPT]) {
-    assert.ok(prompt.includes("bare names without discovery"));
-    assert.ok(prompt.includes("never search every connection"));
-    assert.ok(prompt.includes("Personal Supermemory"));
-  }
+  assert.ok(GENERAL_PROMPT.includes("bare names without discovery"));
+  assert.ok(GENERAL_PROMPT.includes("never search every connection"));
+  assert.ok(GENERAL_PROMPT.includes("Personal Supermemory"));
 });
 
 test("all agent-facing Markdown avoids retired provider connection names", () => {

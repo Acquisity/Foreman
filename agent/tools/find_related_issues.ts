@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { isAutonomous, isIntakeOnly } from "#lib/trust.js";
+import { isIntakeOnly } from "#lib/trust.js";
 
 const relatedIssueSchema = z.object({
   assignee: z.string().nullable(),
@@ -25,14 +25,6 @@ export default defineTool({
     "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate.",
   async execute(input, ctx) {
     const auth = ctx.session.auth.current;
-    if (isAutonomous(auth)) {
-      return {
-        createdAfter: null,
-        error: "Linear reads are not available to unattended factory runs.",
-        issues: [],
-        truncated: false,
-      };
-    }
     try {
       return await findRelatedIssues(
         { ...input, windowed: isIntakeOnly(auth) },

@@ -9,11 +9,7 @@ import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";
 
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
 import { ExecutorError, executorTransport } from "./executor/transport.js";
-import {
-  AUTONOMOUS_PRINCIPAL,
-  stampInvestigationMemory,
-  stampUnattended,
-} from "./trust.js";
+import { stampInvestigationMemory, stampUnattended } from "./trust.js";
 
 const auth: SessionAuthContext = {
   attributes: {},
@@ -23,7 +19,6 @@ const auth: SessionAuthContext = {
   principalType: "user",
 };
 const internal = stampInvestigationMemory(auth);
-const factory = { ...auth, principalId: AUTONOMOUS_PRINCIPAL };
 const completed = (data: unknown) => ({
   structuredContent: { result: { data, ok: true }, status: "completed" },
 });
@@ -138,13 +133,7 @@ process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
 test("every execution context shares company auth and the same toolkit", () => {
   const connection = executorConnection();
   assert.equal(connection.url, toolkitUrl());
-  for (const current of [
-    null,
-    auth,
-    internal,
-    factory,
-    stampUnattended(auth),
-  ]) {
+  for (const current of [null, auth, internal, stampUnattended(auth)]) {
     const resolved = (
       connection.auth as (ctx: SessionContext) => { principalType?: string }
     )({ session: { auth: { current } } } as SessionContext);
@@ -372,7 +361,7 @@ test("helper invocations use fresh sessions on the same shared toolkit", async (
   };
   await executorTransport.call(context(), OPERATION, {}, { fetch: fetchStub });
   await executorTransport.call(
-    context(factory),
+    context(stampUnattended(auth)),
     OPERATION,
     {},
     { fetch: fetchStub }

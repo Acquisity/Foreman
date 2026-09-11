@@ -42,11 +42,11 @@ export const repositoryKnowledgePolicy = attendedWritePolicy(
 );
 
 /**
- * The live model overrides: which model each factory agent runs on, applied
+ * The live model overrides: which model each agent runs on, applied
  * to every session that starts after the change.
  */
 export const modelSwapPolicy = attendedWritePolicy(
-  "Unattended runs may not change the models the factory runs on."
+  "Unattended runs may not change the models Foreman runs on."
 );
 
 /**
@@ -94,8 +94,7 @@ export const deliveryPolicy = (ctx: ApprovalContext): ApprovalStatus => {
 
 /**
  * Connection-wide policy for MCP servers whose writes must not run
- * unattended, whether the run is a factory turn or a schedule dispatching
- * under a real user (see {@link isUnattended}).
+ * unattended, including a schedule dispatching under a real user (see {@link isUnattended}).
  *
  * @remarks
  * eve hands connection approval predicates the qualified tool name
@@ -133,7 +132,7 @@ export function denyUnattendedWrites(
  * @remarks
  * Denied rather than parked: nobody in an intake-only channel is authorized
  * to ship code, so an approval card would only route the decision to the
- * wrong person, and a station running in task mode cannot park at all.
+ * wrong person, and a child running in task mode cannot park at all.
  * Everything short of delivery stays available, reading and investigating a
  * repository included, so a follow-up question in the thread still gets a
  * real answer. The denial tells the model how to continue without turning an

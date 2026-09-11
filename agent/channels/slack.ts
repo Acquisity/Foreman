@@ -9,7 +9,6 @@ import {
   slackChannel,
 } from "eve/channels/slack";
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
-import { isFactoryRequest } from "../lib/factory-lane.js";
 import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import {
@@ -45,7 +44,7 @@ import { isIntakeOnly } from "../lib/trust.js";
  * Channels listed in SLACK_INTAKE_ONLY_CHANNELS are intake-only: their
  * mentions stay trusted, so conversation and investigation run as normal, but
  * the session is stamped intake-only and intakeOnlyPolicy denies every push,
- * on the direct path and inside the stations alike. The channel mapping tells
+ * on the direct path and inside delegated tasks alike. The channel mapping tells
  * the model which intake workflow and skills to use.
  *
  * Automatic Slack connection attempts never show a sign-in prompt: user-scoped
@@ -138,10 +137,6 @@ export const dispatch = async (
   // slackSessionAuth stamps it for every admitted Slack session.
   const intakeOnly = SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
   const stamped = slackSessionAuth(auth, {
-    // The factory skill is offered only where the lane warrants it, and this
-    // dispatch is the only place that sees the delivered text: a dynamic skill
-    // resolver runs at turn.started with an empty message snapshot.
-    factoryIntent: isFactoryRequest(message.text),
     intakeOnly,
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,

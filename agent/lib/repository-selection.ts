@@ -5,7 +5,7 @@ import { defineState } from "eve/context";
  *
  * @remarks
  * `prepare_repository` writes `/workspace/.foreman/repository.json`, and that
- * marker stays the source of truth: stations read it, a switch rolls it back,
+ * marker stays the source of truth: repository tools read it, a switch rolls it back,
  * and nothing here replaces it. What the marker cannot do is be read from a
  * dynamic tool resolver, which has no sandbox. So the slug is recorded here as
  * well, and only the slug, because that is all

@@ -61,7 +61,6 @@ const WRITE_TOOL_NAMES = new Set([
   "set_agent_models",
   "save_user_preferences",
   "clear_user_preferences",
-  "record_pipeline_run",
   "rebuild_warm_snapshot",
   "bash",
   "write_file",

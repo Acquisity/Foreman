@@ -69,6 +69,106 @@ describe("Instantly tool authorization", () => {
 });
 
 describe("Instantly tool inputs", () => {
+  it("publishes a flat object schema and retains resource-specific validation", () => {
+    assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
+    const schema = z.toJSONSchema(readWorkspace.inputSchema, {
+      io: "input",
+      target: "draft-7",
+    });
+    assert.equal(schema.type, "object");
+    assert.equal(schema.anyOf, undefined);
+    assert.equal(schema.oneOf, undefined);
+    assert.equal(schema.allOf, undefined);
+    const workspaceId = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
+    assert.equal(
+      readWorkspace.inputSchema.safeParse({
+        resource: "accounts",
+        status: 0,
+        workspaceId,
+      }).success,
+      false
+    );
+    assert.deepEqual(
+      readWorkspace.inputSchema.parse({
+        resource: "campaigns",
+        status: 0,
+        workspaceId,
+      }),
+      { limit: 20, resource: "campaigns", status: 0, workspaceId }
+    );
+    const accountFilters = {
+      providerCode: 1,
+      resource: "accounts",
+      status: 1,
+      workspaceId,
+    };
+    assert.deepEqual(readWorkspace.inputSchema.parse(accountFilters), {
+      ...accountFilters,
+      limit: 20,
+    });
+    const emailFilters = {
+      campaignId: workspaceId,
+      emailAccount: "sender@example.test",
+      emailType: "received",
+      latestOfThread: true,
+      lead: "lead@example.test",
+      maxTimestampCreated: "2026-09-11T12:00:00Z",
+      minTimestampCreated: "2026-09-10T12:00:00Z",
+      resource: "emails",
+      workspaceId,
+    };
+    assert.deepEqual(readWorkspace.inputSchema.parse(emailFilters), {
+      ...emailFilters,
+      limit: 20,
+    });
+  });
+
+  it("rejects filters that do not apply to the selected resource", () => {
+    assert.ok(readWorkspace.inputSchema instanceof z.ZodType);
+    const workspaceId = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
+    const emailFilters = {
+      campaignId: workspaceId,
+      emailAccount: "sender@example.test",
+      emailType: "received",
+      latestOfThread: true,
+      lead: "lead@example.test",
+      maxTimestampCreated: "2026-09-11T12:00:00Z",
+      minTimestampCreated: "2026-09-10T12:00:00Z",
+    };
+    for (const resource of ["accounts", "campaigns"]) {
+      for (const [field, value] of Object.entries(emailFilters)) {
+        assert.equal(
+          readWorkspace.inputSchema.safeParse({
+            [field]: value,
+            resource,
+            workspaceId,
+          }).success,
+          false,
+          `${resource} must reject the email filter ${field}`
+        );
+      }
+    }
+    for (const resource of ["campaigns", "emails"]) {
+      assert.equal(
+        readWorkspace.inputSchema.safeParse({
+          providerCode: 1,
+          resource,
+          workspaceId,
+        }).success,
+        false,
+        `${resource} must reject the accounts filter providerCode`
+      );
+    }
+    assert.equal(
+      readWorkspace.inputSchema.safeParse({
+        resource: "emails",
+        status: 1,
+        workspaceId,
+      }).success,
+      false
+    );
+  });
+
   it("allows name discovery without IDs and rejects unbounded or empty searches", () => {
     assert.ok(listWorkspaces.inputSchema instanceof z.ZodType);
     const schema = listWorkspaces.inputSchema;

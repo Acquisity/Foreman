@@ -2,6 +2,15 @@
 
 Status: preview testing is in progress. This branch is not cleared for production. The current design is one shared `Foreman` toolkit. Earlier role/profile evidence below is historical and superseded by the consolidation section.
 
+## Current setup for every PR
+
+1. Inspect the live Foreman Preview Slack connector and its triggers. Target the current PR branch at the existing Slack channel route, remove the previous Preview trigger branch, and read the trigger configuration back. Preserve Production routing. The connector UID, bot, channel, and branch names recorded under historical sections below must be verified live before reuse.
+2. Attach the intended Preview Executor app connector. Set branch-scoped Preview `SLACK_CONNECTOR` and `EXECUTOR_MCP_CONNECTOR` to the actual attached UIDs, `EXECUTOR_BASE_URL=https://executor.acquisity.ai`, and `EXECUTOR_OPERATION_BINDINGS` to the compact JSON contents of `.github/executor/operation-bindings.json` after catalog verification. There is no Executor enable switch; missing auth or `{}` bindings disables access. Retain the Preview's other channel, model, storage, and sandbox configuration.
+3. Keep `FOREMAN_SUPPORT_ENABLED` and `FOREMAN_SUPPORT_FOLLOWUPS_ENABLED` false during ordinary smoke; the support queue is not accessed while both are disabled. Preserve the existing investigation-memory configuration for those checks. Before enabling scheduled support tests, require a separate private, migrated Preview database and queue through `FOREMAN_MEMORY_DATABASE_URL`; Preview must never claim the Production support queue. Scheduled tests also need a current watermark, selected synthetic conversations, the verified Intercom handoff app ID, and the support toolkit grants. The support Slack channel is fixed in `agent/lib/support/config.ts`, so changing the Preview bot trigger does not isolate scheduled delivery. See [INTERCOM-SUPPORT-CRON.md](./INTERCOM-SUPPORT-CRON.md).
+4. Run `pnpm executor:contract`, `pnpm executor:readiness`, and the metadata-only live check with an explicit `EXECUTOR_SETUP_PROFILE`. The support live check uses `--support --live`. These checks do not prove provider authorization.
+5. Deploy or redeploy the exact current PR commit after environment or connector changes. Verify deployment ID, commit SHA, active Preview route, and absence of the stale Preview trigger. Send a fresh mention and run [UAT-BATTERY.md](./UAT-BATTERY.md), including actual root, native-child, and critic provider reads plus a staged image. Record Slack links and deployed logs; a successful operator OAuth probe is not proof of the bot's app credential.
+6. Aaron tests and accepts this PR before the next opens. Repeat branch targeting and branch-scoped environment setup for the next PR. Production deployment follows merge to `main`; Preview environment does not automatically propagate. Rollback is a revert on `main`, never `vercel rollback`.
+
 ## Configuration (historical, before shared-toolkit consolidation)
 
 - PR: https://github.com/Acquisity/Foreman/pull/118 (draft).
@@ -45,7 +54,7 @@ Mention the preview bot in a fresh thread with `test Linear`, `test Instantly`, 
 - Give critic a complete designated evidence packet as well as the incomplete packet above. Verify its own reads and output shape.
 - Attach an image for vision; also test a missing image and a Linear-hosted attachment. Do not include the expected visual answer in the request or alt text.
 - A real second authorized employee must initiate both Linear and Intercom triage without being asked to sign in to either provider. Do not simulate another human by changing an actor identifier.
-- Test factory and schedule lanes, denied writes, guessed nested operations, and reused sessions. Use a scratch repository for a full factory pipeline.
+- Test native delegates and schedule lanes, denied writes, guessed nested operations, and reused sessions. Use a scratch repository and an existing test ticket for direct feature-branch and pull-request delivery.
 - Cover oversized query output, sanitization, pagination caps, cancellation, timeout, missing credentials and unavailable-versus-empty responses.
 
 ## Release gate
@@ -54,7 +63,7 @@ Mention the preview bot in a fresh thread with `test Linear`, `test Instantly`, 
 2. Run `pnpm validate`, inspect root/critic catalogs and run `pnpm report:capabilities`.
 3. Deploy the exact reviewed branch with its verified binding JSON and rerun the acceptance cases above. Record deployment ID, commit and test thread links.
 4. After user approval and merge, attach the intended app connector and the same verified configuration to Production, deploy, and repeat small smoke reads. Preview environment values do not automatically become production values on merge.
-5. Retain the previous deployment/configuration for rollback. Retire old outbound references only after observation; retain inbound Slack/Linear, GitHub, personal Supermemory, Blob, investigation memory, models, and sandbox infrastructure.
+5. Roll back with a revert commit on `main` and let Vercel deploy it; never use `vercel rollback`. Retain the previous configuration as evidence. Retire old outbound references only after observation; retain inbound Slack/Linear, GitHub, personal Supermemory, Blob, investigation memory, models, and sandbox infrastructure.
 
 ## Follow-up on the deployed helpers
 

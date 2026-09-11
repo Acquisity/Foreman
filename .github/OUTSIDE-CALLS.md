@@ -59,8 +59,6 @@ A caller that passes its own `abortSignal` keeps it: the helper composes the cal
 | --- | --- | --- |
 | `agent/tools/prepare_repository.ts` | 300s per command | ENG-13317 bounded the clone, refresh, install, publish, and discard. ENG-13318 bounded the five local probes it left: worktree detection, origin read, the occupied and warm-checkout probes, and the git identity write. A deadline on the occupied probe refuses instead of publishing over a path it could not read. ENG-13320 bounded the four commands a repository switch adds: the lockfile diff, the set-aside and restore renames, and the marker discard. A deadline on the lockfile diff installs rather than assuming the dependencies held still. |
 | `agent/tools/checkout_branch.ts`, `agent/tools/push_branch.ts` | 300s per command | ENG-13318. |
-| `agent/subagents/implementer/tools/checkout_branch.ts`, `.../push_branch.ts` | 300s per command | ENG-13318. |
-| `agent/subagents/reviewer/tools/checkout_branch.ts` | 300s per command | ENG-13318. |
 | `agent/subagents/critic/tools/checkout_commit.ts` | 300s per command | ENG-13318. |
 | `agent/sandbox.ts` `onSession` | 300s | ENG-13318. A deadline surfaces as the existing non-zero branch, which throws and fails the session rather than hanging it. |
 | `agent/lib/repository-snapshot.ts` | 800s for the whole build | The sandbox itself carries `timeout: BUILD_TIMEOUT_MS`, so every command inside is bounded by the sandbox's own death, matched to eve's Vercel invocation ceiling. |

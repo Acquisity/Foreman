@@ -6,12 +6,10 @@
  * @remarks
  * This module measures and reports. It gates nothing: the lane differences it
  * observes are the ones the authored configuration already makes. Today those
- * are the `factory-pipeline` dynamic skill and the repository and GitHub tool
- * catalogs, offered by `factorySkillAvailable` and
+ * are the repository and GitHub tool catalogs, offered by
  * `repositoryCapabilitiesAvailable` to a lane that has a repository selected
- * or a factory path open to it (of the four measured lanes, only
- * `repository-interactive` and `autonomous-factory`, since none of them
- * carries explicit factory intent). Reading a lane's numbers must never change
+ * (of the three measured lanes, only `repository-interactive`). Reading a
+ * lane's numbers must never change
  * what that lane may call, and no gate is restated here: a lane that carries
  * nothing from a resolver measures as nothing.
  *
@@ -46,9 +44,7 @@
  */
 import { readFileSync } from "node:fs";
 import type { SessionAuthContext } from "eve/context";
-import type { DynamicResolveContext } from "eve/skills";
 import { z } from "zod";
-import factoryPipeline from "../skills/factory-pipeline.js";
 import { OWNER_USER_ID, SLACK_TEAM_ID } from "./constants.js";
 import type {
   AdmittedDynamicTool,
@@ -60,23 +56,16 @@ import {
   installedEveVersion,
   resolveCompiledDynamicTools,
 } from "./eve-dynamic-tools.js";
-import { githubFactoryAuth, slackSessionAuth } from "./session-auth.js";
+import { slackSessionAuth } from "./session-auth.js";
 
-/** The four session lanes the report covers. */
+/** The three session lanes the report covers. */
 export const CAPABILITY_LANES = [
   "slack",
   "slack-intake-only",
   "repository-interactive",
-  "autonomous-factory",
 ] as const;
 
 export type CapabilityLane = (typeof CAPABILITY_LANES)[number];
-
-const dynamicEntrySchema = z.object({
-  eventNames: z.array(z.string()).default([]),
-  slug: z.string(),
-  sourceId: z.string(),
-});
 
 const namedEntrySchema = z.object({
   description: z.string().default(""),
@@ -113,7 +102,10 @@ export const capabilityManifestSchema = z.object({
         .optional(),
     })
     .optional(),
-  dynamicSkills: z.array(dynamicEntrySchema).default([]),
+  dynamicSkills: z
+    .array(z.unknown())
+    .max(0, "capability-budget.ts does not support dynamic skills.")
+    .default([]),
   dynamicTools: z.array(dynamicToolEntrySchema).default([]),
   kind: z.literal(MEASURED_MANIFEST_KIND),
   skills: z
@@ -177,12 +169,6 @@ export function readCompiledManifest(appRoot: URL): CapabilityManifest {
   );
 }
 
-/** What a dynamic skill resolver returns when it offers the lane a skill. */
-const resolvedSkillSchema = z.object({
-  description: z.string().default(""),
-  markdown: z.string().default(""),
-});
-
 export type CapabilityKind = "tool" | "skill" | "subagent";
 
 /** One measured group of capabilities: one kind from one source. */
@@ -224,38 +210,15 @@ const SLACK_AUTH: SessionAuthContext = {
   principalType: "user",
 };
 
-/** The repository the repository-selected and factory lanes name. */
+/** The repository the repository-selected lane names. */
 const MEASURED_REPOSITORY = "Acquisity/Foreman";
-
-/** The issue number the measured factory run is dispatched from. */
-const MEASURED_INTAKE_ISSUE = 1;
-
-// A signed GitHub webhook sender, in the shape `defaultGitHubAuth` builds,
-// before `githubFactoryAuth` rewrites it into the unattended factory
-// principal.
-const GITHUB_AUTH: SessionAuthContext = {
-  attributes: {
-    conversation_kind: "issue",
-    issue_number: String(MEASURED_INTAKE_ISSUE),
-    repository: MEASURED_REPOSITORY,
-    user_login: "capability-budget",
-    user_type: "User",
-  },
-  authenticator: "github-webhook",
-  issuer: "github:Acquisity",
-  principalId: "github:1",
-  principalType: "user",
-  subject: "capability-budget",
-};
 
 /**
  * The auth each lane's channel stamps at dispatch, composed by the same
- * helpers `agent/channels/slack.ts` and `agent/channels/github.ts` call, so a
+ * helpers `agent/channels/slack.ts` calls, so a
  * change to either dispatch moves the measurement with it.
  */
 const LANE_AUTH: Record<CapabilityLane, () => SessionAuthContext> = {
-  "autonomous-factory": () =>
-    githubFactoryAuth(GITHUB_AUTH, MEASURED_REPOSITORY, MEASURED_INTAKE_ISSUE),
   "repository-interactive": () =>
     slackSessionAuth(SLACK_AUTH, {
       intakeOnly: false,
@@ -276,36 +239,6 @@ const laneSession = (lane: CapabilityLane): DynamicToolSession => ({
   id: `capability-budget:${lane}`,
 });
 
-const resolveContext = (lane: CapabilityLane): DynamicResolveContext => ({
-  channel: { kind: lane === "autonomous-factory" ? "github" : "slack" },
-  messages: [],
-  session: {
-    auth: { current: laneAuth(lane), initiator: laneAuth(lane) },
-    id: laneSession(lane).id,
-  },
-});
-
-/**
- * The authored module behind each compiled dynamic skill, keyed by the source
- * the manifest records.
- *
- * @remarks
- * One entry per dynamic skill in the tree. A compiled entry with no module
- * here is rejected rather than measured with another entry's result, which
- * would report the wrong name, description, and body under the new slug.
- */
-const DYNAMIC_SKILL_SOURCES = new Map<string, typeof factoryPipeline>([
-  ["skills/factory-pipeline.ts", factoryPipeline],
-]);
-
-/** One dynamic skill a lane resolves. */
-interface ResolvedDynamicSkill {
-  readonly description: string;
-  readonly markdown: string;
-  readonly slug: string;
-  readonly source: string;
-}
-
 /** One model-visible tool a dynamic tool resolver returned, with its source. */
 interface ResolvedDynamicTool extends AdmittedDynamicTool {
   readonly source: string;
@@ -313,48 +246,10 @@ interface ResolvedDynamicTool extends AdmittedDynamicTool {
 
 /** Everything a lane carries that the compiled manifest cannot state. */
 export interface ResolvedLaneCapabilities {
-  readonly dynamicSkills: readonly ResolvedDynamicSkill[];
   readonly dynamicTools: readonly ResolvedDynamicTool[];
   /** Input schema characters on each subagent's delegation tool. */
   readonly subagentSchemaChars: number;
 }
-
-const dynamicSkillEntry = async (
-  entry: z.infer<typeof dynamicEntrySchema>,
-  lane: CapabilityLane
-): Promise<ResolvedDynamicSkill | null> => {
-  const module = DYNAMIC_SKILL_SOURCES.get(entry.sourceId);
-  if (!module) {
-    throw new Error(
-      `Dynamic skill '${entry.slug}' from ${entry.sourceId} has no resolver registered in capability-budget.ts, so its catalog cost cannot be measured.`
-    );
-  }
-  // Resolvers run at session, turn, or step scope; the compiled entry names
-  // the events this one handles, and the first non-nil result in that order is
-  // what the lane carries.
-  const resolutions = await Promise.all(
-    entry.eventNames.map((eventName) => {
-      const resolve = module.events[eventName as keyof typeof module.events];
-      if (!resolve) {
-        throw new Error(
-          `Dynamic skill '${entry.slug}' compiled for '${eventName}' but its module has no such resolver.`
-        );
-      }
-      return resolve({}, resolveContext(lane));
-    })
-  );
-  for (const resolution of resolutions) {
-    const parsed = resolvedSkillSchema.safeParse(resolution);
-    if (parsed.success) {
-      return {
-        ...parsed.data,
-        slug: entry.slug,
-        source: capabilitySource(entry.sourceId),
-      };
-    }
-  }
-  return null;
-};
 
 // `ext-override:` is the same extension, mounted as a directory so the
 // consumer can replace one of its contributions. The tools still reach the
@@ -426,9 +321,6 @@ export async function resolveLaneCapabilities(
   manifest: CapabilityManifest,
   lane: CapabilityLane
 ): Promise<ResolvedLaneCapabilities> {
-  const skills = await Promise.all(
-    manifest.dynamicSkills.map((entry) => dynamicSkillEntry(entry, lane))
-  );
   const tools = await Promise.all(
     manifest.dynamicTools.map(async (entry) => {
       const admitted = await resolveCompiledDynamicTools(
@@ -441,7 +333,6 @@ export async function resolveLaneCapabilities(
     })
   );
   return {
-    dynamicSkills: skills.filter((skill) => skill !== null),
     dynamicTools: tools.flat(),
     subagentSchemaChars: await subagentDelegationSchemaChars(
       manifest.config?.experimental?.subagentPersistentSessions === true
@@ -513,22 +404,16 @@ export function measureLane(
       source: tool.source,
     })),
   ]);
-  const skillRows = groupRows("skill", [
-    ...manifest.skills.map((skill) => ({
+  const skillRows = groupRows(
+    "skill",
+    manifest.skills.map((skill) => ({
       bodyChars: skill.markdown.length,
       descriptionChars: skill.description.length,
       nameChars: skill.name.length,
       schemaChars: 0,
       source: capabilitySource(skill.sourceId),
-    })),
-    ...resolved.dynamicSkills.map((skill) => ({
-      bodyChars: skill.markdown.length,
-      descriptionChars: skill.description.length,
-      nameChars: skill.slug.length,
-      schemaChars: 0,
-      source: skill.source,
-    })),
-  ]);
+    }))
+  );
   const subagentRows = groupRows(
     "subagent",
     manifest.subagents.map((subagent) => ({
@@ -654,10 +539,7 @@ export function formatCapabilityBudget(budgets: readonly LaneBudget[]): string {
       `catalog ${budget.catalogChars} characters (about ${estimateTokens(budget.catalogChars)} tokens), body ${budget.bodyChars} characters`
     );
   }
-  const repositoryLanes = [
-    "repository-interactive",
-    "autonomous-factory",
-  ] as const;
+  const repositoryLanes = ["repository-interactive"] as const;
   const shares = repositoryLanes.flatMap((lane) => {
     const share = ordinarySlackShare(budgets, lane);
     return share === null ? [] : [[lane, share] as const];

@@ -56,8 +56,8 @@ export const checkoutBranchTool = defineTool({
 });
 
 /**
- * Absent from a lane with no repository selected and no factory path open to
- * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * Absent from a lane with no repository selected.
+ * `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
  * gates the catalog only, never authorization. The resolver runs at
  * `step.started`, the same event the GitHub surface it is gated alongside
  * runs at, because eve resolves `turn.started` once before the turn's first

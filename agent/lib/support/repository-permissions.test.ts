@@ -4,9 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext, DynamicResolveContext } from "eve/tools";
 import checkout from "../../tools/checkout_branch.js";
 import push from "../../tools/push_branch.js";
-import readPipeline from "../../tools/read_pipeline_run.js";
 import readKnowledge from "../../tools/read_repository_knowledge.js";
-import record from "../../tools/record_pipeline_run.js";
 import update from "../../tools/update_repository_knowledge.js";
 import {
   deliveryPolicy,
@@ -32,7 +30,7 @@ const context = {
 } as DynamicResolveContext;
 
 test("support initiator hides every repository write resolver while preserving reads", () => {
-  for (const tool of [checkout, push, record, update]) {
+  for (const tool of [checkout, push, update]) {
     assert.equal(tool.events["step.started"]?.({} as never, context), null);
     assert.ok(
       tool.events["step.started"]?.({} as never, {
@@ -41,7 +39,7 @@ test("support initiator hides every repository write resolver while preserving r
       })
     );
   }
-  for (const tool of [readPipeline, readKnowledge]) {
+  for (const tool of [readKnowledge]) {
     assert.ok(tool.events["step.started"]?.({} as never, context));
   }
 });

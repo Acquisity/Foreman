@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools";
 import {
-  stampAutonomous,
   stampIntakeOnly,
   stampTrusted,
   UNATTENDED_ATTRIBUTE,
@@ -53,11 +52,6 @@ describe("deliveryPolicy", () => {
     );
   });
 
-  it("denies an autonomous principal", () => {
-    const status = deliveryPolicy(approvalFor(stampAutonomous(auth, 123)));
-    assert.equal(typeof status === "object" && status.type, "denied");
-  });
-
   it("denies a schedule dispatched under a real user, even when trusted", () => {
     const status = deliveryPolicy(approvalFor(stampTrusted(unattendedAuth)));
     assert.equal(typeof status === "object" && status.type, "denied");
@@ -90,10 +84,8 @@ describe("repositoryKnowledgePolicy", () => {
     assert.equal(repositoryKnowledgePolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies an autonomous principal", () => {
-    const status = repositoryKnowledgePolicy(
-      approvalFor(stampAutonomous(auth, 123))
-    );
+  it("denies an unattended schedule", () => {
+    const status = repositoryKnowledgePolicy(approvalFor(unattendedAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -110,8 +102,8 @@ describe("modelSwapPolicy", () => {
     assert.equal(modelSwapPolicy(approvalFor(auth)), "user-approval");
   });
 
-  it("denies an autonomous principal", () => {
-    const status = modelSwapPolicy(approvalFor(stampAutonomous(auth, 123)));
+  it("denies an unattended schedule", () => {
+    const status = modelSwapPolicy(approvalFor(unattendedAuth));
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 });
@@ -119,18 +111,16 @@ describe("modelSwapPolicy", () => {
 describe("denyUnattendedWrites", () => {
   const policy = denyUnattendedWrites("Supermemory", ["add_memory"]);
 
-  it("denies an autonomous write", () => {
+  it("denies an unattended write", () => {
     const status = policy(
-      approvalFor(stampAutonomous(auth, 123), "supermemory__add_memory")
+      approvalFor(unattendedAuth, "supermemory__add_memory")
     );
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 
-  it("leaves an autonomous non-write ungated", () => {
+  it("leaves an unattended non-write ungated", () => {
     assert.equal(
-      policy(
-        approvalFor(stampAutonomous(auth, 123), "supermemory__search_memory")
-      ),
+      policy(approvalFor(unattendedAuth, "supermemory__search_memory")),
       "not-applicable"
     );
   });
@@ -146,13 +136,6 @@ describe("denyUnattendedWrites", () => {
 describe("userPreferencesDeletionPolicy", () => {
   it("denies a schedule dispatched under a real user", () => {
     const status = userPreferencesDeletionPolicy(approvalFor(unattendedAuth));
-    assert.equal(typeof status === "object" && status.type, "denied");
-  });
-
-  it("denies an autonomous run", () => {
-    const status = userPreferencesDeletionPolicy(
-      approvalFor(stampAutonomous(auth, 7))
-    );
     assert.equal(typeof status === "object" && status.type, "denied");
   });
 

@@ -2,7 +2,6 @@ import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { FOREMAN_BRANCH_PREFIX } from "#lib/constants.js";
 import { FALLBACK_BOT_NAME, resolveBotName } from "#lib/github/bot-name.js";
 import { githubCredentials } from "#lib/github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "#lib/github/git-remote.js";
@@ -755,11 +754,7 @@ const recordPreparedRepository = async (
   }
   try {
     await sandbox.writeTextFile({
-      content: JSON.stringify(
-        { ...target, branchPrefix: FOREMAN_BRANCH_PREFIX, worktree },
-        null,
-        2
-      ),
+      content: JSON.stringify({ ...target, worktree }, null, 2),
       path: REPOSITORY_MARKER,
     });
   } catch (error) {
@@ -898,7 +893,7 @@ export const prepareRepositoryWorkspace = async (
 
 export default defineTool({
   description:
-    "Select and prepare a GitHub repository workspace for direct work or factory mode. A signed GitHub webhook repository is authoritative and stays bound to its checkout. On other channels pass the one explicit owner/repo or GitHub URL from the request; naming a different repository replaces the prepared one. Call this before editing files or delegating a repository station.",
+    "Select and prepare a GitHub repository workspace for repository work. A signed GitHub webhook repository is authoritative and stays bound to its checkout. On other channels pass the one explicit owner/repo or GitHub URL from the request; naming a different repository replaces the prepared one. Call this before editing files or delegating repository work.",
   execute: ({ repository }, ctx) => prepareRepositoryWorkspace(repository, ctx),
   inputSchema: z.object({
     repository: z

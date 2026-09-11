@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import {
-  AUTONOMOUS_PRINCIPAL,
   isUnattended,
   stampUnattended,
   UNATTENDED_ATTRIBUTE,
@@ -23,13 +22,6 @@ const auth = (
 test("isUnattended", async (t) => {
   await t.test("is false for an ordinary user turn", () => {
     assert.equal(isUnattended(auth()), false);
-  });
-
-  await t.test("is true for the autonomous factory principal", () => {
-    assert.equal(
-      isUnattended(auth({ principalId: AUTONOMOUS_PRINCIPAL })),
-      true
-    );
   });
 
   await t.test("is true for a stamped user principal", () => {

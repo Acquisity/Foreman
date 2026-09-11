@@ -23,9 +23,9 @@ const workspace = {
     ),
 };
 
-const inputSchema = z
+const resourceInputSchema = z
   .discriminatedUnion("resource", [
-    z.object({
+    z.strictObject({
       ...workspace,
       limit,
       providerCode: z.number().int().min(1).max(8).optional(),
@@ -43,7 +43,7 @@ const inputSchema = z
         ])
         .optional(),
     }),
-    z.object({
+    z.strictObject({
       ...workspace,
       limit,
       resource: z.literal("campaigns"),
@@ -62,7 +62,7 @@ const inputSchema = z
         ])
         .optional(),
     }),
-    z.object({
+    z.strictObject({
       ...workspace,
       campaignId: uuid.optional(),
       emailAccount: z.string().email().max(320).optional(),
@@ -89,6 +89,21 @@ const inputSchema = z
       });
     }
   });
+
+const [accountsInput, campaignsInput, emailsInput] =
+  resourceInputSchema.options;
+// Advertise one flat object while preserving resource-specific validation and
+// exactly one workspace selector. Reject filters belonging to another resource.
+const inputSchema = z
+  .object({
+    ...accountsInput.shape,
+    ...campaignsInput.shape,
+    ...emailsInput.shape,
+    limit: limit.unwrap().optional(),
+    resource: z.enum(["accounts", "campaigns", "emails"]),
+    status: z.number().int().optional(),
+  })
+  .pipe(resourceInputSchema);
 
 const unavailableReason = (error: unknown): string =>
   error instanceof InstantlyApiError

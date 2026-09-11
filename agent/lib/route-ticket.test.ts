@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
-import { AUTONOMOUS_PRINCIPAL } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
@@ -310,21 +309,9 @@ describe("routeTicket", () => {
 });
 
 describe("route_ticket tool", () => {
-  it("allows an autonomous run through the Linear approval policy", async () => {
+  it("never requires an approval card", async () => {
     const { approval } = tool;
-    const status = await (approval as (ctx: unknown) => unknown)({
-      session: {
-        auth: {
-          current: {
-            attributes: {},
-            authenticator: "github",
-            principalId: AUTONOMOUS_PRINCIPAL,
-            principalType: "service",
-          },
-        },
-      },
-      toolName: "route_ticket",
-    });
+    const status = await (approval as () => unknown)();
     assert.equal(status, "not-applicable");
   });
 });

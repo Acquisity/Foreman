@@ -25,7 +25,7 @@ const [
   { SIGN_IN_CONNECTIONS, signInAuth },
   { default: signIn },
   { SLACK_SIGN_IN_REASON, consentAuth },
-  { AUTONOMOUS_PRINCIPAL, UNATTENDED_ATTRIBUTE },
+  { stampUnattended },
 ] = await Promise.all([
   import("./sign-in.js"),
   import("../tools/sign_in.js"),
@@ -93,12 +93,7 @@ describe("sign_in tool", () => {
   it("refuses unattended or non-user sessions before requesting any token", async () => {
     const cases = [
       null,
-      { attributes: {}, principalId: AUTONOMOUS_PRINCIPAL },
-      {
-        attributes: { [UNATTENDED_ATTRIBUTE]: "true" },
-        principalId: "slack:T123:U0OWNER",
-        principalType: "user",
-      },
+      stampUnattended({ ...attendedAuth, issuer: "slack" }),
       {
         attributes: {},
         principalId: "acquisity-asks",

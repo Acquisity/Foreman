@@ -6,8 +6,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
 
-// prompts.ts, reached through the factory-pipeline skill, reads both connector
-// variables at module load (constants.ts). Nothing is contacted. Measuring a
+// Root modules read connector variables at module load. Nothing is contacted. Measuring a
 // dynamic tool evaluates every authored module through eve's bundled module
 // map, which needs the rest of the connector environment `eve info` needs;
 // `pnpm validate` runs both under the same environment.
@@ -35,25 +34,17 @@ const HAS_COMPILED_MANIFEST = [
   COMPILE_METADATA_PATH,
 ].every((path) => existsSync(new URL(`../../${path}`, import.meta.url)));
 
-const {
-  AUTONOMOUS_PRINCIPAL,
-  canUseInvestigationMemory,
-  intakeIssueNumber,
-  isAutonomous,
-  isIntakeOnly,
-  isTrusted,
-  isUnattended,
-} = await import("./trust.js");
+const { canUseInvestigationMemory, isIntakeOnly, isTrusted, isUnattended } =
+  await import("./trust.js");
 const { repositoryFromAuth } = await import("./repository.js");
 
-const SECOND_PIPELINE = /second-pipeline/u;
+const UNSUPPORTED_DYNAMIC_SKILLS = /does not support dynamic skills/u;
 const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
 
-/** The lanes `repositoryCapabilitiesAvailable` admits, of the four measured. */
+/** The lanes `repositoryCapabilitiesAvailable` admits, of the three measured. */
 const REPOSITORY_LANES = new Set<(typeof CAPABILITY_LANES)[number]>([
   "repository-interactive",
-  "autonomous-factory",
 ]);
 
 /**
@@ -63,9 +54,7 @@ const REPOSITORY_LANES = new Set<(typeof CAPABILITY_LANES)[number]>([
 const GATED_REPOSITORY_TOOLS = [
   "checkout_branch",
   "push_branch",
-  "read_pipeline_run",
   "read_repository_knowledge",
-  "record_pipeline_run",
   "update_repository_knowledge",
 ];
 const SLACK_PRINCIPAL = /^slack:/u;
@@ -79,9 +68,7 @@ const SLACK_PRINCIPAL = /^slack:/u;
  * the gate. A ratio rather than a character count, so a description edit to a
  * tool every lane carries moves both sides and still passes, while a change
  * that hands ordinary Slack the GitHub surface, the gated repository tools,
- * or another catalog of that size fails. The same ceiling is held against the
- * factory lane, whose catalog is the repository-selected one minus the
- * factory skill.
+ * or another catalog of that size fails.
  */
 const ORDINARY_SLACK_CATALOG_CEILING = 0.75;
 
@@ -99,13 +86,6 @@ const MANIFEST_HEADER = {
 // every counted character is known by inspection.
 const FIXTURE = parseCapabilityManifest({
   ...MANIFEST_HEADER,
-  dynamicSkills: [
-    {
-      eventNames: ["turn.started"],
-      slug: "factory-pipeline",
-      sourceId: "skills/factory-pipeline.ts",
-    },
-  ],
   dynamicTools: [
     // The consumer's override of the extension's own `tools/github.ts` slot,
     // exactly as `eve info` compiles it: the mount namespace is still github,
@@ -142,14 +122,6 @@ const FIXTURE = parseCapabilityManifest({
 
 // One resolved set with known sizes, so the row arithmetic below is readable.
 const RESOLVED = {
-  dynamicSkills: [
-    {
-      description: "dd",
-      markdown: "mmm",
-      slug: "factory-pipeline",
-      source: "skills/",
-    },
-  ],
   // name 8 + description 2 + schema 3 characters.
   dynamicTools: [
     {
@@ -163,7 +135,6 @@ const RESOLVED = {
 };
 
 const NO_DYNAMIC = {
-  dynamicSkills: [],
   dynamicTools: [],
   subagentSchemaChars: 0,
 };
@@ -178,7 +149,7 @@ describe("capability source grouping", () => {
       capabilitySource("ext-override:github:tools/github.ts"),
       "ext:github"
     );
-    assert.equal(capabilitySource("subagents/analyst"), "subagents/");
+    assert.equal(capabilitySource("subagents/critic"), "subagents/");
     assert.equal(
       capabilitySource("ext:browser:tools/click.mjs"),
       "ext:browser"
@@ -188,6 +159,27 @@ describe("capability source grouping", () => {
 });
 
 describe("manifest provenance", () => {
+  it("rejects unsupported dynamic skills before measuring the manifest", () => {
+    assert.throws(
+      () =>
+        parseCapabilityManifest({
+          ...MANIFEST_HEADER,
+          dynamicSkills: [
+            {
+              eventNames: ["turn.started"],
+              slug: "new-skill",
+              sourceId: "skills/new-skill.ts",
+            },
+          ],
+        }),
+      UNSUPPORTED_DYNAMIC_SKILLS
+    );
+    assert.deepEqual(
+      parseCapabilityManifest(MANIFEST_HEADER).dynamicSkills,
+      []
+    );
+  });
+
   it("rejects an artifact of another kind or revision", () => {
     assert.throws(() =>
       parseCapabilityManifest({ ...MANIFEST_HEADER, kind: "something-else" })
@@ -231,11 +223,11 @@ describe("lane measurement", () => {
         source: "tools/",
       },
       {
-        bodyChars: 7,
-        descriptionChars: 4,
-        entries: 2,
+        bodyChars: 4,
+        descriptionChars: 2,
+        entries: 1,
         kind: "skill",
-        nameChars: 18,
+        nameChars: 2,
         schemaChars: 0,
         source: "skills/",
       },
@@ -250,19 +242,7 @@ describe("lane measurement", () => {
         source: "subagents/",
       },
     ]);
-    assert.equal(budget.catalogChars, 49 + 14 + 7);
-    assert.equal(budget.bodyChars, 7);
-  });
-
-  it("drops the dynamic skill from its source row when unresolved", () => {
-    const budget = measureLane(FIXTURE, "autonomous-factory", {
-      ...RESOLVED,
-      dynamicSkills: [],
-    });
-    assert.ok(
-      budget.rows.some((row) => row.source === "skills/" && row.entries === 1)
-    );
-    assert.equal(budget.catalogChars, 49 + 14 + 7 - 16 - 2);
+    assert.equal(budget.catalogChars, 2 + 14 + 21 + 4 + 11);
     assert.equal(budget.bodyChars, 4);
   });
 
@@ -289,41 +269,6 @@ describe("lane measurement", () => {
 });
 
 describe("dynamic capability resolution", () => {
-  it("resolves each compiled dynamic skill through its own source", async () => {
-    // The repository-selected lane is the one of the four the factory skill
-    // is offered to; see `factorySkillAvailable`.
-    const resolved = await resolveLaneCapabilities(
-      FIXTURE,
-      "repository-interactive"
-    );
-    assert.equal(resolved.dynamicSkills.length, 1);
-    assert.equal(resolved.dynamicSkills[0]?.slug, "factory-pipeline");
-    assert.equal(resolved.dynamicSkills[0]?.source, "skills/");
-    assert.ok((resolved.dynamicSkills[0]?.markdown.length ?? 0) > 0);
-  });
-
-  it("refuses a second dynamic skill rather than repeating the first", async () => {
-    const manifest = parseCapabilityManifest({
-      ...MANIFEST_HEADER,
-      dynamicSkills: [
-        {
-          eventNames: ["turn.started"],
-          slug: "factory-pipeline",
-          sourceId: "skills/factory-pipeline.ts",
-        },
-        {
-          eventNames: ["turn.started"],
-          slug: "second-pipeline",
-          sourceId: "skills/second-pipeline.ts",
-        },
-      ],
-    });
-    await assert.rejects(
-      resolveLaneCapabilities(manifest, "slack"),
-      SECOND_PIPELINE
-    );
-  });
-
   it("refuses a dynamic tool whose module is not in the bundle", async () => {
     const manifest = parseCapabilityManifest({
       ...MANIFEST_HEADER,
@@ -398,22 +343,6 @@ describe("dynamic capability resolution", () => {
     assert.ok((await subagentDelegationSchemaChars(true)) > chars);
   });
 
-  it("resolves the factory skill only for the repository-selected lane", async () => {
-    // None of the measured lanes carries explicit factory intent, so the
-    // selected repository is the only thing that offers the skill here. The
-    // gate itself is exercised in `factory-lane.test.ts`.
-    const resolved = await Promise.all(
-      CAPABILITY_LANES.map((lane) => resolveLaneCapabilities(FIXTURE, lane))
-    );
-    for (const [index, lane] of CAPABILITY_LANES.entries()) {
-      assert.equal(
-        resolved[index]?.dynamicSkills.length,
-        lane === "repository-interactive" ? 1 : 0,
-        `${lane} dynamic skills`
-      );
-    }
-  });
-
   it("measures the same manifest identically every time", async () => {
     const first = await measureCapabilityBudget(FIXTURE);
     const second = await measureCapabilityBudget(FIXTURE);
@@ -427,8 +356,7 @@ describe("dynamic capability resolution", () => {
 
 describe("session lanes", () => {
   // Each expectation is read from the channel that dispatches the lane:
-  // `agent/channels/slack.ts` for the three Slack lanes, the factory intake
-  // branch of `agent/channels/github.ts` for the fourth. Both call the same
+  // `agent/channels/slack.ts` for all three Slack lanes. It calls the same
   // helpers in `session-auth.ts` the measurement calls, so a stamp added on
   // one side without the other fails here.
   it("carries the complete Slack dispatch stamps", () => {
@@ -444,7 +372,6 @@ describe("session lanes", () => {
       assert.ok(isTrusted(auth), `${lane} trusted`);
       assert.ok(canUseInvestigationMemory(auth), `${lane} reads memory`);
       assert.ok(!isUnattended(auth), `${lane} attended`);
-      assert.ok(!isAutonomous(auth), `${lane} not autonomous`);
       assert.equal(
         isIntakeOnly(auth),
         lane === "slack-intake-only",
@@ -464,37 +391,14 @@ describe("session lanes", () => {
       );
     }
   });
-
-  it("carries the complete factory intake stamps", () => {
-    const auth = laneAuth("autonomous-factory");
-    assert.equal(auth.authenticator, "github-webhook");
-    assert.equal(auth.principalId, AUTONOMOUS_PRINCIPAL);
-    assert.equal(auth.principalType, "service");
-    assert.ok(isAutonomous(auth));
-    assert.ok(isUnattended(auth));
-    assert.equal(intakeIssueNumber(auth), 1);
-    // The GitHub channel never stamps an unattended run trusted, and never
-    // stamps it for investigation memory.
-    assert.ok(!isTrusted(auth));
-    assert.ok(!canUseInvestigationMemory(auth));
-    assert.ok(!isIntakeOnly(auth));
-    assert.deepEqual(repositoryFromAuth(auth), {
-      owner: "Acquisity",
-      repo: "Foreman",
-      slug: "Acquisity/Foreman",
-      source: "github-webhook",
-    });
-  });
 });
 
 const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
 const TOTALS_LINE =
-  /catalog 70 characters \(about 18 tokens\), body 7 characters/u;
+  /catalog 52 characters \(about 13 tokens\), body 4 characters/u;
 const SHARE_LINE =
   /slack carries 50\.0% of the repository-interactive catalog/u;
-const FACTORY_SHARE_LINE =
-  /slack carries 25\.0% of the autonomous-factory catalog/u;
 
 describe("capability report", () => {
   it("renders every lane with its totals", () => {
@@ -514,18 +418,9 @@ describe("capability report", () => {
       ...measureLane(FIXTURE, "repository-interactive", RESOLVED),
       catalogChars: slack.catalogChars * 2,
     };
-    const factory = {
-      ...measureLane(FIXTURE, "autonomous-factory", RESOLVED),
-      catalogChars: slack.catalogChars * 4,
-    };
     assert.equal(ordinarySlackShare([slack, repository]), 0.5);
-    assert.equal(
-      ordinarySlackShare([slack, factory], "autonomous-factory"),
-      0.25
-    );
-    const report = formatCapabilityBudget([slack, repository, factory]);
+    const report = formatCapabilityBudget([slack, repository]);
     assert.match(report, SHARE_LINE);
-    assert.match(report, FACTORY_SHARE_LINE);
     // One lane alone compares nothing, and neither does an empty catalog.
     assert.equal(ordinarySlackShare([slack]), null);
     assert.equal(
@@ -540,6 +435,10 @@ describe("capability report", () => {
       : "run pnpm validate to compile the repository manifest first",
   }, async () => {
     const manifest = readCompiledManifest(new URL("../../", import.meta.url));
+    assert.deepEqual(manifest.subagents.map((entry) => entry.name).sort(), [
+      "critic",
+      "vision",
+    ]);
     const budgets = await measureCapabilityBudget(manifest);
     const byLane = new Map(budgets.map((budget) => [budget.lane, budget]));
     for (const lane of CAPABILITY_LANES) {
@@ -578,12 +477,10 @@ describe("capability report", () => {
     const slack = byLane.get("slack");
     const intake = byLane.get("slack-intake-only");
     const repository = byLane.get("repository-interactive");
-    const factory = byLane.get("autonomous-factory");
-    assert.ok(slack && intake && repository && factory);
+    assert.ok(slack && intake && repository);
     // The lane matrix, read off the repository's own compiled manifest. The
     // two Slack lanes with no repository need carry neither the GitHub surface
-    // nor the gated repository tools; both lanes that do carry both, and the
-    // repository-selected lane additionally carries the factory skill.
+    // nor the gated repository tools; the repository-selected lane carries both.
     const authoredTools = (lane: (typeof CAPABILITY_LANES)[number]) =>
       byLane
         .get(lane)
@@ -591,29 +488,23 @@ describe("capability report", () => {
         ?.entries ?? 0;
     assert.equal(slack.catalogChars, intake.catalogChars);
     assert.ok(repository.catalogChars > slack.catalogChars);
-    assert.ok(factory.catalogChars > slack.catalogChars);
-    assert.ok(repository.catalogChars > factory.catalogChars);
-    assert.equal(
-      authoredTools("repository-interactive"),
-      authoredTools("autonomous-factory")
-    );
+
     assert.equal(authoredTools("slack"), authoredTools("slack-intake-only"));
     assert.equal(
       authoredTools("repository-interactive") - authoredTools("slack"),
       GATED_REPOSITORY_TOOLS.length
     );
     // The achieved budget boundary. Ordinary Slack must stay materially below
-    // both lanes that carry the repository surface; see the ceiling's remarks.
-    for (const full of [repository, factory]) {
+    // the lane that carries the repository surface; see the ceiling's remarks.
+    for (const full of [repository]) {
       assert.ok(
         slack.catalogChars <=
           full.catalogChars * ORDINARY_SLACK_CATALOG_CEILING,
         `slack carries ${slack.catalogChars} of ${full.lane}'s ${full.catalogChars} catalog characters, above ${ORDINARY_SLACK_CATALOG_CEILING * 100}%`
       );
     }
-    // No loss on the admitted side: both repository lanes carry every authored
-    // tool the tree compiles, static and gated alike, and every subagent, and
-    // the factory skill is the only capability that separates the two.
+    // No loss on the admitted side: the repository lane carries every authored
+    // tool the tree compiles, static and gated alike, and both declared children.
     const entries = (
       lane: (typeof CAPABILITY_LANES)[number],
       kind: string,
@@ -652,10 +543,6 @@ describe("capability report", () => {
     }
     assert.equal(
       entries("repository-interactive", "skill", "skills/"),
-      manifest.skills.length + manifest.dynamicSkills.length
-    );
-    assert.equal(
-      entries("autonomous-factory", "skill", "skills/"),
       manifest.skills.length
     );
   });

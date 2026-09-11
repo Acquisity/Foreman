@@ -1,21 +1,23 @@
 import { defineEval } from "eve/evals";
+import { WRITE_TOOLS } from "../helpers.js";
 
 export default defineEval({
   description:
-    "An ambiguous work item loads the factory-pipeline skill and stops the pipeline at classification: the agent asks the requester instead of building on guesses, and nothing reaches the implementer.",
+    "An ambiguous request asks specific clarifying questions before attempting changes.",
   tags: ["slow"],
   async test(t) {
     await t.send(
-      "Use factory mode for Acquisity/Foreman. Something is wrong with the emails, you know the one I mean. Fix it properly this time."
+      "In Acquisity/Foreman, something is wrong with the emails, you know the one I mean. Fix it properly this time. Ask me what you need to know before investigating or changing anything."
     );
-    t.loadedSkill("factory-pipeline");
-    t.calledSubagent("classifier");
-    t.calledSubagent("implementer", { count: 0 });
-    t.calledSubagent("reviewer", { count: 0 });
+    t.succeeded();
+    t.notEvent("subagent.called");
+    t.notCalledTool("prepare_repository");
+    for (const tool of WRITE_TOOLS) {
+      t.notCalledTool(tool);
+    }
     t.judge.autoevals
       .closedQA(
-        "Does the submission ask the user specific clarifying questions about which email problem they mean, rather than proceeding to build something or claiming work was done?",
-        { on: t.reply ?? "(the run parked on a question instead of replying)" }
+        "Does the submission ask specific questions about which email problem the user means, without claiming to have investigated or fixed it?"
       )
       .soft(0.5);
   },

@@ -12,7 +12,7 @@ import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 export const updateRepositoryKnowledgeTool = defineTool({
   approval: repositoryKnowledgePolicy,
   description:
-    "Overwrite the verified knowledge document for one selected repository. Read and merge first. A write always targets the new repository-knowledge namespace. Any legacy factory-brain document is left in place and is no longer read once this document exists.",
+    "Overwrite the verified knowledge document for one selected repository. Read and merge first. A write always targets the new repository-knowledge namespace. Any legacy knowledge document is left in place and is no longer read once this document exists.",
   async execute({ knowledge, repository }, ctx) {
     try {
       const target = resolveRepositoryInput(
@@ -43,8 +43,8 @@ export const updateRepositoryKnowledgeTool = defineTool({
 });
 
 /**
- * Absent from a lane with no repository selected and no factory path open to
- * it. `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
+ * Absent from a lane with no repository selected.
+ * `agent/lib/repository-lane.ts` owns the decision and the reasoning; it
  * gates the catalog only, never authorization. The resolver runs at
  * `step.started`, the same event the GitHub surface it is gated alongside
  * runs at, because eve resolves `turn.started` once before the turn's first

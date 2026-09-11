@@ -27,11 +27,17 @@ describe("gatewayRouting", () => {
 });
 
 describe("parseModelOverrides", () => {
-  it("strips a stale chat key", () => {
+  it("strips obsolete slots while retaining current overrides", () => {
     const overrides = parseModelOverrides(
       JSON.stringify({
+        analyst: "deepseek/deepseek-v4-pro-0813",
         chat: "anthropic/claude-opus-4.8",
+        classifier: "deepseek/deepseek-v4-pro-0813",
+        implementer: "deepseek/deepseek-v4-pro-0813",
+        investigator: "deepseek/deepseek-v4-pro-0813",
         orchestrator: "deepseek/deepseek-v4-pro-0813",
+        researcher: "deepseek/deepseek-v4-pro-0813",
+        reviewer: "anthropic/claude-opus-4.8",
       })
     );
     assert.deepEqual(overrides, {
@@ -42,33 +48,33 @@ describe("parseModelOverrides", () => {
   it("keeps known slots with valid ids", () => {
     const overrides = parseModelOverrides(
       JSON.stringify({
+        critic: "anthropic/claude-opus-4.8",
         orchestrator: "deepseek/deepseek-v4-pro-0813",
-        reviewer: "anthropic/claude-opus-4.8",
       })
     );
     assert.deepEqual(overrides, {
+      critic: "anthropic/claude-opus-4.8",
       orchestrator: "deepseek/deepseek-v4-pro-0813",
-      reviewer: "anthropic/claude-opus-4.8",
     });
   });
 
   it("drops invalid ids", () => {
     const overrides = parseModelOverrides(
       JSON.stringify({
+        critic: "anthropic/claude-opus-4.8",
         orchestrator: "not a valid id",
-        reviewer: "anthropic/claude-opus-4.8",
       })
     );
-    assert.deepEqual(overrides, { reviewer: "anthropic/claude-opus-4.8" });
+    assert.deepEqual(overrides, { critic: "anthropic/claude-opus-4.8" });
   });
 
   it("drops non-string values", () => {
     const overrides = parseModelOverrides(
       JSON.stringify({
+        critic: "anthropic/claude-opus-4.8",
         orchestrator: 123,
-        reviewer: "anthropic/claude-opus-4.8",
       })
     );
-    assert.deepEqual(overrides, { reviewer: "anthropic/claude-opus-4.8" });
+    assert.deepEqual(overrides, { critic: "anthropic/claude-opus-4.8" });
   });
 });

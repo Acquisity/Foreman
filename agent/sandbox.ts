@@ -28,14 +28,14 @@ import { boundedRun } from "#lib/sandbox-deadline.js";
  * of paying the install on first use in every fresh sandbox; the revalidation key rebuilds
  * the template when the pinned agent-browser version changes.
  *
- * The factory repositories (Acquisity/Foreman and Acquisity/Acquisity) are warmed out of
+ * The repositories (Acquisity/Foreman and Acquisity/Acquisity) are warmed out of
  * band by the `rebuild_warm_snapshot` tool, which clones, installs, and builds them in a
  * throwaway sandbox and snapshots the result. It is run on request, when the warm-up itself
  * changes, rather than on a cadence: `prepare_repository` refreshes the warmed checkout to
  * the remote HEAD on every session, so an older snapshot costs a slightly longer install,
  * not correctness. The template starts from that snapshot via
- * `source: { type: "snapshot", snapshotId }`, so `prepare_repository` and the station
- * sandboxes begin from a warm checkout instead of a full install on every fresh session. The
+ * `source: { type: "snapshot", snapshotId }`, so `prepare_repository` and delegated work
+ * begin from a warm checkout instead of a full install on every fresh session. The
  * snapshot id is read synchronously from `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` because `source`
  * is fixed at template build time; when it is unset the template omits `source` and
  * `prepare_repository` cold-clones, which is the safe fallback before the first snapshot

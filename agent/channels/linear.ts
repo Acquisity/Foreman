@@ -4,12 +4,7 @@ import type {
   LinearInboundResult,
   LinearSessionContext,
 } from "eve/channels/linear";
-import {
-  defaultLinearAuth,
-  linearChannel,
-  messageFromLinearAgentSessionEvent,
-} from "eve/channels/linear";
-import { isFactoryRequest, stampFactoryIntent } from "../lib/factory-lane.js";
+import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
@@ -45,14 +40,8 @@ export const onAgentSession = (
     repositories.length === 1 && repository
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
-  // An Agent Session is an interactive lane, so it can ask for the factory the
-  // same way Slack does. The dispatch is the only place that sees the delivered
-  // text, because a dynamic skill resolver runs at turn.started with an empty
-  // message snapshot, and a Linear issue often names no GitHub URL at all.
   return {
-    auth: isFactoryRequest(messageFromLinearAgentSessionEvent(event))
-      ? stampFactoryIntent(withRepository)
-      : withRepository,
+    auth: withRepository,
     context,
   };
 };

@@ -1,14 +1,12 @@
 # Foreman architecture
 
-Company MCPs and authored provider helpers use one app-scoped Executor toolkit, `Foreman`. Root, critic, factory, and schedules share the same provider access; skills define workflow behavior and the critic remains instructed to review read-only. The toolkit manifest and exact operation bindings live under `.github/executor/`. Personal Supermemory and inbound delivery, storage, models, and sandbox infrastructure remain separate.
+Company MCPs and authored provider helpers use one app-scoped Executor toolkit, `Foreman`. Root, native delegates, critic, and schedules share the same provider access; skills define workflow behavior and the critic remains instructed to review read-only. The toolkit manifest and exact operation bindings live under `.github/executor/`. Personal Supermemory and inbound delivery, storage, models, and sandbox infrastructure remain separate.
 
-Foreman is a repository-neutral eve agent with a general execution path and an optional factory path.
+Foreman is a repository-neutral eve agent with one general execution path.
 
 ## Routing
 
-General mode handles conversation, investigation, connected-service work, and small repository changes directly. Slack and Linear sessions (including assigned issues) remain general by default. `agent/lib/factory-lane.ts` advertises the `factory-pipeline` skill when a session has explicit factory intent or a repository stamped by the channel; intake-only Slack additionally requires trusted explicit intent. Complexity, uncertainty, risk, and requested review depth guide whether the model loads an available skill. Autonomous factory turns carry the same procedure inline instead.
-
-Factory mode activates deterministically only for a trusted GitHub issue label matching `FOREMAN_FACTORY_LABEL`. GitHub factory-label and stabilization turns use the autonomous principal and inline the pipeline instructions. Interactive sessions load the skill on demand.
+`agent/lib/prompts.ts` composes one general prompt for every interactive channel. The root handles repository changes directly and may delegate independent work through eve's native `agent` tool. Critic and vision remain declared children for triage review and image reads. GitHub starts work only for trusted mentions; factory labels, CI events, reviews, synchronizations, and PR opens do not dispatch work.
 
 ## Repository binding
 
@@ -19,41 +17,37 @@ Factory mode activates deterministically only for a trusted GitHub issue label m
 - `prepare_repository` refuses missing, ambiguous, and conflicting targets. It reuses `/workspace` after GitHub channel checkout or clones to `/workspace/repo` at runtime.
 - An attended session may prepare a different validated repository later, and the checkout is replaced rather than the request refused. The old checkout is set aside to a tool-owned path first, so a clone that fails, times out, or is refused puts it back and keeps the marker it had. A rollback that itself fails clears the marker, and the session is left with no repository prepared. An interrupted switch is settled by the published checkout's own origin before either reuse or a switch trusts the marker. A signed GitHub checkout, an unattended run, and a checkout at `/workspace` are never replaced. A refreshed checkout reinstalls dependencies only when the repository's lockfile moved between the old and new HEAD, or when its install state is unknown. Every refusal returns `success: false` with the reason and leaves one bounded warning behind.
 - GitHub extension calls supply `owner` and `repo` explicitly. The extension has no fixed context.
-- The repository tools and the GitHub tool surface are resolved per lane by `agent/lib/repository-lane.ts`. A session with no selected repository, no repository prepared, and no factory path open to it carries neither; a repository-selected or factory lane carries both, and a session that prepares a repository at runtime carries them from the next step of that turn. `prepare_repository` and `rebuild_warm_snapshot` stay static, because the first is how a lane names a repository at all; the slug it records lives in `agent/lib/repository-selection.ts`. The gate is catalog composition, not authorization: trust, approval, the intake-only denials, and signed webhook binding are unchanged by it.
-- Analyst, investigator, implementer, and reviewer share the root sandbox. The reviewer checkout tool verifies and hard-resets to the exact pushed SHA.
+- The repository tools and the GitHub tool surface are resolved per lane by `agent/lib/repository-lane.ts`. A session with no selected repository, and no repository prepared carries neither; a repository-selected lane carries both, and a session that prepares a repository at runtime carries them from the next step of that turn. `prepare_repository` and `rebuild_warm_snapshot` stay static, because the first is how a lane names a repository at all; the slug it records lives in `agent/lib/repository-selection.ts`. The gate is catalog composition, not authorization: trust, approval, the intake-only denials, and signed webhook binding are unchanged by it.
+- Native root-agent copies and vision share the root sandbox. Critic has its own sandbox and can check out the exact commit for independent evidence review.
 
-Every clone, fetch, and push targets `https://github.com/<validated-owner>/<validated-repo>.git` literally. Installation credentials are injected by `brokerPolicy` at the sandbox firewall and removed in `finally`. `validateBranch` rejects protected or non-plain branch names; it is the whole gate, so `push_branch` delivers a human branch name such as `afragahaha/eng-13319` unchanged. The `FOREMAN_BRANCH_PREFIX` branches are the factory's own, and the GitHub channel uses the prefix to recognize them for red-CI stabilization, which is ownership rather than permission.
+Every clone, fetch, and push targets `https://github.com/<validated-owner>/<validated-repo>.git` literally. Installation credentials are injected by `brokerPolicy` at the sandbox firewall and removed in `finally`. `validateBranch` rejects protected or non-plain branch names; it is the whole gate, so `push_branch` delivers a human branch name such as `afragahaha/eng-13319` unchanged.
 
-## Factory lifecycle
+## Delegation and delivery
 
-The ordered stations are classifier, investigator, analyst, implementer, and reviewer. The root investigates relevant production tools before planning and passes self-contained evidence to children. Task-mode children cannot park and receive only their authored tools and the shared sandbox. The vision sidecar narrows that further: it carries `read_image` alone, with eve's `bash`, `read_file`, `write_file`, `web_fetch`, `web_search`, and `todo` defaults disabled, so a delegation that names no image is answered rather than searched for.
+On eve 0.44, native `agent` calls block until the fresh child completes. Children inherit the root's configuration and sandbox with fresh history and state; they receive neither `agent` nor `Workflow`. Send self-contained tasks and avoid overlapping edits. The declared critic keeps its own tools, skills, and sandbox; vision carries only `read_image` and explicitly disables shell, file, web, and todo defaults. Keep critic's independent sandbox because it owns a skill.
 
-After the reviewer approves the exact pushed head and an existing Linear ticket is confirmed, Foreman opens a normal pull request. Trusted GitHub labels authorize intake only. `pipeline-runs/` persists source Linear ids, repository, PR, head SHA, stage, processed feedback ids, readiness signals, blockers, and consecutive blocker count. Current-head CI failures, trusted collaborator comments, and PR synchronizations drive revisions on the existing branch. Webhooks are the only trigger; there is no reconciliation schedule. Feedback is deduplicated, stale heads are ignored, and the third unchanged blocker set escalates.
-
-Readiness requires all of: internal approval for the current head, passing required checks, mergeability, no actionable trusted feedback, and no blockers. Readiness and escalation are reported to the PR and originating Linear context. Merge tools are absent.
+The root owns feature-branch and pull-request delivery. There is no station protocol, artifact handoff, automatic stabilization, or readiness state machine. Repository authority, protected branches, intake-only denials, and the human merge boundary remain enforced.
 
 ## Channels and trust
 
-- GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Label intake additionally checks the labeler's repository permission. Signed repository context is stamped before any model step.
-- Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the current mode.
-- Slack mentions are trusted by channel membership and have no factory default.
-- The Eve HTTP channel uses local dev or Vercel OIDC auth, and stamps factory intent and a single URL-named repository from the delivered message like the other interactive channels.
+- GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Signed repository context is stamped before any model step.
+- Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the existing session.
+- Slack mentions are trusted by channel membership.
+- The Eve HTTP channel uses local dev or Vercel OIDC auth, and stamps a single URL-named repository from the delivered message like the other interactive channels.
 
 `agent/lib/trust.ts` is the sole caller-trust authority. Unattended runs are denied writes to shared repository knowledge, global model configuration, and personal Supermemory. For repository knowledge and model configuration, trusted attended callers write directly; other attended callers receive approval prompts. Company services share the same Executor catalog across attended and unattended workflows; workflow instructions govern their use.
 
-Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions, unattended factory runs, and schedules never do. It is fail-closed: an unstamped session reads nothing.
+Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions and schedules never do. It is fail-closed: an unstamped session reads nothing.
 
 Autumn and Stripe billing helpers use the shared company account through Executor on every workflow. They retain fixed read operations, identifier validation, bounded history, and field filtering; they expose no billing writes and require no requester-specific provider consent.
 
 ## Storage
 
-All Blob namespaces are registered in `agent/lib/blob.ts`.
+Active Blob namespaces are registered in `agent/lib/blob.ts`.
 
 - `repository-knowledge/<repository-hash>.md`: verified shared facts. Reads fall back to legacy `factory-brain/<repository-hash>.md`; trusted writes always use the new namespace.
-- `pipeline-runs/<repository-hash>/<scope>.json`: stabilization state.
 - `model-overrides/foreman.json`: global model overrides used at session start.
 - `user-preferences/<principal-hash>.md`: private principal preferences.
-- `artifacts/<validated-id>.md`: write-once station handoffs.
 
 Supermemory is available for broader attended-session recall, never as repository authority or autonomous shared memory, and never the backing store for investigation memory.
 
@@ -61,4 +55,6 @@ Investigation memory is a private Foreman-owned Postgres database, separate from
 
 ## Verification
 
-Every Foreman-authored call that leaves the process is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md), with its deadline or its exemption. `pnpm validate` checks generated Linear-spec drift, then runs Ultracite, TypeScript, `eve info`, and unit tests in that order. Unit tests cover repository parsing and webhook authority, protected branches and literal remotes, stale events, feedback deduplication, third-repeat escalation, readiness, and scoped run keys. Routing and safety evals cover the direct path, explicit factory selection, ordinary conversation, station order, knowledge and model approvals, and the human merge boundary. The full pipeline eval requires an explicit scratch repository.
+Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` checks three lanes and admits GitHub dynamic tools through eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic and vision as declared children.
+
+Evals cover direct questions, clarification, repository/model approvals, prompt injection, native delegation, and opt-in scratch delivery. Build and discovery do not prove runtime dispatch: run [UAT-BATTERY.md](./UAT-BATTERY.md) on the exact Preview commit, including attachments, intake restrictions, critic, native children, cancellation, and real provider reads. Configure the current PR's Preview trigger and Executor environment before testing. Production rollback is a revert on `main`, never `vercel rollback`.
