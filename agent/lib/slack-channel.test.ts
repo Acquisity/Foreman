@@ -537,6 +537,7 @@ describe("slack channel", () => {
     const handler = slackChannelEvents["turn.cancelled"];
     assert.ok(handler);
     const posts: string[] = [];
+    const statuses: (string | undefined)[] = [];
     const eventChannel = {
       state: {
         progress: {
@@ -551,10 +552,15 @@ describe("slack channel", () => {
           posts.push(text);
           return Promise.resolve();
         },
+        startTyping: (status?: string) => {
+          statuses.push(status);
+          return Promise.resolve();
+        },
       },
     } as unknown as SlackEventContext;
     await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
     assert.deepEqual(posts, []);
+    assert.deepEqual(statuses, [undefined]);
     assert.equal(eventChannel.state.progress, undefined);
   });
 
@@ -1146,10 +1152,13 @@ describe("slack channel progress", () => {
     assert.equal(eventChannel.state.progress, undefined);
   });
 
-  it("clears progress state when the turn is cancelled", async () => {
+  it("clears progress and Slack typing status when the turn is cancelled", async () => {
     const handler = handlerFor("turn.cancelled");
     const calls: string[] = [];
     const eventChannel = progressChannel(calls, {
+      lastReasoningTypingAtMs: Date.now(),
+      lastReasoningTypingStatus: "Checking one more hypothesis",
+      pendingToolCallMessage: "Still investigating",
       progress: {
         posts: 1,
         startedAtMs: Date.now(),
@@ -1158,8 +1167,11 @@ describe("slack channel progress", () => {
       },
     });
     await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
-    assert.deepEqual(calls, []);
+    assert.deepEqual(calls, ["typing:"]);
     assert.equal(eventChannel.state.progress, undefined);
+    assert.equal(eventChannel.state.pendingToolCallMessage, null);
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
   });
 
   it("mirrors the default actions.requested typing label and prefers narration", async (t) => {

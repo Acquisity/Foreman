@@ -380,11 +380,18 @@ export const slackChannelEvents: SlackChannelEvents = {
     }
     await checkSlackProgress(channel, data.turnId);
   },
-  "turn.cancelled"(_data, channel) {
+  async "turn.cancelled"(_data, channel) {
     // The explicit stop path owns its exact-turn confirmation. This handler
-    // only tears down progress so unrelated cooperative cancellations stay
+    // clears progress and typing so unrelated cooperative cancellations stay
     // quiet and no late checkpoint can post beside the stop notice.
     channel.state.progress = undefined;
+    channel.state.pendingToolCallMessage = null;
+    channel.state.lastReasoningTypingAtMs = null;
+    channel.state.lastReasoningTypingStatus = null;
+    // API and dashboard cancellation bypass the Slack stop-command reply.
+    // Clear the provider's status explicitly so a settled turn cannot keep
+    // looking active in Slack.
+    await channel.thread.startTyping();
   },
   async "turn.failed"(data, channel) {
     // A failed turn leaves no progress state behind. Mirrors eve's default
