@@ -1,0 +1,388 @@
+diff --git a/dist/extension/_manifest.json b/dist/extension/_manifest.json
+index 627f4f4..2f55b45 100644
+--- a/dist/extension/_manifest.json
++++ b/dist/extension/_manifest.json
+@@ -1,10 +1,10 @@
+ {
+   "kind": "eve-extension",
+   "formatVersion": 2,
+-  "builtWithEve": "0.47.3",
++  "builtWithEve": "0.54.2",
+   "requires": {
+     "extension": 1,
+-    "tool": 21,
++    "tool": 35,
+     "instructions": 2,
+     "config": 1
+   }
+diff --git a/dist/extension/extension.mjs b/dist/extension/extension.mjs
+index 8f8fca8..2909470 100644
+--- a/dist/extension/extension.mjs
++++ b/dist/extension/extension.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { defineExtension } from "eve/extension";
+ import { z } from "zod";
+diff --git a/dist/extension/lib/browser.mjs b/dist/extension/lib/browser.mjs
+index c6fdded..9a8078f 100644
+--- a/dist/extension/lib/browser.mjs
++++ b/dist/extension/lib/browser.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import extension_default from "../extension.mjs";
+ import { buildAgentBrowserCommand, installAgentBrowser } from "./sandbox.mjs";
+diff --git a/dist/extension/lib/sandbox.mjs b/dist/extension/lib/sandbox.mjs
+index 05df14d..2ffec9a 100644
+--- a/dist/extension/lib/sandbox.mjs
++++ b/dist/extension/lib/sandbox.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { AgentBrowserCommandError, DEFAULT_AGENT_BROWSER_INSTALL_SPEC, buildAgentBrowserArgv, buildShellCommand, createAgentBrowserCommandResult, defaultSessionName, quoteShellArg, quoteShellArg as quoteShellArg$1, resolveAgentBrowserInstallSpec, resolveAgentBrowserInstallSpec as resolveAgentBrowserInstallSpec$1, throwIfCommandFailed } from "@agent-browser/sandbox";
+ const APT_CHROMIUM_DEPENDENCIES = [
+diff --git a/dist/extension/tools/click.mjs b/dist/extension/tools/click.mjs
+index 499a74e..27f5317 100644
+--- a/dist/extension/tools/click.mjs
++++ b/dist/extension/tools/click.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/close.mjs b/dist/extension/tools/close.mjs
+index 74128f2..9b72920 100644
+--- a/dist/extension/tools/close.mjs
++++ b/dist/extension/tools/close.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/console.mjs b/dist/extension/tools/console.mjs
+index a8bee70..07b4d07 100644
+--- a/dist/extension/tools/console.mjs
++++ b/dist/extension/tools/console.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/drag.mjs b/dist/extension/tools/drag.mjs
+index c1a1d17..060996b 100644
+--- a/dist/extension/tools/drag.mjs
++++ b/dist/extension/tools/drag.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/evaluate.mjs b/dist/extension/tools/evaluate.mjs
+index be92cf9..c663ecc 100644
+--- a/dist/extension/tools/evaluate.mjs
++++ b/dist/extension/tools/evaluate.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/fill.mjs b/dist/extension/tools/fill.mjs
+index 1e3fcbb..a42929c 100644
+--- a/dist/extension/tools/fill.mjs
++++ b/dist/extension/tools/fill.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/find.mjs b/dist/extension/tools/find.mjs
+index c2c84a8..8cf8453 100644
+--- a/dist/extension/tools/find.mjs
++++ b/dist/extension/tools/find.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/get.mjs b/dist/extension/tools/get.mjs
+index 9f0a039..879db29 100644
+--- a/dist/extension/tools/get.mjs
++++ b/dist/extension/tools/get.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/hover.mjs b/dist/extension/tools/hover.mjs
+index 030e7b8..6aaabbc 100644
+--- a/dist/extension/tools/hover.mjs
++++ b/dist/extension/tools/hover.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/navigate.mjs b/dist/extension/tools/navigate.mjs
+index c2717e1..90a8bdc 100644
+--- a/dist/extension/tools/navigate.mjs
++++ b/dist/extension/tools/navigate.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/network_requests.mjs b/dist/extension/tools/network_requests.mjs
+index 67836da..7a24da8 100644
+--- a/dist/extension/tools/network_requests.mjs
++++ b/dist/extension/tools/network_requests.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/press_key.mjs b/dist/extension/tools/press_key.mjs
+index 6daf548..aa9e613 100644
+--- a/dist/extension/tools/press_key.mjs
++++ b/dist/extension/tools/press_key.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/read.mjs b/dist/extension/tools/read.mjs
+index 98c0930..6a99ded 100644
+--- a/dist/extension/tools/read.mjs
++++ b/dist/extension/tools/read.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/screenshot.mjs b/dist/extension/tools/screenshot.mjs
+index 23883c2..703f0da 100644
+--- a/dist/extension/tools/screenshot.mjs
++++ b/dist/extension/tools/screenshot.mjs
+@@ -1,13 +1,14 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import extension_default from "../extension.mjs";
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+ import { defineTool } from "eve/tools";
+-const MAX_INLINE_SCREENSHOT_BYTES = 4 * 1024 * 1024;
++const MAX_INLINE_SCREENSHOT_BYTES = 4194304;
+ var screenshot_default = defineTool({
+ 	description: "Take a screenshot of the current page and save it inside the sandbox. Returns the sandbox file path. With annotate, interactive elements get numbered labels matching snapshot refs (@eN).",
+ 	inputSchema: z.object({
+diff --git a/dist/extension/tools/scroll.mjs b/dist/extension/tools/scroll.mjs
+index 5e014b6..265ee89 100644
+--- a/dist/extension/tools/scroll.mjs
++++ b/dist/extension/tools/scroll.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/select_option.mjs b/dist/extension/tools/select_option.mjs
+index efbb8cd..2b7380d 100644
+--- a/dist/extension/tools/select_option.mjs
++++ b/dist/extension/tools/select_option.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/set_checked.mjs b/dist/extension/tools/set_checked.mjs
+index 7efade6..d5c3b63 100644
+--- a/dist/extension/tools/set_checked.mjs
++++ b/dist/extension/tools/set_checked.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/snapshot.mjs b/dist/extension/tools/snapshot.mjs
+index 451d8af..ddcb908 100644
+--- a/dist/extension/tools/snapshot.mjs
++++ b/dist/extension/tools/snapshot.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/tabs.mjs b/dist/extension/tools/tabs.mjs
+index 71313d8..fc12fc2 100644
+--- a/dist/extension/tools/tabs.mjs
++++ b/dist/extension/tools/tabs.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/upload.mjs b/dist/extension/tools/upload.mjs
+index ef48264..c7361be 100644
+--- a/dist/extension/tools/upload.mjs
++++ b/dist/extension/tools/upload.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/extension/tools/wait_for.mjs b/dist/extension/tools/wait_for.mjs
+index 8a61a27..5187366 100644
+--- a/dist/extension/tools/wait_for.mjs
++++ b/dist/extension/tools/wait_for.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import { SELECTOR_HINT, runBrowser } from "../lib/browser.mjs";
+ import { z } from "zod";
+diff --git a/dist/index.mjs b/dist/index.mjs
+index e7e4cd8..403ecc4 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import extension_default from "./extension/extension.mjs";
+ export { extension_default as default, extension_default as eve };
+diff --git a/dist/tools/index.mjs b/dist/tools/index.mjs
+index 8ffaa8e..07d4b4e 100644
+--- a/dist/tools/index.mjs
++++ b/dist/tools/index.mjs
+@@ -1,7 +1,8 @@
+ import { fileURLToPath as __eveFileURLToPath } from "node:url";
+ import { dirname as __eveDirname } from "node:path";
+ import { createRequire as __eveCreateRequire } from "node:module";
+-__eveDirname(__eveFileURLToPath(import.meta.url));
++const __filename = __eveFileURLToPath(import.meta.url);
++__eveDirname(__filename);
+ __eveCreateRequire(import.meta.url);
+ import click_default from "../extension/tools/click.mjs";
+ import close_default from "../extension/tools/close.mjs";

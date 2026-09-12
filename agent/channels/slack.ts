@@ -11,6 +11,7 @@ import {
 import { SLACK_INTAKE_ONLY_CHANNELS } from "../lib/constants.js";
 import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
+import { slackFreshSessionHistory } from "../lib/slack-history.js";
 import {
   FINAL_SLACK_POST_RULE,
   slackAttachmentContext,
@@ -75,10 +76,10 @@ import { isIntakeOnly } from "../lib/trust.js";
  * cancels the active turn through its exact session handle, and is consumed
  * without
  * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. The stop path posts the single short notice only
- * after the exact turn emits its durable cancellation boundary, so unrelated
- * cooperative cancellations and no-op requests against parked sessions stay
- * quiet.
+ * ordinary model input. The stop path includes background tasks and posts one
+ * short acknowledgement when the exact session accepts the request. Native
+ * cancellation settlement is asynchronous; an acknowledgement is not proof
+ * that every child has stopped.
  *
  * A turn still running at 5 and 15 minutes posts one short progress line at
  * each threshold and never a third. `turn.started` seeds the per-turn
@@ -87,24 +88,25 @@ import { isIntakeOnly } from "../lib/trust.js";
  * `actions.requested`, and `action.result` are the checkpoints: they count
  * finished calls, record what the turn is waiting on, and post the line
  * `slack-progress.ts` says is due. The final `message.completed` branch,
- * `turn.cancelled`, and `turn.failed` clear the state without checking, so
- * a progress line can never precede, follow, or duplicate the
- * requester-facing reply, and a failed turn leaves nothing behind. eve
+ * `turn.completed`, `turn.cancelled`, and `turn.failed` clear the state without
+ * checking, preventing a late progress checkpoint from posting beside the
+ * final reply. A failed turn leaves nothing behind. eve
  * emits no event during a single uninterrupted tool execution and offers
  * authored channel code no durable wakeup, so a line that comes due
- * mid-action posts at the next lifecycle event. The overridden events all
- * carry eve defaults that are not exported; each handler mirrors its
- * default exactly (the same pattern as `message.completed` below) and adds
- * only the progress behavior.
+ * mid-action posts at the next lifecycle event. Typing follows eve's default
+ * behavior, while Foreman adds progress bookkeeping and terminal cleanup,
+ * including an authored `turn.completed` handler. Reasoning text is local to
+ * the current streamed block. Progress and typing throttle fields remain in
+ * durable channel state.
  *
  * Delivery sends each completed assistant response without a split marker;
  * an empty response falls back to a typing indicator. Slack rejects a
  * markdown post over 12,000 characters and eve swallows an event-handler
  * throw, so final replies go through `slack-post.ts`: ordered chunks that
  * prefer paragraph then line boundaries, plus one short visible fallback
- * naming the Slack error when a post is rejected. The handler mirrors eve's
- * default `message.completed` branches, which are not exported, and changes
- * only the post.
+ * naming the Slack error when a post is rejected. The handler follows eve's
+ * default `message.completed` branches and adds terminal cleanup alongside
+ * the authored delivery behavior.
  */
 
 export const dispatch = async (
@@ -119,13 +121,12 @@ export const dispatch = async (
     return null;
   }
   // A literal stop/cancel is a command for the running turn, never model
-  // input: cancel the exact active turn and consume the message. Confirming its
-  // durable cancellation boundary ties the notice to this command instead of
-  // another cooperative cancellation; with no active turn it drops quietly.
+  // input: request cancellation on the exact session, including background
+  // tasks, and consume the message. A missing owner drops quietly.
   if (isStopRequest(message.text)) {
-    const cancelledTurnId = await cancelActiveSlackTurn(ctx);
-    if (cancelledTurnId) {
-      await postStopConfirmation(ctx, cancelledTurnId);
+    const requestedTurnId = await cancelActiveSlackTurn(ctx);
+    if (requestedTurnId) {
+      await postStopConfirmation(ctx, requestedTurnId);
     }
     return null;
   }
@@ -146,22 +147,32 @@ export const dispatch = async (
   // the triggering message is read here: eve's own thread lookback, which
   // stages a file dropped earlier in the thread, is not visible to dispatch.
   const attachmentContext = slackAttachmentContext(message.attachments);
+  const history = await slackFreshSessionHistory(ctx, message);
   const context = [
     intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
     ...(attachmentContext ? [attachmentContext] : []),
+    ...(history ? [history] : []),
   ];
   return { auth: stamped, context };
 };
 
-// --- Mirrors of eve's unexported Slack default rendering -------------------
-// Overriding an event replaces its default per-key, and the defaults for
-// reasoning.appended, actions.requested, and turn.failed are not exported
-// (they live in eve's channels/slack defaults module). Each helper below
-// replicates one piece of that default rendering exactly, so the overrides
-// add progress behavior without changing what the thread already saw. The
-// action label is the exception: eve/channels/slack publicly exports
-// describeActionRequests, so the actions.requested override calls the
-// canonical helper instead of mirroring it.
+// --- Slack rendering based on eve's unexported defaults --------------------
+// Overriding an event replaces its default per-key. Typing follows eve's
+// defaults; Foreman owns progress, terminal cleanup, chunked replies, and its
+// existing error text. Action labels use the public describeActionRequests.
+
+// Like eve 0.54.2, key transient reasoning by the live per-step state object.
+// A reasoning block ends within its model stream and needs no durable copy.
+const reasoningByState = new WeakMap<
+  SlackEventContext["state"],
+  { turnId: string; stepIndex: number; text: string }
+>();
+
+const clearReasoning = (channel: SlackEventContext): void => {
+  reasoningByState.delete(channel.state);
+  channel.state.lastReasoningTypingAtMs = null;
+  channel.state.lastReasoningTypingStatus = null;
+};
 
 const LINE_SPLIT_PATTERN = /\r?\n/u;
 
@@ -335,6 +346,7 @@ export const slackChannelEvents: SlackChannelEvents = {
       return;
     }
     channel.state.pendingToolCallMessage = null;
+    clearReasoning(channel);
     // The final message ends progress tracking for the turn; the reply below
     // is the only thing the thread sees at completion.
     channel.state.progress = undefined;
@@ -350,7 +362,20 @@ export const slackChannelEvents: SlackChannelEvents = {
     // Mirrors eve's default reasoning.appended typing indicator: substantial
     // progressive extensions post immediately, smaller deltas refresh at
     // most every five seconds.
-    const firstLine = firstNonEmptyLine(data.reasoningSoFar);
+    const previousBlock = reasoningByState.get(channel.state);
+    const sameBlock =
+      previousBlock?.turnId === data.turnId &&
+      previousBlock.stepIndex === data.stepIndex;
+    if (!sameBlock) {
+      clearReasoning(channel);
+    }
+    const text = (sameBlock ? previousBlock.text : "") + data.reasoningDelta;
+    reasoningByState.set(channel.state, {
+      stepIndex: data.stepIndex,
+      text,
+      turnId: data.turnId,
+    });
+    const firstLine = firstNonEmptyLine(text);
     if (firstLine !== undefined) {
       const status = truncateTypingStatus(firstLine);
       const previous = channel.state.lastReasoningTypingStatus;
@@ -375,15 +400,27 @@ export const slackChannelEvents: SlackChannelEvents = {
     }
     await checkSlackProgress(channel, data.turnId);
   },
+  "reasoning.completed"(data, channel) {
+    const block = reasoningByState.get(channel.state);
+    if (block?.turnId === data.turnId && block.stepIndex === data.stepIndex) {
+      clearReasoning(channel);
+    }
+  },
   "turn.cancelled"(_data, channel) {
-    // The explicit stop path owns its exact-turn confirmation. This handler
+    clearReasoning(channel);
+    // The explicit stop path owns its exact-turn acknowledgement. This handler
     // only tears down progress so unrelated cooperative cancellations stay
     // quiet and no late checkpoint can post beside the stop notice.
     channel.state.progress = undefined;
   },
+  "turn.completed"(_data, channel) {
+    clearReasoning(channel);
+    channel.state.progress = undefined;
+  },
   async "turn.failed"(data, channel) {
-    // A failed turn leaves no progress state behind. Mirrors eve's default
-    // turn.failed error post exactly.
+    clearReasoning(channel);
+    // A failed turn leaves no progress state behind. Preserve Foreman's
+    // existing error post while clearing its local rendering state.
     channel.state.progress = undefined;
     const errorId = extractErrorId(data.details);
     await channel.thread.post(
@@ -399,8 +436,7 @@ export const slackChannelEvents: SlackChannelEvents = {
     // Mirrors eve's default turn.started, which is not exported: clear the
     // buffered narration and typing state, then show the Working indicator.
     channel.state.pendingToolCallMessage = null;
-    channel.state.lastReasoningTypingAtMs = null;
-    channel.state.lastReasoningTypingStatus = null;
+    clearReasoning(channel);
     // Progress tracking starts here and only outside intake-only sessions:
     // those threads receive the final answer and no intermediate lines, so
     // they never carry progress state at all.

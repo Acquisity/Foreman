@@ -8,12 +8,13 @@ import {
   supportScheduleEnabled,
 } from "./config.js";
 import { notificationConversation } from "./conversation.js";
+import { reportSupportFailureForClaim } from "./investigation.js";
 import { readSupportIntake } from "./slack.js";
 import {
   claimHandoffs,
   discoverHandoff,
   saveSupportCursor,
-  settleSupport,
+  settleSupportIfNoReport,
   supportCursor,
 } from "./store.js";
 
@@ -51,10 +52,16 @@ export async function runSupportSchedule(
   await Promise.all(
     claims.map(async (claim) => {
       try {
+        if (claim.abandonedIntake) {
+          // The claim query decides this under its row lock; pending outboxes
+          // stay on the ordinary dispatch path for reconciliation.
+          await reportSupportFailureForClaim(claim);
+          return;
+        }
         await send(claim, supportAuth(appAuth, claim));
       } catch {
         logOpsEvent("support.dispatch.failed", { outcome: "error" });
-        await settleSupport(claim);
+        await settleSupportIfNoReport(claim);
       }
     })
   );

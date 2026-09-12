@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { defineTool } from "eve/tools";
+import { laneAuth } from "../agent/lib/capability-budget.ts";
+import {
+  admitDynamicTools,
+  installedEveVersion,
+} from "../agent/lib/eve-dynamic-tools.ts";
 import { GITHUB_TOOL_ALLOWLIST } from "../agent/lib/github/tool-allowlist.ts";
 
 // Run after sourcing .env.example and building. Importing the actual server in
@@ -14,51 +19,97 @@ const UNSTAMPED_PROJECTION = /toModelOutput.*durable descriptor/u;
 
 async function verify() {
   await import("../.output/server/index.mjs");
-  const bundle = await import(
-    "../.output/server/_libs/@github-tools/eve-extension.mjs"
-  );
-  // Nitro aliases chunk exports, so the authored default is not necessarily
-  // exported as "default". Require exactly one dynamic resolver in this chunk.
-  const resolvers = Object.values(bundle).filter(
-    (entry) => typeof entry?.events?.["step.started"] === "function"
-  );
-  assert.equal(resolvers.length, 1, "Expected one built GitHub resolver.");
-  const [resolver] = resolvers;
-  const t = { default: resolver };
   const require = createRequire(import.meta.url);
   const evePackage = pathToFileURL(require.resolve("eve/package.json"));
+  // Eve 0.54 inlines installed extensions into the server entry. Read the
+  // module map that this actual server boot registered, never a source import
+  // or a second locally compiled bundle.
+  const { readBundledCompiledArtifacts } = await import(
+    new URL("./dist/src/runtime/loaders/bundled-artifacts.js", evePackage).href
+  );
+  const artifacts = readBundledCompiledArtifacts();
+  assert.ok(
+    artifacts,
+    "The built server must register its compiled artifacts."
+  );
+  assert.equal(artifacts.metadata.generator.version, installedEveVersion());
+  const entry = artifacts.manifest.dynamicTools.find(
+    (tool) => tool.slug === "github__github"
+  );
+  assert.ok(entry, "The built manifest must mount the GitHub resolver.");
+  const { resolveDynamicToolDefinition } = await import(
+    new URL("./dist/src/runtime/resolve-dynamic-tool.js", evePackage).href
+  );
+  const resolver = await resolveDynamicToolDefinition(
+    entry,
+    artifacts.moduleMap,
+    "__root__"
+  );
+  const expectedNames = GITHUB_TOOL_ALLOWLIST.map(
+    (name) => `github__${name}`
+  ).sort((left, right) => left.localeCompare(right));
+  const admitted = await admitDynamicTools(resolver, {
+    auth: laneAuth("repository-interactive"),
+    id: "built-github-proof",
+  });
+  assert.deepEqual(
+    admitted
+      .map((tool) => tool.name)
+      .sort((left, right) => left.localeCompare(right)),
+    expectedNames,
+    "Eve must admit the exact qualified model-visible names from the built artifact."
+  );
+  await Promise.all(
+    ["slack", "slack-intake-only"].map(async (lane) => {
+      assert.deepEqual(
+        await admitDynamicTools(resolver, {
+          auth: laneAuth(lane),
+          id: `built-github-proof:${lane}`,
+        }),
+        [],
+        `${lane} must omit GitHub in native dispatch.`
+      );
+    })
+  );
+  assert.equal(typeof resolver?.events?.["step.started"], "function");
+  const resolve = (lane) =>
+    resolver.events["step.started"](
+      {
+        data: { stepIndex: 0, turnId: "built-github-proof" },
+        type: "step.started",
+      },
+      {
+        session: {
+          auth: { current: laneAuth(lane) },
+          id: "built-github-proof",
+        },
+      }
+    );
   const { validateDurableDynamicToolCallbacks } = await import(
     new URL("./dist/src/context/dynamic-tool-lifecycle.js", evePackage).href
   );
-  const entries = await t.default.events["step.started"]();
-  const names = Object.keys(entries).sort();
+  const entries = await resolve("repository-interactive");
+  const names = Object.keys(entries).sort((left, right) =>
+    left.localeCompare(right)
+  );
   assert.equal(
     names.length,
     31,
     "The built GitHub surface must contain 31 tools."
   );
-  assert.deepEqual(names, [...GITHUB_TOOL_ALLOWLIST].sort());
+  assert.deepEqual(names, expectedNames);
 
   const owner = (entryKey) => ({
     entryKey,
-    name: `github__${entryKey}`,
+    name: entryKey,
     resolverSlug: "github__github",
     scope: "step",
     sessionId: "built-github-proof",
   });
-  const expectedCallbacks = {
-    compareCommits: ["execute", "toModelOutput"],
-    createPullRequest: ["approvalRequest", "execute"],
-    getCommit: ["execute", "toModelOutput"],
-    getFileContent: ["execute", "toModelOutput"],
-    getPullRequestContext: ["execute", "toModelOutput"],
-    listPullRequestFiles: ["execute", "toModelOutput"],
-    updatePullRequest: ["approvalRequest", "execute"],
-  };
   const callbackPhases = {};
   for (const entryKey of names) {
     const identity = owner(entryKey);
-    // Eve 0.44 ignores argument three; 0.54 uses it for callback ownership.
+    // Eve 0.54 registers every callback under its exact resolver owner.
     const callbacks = validateDurableDynamicToolCallbacks(
       identity.name,
       entries[entryKey],
@@ -66,7 +117,7 @@ async function verify() {
     );
     assert.deepEqual(
       Object.keys(callbacks).sort(),
-      [...(expectedCallbacks[entryKey] ?? ["execute"])].sort(),
+      ["approvalRequest", "execute", "toModelOutput"],
       `Unexpected durable callback phases for ${identity.name}.`
     );
     for (const phase of Object.keys(callbacks)) {
@@ -80,7 +131,7 @@ async function verify() {
     toolInput: { draft: false },
   };
   assert.equal(
-    await entries.createPullRequest.approval({
+    await entries.github__createPullRequest.approval({
       ...approvalContext,
       toolName: "github__createPullRequest",
     }),
@@ -89,7 +140,7 @@ async function verify() {
   );
   assert.equal(
     (
-      await entries.updatePullRequest.approval({
+      await entries.github__updatePullRequest.approval({
         ...approvalContext,
         toolName: "github__updatePullRequest",
       })
@@ -101,10 +152,10 @@ async function verify() {
   // Re-author just one projection without the compiler transform. This must
   // fail even though every other callback and all 31 tool names remain valid.
   const broken = defineTool({
-    ...entries.getFileContent,
+    ...entries.github__getFileContent,
     toModelOutput: () => ({ type: "json", value: null }),
   });
-  const identity = owner("getFileContent");
+  const identity = owner("github__getFileContent");
   assert.throws(
     () => validateDurableDynamicToolCallbacks(identity.name, broken, identity),
     UNSTAMPED_PROJECTION
@@ -115,6 +166,8 @@ async function verify() {
     approvalPoliciesMatch: true,
     callbackPhases,
     count: names.length,
+    mountedGateMatches: true,
+    nativeDispatchNamesMatch: true,
     unstampedCallbackRejected: true,
   };
 }

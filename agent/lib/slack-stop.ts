@@ -1,12 +1,9 @@
 import { createHash } from "node:crypto";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
-import {
-  isCurrentTurnBoundaryEvent,
-  type MessageStreamEvent,
-} from "eve/client";
+import type { MessageStreamEvent } from "eve/client";
 
 const MAX_TEXT_LENGTH = 200;
-const CANCELLATION_CONFIRMATION_TIMEOUT_MS = 10_000;
+const CANCELLATION_SNAPSHOT_EVENTS = 256;
 
 const STOP_PATTERN =
   /^(?:<@[A-Za-z0-9]+(?:\|[^>]*)?>\s*)*(?:stop|cancel)(?:[\s.!?…]|<@[A-Za-z0-9]+(?:\|[^>]*)?>)*$/i;
@@ -26,75 +23,60 @@ export const isStopRequest = (text: string): boolean =>
   STOP_PATTERN.test(text.trim());
 
 const eventTurnId = (event: MessageStreamEvent): string | null => {
-  if (!("data" in event) || typeof event.data !== "object") {
-    return null;
+  // Deliberately allow only parent-owned event coordinates in Eve 0.54.2.
+  // A generic data.turnId lookup also sees proxied child input/authorization
+  // and subagent.called coordinates, which cannot select this session's owner.
+  // Standalone parent epilogues may have an empty ID and are ignored too.
+  // New event kinds require review before entering this allowlist.
+  switch (event.type) {
+    case "turn.started":
+    case "turn.completed":
+    case "turn.cancelled":
+    case "turn.failed":
+    case "step.started":
+    case "step.failed":
+    case "message.received":
+    case "message.appended":
+    case "message.completed":
+    case "reasoning.appended":
+    case "reasoning.completed":
+    case "actions.requested":
+    case "action.input.appended":
+    case "action.partial":
+    case "action.result":
+      return event.data.turnId || null;
+    default:
+      return null;
   }
-  if (!("turnId" in event.data) || typeof event.data.turnId !== "string") {
-    return null;
-  }
-  return event.data.turnId;
 };
 
-const readActiveTurn = async (
-  reader: ReadableStreamDefaultReader<MessageStreamEvent>,
-  remaining: number,
-  activeTurnId: string | null
-): Promise<string | null> => {
-  if (remaining === 0) {
-    return activeTurnId;
-  }
-  const { done, value } = await reader.read();
-  if (done) {
-    return null;
-  }
-  let nextActiveTurnId = activeTurnId;
-  if (value.type === "turn.started") {
-    nextActiveTurnId = value.data.turnId;
-  } else if (isCurrentTurnBoundaryEvent(value)) {
-    nextActiveTurnId = null;
-  }
-  return readActiveTurn(reader, remaining - 1, nextActiveTurnId);
-};
-
-/** Reads the durable stream through an already-observed tail. */
-const activeTurnAtTail = async (
+/** Read only the already-observed tail; waiting does not retire its turn ID. */
+const latestTurnAtTail = async (
   stream: ReadableStream<MessageStreamEvent>,
-  tailIndex: number
+  count: number
 ): Promise<string | null> => {
   const reader = stream.getReader();
+  let turnId: string | null = null;
   try {
-    return await readActiveTurn(reader, tailIndex + 1, null);
+    for (let remaining = count; remaining > 0; remaining -= 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: read the durable stream in order through the fixed snapshot tail.
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      turnId = eventTurnId(value) ?? turnId;
+    }
+    return turnId;
   } finally {
     await reader.cancel();
   }
 };
 
-const confirmsCancellation = async (
-  reader: ReadableStreamDefaultReader<MessageStreamEvent>,
-  turnId: string
-): Promise<boolean> => {
-  const { done, value } = await reader.read();
-  if (done) {
-    return false;
-  }
-  const observedTurnId = eventTurnId(value);
-  if (value.type === "turn.cancelled" && observedTurnId === turnId) {
-    return true;
-  }
-  if (isCurrentTurnBoundaryEvent(value)) {
-    return false;
-  }
-  return confirmsCancellation(reader, turnId);
-};
-
 /**
- * Cancels the exact active Slack turn and confirms its durable cancellation.
- *
- * `accepted` alone is insufficient because eve also accepts cancellation for
- * an already-parked session as a no-op. Snapshotting the active turn from the
- * durable stream, applying its id as a stale-request guard, and then observing
- * the matching `turn.cancelled` boundary avoids attributing another terminal
- * outcome to the stop command.
+ * Queue cancellation for this exact session and its background tasks. A parent
+ * can be waiting after its turn completes while children still work, so retain
+ * the latest turn ID as the stale-request guard. Accepted means requested,
+ * not settled; native task cancellation need not emit parent turn.cancelled.
  */
 export const cancelActiveSlackTurn = async (
   ctx: SlackInboundMessageContext
@@ -107,41 +89,14 @@ export const cancelActiveSlackTurn = async (
   if (tailIndex < 0) {
     return null;
   }
-  const snapshot = await session.getEventStream({ startIndex: 0 });
-  const turnId = await activeTurnAtTail(snapshot, tailIndex);
+  const startIndex = Math.max(0, tailIndex + 1 - CANCELLATION_SNAPSHOT_EVENTS);
+  const snapshot = await session.getEventStream({ startIndex });
+  const turnId = await latestTurnAtTail(snapshot, tailIndex - startIndex + 1);
   if (!turnId) {
     return null;
   }
-
-  // Open from the observed tail before requesting cancellation. The durable
-  // cursor includes any terminal event that wins the race in between.
-  const confirmation = await session.getEventStream({
-    startIndex: tailIndex + 1,
-  });
-  const reader = confirmation.getReader();
-  let confirmationTimeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const result = await session.cancel({ turnId });
-    if (result.status !== "accepted") {
-      return null;
-    }
-    const confirmed = await Promise.race([
-      confirmsCancellation(reader, turnId),
-      new Promise<false>((resolve) => {
-        confirmationTimeout = setTimeout(
-          () => resolve(false),
-          CANCELLATION_CONFIRMATION_TIMEOUT_MS
-        );
-        confirmationTimeout.unref?.();
-      }),
-    ]);
-    return confirmed ? turnId : null;
-  } finally {
-    if (confirmationTimeout) {
-      clearTimeout(confirmationTimeout);
-    }
-    await reader.cancel();
-  }
+  const result = await session.cancel({ tasks: true, turnId });
+  return result.status === "accepted" ? turnId : null;
 };
 
 const stopConfirmationId = (
@@ -163,7 +118,7 @@ const stopConfirmationId = (
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
-/** Posts one provider-idempotent confirmation for an exact cancelled turn. */
+/** Posts one provider-idempotent acknowledgement for an accepted request. */
 export const postStopConfirmation = async (
   ctx: SlackInboundMessageContext,
   turnId: string
@@ -172,16 +127,16 @@ export const postStopConfirmation = async (
     const response = await ctx.slack.request("chat.postMessage", {
       channel: ctx.slack.channelId,
       client_msg_id: stopConfirmationId(ctx, turnId),
-      text: "Stopped.",
+      text: "Stop requested.",
       thread_ts: ctx.slack.threadTs,
     });
     if (response.ok) {
       return;
     }
   } catch {
-    // The cancellation has already settled. Eve catches an authored Slack
+    // The cancellation request has already been accepted. Eve catches an authored Slack
     // handler rejection after acknowledging the webhook, so throwing cannot
-    // produce a useful retry and only misclassifies the successful stop.
+    // produce a useful retry and only misclassifies the accepted request.
   }
   console.warn("Slack stop confirmation could not be posted.");
 };

@@ -367,13 +367,24 @@ describe("the same turn a repository is prepared", () => {
         id: "repository-lane:same-turn",
       });
       assert.deepEqual(
-        await turn.dispatch("turn.started"),
+        await turn.dispatch("turn.started", 0),
         [],
         "a bare-slug Slack turn starts with no repository capability at all"
       );
+      const firstStep = await turn.dispatch("step.started", 0);
+      assert.deepEqual(
+        firstStep,
+        [],
+        "step zero starts before repository selection"
+      );
       assert.equal((await prepare(auth, REPOSITORY)).success, true);
+      assert.deepEqual(
+        await turn.dispatch("step.started", 0),
+        firstStep,
+        "replaying the same step retains Eve's cached capability selection"
+      );
       const names = new Set(
-        (await turn.dispatch("step.started")).map((tool) => tool.name)
+        (await turn.dispatch("step.started", 1)).map((tool) => tool.name)
       );
       for (const tool of GATED_TOOLS) {
         assert.ok(names.has(tool), `${tool} resolves on the following step`);

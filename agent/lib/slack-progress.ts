@@ -95,6 +95,7 @@ export const slackProgressActionLabel = (
  */
 export type SlackProgressActionRequest =
   | { readonly kind: "tool-call"; readonly toolName: string }
+  | { readonly kind: "workflow-tool-call"; readonly toolName: string }
   | { readonly kind: "subagent-call"; readonly subagentName: string }
   | { readonly kind: "remote-agent-call"; readonly remoteAgentName: string }
   | { readonly kind: "load-skill" };
@@ -112,7 +113,7 @@ export const slackProgressActionRequestLabel = (
   if (!first || first.kind === "load-skill") {
     return null;
   }
-  if (first.kind === "tool-call") {
+  if (first.kind === "tool-call" || first.kind === "workflow-tool-call") {
     return first.toolName;
   }
   if (first.kind === "subagent-call") {
