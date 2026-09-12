@@ -23,9 +23,11 @@ export const isStopRequest = (text: string): boolean =>
   STOP_PATTERN.test(text.trim());
 
 const eventTurnId = (event: MessageStreamEvent): string | null => {
-  // Child input and authorization events are proxied into the parent stream
-  // with the child's turn ID. Their standalone parent epilogue can also carry
-  // an empty ID. Neither may replace the owner of the cancellation request.
+  // Deliberately allow only parent-owned event coordinates in Eve 0.54.2.
+  // A generic data.turnId lookup also sees proxied child input/authorization
+  // and subagent.called coordinates, which cannot select this session's owner.
+  // Standalone parent epilogues may have an empty ID and are ignored too.
+  // New event kinds require review before entering this allowlist.
   switch (event.type) {
     case "turn.started":
     case "turn.completed":

@@ -324,7 +324,7 @@ export async function admitDynamicTools(
   for (const eventName of DYNAMIC_TOOL_EVENTS) {
     if (resolver.eventNames.includes(eventName)) {
       // biome-ignore lint/performance/noAwaitInLoops: the dispatches share one context in eve's own lifecycle order, so they have to run in sequence.
-      admitted = await turn.dispatch(eventName);
+      admitted = await turn.dispatch(eventName, 0);
     }
   }
   return admitted;
@@ -345,11 +345,12 @@ export interface DynamicToolTurn {
   /**
    * Dispatches one lifecycle event against the held context and returns every
    * tool the model would carry after it, read from all three metadata keys the
-   * way eve reads them.
+   * way eve reads them. Pass the exact step index, including on replay;
+   * session and turn boundaries use zero.
    */
   readonly dispatch: (
     eventName: DynamicToolEventName,
-    stepIndex?: number
+    stepIndex: number
   ) => Promise<AdmittedDynamicTool[]>;
 }
 
@@ -417,16 +418,10 @@ export async function openDynamicToolTurn(
   );
   const slugs = resolvers.map((resolver) => resolver.slug).join(", ");
   let turnSequence = 0;
-  let nextStepIndex = 0;
   return {
-    dispatch: async (eventName: DynamicToolEventName, stepIndex?: number) => {
+    dispatch: async (eventName: DynamicToolEventName, stepIndex: number) => {
       if (eventName === "turn.started") {
         turnSequence += 1;
-        nextStepIndex = 0;
-      }
-      const currentStep = stepIndex ?? nextStepIndex;
-      if (eventName === "step.started") {
-        nextStepIndex = currentStep + 1;
       }
       // Counted per dispatch, against the key eve files this event's result
       // under: eve replaces that key's entries for the resolvers that ran, so
@@ -437,7 +432,7 @@ export async function openDynamicToolTurn(
         ctx,
         event: {
           data: {
-            stepIndex: currentStep,
+            stepIndex,
             turnId: `${session.id}:turn:${turnSequence}`,
           },
           type: eventName,

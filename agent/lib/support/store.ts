@@ -88,20 +88,24 @@ export async function discoverHandoff(conversation: string, thread: string) {
 export async function claimHandoffs(
   mode: SupportScheduleMode,
   conversations: string[] = []
-): Promise<(SupportClaim & { reclaimed: boolean })[]> {
+): Promise<(SupportClaim & { abandonedIntake: boolean })[]> {
   const rows = await query(
     `WITH due AS (
-    SELECT conversation, thread, lease_until IS NOT NULL AS reclaimed FROM support_handoffs
+    SELECT conversation, thread,
+      (lease_until IS NOT NULL AND processed_version IS NULL AND report IS NULL) AS abandoned_intake
+    FROM support_handoffs
     WHERE NOT closed AND next_check <= now() AND (lease_until IS NULL OR lease_until < now())
     AND (($3 = 'intake' AND processed_version IS NULL) OR ($3 = 'followups' AND processed_version IS NOT NULL))
     AND (cardinality($2::text[]) = 0 OR conversation = ANY($2::text[]))
     ORDER BY next_check LIMIT 3 FOR UPDATE SKIP LOCKED
   ) UPDATE support_handoffs h SET lease = $1, lease_until = now() + interval '20 minutes'
     FROM due WHERE h.conversation = due.conversation AND h.thread = due.thread
-    RETURNING h.conversation, h.thread, h.lease, due.reclaimed`,
+    RETURNING h.conversation, h.thread, h.lease, due.abandoned_intake AS "abandonedIntake"`,
     [randomUUID(), conversations, mode]
   );
-  return z.array(supportClaim.extend({ reclaimed: z.boolean() })).parse(rows);
+  return z
+    .array(supportClaim.extend({ abandonedIntake: z.boolean() }))
+    .parse(rows);
 }
 
 export async function findSupportLease(
@@ -176,6 +180,21 @@ export async function settleSupport(
       AND (NOT $4 OR report IS NULL OR NOT delivery_attempted) RETURNING 1`,
     [claim.conversation, claim.thread, claim.lease, closed, processed]
   );
+}
+
+/** Failed dispatch may release only its own claim with no pending outbox. */
+export async function settleSupportIfNoReport(claim: SupportClaim) {
+  if (!supportEnabled()) {
+    return false;
+  }
+  const rows = await query(
+    `UPDATE support_handoffs SET lease = NULL, lease_until = NULL,
+    next_check = now() + interval '10 minutes'
+    WHERE conversation = $1 AND thread = $2 AND lease = $3 AND lease_until > now()
+      AND report IS NULL RETURNING 1`,
+    [claim.conversation, claim.thread, claim.lease]
+  );
+  return rows.length === 1;
 }
 
 export async function queueSupportReport(

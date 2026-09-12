@@ -13,9 +13,8 @@ import { readSupportIntake } from "./slack.js";
 import {
   claimHandoffs,
   discoverHandoff,
-  findSupportLease,
   saveSupportCursor,
-  settleSupport,
+  settleSupportIfNoReport,
   supportCursor,
 } from "./store.js";
 
@@ -53,22 +52,16 @@ export async function runSupportSchedule(
   await Promise.all(
     claims.map(async (claim) => {
       try {
-        if (claim.reclaimed) {
-          const row = await findSupportLease(claim);
-          if (row && !row.processed_version && !row.report) {
-            // A parent turn may end while its delegates work. Only an expired
-            // initial lease produces the fallback; pending delivery reconciles first.
-            await reportSupportFailureForClaim(claim);
-            return;
-          }
+        if (claim.abandonedIntake) {
+          // The claim query decides this under its row lock; pending outboxes
+          // stay on the ordinary dispatch path for reconciliation.
+          await reportSupportFailureForClaim(claim);
+          return;
         }
         await send(claim, supportAuth(appAuth, claim));
       } catch {
         logOpsEvent("support.dispatch.failed", { outcome: "error" });
-        const row = await findSupportLease(claim);
-        if (row && !row.report) {
-          await settleSupport(claim);
-        }
+        await settleSupportIfNoReport(claim);
       }
     })
   );

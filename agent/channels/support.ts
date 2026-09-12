@@ -1,20 +1,20 @@
 import { defineChannel, GET } from "eve/channels";
 import {
-  claimFromContext,
   isSupportAuth,
   type SupportClaim,
   supportClaim,
 } from "../lib/support/auth.js";
 import { reportSupportFailureForClaim } from "../lib/support/investigation.js";
-import { findSupportLease, requireSupportLease } from "../lib/support/store.js";
+import { requireSupportLease } from "../lib/support/store.js";
 
 async function reportFailure(claim: SupportClaim | null) {
-  if (claim) {
-    await findSupportLease(claim)
-      .then((row) =>
-        row && !row.report ? reportSupportFailureForClaim(claim) : undefined
-      )
-      .catch(() => undefined);
+  if (!claim) {
+    return;
+  }
+  try {
+    await reportSupportFailureForClaim(claim);
+  } catch {
+    // Stale leases and pending or uncertain outboxes stay with the next check.
   }
 }
 
@@ -30,9 +30,9 @@ export default defineChannel({
       // This event has no session context. Only the root receive seeds a claim.
       await reportFailure(channel.state.claim);
     },
-    async "turn.failed"(_event, _channel, ctx) {
+    async "turn.failed"(_event, channel, ctx) {
       if (!ctx.session.parent) {
-        await reportFailure(claimFromContext(ctx));
+        await reportFailure(channel.state.claim);
       }
     },
   },

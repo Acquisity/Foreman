@@ -3,7 +3,10 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { defineTool } from "eve/tools";
 import { laneAuth } from "../agent/lib/capability-budget.ts";
-import { admitDynamicTools } from "../agent/lib/eve-dynamic-tools.ts";
+import {
+  admitDynamicTools,
+  installedEveVersion,
+} from "../agent/lib/eve-dynamic-tools.ts";
 import { GITHUB_TOOL_ALLOWLIST } from "../agent/lib/github/tool-allowlist.ts";
 
 // Run after sourcing .env.example and building. Importing the actual server in
@@ -29,7 +32,7 @@ async function verify() {
     artifacts,
     "The built server must register its compiled artifacts."
   );
-  assert.equal(artifacts.metadata.generator.version, "0.54.2");
+  assert.equal(artifacts.metadata.generator.version, installedEveVersion());
   const entry = artifacts.manifest.dynamicTools.find(
     (tool) => tool.slug === "github__github"
   );

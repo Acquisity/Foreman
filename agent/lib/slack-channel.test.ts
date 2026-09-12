@@ -1197,10 +1197,58 @@ describe("slack channel progress", () => {
       "typing:First thought.",
       "typing:First thought. Extended.",
     ]);
-    assert.equal(
-      eventChannel.state.reasoning?.text,
-      "First thought. Extended."
+    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
+  });
+
+  it("shares reasoning within one live state and isolates other sessions", async () => {
+    const firstCalls: string[] = [];
+    const secondCalls: string[] = [];
+    const first = progressChannel(firstCalls);
+    const second = progressChannel(secondCalls);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("First session."),
+      first,
+      trustedCtx
     );
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Second session."),
+      second,
+      trustedCtx
+    );
+    await handlerFor("reasoning.appended")(
+      reasoningEvent(" Continued."),
+      { ...first },
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(firstCalls), [
+      "typing:First session.",
+      "typing:First session. Continued.",
+    ]);
+    assert.deepEqual(typingsOf(secondCalls), ["typing:Second session."]);
+  });
+
+  it("does not serialize full reasoning or reuse it in a rebuilt channel state", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Visible first line.\nTransient later reasoning."),
+      eventChannel,
+      trustedCtx
+    );
+    const serialized = JSON.stringify(eventChannel.state);
+    assert.equal(serialized.includes("Transient later reasoning."), false);
+    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
+    // Eve rebuilds channel context from serialized state at a durable step.
+    const rebuilt = progressChannel(calls, JSON.parse(serialized));
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Rebuilt stream."),
+      rebuilt,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Visible first line.",
+      "typing:Rebuilt stream.",
+    ]);
   });
 
   it("resets reasoning at step, block and turn boundaries", async () => {
@@ -1218,7 +1266,8 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
-    assert.equal(eventChannel.state.reasoning, undefined);
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
     await handlerFor("reasoning.appended")(
       { ...nextStep, reasoningDelta: "New block." },
       eventChannel,
@@ -1240,7 +1289,14 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
-    assert.equal(eventChannel.state.reasoning, undefined);
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
+    await handlerFor("reasoning.appended")(
+      { ...nextStep, reasoningDelta: "After completion.", turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(typingsOf(calls).at(-1), "typing:After completion.");
   });
 
   it("labels real workflow tool requests", async () => {

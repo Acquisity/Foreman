@@ -257,10 +257,17 @@ describe("manifest provenance", () => {
     assert.throws(() => parseCapabilityManifest({ tools: [] }));
   });
   it("rejects missing ownership and unsupported capability shapes", () => {
-    assert.throws(
-      () => parseCapabilityManifest({ ...FIXTURE, bindings: {} }),
-      MISSING_OWNERSHIP
-    );
+    for (const sourceId of [
+      "tools/t.ts",
+      "ext-override:github:tools/github.ts",
+    ]) {
+      const bindings = { ...FIXTURE.bindings };
+      delete bindings[sourceId];
+      assert.throws(
+        () => parseCapabilityManifest({ ...FIXTURE, bindings }),
+        MISSING_OWNERSHIP
+      );
+    }
     assert.throws(() =>
       parseCapabilityManifest({
         ...MANIFEST_HEADER,

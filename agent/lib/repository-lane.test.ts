@@ -367,7 +367,7 @@ describe("the same turn a repository is prepared", () => {
         id: "repository-lane:same-turn",
       });
       assert.deepEqual(
-        await turn.dispatch("turn.started"),
+        await turn.dispatch("turn.started", 0),
         [],
         "a bare-slug Slack turn starts with no repository capability at all"
       );

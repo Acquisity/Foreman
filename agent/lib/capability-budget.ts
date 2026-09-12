@@ -317,13 +317,8 @@ export function capabilitySource(
 const toolSource = (
   manifest: CapabilityManifest,
   sourceId: string
-): string | null => {
-  const binding = manifest.bindings[sourceId];
-  if (!binding) {
-    throw new Error(`Capability ${sourceId} has no ownership binding.`);
-  }
-  return capabilitySource(sourceId, binding.owner);
-};
+): string | null =>
+  capabilitySource(sourceId, manifest.bindings[sourceId].owner);
 
 const preparedSubagentSchema = z.object({
   description: z.string(),
