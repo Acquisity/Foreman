@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
-import { isStopRequest, postStopConfirmation } from "./slack-stop.js";
+import {
+  isStopRequest,
+  postStopConfirmation,
+  stopSlackSession,
+} from "./slack-stop.js";
 
 describe("isStopRequest", () => {
   it("accepts the bare words stop and cancel", () => {
@@ -39,6 +43,7 @@ describe("isStopRequest", () => {
     assert.equal(isStopRequest("cancel that please"), false);
     assert.equal(isStopRequest("please stop."), false);
     assert.equal(isStopRequest("stop and then cancel"), false);
+    assert.equal(isStopRequest("stop that subagent, keep working"), false);
   });
 
   it("rejects words that merely contain stop or cancel", () => {
@@ -84,7 +89,7 @@ describe("isStopRequest", () => {
 });
 
 describe("postStopConfirmation", () => {
-  it("keeps the legacy id stable when retrying an ambiguously accepted post", async (t) => {
+  it("keeps the retired-session id stable when retrying an ambiguously accepted post", async (t) => {
     t.mock.method(console, "warn", () => undefined);
     const acceptedIds = new Set<string>();
     const attemptedIds: string[] = [];
@@ -111,13 +116,81 @@ describe("postStopConfirmation", () => {
       },
     } as unknown as SlackInboundMessageContext;
 
-    await postStopConfirmation(ctx, "t1");
-    await postStopConfirmation(ctx, "t1");
+    await postStopConfirmation(ctx, "session-1");
+    await postStopConfirmation(ctx, "session-1");
 
-    assert.deepEqual(attemptedIds, [
-      "03b20daa-a654-590a-8629-6e46c73043e0",
-      "03b20daa-a654-590a-8629-6e46c73043e0",
-    ]);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.equal(attemptedIds.length, 2);
+    assert.equal(attemptedIds[0], attemptedIds[1]);
+    assert.deepEqual(posts, ["Stop requested."]);
+  });
+});
+
+describe("stopSlackSession", () => {
+  it("resets the resolved session without cancelling or scanning events", async () => {
+    const requests: unknown[] = [];
+    const session = {
+      cancel: () =>
+        assert.fail("task cancellation must not wake the parent before reset"),
+      getEventStream: () => assert.fail("reset needs no turn stream"),
+      getStreamTailIndex: () => assert.fail("reset needs no turn lookup"),
+      id: "session-1",
+      reset: (options: unknown) => {
+        requests.push(options);
+        return Promise.resolve({
+          previousSessionId: "session-1",
+          status: "reset",
+        });
+      },
+    };
+    const ctx = {
+      reset: () => assert.fail("reset must use the resolved exact handle"),
+      resolveSession: () => Promise.resolve(session),
+    } as unknown as SlackInboundMessageContext;
+
+    assert.equal(await stopSlackSession(ctx), "session-1");
+    assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
+  });
+
+  it("does not resolve or reset a replacement owner while the exact reset awaits", async () => {
+    let finishReset: (() => void) | undefined;
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const completion = new Promise<void>((resolve) => {
+      finishReset = resolve;
+    });
+    const requests: unknown[] = [];
+    const original = {
+      id: "session-original",
+      reset: async (options: unknown) => {
+        requests.push(options);
+        markStarted?.();
+        await completion;
+        return { previousSessionId: "session-original", status: "reset" };
+      },
+    };
+    let owner = original;
+    let resolutions = 0;
+    const ctx = {
+      reset: () => assert.fail("thread-bound reset could target a replacement"),
+      resolveSession: () => {
+        resolutions += 1;
+        return Promise.resolve(owner);
+      },
+    } as unknown as SlackInboundMessageContext;
+
+    const stopping = stopSlackSession(ctx);
+    await started;
+    owner = {
+      id: "session-replacement",
+      reset: () => assert.fail("replacement session must remain untouched"),
+    };
+    finishReset?.();
+
+    assert.equal(await stopping, "session-original");
+    assert.equal(resolutions, 1);
+    assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
+    assert.equal(owner.id, "session-replacement");
   });
 });

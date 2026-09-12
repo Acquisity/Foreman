@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { ApprovalContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import { investigationMemoryWritePolicy } from "../github/approval.js";
 import {
   canUseInvestigationMemory,

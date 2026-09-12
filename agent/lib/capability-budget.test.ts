@@ -26,7 +26,7 @@ const {
   parseCapabilityManifest,
   readCompiledManifest,
   resolveLaneCapabilities,
-  subagentDelegationSchemaChars,
+  resolveSubagentTools,
 } = await import("./capability-budget.js");
 
 const HAS_COMPILED_MANIFEST = [
@@ -38,6 +38,7 @@ const { canUseInvestigationMemory, isIntakeOnly, isTrusted, isUnattended } =
   await import("./trust.js");
 const { repositoryFromAuth } = await import("./repository.js");
 
+const MISSING_OWNERSHIP = /no ownership binding/u;
 const UNSUPPORTED_DYNAMIC_SKILLS = /does not support dynamic skills/u;
 const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
@@ -76,24 +77,46 @@ const ORDINARY_SLACK_CATALOG_CEILING = 0.75;
 // bundled module map the repository's own manifest does.
 const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
+const APPLICATION_OWNER = { kind: "application" } as const;
+const BROWSER_OWNER = {
+  kind: "extension",
+  namespace: "browser",
+  packageName: "@agent-browser/eve",
+} as const;
+const FRAMEWORK_OWNER = { feature: "eve:defaults", kind: "framework" } as const;
+
 const MANIFEST_HEADER = {
   appRoot: APP_ROOT,
+  bindings: {},
   kind: "eve-agent-compiled-manifest",
-  version: 41,
+  version: 48,
 } as const;
 
 // A hand-built manifest with one capability of each kind from each source, so
 // every counted character is known by inspection.
 const FIXTURE = parseCapabilityManifest({
   ...MANIFEST_HEADER,
+  bindings: {
+    "eve:defaults:tools/bash.ts": { owner: FRAMEWORK_OWNER },
+    "eve:defaults:tools/connection_search.ts": { owner: FRAMEWORK_OWNER },
+    "ext-override:github:tools/github.ts": { owner: APPLICATION_OWNER },
+    "ext:browser:tools/b.mjs": { owner: BROWSER_OWNER },
+    "tools/t.ts": { owner: APPLICATION_OWNER },
+  },
   dynamicTools: [
+    {
+      eventNames: ["step.started"],
+      logicalPath: "tools/connection_search.ts",
+      slug: "connection_search",
+      sourceId: "eve:defaults:tools/connection_search.ts",
+      sourceKind: "module",
+    },
     // The consumer's override of the extension's own `tools/github.ts` slot,
     // exactly as `eve info` compiles it: the mount namespace is still github,
     // so the tools still reach the model as `github__*`.
     {
       eventNames: ["step.started"],
-      extensionNamespace: "github",
-      logicalPath: "extensions/github/tools/github.ts",
+      logicalPath: "tools/github__github.ts",
       slug: "github__github",
       sourceId: "ext-override:github:tools/github.ts",
       sourceKind: "module",
@@ -104,11 +127,27 @@ const FIXTURE = parseCapabilityManifest({
       description: "de",
       markdown: "body",
       name: "aa",
+      owner: APPLICATION_OWNER,
       sourceId: "skills/aa/SKILL.md",
     },
   ],
-  subagents: [{ description: "ddd", name: "s", sourceId: "subagents/s" }],
+  subagents: [
+    {
+      description: "ddd",
+      logicalPath: "subagents/s",
+      name: "s",
+      nodeId: "subagents/s",
+      owner: APPLICATION_OWNER,
+      sourceId: "subagents/s",
+      sourceKind: "module",
+    },
+  ],
   tools: [
+    {
+      description: "Built-in tool",
+      name: "bash",
+      sourceId: "eve:defaults:tools/bash.ts",
+    },
     {
       description: "abc",
       // JSON.stringify gives {"type":"object"}, 17 characters.
@@ -131,30 +170,58 @@ const RESOLVED = {
       source: "ext:github",
     },
   ],
-  subagentSchemaChars: 7,
+  subagentTools: [
+    {
+      description: "ddd",
+      name: "s",
+      nodeId: "subagents/s",
+      schemaChars: 7,
+      source: "subagents/",
+    },
+  ],
 };
 
 const NO_DYNAMIC = {
   dynamicTools: [],
-  subagentSchemaChars: 0,
+  subagentTools: [],
 };
 
 describe("capability source grouping", () => {
   it("groups by extension namespace or authored directory", () => {
-    assert.equal(capabilitySource("tools/checkout_branch.ts"), "tools/");
-    assert.equal(capabilitySource("skills/aa/SKILL.md"), "skills/");
+    assert.equal(
+      capabilitySource("tools/checkout_branch.ts", APPLICATION_OWNER),
+      "tools/"
+    );
+    assert.equal(
+      capabilitySource("skills/aa/SKILL.md", APPLICATION_OWNER),
+      "skills/"
+    );
     // A directory-mounted override is the same extension, so it reports under
     // the namespace the model sees rather than under a source of its own.
     assert.equal(
-      capabilitySource("ext-override:github:tools/github.ts"),
+      capabilitySource(
+        "ext-override:github:tools/github.ts",
+        APPLICATION_OWNER
+      ),
       "ext:github"
     );
-    assert.equal(capabilitySource("subagents/critic"), "subagents/");
     assert.equal(
-      capabilitySource("ext:browser:tools/click.mjs"),
+      capabilitySource("subagents/critic", APPLICATION_OWNER),
+      "subagents/"
+    );
+    assert.equal(
+      capabilitySource("ext:browser:tools/click.mjs", BROWSER_OWNER),
       "ext:browser"
     );
-    assert.equal(capabilitySource("ext:github:tools/github.mjs"), "ext:github");
+    assert.equal(
+      capabilitySource("ext:github:tools/github.mjs", {
+        kind: "extension",
+        namespace: "github",
+        packageName: "@github-tools/eve-extension",
+      }),
+      "ext:github"
+    );
+    assert.equal(capabilitySource("tools/bash.ts", FRAMEWORK_OWNER), null);
   });
 });
 
@@ -188,6 +255,45 @@ describe("manifest provenance", () => {
       parseCapabilityManifest({ ...MANIFEST_HEADER, version: 40 })
     );
     assert.throws(() => parseCapabilityManifest({ tools: [] }));
+  });
+  it("rejects missing ownership and unsupported capability shapes", () => {
+    for (const sourceId of [
+      "tools/t.ts",
+      "ext-override:github:tools/github.ts",
+    ]) {
+      const bindings = { ...FIXTURE.bindings };
+      delete bindings[sourceId];
+      assert.throws(
+        () => parseCapabilityManifest({ ...FIXTURE, bindings }),
+        MISSING_OWNERSHIP
+      );
+    }
+    assert.throws(() =>
+      parseCapabilityManifest({
+        ...MANIFEST_HEADER,
+        bindings: { bad: { owner: { kind: "unknown" } } },
+      })
+    );
+    assert.throws(() =>
+      parseCapabilityManifest({
+        ...MANIFEST_HEADER,
+        subagents: [{ ...FIXTURE.subagents[0], nodeId: undefined }],
+      })
+    );
+    assert.throws(() =>
+      parseCapabilityManifest({
+        ...MANIFEST_HEADER,
+        subagents: [
+          {
+            ...FIXTURE.subagents[0],
+            configResolver: { eventNames: ["turn.started"] },
+          },
+        ],
+      })
+    );
+    assert.throws(() =>
+      parseCapabilityManifest({ ...MANIFEST_HEADER, remoteAgents: [{}] })
+    );
   });
 });
 
@@ -249,6 +355,10 @@ describe("lane measurement", () => {
   it("sums entries from one source instead of listing them", () => {
     const manifest = parseCapabilityManifest({
       ...MANIFEST_HEADER,
+      bindings: {
+        "tools/one.ts": { owner: APPLICATION_OWNER },
+        "tools/two.ts": { owner: APPLICATION_OWNER },
+      },
       tools: [
         { description: "ab", name: "one", sourceId: "tools/one.ts" },
         { description: "c", name: "two", sourceId: "tools/two.ts" },
@@ -272,6 +382,11 @@ describe("dynamic capability resolution", () => {
   it("refuses a dynamic tool whose module is not in the bundle", async () => {
     const manifest = parseCapabilityManifest({
       ...MANIFEST_HEADER,
+      bindings: {
+        "ext:crm:tools/crm.mjs": {
+          owner: { kind: "extension", namespace: "crm", packageName: "crm" },
+        },
+      },
       dynamicTools: [
         {
           eventNames: ["step.started"],
@@ -336,11 +451,40 @@ describe("dynamic capability resolution", () => {
     );
   });
 
-  it("reads the subagent delegation schema from eve", async () => {
-    const chars = await subagentDelegationSchemaChars(false);
-    assert.ok(chars > 0);
-    // The persistent-session form adds the agentId continuation field.
-    assert.ok((await subagentDelegationSchemaChars(true)) > chars);
+  it("prepares each subagent with eve's model-visible description and schema", async () => {
+    const definitions = [
+      FIXTURE.subagents[0],
+      {
+        ...FIXTURE.subagents[0],
+        description: "A different task",
+        logicalPath: "subagents/second",
+        name: "second",
+        nodeId: "subagents/second",
+        sourceId: "subagents/second",
+      },
+    ];
+    assert.ok(definitions[0]);
+    const compiled = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
+      subagents: definitions,
+    });
+    const tools = await resolveSubagentTools(compiled.subagents);
+    assert.equal(tools.length, 2);
+    for (const [index, tool] of tools.entries()) {
+      const definition = compiled.subagents[index];
+      assert.ok(definition);
+      assert.equal(tool.nodeId, definition.nodeId);
+      assert.equal(tool.name, definition.name);
+      assert.ok(tool.schemaChars > 0);
+      assert.ok(tool.description.startsWith(definition.description));
+      assert.ok(tool.description.includes("background task"));
+      assert.ok(tool.description.length > definition.description.length);
+    }
+    assert.equal(
+      measureLane(compiled, "slack", { dynamicTools: [], subagentTools: tools })
+        .rows[0]?.descriptionChars,
+      tools.reduce((total, tool) => total + tool.description.length, 0)
+    );
   });
 
   it("measures the same manifest identically every time", async () => {
@@ -439,6 +583,20 @@ describe("capability report", () => {
       "critic",
       "vision",
     ]);
+    const repositoryResolved = await resolveLaneCapabilities(
+      manifest,
+      "repository-interactive"
+    );
+    assert.deepEqual(
+      repositoryResolved.dynamicTools
+        .filter((tool) => tool.source === "ext:github")
+        .map((tool) => tool.name)
+        .sort((left, right) => left.localeCompare(right)),
+      GITHUB_TOOL_ALLOWLIST.map((name) => `github__${name}`).sort(
+        (left, right) => left.localeCompare(right)
+      ),
+      "the compiled catalog preserves exact model-visible GitHub names"
+    );
     const budgets = await measureCapabilityBudget(manifest);
     const byLane = new Map(budgets.map((budget) => [budget.lane, budget]));
     for (const lane of CAPABILITY_LANES) {
@@ -514,13 +672,16 @@ describe("capability report", () => {
         .get(lane)
         ?.rows.find((row) => row.kind === kind && row.source === source)
         ?.entries ?? 0;
+    const isAuthoredTool = (tool: { sourceId: string }) => {
+      const binding = manifest.bindings[tool.sourceId];
+      assert.ok(binding, `${tool.sourceId} has a binding`);
+      return capabilitySource(tool.sourceId, binding.owner) === "tools/";
+    };
     const authoredToolModules =
-      manifest.tools.filter(
-        (tool) => capabilitySource(tool.sourceId) === "tools/"
-      ).length +
+      manifest.tools.filter(isAuthoredTool).length +
       manifest.dynamicTools.filter(
         (tool) =>
-          capabilitySource(tool.sourceId) === "tools/" &&
+          isAuthoredTool(tool) &&
           ![
             "tools/support_investigation.ts",
             "tools/support_provider.ts",

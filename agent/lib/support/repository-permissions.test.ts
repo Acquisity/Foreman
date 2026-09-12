@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { ApprovalContext, DynamicResolveContext } from "eve/tools";
+import type { DynamicResolveContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import checkout from "../../tools/checkout_branch.js";
 import push from "../../tools/push_branch.js";
 import readKnowledge from "../../tools/read_repository_knowledge.js";

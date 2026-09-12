@@ -33,12 +33,12 @@
  *   offers nothing to measures as zero. A descriptor whose module is not in
  *   the bundled module map fails the measurement instead of being reported as
  *   a smaller number.
- * - The subagent delegation tools eve lowers at runtime. Their input schema is
- *   framework-owned and identical for every subagent, so it is read from eve
- *   itself rather than guessed at.
+ * - The subagent delegation tools eve lowers at runtime. The prepared name,
+ *   description, and input schema are read from eve for each compiled subagent,
+ *   including the background-task instructions eve appends to its description.
  *
- * eve's own built-in tools (`bash`, `read_file`, and the rest) are outside the
- * compiled manifest and outside this measurement. They are the same in every
+ * eve's own built-in tools (`bash`, `read_file`, and the rest) are identified
+ * by framework ownership and excluded from this measurement. They are the same in every
  * lane by construction, so they cannot explain a difference between lanes,
  * which is what this report exists to show.
  */
@@ -85,38 +85,75 @@ export const MEASURED_MANIFEST_KIND = "eve-agent-compiled-manifest";
  * numbers mean anything. Failing on an unrecognized revision is the point:
  * measuring it anyway would publish a total nobody had verified.
  */
-export const MEASURED_MANIFEST_VERSION = 41;
+export const MEASURED_MANIFEST_VERSION = 48;
+
+const capabilityOwnerSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("application") }),
+  z.object({ feature: z.string(), kind: z.literal("framework") }),
+  z.object({
+    kind: z.literal("extension"),
+    namespace: z.string(),
+    packageName: z.string(),
+  }),
+]);
+
+type CapabilityOwner = z.infer<typeof capabilityOwnerSchema>;
+
+const compiledSubagentSchema = namedEntrySchema.extend({
+  configResolver: z.never().optional(),
+  description: z.string(),
+  logicalPath: z.string(),
+  nodeId: z.string(),
+  owner: capabilityOwnerSchema,
+  sourceKind: z.literal("module"),
+});
+
+type CompiledSubagent = z.infer<typeof compiledSubagentSchema>;
 
 /**
- * The slice of eve's compiled manifest this measurement reads. Unlisted keys
- * are dropped, so a manifest that grows new fields still parses, while a
- * manifest of another kind or revision is rejected outright.
+ * Unsupported ownership, dynamic skills/subagents, and remote agents fail
+ * instead of producing a partial catalog. Module capabilities get their owner
+ * from the binding; directory resources carry it directly in their entry.
  */
-export const capabilityManifestSchema = z.object({
-  /** The application root eve compiled, where its authored modules live. */
-  appRoot: z.string(),
-  config: z
-    .object({
-      experimental: z
-        .object({ subagentPersistentSessions: z.boolean().optional() })
-        .optional(),
-    })
-    .optional(),
-  dynamicSkills: z
-    .array(z.unknown())
-    .max(0, "capability-budget.ts does not support dynamic skills.")
-    .default([]),
-  dynamicTools: z.array(dynamicToolEntrySchema).default([]),
-  kind: z.literal(MEASURED_MANIFEST_KIND),
-  skills: z
-    .array(namedEntrySchema.extend({ markdown: z.string().default("") }))
-    .default([]),
-  subagents: z.array(namedEntrySchema).default([]),
-  tools: z
-    .array(namedEntrySchema.extend({ inputSchema: z.unknown().optional() }))
-    .default([]),
-  version: z.literal(MEASURED_MANIFEST_VERSION),
-});
+export const capabilityManifestSchema = z
+  .object({
+    appRoot: z.string(),
+    bindings: z.record(z.string(), z.object({ owner: capabilityOwnerSchema })),
+    dynamicSkills: z
+      .array(z.unknown())
+      .max(0, "capability-budget.ts does not support dynamic skills.")
+      .default([]),
+    dynamicTools: z.array(dynamicToolEntrySchema).default([]),
+    kind: z.literal(MEASURED_MANIFEST_KIND),
+    remoteAgents: z
+      .array(z.unknown())
+      .max(0, "capability-budget.ts does not support remote agents.")
+      .default([]),
+    skills: z
+      .array(
+        namedEntrySchema.extend({
+          markdown: z.string().default(""),
+          owner: capabilityOwnerSchema,
+        })
+      )
+      .default([]),
+    subagents: z.array(compiledSubagentSchema).default([]),
+    tools: z
+      .array(namedEntrySchema.extend({ inputSchema: z.unknown().optional() }))
+      .default([]),
+    version: z.literal(MEASURED_MANIFEST_VERSION),
+  })
+  .superRefine((manifest, ctx) => {
+    for (const entry of [...manifest.tools, ...manifest.dynamicTools]) {
+      if (!manifest.bindings[entry.sourceId]) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Capability ${entry.sourceId} has no ownership binding.`,
+          path: ["bindings", entry.sourceId],
+        });
+      }
+    }
+  });
 
 export type CapabilityManifest = z.infer<typeof capabilityManifestSchema>;
 
@@ -244,24 +281,32 @@ interface ResolvedDynamicTool extends AdmittedDynamicTool {
   readonly source: string;
 }
 
+interface ResolvedSubagentTool extends ResolvedDynamicTool {
+  readonly nodeId: string;
+}
+
 /** Everything a lane carries that the compiled manifest cannot state. */
 export interface ResolvedLaneCapabilities {
   readonly dynamicTools: readonly ResolvedDynamicTool[];
-  /** Input schema characters on each subagent's delegation tool. */
-  readonly subagentSchemaChars: number;
+  readonly subagentTools: readonly ResolvedSubagentTool[];
 }
 
-// `ext-override:` is the same extension, mounted as a directory so the
-// consumer can replace one of its contributions. The tools still reach the
-// model under the extension's namespace, so they are reported under it too.
-const EXTENSION_SOURCE = /^ext(?:-override)?:([^:]+)/u;
+// Directory-mounted overrides are application-owned but reach the model under
+// the extension's namespace, so they remain in that measured group.
+const EXTENSION_OVERRIDE_SOURCE = /^ext-override:([^:]+)/u;
 
-/**
- * The source a capability came from: an extension namespace such as
- * `ext:browser`, or the authored directory such as `tools/`.
- */
-export function capabilitySource(sourceId: string): string {
-  const namespace = EXTENSION_SOURCE.exec(sourceId)?.[1];
+/** Returns the measured group, or null for a framework-owned capability. */
+export function capabilitySource(
+  sourceId: string,
+  owner: CapabilityOwner
+): string | null {
+  if (owner.kind === "framework") {
+    return null;
+  }
+  if (owner.kind === "extension") {
+    return `ext:${owner.namespace}`;
+  }
+  const namespace = EXTENSION_OVERRIDE_SOURCE.exec(sourceId)?.[1];
   if (namespace) {
     return `ext:${namespace}`;
   }
@@ -269,47 +314,74 @@ export function capabilitySource(sourceId: string): string {
   return `${directory ?? sourceId}/`;
 }
 
-const eveSubagentRegistryUrl = (): URL =>
-  new URL("./dist/src/runtime/subagents/registry.js", evePackageUrl());
+const toolSource = (
+  manifest: CapabilityManifest,
+  sourceId: string
+): string | null =>
+  capabilitySource(sourceId, manifest.bindings[sourceId].owner);
 
-const subagentRegistrySchema = z.object({
-  getSubagentToolInputJsonSchema: z.custom<(persistent: boolean) => unknown>(
-    (value) => typeof value === "function"
-  ),
+const preparedSubagentSchema = z.object({
+  description: z.string(),
+  inputSchema: z.record(z.string(), z.unknown()),
+  logicalPath: z.string(),
+  name: z.string(),
+  nodeId: z.string(),
+  sourceId: z.string(),
 });
 
-/**
- * The characters every subagent's delegation tool carries in its input schema.
- *
- * @remarks
- * eve lowers one fixed schema onto every subagent tool, so it is framework
- * cost rather than authored cost, and it appears nowhere in the compiled
- * manifest. It is read from the installed eve instead of restated here: a
- * copied schema would keep reporting the old number after eve changed the real
- * one. If eve stops exposing it, this throws and no total is published.
- */
-export async function subagentDelegationSchemaChars(
-  persistentSessions: boolean
-): Promise<number> {
-  const url = eveSubagentRegistryUrl();
+const subagentRegistrySchema = z.object({
+  createPreparedRuntimeSubagentTool: z.custom<
+    (definition: CompiledSubagent & { kind: "subagent" }) => unknown
+  >((value) => typeof value === "function"),
+});
+
+/** Reads the actual runtime tool for every compiled static subagent. */
+export async function resolveSubagentTools(
+  subagents: readonly CompiledSubagent[]
+): Promise<ResolvedSubagentTool[]> {
+  if (subagents.length === 0) {
+    return [];
+  }
+  const url = new URL(
+    "./dist/src/runtime/subagents/registry.js",
+    evePackageUrl()
+  );
   let module: unknown;
   try {
     module = await import(url.href);
   } catch (error) {
     throw new Error(
-      `eve's subagent delegation schema is not readable at ${url.href}.`,
+      `eve's subagent tool preparation is not readable at ${url.href}.`,
       { cause: error }
     );
   }
   const parsed = subagentRegistrySchema.safeParse(module);
   if (!parsed.success) {
     throw new Error(
-      `eve no longer exposes getSubagentToolInputJsonSchema at ${url.href}, so subagent schema characters cannot be measured.`
+      `eve no longer exposes createPreparedRuntimeSubagentTool at ${url.href}, so subagent tools cannot be measured.`
     );
   }
-  return JSON.stringify(
-    parsed.data.getSubagentToolInputJsonSchema(persistentSessions)
-  ).length;
+  return subagents.flatMap((subagent) => {
+    const source = capabilitySource(subagent.sourceId, subagent.owner);
+    if (source === null) {
+      return [];
+    }
+    const prepared = preparedSubagentSchema.parse(
+      parsed.data.createPreparedRuntimeSubagentTool({
+        ...subagent,
+        kind: "subagent",
+      })
+    );
+    return [
+      {
+        description: prepared.description,
+        name: prepared.name,
+        nodeId: prepared.nodeId,
+        schemaChars: JSON.stringify(prepared.inputSchema).length,
+        source,
+      },
+    ];
+  });
 }
 
 /**
@@ -323,20 +395,21 @@ export async function resolveLaneCapabilities(
 ): Promise<ResolvedLaneCapabilities> {
   const tools = await Promise.all(
     manifest.dynamicTools.map(async (entry) => {
+      const source = toolSource(manifest, entry.sourceId);
+      if (source === null) {
+        return [];
+      }
       const admitted = await resolveCompiledDynamicTools(
         entry,
         manifest.appRoot,
         laneSession(lane)
       );
-      const source = capabilitySource(entry.sourceId);
       return admitted.map((tool) => ({ ...tool, source }));
     })
   );
   return {
     dynamicTools: tools.flat(),
-    subagentSchemaChars: await subagentDelegationSchemaChars(
-      manifest.config?.experimental?.subagentPersistentSessions === true
-    ),
+    subagentTools: await resolveSubagentTools(manifest.subagents),
   };
 }
 
@@ -389,13 +462,20 @@ export function measureLane(
   resolved: ResolvedLaneCapabilities
 ): LaneBudget {
   const toolRows = groupRows("tool", [
-    ...manifest.tools.map((tool) => ({
-      bodyChars: 0,
-      descriptionChars: tool.description.length,
-      nameChars: tool.name.length,
-      schemaChars: schemaChars(tool.inputSchema),
-      source: capabilitySource(tool.sourceId),
-    })),
+    ...manifest.tools.flatMap((tool) => {
+      const source = toolSource(manifest, tool.sourceId);
+      return source === null
+        ? []
+        : [
+            {
+              bodyChars: 0,
+              descriptionChars: tool.description.length,
+              nameChars: tool.name.length,
+              schemaChars: schemaChars(tool.inputSchema),
+              source,
+            },
+          ];
+    }),
     ...resolved.dynamicTools.map((tool) => ({
       bodyChars: 0,
       descriptionChars: tool.description.length,
@@ -406,22 +486,29 @@ export function measureLane(
   ]);
   const skillRows = groupRows(
     "skill",
-    manifest.skills.map((skill) => ({
-      bodyChars: skill.markdown.length,
-      descriptionChars: skill.description.length,
-      nameChars: skill.name.length,
-      schemaChars: 0,
-      source: capabilitySource(skill.sourceId),
-    }))
+    manifest.skills.flatMap((skill) => {
+      const source = capabilitySource(skill.sourceId, skill.owner);
+      return source === null
+        ? []
+        : [
+            {
+              bodyChars: skill.markdown.length,
+              descriptionChars: skill.description.length,
+              nameChars: skill.name.length,
+              schemaChars: 0,
+              source,
+            },
+          ];
+    })
   );
   const subagentRows = groupRows(
     "subagent",
-    manifest.subagents.map((subagent) => ({
+    resolved.subagentTools.map((subagent) => ({
       bodyChars: 0,
       descriptionChars: subagent.description.length,
       nameChars: subagent.name.length,
-      schemaChars: resolved.subagentSchemaChars,
-      source: capabilitySource(subagent.sourceId),
+      schemaChars: subagent.schemaChars,
+      source: subagent.source,
     }))
   );
   const rows = [...toolRows, ...skillRows, ...subagentRows];

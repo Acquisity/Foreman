@@ -19,7 +19,7 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
   t.mock.method(globalThis, "fetch", () =>
     Promise.reject(new Error("No network in this test"))
   );
-  // White-box regression against the lockfile's Eve 0.44.0 runtime. This private
+  // White-box regression against the lockfile's Eve 0.54.2 runtime. This private
   // import deliberately fails on internal API drift so upgrades require review.
   // It checks selection validation under the documented step -> live contract,
   // not lifecycle dispatch end to end; no public API exposes this validation.

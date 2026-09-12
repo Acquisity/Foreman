@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { ApprovalContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import {
   stampIntakeOnly,
   stampTrusted,

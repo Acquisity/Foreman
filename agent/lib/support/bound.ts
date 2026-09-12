@@ -3,7 +3,26 @@ import type { SessionAuthContext } from "eve/context";
 export const SUPPORT_MAX_STEPS = 150;
 export const SUPPORT_RUN_MS = 18 * 60_000;
 
-/** Epoch ms stamped by `supportAuth`; a missing or malformed stamp reads as NaN and fails closed. */
+export interface SupportRunSteps {
+  count: number;
+  stepIndex: number;
+  turnId: string | null;
+}
+
+/** Root turns run serially; a retried step must not consume its budget twice. */
+export const countSupportStep = (
+  previous: SupportRunSteps,
+  step: { stepIndex: number; turnId: string }
+): SupportRunSteps =>
+  previous.turnId === step.turnId && step.stepIndex <= previous.stepIndex
+    ? previous
+    : {
+        count: previous.count + 1,
+        stepIndex: step.stepIndex,
+        turnId: step.turnId,
+      };
+
+/** Epoch ms stamped by supportAuth; a malformed stamp fails closed. */
 export const supportDeadline = (
   auth: SessionAuthContext | null | undefined
 ): number => {
@@ -14,12 +33,10 @@ export const supportDeadline = (
 export const supportRunBoundReached = ({
   deadline,
   now,
-  stepIndex,
+  steps,
 }: {
   deadline: number;
   now: number;
-  stepIndex: number;
+  steps: number;
 }): boolean =>
-  stepIndex >= SUPPORT_MAX_STEPS ||
-  !Number.isFinite(deadline) ||
-  now >= deadline;
+  steps > SUPPORT_MAX_STEPS || !Number.isFinite(deadline) || now >= deadline;

@@ -22,7 +22,9 @@ const REPOSITORIES = `# Repository selection and workspaces
 
 const DELEGATION = `# Delegation
 
-Give every delegated child a self-contained message because it does not see the parent conversation, and give parallel children non-overlapping write scopes in the shared sandbox. For repository work, include the selected \`owner/repo\` and tell the child to call \`prepare_repository\` before working. For scheduled support delegation, begin the child message with "${SUPPORT_DELEGATION_LABEL}", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent. The root keeps the investigation journal, Linear writes, and Slack delivery.`;
+Give every delegated child a self-contained message because it does not see the parent conversation, and give parallel children non-overlapping write scopes in the shared sandbox. For repository work, include the selected \`owner/repo\` and tell the child to call \`prepare_repository\` before working. For scheduled support delegation, begin the child message with "${SUPPORT_DELEGATION_LABEL}", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent. The root keeps the investigation journal, Linear writes, and Slack delivery.
+
+Delegation returns a working task receipt immediately. It is not the child's answer. Continue independent work, then use the later task completion or failure delivered by eve to finish dependent work and answer the user. Overlapping successful results arrive together after the cohort settles. Read the actual critic verdict or vision findings before relying on them; never treat a launch receipt as a completed investigation.`;
 
 export const MEMORY = `# Investigation memory
 

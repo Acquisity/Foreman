@@ -8,3 +8,5 @@ minimumReleaseAgeExclude:
   - ai
   - eve
   - workflow
+patchedDependencies:
+  "@agent-browser/eve@0.37.1": patches/agent-browser-eve-0.37.1.patch

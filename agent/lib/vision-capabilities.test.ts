@@ -28,6 +28,7 @@ const HAS_COMPILED_MANIFEST = [
  * steps and 46 out-of-memory kills before failing.
  */
 const DISABLED = [
+  "ask_question",
   "bash",
   "read_file",
   "todo",
@@ -37,7 +38,7 @@ const DISABLED = [
 ];
 
 // The nested subagent node, which capability-budget's own schema drops: it
-// measures the root's surface and needs only each subagent's name.
+// measures the root's delegation tools, not the child's own capability surface.
 const TS_EXTENSION = /\.ts$/u;
 // The whole conditional, trigger included: a malformed or non-Linear url is
 // not "no url or path at all", so it must reach read_image and surface
@@ -49,8 +50,19 @@ const visionNodeSchema = z.object({
   subagents: z.array(
     z.object({
       agent: z.object({
-        disabledFrameworkTools: z.array(z.string()).default([]),
-        tools: z.array(z.object({ name: z.string() })).default([]),
+        connections: z.array(z.unknown()),
+        dynamicTools: z.array(
+          z.object({ slug: z.string(), sourceId: z.string() })
+        ),
+        sourceComposition: z.object({
+          entries: z.array(
+            z.object({
+              kind: z.string(),
+              source: z.object({ sourceId: z.string() }),
+            })
+          ),
+        }),
+        tools: z.array(z.object({ name: z.string(), sourceId: z.string() })),
       }),
       name: z.string(),
     })
@@ -91,16 +103,31 @@ describe("vision capability surface", () => {
     assert.match(instructions, NO_IMAGE_REFUSAL);
   });
 
-  it("compiles to read_image and nothing else", {
+  it("compiles only the image tool and retained framework defaults", {
     skip: HAS_COMPILED_MANIFEST
       ? false
       : "run pnpm validate to compile the repository manifest first",
   }, () => {
-    const { disabledFrameworkTools, tools } = visionNode();
+    const { connections, dynamicTools, sourceComposition, tools } =
+      visionNode();
+    assert.deepEqual(tools, [
+      { name: "load_skill", sourceId: "eve:defaults:tools/load_skill.ts" },
+      { name: "task_cancel", sourceId: "eve:defaults:tools/task_cancel.ts" },
+      { name: "read_image", sourceId: "tools/read_image.ts" },
+    ]);
+    assert.deepEqual(dynamicTools, [
+      {
+        slug: "connection_search",
+        sourceId: "eve:defaults:tools/connection_search.ts",
+      },
+    ]);
+    assert.deepEqual(connections, []);
     assert.deepEqual(
-      tools.map(({ name }) => name),
-      ["read_image"]
+      sourceComposition.entries
+        .filter((entry) => entry.kind === "disabled")
+        .map((entry) => entry.source.sourceId)
+        .sort(),
+      DISABLED.map((name) => `tools/${name}.ts`)
     );
-    assert.deepEqual([...disabledFrameworkTools].sort(), DISABLED);
   });
 });

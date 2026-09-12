@@ -17,12 +17,18 @@ it("registers the support handoff in Eve's compiled channel catalog", {
   // missed the production failure: Eve silently omitted a channel with no routes.
   const manifest = z
     .object({
-      channels: z.array(
-        z.object({ method: z.string(), name: z.string(), urlPath: z.string() })
-      ),
+      channelRoutes: z.object({
+        effective: z.array(
+          z.object({
+            method: z.string(),
+            name: z.string(),
+            urlPath: z.string(),
+          })
+        ),
+      }),
     })
     .parse(JSON.parse(readFileSync(manifestUrl, "utf8")));
-  const support = manifest.channels.filter(
+  const support = manifest.channelRoutes.effective.filter(
     (channel) => channel.name === "support"
   );
   assert.equal(support.length, 1);

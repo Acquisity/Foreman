@@ -8,7 +8,7 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
  *
  * @remarks
  * This file overrides the extension's own `tools/github.ts` slot, which is the
- * only place eve 0.44 lets a consumer gate an extension's tools: a directory
+ * place Foreman gates the extension's tools: a directory
  * mount replaces a same-named contribution, and a dynamic definition replaces
  * a dynamic one. The mount itself stays in `../extension.ts` next to this
  * file, with the allowlist, the `requireApproval: false`, and the durable
@@ -19,7 +19,7 @@ import { repositoryCapabilitiesAvailable } from "../../../lib/repository-lane.js
  * descriptor only where the callback is authored inline in a transformed
  * `defineTool` call, and every one of the extension's `execute`, `approval`,
  * and `toModelOutput` callbacks is stamped inside its own bundled module; a
- * reimplementation here would carry none, and eve 0.44 drops the whole 31-tool
+ * reimplementation here would carry none, and eve drops the whole 31-tool
  * map when a single entry lacks one, silently. And the descriptors the
  * extension resolves are read from its own dist, so a version bump changes the
  * tool set here with no edit.
@@ -51,7 +51,13 @@ export default defineDynamic({
           "@github-tools/eve-extension exposes no step.started resolver to forward; the GitHub tool override cannot gate a slot that moved"
         );
       }
-      return await resolve(event, ctx);
+      const tools = await resolve(event, ctx);
+      // Eve 0.54 treats a directory override as application-owned and does not
+      // prefix a returned map. Qualify its keys while keeping each upstream
+      // branded definition and its durable callbacks intact.
+      return Object.fromEntries(
+        Object.entries(tools).map(([name, tool]) => [`github__${name}`, tool])
+      );
     },
   },
 });

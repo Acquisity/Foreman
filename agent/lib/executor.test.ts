@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { SessionAuthContext, SessionContext } from "eve/context";
-import type { ApprovalContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import { operationPath } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
 import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { SessionAuthContext, SessionContext } from "eve/context";
-import type { ApprovalContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import {
   dynamicToolEntrySchema,
   resolveCompiledDynamicTools,

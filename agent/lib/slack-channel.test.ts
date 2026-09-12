@@ -10,7 +10,6 @@ import type {
   SlackInboundMessageContext,
   SlackMessage,
 } from "eve/channels/slack";
-import type { MessageStreamEvent } from "eve/client";
 import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
 
 // Connector variables the channel module requires at evaluation time.
@@ -88,65 +87,38 @@ const inboundContext = (
       teamId: "T123",
       threadTs: "1700000000.000100",
     },
+    thread: {
+      recentMessages: [
+        {
+          isMe: false,
+          markdown: "Earlier user message",
+          text: "Earlier user message",
+          threadTs: "1700000000.000100",
+          ts: "1700000000.000100",
+        },
+      ],
+      refresh: () => Promise.resolve(),
+    },
   }) as unknown as SlackInboundMessageContext;
 
-const streamEvent = (
-  type: MessageStreamEvent["type"],
-  turnId?: string
-): MessageStreamEvent =>
-  ({
-    data:
-      type === "session.waiting"
-        ? { continuationToken: "thread", wait: "next-user-message" }
-        : { sequence: 1, turnId },
-    meta: { at: "2026-08-31T12:00:00.000Z", id: `evt_${type}` },
-    type,
-  }) as MessageStreamEvent;
-
-const eventStream = (
-  events: readonly MessageStreamEvent[]
-): ReadableStream<MessageStreamEvent> =>
-  new ReadableStream({
-    start(controller) {
-      for (const event of events) {
-        controller.enqueue(event);
-      }
-      controller.close();
-    },
-  });
-
-const cancellableSession = (
-  snapshot: readonly MessageStreamEvent[],
-  confirmation: readonly MessageStreamEvent[],
-  calls: unknown[]
-): Session =>
-  ({
-    cancel: (options?: { turnId?: string }) => {
-      calls.push(options);
-      return Promise.resolve({ sessionId: "s1", status: "accepted" });
-    },
-    getEventStream: ({ startIndex = 0 } = {}) =>
-      Promise.resolve(eventStream(startIndex === 0 ? snapshot : confirmation)),
-    getStreamTailIndex: () => Promise.resolve(snapshot.length - 1),
-    id: "s1",
-  }) as unknown as Session;
-
-const cancellableSessionWithConfirmationStream = (
-  snapshot: readonly MessageStreamEvent[],
-  confirmation: ReadableStream<MessageStreamEvent>,
+const resettableSession = (
   calls: unknown[],
-  onCancel: () => void
+  status: "reset" | "no_active_session" = "reset",
+  id = "s1"
 ): Session =>
   ({
-    cancel: (options?: { turnId?: string }) => {
+    cancel: () =>
+      assert.fail("literal stop must reset without cancelling first"),
+    getEventStream: () => assert.fail("literal stop must not scan turn events"),
+    getStreamTailIndex: () =>
+      assert.fail("literal stop must not look up a turn"),
+    id,
+    reset: (options: unknown) => {
       calls.push(options);
-      onCancel();
-      return Promise.resolve({ sessionId: "s1", status: "accepted" });
+      return Promise.resolve(
+        status === "reset" ? { previousSessionId: id, status } : { status }
+      );
     },
-    getEventStream: ({ startIndex = 0 } = {}) =>
-      Promise.resolve(startIndex === 0 ? eventStream(snapshot) : confirmation),
-    getStreamTailIndex: () => Promise.resolve(snapshot.length - 1),
-    id: "s1",
   }) as unknown as Session;
 
 describe("slack channel", () => {
@@ -155,39 +127,30 @@ describe("slack channel", () => {
     assert.ok(channel.routes.length > 0);
   });
 
-  it("cancels the active turn and consumes a literal stop", async () => {
+  it("resets the exact session and acknowledges its retirement", async () => {
     const calls: unknown[] = [];
     const posts: string[] = [];
-    const session = cancellableSession(
-      [streamEvent("turn.started", "t1")],
-      [streamEvent("turn.cancelled", "t1")],
-      calls
-    );
+    const session = resettableSession(calls);
     const result = await dispatch(
       inboundContext(session, posts),
       message("stop")
     );
     assert.equal(result, null);
-    assert.deepEqual(calls, [{ turnId: "t1" }]);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.deepEqual(calls, [{ reason: "Slack stop requested." }]);
+    assert.deepEqual(posts, ["Stop requested."]);
   });
 
   it("accepts a mention and terminal punctuation around cancel", async () => {
     const calls: unknown[] = [];
-    const session = cancellableSession(
-      [streamEvent("turn.started", "t1")],
-      [streamEvent("turn.cancelled", "t1")],
-      calls
+    const session = resettableSession(calls);
+    assert.equal(
+      await dispatch(inboundContext(session), message("<@U999>  Cancel!!")),
+      null
     );
-    const result = await dispatch(
-      inboundContext(session),
-      message("<@U999>  Cancel!!")
-    );
-    assert.equal(result, null);
-    assert.deepEqual(calls, [{ turnId: "t1" }]);
+    assert.deepEqual(calls, [{ reason: "Slack stop requested." }]);
   });
 
-  it("deduplicates confirmations for concurrent stops across handlers", async () => {
+  it("deduplicates acknowledgements for concurrent stops of the same session", async () => {
     const calls: unknown[] = [];
     const posts: string[] = [];
     const postedIds = new Set<string>();
@@ -195,11 +158,7 @@ describe("slack channel", () => {
       body: Record<string, unknown>;
       operation: string;
     }> = [];
-    const session = cancellableSession(
-      [streamEvent("turn.started", "t1")],
-      [streamEvent("turn.cancelled", "t1")],
-      calls
-    );
+    const session = resettableSession(calls);
     await Promise.all([
       dispatch(
         inboundContext(session, posts, postedIds, requests),
@@ -218,32 +177,91 @@ describe("slack channel", () => {
       requests[1]?.body.client_msg_id
     );
     assert.match(String(requests[0]?.body.client_msg_id), UUID_V5);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.deepEqual(posts, ["Stop requested."]);
   });
 
-  it("keeps a completed stop successful when confirmation delivery fails", async (t) => {
+  it("posts only for the accepted reset when a concurrent stop finds no active session", async () => {
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    const postedIds = new Set<string>();
+    const requests: unknown[] = [];
+    const accepted = resettableSession(calls);
+    const inactive = resettableSession(calls, "no_active_session");
+
+    assert.deepEqual(
+      await Promise.all([
+        dispatch(
+          inboundContext(accepted, posts, postedIds, requests),
+          message("stop")
+        ),
+        dispatch(
+          inboundContext(inactive, posts, postedIds, requests),
+          message("cancel")
+        ),
+      ]),
+      [null, null]
+    );
+
+    assert.deepEqual(calls, [
+      { reason: "Slack stop requested." },
+      { reason: "Slack stop requested." },
+    ]);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(posts, ["Stop requested."]);
+  });
+
+  it("acknowledges distinct retired sessions separately in the same thread", async () => {
+    const posts: string[] = [];
+    const postedIds = new Set<string>();
+    const requests: Array<{
+      body: Record<string, unknown>;
+      operation: string;
+    }> = [];
+    const original = resettableSession([], "reset", "session-original");
+    const replacement = resettableSession([], "reset", "session-replacement");
+    assert.equal(
+      await dispatch(
+        inboundContext(original, posts, postedIds, requests),
+        message("stop")
+      ),
+      null
+    );
+    assert.equal(
+      await dispatch(
+        inboundContext(replacement, posts, postedIds, requests),
+        message("stop")
+      ),
+      null
+    );
+    assert.equal(requests.length, 2);
+    assert.notEqual(
+      requests[0]?.body.client_msg_id,
+      requests[1]?.body.client_msg_id
+    );
+    assert.equal(requests[0]?.body.thread_ts, requests[1]?.body.thread_ts);
+    assert.deepEqual(posts, ["Stop requested.", "Stop requested."]);
+  });
+
+  it("keeps a successful reset successful when acknowledgement delivery fails", async (t) => {
     const warnings: string[] = [];
     t.mock.method(console, "warn", (...args: unknown[]) => {
       warnings.push(args.map(String).join(" "));
     });
-    const requestOutcomes = [
-      () => Promise.resolve({ ok: false }),
-      () => Promise.reject(new Error("provider response must stay private")),
-    ];
-    const results = await Promise.all(
-      requestOutcomes.map((requestOverride) => {
-        const session = cancellableSession(
-          [streamEvent("turn.started", "t1")],
-          [streamEvent("turn.cancelled", "t1")],
-          []
-        );
-        return dispatch(
-          inboundContext(session, [], new Set<string>(), [], requestOverride),
-          message("stop")
+    await Promise.all(
+      [
+        () => Promise.resolve({ ok: false }),
+        () => Promise.reject(new Error("provider response must stay private")),
+      ].map(async (requestOverride) => {
+        const session = resettableSession([]);
+        assert.equal(
+          await dispatch(
+            inboundContext(session, [], new Set<string>(), [], requestOverride),
+            message("stop")
+          ),
+          null
         );
       })
     );
-    assert.deepEqual(results, [null, null]);
     assert.deepEqual(warnings, [
       "Slack stop confirmation could not be posted.",
       "Slack stop confirmation could not be posted.",
@@ -251,102 +269,132 @@ describe("slack channel", () => {
     assert.equal(warnings.join(" ").includes("provider response"), false);
   });
 
-  it("stays quiet when an accepted session is already parked", async () => {
-    const calls: unknown[] = [];
-    const posts: string[] = [];
-    const session = cancellableSession(
-      [
-        streamEvent("turn.started", "t1"),
-        streamEvent("turn.completed", "t1"),
-        streamEvent("session.waiting"),
-      ],
-      [],
-      calls
+  it("never acknowledges a failed session lookup or reset", async () => {
+    await Promise.all(
+      (["lookup", "reset"] as const).map(async (failureAt) => {
+        const error = new Error(`${failureAt} failed`);
+        const posts: string[] = [];
+        const requests: unknown[] = [];
+        const session = resettableSession([]);
+        session.reset = () => Promise.reject(error);
+        const base = inboundContext(
+          session,
+          posts,
+          new Set<string>(),
+          requests
+        );
+        const ctx = {
+          ...base,
+          resolveSession:
+            failureAt === "lookup"
+              ? () => Promise.reject(error)
+              : base.resolveSession,
+        };
+        await assert.rejects(dispatch(ctx, message("stop")), (actual) => {
+          assert.equal(actual, error);
+          return true;
+        });
+        assert.deepEqual(requests, []);
+        assert.deepEqual(posts, []);
+      })
     );
-    const result = await dispatch(
-      inboundContext(session, posts),
-      message("stop")
-    );
-    assert.equal(result, null);
-    assert.deepEqual(calls, []);
-    assert.deepEqual(posts, []);
   });
 
-  it("stays quiet when the observed turn completes before cancellation", async () => {
+  it("stays quiet when the exact session is already inactive", async () => {
     const calls: unknown[] = [];
     const posts: string[] = [];
-    const session = cancellableSession(
-      [streamEvent("turn.started", "t1")],
-      [streamEvent("turn.completed", "t1"), streamEvent("session.waiting")],
-      calls
+    const session = resettableSession(calls, "no_active_session");
+    assert.equal(
+      await dispatch(inboundContext(session, posts), message("stop")),
+      null
     );
-    const result = await dispatch(
-      inboundContext(session, posts),
-      message("stop")
-    );
-    assert.equal(result, null);
-    assert.deepEqual(calls, [{ turnId: "t1" }]);
+    assert.deepEqual(calls, [{ reason: "Slack stop requested." }]);
     assert.deepEqual(posts, []);
-  });
-
-  it("bounds cancellation confirmation and closes a stalled stream", async (t) => {
-    t.mock.timers.enable({ apis: ["setTimeout"] });
-    const calls: unknown[] = [];
-    const posts: string[] = [];
-    let streamCancelled = false;
-    let cancellationRequested: (() => void) | undefined;
-    const cancellationStarted = new Promise<void>((resolve) => {
-      cancellationRequested = resolve;
-    });
-    const confirmation = new ReadableStream<MessageStreamEvent>({
-      cancel() {
-        streamCancelled = true;
-      },
-    });
-    const session = cancellableSessionWithConfirmationStream(
-      [streamEvent("turn.started", "t1")],
-      confirmation,
-      calls,
-      () => cancellationRequested?.()
-    );
-
-    const pendingDispatch = dispatch(
-      inboundContext(session, posts),
-      message("stop")
-    );
-    await cancellationStarted;
-    await Promise.resolve();
-    t.mock.timers.tick(10_000);
-
-    assert.equal(await pendingDispatch, null);
-    assert.deepEqual(calls, [{ turnId: "t1" }]);
-    assert.deepEqual(posts, []);
-    assert.equal(streamCancelled, true);
   });
 
   it("stays quiet when the Slack thread has no session owner", async () => {
     const posts: string[] = [];
-    const result = await dispatch(
-      inboundContext(undefined, posts),
-      message("stop")
+    assert.equal(
+      await dispatch(inboundContext(undefined, posts), message("stop")),
+      null
     );
-    assert.equal(result, null);
     assert.deepEqual(posts, []);
   });
 
-  it("never lets an authorless event cancel work", async () => {
-    const authorless = { ...message("stop"), author: undefined };
-    const result = await dispatch(inboundContext(undefined), authorless);
-    assert.equal(result, null);
+  it("keeps historical repository URLs out of dispatch authority", async () => {
+    const base = inboundContext(undefined);
+    const ctx = {
+      ...base,
+      thread: {
+        ...base.thread,
+        recentMessages: [
+          {
+            botId: "B123",
+            isMe: true,
+            markdown: "Earlier work on https://github.com/Acquisity/old-repo",
+            raw: {},
+            text: "Earlier work on https://github.com/Acquisity/old-repo",
+            threadTs: "1700000000.000100",
+            ts: "1700000000.000100",
+            user: "U_BOT",
+          },
+        ],
+      },
+    };
+    const result = await dispatch(ctx, message("continue here"));
+    assert.ok(result?.context.some((part) => part.includes("old-repo")));
+    assert.equal(JSON.stringify(result?.auth).includes("old-repo"), false);
   });
 
-  it("delivers a longer request that merely starts with stop", async () => {
-    const result = await dispatch(
-      inboundContext(undefined),
-      message("stop the deploy")
-    );
+  it("still dispatches the admitted message when optional history session lookup fails", async () => {
+    const ctx = {
+      ...inboundContext(undefined),
+      resolveSession: () =>
+        Promise.reject(new Error("private session storage details")),
+    };
+    const result = await dispatch(ctx, message("continue here"));
     assert.ok(result?.auth);
-    assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
+    assert.equal(result.context[0], FINAL_SLACK_POST_RULE);
+    assert.ok(result.context[1]?.includes("history is unavailable"));
+    assert.equal(
+      JSON.stringify(result).includes("private session storage"),
+      false
+    );
+  });
+
+  it("never resolves or resets work for an authorless stop event", async () => {
+    const posts: string[] = [];
+    const calls: unknown[] = [];
+    const ctx = {
+      ...inboundContext(resettableSession(calls), posts),
+      resolveSession: () =>
+        assert.fail("rejected auth must not resolve a session"),
+    };
+    const authorless = { ...message("stop"), author: undefined };
+    assert.equal(await dispatch(ctx, authorless), null);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(posts, []);
+  });
+
+  it("delivers longer stop requests as ordinary input without resetting", async () => {
+    await Promise.all(
+      ["stop the deploy", "stop that subagent, keep working"].map(
+        async (text) => {
+          const calls: unknown[] = [];
+          const posts: string[] = [];
+          const input = message(text);
+          const result = await dispatch(
+            inboundContext(resettableSession(calls), posts),
+            input
+          );
+          assert.ok(result?.auth);
+          assert.deepEqual(result.context, [FINAL_SLACK_POST_RULE]);
+          assert.equal(input.text, text);
+          assert.deepEqual(calls, []);
+          assert.deepEqual(posts, []);
+        }
+      )
+    );
   });
 
   // eve stages Slack files in the sandbox without telling the text-only chat
@@ -652,9 +700,8 @@ describe("slack channel progress", () => {
   // Event fixtures use the real stream-event shapes and valid statuses.
   const turnStartedEvent = { sequence: 1, turnId: "t1" };
 
-  const reasoningEvent = (reasoningSoFar: string) => ({
-    reasoningDelta: reasoningSoFar,
-    reasoningSoFar,
+  const reasoningEvent = (reasoningDelta: string) => ({
+    reasoningDelta,
     sequence: 2,
     stepIndex: 0,
     turnId: "t1",
@@ -764,7 +811,7 @@ describe("slack channel progress", () => {
     // The 5-minute line lands during streaming, before any action result.
     now.advance(2000);
     await handlerFor("reasoning.appended")(
-      reasoningEvent("Checking the code more deeply."),
+      reasoningEvent(" More deeply."),
       eventChannel,
       trustedCtx
     );
@@ -1154,7 +1201,7 @@ describe("slack channel progress", () => {
     assert.equal(eventChannel.state.pendingToolCallMessage, null);
   });
 
-  it("mirrors the default reasoning.appended typing throttle", async (t) => {
+  it("accumulates reasoning deltas while throttling small extensions", async (t) => {
     const now = clock(t);
     const calls: string[] = [];
     const eventChannel = progressChannel(calls);
@@ -1168,17 +1215,15 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
-    // A different status inside the five-second window is suppressed.
     now.advance(1000);
     await handlerFor("reasoning.appended")(
-      reasoningEvent("Different thought."),
+      reasoningEvent(" E"),
       eventChannel,
       trustedCtx
     );
-    // A substantial extension of the last posted status posts immediately.
     now.advance(1000);
     await handlerFor("reasoning.appended")(
-      reasoningEvent("First thought. Extended."),
+      reasoningEvent("xtended."),
       eventChannel,
       trustedCtx
     );
@@ -1187,6 +1232,134 @@ describe("slack channel progress", () => {
       "typing:First thought.",
       "typing:First thought. Extended.",
     ]);
+    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
+  });
+
+  it("shares reasoning within one live state and isolates other sessions", async () => {
+    const firstCalls: string[] = [];
+    const secondCalls: string[] = [];
+    const first = progressChannel(firstCalls);
+    const second = progressChannel(secondCalls);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("First session."),
+      first,
+      trustedCtx
+    );
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Second session."),
+      second,
+      trustedCtx
+    );
+    await handlerFor("reasoning.appended")(
+      reasoningEvent(" Continued."),
+      { ...first },
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(firstCalls), [
+      "typing:First session.",
+      "typing:First session. Continued.",
+    ]);
+    assert.deepEqual(typingsOf(secondCalls), ["typing:Second session."]);
+  });
+
+  it("does not serialize full reasoning or reuse it in a rebuilt channel state", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Visible first line.\nTransient later reasoning."),
+      eventChannel,
+      trustedCtx
+    );
+    const serialized = JSON.stringify(eventChannel.state);
+    assert.equal(serialized.includes("Transient later reasoning."), false);
+    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
+    // Eve rebuilds channel context from serialized state at a durable step.
+    const rebuilt = progressChannel(calls, JSON.parse(serialized));
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Rebuilt stream."),
+      rebuilt,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Visible first line.",
+      "typing:Rebuilt stream.",
+    ]);
+  });
+
+  it("resets reasoning at step, block and turn boundaries", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Old step."),
+      eventChannel,
+      trustedCtx
+    );
+    const nextStep = { ...reasoningEvent("New step."), stepIndex: 1 };
+    await handlerFor("reasoning.appended")(nextStep, eventChannel, trustedCtx);
+    await handlerFor("reasoning.completed")(
+      { reasoning: "New step.", sequence: 3, stepIndex: 1, turnId: "t1" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
+    await handlerFor("reasoning.appended")(
+      { ...nextStep, reasoningDelta: "New block." },
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("reasoning.appended")(
+      { ...nextStep, reasoningDelta: "New turn.", turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(typingsOf(calls), [
+      "typing:Old step.",
+      "typing:New step.",
+      "typing:New block.",
+      "typing:New turn.",
+    ]);
+    await handlerFor("turn.completed")(
+      { sequence: 4, turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
+    await handlerFor("reasoning.appended")(
+      { ...nextStep, reasoningDelta: "After completion.", turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(typingsOf(calls).at(-1), "typing:After completion.");
+  });
+
+  it("labels real workflow tool requests", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("actions.requested")(
+      {
+        ...actionsRequestedEvent,
+        actions: [
+          {
+            callId: "workflow-1",
+            input: { seconds: 2 },
+            kind: "workflow-tool-call",
+            toolName: "sleep",
+            workflowId: "sleep-workflow",
+          },
+        ],
+      },
+      eventChannel,
+      trustedCtx
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "sleep");
+    assert.equal(typingsOf(calls).at(-1), "typing:sleep");
   });
 });
 

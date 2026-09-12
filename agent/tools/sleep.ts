@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineWorkflowTool } from "eve/tools";
 import { sleep } from "eve/tools/sleep";
 import { z } from "zod";
 
@@ -19,9 +19,9 @@ const MAX_SLEEP_SECONDS = 600;
 
 const base = sleep();
 
-export default defineTool({
+export default defineWorkflowTool({
+  ...base,
   description: `${base.description} The wait is capped at ${MAX_SLEEP_SECONDS} seconds.`,
-  execute: base.execute,
   inputSchema: z.strictObject({
     seconds: z
       .number()
@@ -29,5 +29,4 @@ export default defineTool({
       .max(MAX_SLEEP_SECONDS)
       .describe(`How long to wait, in seconds, up to ${MAX_SLEEP_SECONDS}.`),
   }),
-  outputSchema: base.outputSchema,
 });

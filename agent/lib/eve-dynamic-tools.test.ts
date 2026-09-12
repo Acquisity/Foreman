@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
 
 // Resolving a dynamic tool evaluates every authored module through eve's
 // bundled module map, and prompts.ts reads the Linear connector variable at module
@@ -10,10 +12,22 @@ import { z } from "zod";
 // under the same environment.
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
-const { admitDynamicTools, dynamicToolCacheKey } = await import(
-  "./eve-dynamic-tools.js"
-);
-const { laneAuth } = await import("./capability-budget.js");
+const {
+  admitDynamicTools,
+  dynamicToolCacheKey,
+  loadCompiledDynamicToolResolvers,
+} = await import("./eve-dynamic-tools.js");
+const {
+  laneAuth,
+  readCompiledManifest,
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
+} = await import("./capability-budget.js");
+
+const HAS_COMPILED_MANIFEST = [
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
+].every((path) => existsSync(new URL(`../../${path}`, import.meta.url)));
 
 const NOTHING_ADMITTED = /eve admitted 0 of the 1 tools 'crm'/u;
 
@@ -37,6 +51,46 @@ const session = (lane: "slack" | "repository-interactive") => ({
 });
 
 describe("eve dynamic tool adapter", () => {
+  it("admits qualified GitHub names from the actual application-owned override", {
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
+  }, async () => {
+    const manifest = readCompiledManifest(new URL("../../", import.meta.url));
+    const entry = manifest.dynamicTools.find(
+      (candidate) =>
+        candidate.sourceId === "ext-override:github:tools/github.ts"
+    );
+    assert.ok(entry);
+    assert.equal(
+      entry.extensionNamespace,
+      undefined,
+      "Eve 0.54 does not prefix directory overrides"
+    );
+    const [resolver] = await loadCompiledDynamicToolResolvers(
+      [entry],
+      APP_ROOT
+    );
+    assert.ok(resolver);
+    assert.equal(
+      resolver.extensionNamespace,
+      undefined,
+      "the adapter must not inject namespace metadata"
+    );
+    const admitted = await admitDynamicTools(
+      resolver,
+      session("repository-interactive")
+    );
+    assert.deepEqual(
+      admitted
+        .map((tool) => tool.name)
+        .sort((left, right) => left.localeCompare(right)),
+      GITHUB_TOOL_ALLOWLIST.map((name) => `github__${name}`).sort(
+        (left, right) => left.localeCompare(right)
+      )
+    );
+    assert.deepEqual(await admitDynamicTools(resolver, session("slack")), []);
+  });
   it("refuses to count a dynamic tool map eve would drop", async () => {
     // eve stamps a durable descriptor on a callback only when it bundles the
     // authored module, so every callback in this test process is bare, the

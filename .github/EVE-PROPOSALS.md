@@ -1,6 +1,6 @@
 # Eve proposals
 
-Gating and composition requests checked against the versions named below, with what was built instead. Each entry names the eve version it was checked against, the supported subset that shipped, and the bounded change that would remove the workaround. Nothing here is a reason to approximate a gate unsafely: where eve cannot express a bound, the authored subset ships and the remainder is written down.
+Gating and composition requests checked against the versions named below, with what was built instead. Each entry names the eve version it was checked against, the supported subset that shipped, and the bounded change that would remove the workaround. ENG-13737 rechecked the relevant APIs against Eve 0.54.2. Historical version checks remain identified below; newly supported APIs do not justify unrelated gating changes. Nothing here is a reason to approximate a gate unsafely: where eve cannot express a bound, the authored subset ships and the remainder is written down.
 
 ## 1. Gate an extension as a whole, not one contribution at a time
 
@@ -12,6 +12,8 @@ Shipped: `agent/extensions/github/tools/github.ts` replaces the extension's own 
 
 Proposal: let a mount take an availability resolver, for example `github(config, { available: (ctx) => boolean })`, resolved on `session.started` and `turn.started`, that omits every contribution the mount makes for that session. Same semantics as a dynamic subagent returning `null`, applied to a mount.
 
+Eve 0.54.2 update: dynamic connections are now supported alongside tools, skills, instructions and subagents. There is still no whole-mount availability resolver; channel, schedule and hook lifecycle is not made session-dynamic by a tool replacement. Keep the existing GitHub slot gate.
+
 ## 2. Remove a same-named authored tool from a dynamic resolver
 
 Checked against eve 0.44.0.
@@ -22,13 +24,15 @@ Shipped: each gated repository tool exports its `defineTool` object as a named e
 
 Proposal: let a dynamic resolver returning `null` for a name suppress a same-named authored tool, or accept `disableTool()` as a resolver result.
 
+Eve 0.54.2 update: separate-file null suppression is still unavailable. Keep the same-slot authored wrappers and stamped callbacks; the supported built-in replacement described in section 5 does not suppress an unrelated static definition.
+
 ## 3. Gate a subagent's delegation tool without gating the subagent
 
 Checked against eve 0.44.0.
 
 `defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
 
-Eve still lowers a fixed delegation schema onto each declared subagent. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
+Eve 0.54.2 still prepares the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. The report uses each compiled node's prepared tool, including its actual background-work description. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
 
 ## 4. Gate a static extension tool per session without one slot per tool
 
@@ -38,13 +42,11 @@ The browser extension contributes 21 static tools, 11,828 catalog characters, to
 
 Proposal: the mount-level availability resolver of section 1, which would gate all 21 tools and the instructions fragment together.
 
-## 5. Gate eve's built-in tools per session
+## 5. Gate eve's built-in tools per session (supported in 0.54.2)
 
-Checked against eve 0.44.0.
+The original Eve 0.44.0 check found only global `disableTool()` overrides. Eve 0.54.2 gives framework defaults the same file slots as authored tools, so a same-slot `defineDynamic` can return the imported default or `null` for that session. The requested mechanism is now available; no replacement gating system is needed.
 
-eve's default tools (`bash`, `read_file`, `web_fetch`, and the rest) are gated only globally: a `disableTool()` sentinel in `agent/tools/<slug>.ts` removes one for every session, which is how `ask_question` is removed today. The native `agent` tool is enabled. There is no per-session form, and the built-in catalog is outside the compiled manifest, so `pnpm report:capabilities` does not measure it. Every lane carries the same built-in set by construction.
-
-Proposal: accept a `defineDynamic` in a built-in tool's slot that returns the default or `null` per session, matching what authored and extension slots already allow.
+Foreman keeps its current choices: native `agent` enabled and `ask_question` disabled on root, critic and vision. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
 
 ## 6. Time one tool call
 
@@ -54,23 +56,31 @@ A tool-call duration is not expressible from a hook. `ActionResultStreamEvent.da
 
 Shipped: one bounded line per tool call with no duration, naming the tool, the connection, and `ok` or `error`. The hook keeps no state and starts no timer. Timing the call from a hook would mean carrying the `actions.requested` event's `meta.at`, keyed by call ID, and reading it back at `action.result`, which is hook-owned state that outlives the event that created it: it leaks whenever a call never returns, it is wrong under a resumed or replayed turn, and it invents a number eve never measured. That is exactly the unsafe approximation this file exists to avoid, so the line reports reach and failure and stays silent about latency.
 
+Eve 0.54.2 adds workflow-tool action variants but still supplies no framework-measured tool duration on these result events. Keep the existing bounded outcome logs.
+
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
 
 ## Per-session MCP connection URL selection (resolved in Foreman)
 
 Checked against eve 0.44.0.
 
-Ordinary Foreman workflows retain one shared Executor toolkit. ENG-13601 introduces an explicit scheduled-support exception. Eve 0.44 requires a static `McpClientConnectionDefinition.url`, so that job denies the general MCP connection and uses an authored operation dispatcher to the support toolkit. Its helpers select the same endpoint from the framework-owned initiator identity. This preserves existing interactive discovery and gives support Linear writes a durable journal; it does not pretend that the MCP URL is dynamic.
+Ordinary Foreman workflows retain one shared Executor toolkit. ENG-13601 introduces an explicit scheduled-support exception. Eve 0.44 requires a static `McpClientConnectionDefinition.url`, so that job denies the general MCP connection and uses an authored operation dispatcher to the support toolkit. Its helpers select the same endpoint from the framework-owned initiator identity. This preserved existing interactive discovery and gave support Linear writes a durable journal.
+
+Eve 0.54.2 supports `defineDynamic` connections with explicit stable instance keys for authenticated definitions. The former static-URL restriction is historical. Foreman retains its support dispatcher because selected operations, delegated write denial and durable Linear journal recovery are still required; replacing it with a dynamic connection alone would not preserve those behaviors.
 
 
 ## Durable per-run cancellation for support schedules
 
 Checked against Eve 0.44.0 for ENG-13601 and corrected for ENG-13724. A custom channel cannot fail a turn from its event handlers: `callAdapterEventHandler` in `node_modules/eve/dist/src/channel/adapter.js` catches every adapter handler error and logs it as "adapter event handler threw — event swallowed", so the run continues. Only an authored hook throw fails the turn, because `dispatchStreamEventHooks` in `node_modules/eve/dist/src/context/hook-lifecycle.js` awaits handlers with no catch. The channel's `SessionHandle` exposes identity and continuation rekeying, not cancellation or a durable timer, and the cross-channel send options do not accept per-run resource limits. Support therefore applies an eighteen-minute deadline and a ceiling of 150 model steps from a `step.started` hook, twenty-minute provider-write leases, and the existing provider/sandbox deadlines. This bounds work at the available boundaries; it is not a promise to interrupt one silent model call or the Connect SDK exactly at eighteen minutes. No detached timeout or polling workflow is used to simulate that guarantee.
 
+Eve 0.54.2 update: support runs use conversation sessions so background results can return. Normal parent-turn completion does not settle a claim. The public `defineState` counter enforces 150 total root steps across turns, preserving the original eighteen-minute deadline. Public input/authorization hooks prevent unattended root and child waits. Root turn failures use auth and terminal session failures use persisted channel claim state. An unfinished first intake gets the existing notice on a later claim after its twenty-minute lease expires; pending outboxes reconcile first. Dormant sessions use Eve's default thirty-day lifetime from creation. These changes do not create a durable wall-clock interruption for a silent provider call.
+
 Proposal: expose a runtime-owned per-run deadline on channel sends that cancels model calls, delegated work and token resolution durably.
 
 ## Register receive-only channels
 
 Checked against eve 0.44.0 after ENG-13601's first production intake tick. The compiler emits channel entries from HTTP routes, so `routes: []` omits a receive-only channel from the runtime catalog. Cross-channel dispatch also falls back to a route fingerprint when bundled module references differ. Foreman's support channel therefore carries one inert GET route that always returns 404, allowing registration without exposing session creation. A compiled-manifest regression test checks that the channel survives compilation.
+
+Eve 0.54.2 upgrade: retain the inert route and verify it in `channelRoutes.effective` of the compiled manifest. This upgrade does not remove the receive-only registration safeguard or expose an HTTP session-creation endpoint.
 
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
