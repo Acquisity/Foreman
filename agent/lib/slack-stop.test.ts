@@ -126,41 +126,30 @@ describe("postStopConfirmation", () => {
 });
 
 describe("stopSlackSession", () => {
-  for (const initialState of ["active", "waiting"] as const) {
-    it(`resets the ${initialState} session directly without a cancellation wakeup`, async () => {
-      let state: string = initialState;
-      let parentWakeups = 0;
-      const requests: unknown[] = [];
-      const session = {
-        cancel: () => {
-          parentWakeups += 1;
-          assert.fail(
-            "task cancellation must not wake the parent before reset"
-          );
-        },
-        getEventStream: () => assert.fail("reset needs no turn stream"),
-        getStreamTailIndex: () => assert.fail("reset needs no turn lookup"),
-        id: "session-1",
-        reset: (options: unknown) => {
-          requests.push(options);
-          state = "retired";
-          return Promise.resolve({
-            previousSessionId: "session-1",
-            status: "reset",
-          });
-        },
-      };
-      const ctx = {
-        reset: () => assert.fail("reset must use the resolved exact handle"),
-        resolveSession: () => Promise.resolve(session),
-      } as unknown as SlackInboundMessageContext;
+  it("resets the resolved session without cancelling or scanning events", async () => {
+    const requests: unknown[] = [];
+    const session = {
+      cancel: () =>
+        assert.fail("task cancellation must not wake the parent before reset"),
+      getEventStream: () => assert.fail("reset needs no turn stream"),
+      getStreamTailIndex: () => assert.fail("reset needs no turn lookup"),
+      id: "session-1",
+      reset: (options: unknown) => {
+        requests.push(options);
+        return Promise.resolve({
+          previousSessionId: "session-1",
+          status: "reset",
+        });
+      },
+    };
+    const ctx = {
+      reset: () => assert.fail("reset must use the resolved exact handle"),
+      resolveSession: () => Promise.resolve(session),
+    } as unknown as SlackInboundMessageContext;
 
-      assert.equal(await stopSlackSession(ctx), "session-1");
-      assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
-      assert.equal(state, "retired");
-      assert.equal(parentWakeups, 0);
-    });
-  }
+    assert.equal(await stopSlackSession(ctx), "session-1");
+    assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
+  });
 
   it("does not resolve or reset a replacement owner while the exact reset awaits", async () => {
     let finishReset: (() => void) | undefined;

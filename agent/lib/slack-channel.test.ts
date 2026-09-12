@@ -180,6 +180,36 @@ describe("slack channel", () => {
     assert.deepEqual(posts, ["Stop requested."]);
   });
 
+  it("posts only for the accepted reset when a concurrent stop finds no active session", async () => {
+    const calls: unknown[] = [];
+    const posts: string[] = [];
+    const postedIds = new Set<string>();
+    const requests: unknown[] = [];
+    const accepted = resettableSession(calls);
+    const inactive = resettableSession(calls, "no_active_session");
+
+    assert.deepEqual(
+      await Promise.all([
+        dispatch(
+          inboundContext(accepted, posts, postedIds, requests),
+          message("stop")
+        ),
+        dispatch(
+          inboundContext(inactive, posts, postedIds, requests),
+          message("cancel")
+        ),
+      ]),
+      [null, null]
+    );
+
+    assert.deepEqual(calls, [
+      { reason: "Slack stop requested." },
+      { reason: "Slack stop requested." },
+    ]);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(posts, ["Stop requested."]);
+  });
+
   it("acknowledges distinct retired sessions separately in the same thread", async () => {
     const posts: string[] = [];
     const postedIds = new Set<string>();
