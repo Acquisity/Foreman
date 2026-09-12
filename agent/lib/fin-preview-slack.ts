@@ -6,8 +6,9 @@ import { logOpsEvent } from "./ops-log.js";
 export interface FinProbeResult {
   message: string;
   probe: string;
+  run_handle?: string;
   session_id: string;
-  status: "connected" | "pending" | "unexpected_reply" | "failed";
+  status: "connected" | "completed" | "pending" | "unexpected_reply" | "failed";
 }
 
 const slackResponse = z.object({
@@ -56,14 +57,14 @@ export async function reportFinProbeToSlack(
     const posted = await request("chat.postMessage", {
       channel,
       client_msg_id: probe,
-      text: `Fin requested a Foreman connection test.\nProbe: ${probe}`,
+      text: `Fin requested a Foreman run.\nProbe: ${probe}`,
       unfurl_links: "false",
       unfurl_media: "false",
     });
     const outcome = await observed;
     const text = outcome
-      ? `Fin → Foreman test: ${outcome.status}\n${outcome.message}\nSession: ${outcome.session_id}\nProbe: ${probe}`
-      : `Fin → Foreman test: failed\nCould not start or observe the connection test.\nProbe: ${probe}`;
+      ? `Fin → Foreman: ${outcome.status}\n${outcome.message}\nSession: ${outcome.session_id || "not started"}\nProbe: ${probe}`
+      : `Fin → Foreman: failed\nCould not start or observe the run.\nProbe: ${probe}`;
     await request("chat.update", { channel, text, ts: posted.ts });
   } catch {
     logOpsEvent("fin_preview_slack_failed", {

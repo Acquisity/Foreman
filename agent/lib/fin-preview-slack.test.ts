@@ -69,7 +69,7 @@ describe("Fin preview Slack visibility", () => {
         body: {
           channel: "C0TESTPREVIEW",
           client_msg_id: "probe-1",
-          text: "Fin requested a Foreman connection test.\nProbe: probe-1",
+          text: "Fin requested a Foreman run.\nProbe: probe-1",
           unfurl_links: "false",
           unfurl_media: "false",
         },
@@ -82,7 +82,7 @@ describe("Fin preview Slack visibility", () => {
     assert.deepEqual(requests[1], {
       body: {
         channel: "C0TESTPREVIEW",
-        text: `Fin → Foreman test: connected\n${connected.message}\nSession: test-session\nProbe: probe-1`,
+        text: `Fin → Foreman: connected\n${connected.message}\nSession: test-session\nProbe: probe-1`,
         ts: "123.456",
       },
       method: "chat.update",
@@ -139,7 +139,7 @@ describe("Fin preview Slack visibility", () => {
     assert.deepEqual(requests[1], {
       body: {
         channel: "C0TESTPREVIEW",
-        text: "Fin → Foreman test: failed\nCould not start or observe the connection test.\nProbe: probe-1",
+        text: "Fin → Foreman: failed\nCould not start or observe the run.\nProbe: probe-1",
         ts: "123.456",
       },
       method: "chat.update",
@@ -163,7 +163,37 @@ describe("Fin preview Slack visibility", () => {
       }
     );
     assert.equal(texts.length, 2);
-    assert.ok(texts[1].includes("test: pending"));
+    assert.ok(texts[1].includes("Foreman: pending"));
     assert.ok(texts[1].includes("not received within this connector call"));
+  });
+
+  it("updates the same receipt with the completed diagnostic report without publishing its access handle", async (context) => {
+    configureSlack(context);
+    const requests: { method: string; body: Record<string, string> }[] = [];
+    const report =
+      "The designated workspace has 42 credits. Source: billing read.";
+    await reportFinProbeToSlack(
+      "probe-1",
+      Promise.resolve({
+        ...connected,
+        message: report,
+        run_handle: "signed-result-access-handle",
+        status: "completed",
+      }),
+      (method, body) => {
+        requests.push({ body, method });
+        return Promise.resolve({ ok: true, ts: "123.456" });
+      }
+    );
+    assert.equal(requests.length, 2);
+    assert.equal(requests[1].method, "chat.update");
+    assert.equal(requests[1].body.ts, "123.456");
+    assert.equal(
+      requests[1].body.text,
+      `Fin → Foreman: completed\n${report}\nSession: test-session\nProbe: probe-1`
+    );
+    assert.ok(
+      !JSON.stringify(requests).includes("signed-result-access-handle")
+    );
   });
 });
