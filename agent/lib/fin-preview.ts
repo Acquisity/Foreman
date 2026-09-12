@@ -15,10 +15,13 @@ import {
 const digest = (value: string) => createHash("sha256").update(value).digest();
 const requestSchema = z
   .object({
+    action: z.enum(["start", "result"]).optional(),
     handle: z.string().trim().max(1024).optional().default(""),
     question: z.string().trim().max(4000).optional().default(""),
   })
-  .strict();
+  .strict()
+  .refine((input) => input.action !== "start" || input.question.length > 0)
+  .refine((input) => input.action !== "result" || input.handle.length > 0);
 const handleSchema = z
   .object({
     probe: z.string().uuid(),
@@ -171,9 +174,16 @@ export async function receiveFinProbe(
     }
     input = requestSchema.parse(body.trim() ? JSON.parse(body) : {});
   } catch {
-    return json({ error: "Supply a question or an existing run handle." }, 400);
+    return json(
+      {
+        message:
+          "Supply a question to start or a saved run handle to check a result; no run was started.",
+        status: "failed",
+      },
+      400
+    );
   }
-  if (input.handle) {
+  if (input.handle && input.action !== "start") {
     let identity: z.infer<typeof handleSchema>;
     try {
       identity = readHandle(input.handle, secret);

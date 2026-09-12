@@ -252,6 +252,7 @@ describe("Fin diagnostic intake", () => {
     await Promise.all(
       [
         "not JSON",
+        JSON.stringify({ action: "unknown", question: "Check credits" }),
         JSON.stringify({ question: "x".repeat(4001) }),
         JSON.stringify({
           question: "Check credits",
@@ -272,6 +273,33 @@ describe("Fin diagnostic intake", () => {
     );
   });
 
+  it("rejects explicit starts or result checks missing their required input without creating a probe", async (context) => {
+    enablePreview(context);
+    await Promise.all(
+      [
+        { action: "start", handle: "", question: "" },
+        { action: "start", handle: "stale-saved-handle", question: "  " },
+        { action: "result", handle: "", question: "" },
+        { action: "result", handle: "  ", question: "Check credits" },
+      ].map(async (input) => {
+        const response = await receiveFinProbe(request(JSON.stringify(input)), {
+          attachSession: () =>
+            assert.fail("missing input must not read another session"),
+          from: () =>
+            assert.fail("missing input must not start any run or probe"),
+          waitUntil: () => assert.fail("missing input must not post to Slack"),
+        });
+        assert.equal(response.status, 400);
+        const result = await response.json();
+        assert.equal(result.status, "failed");
+        assert.ok(
+          result.message.includes("no run was started") ||
+            result.message.includes("no new run was started")
+        );
+      })
+    );
+  });
+
   it("investigates the bounded question and replays only its signed session without a new run or Slack post", async (context) => {
     enablePreview(context);
     const tasks: Promise<unknown>[] = [];
@@ -284,7 +312,13 @@ describe("Fin diagnostic intake", () => {
       terminal("session.completed"),
     ];
     const response = await receiveFinProbe(
-      request(JSON.stringify({ handle: "", question: "Check my credits" })),
+      request(
+        JSON.stringify({
+          action: "start",
+          handle: "stale-saved-handle",
+          question: "Check my credits",
+        })
+      ),
       {
         attachSession: () =>
           assert.fail("starting does not attach existing sessions"),
@@ -330,6 +364,7 @@ describe("Fin diagnostic intake", () => {
     const read = await receiveFinProbe(
       request(
         JSON.stringify({
+          action: "result",
           handle: first.run_handle,
           question: "Do not start another run",
         })
