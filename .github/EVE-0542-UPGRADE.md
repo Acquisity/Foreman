@@ -1,6 +1,6 @@
 # Eve 0.54.2 upgrade evidence and acceptance
 
-[ENG-13737](https://linear.app/acquisity/issue/ENG-13737/upgrade-core-foreman-to-eve-0542) upgrades the simplified Foreman to Eve 0.54.2, AI SDK 7.0.97 and GitHub extension 0.7.1. This records implementation evidence gathered on 2026-09-12. It is not Production acceptance. The first validated implementation commit is a2dcf3e6a21246f3a923d62dc9053f267faf8d84. The current verified READY Git Preview runtime is 63904ec2b0c96fd58aad522fd6a3796cafeaa97f. Browser, native-delegation, deployed provider, human Slack Q&A and connector retry results are recorded below with their exact deployments; PR and full live acceptance remain pending.
+[ENG-13737](https://linear.app/acquisity/issue/ENG-13737/upgrade-core-foreman-to-eve-0542) upgrades the simplified Foreman to Eve 0.54.2, AI SDK 7.0.97 and GitHub extension 0.7.1. This records implementation evidence gathered on 2026-09-12. It is not Production acceptance. The first validated implementation commit is a2dcf3e6a21246f3a923d62dc9053f267faf8d84. The current verified READY Git Preview runtime is 63904ec2b0c96fd58aad522fd6a3796cafeaa97f. Browser, native-delegation, deployed provider, human Slack Q&A and connector retry results are recorded below with their exact deployments. [PR #131](https://github.com/Acquisity/Foreman/pull/131) is open for code review at Aaron's explicit request; full live acceptance and Production approval remain pending.
 
 ## Local evidence
 
@@ -83,6 +83,8 @@ The corrected run passed in 168 seconds. Observed actions were connection/tool d
 The initial root-only attempt, `wrun_41M2AW25TE0GP52DGQWENWYXTN`, did not pass. Its model-generated query first used an unsupported Linear `identifier` filter, then read `res.data.issues` instead of the provider's GraphQL envelope at `res.data.data.issues`, incorrectly producing empty projections. The bounded correction supplied the existing canonical query, exact team/number filter and verified envelope; it changed the test instructions, not provider permissions or application code. The initial attempt stopped after 149 seconds with no children launched, and public `cancel({ tasks: true })` returned `accepted`. Its failed evidence remains in `.eve/eng13737-preview-provider-uat.json`.
 
 ### Deployment and operator notes
+
+PR #131 initially failed CI before installation because pnpm/action-setup rejected workflow version 11 alongside package.json's exact pnpm@11.1.3 pin. The workflow now derives its version from packageManager alone, preserving the same exact local/cloud dependency version. CodeRabbit and Cubic are reviewing PR #131.
 
 The first Preview deployment, `dpl_ECTZa2rXxEopErpWgx6XNx2psN5P`, failed because Vercel selected pnpm 10 and rejected the pnpm 11 patch configuration; the package-manager pin and Corepack setting resolved that failure. Manual build `dpl_5NwZSxSAPYHDKNFR1hwess9K2fik` then raced the successful Git build while both warmed the same root template and failed on an apt lock. The successful Git build's installation log and snapshot creation timestamp establish the reused root's completed bootstrap. No template was deleted or manually rebuilt to hide the failure.
 
