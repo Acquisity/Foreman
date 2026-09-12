@@ -19,7 +19,7 @@ export default defineEval({
     let finished = false;
     try {
       const turn = await t.send(
-        `Run this browser compatibility smoke directly using only browser tools. Do not delegate. Make these six calls in order, waiting for each result before the next call. Navigate with browser__navigate to ${PAGE_URL}, then read browser__snapshot. Use browser__fill with clear=true to put exactly ${JSON.stringify(marker)} in #my-text-id. Click the initially unchecked Default checkbox #my-check-2 once with browser__click. Do not submit the form, press Enter, change other fields, or navigate elsewhere. Read back the form with browser__evaluate using exactly this read-only expression: ${READ_FORM}. Capture browser__screenshot with path ${screenshotPath}, fullPage=false and annotate=false. Briefly report the observed outcome.`,
+        `Run this browser compatibility smoke directly using only browser tools. Do not delegate. Make these six calls in order, waiting for each result before the next call. Navigate with browser__navigate to ${PAGE_URL}, then read browser__snapshot. Use browser__fill with clear=true to put exactly ${JSON.stringify(marker)} in #my-text-id. Click the initially unchecked Default checkbox #my-check-2 once with browser__click. Do not submit the form, press Enter, change other fields, or navigate elsewhere. Read back the form with browser__evaluate using exactly this read-only expression: ${READ_FORM}. Capture browser__screenshot with path ${screenshotPath}, fullPage=false and annotate=false. Afterward you may call browser__close once to clean up. Briefly report the observed outcome.`,
         { signal }
       );
       turn.expectOk();
@@ -63,17 +63,19 @@ export default defineEval({
       assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
       assert.equal(bytes.subarray(12, 16).toString("ascii"), "IHDR");
       assert.ok(bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0);
-      assert.deepEqual(
-        turn.toolCalls.map((call) => call.name),
-        [
-          "browser__navigate",
-          "browser__snapshot",
-          "browser__fill",
-          "browser__click",
-          "browser__evaluate",
-          "browser__screenshot",
-        ]
-      );
+      const toolNames = turn.toolCalls.map((call) => call.name);
+      if (toolNames.at(-1) === "browser__close") {
+        turn.requireToolCall("browser__close");
+        toolNames.pop();
+      }
+      assert.deepEqual(toolNames, [
+        "browser__navigate",
+        "browser__snapshot",
+        "browser__fill",
+        "browser__click",
+        "browser__evaluate",
+        "browser__screenshot",
+      ]);
       t.log(
         `Browser smoke session ${turn.sessionId}: verified form readback and ${bytes.length} PNG bytes. Cold installation and warm snapshot reuse remain separate Preview UAT gates.`
       );
