@@ -104,3 +104,7 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 `agent/lib/support/linear-followup.ts` uses the existing support provider dispatch and its 50-second Executor deadline per call, including each issue read and comment page. Each case has at most ten tracked issues; each discussion scan stops at ten pages or one MB. The support lease is checked before each provider dispatch. No additional credentials or direct Linear transport are introduced.
 
 `agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.
+
+### Fin connection preview
+
+`agent/lib/fin-preview.ts` starts a fixed synthetic task through Eve's native channel `send` and reads its typed event stream. Session start and stream acquisition expose no authored abort parameter and remain under the hosting function limit. Reading the acquired stream is limited to ten seconds and cancels the reader on completion or timeout. A timeout reports `pending`, never success; it does not cancel the agent task. This first proof adds no result polling, delivery queue, provider request or customer-data input. The live test must establish whether startup plus the reply fits Intercom's connector deadline.

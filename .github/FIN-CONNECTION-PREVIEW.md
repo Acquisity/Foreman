@@ -1,0 +1,13 @@
+# Fin connection preview
+
+ENG-13759 is a disposable connection proof on `codex/fin-foreman-preview`. It uses the existing Foreman root and Eve channel runtime. No customer investigation or workspace authorization is implemented.
+
+`POST /internal/fin-preview` requires a bearer token and is available only when `VERCEL_ENV=preview` and `FIN_FOREMAN_PREVIEW_ENABLED=true`. Set `FIN_FOREMAN_PREVIEW_TOKEN` only on this Preview branch. The request body is not read or forwarded. Each accepted request starts a fresh task with a server-authored synthetic prompt and random probe ID. A successful response requires the model to return the exact probe. Raw model text and tool results are never returned.
+
+The JSON response contains `status`, `message`, `probe` and `session_id`. `connected` proves the expected model reply was observed. `pending` proves only session acceptance; startup and reply timing must be checked in the live test. `failed` and `unexpected_reply` are not success. This endpoint has no retry deduplication; each invocation is a separate inexpensive test task. Do not use it for customer actions.
+
+When enabled, ordinary Executor calls on this Preview deployment select the dedicated `foreman-fin-preview` toolkit. That toolkit must have no provider connections or operations allowed for the first test. The existing support toolkit remains explicit, so both `FOREMAN_SUPPORT_ENABLED` and `FOREMAN_SUPPORT_FOLLOWUPS_ENABLED` must stay false. This restricts Executor access, not browser, sandbox, GitHub, personal memory or all native agent tools. The fixed prompt is a controlled smoke test, not a customer-facing isolation boundary.
+
+Create a new Intercom data connector restricted to designated internal testers, using this branch's Preview URL and its bearer token. Do not reuse the abandoned Fin Workspace Diagnostics connector. Tell Fin to call it for an explicit Foreman connection test and report the returned status accurately, without claiming a customer investigation occurred. Keep production workflows unchanged. Intercom's real-API Preview requires a live connector and a selected real test user, so verify that audience before enabling it.
+
+Retarget only the existing Foreman Preview Slack connector to this branch at `/eve/v1/slack`. Keep Production routing unchanged. The first live Fin conversation and broader Slack UAT remain pending Aaron's participation; local tests and a successful deployment do not establish reliable triggering.
