@@ -10,17 +10,20 @@ const HISTORY_NOTICE =
 const TRUNCATION_NOTICE =
   "Older whole messages were omitted to fit the history limit.";
 const UNAVAILABLE_NOTICE =
-  "This is a fresh internal session in an existing Slack thread. Earlier visible history is unavailable. Use the available Slack reads if prior context is needed; do not assume hidden tool results or sandbox files survived.";
+  "Earlier visible history is unavailable for this Slack thread. Use the available Slack reads if prior context is needed; if this is a fresh internal session, do not assume hidden tool results or sandbox files survived.";
 
 /** Restore only the prefix that native last-agent-reply lookback leaves out. */
 export const slackFreshSessionHistory = async (
   ctx: SlackInboundMessageContext,
   message: SlackMessage
 ): Promise<string | undefined> => {
-  if (message.ts === message.threadTs || (await ctx.resolveSession())) {
+  if (message.ts === message.threadTs) {
     return undefined;
   }
   try {
+    if (await ctx.resolveSession()) {
+      return undefined;
+    }
     const history = await loadThreadContextMessages(ctx.thread, message, {
       since: "thread-root",
     });
@@ -63,8 +66,9 @@ export const slackFreshSessionHistory = async (
       ...entries,
     ].join("\n");
   } catch {
+    // Optional session lookup and history reads must not abort dispatch.
     // Native refresh normally swallows provider errors; a thrown failure must
-    // likewise leave the new request usable without claiming restored context.
+    // likewise leave the request usable without claiming restored context.
     return UNAVAILABLE_NOTICE;
   }
 };

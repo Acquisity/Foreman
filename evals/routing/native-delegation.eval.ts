@@ -8,6 +8,18 @@ const FIRST_RESULT = /^\s*FIRST=42\s*$/u;
 const SECOND_RESULT = /^\s*SECOND=nevar\s*$/u;
 const FIRST_REPLY_LINE = /^FIRST=42$/mu;
 const SECOND_REPLY_LINE = /^SECOND=nevar$/mu;
+const COMPUTATIONS = [
+  {
+    command: "printf 'FIRST=%s\\n' \"$((17 + 25))\"",
+    line: "FIRST=42",
+    output: FIRST_RESULT,
+  },
+  {
+    command: `word=raven; reversed=; for ((i=4; i>=0; i--)); do reversed+="\${word:i:1}"; done; printf 'SECOND=%s\\n' "$reversed"`,
+    line: "SECOND=nevar",
+    output: SECOND_RESULT,
+  },
+] as const;
 const workingReceipt = z.object({
   agentId: z.string().min(1),
   status: z.literal("working"),
@@ -22,15 +34,6 @@ const finalMessage = (events: readonly MessageStreamEvent[]) =>
         event.data.finishReason !== "tool-calls" &&
         Boolean(event.data.message?.trim())
     );
-
-const resultLine = (
-  message: string
-): "FIRST=42" | "SECOND=nevar" | undefined => {
-  if (FIRST_RESULT.test(message)) {
-    return "FIRST=42";
-  }
-  return SECOND_RESULT.test(message) ? "SECOND=nevar" : undefined;
-};
 
 export default defineEval({
   description:
@@ -50,7 +53,7 @@ export default defineEval({
       signal.throwIfAborted();
       const launch = await observe(
         t.send(
-          "Use the native agent tool twice for two independent tasks. Give each child all its context. First child: run exactly one read-only bash command computing 17 + 25 and printing FIRST=<computed result>. Second child: run exactly one read-only bash command reversing raven and printing SECOND=<reversed word>. Use Bash built-ins only: assign word=raven and reversed=, loop i from 4 down to 0 appending each character to reversed with Bash substring expansion, then print it with printf. Do not assume external utilities such as rev are installed. Each child must return only its exact printed result line. Do not use critic or vision, create files, access providers, or delegate further. A working receipt is not a result. Let native background delivery bring both results back; do not poll or repeat the tasks. Only after both children finish, put their actual results on separate lines in your final reply.",
+          `Use the native agent tool twice for two independent tasks, in this order. Give each child all its context and copy its command verbatim. First agent call: run exactly this one read-only bash command computing 17 + 25: ${COMPUTATIONS[0].command}. Second agent call: run exactly this one read-only bash command reversing raven using Bash built-ins: ${COMPUTATIONS[1].command}. Each child must return only its exact printed result line. Do not use critic or vision, create files, access providers, or delegate further. A working receipt is not a result. Let native background delivery bring both results back; do not poll or repeat the tasks. Only after both children finish, put their actual results on separate lines in your final reply.`,
           { signal }
         )
       );
@@ -77,7 +80,17 @@ export default defineEval({
           "two distinct native agent tool calls and no other launch actions"
         )
       );
-      const receipts = calls.map((call) => {
+      const receipts = calls.map((call, index) => {
+        const expected = COMPUTATIONS[index];
+        if (
+          !expected ||
+          typeof call.input.message !== "string" ||
+          !call.input.message.includes(expected.command)
+        ) {
+          throw new Error(
+            `Native call ${call.callId} did not receive its assigned computation.`
+          );
+        }
         const results = launch.events
           .filter((event) => event.type === "action.result")
           .filter((event) => event.data.result.callId === call.callId);
@@ -95,6 +108,7 @@ export default defineEval({
         }
         return {
           callId: call.callId,
+          expected,
           ...workingReceipt.parse(result.data.result.output),
         };
       });
@@ -184,15 +198,19 @@ export default defineEval({
           child.notEvent("subagent.called");
 
           const result = finalMessage(child.events);
-          const line = resultLine(result?.data.message ?? "");
+          const line = result?.data.message?.trim();
           await t.require(
-            line !== undefined,
+            line === receipt.expected.line,
             satisfies(Boolean, "child returns exactly its computed result line")
           );
-          const expected = line === "FIRST=42" ? FIRST_RESULT : SECOND_RESULT;
           child.calledTool("bash", {
             count: 1,
-            output: { exitCode: 0, stderr: "", stdout: expected },
+            input: { command: receipt.expected.command },
+            output: {
+              exitCode: 0,
+              stderr: "",
+              stdout: receipt.expected.output,
+            },
             status: "completed",
           });
           const childRequests = child.events

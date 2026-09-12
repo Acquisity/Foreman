@@ -277,18 +277,24 @@ describe("slack channel", () => {
     assert.deepEqual(posts, []);
   });
 
-  it("bounds the snapshot and finds the latest turn from a tail event", async () => {
+  it("bounds the snapshot and finds the latest turn from a tail event", async (t) => {
     const calls: unknown[] = [];
-    const events = Array.from({ length: 400 }, () =>
-      streamEvent("action.result", "t1")
+    const events = Array.from({ length: 400 }, (_, index) =>
+      streamEvent("action.result", index < 145 ? "outside-window" : "t1")
     );
+    events[399] = streamEvent("turn.completed", "t2");
     events.push(streamEvent("session.waiting"));
     const session = cancellableSession(events, calls);
+    const snapshot = t.mock.method(session, "getEventStream");
     assert.equal(
       await dispatch(inboundContext(session), message("stop")),
       null
     );
-    assert.deepEqual(calls, [{ tasks: true, turnId: "t1" }]);
+    assert.deepEqual(
+      snapshot.mock.calls.map((call) => call.arguments),
+      [[{ startIndex: 145 }]]
+    );
+    assert.deepEqual(calls, [{ tasks: true, turnId: "t2" }]);
   });
 
   it("stays quiet when the Slack thread has no session owner", async () => {
@@ -323,6 +329,22 @@ describe("slack channel", () => {
     const result = await dispatch(ctx, message("continue here"));
     assert.ok(result?.context.some((part) => part.includes("old-repo")));
     assert.equal(JSON.stringify(result?.auth).includes("old-repo"), false);
+  });
+
+  it("still dispatches the admitted message when optional history session lookup fails", async () => {
+    const ctx = {
+      ...inboundContext(undefined),
+      resolveSession: () =>
+        Promise.reject(new Error("private session storage details")),
+    };
+    const result = await dispatch(ctx, message("continue here"));
+    assert.ok(result?.auth);
+    assert.equal(result.context[0], FINAL_SLACK_POST_RULE);
+    assert.ok(result.context[1]?.includes("history is unavailable"));
+    assert.equal(
+      JSON.stringify(result).includes("private session storage"),
+      false
+    );
   });
 
   it("never lets an authorless event cancel work", async () => {

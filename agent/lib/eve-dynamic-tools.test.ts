@@ -17,9 +17,17 @@ const {
   dynamicToolCacheKey,
   loadCompiledDynamicToolResolvers,
 } = await import("./eve-dynamic-tools.js");
-const { laneAuth, readCompiledManifest, COMPILED_MANIFEST_PATH } = await import(
-  "./capability-budget.js"
-);
+const {
+  laneAuth,
+  readCompiledManifest,
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
+} = await import("./capability-budget.js");
+
+const HAS_COMPILED_MANIFEST = [
+  COMPILED_MANIFEST_PATH,
+  COMPILE_METADATA_PATH,
+].every((path) => existsSync(new URL(`../../${path}`, import.meta.url)));
 
 const NOTHING_ADMITTED = /eve admitted 0 of the 1 tools 'crm'/u;
 
@@ -44,9 +52,9 @@ const session = (lane: "slack" | "repository-interactive") => ({
 
 describe("eve dynamic tool adapter", () => {
   it("admits qualified GitHub names from the actual application-owned override", {
-    skip: !existsSync(
-      new URL(`../../${COMPILED_MANIFEST_PATH}`, import.meta.url)
-    ),
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
   }, async () => {
     const manifest = readCompiledManifest(new URL("../../", import.meta.url));
     const entry = manifest.dynamicTools.find(

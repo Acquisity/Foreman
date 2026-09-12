@@ -150,6 +150,23 @@ describe("fresh Slack session history", () => {
     assert.ok(prefix?.includes("available Slack reads"));
   });
 
+  it("reports unavailable history when session lookup rejects", async () => {
+    let refreshes = 0;
+    const ctx = {
+      ...context(history, false, () => {
+        refreshes += 1;
+        return Promise.resolve();
+      }),
+      resolveSession: () =>
+        Promise.reject(new Error("private session storage details")),
+    };
+    const prefix = await slackFreshSessionHistory(ctx, trigger);
+    assert.ok(prefix?.includes("history is unavailable"));
+    assert.ok(prefix?.includes("available Slack reads"));
+    assert.ok(!prefix?.includes("private session storage details"));
+    assert.equal(refreshes, 0);
+  });
+
   it("keeps the request usable when history refresh throws", async () => {
     const prefix = await slackFreshSessionHistory(
       context([], false, () =>

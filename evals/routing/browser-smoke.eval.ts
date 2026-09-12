@@ -48,7 +48,7 @@ export default defineEval({
         output: { result: { checked: true, url: PAGE_URL, value: marker } },
       });
       const screenshot = turn.requireToolCall("browser__screenshot", {
-        input: { path: screenshotPath },
+        input: { annotate: false, fullPage: false, path: screenshotPath },
         output: { path: screenshotPath },
       });
       // These are actual action.result outputs, not the model's claims or the

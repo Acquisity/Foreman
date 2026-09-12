@@ -325,6 +325,8 @@ try {
 
   const urls: string[] = [];
   const slackPosts: string[] = [];
+  const slackReplies: { client_msg_id: string; ts: string }[] = [];
+  const slackReplyThreads: string[] = [];
   process.env.VERCEL_OIDC_TOKEN = `test.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.test`;
   const intercom = {
     conversation_parts: { conversation_parts: [], total_count: 0 },
@@ -385,6 +387,13 @@ try {
     }
     if (String(url) === "https://slack.com/api/conversations.history") {
       return Promise.resolve(Response.json({ messages: [], ok: true }));
+    }
+    if (String(url) === "https://slack.com/api/conversations.replies") {
+      const body = new URLSearchParams(String(init?.body));
+      slackReplyThreads.push(body.get("ts") ?? "");
+      return Promise.resolve(
+        Response.json({ messages: [...slackReplies], ok: true })
+      );
     }
     const rpc = JSON.parse(String(init?.body));
     const code = String(rpc.params?.arguments?.code ?? "");
@@ -843,7 +852,9 @@ try {
     "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
     [pendingFirst.conversation]
   );
+  const beforePendingDispatch = scheduledClaims.length;
   await runIntake(pendingFirst.conversation);
+  assert.equal(scheduledClaims.length, beforePendingDispatch + 1);
   const pending = scheduledClaims.at(-1);
   assert.ok(pending);
   assert.equal(pending.conversation, pendingFirst.conversation);
@@ -867,15 +878,44 @@ try {
     pendingKey,
     "An ambiguous delivery cannot be discarded or closed before reconciliation"
   );
-  await completeSupportDelivery(pending, "1788959999.000012", true);
+  intercom.id = pending.conversation;
+  intercom.state = "closed";
+  slackReplies.push({
+    client_msg_id: pendingKey,
+    ts: "1788959999.000012",
+  });
+  const pendingAuth = supportAuth(auth, pending);
+  assert.deepEqual(
+    await openSupportInvestigation({
+      ...ctx,
+      session: {
+        ...ctx.session,
+        auth: { current: pendingAuth, initiator: pendingAuth },
+      },
+    } as ProviderContext),
+    {
+      investigate: false,
+      reason: "Prior delivery reconciled; a later run will check new content.",
+    }
+  );
+  assert.deepEqual(slackReplyThreads, [pending.thread]);
+  slackReplies.length = 0;
+  assert.equal(
+    slackPosts.length,
+    postsBeforeCompletion + 1,
+    "Reconciliation finds the prior delivery without posting again"
+  );
   const reconciled = await pool.query(
-    "SELECT closed, report, report_key, posted_ts, lease FROM support_handoffs WHERE conversation=$1",
+    "SELECT closed, report, report_key, posted_ts, lease, delivery_attempted, processed_version, last_report_hash FROM support_handoffs WHERE conversation=$1",
     [pending.conversation]
   );
   assert.deepEqual(reconciled.rows[0], {
     closed: true,
+    delivery_attempted: false,
+    last_report_hash: "pending-hash",
     lease: null,
     posted_ts: "1788959999.000012",
+    processed_version: "pending-version",
     report: null,
     report_key: null,
   });
@@ -986,17 +1026,44 @@ try {
   );
   process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED = "true";
   process.env.FOREMAN_SUPPORT_TEST_CONVERSATIONS = initial.conversation;
-  await runSupportSchedule("followups", auth, (_claim, nextAuth) =>
-    openSupportInvestigation({
-      ...ctx,
-      session: {
-        ...ctx.session,
-        auth: { current: nextAuth, initiator: nextAuth },
-      },
-    } as ProviderContext)
-  );
+  const beforeFollowupDispatch = scheduledClaims.length;
+  const followupResults: Awaited<
+    ReturnType<typeof openSupportInvestigation>
+  >[] = [];
+  await runSupportSchedule("followups", auth, async (claimed, nextAuth) => {
+    scheduledClaims.push(claimed);
+    followupResults.push(
+      await openSupportInvestigation({
+        ...ctx,
+        session: {
+          ...ctx.session,
+          auth: { current: nextAuth, initiator: nextAuth },
+        },
+      } as ProviderContext)
+    );
+  });
+  assert.equal(scheduledClaims.length, beforeFollowupDispatch + 1);
+  const reclaimedFollowup = scheduledClaims.at(-1);
+  assert.ok(reclaimedFollowup);
+  assert.equal(reclaimedFollowup.conversation, expiredFollowup.conversation);
+  assert.notEqual(reclaimedFollowup.lease, expiredFollowup.lease);
+  assert.deepEqual(followupResults, [
+    { investigate: false, reason: "No new actionable case evidence." },
+  ]);
   assert.equal(slackPosts.length, beforeInitial + 1);
-  assert.equal(await findSupportLease(expiredFollowup), null);
+  assert.equal(await findSupportLease(reclaimedFollowup), null);
+  const quietFollowupState = await pool.query(
+    "SELECT lease, lease_until, report, closed, processed_version, next_check > now() AS deferred FROM support_handoffs WHERE conversation=$1",
+    [reclaimedFollowup.conversation]
+  );
+  assert.deepEqual(quietFollowupState.rows[0], {
+    closed: false,
+    deferred: true,
+    lease: null,
+    lease_until: null,
+    processed_version: observed.version,
+    report: null,
+  });
 
   // Native child failures must return to the root, never settle its active lease.
   await discoverHandoff("999010", "1788959999.000020");
@@ -1103,6 +1170,7 @@ try {
           "https://executor.acquisity.ai/mcp/toolkits/foreman-support?artifacts=false" ||
         url === "https://slack.com/api/chat.postMessage" ||
         url === "https://slack.com/api/conversations.history" ||
+        url === "https://slack.com/api/conversations.replies" ||
         url.startsWith("https://api.vercel.com/v1/connect/token/")
     )
   );
