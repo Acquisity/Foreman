@@ -79,6 +79,7 @@ describe("Fin preview intake", () => {
       enablePreview(context, environment);
       const response = await receiveFinProbe(request("{}"), {
         from: () => assert.fail("disabled intake must not create a session"),
+        waitUntil: () => assert.fail("disabled intake must not notify Slack"),
       });
       assert.equal(response.status, 404);
     });
@@ -91,6 +92,8 @@ describe("Fin preview intake", () => {
         const response = await receiveFinProbe(request("{}", authorization), {
           from: () =>
             assert.fail("unauthorized intake must not create a session"),
+          waitUntil: () =>
+            assert.fail("unauthorized intake must not notify Slack"),
         });
         assert.equal(response.status, 401);
       })
@@ -140,6 +143,7 @@ describe("Fin preview intake", () => {
               },
             } as ReturnType<RouteHandlerArgs["from"]>;
           },
+          waitUntil: () => undefined,
         });
         assert.equal(fromCalls, 1);
         assert.equal(sendCalls, 1);
@@ -167,6 +171,7 @@ describe("Fin preview intake", () => {
               sessionWithEvents([completed("unexpected private agent output")])
             ),
         }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
     });
     const result = await response.json();
     assert.equal(result.status, "unexpected_reply");

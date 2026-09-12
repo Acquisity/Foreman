@@ -1,6 +1,10 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { finPreviewEnabled } from "./executor/endpoint.js";
+import {
+  type FinProbeResult,
+  reportFinProbeToSlack,
+} from "./fin-preview-slack.js";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 
@@ -41,7 +45,7 @@ export async function waitForProbe(
 
 export async function receiveFinProbe(
   request: Request,
-  { from }: Pick<RouteHandlerArgs, "from">
+  { from, waitUntil }: Pick<RouteHandlerArgs, "from" | "waitUntil">
 ) {
   const secret = process.env.FIN_FOREMAN_PREVIEW_TOKEN;
   if (!(finPreviewEnabled() && secret)) {
@@ -56,6 +60,17 @@ export async function receiveFinProbe(
     return new Response(null, { status: 401 });
   }
   const probe = randomUUID();
+  const result = runFinProbe(from, probe);
+  waitUntil(reportFinProbeToSlack(probe, result));
+  return Response.json(await result, {
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+async function runFinProbe(
+  from: RouteHandlerArgs["from"],
+  probe: string
+): Promise<FinProbeResult> {
   // No request body, conversation, customer identifier, or caller prompt is forwarded.
   const session = await from(probe).send(
     `This is an internal Fin connection test. Do not use tools, consult memory, or investigate anything. Reply with exactly FOREMAN_CONNECTED:${probe}`,
@@ -80,13 +95,10 @@ export async function receiveFinProbe(
     unexpected_reply:
       "Foreman replied, but did not return the expected connection-test response.",
   };
-  return Response.json(
-    {
-      message: messages[status],
-      probe,
-      session_id: session.id,
-      status,
-    },
-    { headers: { "cache-control": "no-store" } }
-  );
+  return {
+    message: messages[status],
+    probe,
+    session_id: session.id,
+    status,
+  };
 }
