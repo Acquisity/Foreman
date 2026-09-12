@@ -128,7 +128,7 @@ type CompiledModuleMap = z.infer<typeof compiledModuleMapSchema>;
  * This is the one step that makes durable callback descriptors observable.
  * eve stamps them with a source transform that runs when it bundles the
  * authored modules for a deployment or a development generation, never when
- * the same files are imported directly. `prepareMaterializedAuthoredModules`
+ * the same files are imported directly. `prepareAuthoredRuntimeModules`
  * is eve's bundling entry point and applies that transform along with the
  * extension mount scoping, so the evaluated modules carry exactly the
  * callbacks a deployment carries. The bundle is written to eve's own cache for
@@ -154,15 +154,15 @@ const loadAuthoredModuleMapOnce = async (
       z.object({ createDiskRuntimeCompiledArtifactsSource: eveFunction })
     ),
   ]);
-  const { prepareMaterializedAuthoredModules } = await eveRuntimeModule(
-    "./dist/src/internal/materialized-authored-modules.js",
-    z.object({ prepareMaterializedAuthoredModules: eveFunction })
+  const { prepareAuthoredRuntimeModules } = await eveRuntimeModule(
+    "./dist/src/internal/authored-runtime-modules.js",
+    z.object({ prepareAuthoredRuntimeModules: eveFunction })
   );
   const manifest = await loadCompiledManifest({
     compiledArtifactsSource: createDiskRuntimeCompiledArtifactsSource(appRoot),
   });
   const { moduleMapCode } = z.object({ moduleMapCode: z.string() }).parse(
-    await prepareMaterializedAuthoredModules({
+    await prepareAuthoredRuntimeModules({
       manifest,
       moduleMapPath: join(appRoot, COMPILED_MODULE_MAP_PATH),
     })
@@ -348,7 +348,8 @@ export interface DynamicToolTurn {
    * way eve reads them.
    */
   readonly dispatch: (
-    eventName: DynamicToolEventName
+    eventName: DynamicToolEventName,
+    stepIndex?: number
   ) => Promise<AdmittedDynamicTool[]>;
 }
 
@@ -415,8 +416,18 @@ export async function openDynamicToolTurn(
     countingResolver(resolver, returned)
   );
   const slugs = resolvers.map((resolver) => resolver.slug).join(", ");
+  let turnSequence = 0;
+  let nextStepIndex = 0;
   return {
-    dispatch: async (eventName: DynamicToolEventName) => {
+    dispatch: async (eventName: DynamicToolEventName, stepIndex?: number) => {
+      if (eventName === "turn.started") {
+        turnSequence += 1;
+        nextStepIndex = 0;
+      }
+      const currentStep = stepIndex ?? nextStepIndex;
+      if (eventName === "step.started") {
+        nextStepIndex = currentStep + 1;
+      }
       // Counted per dispatch, against the key eve files this event's result
       // under: eve replaces that key's entries for the resolvers that ran, so
       // the two numbers describe the same dispatch even when a caller
@@ -424,7 +435,13 @@ export async function openDynamicToolTurn(
       returned.count = 0;
       await dispatchDynamicToolEvent({
         ctx,
-        event: { type: eventName },
+        event: {
+          data: {
+            stepIndex: currentStep,
+            turnId: `${session.id}:turn:${turnSequence}`,
+          },
+          type: eventName,
+        },
         messages: [],
         resolvers: counted,
       });

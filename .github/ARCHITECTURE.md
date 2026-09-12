@@ -2,7 +2,7 @@
 
 Company MCPs and authored provider helpers use one app-scoped Executor toolkit, `Foreman`. Root, native delegates, critic, and schedules share the same provider access; skills define workflow behavior and the critic remains instructed to review read-only. The toolkit manifest and exact operation bindings live under `.github/executor/`. Personal Supermemory and inbound delivery, storage, models, and sandbox infrastructure remain separate.
 
-Foreman is a repository-neutral eve agent with one general execution path.
+Foreman is a repository-neutral Eve 0.54.2 agent with one general execution path. The upgrade pins AI SDK 7.0.97 and the GitHub extension 0.7.1.
 
 ## Routing
 
@@ -24,9 +24,13 @@ Every clone, fetch, and push targets `https://github.com/<validated-owner>/<vali
 
 ## Delegation and delivery
 
-On eve 0.44, native `agent` calls block until the fresh child completes. Children inherit the root's configuration and sandbox with fresh history and state; they receive neither `agent` nor `Workflow`. Send self-contained tasks and avoid overlapping edits. The declared critic keeps its own tools, skills, and sandbox; vision carries only `read_image` and explicitly disables shell, file, web, and todo defaults. Keep critic's independent sandbox because it owns a skill.
+Native `agent`, critic and vision launches return working receipts with task and child IDs. Those receipts admit background work; they are not completed findings. Eve delivers later child results to the parent, grouping successful results from overlapping tasks when that group settles. Later user turns and another round of delegation use this same native delivery. The root adjudicates the returned evidence and finishes dependent work. There is no authored polling loop or task tracker.
+
+Native children inherit the root's configuration and sandbox with fresh history and state and cannot delegate recursively. Send self-contained tasks and avoid overlapping edits. Critic keeps its own tools, skill and independent sandbox. Vision shares the root sandbox, carries only `read_image`, and disables shell, file, web, todo and question defaults. Root and critic also disable `ask_question`.
 
 The root owns feature-branch and pull-request delivery. There is no station protocol, artifact handoff, automatic stabilization, or readiness state machine. Repository authority, protected branches, intake-only denials, and the human merge boundary remain enforced.
+
+The browser extension uses a temporary exact-version pnpm patch containing the upstream 0.37.1 distribution rebuilt for Eve 0.54.2. Browser behavior and the 21-tool surface stay unchanged. This is a removable compatibility measure: prefer a verified official release and remove the patch when one passes the same build and live Preview checks. Build provenance and removal instructions are in [EVE-BROWSER-REBUILD.md](./EVE-BROWSER-REBUILD.md).
 
 ## Channels and trust
 
@@ -40,6 +44,20 @@ The root owns feature-branch and pull-request delivery. There is no station prot
 Investigation-memory access is a separate, narrower stamp on the same authority. Linear Agent Sessions, every Slack surface the app is invited into, and the local dev TUI carry it; GitHub sessions and schedules never do. It is fail-closed: an unstamped session reads nothing.
 
 Autumn and Stripe billing helpers use the shared company account through Executor on every workflow. They retain fixed read operations, identifier validation, bounded history, and field filtering; they expose no billing writes and require no requester-specific provider consent.
+
+## Slack continuity and cancellation
+
+Slack queues later mentions and preserves each request's auth stamp. Reasoning deltas accumulate in per-turn/per-step channel state and clear at lifecycle boundaries. Progress remains limited to one line at five minutes and one at fifteen minutes, with intake-only sessions quiet and terminal events clearing state.
+
+A literal stop/cancel resolves the exact durable session and requests `cancel({ turnId, tasks: true })`, retaining the latest turn ID even while the parent waits on children. One idempotent "Stop requested." acknowledges acceptance; it does not claim child termination. Native background-task cancellation can settle without a parent `turn.cancelled` event, so runtime verification observes child streams.
+
+When an existing Slack thread has no active Eve session, dispatch restores earlier visible messages through the last bot reply using Eve's public history helper. Native lookback supplies the messages after that reply. The added prefix is capped at 32,000 characters, drops whole oldest messages and identifies truncation or unavailable history. The helper reads at most the first 50 replies. This is untrusted context, never fresh authorization or restored tool results, internal notes or sandbox files. Version cutover retires old internal sessions after work drains while keeping the Slack threads; the reset and rollback checks are in [UAT-BATTERY.md](./UAT-BATTERY.md).
+
+## Scheduled support lifecycle
+
+Each support lease starts a conversation session, allowing later critic/vision results to reach its root. Ordinary parent-turn completion does not settle the investigation. Explicit finish/quiet/skip actions retain the existing revision, review, journal and delivery checks. Root turn failures and terminal session failures use the claim seeded into auth and persisted channel state; child failures cannot release the root lease.
+
+One public durable state value counts at most 150 root model steps across turns, deduplicating retries, under the original eighteen-minute deadline. Support-only hooks reject input and authorization waits on the root, native delegates, critic and vision. An unfinished first intake gets the existing incomplete notice on the next claim after its twenty-minute lease expires; pending outboxes reconcile first, repeated identical notices are suppressed and unchanged follow-ups stay quiet. Dormant conversation sessions use Eve's default thirty-day lifetime from creation. Provider calls and writes remain fenced by the much shorter support lease. See [INTERCOM-SUPPORT-CRON.md](./INTERCOM-SUPPORT-CRON.md).
 
 ## Storage
 
@@ -55,6 +73,8 @@ Investigation memory is a private Foreman-owned Postgres database, separate from
 
 ## Verification
 
-Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` checks three lanes and admits GitHub dynamic tools through eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic and vision as declared children.
+Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` reads manifest version 48, distinguishes framework defaults through compiled owner bindings, and measures each declared child's actual prepared delegation description and schema. It checks three lanes and admits GitHub dynamic tools through Eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic and vision as declared children.
+
+`pnpm verify:built-github` boots the actual server and reads its registered compiled module map, including the GitHub extension inlined by Eve 0.54.2. It verifies the exact 31-tool allowlist and all 31 execute, approvalRequest and toModelOutput callbacks, mounted lane gates, distinct approval policies and an unstamped negative fixture.
 
 Evals cover direct questions, clarification, repository/model approvals, prompt injection, native delegation, and opt-in scratch delivery. Build and discovery do not prove runtime dispatch: run [UAT-BATTERY.md](./UAT-BATTERY.md) on the exact Preview commit, including attachments, intake restrictions, critic, native children, cancellation, and real provider reads. Configure the current PR's Preview trigger and Executor environment before testing. Production rollback is a revert on `main`, never `vercel rollback`.

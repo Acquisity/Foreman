@@ -9,7 +9,8 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "../agent/lib/executor/dispatch.js";
-import { supportAuth } from "../agent/lib/support/auth.js";
+import { type SupportClaim, supportAuth } from "../agent/lib/support/auth.js";
+import { runSupportSchedule } from "../agent/lib/support/dispatch.js";
 import {
   SupportRefusal,
   SupportStateConflict,
@@ -230,6 +231,7 @@ try {
   );
   const [claim] = claims;
   assert.ok(claim);
+  assert.equal(claim.reclaimed, false);
   await setSupportVersion(claim, "customer-version-1");
   const reserved = await reserveSupportOperation(
     claim,
@@ -348,6 +350,7 @@ try {
     url: "https://linear.app/acquisity/document/triage-test",
   };
   let incompleteComments = false;
+  let loseSlackReceipt = false;
   let wireFailure: "initialize" | "response" | null = null;
   let writeDispatches = 0;
   const comments = [
@@ -369,12 +372,19 @@ try {
     if (String(url) === "https://slack.com/api/chat.postMessage") {
       const body = new URLSearchParams(String(init?.body));
       slackPosts.push(body.get("text") ?? "");
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: The fixture changes after this callback is installed; the lost-receipt scenario below proves this branch.
+      if (loseSlackReceipt) {
+        return Promise.reject(new Error("Synthetic lost Slack response"));
+      }
       return Promise.resolve(
         Response.json({
           ok: true,
           ts: `1788959999.${String(100 + slackPosts.length).padStart(6, "0")}`,
         })
       );
+    }
+    if (String(url) === "https://slack.com/api/conversations.history") {
+      return Promise.resolve(Response.json({ messages: [], ok: true }));
     }
     const rpc = JSON.parse(String(init?.body));
     const code = String(rpc.params?.arguments?.code ?? "");
@@ -684,21 +694,42 @@ try {
   const { SessionKey } = await import(
     new URL("./dist/src/context/keys.js", evePackageUrl()).href
   );
-  const completeTurn = (context: ProviderContext) => {
+  const { adapter } = supportChannel as unknown as {
+    adapter: Record<
+      string,
+      ((event: unknown, context: unknown) => Promise<void>) | undefined
+    >;
+  };
+  const failTurn = (context: ProviderContext) => {
     assert.ok(context.session);
     const container = new ContextContainer();
     container.setVirtualContext(SessionKey, {
       auth: context.session.auth,
+      parent: context.session.parent,
       sessionId: "support-smoke-session",
     });
-    const handler = (
-      supportChannel as unknown as {
-        adapter: {
-          "turn.completed": (event: unknown, context: unknown) => Promise<void>;
-        };
-      }
-    ).adapter["turn.completed"];
+    const handler = adapter["turn.failed"];
+    assert.ok(handler);
     return contextStorage.run(container, () => handler({}, {}));
+  };
+  const failSession = (failedClaim: SupportClaim | null) => {
+    const handler = adapter["session.failed"];
+    assert.ok(handler);
+    // Terminal failure runs outside Eve context, using persisted channel state.
+    return handler(
+      { sessionId: "support-smoke-session" },
+      { state: { claim: failedClaim } }
+    );
+  };
+  process.env.FOREMAN_SUPPORT_HANDOFF_APP_ID = "ATEST";
+  process.env.FOREMAN_SUPPORT_SINCE = "2026-09-09T00:00:00Z";
+  const scheduledClaims: SupportClaim[] = [];
+  const runIntake = async (conversation: string) => {
+    process.env.FOREMAN_SUPPORT_TEST_CONVERSATIONS = conversation;
+    await runSupportSchedule("intake", auth, (claimed) => {
+      scheduledClaims.push(claimed);
+      return Promise.resolve();
+    });
   };
   await discoverHandoff("999001", "1788959999.000010");
   const [unfinished] = await claimHandoffs("intake", ["999001"]);
@@ -723,12 +754,68 @@ try {
       refused: true,
     }
   );
+  const receive = supportChannel.receive as unknown as (
+    input: unknown,
+    context: {
+      from: (address: string) => {
+        send: (message: unknown, options: unknown) => Promise<unknown>;
+      };
+    }
+  ) => Promise<unknown>;
+  await receive(
+    { auth: unfinishedAuth, message: "Synthetic intake" },
+    {
+      from: (address) => ({
+        send: (message, options) => {
+          assert.equal(
+            address,
+            `${unfinished.conversation}:${unfinished.thread}:${unfinished.lease}`
+          );
+          assert.equal(message, "Synthetic intake");
+          assert.deepEqual(options, {
+            auth: unfinishedAuth,
+            mode: "conversation",
+            state: {
+              claim: {
+                conversation: unfinished.conversation,
+                lease: unfinished.lease,
+                thread: unfinished.thread,
+              },
+            },
+            turnPolicy: "queue",
+          });
+          return Promise.resolve();
+        },
+      }),
+    }
+  );
   const postsBeforeCompletion = slackPosts.length;
-  await completeTurn(unfinishedContext);
+  assert.equal(adapter["turn.completed"], undefined);
+  assert.ok(await findSupportLease(unfinished));
+  await runIntake(unfinished.conversation);
+  assert.equal(slackPosts.length, postsBeforeCompletion);
+  assert.equal(scheduledClaims.length, 0, "A live lease is not reclaimed");
+  await pool.query(
+    "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
+    [unfinished.conversation]
+  );
+  await runIntake(unfinished.conversation);
   assert.equal(
     slackPosts.length,
     postsBeforeCompletion + 1,
-    "An unfinished initial intake posts one short incomplete status"
+    "An unfinished first intake posts its incomplete status only after lease expiry"
+  );
+  assert.equal(
+    scheduledClaims.length,
+    0,
+    "Reporting leaves investigation for the next check"
+  );
+  await failTurn(unfinishedContext);
+  await failSession(unfinished);
+  assert.equal(
+    slackPosts.length,
+    postsBeforeCompletion + 1,
+    "Late failures cannot report twice"
   );
   assert.equal(await findSupportLease(unfinished), null);
   const unfinishedState = await pool.query(
@@ -742,19 +829,30 @@ try {
   });
 
   await discoverHandoff("999002", "1788959999.000011");
-  const [pending] = await claimHandoffs("intake", ["999002"]);
+  const [pendingFirst] = await claimHandoffs("intake", ["999002"]);
+  assert.ok(pendingFirst);
+  await setSupportVersion(pendingFirst, "pending-version");
+  await queueSupportReport(pendingFirst, "Attempted finding", "pending-hash");
+  const pendingKey = await attemptSupportDelivery(pendingFirst);
+  await failSession(pendingFirst);
+  assert.equal(
+    (await requireSupportLease(pendingFirst)).report_key,
+    pendingKey
+  );
+  await pool.query(
+    "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
+    [pendingFirst.conversation]
+  );
+  await runIntake(pendingFirst.conversation);
+  const pending = scheduledClaims.at(-1);
   assert.ok(pending);
-  await setSupportVersion(pending, "pending-version");
-  await queueSupportReport(pending, "Attempted finding", "pending-hash");
-  const pendingKey = await attemptSupportDelivery(pending);
-  const pendingAuth = supportAuth(auth, pending);
-  await completeTurn({
-    ...ctx,
-    session: {
-      ...ctx.session,
-      auth: { current: pendingAuth, initiator: pendingAuth },
-    },
-  } as ProviderContext);
+  assert.equal(pending.conversation, pendingFirst.conversation);
+  assert.notEqual(pending.lease, pendingFirst.lease);
+  assert.equal(
+    slackPosts.length,
+    postsBeforeCompletion + 1,
+    "Reconciliation takes precedence over a fallback notice"
+  );
   assert.equal((await requireSupportLease(pending)).report_key, pendingKey);
   await assert.rejects(
     () => discardSupportReport(pending),
@@ -873,6 +971,109 @@ try {
     beforeInitial + 1,
     "Unchanged later follow-up remains quiet"
   );
+  // Expired follow-up claims retain the ordinary quiet/reconciliation path.
+  await pool.query(
+    "UPDATE support_handoffs SET next_check=now() WHERE conversation=$1",
+    [initial.conversation]
+  );
+  const [expiredFollowup] = await claimHandoffs("followups", [
+    initial.conversation,
+  ]);
+  assert.ok(expiredFollowup);
+  await pool.query(
+    "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
+    [initial.conversation]
+  );
+  process.env.FOREMAN_SUPPORT_FOLLOWUPS_ENABLED = "true";
+  process.env.FOREMAN_SUPPORT_TEST_CONVERSATIONS = initial.conversation;
+  await runSupportSchedule("followups", auth, (_claim, nextAuth) =>
+    openSupportInvestigation({
+      ...ctx,
+      session: {
+        ...ctx.session,
+        auth: { current: nextAuth, initiator: nextAuth },
+      },
+    } as ProviderContext)
+  );
+  assert.equal(slackPosts.length, beforeInitial + 1);
+  assert.equal(await findSupportLease(expiredFollowup), null);
+
+  // Native child failures must return to the root, never settle its active lease.
+  await discoverHandoff("999010", "1788959999.000020");
+  const [rootFailure] = await claimHandoffs("intake", ["999010"]);
+  assert.ok(rootFailure);
+  const failureAuth = supportAuth(auth, rootFailure);
+  const failureContext = {
+    ...ctx,
+    session: {
+      ...ctx.session,
+      auth: { current: failureAuth, initiator: failureAuth },
+    },
+  } as ProviderContext;
+  const beforeFailure = slackPosts.length;
+  await failTurn({
+    ...failureContext,
+    session: {
+      ...failureContext.session,
+      parent: { sessionId: "support-smoke-session" },
+    },
+  } as ProviderContext);
+  await failSession(null);
+  assert.equal(slackPosts.length, beforeFailure);
+  assert.ok(await findSupportLease(rootFailure));
+  await failTurn(failureContext);
+  assert.equal(slackPosts.length, beforeFailure + 1);
+  assert.equal(await findSupportLease(rootFailure), null);
+  await failSession(rootFailure);
+  assert.equal(slackPosts.length, beforeFailure + 1);
+
+  await discoverHandoff("999011", "1788959999.000021");
+  const [terminalFailure] = await claimHandoffs("intake", ["999011"]);
+  assert.ok(terminalFailure);
+  await failSession(terminalFailure);
+  assert.equal(slackPosts.length, beforeFailure + 2);
+  assert.equal(await findSupportLease(terminalFailure), null);
+
+  // The next fresh claim resumes investigation; repeated incomplete runs do not spam.
+  await pool.query(
+    "UPDATE support_handoffs SET next_check=now() WHERE conversation=$1",
+    [terminalFailure.conversation]
+  );
+  const beforeRetry = scheduledClaims.length;
+  await runIntake(terminalFailure.conversation);
+  const restarted = scheduledClaims.at(-1);
+  assert.ok(restarted);
+  assert.equal(scheduledClaims.length, beforeRetry + 1);
+  assert.equal(restarted.conversation, terminalFailure.conversation);
+  await pool.query(
+    "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
+    [restarted.conversation]
+  );
+  await runIntake(restarted.conversation);
+  assert.equal(slackPosts.length, beforeFailure + 2);
+  assert.equal(await findSupportLease(restarted), null);
+
+  await discoverHandoff("999012", "1788959999.000022");
+  const [ambiguousFailure] = await claimHandoffs("intake", ["999012"]);
+  assert.ok(ambiguousFailure);
+  await pool.query(
+    "UPDATE support_handoffs SET lease_until=now() - interval '1 second' WHERE conversation=$1",
+    [ambiguousFailure.conversation]
+  );
+  loseSlackReceipt = true;
+  await runIntake(ambiguousFailure.conversation);
+  loseSlackReceipt = false;
+  const uncertainFailure = await pool.query(
+    "SELECT lease, report, delivery_attempted FROM support_handoffs WHERE conversation=$1",
+    [ambiguousFailure.conversation]
+  );
+  assert.ok(uncertainFailure.rows[0].lease);
+  assert.ok(uncertainFailure.rows[0].report);
+  assert.equal(
+    uncertainFailure.rows[0].delivery_attempted,
+    true,
+    "A lost fallback receipt keeps its outbox and lease for reconciliation"
+  );
   for (const [id, state, thread] of [
     ["999005", "closed", "1788959999.000015"],
     ["999006", "snoozed", "1788959999.000016"],
@@ -901,11 +1102,12 @@ try {
         url ===
           "https://executor.acquisity.ai/mcp/toolkits/foreman-support?artifacts=false" ||
         url === "https://slack.com/api/chat.postMessage" ||
+        url === "https://slack.com/api/conversations.history" ||
         url.startsWith("https://api.vercel.com/v1/connect/token/")
     )
   );
   console.log(
-    "PASS: real PostgreSQL migrations, leases, outbox, linked Linear recovery, change detection, incomplete-read retry and silent follow-up completion."
+    "PASS: PostgreSQL 18 migrations, lease reclamation, delayed first-intake notices, failure cleanup, uncertain outboxes, linked Linear recovery and quiet follow-ups."
   );
 } finally {
   neonConfig.fetchFunction = previousFetch;

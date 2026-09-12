@@ -5,7 +5,7 @@ import {
   type ConnectionPrincipal,
 } from "eve/connections";
 import type { SessionAuthContext } from "eve/context";
-import type { ApprovalContext } from "eve/tools";
+import type { ApprovalContext } from "eve/tools/approval";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import {
   FINAL_SLACK_POST_RULE,

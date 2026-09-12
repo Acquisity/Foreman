@@ -8,10 +8,12 @@ import {
   supportScheduleEnabled,
 } from "./config.js";
 import { notificationConversation } from "./conversation.js";
+import { reportSupportFailureForClaim } from "./investigation.js";
 import { readSupportIntake } from "./slack.js";
 import {
   claimHandoffs,
   discoverHandoff,
+  findSupportLease,
   saveSupportCursor,
   settleSupport,
   supportCursor,
@@ -51,10 +53,22 @@ export async function runSupportSchedule(
   await Promise.all(
     claims.map(async (claim) => {
       try {
+        if (claim.reclaimed) {
+          const row = await findSupportLease(claim);
+          if (row && !row.processed_version && !row.report) {
+            // A parent turn may end while its delegates work. Only an expired
+            // initial lease produces the fallback; pending delivery reconciles first.
+            await reportSupportFailureForClaim(claim);
+            return;
+          }
+        }
         await send(claim, supportAuth(appAuth, claim));
       } catch {
         logOpsEvent("support.dispatch.failed", { outcome: "error" });
-        await settleSupport(claim);
+        const row = await findSupportLease(claim);
+        if (row && !row.report) {
+          await settleSupport(claim);
+        }
       }
     })
   );

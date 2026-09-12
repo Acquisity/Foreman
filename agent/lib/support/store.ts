@@ -88,20 +88,20 @@ export async function discoverHandoff(conversation: string, thread: string) {
 export async function claimHandoffs(
   mode: SupportScheduleMode,
   conversations: string[] = []
-): Promise<SupportClaim[]> {
+): Promise<(SupportClaim & { reclaimed: boolean })[]> {
   const rows = await query(
     `WITH due AS (
-    SELECT conversation, thread FROM support_handoffs
+    SELECT conversation, thread, lease_until IS NOT NULL AS reclaimed FROM support_handoffs
     WHERE NOT closed AND next_check <= now() AND (lease_until IS NULL OR lease_until < now())
     AND (($3 = 'intake' AND processed_version IS NULL) OR ($3 = 'followups' AND processed_version IS NOT NULL))
     AND (cardinality($2::text[]) = 0 OR conversation = ANY($2::text[]))
     ORDER BY next_check LIMIT 3 FOR UPDATE SKIP LOCKED
   ) UPDATE support_handoffs h SET lease = $1, lease_until = now() + interval '20 minutes'
     FROM due WHERE h.conversation = due.conversation AND h.thread = due.thread
-    RETURNING h.conversation, h.thread, h.lease`,
+    RETURNING h.conversation, h.thread, h.lease, due.reclaimed`,
     [randomUUID(), conversations, mode]
   );
-  return z.array(supportClaim).parse(rows);
+  return z.array(supportClaim.extend({ reclaimed: z.boolean() })).parse(rows);
 }
 
 export async function findSupportLease(

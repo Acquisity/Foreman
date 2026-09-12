@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
-import { isStopRequest, postStopConfirmation } from "./slack-stop.js";
+import type { MessageStreamEvent } from "eve/client";
+import {
+  cancelActiveSlackTurn,
+  isStopRequest,
+  postStopConfirmation,
+} from "./slack-stop.js";
 
 describe("isStopRequest", () => {
   it("accepts the bare words stop and cancel", () => {
@@ -118,6 +123,89 @@ describe("postStopConfirmation", () => {
       "03b20daa-a654-590a-8629-6e46c73043e0",
       "03b20daa-a654-590a-8629-6e46c73043e0",
     ]);
-    assert.deepEqual(posts, ["Stopped."]);
+    assert.deepEqual(posts, ["Stop requested."]);
+  });
+});
+
+// These are the relevant fields of native events on the parent's durable
+// stream; child input and authorization retain their original child turn ID.
+const streamEvent = (
+  type: MessageStreamEvent["type"],
+  turnId?: string
+): MessageStreamEvent =>
+  ({
+    data: turnId === undefined ? {} : { turnId },
+    type,
+  }) as MessageStreamEvent;
+
+const cancellationContext = (events: readonly MessageStreamEvent[]) => {
+  const requests: unknown[] = [];
+  const starts: number[] = [];
+  const ctx = {
+    resolveSession: () =>
+      Promise.resolve({
+        cancel: (request: unknown) => {
+          requests.push(request);
+          return Promise.resolve({ status: "accepted" });
+        },
+        getEventStream: ({ startIndex }: { startIndex: number }) => {
+          starts.push(startIndex);
+          return Promise.resolve(
+            new ReadableStream<MessageStreamEvent>({
+              start(controller) {
+                for (const event of events.slice(startIndex)) {
+                  controller.enqueue(event);
+                }
+                controller.close();
+              },
+            })
+          );
+        },
+        getStreamTailIndex: () => Promise.resolve(events.length - 1),
+      }),
+  } as unknown as SlackInboundMessageContext;
+  return { ctx, requests, starts };
+};
+
+describe("background Slack cancellation owner", () => {
+  it("keeps the waiting parent ID across child requests and empty native epilogues", async () => {
+    const { ctx, requests } = cancellationContext([
+      streamEvent("turn.started", "turn_5"),
+      streamEvent("turn.completed", "turn_5"),
+      streamEvent("session.waiting"),
+      streamEvent("input.requested", "turn_1"),
+      streamEvent("turn.completed", ""),
+      streamEvent("session.waiting"),
+      streamEvent("authorization.required", "turn_2"),
+      streamEvent("turn.completed", ""),
+      streamEvent("session.waiting"),
+      streamEvent("authorization.completed", "turn_2"),
+    ]);
+    assert.equal(await cancelActiveSlackTurn(ctx), "turn_5");
+    assert.deepEqual(requests, [{ tasks: true, turnId: "turn_5" }]);
+  });
+
+  it("can recover a long active parent turn from the bounded tail", async () => {
+    const { ctx, requests, starts } = cancellationContext([
+      streamEvent("turn.started", "turn_5"),
+      ...Array.from({ length: 300 }, () =>
+        streamEvent("reasoning.appended", "turn_5")
+      ),
+      streamEvent("authorization.required", "turn_1"),
+    ]);
+    assert.equal(await cancelActiveSlackTurn(ctx), "turn_5");
+    assert.deepEqual(starts, [46]);
+    assert.deepEqual(requests, [{ tasks: true, turnId: "turn_5" }]);
+  });
+
+  it("does not mistake a child-only tail for a known parent turn", async () => {
+    const { ctx, requests } = cancellationContext([
+      streamEvent("input.requested", "turn_1"),
+      streamEvent("authorization.required", "turn_1"),
+      streamEvent("turn.completed", ""),
+      streamEvent("session.waiting"),
+    ]);
+    assert.equal(await cancelActiveSlackTurn(ctx), null);
+    assert.deepEqual(requests, []);
   });
 });
