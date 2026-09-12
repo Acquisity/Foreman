@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SlackInboundMessageContext } from "eve/channels/slack";
-import type { MessageStreamEvent } from "eve/client";
 import {
-  cancelActiveSlackTurn,
   isStopRequest,
   postStopConfirmation,
+  stopSlackSession,
 } from "./slack-stop.js";
 
 describe("isStopRequest", () => {
@@ -44,6 +43,7 @@ describe("isStopRequest", () => {
     assert.equal(isStopRequest("cancel that please"), false);
     assert.equal(isStopRequest("please stop."), false);
     assert.equal(isStopRequest("stop and then cancel"), false);
+    assert.equal(isStopRequest("stop that subagent, keep working"), false);
   });
 
   it("rejects words that merely contain stop or cancel", () => {
@@ -89,7 +89,7 @@ describe("isStopRequest", () => {
 });
 
 describe("postStopConfirmation", () => {
-  it("keeps the legacy id stable when retrying an ambiguously accepted post", async (t) => {
+  it("keeps the retired-session id stable when retrying an ambiguously accepted post", async (t) => {
     t.mock.method(console, "warn", () => undefined);
     const acceptedIds = new Set<string>();
     const attemptedIds: string[] = [];
@@ -116,96 +116,92 @@ describe("postStopConfirmation", () => {
       },
     } as unknown as SlackInboundMessageContext;
 
-    await postStopConfirmation(ctx, "t1");
-    await postStopConfirmation(ctx, "t1");
+    await postStopConfirmation(ctx, "session-1");
+    await postStopConfirmation(ctx, "session-1");
 
-    assert.deepEqual(attemptedIds, [
-      "03b20daa-a654-590a-8629-6e46c73043e0",
-      "03b20daa-a654-590a-8629-6e46c73043e0",
-    ]);
+    assert.equal(attemptedIds.length, 2);
+    assert.equal(attemptedIds[0], attemptedIds[1]);
     assert.deepEqual(posts, ["Stop requested."]);
   });
 });
 
-// These are the relevant fields of native events on the parent's durable
-// stream; child input and authorization retain their original child turn ID.
-const streamEvent = (
-  type: MessageStreamEvent["type"],
-  turnId?: string
-): MessageStreamEvent =>
-  ({
-    data: turnId === undefined ? {} : { turnId },
-    type,
-  }) as MessageStreamEvent;
-
-const cancellationContext = (events: readonly MessageStreamEvent[]) => {
-  const requests: unknown[] = [];
-  const starts: number[] = [];
-  const ctx = {
-    resolveSession: () =>
-      Promise.resolve({
-        cancel: (request: unknown) => {
-          requests.push(request);
-          return Promise.resolve({ status: "accepted" });
-        },
-        getEventStream: ({ startIndex }: { startIndex: number }) => {
-          starts.push(startIndex);
-          return Promise.resolve(
-            new ReadableStream<MessageStreamEvent>({
-              start(controller) {
-                for (const event of events.slice(startIndex)) {
-                  controller.enqueue(event);
-                }
-                controller.close();
-              },
-            })
+describe("stopSlackSession", () => {
+  for (const initialState of ["active", "waiting"] as const) {
+    it(`resets the ${initialState} session directly without a cancellation wakeup`, async () => {
+      let state: string = initialState;
+      let parentWakeups = 0;
+      const requests: unknown[] = [];
+      const session = {
+        cancel: () => {
+          parentWakeups += 1;
+          assert.fail(
+            "task cancellation must not wake the parent before reset"
           );
         },
-        getStreamTailIndex: () => Promise.resolve(events.length - 1),
-      }),
-  } as unknown as SlackInboundMessageContext;
-  return { ctx, requests, starts };
-};
+        getEventStream: () => assert.fail("reset needs no turn stream"),
+        getStreamTailIndex: () => assert.fail("reset needs no turn lookup"),
+        id: "session-1",
+        reset: (options: unknown) => {
+          requests.push(options);
+          state = "retired";
+          return Promise.resolve({
+            previousSessionId: "session-1",
+            status: "reset",
+          });
+        },
+      };
+      const ctx = {
+        reset: () => assert.fail("reset must use the resolved exact handle"),
+        resolveSession: () => Promise.resolve(session),
+      } as unknown as SlackInboundMessageContext;
 
-describe("background Slack cancellation owner", () => {
-  it("keeps the waiting parent ID across child requests and empty native epilogues", async () => {
-    const { ctx, requests } = cancellationContext([
-      streamEvent("turn.started", "turn_5"),
-      streamEvent("turn.completed", "turn_5"),
-      streamEvent("session.waiting"),
-      streamEvent("input.requested", "turn_1"),
-      streamEvent("turn.completed", ""),
-      streamEvent("session.waiting"),
-      streamEvent("authorization.required", "turn_2"),
-      streamEvent("turn.completed", ""),
-      streamEvent("session.waiting"),
-      streamEvent("authorization.completed", "turn_2"),
-    ]);
-    assert.equal(await cancelActiveSlackTurn(ctx), "turn_5");
-    assert.deepEqual(requests, [{ tasks: true, turnId: "turn_5" }]);
-  });
+      assert.equal(await stopSlackSession(ctx), "session-1");
+      assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
+      assert.equal(state, "retired");
+      assert.equal(parentWakeups, 0);
+    });
+  }
 
-  it("can recover a long active parent turn from the bounded tail", async () => {
-    const { ctx, requests, starts } = cancellationContext([
-      streamEvent("turn.started", "turn_5"),
-      ...Array.from({ length: 300 }, () =>
-        streamEvent("reasoning.appended", "turn_5")
-      ),
-      streamEvent("authorization.required", "turn_1"),
-    ]);
-    assert.equal(await cancelActiveSlackTurn(ctx), "turn_5");
-    assert.deepEqual(starts, [46]);
-    assert.deepEqual(requests, [{ tasks: true, turnId: "turn_5" }]);
-  });
+  it("does not resolve or reset a replacement owner while the exact reset awaits", async () => {
+    let finishReset: (() => void) | undefined;
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const completion = new Promise<void>((resolve) => {
+      finishReset = resolve;
+    });
+    const requests: unknown[] = [];
+    const original = {
+      id: "session-original",
+      reset: async (options: unknown) => {
+        requests.push(options);
+        markStarted?.();
+        await completion;
+        return { previousSessionId: "session-original", status: "reset" };
+      },
+    };
+    let owner = original;
+    let resolutions = 0;
+    const ctx = {
+      reset: () => assert.fail("thread-bound reset could target a replacement"),
+      resolveSession: () => {
+        resolutions += 1;
+        return Promise.resolve(owner);
+      },
+    } as unknown as SlackInboundMessageContext;
 
-  it("does not mistake a child-only tail for a known parent turn", async () => {
-    const { ctx, requests } = cancellationContext([
-      streamEvent("input.requested", "turn_1"),
-      streamEvent("authorization.required", "turn_1"),
-      streamEvent("turn.completed", ""),
-      streamEvent("session.waiting"),
-    ]);
-    assert.equal(await cancelActiveSlackTurn(ctx), null);
-    assert.deepEqual(requests, []);
+    const stopping = stopSlackSession(ctx);
+    await started;
+    owner = {
+      id: "session-replacement",
+      reset: () => assert.fail("replacement session must remain untouched"),
+    };
+    finishReset?.();
+
+    assert.equal(await stopping, "session-original");
+    assert.equal(resolutions, 1);
+    assert.deepEqual(requests, [{ reason: "Slack stop requested." }]);
+    assert.equal(owner.id, "session-replacement");
   });
 });

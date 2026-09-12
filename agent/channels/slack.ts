@@ -25,9 +25,9 @@ import {
   slackProgressActionRequestLabel,
 } from "../lib/slack-progress.js";
 import {
-  cancelActiveSlackTurn,
   isStopRequest,
   postStopConfirmation,
+  stopSlackSession,
 } from "../lib/slack-stop.js";
 import { isIntakeOnly } from "../lib/trust.js";
 
@@ -73,13 +73,13 @@ import { isIntakeOnly } from "../lib/trust.js";
  * where the default steer policy cancelled the active turn and silently lost
  * the earlier request. One message still cancels on purpose: a text that is
  * only `stop` or `cancel` (see `slack-stop.ts`) is intercepted in dispatch,
- * cancels the active turn through its exact session handle, and is consumed
- * without
- * reaching the model. Anything longer, such as `stop the deploy`, is
- * ordinary model input. The stop path includes background tasks and posts one
- * short acknowledgement when the exact session accepts the request. Native
- * cancellation settlement is asynchronous; an acknowledgement is not proof
- * that every child has stopped.
+ * retires the entire session through its exact handle, and is consumed without
+ * reaching the model. Reset finalizes background tasks so their cancellation
+ * results cannot restart the root. The next message starts a fresh internal
+ * session with visible Slack history; hidden state and sandbox files are lost.
+ * Anything longer, such as `stop the deploy`, remains ordinary model input.
+ * One acknowledgement follows a successful reset; a missing session stays
+ * quiet. Child settlement still needs independent verification.
  *
  * A turn still running at 5 and 15 minutes posts one short progress line at
  * each threshold and never a third. `turn.started` seeds the per-turn
@@ -120,13 +120,12 @@ export const dispatch = async (
   if (auth === null) {
     return null;
   }
-  // A literal stop/cancel is a command for the running turn, never model
-  // input: request cancellation on the exact session, including background
-  // tasks, and consume the message. A missing owner drops quietly.
+  // A literal stop/cancel retires the exact session, never reaching the model.
+  // Do not cancel first: a cancelled task can wake the root before reset.
   if (isStopRequest(message.text)) {
-    const requestedTurnId = await cancelActiveSlackTurn(ctx);
-    if (requestedTurnId) {
-      await postStopConfirmation(ctx, requestedTurnId);
+    const stoppedSessionId = await stopSlackSession(ctx);
+    if (stoppedSessionId) {
+      await postStopConfirmation(ctx, stoppedSessionId);
     }
     return null;
   }

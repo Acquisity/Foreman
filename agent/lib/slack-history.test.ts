@@ -139,7 +139,7 @@ describe("fresh Slack session history", () => {
       entry(`1.${index}`, "Earlier message")
     );
     const prefix = await slackFreshSessionHistory(context(entries), trigger);
-    assert.ok(prefix?.includes("at most the first 50"));
+    assert.ok(prefix?.includes("requests one page of 50"));
     assert.ok(prefix?.includes("can be incomplete"));
     assert.ok(!prefix?.includes("Earlier message"));
   });
