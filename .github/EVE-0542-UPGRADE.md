@@ -1,6 +1,6 @@
 # Eve 0.54.2 upgrade evidence and acceptance
 
-[ENG-13737](https://linear.app/acquisity/issue/ENG-13737/upgrade-core-foreman-to-eve-0542) upgrades the simplified Foreman to Eve 0.54.2, AI SDK 7.0.97 and GitHub extension 0.7.1. This records implementation evidence gathered on 2026-09-12. It is not Production acceptance. Commit SHA, PR, Preview deployment and live session references remain pending.
+[ENG-13737](https://linear.app/acquisity/issue/ENG-13737/upgrade-core-foreman-to-eve-0542) upgrades the simplified Foreman to Eve 0.54.2, AI SDK 7.0.97 and GitHub extension 0.7.1. This records implementation evidence gathered on 2026-09-12. It is not Production acceptance. The first validated implementation commit is a2dcf3e6a21246f3a923d62dc9053f267faf8d84. PR and live acceptance references remain pending.
 
 ## Local evidence
 
@@ -31,11 +31,14 @@ Interrupted local eval cleanup used the public task-inclusive cancel endpoint fo
 
 ## Preview setup and acceptance
 
-The branch is `codex/eng-13737-eve-0542`. It has no remote branch at this checkpoint, so branch-scoped Vercel configuration awaits the validated commit and push. Configuration inspection verified Preview connector UIDs `slack/foreman-preview` and `executor.acquisity.ai/foreman-preview`. The existing Preview Slack trigger still targets `codex/eng-13736-remove-factory`; retargeting and branch-scoped configuration remain pending. No external configuration changes have been applied for this checkpoint.
+The pushed branch is `codex/eng-13737-eve-0542`. Verified branch-scoped Preview settings select `slack/foreman-preview`, `executor.acquisity.ai/foreman-preview`, `https://executor.acquisity.ai` and all 36 operation bindings. Both scheduled support enable flags are explicitly false. The Preview Slack trigger still targets `codex/eng-13736-remove-factory` until the new deployment is ready.
+
+The first Preview deployment, `dpl_ECTZa2rXxEopErpWgx6XNx2psN5P` at https://foreman-7edcl43md-acquisity.vercel.app, failed before build because Vercel selected pnpm 10 and rejected the pnpm 11 patch configuration. The package now pins `packageManager: pnpm@11.1.3`; this branch also enables `ENABLE_EXPERIMENTAL_COREPACK=1`. Production needs the same package-manager selection verified before cutover. No Production configuration was changed.
 
 The inspected database URL is shared by Production and Preview. Keep both support enable flags false on Preview until a separate private database and queue are configured and migrated. Preview bot routing does not isolate the scheduled support Slack destination.
 
-- [ ] Record the final validation and fast-eval results, then commit, push and record the exact SHA and PR.
+- [x] Record local validation and fast/native evals, then commit and push implementation a2dcf3e6a21246f3a923d62dc9053f267faf8d84.
+- [ ] Complete Preview gates and record the final deployment SHA and review PR.
 - [ ] Recheck the official browser release. Use a compatible official version when it passes the same checks; otherwise retain the documented temporary patch and its explicit removal requirement.
 - [ ] Retarget the verified Preview Slack connector and remove its previous trigger branch. Set verified branch-scoped Executor settings and complete operation bindings, then redeploy and confirm the exact SHA.
 - [ ] Prove an actual provider read through the deployed root and delegated paths. Metadata checks alone do not close this item.
