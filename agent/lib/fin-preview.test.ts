@@ -254,6 +254,15 @@ describe("Fin diagnostic intake", () => {
         "not JSON",
         JSON.stringify({ action: "unknown", question: "Check credits" }),
         JSON.stringify({ question: "x".repeat(4001) }),
+        JSON.stringify({ callback_url: 123, question: "Check credits" }),
+        JSON.stringify({
+          callback_url: "https://attacker.test/report",
+          question: "Check credits",
+        }),
+        JSON.stringify({
+          callback_url: "x".repeat(2049),
+          question: "Check credits",
+        }),
         JSON.stringify({
           question: "Check credits",
           workspace_id: "another-workspace",
@@ -445,6 +454,100 @@ describe("Fin diagnostic intake", () => {
     assert.equal(observed.message, "Workspace read completed successfully.");
     assert.equal(reads, 1);
     assert.equal(cancelled, 1);
+  });
+
+  it("seeds the callback only in durable channel state and preserves signed result reads", async (context) => {
+    enablePreview(context);
+    const callbackUrl = `https://api.intercom.io/hooks/procedures/callback/${"a".repeat(488)}`;
+    const tasks: Promise<unknown>[] = [];
+    const events = [
+      completed("Verified report."),
+      terminal("session.completed"),
+    ];
+    let probe = "";
+    const response = await receiveFinProbe(
+      request(
+        JSON.stringify({
+          action: "start",
+          callback_url: callbackUrl,
+          question: "Check credits",
+        })
+      ),
+      {
+        attachSession: () => assert.fail("start must create its own session"),
+        from(address) {
+          probe = address;
+          return {
+            send(message, options) {
+              assert.ok(!String(message).includes(callbackUrl));
+              assert.deepEqual(options.state, {
+                callback: {
+                  answer: "",
+                  delivered: false,
+                  url: callbackUrl,
+                },
+              });
+              return Promise.resolve(sessionWithEvents(events));
+            },
+          } as ReturnType<Parameters<typeof receiveFinProbe>[1]["from"]>;
+        },
+        waitUntil: (task) => tasks.push(task),
+      }
+    );
+    const accepted = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(accepted.status, "pending");
+    assert.equal(accepted.session_id, "test-session");
+    assert.equal(accepted.probe, probe);
+    assert.ok(accepted.run_handle);
+    assert.ok(!JSON.stringify(accepted).includes(callbackUrl));
+    await Promise.all(tasks);
+    const read = await receiveFinProbe(
+      request(
+        JSON.stringify({
+          action: "result",
+          callback_url: "",
+          handle: accepted.run_handle,
+        })
+      ),
+      {
+        attachSession: () => sessionWithEvents(events),
+        from: () => assert.fail("result check must not start another run"),
+        waitUntil: () => assert.fail("result check must not notify Slack"),
+      }
+    );
+    assert.equal((await read.json()).message, "Verified report.");
+  });
+
+  it("rejects callbacks that do not accompany a fresh diagnostic start", async (context) => {
+    enablePreview(context);
+    const callbackUrl = `https://api.intercom.io/hooks/procedures/callback/${"a".repeat(488)}`;
+    await Promise.all(
+      [
+        { callback_url: callbackUrl },
+        {
+          action: "result",
+          callback_url: callbackUrl,
+          handle: "saved-handle",
+          question: "Check credits",
+        },
+        {
+          callback_url: callbackUrl,
+          handle: "saved-handle",
+          question: "Check credits",
+        },
+      ].map(async (input) => {
+        const response = await receiveFinProbe(request(JSON.stringify(input)), {
+          attachSession: () =>
+            assert.fail("a callback cannot retarget an existing run"),
+          from: () =>
+            assert.fail("invalid callback input cannot create a probe"),
+          waitUntil: () =>
+            assert.fail("invalid callback input cannot send messages"),
+        });
+        assert.equal(response.status, 400);
+      })
+    );
   });
 
   it("does not return a raw dispatch exception or invent a run handle", async (context) => {

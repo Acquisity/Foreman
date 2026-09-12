@@ -8,6 +8,13 @@ import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
 import { finPreviewEnabled } from "./executor/endpoint.js";
 import {
+  boundedFinAnswer,
+  createFinCallback,
+  type FinCallbackState,
+  finDiagnosticFailure as failed,
+  isFinCallbackUrl,
+} from "./fin-preview-callback.js";
+import {
   type FinProbeResult,
   reportFinProbeToSlack,
 } from "./fin-preview-slack.js";
@@ -16,12 +23,21 @@ const digest = (value: string) => createHash("sha256").update(value).digest();
 const requestSchema = z
   .object({
     action: z.enum(["start", "result"]).optional(),
+    callback_url: z.string().trim().max(2048).optional().default(""),
     handle: z.string().trim().max(1024).optional().default(""),
     question: z.string().trim().max(4000).optional().default(""),
   })
   .strict()
   .refine((input) => input.action !== "start" || input.question.length > 0)
-  .refine((input) => input.action !== "result" || input.handle.length > 0);
+  .refine((input) => input.action !== "result" || input.handle.length > 0)
+  .refine(
+    (input) =>
+      !input.callback_url ||
+      (isFinCallbackUrl(input.callback_url) &&
+        input.question.length > 0 &&
+        input.action !== "result" &&
+        (input.action === "start" || !input.handle))
+  );
 const handleSchema = z
   .object({
     probe: z.string().uuid(),
@@ -41,11 +57,6 @@ const pending = {
   message:
     "Foreman is still investigating. Call the result check again with run_handle; do not start another investigation.",
   status: "pending" as const,
-};
-const failed = {
-  message:
-    "Foreman could not complete or retrieve the investigation. Check the internal run before retrying.",
-  status: "failed" as const,
 };
 
 function readHandle(handle: string, secret: string) {
@@ -87,11 +98,7 @@ export async function waitForDiagnostic(
           if (event.data.finishReason === "tool-calls") {
             break;
           }
-          const text = event.data.message?.trim() ?? "";
-          answer =
-            text.length > 12_000
-              ? `${text.slice(0, 12_000)}\n[Report truncated.]`
-              : text;
+          answer = boundedFinAnswer(event.data.message);
           break;
         }
         case "session.completed":
@@ -151,7 +158,10 @@ export async function receiveFinProbe(
     from,
     waitUntil,
     attachSession,
-  }: Pick<RouteHandlerArgs, "from" | "waitUntil" | "attachSession">,
+  }: Pick<
+    RouteHandlerArgs<{ callback: FinCallbackState | null }>,
+    "from" | "waitUntil" | "attachSession"
+  >,
   responseWaitMs = 8000
 ) {
   const secret = process.env.FIN_FOREMAN_PREVIEW_TOKEN;
@@ -218,6 +228,9 @@ export async function receiveFinProbe(
             principalType: "service",
           },
           mode: "task",
+          state: {
+            callback: createFinCallback(input.callback_url),
+          },
         }
       );
       const payload = Buffer.from(
@@ -233,6 +246,14 @@ export async function receiveFinProbe(
         .catch(() => ({ ...identity, ...failed }));
       // The observer continues for Slack after the HTTP wait ends; polling replays Eve's stored stream.
       waitUntil(Promise.all([result, reportFinProbeToSlack(probe, result)]));
+      if (input.callback_url) {
+        return json({
+          ...identity,
+          message:
+            "Foreman accepted the investigation and will return its report through the procedure callback when finished.",
+          status: "pending",
+        });
+      }
       let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         return json(
