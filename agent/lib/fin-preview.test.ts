@@ -449,7 +449,7 @@ describe("Fin diagnostic intake", () => {
     assert.ok(controller);
     controller.enqueue(completed("Workspace read completed successfully."));
     controller.enqueue(terminal("session.completed"));
-    const [observed] = (await tasks[0]) as [FinProbeResult, unknown];
+    const observed = (await tasks[0]) as FinProbeResult;
     assert.equal(observed.status, "completed");
     assert.equal(observed.message, "Workspace read completed successfully.");
     assert.equal(reads, 1);
@@ -481,11 +481,13 @@ describe("Fin diagnostic intake", () => {
             send(message, options) {
               assert.ok(!String(message).includes(callbackUrl));
               assert.deepEqual(options.state, {
+                answer: "",
                 callback: {
                   answer: "",
                   delivered: false,
                   url: callbackUrl,
                 },
+                slack: null,
               });
               return Promise.resolve(sessionWithEvents(events));
             },

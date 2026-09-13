@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 import {
   type FinProbeResult,
+  postFinSlackReceipt,
   reportFinProbeToSlack,
+  updateFinSlackReceipt,
 } from "./fin-preview-slack.js";
 
 const configureSlack = (
@@ -195,5 +197,64 @@ describe("Fin preview Slack visibility", () => {
     assert.ok(
       !JSON.stringify(requests).includes("signed-result-access-handle")
     );
+  });
+});
+
+describe("durable Fin Slack receipts", () => {
+  it("updates the original receipt after restoration, independently of the HTTP observer", async (context) => {
+    configureSlack(context);
+    const requests: { method: string; body: Record<string, string> }[] = [];
+    const request: SlackRequest = (method, body) => {
+      requests.push({ body, method });
+      return Promise.resolve({ ok: true, ts: "123.456" });
+    };
+    const receipt = await postFinSlackReceipt("probe-1", request);
+    // A later durable event restores state after the initiating request has ended.
+    const restored = JSON.parse(JSON.stringify(receipt));
+    process.env.FIN_FOREMAN_PREVIEW_SLACK_CHANNEL = "C0DIFFERENT";
+    await updateFinSlackReceipt(
+      restored,
+      {
+        message: "The calendar connection needs attention.",
+        status: "completed",
+      },
+      request
+    );
+    await updateFinSlackReceipt(restored, null, request);
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests[1], {
+      body: {
+        channel: "C0TESTPREVIEW",
+        text: "*Investigation complete*\n\nThe calendar connection needs attention.",
+        ts: "123.456",
+      },
+      method: "chat.update",
+    });
+  });
+
+  it("does not mark a failed Slack delivery as delivered and allows another terminal attempt", async (context) => {
+    configureSlack(context);
+    context.mock.method(console, "info", () => undefined);
+    const receipt = {
+      channel: "C0TESTPREVIEW",
+      delivered: false,
+      ts: "123.456",
+    };
+    await updateFinSlackReceipt(receipt, null, () =>
+      Promise.reject(new Error("unavailable"))
+    );
+    assert.equal(receipt.delivered, false);
+    await updateFinSlackReceipt(
+      receipt,
+      { message: "No findings are available.", status: "failed" },
+      (_method, body) => {
+        assert.equal(
+          body.text,
+          "*Investigation unavailable*\n\nNo findings are available."
+        );
+        return Promise.resolve({ ok: true, ts: receipt.ts });
+      }
+    );
+    assert.equal(receipt.delivered, true);
   });
 });

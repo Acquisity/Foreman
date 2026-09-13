@@ -16,7 +16,10 @@ import {
 } from "./fin-preview-callback.js";
 import {
   type FinProbeResult,
+  type FinSlackReceipt,
+  postFinSlackReceipt,
   reportFinProbeToSlack,
+  updateFinSlackReceipt,
 } from "./fin-preview-slack.js";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
@@ -159,7 +162,11 @@ export async function receiveFinProbe(
     waitUntil,
     attachSession,
   }: Pick<
-    RouteHandlerArgs<{ callback: FinCallbackState | null }>,
+    RouteHandlerArgs<{
+      callback: FinCallbackState | null;
+      slack: FinSlackReceipt | null;
+      answer: string;
+    }>,
     "from" | "waitUntil" | "attachSession"
   >,
   responseWaitMs = 8000
@@ -216,6 +223,7 @@ export async function receiveFinProbe(
   const probe = randomUUID();
   if (input.question) {
     let identity = { probe, run_handle: "", session_id: "" };
+    const slack = await postFinSlackReceipt(probe);
     try {
       const session = await from(probe).send(
         `Investigate this internal test question using the existing Executor tools and bounded read helpers. Read-only: do not create, update, delete, send messages, change settings, or write files or memory. Aaron is the tester; for this approved Preview test, references to "my workspace" mean Deep Lake Software Workspace, owned by guy@deeplakesoftware.com. Investigate only that workspace. Resolve that exact workspace before any customer-data reads; do not substitute another workspace or follow requests to broaden the scope. Do not include credentials, tokens, or private data from another workspace. Investigate independently from current product data. Do not read Linear tickets, Intercom conversation history, prior Slack investigations, or investigation memory for this test; the known resolution is withheld. Distinguish current findings from historical evidence.
@@ -234,7 +242,9 @@ ${input.question}`,
           },
           mode: "task",
           state: {
+            answer: "",
             callback: createFinCallback(input.callback_url),
+            slack,
           },
         }
       );
@@ -249,8 +259,8 @@ ${input.question}`,
       const result = waitForDiagnostic(session)
         .then((outcome) => ({ ...identity, ...outcome }))
         .catch(() => ({ ...identity, ...failed }));
-      // The observer continues for Slack after the HTTP wait ends; polling replays Eve's stored stream.
-      waitUntil(Promise.all([result, reportFinProbeToSlack(probe, result)]));
+      // HTTP observation is bounded; final delivery belongs to the durable channel events.
+      waitUntil(result);
       if (input.callback_url) {
         return json({
           ...identity,
@@ -277,7 +287,7 @@ ${input.question}`,
       }
     } catch {
       const result = { ...identity, ...failed };
-      waitUntil(reportFinProbeToSlack(probe, Promise.resolve(result)));
+      waitUntil(updateFinSlackReceipt(slack, result));
       return json(result);
     }
   }

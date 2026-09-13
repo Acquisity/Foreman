@@ -50,16 +50,19 @@ async function slackRequest(
   return slackResponse.parse(await response.json());
 }
 
-export async function reportFinProbeToSlack(
+export interface FinSlackReceipt {
+  channel: string;
+  delivered: boolean;
+  ts: string;
+}
+
+export async function postFinSlackReceipt(
   probe: string,
-  result: Promise<FinProbeResult>,
   request = slackRequest
-): Promise<void> {
-  // Handle rejection immediately, even while Slack is loading its credentials.
-  const observed = result.catch(() => null);
+): Promise<FinSlackReceipt | null> {
   const channel = process.env.FIN_FOREMAN_PREVIEW_SLACK_CHANNEL;
   if (!(channel && process.env.SLACK_CONNECTOR)) {
-    return;
+    return null;
   }
   try {
     const posted = await request("chat.postMessage", {
@@ -69,14 +72,47 @@ export async function reportFinProbeToSlack(
       unfurl_links: "false",
       unfurl_media: "false",
     });
-    const outcome = await observed;
+    return { channel, delivered: false, ts: posted.ts };
+  } catch {
+    logOpsEvent("fin_preview_slack_failed", {
+      message: "Fin preview Slack notification could not be delivered.",
+    });
+    return null;
+  }
+}
+
+export async function updateFinSlackReceipt(
+  receipt: FinSlackReceipt | null,
+  outcome: Pick<FinProbeResult, "status" | "message"> | null,
+  request = slackRequest
+): Promise<void> {
+  if (!receipt || receipt.delivered) {
+    return;
+  }
+  try {
     const text = outcome
       ? `*${statusTitles[outcome.status]}*\n\n${outcome.message}`
       : "*Investigation unavailable*\n\nThe check could not be started or its result retrieved.";
-    await request("chat.update", { channel, text, ts: posted.ts });
+    await request("chat.update", {
+      channel: receipt.channel,
+      text,
+      ts: receipt.ts,
+    });
+    receipt.delivered = true;
   } catch {
     logOpsEvent("fin_preview_slack_failed", {
       message: "Fin preview Slack notification could not be delivered.",
     });
   }
+}
+
+export async function reportFinProbeToSlack(
+  probe: string,
+  result: Promise<FinProbeResult>,
+  request = slackRequest
+): Promise<void> {
+  // Handle rejection immediately, even while Slack is loading its credentials.
+  const observed = result.catch(() => null);
+  const receipt = await postFinSlackReceipt(probe, request);
+  await updateFinSlackReceipt(receipt, await observed, request);
 }

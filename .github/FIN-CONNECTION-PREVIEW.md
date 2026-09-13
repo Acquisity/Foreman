@@ -41,3 +41,8 @@ The first live Procedure run, `wrun_41M2BYVSX40GX5DSWNH5X1XTQ5` in conversation 
 An artificial request to return a fixed test marker in conversation `215475914098155` was rejected by Fin's built-in safety guard (`OFFTOPIC_ABUSE`) before the Procedure or any connector ran. The experiment does not bypass Fin guardrails or guarantee triggering for arbitrary phrasing.
 
 A second natural request, listing workspace campaign names, completed in session `wrun_41M2BZ9S6X0GPVY06AAB77N642` and conversation `215475914101039`. The start succeeded at 23:30:04 UTC; the callback resumed Fin at 23:31:05 and the report appeared at 23:31:06 without another user message. Its three names, workspace provenance, empty follow-up page and source-status caveats matched the Slack report. These two corrected runs prove observed automatic returns, not broad triggering reliability. The second Procedure's internal handover inaccurately called the campaigns active despite the displayed report only listing names; follow-up context fidelity remains unproven.
+
+
+### Long investigation Slack completion
+
+Diagnostic requests post the initial Preview Slack receipt before dispatch and persist its channel and timestamp in Eve channel state. The channel updates that same receipt on session completion or failure, alongside the independent Fin callback. The bounded HTTP stream observer no longer writes diagnostic Slack status, so its two-minute timeout cannot leave or overwrite a completed report with a pending message. Slack delivery remains best effort with a five-second HTTP deadline; failures do not prevent the Fin callback. Previously started runs lack the stored receipt and are not repaired by this change. Synthetic connection probes retain their bounded observation path.
