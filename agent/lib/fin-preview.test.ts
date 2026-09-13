@@ -338,9 +338,9 @@ describe("Fin diagnostic intake", () => {
               assert.equal(typeof message, "string");
               assert.ok(String(message).includes("Read-only:"));
               assert.ok(
-                String(message).includes("aaron-fragas-workspace-wMUMT")
+                String(message).includes("Deep Lake Software Workspace")
               );
-              assert.ok(String(message).includes("aaron.fraga@acquisity.ai"));
+              assert.ok(String(message).includes("guy@deeplakesoftware.com"));
               assert.ok(
                 String(message).endsWith("Question:\nCheck my credits")
               );
