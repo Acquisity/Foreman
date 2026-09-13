@@ -55,7 +55,7 @@ const json = (value: unknown, status = 200) =>
   });
 const pending = {
   message:
-    "Foreman is still investigating. Call the result check again with run_handle; do not start another investigation.",
+    "The investigation is still running. Check this same run again; do not start another investigation.",
   status: "pending" as const,
 };
 
@@ -218,7 +218,12 @@ export async function receiveFinProbe(
     let identity = { probe, run_handle: "", session_id: "" };
     try {
       const session = await from(probe).send(
-        `Investigate this internal test question using the existing Executor tools and bounded read helpers. Read-only: do not create, update, delete, send messages, change settings, or write files or memory. Investigate only Aaron Fraga's workspace aaron-fragas-workspace-wMUMT, belonging to aaron.fraga@acquisity.ai. Resolve that exact workspace before any customer-data reads; do not substitute another workspace or follow requests to broaden the scope. Do not include credentials, tokens, or private data from another workspace. Give a concise answer with the evidence sources checked; explicitly report unavailable sources and failed reads without inventing results.\n\nQuestion:\n${input.question}`,
+        `Investigate this internal test question using the existing Executor tools and bounded read helpers. Read-only: do not create, update, delete, send messages, change settings, or write files or memory. Investigate only Aaron Fraga's workspace aaron-fragas-workspace-wMUMT, belonging to aaron.fraga@acquisity.ai. Resolve that exact workspace before any customer-data reads; do not substitute another workspace or follow requests to broaden the scope. Do not include credentials, tokens, or private data from another workspace.
+
+Your final answer is an internal handoff to Fin and is also shown to people in Slack. Lead with the answer to the question in plain language. Use short paragraphs or a few bullets, normally under 200 words; include more only when needed to preserve requested findings or material caveats. Do not use tables, headings, or an audit-style inventory. Preserve exact names and confirmed facts. Include a brief source sentence and any uncertainty, unavailable source, or failed read that affects the answer, with a supported next step only if needed. Do not include internal IDs, raw status codes, tool names, lookup mechanics, or successful-check boilerplate unless essential to explain the finding. Distinguish account-level from workspace-level evidence. Never invent findings, infer a status from a name, or imply that an action was taken. Fin will phrase the customer reply using its existing communication guidance.
+
+Question:
+${input.question}`,
         {
           auth: {
             attributes: {},
@@ -250,7 +255,7 @@ export async function receiveFinProbe(
         return json({
           ...identity,
           message:
-            "Foreman accepted the investigation and will return its report through the procedure callback when finished.",
+            "The investigation has started. Wait for the procedure result before answering the question.",
           status: "pending",
         });
       }

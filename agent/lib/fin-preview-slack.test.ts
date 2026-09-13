@@ -69,7 +69,7 @@ describe("Fin preview Slack visibility", () => {
         body: {
           channel: "C0TESTPREVIEW",
           client_msg_id: "probe-1",
-          text: "Fin requested a Foreman run.\nProbe: probe-1",
+          text: "Fin requested a workspace check. I’ll update this message with the result.",
           unfurl_links: "false",
           unfurl_media: "false",
         },
@@ -82,7 +82,7 @@ describe("Fin preview Slack visibility", () => {
     assert.deepEqual(requests[1], {
       body: {
         channel: "C0TESTPREVIEW",
-        text: `Fin → Foreman: connected\n${connected.message}\nSession: test-session\nProbe: probe-1`,
+        text: `*Connection test passed*\n\n${connected.message}`,
         ts: "123.456",
       },
       method: "chat.update",
@@ -139,7 +139,7 @@ describe("Fin preview Slack visibility", () => {
     assert.deepEqual(requests[1], {
       body: {
         channel: "C0TESTPREVIEW",
-        text: "Fin → Foreman: failed\nCould not start or observe the run.\nProbe: probe-1",
+        text: "*Investigation unavailable*\n\nThe check could not be started or its result retrieved.",
         ts: "123.456",
       },
       method: "chat.update",
@@ -163,7 +163,7 @@ describe("Fin preview Slack visibility", () => {
       }
     );
     assert.equal(texts.length, 2);
-    assert.ok(texts[1].includes("Foreman: pending"));
+    assert.ok(texts[1].includes("Investigation still running"));
     assert.ok(texts[1].includes("not received within this connector call"));
   });
 
@@ -190,7 +190,7 @@ describe("Fin preview Slack visibility", () => {
     assert.equal(requests[1].body.ts, "123.456");
     assert.equal(
       requests[1].body.text,
-      `Fin → Foreman: completed\n${report}\nSession: test-session\nProbe: probe-1`
+      `*Investigation complete*\n\n${report}`
     );
     assert.ok(
       !JSON.stringify(requests).includes("signed-result-access-handle")

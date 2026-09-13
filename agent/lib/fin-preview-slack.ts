@@ -16,6 +16,14 @@ const slackResponse = z.object({
   ts: z.string().min(1),
 });
 
+const statusTitles: Record<FinProbeResult["status"], string> = {
+  completed: "Investigation complete",
+  connected: "Connection test passed",
+  failed: "Investigation unavailable",
+  pending: "Investigation still running",
+  unexpected_reply: "Connection test needs checking",
+};
+
 async function slackRequest(
   operation: "chat.postMessage" | "chat.update",
   input: Record<string, string>
@@ -57,14 +65,14 @@ export async function reportFinProbeToSlack(
     const posted = await request("chat.postMessage", {
       channel,
       client_msg_id: probe,
-      text: `Fin requested a Foreman run.\nProbe: ${probe}`,
+      text: "Fin requested a workspace check. I’ll update this message with the result.",
       unfurl_links: "false",
       unfurl_media: "false",
     });
     const outcome = await observed;
     const text = outcome
-      ? `Fin → Foreman: ${outcome.status}\n${outcome.message}\nSession: ${outcome.session_id || "not started"}\nProbe: ${probe}`
-      : `Fin → Foreman: failed\nCould not start or observe the run.\nProbe: ${probe}`;
+      ? `*${statusTitles[outcome.status]}*\n\n${outcome.message}`
+      : "*Investigation unavailable*\n\nThe check could not be started or its result retrieved.";
     await request("chat.update", { channel, text, ts: posted.ts });
   } catch {
     logOpsEvent("fin_preview_slack_failed", {

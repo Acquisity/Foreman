@@ -12,7 +12,7 @@ export function createFinCallback(url: string): FinCallbackState | null {
 
 export const finDiagnosticFailure = {
   message:
-    "Foreman could not complete or retrieve the investigation. Check the internal run before retrying.",
+    "The investigation could not be completed or retrieved. No findings are available.",
   status: "failed" as const,
 };
 
