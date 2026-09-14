@@ -1,6 +1,8 @@
+import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
+import { FIN_PREVIEW_TOOLKIT } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -8,6 +10,39 @@ export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
 export type ExecutorOutcome = Awaited<
   ReturnType<typeof executorTransport.call>
 >;
+const FIN_INTERCOM_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** The HTTP intake has no Eve session yet. Only these two identity reads run here. */
+export async function readFinIntercom(
+  operation: "get_conversation" | "get_contact",
+  id: string,
+  signal: AbortSignal
+): Promise<unknown> {
+  if (
+    !(
+      ["get_conversation", "get_contact"].includes(operation) &&
+      FIN_INTERCOM_ID.test(id)
+    )
+  ) {
+    throw new Error("Invalid Fin identity read.");
+  }
+  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
+  if (!connector) {
+    throw new Error("Fin identity verification is unavailable.");
+  }
+  signal.throwIfAborted();
+  const token = await getConnectToken(connector, { subject: { type: "app" } });
+  signal.throwIfAborted();
+  const result = await executorTransport.call(
+    { signal, token, toolkit: FIN_PREVIEW_TOOLKIT },
+    `intercom.org.foremanIntercom.${operation}`,
+    { id }
+  );
+  if (!result.ok || (result.http && result.http.status !== 200)) {
+    throw new Error("Fin identity verification is unavailable.");
+  }
+  return result.data;
+}
 
 async function connection(
   ctx: ProviderContext,
