@@ -2,11 +2,31 @@ import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import {
-  receiveFinProbe,
+  receiveFinProbe as receiveVerifiedFinProbe,
   waitForDiagnostic,
   waitForProbe,
 } from "./fin-preview.js";
 import type { FinProbeResult } from "./fin-preview-slack.js";
+
+const verifiedContext = {
+  contactId: "contact-1",
+  conversationId: "123456",
+  intercomAppId: "ls8uffkp",
+  organizationId: "33333333-3333-4333-8333-333333333333",
+  organizationName: "Diamond",
+  organizationSlug: "diamond-nF5ow",
+  origin: "https://app.example.test",
+  partnerId: "00000000-0000-0000-0000-000000000001",
+  role: "admin" as const,
+  userId: "11111111-1111-4111-8111-111111111111",
+  verifiedAt: "2026-09-14T12:00:00.000Z",
+} as const;
+const receiveFinProbe = (
+  incoming: Request,
+  args: Parameters<typeof receiveVerifiedFinProbe>[1],
+  waitMs?: number
+) =>
+  receiveVerifiedFinProbe(incoming, args, waitMs, async () => verifiedContext);
 
 type EventStream = Awaited<ReturnType<Session["getEventStream"]>>;
 type StreamEvent =
@@ -68,12 +88,25 @@ const sessionWithEvents = (events: StreamEvent[]): Session =>
     id: "test-session",
   }) as Session;
 
-const request = (body: string, authorization = "Bearer test-only-token") =>
-  new Request("https://preview.example.test/internal/fin-probe", {
-    body,
+const request = (body: string, authorization = "Bearer test-only-token") => {
+  let wireBody = body;
+  try {
+    const input = JSON.parse(body);
+    if (input.question || input.handle) {
+      wireBody = JSON.stringify({
+        conversation_id: verifiedContext.conversationId,
+        ...input,
+      });
+    }
+  } catch {
+    // Invalid JSON fixtures must reach the real request parser unchanged.
+  }
+  return new Request("https://preview.example.test/internal/fin-probe", {
+    body: wireBody,
     headers: { authorization, "content-type": "application/json" },
     method: "POST",
   });
+};
 
 describe("Fin preview intake", () => {
   for (const [name, environment] of [
@@ -247,6 +280,57 @@ const terminal = (
 ) => ({ data: {}, type }) as StreamEvent;
 
 describe("Fin diagnostic intake", () => {
+  it("rejects unverified workspace access before creating work or posting to Slack", async (context) => {
+    enablePreview(context);
+    let checks = 0;
+    const response = await receiveVerifiedFinProbe(
+      request(
+        JSON.stringify({ question: "Which workspace are you looking at?" }),
+        "Bearer signed-user-token"
+      ),
+      {
+        attachSession: () =>
+          assert.fail("unverified access must not read work"),
+        from: () => assert.fail("unverified access must not start work"),
+        waitUntil: () =>
+          assert.fail("unverified access must not post to Slack"),
+      },
+      5,
+      (input) => {
+        checks += 1;
+        assert.equal(input.userToken, "signed-user-token");
+        assert.equal(input.conversationId, verifiedContext.conversationId);
+        throw new Error("private provider credential");
+      }
+    );
+    assert.equal(checks, 1);
+    assert.equal(response.status, 403);
+    assert.ok(
+      !JSON.stringify(await response.json()).includes("private provider")
+    );
+  });
+
+  it("requires a conversation for a real question even with the old shared token", async (context) => {
+    enablePreview(context);
+    const response = await receiveVerifiedFinProbe(
+      new Request("https://preview.example.test/internal/fin-preview", {
+        body: JSON.stringify({ question: "Which workspace am I in?" }),
+        headers: { authorization: "Bearer test-only-token" },
+        method: "POST",
+      }),
+      {
+        attachSession: () =>
+          assert.fail("missing conversation must not read work"),
+        from: () => assert.fail("missing conversation must not start work"),
+        waitUntil: () =>
+          assert.fail("missing conversation must not post to Slack"),
+      },
+      5,
+      () => assert.fail("missing conversation must not query providers")
+    );
+    assert.equal(response.status, 403);
+  });
+
   it("rejects malformed, oversized, and caller-selected authority before starting work", async (context) => {
     enablePreview(context);
     await Promise.all(
@@ -336,16 +420,16 @@ describe("Fin diagnostic intake", () => {
             send(message, options) {
               starts += 1;
               assert.equal(typeof message, "string");
-              assert.ok(String(message).includes("Read-only:"));
-              assert.ok(
-                String(message).includes("aaron-fragas-workspace-wMUMT")
-              );
-              assert.ok(String(message).includes("aaron.fraga@acquisity.ai"));
+              assert.ok(String(message).includes("Diamond"));
+              assert.ok(String(message).includes("diamond-nF5ow"));
+              assert.ok(!String(message).includes("aaron-fragas-workspace"));
               assert.ok(
                 String(message).endsWith("Question:\nCheck my credits")
               );
               assert.equal(options.mode, "task");
-              assert.deepEqual(options.auth?.attributes, {});
+              assert.deepEqual(options.auth?.attributes, verifiedContext);
+              assert.equal(options.auth?.issuer, "foreman:fin-context-preview");
+              assert.equal(options.auth?.principalId, verifiedContext.userId);
               return Promise.resolve(sessionWithEvents(events));
             },
           }) as ReturnType<RouteHandlerArgs["from"]>,
@@ -381,6 +465,25 @@ describe("Fin diagnostic intake", () => {
       resultContext
     );
     assert.deepEqual(await read.json(), first);
+
+    for (const changedScope of [
+      { conversationId: "654321" },
+      { userId: "22222222-2222-4222-8222-222222222222" },
+      { organizationId: "44444444-4444-4444-8444-444444444444" },
+    ]) {
+      // biome-ignore lint/performance/noAwaitInLoops: verify each authority mismatch independently.
+      const denied = await receiveVerifiedFinProbe(
+        request(JSON.stringify({ action: "result", handle: first.run_handle })),
+        {
+          ...resultContext,
+          attachSession: () =>
+            assert.fail("another user, workspace or chat cannot read this run"),
+        },
+        5,
+        async () => ({ ...verifiedContext, ...changedScope })
+      );
+      assert.equal(denied.status, 403);
+    }
 
     const [payload, signature] = first.run_handle.split(".");
     const forged = JSON.parse(Buffer.from(payload, "base64url").toString());

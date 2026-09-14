@@ -1,4 +1,5 @@
 import { defineAgent, defineDynamic } from "eve";
+import { finContextModel } from "./lib/fin-context-model.js";
 import { gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 
@@ -22,10 +23,13 @@ export default defineAgent({
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "step.started": async () => {
+      "step.started": async (_event, ctx) => {
         const id = await resolveModel("orchestrator");
         return {
-          model: ticketLinkedModel(id),
+          model:
+            ctx.session.auth.initiator?.issuer === "foreman:fin-context-preview"
+              ? finContextModel(id)
+              : ticketLinkedModel(id),
           modelOptions: gatewayRouting(id),
         };
       },

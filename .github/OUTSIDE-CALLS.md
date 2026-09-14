@@ -25,6 +25,7 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | --- | --- | --- |
 | `scripts/executor-readiness.ts --live` | 20s per GET | Operator-only toolkit, policy, and connection-pattern metadata from the fixed Acquisity Executor API; redirects refused. Uses the selected local OAuth profile without requesting provider credentials or printing tokens. |
 | `agent/lib/executor/transport.ts` | 50s for handshake and invocation, composed with the caller and provider deadline | Covers body streaming; 8 MiB cap; redirects refused. Provider helpers below impose their tighter existing deadlines. |
+| `agent/lib/fin-context.ts` | 50s across the two native Intercom reads and Acquisity context POST, composed with request cancellation | Fixed configured HTTPS Acquisity origin; redirects refused; context body capped at 4 KiB. The exact conversation/contact reads use existing Executor transport. The Connect token lookup retains the SDK exemption below. |
 | `agent/lib/billing-api.ts` (Stripe, Autumn) | 20s per request | ENG-13315. Composed with the caller's signal; the failure is classified from the composed signal's first abort reason, so a late caller abort cannot turn a timeout into a cancellation. |
 | `agent/lib/instantly-api.ts` | 15s per request | ENG-13316. The deadline covers the complete typed call, including MCP response streaming in Executor transport; provider retries begin only after the prior invocation has settled. |
 | `agent/lib/linear-api.ts` | 15s per request | Composed with the caller's signal. |

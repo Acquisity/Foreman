@@ -15,45 +15,50 @@ describe("root agent limits", () => {
   });
 });
 
-it("accepts the wrapped root model under Eve's documented live-step contract", async (t) => {
-  t.mock.method(globalThis, "fetch", () =>
-    Promise.reject(new Error("No network in this test"))
-  );
-  // White-box regression against the lockfile's Eve 0.54.2 runtime. This private
-  // import deliberately fails on internal API drift so upgrades require review.
-  // It checks selection validation under the documented step -> live contract,
-  // not lifecycle dispatch end to end; no public API exposes this validation.
-  const eveRoot = pathToFileURL(
-    createRequire(import.meta.url).resolve("eve/package.json")
-  );
-  const { resolveRuntimeModelSelection } = await import(
-    new URL("dist/src/runtime/agent/resolve-model.js", eveRoot).href
-  );
-  const { events } = rootAgent.model;
-  assert.deepEqual(Object.keys(events), ["step.started"]);
-  const [[event, resolve]] = Object.entries(events);
-  const selection = await Reflect.apply(resolve, undefined, []);
-  const resolved = await resolveRuntimeModelSelection({
-    catalog: {
-      getByGatewayId: (id: string) =>
-        Promise.resolve({
-          contextWindowTokens: 200_000,
-          resolvedModelId: id,
-        }),
-    },
-    durability: event === "step.started" ? "live" : "durable",
-    selection,
-    state: { get: () => undefined, set: () => undefined },
+for (const issuer of ["foreman:slack", "foreman:fin-context-preview"]) {
+  it(`accepts the wrapped ${issuer} model under Eve's documented live-step contract`, async (t) => {
+    t.mock.method(globalThis, "fetch", () =>
+      Promise.reject(new Error("No network in this test"))
+    );
+    // White-box regression against the lockfile's Eve 0.54.2 runtime. This private
+    // import deliberately fails on internal API drift so upgrades require review.
+    // It checks selection validation under the documented step -> live contract,
+    // not lifecycle dispatch end to end; no public API exposes this validation.
+    const eveRoot = pathToFileURL(
+      createRequire(import.meta.url).resolve("eve/package.json")
+    );
+    const { resolveRuntimeModelSelection } = await import(
+      new URL("dist/src/runtime/agent/resolve-model.js", eveRoot).href
+    );
+    const { events } = rootAgent.model;
+    assert.deepEqual(Object.keys(events), ["step.started"]);
+    const [[event, resolve]] = Object.entries(events);
+    const selection = await Reflect.apply(resolve, undefined, [
+      {},
+      { session: { auth: { initiator: { issuer } } } },
+    ]);
+    const resolved = await resolveRuntimeModelSelection({
+      catalog: {
+        getByGatewayId: (id: string) =>
+          Promise.resolve({
+            contextWindowTokens: 200_000,
+            resolvedModelId: id,
+          }),
+      },
+      durability: event === "step.started" ? "live" : "durable",
+      selection,
+      state: { get: () => undefined, set: () => undefined },
+    });
+    assert.equal(resolved.model, selection.model);
+    assert.equal(typeof resolved.model.doStream, "function");
+    // The DeepSeek routing rides on the selection and eve forwards it as providerOptions.
+    // The order itself is pinned in models.test.ts; this only checks the forwarding.
+    const { gatewayRouting, MODELS } = await import("./lib/models.js");
+    const expected = gatewayRouting(MODELS.orchestrator);
+    assert.ok(expected);
+    assert.deepEqual(
+      resolved.reference.providerOptions,
+      expected.providerOptions
+    );
   });
-  assert.equal(resolved.model, selection.model);
-  assert.equal(typeof resolved.model.doStream, "function");
-  // The DeepSeek routing rides on the selection and eve forwards it as providerOptions.
-  // The order itself is pinned in models.test.ts; this only checks the forwarding.
-  const { gatewayRouting, MODELS } = await import("./lib/models.js");
-  const expected = gatewayRouting(MODELS.orchestrator);
-  assert.ok(expected);
-  assert.deepEqual(
-    resolved.reference.providerOptions,
-    expected.providerOptions
-  );
-});
+}
