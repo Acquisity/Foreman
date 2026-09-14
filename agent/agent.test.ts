@@ -17,8 +17,50 @@ describe("root agent limits", () => {
 
 for (const issuer of ["foreman:slack", "foreman:fin-context-preview"]) {
   it(`accepts the wrapped ${issuer} model under Eve's documented live-step contract`, async (t) => {
-    t.mock.method(globalThis, "fetch", () =>
-      Promise.reject(new Error("No network in this test"))
+    const previousKey = process.env.AI_GATEWAY_API_KEY;
+    process.env.AI_GATEWAY_API_KEY = "test-only-no-network";
+    t.after(() => {
+      if (previousKey === undefined) {
+        delete process.env.AI_GATEWAY_API_KEY;
+      } else {
+        process.env.AI_GATEWAY_API_KEY = previousKey;
+      }
+    });
+    const toolCall = {
+      input: "{}",
+      toolCallId: "issuer-check",
+      toolName: "bash",
+      type: "tool-call",
+    };
+    let providerRequest: { tools?: unknown; toolChoice?: unknown } | undefined;
+    t.mock.method(
+      globalThis,
+      "fetch",
+      (url: string | URL, init?: RequestInit) => {
+        if (
+          String(url) !== "https://ai-gateway.vercel.sh/v4/ai/language-model"
+        ) {
+          return Promise.reject(new Error("No network in this test"));
+        }
+        const body = init?.body;
+        assert.ok(typeof body === "string");
+        providerRequest = JSON.parse(body);
+        return Promise.resolve(
+          Response.json({
+            content: [toolCall],
+            finishReason: { raw: "tool_calls", unified: "tool-calls" },
+            usage: {
+              inputTokens: {
+                cacheRead: 0,
+                cacheWrite: 0,
+                noCache: 1,
+                total: 1,
+              },
+              outputTokens: { reasoning: 0, text: 1, total: 1 },
+            },
+          })
+        );
+      }
     );
     // White-box regression against the lockfile's Eve 0.54.2 runtime. This private
     // import deliberately fails on internal API drift so upgrades require review.
@@ -60,5 +102,26 @@ for (const issuer of ["foreman:slack", "foreman:fin-context-preview"]) {
       resolved.reference.providerOptions,
       expected.providerOptions
     );
+    // Exercise the selected model through its public provider boundary. Swapping
+    // the issuer branches must fail even though both satisfy Eve's model contract.
+    const tools = [
+      { inputSchema: { type: "object" }, name: "bash", type: "function" },
+    ];
+    const generated = selection.model.doGenerate({
+      prompt: [],
+      toolChoice: { type: "auto" },
+      tools,
+    });
+    if (issuer === "foreman:fin-context-preview") {
+      await assert.rejects(generated, {
+        message: "Fin context Preview cannot execute tools.",
+      });
+      assert.deepEqual(providerRequest?.tools, []);
+      assert.deepEqual(providerRequest?.toolChoice, { type: "none" });
+    } else {
+      assert.deepEqual((await generated).content, [toolCall]);
+      assert.deepEqual(providerRequest?.tools, tools);
+      assert.deepEqual(providerRequest?.toolChoice, { type: "auto" });
+    }
   });
 }
