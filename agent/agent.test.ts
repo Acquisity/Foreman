@@ -15,7 +15,11 @@ describe("root agent limits", () => {
   });
 });
 
-for (const issuer of ["foreman:slack", "foreman:fin-context-preview"]) {
+for (const issuer of [
+  "slack:T0A9AUZJXC2",
+  "foreman:fin-context-preview",
+  "foreman:fin-preview",
+]) {
   it(`accepts the wrapped ${issuer} model under Eve's documented live-step contract`, async (t) => {
     const previousKey = process.env.AI_GATEWAY_API_KEY;
     process.env.AI_GATEWAY_API_KEY = "test-only-no-network";
@@ -112,16 +116,16 @@ for (const issuer of ["foreman:slack", "foreman:fin-context-preview"]) {
       toolChoice: { type: "auto" },
       tools,
     });
-    if (issuer === "foreman:fin-context-preview") {
+    if (issuer === "slack:T0A9AUZJXC2") {
+      assert.deepEqual((await generated).content, [toolCall]);
+      assert.deepEqual(providerRequest?.tools, tools);
+      assert.deepEqual(providerRequest?.toolChoice, { type: "auto" });
+    } else {
       await assert.rejects(generated, {
         message: "Fin context Preview cannot execute tools.",
       });
       assert.deepEqual(providerRequest?.tools, []);
       assert.deepEqual(providerRequest?.toolChoice, { type: "none" });
-    } else {
-      assert.deepEqual((await generated).content, [toolCall]);
-      assert.deepEqual(providerRequest?.tools, tools);
-      assert.deepEqual(providerRequest?.toolChoice, { type: "auto" });
     }
   });
 }

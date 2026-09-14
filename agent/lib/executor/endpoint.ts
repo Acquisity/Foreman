@@ -29,9 +29,7 @@ export const finPreviewEnabled = () =>
   process.env.FIN_FOREMAN_PREVIEW_ENABLED === "true";
 
 export const toolkitUrl = (
-  slug: ExecutorToolkit = finPreviewEnabled()
-    ? FIN_PREVIEW_TOOLKIT
-    : FOREMAN_TOOLKIT_SLUG
+  slug: ExecutorToolkit = FOREMAN_TOOLKIT_SLUG
 ): string => {
   if (
     slug !== FOREMAN_TOOLKIT_SLUG &&

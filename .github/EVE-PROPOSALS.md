@@ -84,3 +84,26 @@ Checked against eve 0.44.0 after ENG-13601's first production intake tick. The c
 Eve 0.54.2 upgrade: retain the inert route and verify it in `channelRoutes.effective` of the compiled manifest. This upgrade does not remove the receive-only registration safeguard or expose an HTTP session-creation endpoint.
 
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
+
+## Slack reset acknowledgement expires before delayed control delivery
+
+Checked against Eve 0.54.2 during ENG-13763 Preview acceptance on 2026-09-14. This is an observed runtime failure, not an established websocket root cause.
+
+In root `wrun_41M2GKG1QM0GZ7MDCRRTPFQYG3` on `918c6d5`, a genuine Slack stop in the original thread resolved the correct session. The reset webhook returned HTTP 200, but Eve threw `Timed out waiting for session "wrun_41M2GKG1QM0GZ7MDCRRTPFQYG3" to release its command inbox.` after its 30-second wait. Foreman therefore never reached the subsequent "Stop requested." post. UTC evidence:
+
+| Event | Time on 2026-09-14 |
+| --- | --- |
+| Function request `jjpl7-1789411247394-9c021c350c75` started | 18:40:47.394 |
+| Last completed tool action | 18:41:07.082 |
+| Stop webhook requested the exact reset | 18:53:33.830 |
+| Workflow hook delivery invocation | 18:53:34.580 |
+| Original function reached HTTP 504 after 800 seconds | 18:54:07.410 |
+| Root emitted `turn.cancelled` on retry | 18:55:31.040 |
+
+The long `turnStep` had two attempts. Cancellation appeared about 117 seconds after stop, after the original invocation timed out and execution retried. Its external-request trace included a workflow websocket request lasting 799.90 seconds; model requests completed in 3.01 and 74.47 seconds, with no Executor reads. These observations locate the failure around live workflow control and retry; they do not prove why control was delayed or that a websocket lost a message. Turn cancellation alone does not prove final retirement or child settlement.
+
+Successful comparison: on 2026-09-13, root `wrun_41M2DBYW1D0GJ7S42CMJ9DDEN6` on deployment `dpl_5SgYb7Hj5hBzu3Hj8xonzgFqNYqw` was stopped during active bash/provider work. Genuine UI stop `1789302862.320299` preceded `turn.cancelled` at 12:34:26.166 UTC and Slack acknowledgement at 12:34:27.424249, approximately four and five seconds later. An earlier connector message with an added footer was ordinary input, not a reset attempt.
+
+Comparison through `8e92a5f` found Slack dispatch, stop handling, locked dependencies, ticket-link middleware and Executor cancellation transport unchanged from main and the preceding Fin revision. Ordinary Slack still selects the same model wrapper and preserves `abortSignal`; the Fin-only wrapper is not applied to it. This rules out those source changes, not a behavioral regression or deployment/runtime difference.
+
+Eve's public `Session.reset({ reason? })` and exact-ID reset route share the same command-inbox wait. There is no supported force option, configurable wait or separate accepted-reset receipt. `cancel({ tasks: true })` preserves the session and is not equivalent to retirement. No runtime patch or cancellation workaround is shipped here. Upstream investigation needs to reproduce this delayed-control case and distinguish accepted reset from completed retirement; a later successful stop must be recorded separately rather than erase this failure.

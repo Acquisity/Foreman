@@ -25,9 +25,11 @@ export default defineAgent({
     events: {
       "step.started": async (_event, ctx) => {
         const id = await resolveModel("orchestrator");
+        const issuer = ctx.session.auth.initiator?.issuer;
         return {
           model:
-            ctx.session.auth.initiator?.issuer === "foreman:fin-context-preview"
+            issuer === "foreman:fin-context-preview" ||
+            issuer === "foreman:fin-preview"
               ? finContextModel(id)
               : ticketLinkedModel(id),
           modelOptions: gatewayRouting(id),

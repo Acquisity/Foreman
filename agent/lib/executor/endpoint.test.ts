@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import {
   executorOrigin,
+  FIN_PREVIEW_TOOLKIT,
   finPreviewEnabled,
   SUPPORT_TOOLKIT,
   toolkitUrl,
 } from "./endpoint.js";
 
-it("restricts the default toolkit only in explicitly enabled Preview deployments", () => {
+it("keeps the normal default toolkit when Fin Preview is enabled", () => {
   const previous = {
     FIN_FOREMAN_PREVIEW_ENABLED: process.env.FIN_FOREMAN_PREVIEW_ENABLED,
     VERCEL_ENV: process.env.VERCEL_ENV,
@@ -33,10 +34,13 @@ it("restricts the default toolkit only in explicitly enabled Preview deployments
         process.env.VERCEL_ENV = environment;
       }
       assert.equal(finPreviewEnabled(), expected);
-      const toolkit = expected ? "foreman-fin-preview" : "foreman";
       assert.equal(
         toolkitUrl(),
-        `${executorOrigin()}/mcp/toolkits/${toolkit}?artifacts=false`
+        `${executorOrigin()}/mcp/toolkits/foreman?artifacts=false`
+      );
+      assert.equal(
+        toolkitUrl(FIN_PREVIEW_TOOLKIT),
+        `${executorOrigin()}/mcp/toolkits/foreman-fin-preview?artifacts=false`
       );
       assert.equal(
         toolkitUrl(SUPPORT_TOOLKIT),
