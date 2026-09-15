@@ -1,7 +1,6 @@
 import { logOpsEvent } from "./ops-log.js";
 
 export interface FinInvestigationCallbackState {
-  answer: string;
   delivered: boolean;
   url: string;
 }
@@ -11,6 +10,45 @@ export const finInvestigationFailure = {
     "The investigation could not be completed. No findings are available.",
   status: "failed" as const,
 };
+
+export type FinInvestigationOutcome =
+  | typeof finInvestigationFailure
+  | { message: string; status: "completed" };
+
+type FinInvestigationEvent =
+  | {
+      type: "message.completed";
+      finishReason: string;
+      message: string | null;
+    }
+  | { type: "session.completed" | "session.failed" | "turn.started" };
+
+export function reduceFinEvent(
+  answer: string,
+  event: FinInvestigationEvent
+): { answer: string; outcome: FinInvestigationOutcome | null } {
+  if (event.type === "turn.started") {
+    return { answer: "", outcome: null };
+  }
+  if (event.type === "message.completed") {
+    return {
+      answer:
+        event.finishReason === "stop"
+          ? boundedFinAnswer(event.message)
+          : answer,
+      outcome: null,
+    };
+  }
+  if (event.type === "session.failed") {
+    return { answer, outcome: finInvestigationFailure };
+  }
+  return {
+    answer,
+    outcome: answer
+      ? { message: answer, status: "completed" }
+      : finInvestigationFailure,
+  };
+}
 
 export function boundedFinAnswer(message: string | null | undefined) {
   const answer = message?.trim() ?? "";
@@ -33,12 +71,12 @@ export function isFinCallbackUrl(value: string): boolean {
 export const createFinCallback = (
   url: string
 ): FinInvestigationCallbackState | null =>
-  url ? { answer: "", delivered: false, url } : null;
+  url ? { delivered: false, url } : null;
 
 export async function deliverFinCallback(
   state: FinInvestigationCallbackState | null,
   sessionId: string,
-  status: "completed" | "failed",
+  outcome: FinInvestigationOutcome,
   request: typeof fetch = fetch
 ): Promise<void> {
   if (!state || state.delivered) {
@@ -48,12 +86,8 @@ export async function deliverFinCallback(
     if (!isFinCallbackUrl(state.url)) {
       throw new Error("Invalid Fin callback destination.");
     }
-    const result =
-      status === "completed" && state.answer
-        ? { message: state.answer, status }
-        : finInvestigationFailure;
     const response = await request(state.url, {
-      body: JSON.stringify(result),
+      body: JSON.stringify(outcome),
       headers: { "content-type": "application/json" },
       method: "POST",
       redirect: "error",
@@ -63,12 +97,12 @@ export async function deliverFinCallback(
       throw new Error("Fin callback delivery failed.");
     }
     state.delivered = true;
-    logOpsEvent("fin_investigation_callback_delivered", {
-      outcome: result.status,
+    logOpsEvent("fin.investigation.callback.delivered", {
+      outcome: outcome.status,
       sessionId,
     });
   } catch {
-    logOpsEvent("fin_investigation_callback_failed", {
+    logOpsEvent("fin.investigation.callback.failed", {
       message: "Fin investigation callback could not be delivered.",
       sessionId,
     });

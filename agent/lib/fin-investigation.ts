@@ -4,12 +4,11 @@ import { z } from "zod";
 import { verifyFinContext } from "./fin-context.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
 import {
-  boundedFinAnswer,
   createFinCallback,
-  deliverFinCallback,
   type FinInvestigationCallbackState,
   finInvestigationFailure,
   isFinCallbackUrl,
+  reduceFinEvent,
 } from "./fin-investigation-callback.js";
 import {
   type FinInvestigationResult,
@@ -30,32 +29,6 @@ const pending = {
     "The investigation has started. Wait for its result before answering the customer.",
   status: "pending" as const,
 };
-const genericWorkspaceReferences = new Set([
-  "another",
-  "any",
-  "current",
-  "different",
-  "my",
-  "other",
-  "our",
-  "same",
-  "that",
-  "the",
-  "this",
-  "what",
-  "which",
-  "whose",
-  "your",
-]);
-const namedWorkspaceReference =
-  /\b([\p{L}\p{N}][\p{L}\p{N}'’&.-]{1,63})\s+workspace\b/giu;
-const workspaceNameTokens = (name: string) =>
-  new Set(
-    name.toLocaleLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'’&.-]*/gu) ?? []
-  );
-const otherWorkspaceRequest = /\b(?:another|different|other)\s+workspace\b/iu;
-const workspaceRedirect =
-  "I can't check that here because it's a different workspace.";
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
     headers: { "cache-control": "no-store" },
@@ -85,28 +58,6 @@ const readRequestBody = async (request: Request) => {
   }
 };
 
-export function foreignWorkspaceRedirect(
-  question: string,
-  organizationName: string
-): string | null {
-  if (otherWorkspaceRequest.test(question)) {
-    return workspaceRedirect;
-  }
-  const currentTokens = workspaceNameTokens(organizationName);
-  namedWorkspaceReference.lastIndex = 0;
-  for (const match of question.matchAll(namedWorkspaceReference)) {
-    const reference = match[1]?.toLocaleLowerCase();
-    if (
-      reference &&
-      !genericWorkspaceReferences.has(reference) &&
-      !currentTokens.has(reference)
-    ) {
-      return workspaceRedirect;
-    }
-  }
-  return null;
-}
-
 /** Task completion, rather than an intermediate tool-call block, owns the answer. */
 export async function waitForFinInvestigation(
   session: Pick<Session, "getEventStream">,
@@ -125,19 +76,22 @@ export async function waitForFinInvestigation(
       if (done) {
         return pending;
       }
-      if (event.type === "turn.started") {
-        answer = "";
-      } else if (
-        event.type === "message.completed" &&
-        event.data.finishReason === "stop"
+      if (
+        event.type === "turn.started" ||
+        event.type === "session.completed" ||
+        event.type === "session.failed"
       ) {
-        answer = boundedFinAnswer(event.data.message);
-      } else if (event.type === "session.completed") {
-        return answer
-          ? { message: answer, status: "completed" }
-          : finInvestigationFailure;
-      } else if (event.type === "session.failed") {
-        return finInvestigationFailure;
+        const reduced = reduceFinEvent(answer, { type: event.type });
+        ({ answer } = reduced);
+        if (reduced.outcome) {
+          return reduced.outcome;
+        }
+      } else if (event.type === "message.completed") {
+        ({ answer } = reduceFinEvent(answer, {
+          finishReason: event.data.finishReason,
+          message: event.data.message,
+          type: "message.completed",
+        }));
       }
     }
   } catch {
@@ -162,8 +116,7 @@ export async function receiveFinInvestigation(
     "from" | "waitUntil"
   >,
   responseWaitMs = 8000,
-  verifyContext = verifyFinContext,
-  callbackDelivery = deliverFinCallback
+  verifyContext = verifyFinContext
 ) {
   if (
     process.env.VERCEL_ENV !== "preview" ||
@@ -217,27 +170,6 @@ export async function receiveFinInvestigation(
 
   const requestId = randomUUID();
   const slack = await postFinInvestigationReceipt(requestId);
-  const redirect = foreignWorkspaceRedirect(
-    input.question,
-    context.organizationName
-  );
-  if (redirect) {
-    const outcome = { message: redirect, status: "completed" as const };
-    const callback = createFinCallback(input.callback_url);
-    if (callback) {
-      callback.answer = redirect;
-    }
-    waitUntil(
-      Promise.all([
-        callbackDelivery(callback, requestId, "completed"),
-        updateFinInvestigationReceipt(slack, outcome),
-      ])
-    );
-    return json({
-      session_id: requestId,
-      ...(input.callback_url ? pending : outcome),
-    });
-  }
   try {
     const session = await from(requestId).send(input.question, {
       auth: finInvestigationAuth(context),

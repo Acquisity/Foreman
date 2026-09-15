@@ -2,41 +2,34 @@ import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { createFinInvestigationTicket } from "#lib/executor/dispatch.js";
 import { isFinInvestigation } from "#lib/fin-investigation-auth.js";
+import { providerData } from "#lib/support/conversation.js";
 
-const issueUrl = /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:\/|$)/u;
+const issueUrl =
+  /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:\/[^\s?#]*)?(?:[?#][^\s]*)?$/u;
 const issueIdentifier = /^ENG-\d+$/u;
+const writtenIssue = z
+  .object({
+    identifier: z.string().regex(issueIdentifier),
+    url: z.string().regex(issueUrl),
+  })
+  .transform((issue, ctx) => {
+    if (issueUrl.exec(issue.url)?.[1] !== issue.identifier) {
+      ctx.addIssue({ code: "custom", message: "Issue URL does not match." });
+      return z.NEVER;
+    }
+    return issue;
+  });
 
-const findIssue = (
-  value: unknown
-): { identifier: string; url: string } | null => {
-  if (typeof value === "string") {
-    try {
-      return findIssue(JSON.parse(value));
-    } catch {
-      const match = issueUrl.exec(value);
-      return match ? { identifier: match[1], url: match[0] } : null;
-    }
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const issue = findIssue(item);
-      if (issue) {
-        return issue;
-      }
-    }
-  } else if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (
-      typeof record.identifier === "string" &&
-      issueIdentifier.test(record.identifier) &&
-      typeof record.url === "string" &&
-      issueUrl.test(record.url)
-    ) {
-      return { identifier: record.identifier, url: record.url };
-    }
-    return findIssue(Object.values(record));
-  }
-  return null;
+export const confirmedFinIssue = (data: unknown) =>
+  writtenIssue.parse(providerData(data));
+
+export const formatFinCustomerReport = (summary: string) => {
+  const longestRun = Math.max(
+    0,
+    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
+  );
+  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  return `## Customer report\n\n${fence}text\n${summary}\n${fence}`;
 };
 
 const tool = defineTool({
@@ -50,17 +43,21 @@ const tool = defineTool({
       };
     }
     try {
-      const result = await createFinInvestigationTicket(ctx, input);
+      const result = await createFinInvestigationTicket(ctx, {
+        report: formatFinCustomerReport(input.summary),
+        title: input.title,
+      });
       if (!result.ok) {
         return { error: "Linear did not accept the ticket." };
       }
-      const issue = findIssue(result.data);
-      return (
-        issue ?? {
+      try {
+        return confirmedFinIssue(result.data);
+      } catch {
+        return {
           error:
             "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
-        }
-      );
+        };
+      }
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;

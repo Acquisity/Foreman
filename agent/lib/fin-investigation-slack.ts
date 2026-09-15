@@ -72,7 +72,7 @@ export async function postFinInvestigationReceipt(
     });
     return { channel, delivered: false, ts: posted.ts };
   } catch {
-    logOpsEvent("fin_investigation_slack_failed", {
+    logOpsEvent("fin.investigation.slack.failed", {
       message: "Fin investigation Slack notification could not be delivered.",
     });
     return null;
@@ -98,7 +98,7 @@ export async function updateFinInvestigationReceipt(
     });
     receipt.delivered = true;
   } catch {
-    logOpsEvent("fin_investigation_slack_failed", {
+    logOpsEvent("fin.investigation.slack.failed", {
       message: "Fin investigation Slack notification could not be delivered.",
     });
   }

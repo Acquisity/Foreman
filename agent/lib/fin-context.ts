@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { DEFAULT_PARTNER_ID } from "./billing-account.js";
+import { INTERCOM_WORKSPACE } from "./acquisity-constants.js";
 import { readFinIntercom } from "./executor/dispatch.js";
-import { type FinContext, finContextSchema } from "./fin-scope.js";
-import { INTERCOM_WORKSPACE } from "./support/config.js";
+import {
+  type FinContext,
+  finAppContextSchema,
+  finContextSchema,
+} from "./fin-scope.js";
 import { providerData } from "./support/conversation.js";
 
 const MAX_CONTEXT_BYTES = 4096;
@@ -32,16 +35,6 @@ const contactSchema = z.object({
   external_id: z.uuid(),
   id: contactId,
   workspace_id: z.literal(INTERCOM_WORKSPACE),
-});
-const appContextSchema = z.strictObject({
-  intercomAppId: z.literal(INTERCOM_WORKSPACE),
-  organizationId: z.uuid(),
-  organizationName: z.string().min(1).max(500),
-  organizationSlug,
-  partnerId: z.literal(DEFAULT_PARTNER_ID),
-  role: z.enum(["owner", "admin"]),
-  userId: z.uuid(),
-  verifiedAt: z.iso.datetime(),
 });
 
 export type { FinContext } from "./fin-scope.js";
@@ -158,7 +151,7 @@ export async function verifyFinContext(
     response.body?.cancel().catch(() => undefined);
     throw new Error("Workspace investigation access could not be verified.");
   }
-  const verified = appContextSchema.parse(
+  const verified = finAppContextSchema.parse(
     await readContextBody(response, signal)
   );
   if (

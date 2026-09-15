@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { parseReadQueryResult } from "./planetscale.js";
 
 /** Organization ids are uuids in `packages/db` (`primaryId`). */
@@ -9,8 +10,6 @@ export const organizationIdSchema = z.string().trim().toLowerCase().uuid();
  * organizations carry it or null; any other partner id puts billing on the
  * partner's provider (`resolveBillingProviderForPartner`).
  */
-export const DEFAULT_PARTNER_ID = "00000000-0000-0000-0000-000000000001";
-
 /** Rows per history list; hitting it sets the matching `truncated` flag. */
 export const HISTORY_LIMIT = 20;
 

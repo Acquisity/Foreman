@@ -9,71 +9,6 @@ const ALLOWED_TOOLS = new Set([
   "task_cancel",
 ]);
 const BLOCKED = "Customer investigation capability is unavailable.";
-const TICKET_TOOL = "file_fin_investigation_ticket";
-const TICKET_REQUEST =
-  /\b(?:file|create|open|raise|log|submit)\b[\s\S]{0,120}\b(?:engineering\s+)?(?:ticket|issue)\b/iu;
-const NEGATED_TICKET_REQUEST =
-  /\b(?:do\s+not|don't|dont|never)\s+(?:file|create|open|raise|log|submit)\b[\s\S]{0,120}\b(?:ticket|issue)\b/iu;
-
-interface PromptMessage {
-  content: unknown;
-  role: string;
-}
-
-const userText = (content: unknown) => {
-  if (typeof content === "string") {
-    return content;
-  }
-  if (!Array.isArray(content)) {
-    return "";
-  }
-  return content
-    .filter(
-      (part): part is { text: string; type: "text" } =>
-        typeof part === "object" &&
-        part !== null &&
-        "type" in part &&
-        part.type === "text" &&
-        "text" in part &&
-        typeof part.text === "string"
-    )
-    .map((part) => part.text)
-    .join("\n");
-};
-
-const hasTicketCall = (content: unknown) =>
-  Array.isArray(content) &&
-  content.some(
-    (part) =>
-      typeof part === "object" &&
-      part !== null &&
-      "type" in part &&
-      part.type === "tool-call" &&
-      "toolName" in part &&
-      part.toolName === TICKET_TOOL
-  );
-
-const needsTicketCall = (prompt: readonly PromptMessage[]) => {
-  let userIndex = -1;
-  for (let index = prompt.length - 1; index >= 0; index -= 1) {
-    if (prompt[index]?.role === "user") {
-      userIndex = index;
-      break;
-    }
-  }
-  if (userIndex < 0) {
-    return false;
-  }
-  const request = userText(prompt[userIndex]?.content).slice(0, 4096);
-  const explicitRequest =
-    !NEGATED_TICKET_REQUEST.test(request) && TICKET_REQUEST.test(request);
-  return (
-    explicitRequest &&
-    !prompt
-      .slice(userIndex + 1)
-      .some((message) => hasTicketCall(message.content))
-  );
-};
 
 const namedTool = (part: { toolName?: unknown }) =>
   typeof part.toolName === "string" && ALLOWED_TOOLS.has(part.toolName);
@@ -112,19 +47,15 @@ function assertAllowedStreamPart(
 export const finInvestigationMiddleware: LanguageModelMiddleware = {
   specificationVersion: "v4",
   transformParams({ params }) {
-    const { prompt, toolChoice: requestedToolChoice } = params;
+    const { toolChoice: requestedToolChoice } = params;
     const tools = params.tools?.filter(
       (tool) => typeof tool.name === "string" && ALLOWED_TOOLS.has(tool.name)
     );
-    let toolChoice = requestedToolChoice;
-    if (needsTicketCall(prompt)) {
-      toolChoice = { toolName: TICKET_TOOL, type: "tool" };
-    } else if (
-      toolChoice?.type === "tool" &&
-      !ALLOWED_TOOLS.has(toolChoice.toolName)
-    ) {
-      toolChoice = { type: "auto" };
-    }
+    const toolChoice =
+      requestedToolChoice?.type === "tool" &&
+      !ALLOWED_TOOLS.has(requestedToolChoice.toolName)
+        ? { type: "auto" as const }
+        : requestedToolChoice;
     return Promise.resolve({ ...params, toolChoice, tools });
   },
   async wrapGenerate({ doGenerate }) {

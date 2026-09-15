@@ -3,7 +3,6 @@ import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 
 export const SUPPORT_CHANNEL = "C0C0DV1AR8T";
 export const SUPPORT_TEAM = ENGINEERING_TEAM_ID;
-export const INTERCOM_WORKSPACE = "ls8uffkp";
 export const creationRole = z.enum([
   "customer-report",
   "billing",

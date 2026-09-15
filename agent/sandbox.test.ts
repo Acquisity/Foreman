@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { verifiedFinContext } from "./lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "./lib/fin-investigation-auth.js";
-import { verifiedFinContext } from "./lib/fin-investigation-auth.test.js";
 import { sandboxSessionOptions } from "./sandbox.js";
 
 test("customer investigations receive a deny-all sandbox network policy", () => {

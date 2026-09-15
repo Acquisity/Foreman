@@ -114,68 +114,14 @@ describe("Fin customer investigation model boundary", () => {
     assert.deepEqual(generated.content, [toolCall("agent")]);
   });
 
-  it("forces an explicit customer ticket request once, then resumes normally", async () => {
-    const base = new MockLanguageModelV4({ doGenerate: result("agent") });
-    const model = wrapLanguageModel({
-      middleware: finInvestigationMiddleware,
-      model: base,
-    });
-    const request = {
-      content: [
-        {
-          text: "Please file an engineering ticket for this report.",
-          type: "text" as const,
-        },
-      ],
-      role: "user" as const,
-    };
-    await model.doGenerate({ prompt: [request] });
-    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, {
-      toolName: "file_fin_investigation_ticket",
-      type: "tool",
-    });
-
-    await model.doGenerate({
-      prompt: [
-        request,
-        {
-          content: [toolCall("file_fin_investigation_ticket")],
-          role: "assistant",
-        },
-      ],
-      toolChoice: { type: "auto" },
-    });
-    assert.deepEqual(base.doGenerateCalls[1]?.toolChoice, { type: "auto" });
-  });
-
-  it("does not turn a refusal to file into a ticket write", async () => {
-    const base = new MockLanguageModelV4({ doGenerate: result("agent") });
-    const model = wrapLanguageModel({
-      middleware: finInvestigationMiddleware,
-      model: base,
-    });
-    await model.doGenerate({
-      prompt: [
-        {
-          content: [
-            {
-              text: "Please do not file another ticket for this issue.",
-              type: "text",
-            },
-          ],
-          role: "user",
-        },
-      ],
-      toolChoice: { type: "auto" },
-    });
-    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
-  });
-
   for (const reference of [
+    "Please file an engineering ticket for this report.",
+    "Please do not file another ticket for this issue.",
     "Was a ticket opened for this report?",
     "A ticket was created for this report.",
+    "When I open the campaign, the issue is that leads do not log in.",
   ]) {
-    it(`does not turn a past ticket reference into a write: ${reference}`, async () => {
+    it(`does not force a ticket write from customer text: ${reference}`, async () => {
       const base = new MockLanguageModelV4({ doGenerate: result("agent") });
       const model = wrapLanguageModel({
         middleware: finInvestigationMiddleware,

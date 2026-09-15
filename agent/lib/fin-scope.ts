@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  DEFAULT_PARTNER_ID,
+  INTERCOM_WORKSPACE,
+} from "./acquisity-constants.js";
 
 const contactId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const conversationId = z.string().regex(/^\d{1,32}$/);
@@ -15,15 +19,21 @@ const origin = z
 export const finContextSchema = z.strictObject({
   contactId,
   conversationId,
-  intercomAppId: z.literal("ls8uffkp"),
+  intercomAppId: z.literal(INTERCOM_WORKSPACE),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug,
   origin,
-  partnerId: z.literal("00000000-0000-0000-0000-000000000001"),
+  partnerId: z.literal(DEFAULT_PARTNER_ID),
   role: z.enum(["owner", "admin"]),
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
+});
+
+export const finAppContextSchema = finContextSchema.omit({
+  contactId: true,
+  conversationId: true,
+  origin: true,
 });
 
 export type FinContext = Readonly<z.infer<typeof finContextSchema>>;

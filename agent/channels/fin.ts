@@ -2,10 +2,10 @@ import { defineChannel, POST } from "eve/channels";
 import { receiveFinContext } from "../lib/fin-context-route.js";
 import { receiveFinInvestigation } from "../lib/fin-investigation.js";
 import {
-  boundedFinAnswer,
   deliverFinCallback,
   type FinInvestigationCallbackState,
   finInvestigationFailure,
+  reduceFinEvent,
 } from "../lib/fin-investigation-callback.js";
 import {
   type FinInvestigationSlackReceipt,
@@ -16,25 +16,32 @@ export default defineChannel({
   context: (state) => ({ state }),
   events: {
     "message.completed"(event, channel) {
-      if (event.finishReason !== "tool-calls") {
-        channel.state.answer = boundedFinAnswer(event.message);
-        if (channel.state.callback) {
-          channel.state.callback.answer = channel.state.answer;
-        }
-      }
+      channel.state.answer = reduceFinEvent(channel.state.answer, {
+        finishReason: event.finishReason,
+        message: event.message,
+        type: "message.completed",
+      }).answer;
     },
     async "session.completed"(_event, channel, ctx) {
-      const outcome = channel.state.answer
-        ? { message: channel.state.answer, status: "completed" as const }
-        : finInvestigationFailure;
+      const { outcome } = reduceFinEvent(channel.state.answer, {
+        type: "session.completed",
+      });
       await Promise.all([
-        deliverFinCallback(channel.state.callback, ctx.session.id, "completed"),
+        deliverFinCallback(
+          channel.state.callback,
+          ctx.session.id,
+          outcome ?? finInvestigationFailure
+        ),
         updateFinInvestigationReceipt(channel.state.slack, outcome),
       ]);
     },
     async "session.failed"(event, channel) {
       await Promise.all([
-        deliverFinCallback(channel.state.callback, event.sessionId, "failed"),
+        deliverFinCallback(
+          channel.state.callback,
+          event.sessionId,
+          finInvestigationFailure
+        ),
         updateFinInvestigationReceipt(
           channel.state.slack,
           finInvestigationFailure
@@ -42,10 +49,9 @@ export default defineChannel({
       ]);
     },
     "turn.started"(_event, channel) {
-      channel.state.answer = "";
-      if (channel.state.callback) {
-        channel.state.callback.answer = "";
-      }
+      channel.state.answer = reduceFinEvent(channel.state.answer, {
+        type: "turn.started",
+      }).answer;
     },
   },
   routes: [

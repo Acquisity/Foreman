@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { conversationId, INTERCOM_WORKSPACE } from "./config.js";
+import { INTERCOM_WORKSPACE } from "../acquisity-constants.js";
+import { conversationId } from "./config.js";
 import type { SupportSlackMessage } from "./slack.js";
 
 const CONVERSATION_PATH = /\/(?:conversation|conversations)\/(\d+)(?=\/|$)/g;
