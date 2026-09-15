@@ -147,4 +147,27 @@ describe("Fin customer investigation model boundary", () => {
     });
     assert.deepEqual(base.doGenerateCalls[1]?.toolChoice, { type: "auto" });
   });
+
+  it("does not turn a refusal to file into a ticket write", async () => {
+    const base = new MockLanguageModelV4({ doGenerate: result("agent") });
+    const model = wrapLanguageModel({
+      middleware: finInvestigationMiddleware,
+      model: base,
+    });
+    await model.doGenerate({
+      prompt: [
+        {
+          content: [
+            {
+              text: "Please do not file another ticket for this issue.",
+              type: "text",
+            },
+          ],
+          role: "user",
+        },
+      ],
+      toolChoice: { type: "auto" },
+    });
+    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
+  });
 });
