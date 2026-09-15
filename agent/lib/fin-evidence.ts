@@ -200,7 +200,8 @@ export function parseFinEvidence(
     case "campaign": {
       if (result.records.length === 0) {
         return {
-          message: "That campaign is not available in this chat's workspace.",
+          message:
+            "That campaign is not available in this chat's workspace. This result does not establish whether it exists in another workspace; do not infer that it does.",
           status: "not_available",
         };
       }
