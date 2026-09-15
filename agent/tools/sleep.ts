@@ -10,9 +10,10 @@ import { z } from "zod";
  * upstream schema caps `seconds` at `(2**53 - 1) / 1000`, so a model could
  * park a turn for an arbitrary length of time. This repository removed
  * `ask_question` for exactly that reason: a parked turn on Slack can never be
- * answered, and `sleep` can park a turn the same way. Capping the wait keeps
+ * answered, and `sleep` can park a turn the same way. Capping each wait keeps
  * the tool useful for short polling (the review-bot loop sleeps 60 seconds at
- * a time) without letting a turn stall indefinitely.
+ * a time), while the description keeps delegated-task delivery out of a
+ * repeated polling loop.
  */
 
 const MAX_SLEEP_SECONDS = 600;
@@ -21,7 +22,7 @@ const base = sleep();
 
 export default defineWorkflowTool({
   ...base,
-  description: `${base.description} The wait is capped at ${MAX_SLEEP_SECONDS} seconds.`,
+  description: `${base.description} Use it to pause before checking external state again, not to wait for vision, critic, or native-agent results; eve delivers those separately. The wait is capped at ${MAX_SLEEP_SECONDS} seconds.`,
   inputSchema: z.strictObject({
     seconds: z
       .number()

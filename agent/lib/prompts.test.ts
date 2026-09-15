@@ -35,6 +35,14 @@ describe("composePrompt", () => {
     );
   });
 
+  it("hands delegated-task waiting back to eve instead of polling with sleep", () => {
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "Never call `sleep` only to wait for a delegated task. Once independent work is finished, end the current turn and let eve deliver the result in a later turn."
+      )
+    );
+  });
+
   it("limits the Slack wording skill to the two intended channels", () => {
     assert.ok(
       GENERAL_PROMPT.includes(
