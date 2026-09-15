@@ -16,7 +16,11 @@ export async function receiveFinContext(
   request: Request,
   verifyContext = verifyFinContext
 ) {
-  if (process.env.FIN_CONTEXT_ENABLED !== "true") {
+  // Production activation requires a separately approved rollout change.
+  if (
+    process.env.VERCEL_ENV === "production" ||
+    process.env.FIN_CONTEXT_ENABLED !== "true"
+  ) {
     return json({ error: "Not found." }, 404);
   }
   const token = bearer.exec(request.headers.get("authorization") ?? "")?.[1];

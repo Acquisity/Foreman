@@ -33,18 +33,34 @@ function setEnv(t: TestContext, key: string, value: string | undefined) {
   });
 }
 
-test("disabled identity route does no verification, including in production", async (t) => {
-  for (const enabled of [undefined, "false"]) {
+test("production identity route does no verification even when enabled", async (t) => {
+  let calls = 0;
+  const verifier: typeof verifyFinContext = () => {
+    calls += 1;
+    throw new Error("Production must never verify identity.");
+  };
+  for (const enabled of [undefined, "false", "true"]) {
     setEnv(t, "FIN_CONTEXT_ENABLED", enabled);
     setEnv(t, "VERCEL_ENV", "production");
     // biome-ignore lint/performance/noAwaitInLoops: each case changes process environment.
-    const response = await receiveFinContext(request(body), unexpected);
+    const response = await receiveFinContext(request(body), verifier);
     assert.equal(response.status, 404);
     assert.equal(response.headers.get("cache-control"), "no-store");
   }
+  assert.equal(calls, 0);
+});
+
+test("Preview identity route requires explicit enablement", async (t) => {
+  setEnv(t, "VERCEL_ENV", "preview");
+  setEnv(t, "FIN_CONTEXT_ENABLED", undefined);
+  assert.equal(
+    (await receiveFinContext(request(body), unexpected)).status,
+    404
+  );
 });
 
 test("rejects missing identity and caller-authored authority before verification", async (t) => {
+  setEnv(t, "VERCEL_ENV", "preview");
   setEnv(t, "FIN_CONTEXT_ENABLED", "true");
   for (const token of ["", "Bearer invalid token", "Basic abc"]) {
     assert.equal(
@@ -78,9 +94,9 @@ test("rejects missing identity and caller-authored authority before verification
   );
 });
 
-test("returns only the verifier's context and does not require a Preview environment", async (t) => {
+test("enabled Preview route returns only the verifier's context", async (t) => {
   setEnv(t, "FIN_CONTEXT_ENABLED", "true");
-  setEnv(t, "VERCEL_ENV", "production");
+  setEnv(t, "VERCEL_ENV", "preview");
   const context = Object.freeze({
     contactId: "contact-1",
     conversationId: "12345",
@@ -112,6 +128,7 @@ test("returns only the verifier's context and does not require a Preview environ
 });
 
 test("verification failure returns no context or provider error details", async (t) => {
+  setEnv(t, "VERCEL_ENV", "preview");
   setEnv(t, "FIN_CONTEXT_ENABLED", "true");
   const response = await receiveFinContext(request(body), () => {
     throw new Error("private provider error and credential");

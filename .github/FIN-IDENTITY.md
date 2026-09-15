@@ -8,7 +8,9 @@ This is the permanent identity portion extracted from Foreman PR #132. The exper
 
 Mutable contact attributes, supplied workspace IDs and customer text cannot select authority. The native source URL identifies the requested workspace; Acquisity's live authorization grants access. Existing chats retain their original workspace across page navigation. The two fixed Intercom reads use the shared `foreman` Executor toolkit; no Preview-specific toolkit or new provider grant is introduced.
 
-The route returns 404 unless `FIN_CONTEXT_ENABLED=true`. `ACQUISITY_FIN_ORIGIN` must be the exact HTTPS origin of the matching Acquisity deployment. Leave the flag unset in Production. Eventual enablement requires explicit rollout approval and the remaining child-ticket acceptance; merging code does not enable the entry. Missing/malformed identity returns 401, invalid request shape 400, excessive body length 413, and verification failure 403 without provider details.
+The route returns 404 in Vercel Production regardless of `FIN_CONTEXT_ENABLED`, before reading identity or calling a provider. Elsewhere it returns 404 unless `FIN_CONTEXT_ENABLED=true`. `ACQUISITY_FIN_ORIGIN` must be the exact HTTPS origin of the matching Acquisity deployment. Production activation requires a separately approved code change after the remaining child-ticket acceptance; merging this PR or enabling its flag cannot activate the Production entry. Missing/malformed identity returns 401, invalid request shape 400, excessive body length 413, and verification failure 403 without provider details.
+
+During rollout testing, Intercom start/result connectors and the Preview Slack connector must target the experimental Preview branch only. Keep the Production Slack connector on its normal Production trigger. Merged identity code is not permission to retarget tests to Production. ENG-13764 and ENG-13766 must preserve this Production block on any new investigation entry until the ENG-13768 rollout is explicitly approved.
 
 ## Extraction from #132
 
@@ -16,7 +18,7 @@ The route returns 404 unless `FIN_CONTEXT_ENABLED=true`. `ACQUISITY_FIN_ORIGIN` 
 | --- | --- |
 | Native Intercom conversation/contact validation | Synthetic connection probe and marker replies |
 | Live Acquisity identity/membership verification | LLM identity-only sessions and tool-blocking middleware |
-| Immutable verified context and negative tests | Preview-specific toolkit and environment restrictions |
+| Immutable verified context, negative tests and Production rollout block | Preview-specific toolkit selection |
 | Two fixed Executor identity reads | Slack receipts, callbacks, signed run handles and result polling |
 
 The delivery code remains useful implementation material for ENG-13766, but is not required to verify identity. This extraction does not alter agent configuration, model selection, Slack behavior, schedules, dependencies or database schemas.
