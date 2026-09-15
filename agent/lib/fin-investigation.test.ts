@@ -208,6 +208,13 @@ test("recognizes only explicit foreign workspace references", () => {
   );
   assert.equal(
     foreignWorkspaceRedirect(
+      "The problem is in Diamond workspace. Can you investigate it?",
+      context.organizationName
+    ),
+    "I can't check that here because it's a different workspace."
+  );
+  assert.equal(
+    foreignWorkspaceRedirect(
       "Please check another workspace.",
       context.organizationName
     ),

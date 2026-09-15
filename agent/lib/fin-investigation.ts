@@ -32,6 +32,7 @@ const pending = {
 };
 const genericWorkspaceReferences = new Set([
   "another",
+  "any",
   "current",
   "different",
   "my",
@@ -41,10 +42,13 @@ const genericWorkspaceReferences = new Set([
   "that",
   "the",
   "this",
+  "what",
+  "which",
+  "whose",
   "your",
 ]);
-const namedWorkspaceRequest =
-  /\b(?:access|check|inspect|investigate|look|open|review|switch)\b[\s\S]{0,80}\b([\p{L}\p{N}][\p{L}\p{N}'’&.-]{1,63})\s+workspace\b/giu;
+const namedWorkspaceReference =
+  /\b([\p{L}\p{N}][\p{L}\p{N}'’&.-]{1,63})\s+workspace\b/giu;
 const otherWorkspaceRequest = /\b(?:another|different|other)\s+workspace\b/iu;
 const workspaceRedirect =
   "I can't check that here because it's a different workspace.";
@@ -85,8 +89,8 @@ export function foreignWorkspaceRedirect(
     return workspaceRedirect;
   }
   const current = organizationName.toLocaleLowerCase();
-  namedWorkspaceRequest.lastIndex = 0;
-  for (const match of question.matchAll(namedWorkspaceRequest)) {
+  namedWorkspaceReference.lastIndex = 0;
+  for (const match of question.matchAll(namedWorkspaceReference)) {
     const reference = match[1]?.toLocaleLowerCase();
     if (
       reference &&
