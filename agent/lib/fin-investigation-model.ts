@@ -1,13 +1,7 @@
 import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
-const ALLOWED_TOOLS = new Set([
-  // Eve's `agent` is a root-agent copy with inherited auth and capabilities.
-  // Declared specialists are separate `critic` and `vision` tool names and stay blocked.
-  "agent",
-  "file_fin_investigation_ticket",
-  "task_cancel",
-]);
+const ALLOWED_TOOLS = new Set(["file_fin_investigation_ticket"]);
 const BLOCKED = "Customer investigation capability is unavailable.";
 
 const namedTool = (part: { toolName?: unknown }) =>
@@ -41,7 +35,9 @@ function assertAllowedStreamPart(
 }
 
 /**
- * Keep the customer lane to delegation control only until scoped evidence tools land.
+ * Keep the customer lane to its one bounded write until scoped evidence tools land.
+ * Native delegation is background-only, so this task-mode route cannot safely expose
+ * it until the asynchronous result lifecycle owned by ENG-13766 is implemented.
  * The output checks also reject an adversarial model call that was not advertised.
  */
 export const finInvestigationMiddleware: LanguageModelMiddleware = {

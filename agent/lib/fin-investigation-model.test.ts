@@ -24,7 +24,7 @@ const result = (toolName: string) => ({
 });
 
 describe("Fin customer investigation model boundary", () => {
-  it("advertises only native delegation control and removes a forced disallowed choice", async () => {
+  it("advertises only the bounded ticket write and removes a forced disallowed choice", async () => {
     const base = new MockLanguageModelV4({
       doGenerate: {
         content: [{ text: "Unavailable.", type: "text" }],
@@ -64,12 +64,14 @@ describe("Fin customer investigation model boundary", () => {
     });
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["agent", "file_fin_investigation_ticket", "task_cancel"]
+      ["file_fin_investigation_ticket"]
     );
     assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
   });
 
   for (const name of [
+    "agent",
+    "task_cancel",
     "executor__execute",
     "planetscale_execute_read_query",
     "github__createPullRequest",
@@ -105,15 +107,6 @@ describe("Fin customer investigation model boundary", () => {
     });
   }
 
-  it("preserves an allowed native delegation call", async () => {
-    const model = wrapLanguageModel({
-      middleware: finInvestigationMiddleware,
-      model: new MockLanguageModelV4({ doGenerate: result("agent") }),
-    });
-    const generated = await model.doGenerate({ prompt: [] });
-    assert.deepEqual(generated.content, [toolCall("agent")]);
-  });
-
   for (const reference of [
     "Please file an engineering ticket for this report.",
     "Please do not file another ticket for this issue.",
@@ -122,7 +115,9 @@ describe("Fin customer investigation model boundary", () => {
     "When I open the campaign, the issue is that leads do not log in.",
   ]) {
     it(`does not force a ticket write from customer text: ${reference}`, async () => {
-      const base = new MockLanguageModelV4({ doGenerate: result("agent") });
+      const base = new MockLanguageModelV4({
+        doGenerate: result("file_fin_investigation_ticket"),
+      });
       const model = wrapLanguageModel({
         middleware: finInvestigationMiddleware,
         model: base,
