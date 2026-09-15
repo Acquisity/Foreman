@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { DEFAULT_PARTNER_ID } from "./billing-account.js";
 import { readFinIntercom } from "./executor/dispatch.js";
+import { INTERCOM_WORKSPACE } from "./support/config.js";
 import { providerData } from "./support/conversation.js";
 
-const INTERCOM_APP_ID = "ls8uffkp";
-const DEFAULT_PARTNER_ID = "00000000-0000-0000-0000-000000000001";
 const MAX_CONTEXT_BYTES = 4096;
 const WORKSPACE_PATH = /^\/dashboard\/([^/]+)(?:\/|$)/;
 const inputSchema = z.object({
@@ -30,10 +30,10 @@ const conversationSchema = z.object({
 const contactSchema = z.object({
   external_id: z.uuid(),
   id: contactId,
-  workspace_id: z.literal(INTERCOM_APP_ID),
+  workspace_id: z.literal(INTERCOM_WORKSPACE),
 });
 const appContextSchema = z.strictObject({
-  intercomAppId: z.literal(INTERCOM_APP_ID),
+  intercomAppId: z.literal(INTERCOM_WORKSPACE),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug,

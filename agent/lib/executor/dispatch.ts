@@ -31,6 +31,8 @@ export async function readFinIntercom(
     throw new Error("Fin identity verification is unavailable.");
   }
   signal.throwIfAborted();
+  // HTTP intake has no Eve session or ctx.getToken for executorAuth().
+  // Keep its fixed app-authenticated reads inside the transport boundary.
   const token = await getConnectToken(connector, { subject: { type: "app" } });
   signal.throwIfAborted();
   const result = await executorTransport.call(
