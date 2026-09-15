@@ -80,7 +80,7 @@ export async function waitForFinInvestigation(
         answer = "";
       } else if (
         event.type === "message.completed" &&
-        event.data.finishReason !== "tool-calls"
+        event.data.finishReason === "stop"
       ) {
         answer = boundedFinAnswer(event.data.message);
       } else if (event.type === "session.completed") {

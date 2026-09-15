@@ -26,6 +26,8 @@ const REPOSITORIES = /Repository selection and workspaces/;
 const MEMORY = /Investigation memory/;
 const MODEL_CONTROLS = /Model controls/;
 const INVALID_SCOPE = /no valid verified scope/;
+const QUALIFIED_REPORT = /qualified customer report/;
+const CUSTOMER_SAFE = /Do not mention internal lanes/;
 
 test("customer lane keeps the verified scope and omits internal workflow instructions", () => {
   const lane = sessionLane(initiator);
@@ -37,6 +39,8 @@ test("customer lane keeps the verified scope and omits internal workflow instruc
   const prompt = composePrompt(lane);
   assert.match(prompt, WORKSPACE);
   assert.match(prompt, IMMUTABLE);
+  assert.match(prompt, QUALIFIED_REPORT);
+  assert.match(prompt, CUSTOMER_SAFE);
   assert.doesNotMatch(prompt, REPOSITORIES);
   assert.doesNotMatch(prompt, MEMORY);
   assert.doesNotMatch(prompt, MODEL_CONTROLS);

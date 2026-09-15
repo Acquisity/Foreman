@@ -276,3 +276,29 @@ test("stream completion ignores intermediate tool-call messages", async () => {
     status: "completed",
   });
 });
+
+test("stream completion does not publish a length-truncated answer", async () => {
+  const session = {
+    getEventStream: () =>
+      Promise.resolve(
+        new ReadableStream<StreamEvent>({
+          start(controller) {
+            controller.enqueue({
+              data: { finishReason: "length", message: "partial" },
+              type: "message.completed",
+            } as StreamEvent);
+            controller.enqueue({
+              data: {},
+              type: "session.completed",
+            } as unknown as StreamEvent);
+            controller.close();
+          },
+        })
+      ),
+  };
+  assert.deepEqual(await waitForFinInvestigation(session), {
+    message:
+      "The investigation could not be completed. No findings are available.",
+    status: "failed",
+  });
+});

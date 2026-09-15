@@ -57,6 +57,8 @@ describe("Fin customer investigation model boundary", () => {
           name: "executor__execute",
           type: "function",
         },
+        { inputSchema: { type: "object" }, name: "critic", type: "function" },
+        { inputSchema: { type: "object" }, name: "vision", type: "function" },
         { inputSchema: { type: "object" }, name: "bash", type: "function" },
       ],
     });

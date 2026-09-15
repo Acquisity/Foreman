@@ -2,6 +2,8 @@ import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
 const ALLOWED_TOOLS = new Set([
+  // Eve's `agent` is a root-agent copy with inherited auth and capabilities.
+  // Declared specialists are separate `critic` and `vision` tool names and stay blocked.
   "agent",
   "file_fin_investigation_ticket",
   "task_cancel",
