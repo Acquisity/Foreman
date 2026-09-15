@@ -158,6 +158,11 @@ test("an unverified workspace starts no session", async (t) => {
     () => Promise.reject(new Error("not authorized"))
   );
   assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), {
+    message:
+      "I couldn't check this because this chat's workspace could not be verified.",
+    status: "failed",
+  });
 });
 
 test("redirects a named foreign workspace without starting an agent session", async (t) => {

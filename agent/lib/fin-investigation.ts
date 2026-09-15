@@ -204,7 +204,7 @@ export async function receiveFinInvestigation(
     return json(
       {
         message:
-          "I couldn't verify access to this workspace. Please refresh the app and try again.",
+          "I couldn't check this because this chat's workspace could not be verified.",
         status: "failed",
       },
       403
