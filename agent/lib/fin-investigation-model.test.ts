@@ -24,7 +24,7 @@ const result = (toolName: string) => ({
 });
 
 describe("Fin customer investigation model boundary", () => {
-  it("advertises only the bounded ticket write and removes a forced disallowed choice", async () => {
+  it("advertises scoped evidence and the bounded ticket write and removes a forced disallowed choice", async () => {
     const base = new MockLanguageModelV4({
       doGenerate: {
         content: [{ text: "Unavailable.", type: "text" }],
@@ -42,6 +42,11 @@ describe("Fin customer investigation model boundary", () => {
       toolChoice: { toolName: "executor__execute", type: "tool" },
       tools: [
         { inputSchema: { type: "object" }, name: "agent", type: "function" },
+        {
+          inputSchema: { type: "object" },
+          name: "read_fin_outreach_evidence",
+          type: "function",
+        },
         {
           inputSchema: { type: "object" },
           name: "file_fin_investigation_ticket",
@@ -64,7 +69,7 @@ describe("Fin customer investigation model boundary", () => {
     });
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["file_fin_investigation_ticket"]
+      ["read_fin_outreach_evidence", "file_fin_investigation_ticket"]
     );
     assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
   });
