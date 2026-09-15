@@ -111,4 +111,6 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 ## Fin customer investigation delivery
 
+`readFinEvidence` in `agent/lib/executor/dispatch.ts` uses the existing shared Executor transport with a 50-second deadline, caller cancellation and a 128 KiB response cap. It accepts only fixed outreach read purposes and validated local UUIDs, constructs its own SQL, and checks active owner/admin membership in the same statement as the evidence. Credentials retain the existing Vercel Connect exemption. No raw provider response or failure body is returned to the model.
+
 `agent/lib/fin-investigation-callback.ts` posts only the bounded final answer and status to an exact Intercom Procedure callback URL. The request rejects redirects and has a five-second deadline. `agent/lib/fin-investigation-slack.ts` posts and updates one receipt in the configured internal channel with a five-second HTTP deadline; Slack token resolution retains the Vercel Connect exemption above. These delivery calls carry no customer token, workspace identifier, provider result or tool output.

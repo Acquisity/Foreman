@@ -2,9 +2,15 @@ import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import {
+  buildFinEvidenceQuery,
+  type FinEvidenceInput,
+  parseFinEvidence,
+} from "../fin-evidence.js";
+import {
   isFinInvestigation,
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
+import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
 import { ExecutorError, executorTransport } from "./transport.js";
@@ -183,4 +189,37 @@ export async function createFinInvestigationTicket(
     undefined,
     { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
   );
+}
+
+/** Customer reads accept purposes and local IDs, never a provider path or SQL. */
+export async function readFinEvidence(
+  ctx: ProviderContext,
+  input: FinEvidenceInput
+) {
+  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
+  const query = buildFinEvidenceQuery(scope, input);
+  try {
+    ctx.abortSignal.throwIfAborted();
+    const { wire } = await connection(ctx, null);
+    ctx.abortSignal.throwIfAborted();
+    const result = await executorTransport.call(
+      wire,
+      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+      { ...PRODUCTION_READ_QUERY_ARGS, query, use_replica: false },
+      { maxBytes: 128 * 1024, timeoutMs: 50_000 }
+    );
+    if (!result.ok || (result.http && result.http.status !== 200)) {
+      throw new Error("Evidence provider unavailable.");
+    }
+    return parseFinEvidence(result.data, scope, input);
+  } catch (error) {
+    if (ctx.abortSignal.aborted) {
+      throw error;
+    }
+    return {
+      message:
+        "Saved outreach evidence could not be checked. This is not an empty result.",
+      status: "unavailable" as const,
+    };
+  }
 }

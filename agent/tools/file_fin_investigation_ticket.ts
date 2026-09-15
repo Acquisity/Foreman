@@ -34,7 +34,7 @@ export const formatFinCustomerReport = (summary: string) => {
 
 const tool = defineTool({
   description:
-    "File one bounded internal Linear ticket for this verified customer investigation. The team, assignee, conversation and workspace scope are taken from the immutable session, never from this input. Use only when a ticket is warranted; provider reads and all other Linear operations remain unavailable.",
+    "File one bounded internal Linear ticket for this verified customer investigation. The team, assignee, conversation and workspace scope are taken from the immutable session, never from this input. Use only when a ticket is warranted; all other Linear operations remain unavailable.",
   async execute(input, ctx) {
     if (!isFinInvestigation(ctx.session.auth.initiator)) {
       return {

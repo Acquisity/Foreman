@@ -1,7 +1,10 @@
 import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
-const ALLOWED_TOOLS = new Set(["file_fin_investigation_ticket"]);
+const ALLOWED_TOOLS = new Set([
+  "file_fin_investigation_ticket",
+  "read_fin_outreach_evidence",
+]);
 const BLOCKED = "Customer investigation capability is unavailable.";
 
 const namedTool = (part: { toolName?: unknown }) =>
@@ -35,7 +38,7 @@ function assertAllowedStreamPart(
 }
 
 /**
- * Keep the customer lane to its one bounded write until scoped evidence tools land.
+ * Keep the customer lane to authored scoped evidence and its bounded ticket write.
  * Native delegation is background-only, so this task-mode route cannot safely expose
  * it until the asynchronous result lifecycle owned by ENG-13766 is implemented.
  * The output checks also reject an adversarial model call that was not advertised.

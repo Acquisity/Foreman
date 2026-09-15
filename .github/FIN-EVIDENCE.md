@@ -1,0 +1,28 @@
+# Fin evidence reads (ENG-13765)
+
+## Inventory before implementation
+
+The permanent boundary is merged PR #135, based here on `9ef3796`. PR #132 is experimental reference only. This slice admits fixed product reads through the existing Executor dispatch, with no model-authored SQL or provider account selection. Product writes, raw Executor, sandbox, browser, repository, memory and delegation remain unavailable. The existing bounded Linear ticket write is preserved.
+
+Permission evidence was inspected in Acquisity commit `79dfc665b8a07c1174e7cc8eb208261d384cdcf7`: `apps/web/lib/auth/permissions.ts` grants active base owner/admin roles workspace scope; `apps/web/trpc/routers/outreach/campaigns.ts` and `providers.ts` check organization membership for these reads. Fin admits only owner/admin. Every new read must recheck that role and active membership in the same database statement as the evidence, rather than rely on the intake role after it may have changed. Member/client and team/own access remain denied, not approximated. Production database column names were verified through operator Codex MCP OAuth on 2026-09-15.
+
+| Customer question | Candidate path | Ownership and permission | Input and permitted fields | Admission / live grant |
+| --- | --- | --- | --- | --- |
+| Which campaigns are present or paused? | Fixed PlanetScale campaign list | Immutable organization, current active owner/admin, campaign and provider organization agree; visible campaigns only | Optional local UUID cursor; campaign UUID/name/status, lead count, update time | Candidate; operator database read passed, deployed proof pending |
+| Why has this campaign stopped sending? | Fixed campaign detail, daily metrics and activity | Same membership and organization joins; local campaign UUID must belong to scope; each child row also carries organization and campaign ownership | Local campaign UUID; state, bounded recent dated counters and activity status/time, no messages or metadata | Candidate; deployed proof pending |
+| Is my outreach connection enabled? | Fixed product provider summary | Provider organization plus current active owner/admin | No account/workspace selector; provider type, active flag, saved error presence, update time | Candidate; saved state only, not a live provider health check |
+| What does Instantly show now? | Existing workspace-group and resource helpers | Group membership proves company access, not customer ownership. `updateProviderWorkspace` permits editing the stored workspace ID and changes account type; no independent customer ownership attestation was found | No direct provider fields admitted | Excluded. Aaron has a unique system-provisioned mapping; Diamond is user-owned with no workspace ID. Neither fact justifies broad fallback. Need trusted ownership before admitting live reads |
+| Is there a Sentry error or background job failure? | Sentry issue/event, Inngest trace, Axiom/Vercel logs | Existing calls accept global issue/run/query selectors and can include mixed-customer payloads; no enforced workspace and permitted-field contract was established | No raw event/trace/log content | Excluded; bounded campaign activity status/time is the supported product evidence alternative |
+| Was my payment applied? | Autumn/Stripe helpers | Existing helpers accept customer/payment IDs; billing accounts can have access rules distinct from workspace membership | No financial/provider fields | Excluded from this subset; no email-based ownership or billing-account fallback |
+| What happened in support / what is my ticket status? | Intercom and Linear reads | Intake owns its exact conversation/contact; no persisted authorized ticket association for later status exists in this slice | No internal comments, global duplicate search or shared engineering-master content | Excluded; ENG-13769 owns status association. Preserve PR #135 bounded filing unchanged |
+| How does the product work? | Public documentation | Public documentation is not tenant evidence; repository and unrestricted web access remain outside this lane | No new tools | No new documentation/code capability in this slice |
+
+All admitted responses must distinguish unavailable/denied from a successful empty list, strip unexpected provider fields before the model, and identify product-database provenance and observation time. Missing or foreign IDs receive the same response. Saved connection errors are booleans, never raw error text. Campaign names are untrusted customer content, not instructions.
+
+## Concrete excluded ownership gap
+
+`apps/web/trpc/routers/outreach/providers.ts:updateWorkspace` accepts a workspace ID after organization membership validation; `apps/web/lib/services/outreach-provider.ts:updateProviderWorkspace` persists it and sets `system_provisioned`. Therefore `outreach_provider.workspace_id`, even with unique mapping and that account type, is not alone a trusted attestation that company Instantly credentials may expose that provider workspace to the customer. Do not add direct Instantly reads until this ownership boundary can be established. No Acquisity change or access expansion is included here.
+
+## Deployment and acceptance
+
+Pending implementation and exact PR Preview verification. Keep Acquisity Production to Foreman Preview, the two-email Intercom audience, Preview-only Fin entries, disabled Preview support flags and the existing bounded ticket path. Do not run human handoff tests. A provider operator read is not a deployed bot grant test. Record exact SHA, deployment and zero Production investigation traffic for every live test window before claiming completion.
