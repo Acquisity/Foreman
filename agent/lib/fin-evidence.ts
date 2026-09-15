@@ -178,6 +178,7 @@ export function parseFinEvidence(
       break;
     }
     case "connections":
+      // An overflow is unavailable: a partial list must not imply all connections were checked.
       parsed = {
         connections: z.array(provider).max(10).parse(result.records),
         read: "connections",
