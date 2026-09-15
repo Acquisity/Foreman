@@ -2,15 +2,11 @@ import { defineChannel, POST } from "eve/channels";
 import { receiveFinContext } from "../lib/fin-context-route.js";
 import { receiveFinInvestigation } from "../lib/fin-investigation.js";
 import {
-  deliverFinCallback,
-  type FinInvestigationCallbackState,
   finInvestigationFailure,
   reduceFinEvent,
 } from "../lib/fin-investigation-callback.js";
-import {
-  type FinInvestigationSlackReceipt,
-  updateFinInvestigationReceipt,
-} from "../lib/fin-investigation-slack.js";
+import type { FinInvestigationSlackReceipt } from "../lib/fin-investigation-slack.js";
+import { finishFinRun } from "../lib/fin-run-completion.js";
 
 export default defineChannel({
   context: (state) => ({ state }),
@@ -26,27 +22,20 @@ export default defineChannel({
       const { outcome } = reduceFinEvent(channel.state.answer, {
         type: "session.completed",
       });
-      await Promise.all([
-        deliverFinCallback(
-          channel.state.callback,
-          ctx.session.id,
-          outcome ?? finInvestigationFailure
-        ),
-        updateFinInvestigationReceipt(channel.state.slack, outcome),
-      ]);
+      await finishFinRun(
+        channel.state.runId,
+        ctx.session.id,
+        channel.state.slack,
+        outcome ?? finInvestigationFailure
+      );
     },
     async "session.failed"(event, channel) {
-      await Promise.all([
-        deliverFinCallback(
-          channel.state.callback,
-          event.sessionId,
-          finInvestigationFailure
-        ),
-        updateFinInvestigationReceipt(
-          channel.state.slack,
-          finInvestigationFailure
-        ),
-      ]);
+      await finishFinRun(
+        channel.state.runId,
+        event.sessionId,
+        channel.state.slack,
+        finInvestigationFailure
+      );
     },
     "turn.started"(_event, channel) {
       channel.state.answer = reduceFinEvent(channel.state.answer, {
@@ -60,7 +49,7 @@ export default defineChannel({
   ],
   state: {
     answer: "",
-    callback: null as FinInvestigationCallbackState | null,
+    runId: null as string | null,
     slack: null as FinInvestigationSlackReceipt | null,
   },
 });
