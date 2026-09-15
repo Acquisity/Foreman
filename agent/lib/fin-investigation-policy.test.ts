@@ -30,6 +30,8 @@ const QUALIFIED_REPORT = /qualified customer report/;
 const CUSTOMER_SAFE = /Do not mention internal lanes/;
 const COMPLETE_NOW = /perform that bounded action in the root turn/;
 const NO_PROGRESS_PROMISE = /Do not finish with a progress update/;
+const OTHER_WORKSPACE_REDIRECT =
+  /open that workspace and start the request there/;
 
 test("customer lane keeps the verified scope and omits internal workflow instructions", () => {
   const lane = sessionLane(initiator);
@@ -45,6 +47,7 @@ test("customer lane keeps the verified scope and omits internal workflow instruc
   assert.match(prompt, CUSTOMER_SAFE);
   assert.match(prompt, COMPLETE_NOW);
   assert.match(prompt, NO_PROGRESS_PROMISE);
+  assert.match(prompt, OTHER_WORKSPACE_REDIRECT);
   assert.doesNotMatch(prompt, REPOSITORIES);
   assert.doesNotMatch(prompt, MEMORY);
   assert.doesNotMatch(prompt, MODEL_CONTROLS);
