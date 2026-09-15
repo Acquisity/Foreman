@@ -35,10 +35,15 @@ describe("composePrompt", () => {
     );
   });
 
-  it("hands delegated-task waiting back to eve instead of polling with sleep", () => {
+  it("hands delegated-task waiting back to eve instead of polling", () => {
     assert.ok(
       GENERAL_PROMPT.includes(
-        "Never call `sleep` only to wait for a delegated task. Once independent work is finished, end the current turn and let eve deliver the result in a later turn."
+        "After a task receipt, never call `wait_for_external_state` or any other polling tool to wait for vision, critic, or native-agent work."
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "eve queues task lifecycle notifications for later turns, so keeping this turn alive prevents you from receiving them."
       )
     );
   });
