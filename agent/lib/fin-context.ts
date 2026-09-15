@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./billing-account.js";
 import { readFinIntercom } from "./executor/dispatch.js";
+import { type FinContext, finContextSchema } from "./fin-scope.js";
 import { INTERCOM_WORKSPACE } from "./support/config.js";
 import { providerData } from "./support/conversation.js";
 
@@ -43,13 +44,7 @@ const appContextSchema = z.strictObject({
   verifiedAt: z.iso.datetime(),
 });
 
-export type FinContext = Readonly<
-  z.infer<typeof appContextSchema> & {
-    contactId: string;
-    conversationId: string;
-    origin: string;
-  }
->;
+export type { FinContext } from "./fin-scope.js";
 
 /** Require one configured HTTPS origin before sending it a user's identity token. */
 function acquisityOrigin(): string {
@@ -174,10 +169,12 @@ export async function verifyFinContext(
       "The verified user or workspace does not match this conversation."
     );
   }
-  return Object.freeze({
-    ...verified,
-    contactId: id,
-    conversationId: conversation.id,
-    origin,
-  });
+  return Object.freeze(
+    finContextSchema.parse({
+      ...verified,
+      contactId: id,
+      conversationId: conversation.id,
+      origin,
+    })
+  );
 }

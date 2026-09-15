@@ -2,12 +2,9 @@ import {
   agentBrowserRevalidationKey,
   installAgentBrowser,
 } from "@agent-browser/eve/sandbox";
-import {
-  defineSandbox,
-  type SandboxBootstrapContext,
-  type SandboxSessionContext,
-} from "eve/sandbox";
+import { defineSandbox, type SandboxBootstrapContext } from "eve/sandbox";
 import { vercel } from "eve/sandbox/vercel";
+import { isFinInvestigation } from "#lib/fin-investigation-auth.js";
 import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
 
@@ -61,14 +58,23 @@ const backend = snapshotId
     })
   : vercel({ resources: { vcpus: 2 } });
 
+export const sandboxSessionOptions = (
+  initiator: Parameters<typeof isFinInvestigation>[0]
+) =>
+  isFinInvestigation(initiator)
+    ? { networkPolicy: "deny-all" as const }
+    : undefined;
+
 export default defineSandbox({
   backend,
   async bootstrap({ use }: SandboxBootstrapContext): Promise<void> {
     const sandbox = await use();
     await installAgentBrowser(sandbox);
   },
-  async onSession({ use }: SandboxSessionContext): Promise<void> {
-    const sandbox = await use();
+  async onSession({ ctx, use }): Promise<void> {
+    const sandbox = await use(
+      sandboxSessionOptions(ctx.session.auth.initiator)
+    );
     const result = await boundedRun(sandbox, {
       command: "git config --global --add safe.directory /workspace",
     });

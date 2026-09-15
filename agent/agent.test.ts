@@ -32,7 +32,10 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
   const { events } = rootAgent.model;
   assert.deepEqual(Object.keys(events), ["step.started"]);
   const [[event, resolve]] = Object.entries(events);
-  const selection = await Reflect.apply(resolve, undefined, []);
+  const selection = await Reflect.apply(resolve, undefined, [
+    {},
+    { session: { auth: { current: null, initiator: null } } },
+  ]);
   const resolved = await resolveRuntimeModelSelection({
     catalog: {
       getByGatewayId: (id: string) =>

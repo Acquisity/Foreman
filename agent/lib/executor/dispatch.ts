@@ -1,5 +1,9 @@
 import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
+import {
+  isFinInvestigation,
+  requireFinInvestigationContext,
+} from "../fin-investigation-auth.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
 import { ExecutorError, executorTransport } from "./transport.js";
@@ -65,6 +69,11 @@ export async function invokeProvider(
   input: Record<string, unknown>,
   operationKey?: string
 ): Promise<ExecutorOutcome> {
+  if (isFinInvestigation(ctx.session?.auth.initiator)) {
+    throw new ExecutorError("customer_scope_required", 403, {
+      dispatched: false,
+    });
+  }
   const policy = supportOperationPolicy(ctx);
   policy?.assert(path, input);
   const { wire, authorization } = await connection(ctx, policy);
@@ -112,9 +121,37 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
+  if (isFinInvestigation(ctx.session?.auth.initiator)) {
+    throw new ExecutorError("customer_scope_required", 403, {
+      dispatched: false,
+    });
+  }
   const policy = supportOperationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
   const { wire } = await connection(ctx, policy);
   return executorTransport.describe(wire, path);
+}
+
+const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+const FIN_LINEAR_MAX_BYTES = 64 * 1024;
+
+/** The one customer-lane provider write. Its target and scope come only from the session initiator. */
+export async function createFinInvestigationTicket(
+  ctx: ProviderContext,
+  input: { summary: string; title: string }
+): Promise<ExecutorOutcome> {
+  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
+  const { wire } = await connection(ctx, null);
+  return executorTransport.call(
+    wire,
+    FIN_LINEAR_TICKET_PATH,
+    {
+      assignee: "Aaron Fraga",
+      description: `## Customer report\n\n${input.summary}\n\n## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`,
+      team: "Engineering Team",
+      title: input.title,
+    },
+    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+  );
 }

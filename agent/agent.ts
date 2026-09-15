@@ -1,4 +1,6 @@
 import { defineAgent, defineDynamic } from "eve";
+import { isFinInvestigation } from "./lib/fin-investigation-auth.js";
+import { finInvestigationModel } from "./lib/fin-investigation-model.js";
 import { gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 
@@ -22,10 +24,12 @@ export default defineAgent({
   limits: { maxInputTokensPerSession: false },
   model: defineDynamic({
     events: {
-      "step.started": async () => {
+      "step.started": async (_event, ctx) => {
         const id = await resolveModel("orchestrator");
         return {
-          model: ticketLinkedModel(id),
+          model: isFinInvestigation(ctx.session.auth.initiator)
+            ? finInvestigationModel(id)
+            : ticketLinkedModel(id),
           modelOptions: gatewayRouting(id),
         };
       },
