@@ -22,6 +22,12 @@ const statusTitles: Record<FinInvestigationResult["status"], string> = {
   pending: "Investigation still running",
 };
 
+const escapeSlackText = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
 async function slackRequest(
   operation: "chat.postMessage" | "chat.update",
   input: Record<string, string>
@@ -83,7 +89,7 @@ export async function updateFinInvestigationReceipt(
   }
   try {
     const text = outcome
-      ? `*${statusTitles[outcome.status]}*\n\n${outcome.message}`
+      ? `*${statusTitles[outcome.status]}*\n\n${escapeSlackText(outcome.message)}`
       : "*Investigation unavailable*\n\nThe investigation could not be started or completed.";
     await request("chat.update", {
       channel: receipt.channel,

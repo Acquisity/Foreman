@@ -136,6 +136,15 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
 const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
 const FIN_LINEAR_MAX_BYTES = 64 * 1024;
 
+const fencedCustomerReport = (summary: string) => {
+  const longestRun = Math.max(
+    0,
+    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
+  );
+  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  return `${fence}text\n${summary}\n${fence}`;
+};
+
 /** The one customer-lane provider write. Its target and scope come only from the session initiator. */
 export async function createFinInvestigationTicket(
   ctx: ProviderContext,
@@ -148,7 +157,7 @@ export async function createFinInvestigationTicket(
     FIN_LINEAR_TICKET_PATH,
     {
       assignee: "Aaron Fraga",
-      description: `## Customer report\n\n${input.summary}\n\n## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`,
+      description: `## Customer report\n\n${fencedCustomerReport(input.summary)}\n\n## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`,
       team: "Engineering Team",
       title: input.title,
     },

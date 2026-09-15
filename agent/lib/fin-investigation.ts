@@ -47,10 +47,10 @@ const readRequestBody = async (request: Request) => {
       if (done) {
         return body;
       }
-      body += value;
-      if (body.length > 8192) {
+      if (body.length + value.length > 8192) {
         return null;
       }
+      body += value;
     }
   } finally {
     reader.cancel().catch(() => undefined);
@@ -115,7 +115,7 @@ export async function receiveFinInvestigation(
   verifyContext = verifyFinContext
 ) {
   if (
-    process.env.VERCEL_ENV === "production" ||
+    process.env.VERCEL_ENV !== "preview" ||
     process.env.FIN_INVESTIGATION_ENABLED !== "true"
   ) {
     return json({ error: "Not found." }, 404);

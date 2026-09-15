@@ -79,23 +79,26 @@ const enabled = (t: TestContext) => {
   setEnv(t, "FIN_INVESTIGATION_SLACK_CHANNEL", undefined);
 };
 
-test("Production cannot start an investigation even when enabled", async (t) => {
-  setEnv(t, "VERCEL_ENV", "production");
-  setEnv(t, "FIN_INVESTIGATION_ENABLED", "true");
-  const response = await receiveFinInvestigation(
-    request({
-      conversation_id: context.conversationId,
-      question: "Why did this fail?",
-    }),
-    {
-      from: () => assert.fail("Production must not create a session"),
-      waitUntil: () => assert.fail("Production must not start background work"),
-    },
-    1,
-    () => assert.fail("Production must not verify customer identity")
-  );
-  assert.equal(response.status, 404);
-});
+for (const environment of ["production", "development", undefined]) {
+  test(`${environment ?? "unset"} cannot start an investigation even when enabled`, async (t) => {
+    setEnv(t, "VERCEL_ENV", environment);
+    setEnv(t, "FIN_INVESTIGATION_ENABLED", "true");
+    const response = await receiveFinInvestigation(
+      request({
+        conversation_id: context.conversationId,
+        question: "Why did this fail?",
+      }),
+      {
+        from: () => assert.fail("non-Preview must not create a session"),
+        waitUntil: () =>
+          assert.fail("non-Preview must not start background work"),
+      },
+      1,
+      () => assert.fail("non-Preview must not verify customer identity")
+    );
+    assert.equal(response.status, 404);
+  });
+}
 
 test("rejects caller-authored scope and invalid callbacks before verification", async (t) => {
   enabled(t);
