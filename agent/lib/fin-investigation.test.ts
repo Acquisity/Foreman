@@ -44,7 +44,11 @@ const request = (
   authorization = "Bearer signed.user.identity"
 ) =>
   new Request("https://foreman.example/internal/fin/investigation", {
-    body: JSON.stringify(body),
+    body: JSON.stringify(
+      typeof body === "object" && body !== null && !Array.isArray(body)
+        ? { action: "start", ...body }
+        : body
+    ),
     headers: { authorization, "content-type": "application/json" },
     method: "POST",
   });
@@ -103,6 +107,11 @@ for (const environment of ["production", "development", undefined]) {
 test("rejects caller-authored scope and invalid callbacks before verification", async (t) => {
   enabled(t);
   const invalid = [
+    {
+      action: "result",
+      conversation_id: context.conversationId,
+      question: "Check it",
+    },
     {
       conversation_id: context.conversationId,
       question: "Check it",

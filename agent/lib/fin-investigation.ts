@@ -19,6 +19,7 @@ import {
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const inputSchema = z.strictObject({
+  action: z.literal("start"),
   callback_url: z.string().trim().max(2048).optional().default(""),
   conversation_id: z.string().regex(/^\d{1,32}$/),
   question: z.string().trim().min(1).max(4000),
