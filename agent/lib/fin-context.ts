@@ -1,7 +1,11 @@
 import { z } from "zod";
-import { DEFAULT_PARTNER_ID } from "./billing-account.js";
+import { INTERCOM_WORKSPACE } from "./acquisity-constants.js";
 import { readFinIntercom } from "./executor/dispatch.js";
-import { INTERCOM_WORKSPACE } from "./support/config.js";
+import {
+  type FinContext,
+  finAppContextSchema,
+  finContextSchema,
+} from "./fin-scope.js";
 import { providerData } from "./support/conversation.js";
 
 const MAX_CONTEXT_BYTES = 4096;
@@ -32,24 +36,8 @@ const contactSchema = z.object({
   id: contactId,
   workspace_id: z.literal(INTERCOM_WORKSPACE),
 });
-const appContextSchema = z.strictObject({
-  intercomAppId: z.literal(INTERCOM_WORKSPACE),
-  organizationId: z.uuid(),
-  organizationName: z.string().min(1).max(500),
-  organizationSlug,
-  partnerId: z.literal(DEFAULT_PARTNER_ID),
-  role: z.enum(["owner", "admin"]),
-  userId: z.uuid(),
-  verifiedAt: z.iso.datetime(),
-});
 
-export type FinContext = Readonly<
-  z.infer<typeof appContextSchema> & {
-    contactId: string;
-    conversationId: string;
-    origin: string;
-  }
->;
+export type { FinContext } from "./fin-scope.js";
 
 /** Require one configured HTTPS origin before sending it a user's identity token. */
 function acquisityOrigin(): string {
@@ -163,7 +151,7 @@ export async function verifyFinContext(
     response.body?.cancel().catch(() => undefined);
     throw new Error("Workspace investigation access could not be verified.");
   }
-  const verified = appContextSchema.parse(
+  const verified = finAppContextSchema.parse(
     await readContextBody(response, signal)
   );
   if (
@@ -174,10 +162,12 @@ export async function verifyFinContext(
       "The verified user or workspace does not match this conversation."
     );
   }
-  return Object.freeze({
-    ...verified,
-    contactId: id,
-    conversationId: conversation.id,
-    origin,
-  });
+  return Object.freeze(
+    finContextSchema.parse({
+      ...verified,
+      contactId: id,
+      conversationId: conversation.id,
+      origin,
+    })
+  );
 }

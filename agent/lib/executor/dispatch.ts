@@ -1,5 +1,10 @@
 import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
+import { z } from "zod";
+import {
+  isFinInvestigation,
+  requireFinInvestigationContext,
+} from "../fin-investigation-auth.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
 import { ExecutorError, executorTransport } from "./transport.js";
@@ -11,6 +16,14 @@ export type ExecutorOutcome = Awaited<
 >;
 
 const FIN_INTERCOM_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+const FIN_LINEAR_MAX_BYTES = 64 * 1024;
+const finLinearTicketInput = z.strictObject({
+  assignee: z.literal("Aaron Fraga"),
+  description: z.string().min(1).max(16_000),
+  team: z.literal("Engineering Team"),
+  title: z.string().min(1).max(160),
+});
 
 /** Intake has no Eve session. Only these fixed identity reads are available. */
 export async function readFinIntercom(
@@ -58,13 +71,41 @@ async function connection(
   };
 }
 
+const verifiedScopeBlock = (
+  scope: ReturnType<typeof requireFinInvestigationContext>
+) =>
+  `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`;
+
+function assertLaneOperation(
+  ctx: ProviderContext,
+  path: string,
+  input: Record<string, unknown>
+) {
+  if (!isFinInvestigation(ctx.session?.auth.initiator)) {
+    return;
+  }
+  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
+  const parsed = finLinearTicketInput.safeParse(input);
+  if (
+    path !== FIN_LINEAR_TICKET_PATH ||
+    !parsed.success ||
+    !parsed.data.description.endsWith(verifiedScopeBlock(scope))
+  ) {
+    throw new ExecutorError("customer_scope_required", 403, {
+      dispatched: false,
+    });
+  }
+}
+
 /** The single authored operation entry: choose policy before authorizing or dispatching. */
 export async function invokeProvider(
   ctx: ProviderContext,
   path: string,
   input: Record<string, unknown>,
-  operationKey?: string
+  operationKey?: string,
+  options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
+  assertLaneOperation(ctx, path, input);
   const policy = supportOperationPolicy(ctx);
   policy?.assert(path, input);
   const { wire, authorization } = await connection(ctx, policy);
@@ -73,7 +114,7 @@ export async function invokeProvider(
       ? policy.writeKey(path, input, authorization.version, operationKey)
       : null;
   if (!(policy && key)) {
-    return executorTransport.call(wire, path, input);
+    return executorTransport.call(wire, path, input, options);
   }
   const reserved = await policy.reserve(key);
   if (!reserved.fresh) {
@@ -82,7 +123,7 @@ export async function invokeProvider(
     return result;
   }
   const result = await executorTransport
-    .call(wire, path, input)
+    .call(wire, path, input, options)
     .catch(async (error: unknown) => {
       if (error instanceof ExecutorError && error.dispatched === false) {
         await policy.complete(
@@ -112,9 +153,34 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
+  if (isFinInvestigation(ctx.session?.auth.initiator)) {
+    throw new ExecutorError("customer_scope_required", 403, {
+      dispatched: false,
+    });
+  }
   const policy = supportOperationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
   const { wire } = await connection(ctx, policy);
   return executorTransport.describe(wire, path);
+}
+
+/** The one customer-lane provider write. Its target and scope come only from the session initiator. */
+export async function createFinInvestigationTicket(
+  ctx: ProviderContext,
+  input: { report: string; title: string }
+): Promise<ExecutorOutcome> {
+  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
+  return await invokeProvider(
+    ctx,
+    FIN_LINEAR_TICKET_PATH,
+    {
+      assignee: "Aaron Fraga",
+      description: `${input.report}\n\n${verifiedScopeBlock(scope)}`,
+      team: "Engineering Team",
+      title: input.title,
+    },
+    undefined,
+    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+  );
 }

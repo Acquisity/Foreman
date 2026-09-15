@@ -662,7 +662,8 @@ describe("capability report", () => {
       );
     }
     // No loss on the admitted side: the repository lane carries every authored
-    // tool the tree compiles, static and gated alike, and both declared children.
+    // tool except tools exclusive to scheduled support or verified Fin customer
+    // investigations, plus both declared children.
     const entries = (
       lane: (typeof CAPABILITY_LANES)[number],
       kind: string,
@@ -683,6 +684,7 @@ describe("capability report", () => {
         (tool) =>
           isAuthoredTool(tool) &&
           ![
+            "tools/file_fin_investigation_ticket.ts",
             "tools/support_investigation.ts",
             "tools/support_provider.ts",
           ].includes(tool.sourceId)

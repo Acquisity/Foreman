@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { INTERCOM_WORKSPACE } from "../acquisity-constants.js";
 import { invokeProvider, type ProviderContext } from "../executor/dispatch.js";
 import { requireSupportContext, type SupportClaim } from "./auth.js";
-import { type CreationRole, INTERCOM_WORKSPACE } from "./config.js";
+import type { CreationRole } from "./config.js";
 import { intercomConversationIds, providerData } from "./conversation.js";
 import { SupportRefusal } from "./errors.js";
 import { writtenIssueId } from "./linear-state.js";

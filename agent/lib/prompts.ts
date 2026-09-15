@@ -46,10 +46,20 @@ const NOTES = `# Notes
 Do not fabricate links, issue numbers, quotes, statuses, or verification results. Persist only durable user preferences in the principal-scoped preference document. Never store a repository target as a preference.`;
 
 export interface PromptOptions {
+  customer?: boolean;
   discovery?: string;
   instructions?: string;
 }
 export function composePrompt(options: PromptOptions = {}): string {
+  if (options.customer) {
+    return [
+      IDENTITY,
+      WRITING,
+      connections(options.discovery ?? "No connected services are available."),
+      NOTES,
+      ...(options.instructions ? [options.instructions] : []),
+    ].join("\n\n");
+  }
   return [
     IDENTITY,
     WRITING,

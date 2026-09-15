@@ -108,3 +108,7 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 ## Fin identity verification
 
 `agent/lib/fin-context.ts` bounds native Intercom conversation/contact reads and the Acquisity context request with a composed 50-second abort signal. App responses reject redirects and are bounded to 4 KiB while streaming, including cancellation during body consumption. The fixed reads in `agent/lib/executor/dispatch.ts` reuse the existing Executor transport and shared toolkit. Vercel Connect `getToken` exposes no cancellation option; credential resolution retains the existing Connect exemption, with the signal checked before and after resolution. No customer token or provider error is logged. This route starts no model, callback or Slack delivery.
+
+## Fin customer investigation delivery
+
+`agent/lib/fin-investigation-callback.ts` posts only the bounded final answer and status to an exact Intercom Procedure callback URL. The request rejects redirects and has a five-second deadline. `agent/lib/fin-investigation-slack.ts` posts and updates one receipt in the configured internal channel with a five-second HTTP deadline; Slack token resolution retains the Vercel Connect exemption above. These delivery calls carry no customer token, workspace identifier, provider result or tool output.
