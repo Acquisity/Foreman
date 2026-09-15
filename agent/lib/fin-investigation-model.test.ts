@@ -170,4 +170,27 @@ describe("Fin customer investigation model boundary", () => {
     });
     assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
   });
+
+  for (const reference of [
+    "Was a ticket opened for this report?",
+    "A ticket was created for this report.",
+  ]) {
+    it(`does not turn a past ticket reference into a write: ${reference}`, async () => {
+      const base = new MockLanguageModelV4({ doGenerate: result("agent") });
+      const model = wrapLanguageModel({
+        middleware: finInvestigationMiddleware,
+        model: base,
+      });
+      await model.doGenerate({
+        prompt: [
+          {
+            content: [{ text: reference, type: "text" }],
+            role: "user",
+          },
+        ],
+        toolChoice: { type: "auto" },
+      });
+      assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
+    });
+  }
 });

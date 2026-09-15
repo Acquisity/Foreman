@@ -12,8 +12,6 @@ const BLOCKED = "Customer investigation capability is unavailable.";
 const TICKET_TOOL = "file_fin_investigation_ticket";
 const TICKET_REQUEST =
   /\b(?:file|create|open|raise|log|submit)\b[\s\S]{0,120}\b(?:engineering\s+)?(?:ticket|issue)\b/iu;
-const REVERSED_TICKET_REQUEST =
-  /\b(?:ticket|issue)\b[\s\S]{0,80}\b(?:filed|created|opened|raised|logged|submitted)\b/iu;
 const NEGATED_TICKET_REQUEST =
   /\b(?:do\s+not|don't|dont|never)\s+(?:file|create|open|raise|log|submit)\b[\s\S]{0,120}\b(?:ticket|issue)\b/iu;
 
@@ -68,8 +66,7 @@ const needsTicketCall = (prompt: readonly PromptMessage[]) => {
   }
   const request = userText(prompt[userIndex]?.content).slice(0, 4096);
   const explicitRequest =
-    !NEGATED_TICKET_REQUEST.test(request) &&
-    (TICKET_REQUEST.test(request) || REVERSED_TICKET_REQUEST.test(request));
+    !NEGATED_TICKET_REQUEST.test(request) && TICKET_REQUEST.test(request);
   return (
     explicitRequest &&
     !prompt

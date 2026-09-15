@@ -239,6 +239,10 @@ test("recognizes only explicit foreign workspace references", () => {
     ),
     null
   );
+  assert.equal(
+    foreignWorkspaceRedirect("Please check the Apple workspace.", "Pineapple"),
+    "I can't check that here because it's a different workspace."
+  );
 });
 
 test("delivers the short foreign-workspace redirect through the Intercom callback", async (t) => {

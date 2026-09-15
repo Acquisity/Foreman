@@ -49,6 +49,10 @@ const genericWorkspaceReferences = new Set([
 ]);
 const namedWorkspaceReference =
   /\b([\p{L}\p{N}][\p{L}\p{N}'’&.-]{1,63})\s+workspace\b/giu;
+const workspaceNameTokens = (name: string) =>
+  new Set(
+    name.toLocaleLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'’&.-]*/gu) ?? []
+  );
 const otherWorkspaceRequest = /\b(?:another|different|other)\s+workspace\b/iu;
 const workspaceRedirect =
   "I can't check that here because it's a different workspace.";
@@ -88,14 +92,14 @@ export function foreignWorkspaceRedirect(
   if (otherWorkspaceRequest.test(question)) {
     return workspaceRedirect;
   }
-  const current = organizationName.toLocaleLowerCase();
+  const currentTokens = workspaceNameTokens(organizationName);
   namedWorkspaceReference.lastIndex = 0;
   for (const match of question.matchAll(namedWorkspaceReference)) {
     const reference = match[1]?.toLocaleLowerCase();
     if (
       reference &&
       !genericWorkspaceReferences.has(reference) &&
-      !current.includes(reference)
+      !currentTokens.has(reference)
     ) {
       return workspaceRedirect;
     }
