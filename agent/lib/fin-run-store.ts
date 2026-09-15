@@ -54,8 +54,9 @@ export function assertFinRunOwner(
 export async function claimFinRun(
   scope: FinContext,
   requestKey: string,
-  callbackUrl: string
-) {
+  callbackUrl: string,
+  retry = true
+): Promise<{ fresh: boolean; run: FinRun }> {
   const db = privateDatabase();
   const inserted = await db.query(
     `INSERT INTO fin_investigation_runs (id, app_id, conversation_id, request_key, scope, callback_url)
@@ -77,6 +78,13 @@ export async function claimFinRun(
      AND (request_key = $3 OR completed_at IS NULL) ORDER BY (request_key = $3) DESC LIMIT 1`,
     [scope.intercomAppId, scope.conversationId, requestKey]
   );
+  if (!rows.length) {
+    // The conflicting active run can finish between INSERT and SELECT.
+    if (retry) {
+      return claimFinRun(scope, requestKey, callbackUrl, false);
+    }
+    throw new Error("Investigation run could not be claimed.");
+  }
   const run = runSchema.parse(rows[0]);
   assertFinRunOwner(run, scope);
   return { fresh: false, run };

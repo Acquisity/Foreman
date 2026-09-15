@@ -22,11 +22,24 @@ const pool = new pg.Pool({
   connectionTimeoutMillis: 5000,
   query_timeout: 15_000,
 });
+let completeBeforeRead: string | undefined;
 neonConfig.fetchFunction = async (
   _url: RequestInfo | URL,
   options?: RequestInit
 ) => {
   const request = JSON.parse(String(options?.body));
+  if (
+    completeBeforeRead &&
+    request.query.startsWith(
+      "SELECT * FROM fin_investigation_runs WHERE app_id"
+    )
+  ) {
+    await pool.query(
+      "UPDATE fin_investigation_runs SET completed_at = now() WHERE id = $1",
+      [completeBeforeRead]
+    );
+    completeBeforeRead = undefined;
+  }
   const result = await pool.query({
     rowMode: "array",
     text: request.query,
@@ -104,6 +117,12 @@ try {
     assertFinRunOwner(first, scope, first.created_at.getTime() + 60 * 60_000)
   );
   assert.throws(() => assertFinRunOwner(first, concurrentScope));
+  const raceScope = { ...scope, conversationId: "998" };
+  const active = await claimFinRun(raceScope, "old-request", "");
+  completeBeforeRead = active.run.id;
+  const afterCompletion = await claimFinRun(raceScope, "new-request", "");
+  assert.equal(afterCompletion.fresh, true);
+  assert.notEqual(afterCompletion.run.id, active.run.id);
   console.log(
     "Passed: 12 racing starts, independent conversations, callback immutability, out-of-order completion, replay, completed-slot reuse with open ticket, single signal attempt, 11-minute validity, expiry and swapped conversation."
   );

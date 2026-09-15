@@ -66,6 +66,14 @@ test("only a public human reply suppresses customer delivery; later user replies
   assert.notEqual(after.requestKey, initial.requestKey);
 });
 
+for (const authorType of ["lead", "contact"]) {
+  test(`verified ${authorType} authors retain delivery access`, async () => {
+    const f = fixture();
+    f.conversation.source.author.type = authorType;
+    assert.equal((await inspectFinDelivery(scope, f.read)).humanReplied, false);
+  });
+}
+
 test("incomplete history or changed native ownership fails closed", async () => {
   const incomplete = fixture();
   incomplete.conversation.conversation_parts.total_count = 2;

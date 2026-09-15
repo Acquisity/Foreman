@@ -22,7 +22,10 @@ export async function inspectFinDelivery(
         total_count: z.literal(1).optional(),
       }),
       source: z.object({
-        author: z.object({ id: z.string(), type: z.literal("user") }),
+        author: z.object({
+          id: z.string(),
+          type: z.enum(["user", "lead", "contact"]),
+        }),
         url: z.string(),
       }),
     })
