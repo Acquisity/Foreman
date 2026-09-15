@@ -12,6 +12,8 @@ The route returns 404 in Vercel Production regardless of `FIN_CONTEXT_ENABLED`, 
 
 During rollout testing, Intercom start/result connectors and the Preview Slack connector must target the experimental Preview branch only. Keep the Production Slack connector on its normal Production trigger. Merged identity code is not permission to retarget tests to Production. ENG-13764 and ENG-13766 must preserve this Production block on any new investigation entry until the ENG-13768 rollout is explicitly approved.
 
+The request body limit is 1024 UTF-16 code units after UTF-8 decoding, preserving the original JavaScript string-length contract. The reader stops and cancels the stream as soon as that limit is exceeded instead of buffering the complete request first.
+
 ## Extraction from #132
 
 | Carry into this PR | Leave on the experimental branch |

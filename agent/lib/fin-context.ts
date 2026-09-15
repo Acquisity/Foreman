@@ -51,6 +51,7 @@ export type FinContext = Readonly<
   }
 >;
 
+/** Require one configured HTTPS origin before sending it a user's identity token. */
 function acquisityOrigin(): string {
   const configured = process.env.ACQUISITY_FIN_ORIGIN;
   const url = configured ? URL.parse(configured) : null;

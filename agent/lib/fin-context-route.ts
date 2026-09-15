@@ -5,13 +5,38 @@ const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const inputSchema = z.strictObject({
   conversation_id: z.string().regex(/^\d{1,32}$/),
 });
+/** Prevent identity responses and authorization failures from being cached. */
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
     headers: { "cache-control": "no-store" },
     status,
   });
 
-// This endpoint verifies identity only. It never starts or resumes an agent.
+/** Read at most 1024 UTF-16 code units, returning null and cancelling on overflow. */
+async function readRequestBody(request: Request): Promise<string | null> {
+  const reader = request.body?.pipeThrough(new TextDecoderStream()).getReader();
+  if (!reader) {
+    return "";
+  }
+  let body = "";
+  try {
+    for (;;) {
+      // biome-ignore lint/performance/noAwaitInLoops: consume and bound one request stream in order.
+      const { done, value } = await reader.read();
+      if (done) {
+        return body;
+      }
+      if (body.length + value.length > 1024) {
+        return null;
+      }
+      body += value;
+    }
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+}
+
+/** Verify identity on explicitly enabled non-Production deployments without starting an agent. */
 export async function receiveFinContext(
   request: Request,
   verifyContext = verifyFinContext
@@ -29,8 +54,8 @@ export async function receiveFinContext(
   }
   let input: z.infer<typeof inputSchema>;
   try {
-    const body = await request.text();
-    if (body.length > 1024) {
+    const body = await readRequestBody(request);
+    if (body === null) {
       return json({ error: "Request is too large." }, 413);
     }
     input = inputSchema.parse(JSON.parse(body));

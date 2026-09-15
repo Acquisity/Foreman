@@ -3,6 +3,7 @@ import { type TestContext, test } from "node:test";
 import type { verifyFinContext } from "./fin-context.js";
 import { receiveFinContext } from "./fin-context-route.js";
 
+/** Build an intake request without using a real user credential. */
 const request = (
   requestBody: string,
   authorization = "Bearer app.signed.identity"
@@ -17,6 +18,7 @@ const unexpected: typeof verifyFinContext = () => {
   throw new Error("Verification must not run for rejected input.");
 };
 
+/** Restore each environment override when its test finishes. */
 function setEnv(t: TestContext, key: string, value: string | undefined) {
   const previous = process.env[key];
   if (value === undefined) {
@@ -94,7 +96,42 @@ test("rejects missing identity and caller-authored authority before verification
   );
 });
 
-test("enabled Preview route returns only the verifier's context", async (t) => {
+test("oversized streamed requests are cancelled before verification", {
+  timeout: 2000,
+}, async (t) => {
+  setEnv(t, "VERCEL_ENV", "preview");
+  setEnv(t, "FIN_CONTEXT_ENABLED", "true");
+  let resolveCancelled: () => void = () => undefined;
+  const cancelled = new Promise<void>((resolve) => {
+    resolveCancelled = resolve;
+  });
+  let pulls = 0;
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      cancel() {
+        resolveCancelled();
+      },
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new TextEncoder().encode(" ".repeat(1025)));
+      },
+    },
+    { highWaterMark: 0 }
+  );
+  const incoming = new Request("https://foreman.example/internal/fin/context", {
+    body: stream,
+    duplex: "half",
+    headers: { authorization: "Bearer app.signed.identity" },
+    method: "POST",
+  } as RequestInit & { duplex: "half" });
+  const response = await receiveFinContext(incoming, unexpected);
+  assert.equal(response.status, 413);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  await cancelled;
+  assert.ok(pulls <= 2, "must stop consuming the unending request stream");
+});
+
+test("enabled Preview route accepts the size boundary and returns only verified context", async (t) => {
   setEnv(t, "FIN_CONTEXT_ENABLED", "true");
   setEnv(t, "VERCEL_ENV", "preview");
   const context = Object.freeze({
@@ -110,7 +147,7 @@ test("enabled Preview route returns only the verifier's context", async (t) => {
     userId: "11111111-1111-4111-8111-111111111111",
     verifiedAt: "2026-09-15T12:00:00.000Z",
   });
-  const incoming = request(body);
+  const incoming = request(body.padEnd(1024));
   let calls = 0;
   const response = await receiveFinContext(incoming, (input) => {
     calls += 1;
