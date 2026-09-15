@@ -31,7 +31,7 @@ const CUSTOMER_SAFE = /Do not mention internal lanes/;
 const COMPLETE_NOW = /perform that bounded action in the root turn/;
 const NO_PROGRESS_PROMISE = /Do not finish with a progress update/;
 const OTHER_WORKSPACE_REDIRECT =
-  /open that workspace and start the request there/;
+  /cannot be checked here because it is a different workspace/;
 
 test("customer lane keeps the verified scope and omits internal workflow instructions", () => {
   const lane = sessionLane(initiator);
