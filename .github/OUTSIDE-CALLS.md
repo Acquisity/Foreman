@@ -104,3 +104,7 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 `agent/lib/support/linear-followup.ts` uses the existing support provider dispatch and its 50-second Executor deadline per call, including each issue read and comment page. Each case has at most ten tracked issues; each discussion scan stops at ten pages or one MB. The support lease is checked before each provider dispatch. No additional credentials or direct Linear transport are introduced.
 
 `agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.
+
+## Fin identity verification
+
+`agent/lib/fin-context.ts` bounds native Intercom conversation/contact reads and the Acquisity context request with a composed 50-second abort signal. App responses reject redirects and are bounded to 4 KiB while streaming, including cancellation during body consumption. The fixed reads in `agent/lib/executor/dispatch.ts` reuse the existing Executor transport and shared toolkit. Vercel Connect `getToken` exposes no cancellation option; credential resolution retains the existing Connect exemption, with the signal checked before and after resolution. No customer token or provider error is logged. This route starts no model, callback or Slack delivery.
