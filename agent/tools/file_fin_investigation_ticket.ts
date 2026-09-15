@@ -9,15 +9,15 @@ const issueUrl =
 const issueIdentifier = /^ENG-\d+$/u;
 const writtenIssue = z
   .object({
-    identifier: z.string().regex(issueIdentifier),
+    id: z.string().regex(issueIdentifier),
     url: z.string().regex(issueUrl),
   })
   .transform((issue, ctx) => {
-    if (issueUrl.exec(issue.url)?.[1] !== issue.identifier) {
+    if (issueUrl.exec(issue.url)?.[1] !== issue.id) {
       ctx.addIssue({ code: "custom", message: "Issue URL does not match." });
       return z.NEVER;
     }
-    return issue;
+    return { identifier: issue.id, url: issue.url };
   });
 
 export const confirmedFinIssue = (data: unknown) =>

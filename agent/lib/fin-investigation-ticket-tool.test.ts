@@ -34,10 +34,15 @@ test("ticket filing is advertised only in the verified Fin lane", async () => {
 
 test("ticket confirmation accepts only the provider's defined issue shape", () => {
   const issue = {
-    identifier: "ENG-13902",
+    id: "ENG-13902",
     url: "https://linear.app/acquisity/issue/ENG-13902/customer-report",
   };
-  assert.deepEqual(confirmedFinIssue({ structuredContent: issue }), issue);
+  assert.deepEqual(
+    confirmedFinIssue({
+      content: [{ text: JSON.stringify(issue), type: "text" }],
+    }),
+    { identifier: issue.id, url: issue.url }
+  );
   assert.throws(() => confirmedFinIssue({ nested: { issue } }));
   assert.throws(() =>
     confirmedFinIssue({
