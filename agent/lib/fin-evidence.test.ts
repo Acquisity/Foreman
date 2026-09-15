@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import definition from "../tools/read_fin_outreach_evidence.js";
 import {
   invokeProvider,
   type ProviderContext,
@@ -16,8 +17,20 @@ import { finInvestigationAuth } from "./fin-investigation-auth.js";
 
 const scope = verifiedFinContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
+const bindings = JSON.stringify({
+  "planetscale.readQuery": {
+    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+  },
+});
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/fin";
+process.env.EXECUTOR_OPERATION_BINDINGS = bindings;
 after(() => {
+  if (originalBindings === undefined) {
+    delete process.env.EXECUTOR_OPERATION_BINDINGS;
+  } else {
+    process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
+  }
   if (originalConnector === undefined) {
     delete process.env.EXECUTOR_MCP_CONNECTOR;
   } else {
@@ -111,6 +124,7 @@ test("every statement checks current membership and scopes every product join", 
 });
 
 test("successful empty evidence stays distinct from foreign ID, denied access and provider failure", async (t) => {
+  const warning = t.mock.method(console, "warn", () => undefined);
   const empty = parseFinEvidence(envelope([]), scope, { read: "campaigns" });
   assert.equal(empty.status, "ok");
   const missing = parseFinEvidence(envelope([]), scope, {
@@ -131,6 +145,121 @@ test("successful empty evidence stays distinct from foreign ID, denied access an
   assert.equal(failed.status, "unavailable");
   assert.equal(JSON.stringify(failed).includes("secret"), false);
   assert.equal(JSON.stringify(failed).includes("oauth"), false);
+  assert.equal(warning.mock.callCount(), 1);
+  assert.deepEqual(JSON.parse(String(warning.mock.calls[0].arguments[0])), {
+    code: "transport",
+    event: "fin.investigation.evidence.failed",
+    outcome: "error",
+    tool: "read_fin_outreach_evidence",
+  });
+});
+
+test("all four product provider types coexist without losing valid rows", () => {
+  const names = ["instantly", "smartlead", "apollo", "email_bison"];
+  const result = parseFinEvidence(
+    envelope(
+      names.map((provider) => ({
+        active: true,
+        hasSavedConnectionError: false,
+        provider,
+        updatedAt: observedAt,
+      }))
+    ),
+    scope,
+    { read: "connections" }
+  );
+  assert.equal(result.status, "ok");
+  if (result.status === "ok" && result.evidence.read === "connections") {
+    assert.deepEqual(
+      result.evidence.connections.map((entry) => entry.provider),
+      names
+    );
+    assert.ok(
+      result.caveats.some((value) =>
+        value.includes("not when an error occurred")
+      )
+    );
+  } else {
+    assert.fail("Expected saved connections");
+  }
+});
+
+test("SQL-bounded emoji campaign names survive UTF-16 validation", () => {
+  for (const name of [`${"a".repeat(299)}😀`, "😀".repeat(300)]) {
+    const result = parseFinEvidence(envelope([{ ...row, name }]), scope, {
+      read: "campaigns",
+    });
+    assert.equal(result.status, "ok");
+    if (result.status === "ok" && result.evidence.read === "campaigns") {
+      assert.equal(result.evidence.campaigns[0].name, name);
+    }
+  }
+});
+
+test("missing or unexpected bindings deny before credentials and transport", async (t) => {
+  const warning = t.mock.method(console, "warn", () => undefined);
+  const context = {
+    ...ctx,
+    getToken: () => assert.fail("must not resolve credentials"),
+  };
+  t.mock.method(executorTransport, "call", () =>
+    assert.fail("must not dispatch")
+  );
+  try {
+    for (const value of [
+      "{}",
+      "",
+      "invalid",
+      JSON.stringify({
+        "planetscale.readQuery": { path: "other.org.account.read" },
+      }),
+    ]) {
+      process.env.EXECUTOR_OPERATION_BINDINGS = value;
+      // biome-ignore lint/performance/noAwaitInLoops: each case changes shared deployment configuration.
+      const result = await readFinEvidence(context, { read: "connections" });
+      assert.equal(result.status, "unavailable");
+    }
+    assert.equal(warning.mock.callCount(), 4);
+    for (const call of warning.mock.calls) {
+      assert.equal(JSON.parse(String(call.arguments[0])).code, "configuration");
+    }
+  } finally {
+    process.env.EXECUTOR_OPERATION_BINDINGS = bindings;
+  }
+});
+
+test("malformed evidence emits one sanitized warning, never provider values", async (t) => {
+  const warning = t.mock.method(console, "warn", () => undefined);
+  t.mock.method(executorTransport, "call", async () => ({
+    data: envelope([{ ...row, status: "secret provider value" }]),
+    ok: true,
+  }));
+  const result = await readFinEvidence(ctx, { read: "campaigns" });
+  assert.equal(result.status, "unavailable");
+  assert.equal(warning.mock.callCount(), 1);
+  const line = String(warning.mock.calls[0].arguments[0]);
+  assert.equal(JSON.parse(line).code, "response");
+  assert.equal(JSON.stringify(result).includes("secret"), false);
+  assert.equal(line.includes("secret"), false);
+});
+
+test("evidence resolver advertises only the immutable Fin initiator lane", async () => {
+  const resolve = definition.events["step.started"];
+  assert.ok(resolve);
+  assert.ok(await resolve({} as never, ctx as never));
+  const results = await Promise.all(
+    [null, { issuer: "slack" }, { issuer: "github" }].map((initiator) =>
+      resolve(
+        {} as never,
+        {
+          session: {
+            auth: { current: finInvestigationAuth(scope), initiator },
+          },
+        } as never
+      )
+    )
+  );
+  assert.deepEqual(results, [null, null, null]);
 });
 
 test("only permitted fields reach the model, including nested campaign evidence", () => {

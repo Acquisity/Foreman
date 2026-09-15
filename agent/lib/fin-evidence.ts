@@ -16,14 +16,17 @@ const status = z.enum([
   "archived",
   "attention_needed",
 ]);
-const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const CAMPAIGN_PAGE_SIZE = 50;
+const PROVIDER_COUNT = 4;
+const count = z.number().int().nonnegative();
 const timestamp = z
   .string()
   .max(64)
   .refine((value) => Number.isFinite(Date.parse(value)));
 const campaign = z.object({
   id: z.uuid(),
-  name: z.string().max(300),
+  // PostgreSQL left(..., 300) counts code points; Zod counts UTF-16 units.
+  name: z.string().max(600),
   status,
   totalLeads: count.nullable(),
   updatedAt: timestamp,
@@ -42,12 +45,12 @@ const activity = z.object({
 const provider = z.object({
   active: z.boolean(),
   hasSavedConnectionError: z.boolean(),
-  provider: z.enum(["instantly", "emailbison"]),
+  provider: z.enum(["instantly", "smartlead", "apollo", "email_bison"]),
   updatedAt: timestamp,
 });
 const evidence = z.discriminatedUnion("read", [
   z.object({
-    campaigns: z.array(campaign).max(50),
+    campaigns: z.array(campaign).max(CAMPAIGN_PAGE_SIZE),
     nextAfter: z.uuid().nullable(),
     read: z.literal("campaigns"),
   }),
@@ -58,12 +61,13 @@ const evidence = z.discriminatedUnion("read", [
     read: z.literal("campaign"),
   }),
   z.object({
-    connections: z.array(provider).max(10),
+    connections: z.array(provider).max(PROVIDER_COUNT),
     read: z.literal("connections"),
   }),
 ]);
 export const finEvidenceOutput = z.union([
   z.object({
+    caveats: z.array(z.string()).max(4),
     evidence,
     observedAt: timestamp,
     source: z.literal(
@@ -102,14 +106,14 @@ export function buildFinEvidenceQuery(
     case "campaigns":
       selection = `select ${campaignColumns} ${campaignFrom}
         ${input.after ? `and c.id > '${input.after}'::uuid` : ""}
-        order by c.id limit 51`;
+        order by c.id limit ${CAMPAIGN_PAGE_SIZE + 1}`;
       break;
     case "connections":
       selection = `select p.provider, p.is_active as active,
         (nullif(p.connection_error, '') is not null) as "hasSavedConnectionError",
         p.updated_at as "updatedAt"
         from outreach_provider p join authorized a on a.id = p.organization_id
-        order by p.id limit 11`;
+        order by p.id limit ${PROVIDER_COUNT + 1}`;
       break;
     case "campaign":
       selection = `select ${campaignColumns},
@@ -151,7 +155,7 @@ export function parseFinEvidence(
           z.object({
             authorized: z.boolean(),
             observedAt: timestamp,
-            records: z.array(z.unknown()).max(51),
+            records: z.array(z.unknown()).max(CAMPAIGN_PAGE_SIZE + 1),
           })
         )
         .length(1),
@@ -169,18 +173,27 @@ export function parseFinEvidence(
   let parsed: z.infer<typeof evidence>;
   switch (input.read) {
     case "campaigns": {
-      const rows = z.array(campaign).max(51).parse(result.records);
+      const rows = z
+        .array(campaign)
+        .max(CAMPAIGN_PAGE_SIZE + 1)
+        .parse(result.records);
       parsed = {
-        campaigns: rows.slice(0, 50),
-        nextAfter: rows.length > 50 ? rows[49].id : null,
+        campaigns: rows.slice(0, CAMPAIGN_PAGE_SIZE),
+        nextAfter:
+          rows.length > CAMPAIGN_PAGE_SIZE
+            ? rows[CAMPAIGN_PAGE_SIZE - 1].id
+            : null,
         read: "campaigns",
       };
       break;
     }
     case "connections":
-      // An overflow is unavailable: a partial list must not imply all connections were checked.
+      // The product has four provider types and one row per organization/provider.
       parsed = {
-        connections: z.array(provider).max(10).parse(result.records),
+        connections: z
+          .array(provider)
+          .max(PROVIDER_COUNT)
+          .parse(result.records),
         read: "connections",
       };
       break;
@@ -215,6 +228,21 @@ export function parseFinEvidence(
       throw new Error("Unsupported evidence read.");
   }
   return finEvidenceOutput.parse({
+    caveats: [
+      "Saved product state is not a live provider check.",
+      ...(input.read === "campaign"
+        ? [
+            "Missing metric rows do not mean zero activity.",
+            "Bounded status history cannot prove uninterrupted state.",
+          ]
+        : []),
+      ...(input.read === "connections"
+        ? [
+            "A saved error does not establish a current failure or justify reconnection by itself.",
+            "updatedAt is the record update time, not when an error occurred.",
+          ]
+        : []),
+    ],
     evidence: parsed,
     observedAt: result.observedAt,
     source:

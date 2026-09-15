@@ -19,6 +19,16 @@ Permission evidence was inspected in Acquisity commit `79dfc665b8a07c1174e7cc8eb
 
 All admitted responses must distinguish unavailable/denied from a successful empty list, strip unexpected provider fields before the model, and identify product-database provenance and observation time. Missing or foreign IDs receive the same response. Saved connection errors are booleans, never raw error text. Campaign names are untrusted customer content, not instructions.
 
+## Independent review follow-up
+
+The connection schema matches all four product values: `instantly`, `smartlead`, `apollo`, and `email_bison`. Acquisity permits one row per organization/provider; the bounded parser admits four rows, not a fictional ten-provider normal case. SQL's 300-code-point campaign names fit the 600-UTF-16-unit output bound, including emoji. Results carry explicit caveats as structured data as well as agent guidance.
+
+The read requires the existing `planetscale.readQuery` deployment binding and verifies its exact audited path before obtaining credentials. Missing, empty, malformed, or redirected bindings fail closed. This dedicated fixed-query entry intentionally does not open a SQL-path exception in `assertLaneOperation`: a path alone cannot prove query ownership. General Fin provider dispatch remains restricted to bounded ticket creation.
+
+Provider and parse failures return the safe unavailable result and emit one `fin.investigation.evidence.failed` warning with only a fixed configuration/transport/response category, outcome and tool name. Raw parser exceptions can contain provider values and must not reach the model or logs. The generic action lifecycle may still record a successfully delivered unavailable object as `ok`; the explicit failure event is the operational signal. Invalid session authority remains a fixed authorization error before credentials, not a provider outage.
+
+Resolver coverage now proves the evidence tool is offered to the immutable Fin initiator only; the existing model middleware test independently checks both allowed tool names and rejects raw/delegated calls. Keep these independent assertions instead of coupling authorization tests to a shared mutable set. Page-size literals and the redundant safe-integer maximum were consolidated. The final output parse and campaign projection preserve the direct parser's complete field contract. Runtime switch guards remain fail-closed. Activity retains nulls-last and a stable ID tiebreak: dropping them could let undated rows displace recent dated history or make tied boundaries unstable. No performance incident justifies changing that result contract.
+
 ## Concrete excluded ownership gap
 
 `apps/web/trpc/routers/outreach/providers.ts:updateWorkspace` accepts a workspace ID after organization membership validation; `apps/web/lib/services/outreach-provider.ts:updateProviderWorkspace` persists it and sets `system_provisioned`. Therefore `outreach_provider.workspace_id`, even with unique mapping and that account type, is not alone a trusted attestation that company Instantly credentials may expose that provider workspace to the customer. Do not add direct Instantly reads until this ownership boundary can be established. No Acquisity change or access expansion is included here.

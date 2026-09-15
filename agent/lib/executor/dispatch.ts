@@ -11,8 +11,10 @@ import {
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
+import { logOpsEvent } from "../ops-log.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
+import { operationPath } from "./bindings.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -198,24 +200,44 @@ export async function readFinEvidence(
 ) {
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
   const query = buildFinEvidenceQuery(scope, input);
+  let stage = "configuration";
   try {
     ctx.abortSignal.throwIfAborted();
+    const path = operationPath("planetscale.readQuery");
+    if (
+      path !==
+      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
+    ) {
+      throw new Error("Unexpected evidence operation binding.");
+    }
+    stage = "transport";
     const { wire } = await connection(ctx, null);
     ctx.abortSignal.throwIfAborted();
     const result = await executorTransport.call(
       wire,
-      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+      path,
       { ...PRODUCTION_READ_QUERY_ARGS, query, use_replica: false },
       { maxBytes: 128 * 1024, timeoutMs: 50_000 }
     );
     if (!result.ok || (result.http && result.http.status !== 200)) {
       throw new Error("Evidence provider unavailable.");
     }
+    stage = "response";
     return parseFinEvidence(result.data, scope, input);
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;
     }
+    // Parser and provider errors may contain customer rows or credentials. Never forward them.
+    logOpsEvent(
+      "fin.investigation.evidence.failed",
+      {
+        code: stage,
+        outcome: "error",
+        tool: "read_fin_outreach_evidence",
+      },
+      console.warn
+    );
     return {
       message:
         "Saved outreach evidence could not be checked. This is not an empty result.",
