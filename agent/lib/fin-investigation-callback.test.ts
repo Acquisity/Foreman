@@ -21,7 +21,7 @@ test("accepts only exact Intercom Procedure callback URLs", () => {
   }
 });
 
-test("delivers one bounded customer-safe result with a deadline", async () => {
+test("delivers only one data-free wake-up signal with a deadline", async () => {
   const state = createFinCallback(callback);
   assert.ok(state);
   const calls: Array<{ input?: RequestInit; url: string }> = [];
@@ -39,8 +39,9 @@ test("delivers one bounded customer-safe result with a deadline", async () => {
   assert.equal(calls[0]?.url, callback);
   assert.ok(calls[0]?.input?.signal instanceof AbortSignal);
   assert.deepEqual(JSON.parse(String(calls[0]?.input?.body)), {
-    message: "Verified-workspace result.",
-    status: "completed",
+    message:
+      "Retrieve the investigation result for this conversation with Get Foreman Result before replying. This notification contains no findings.",
+    status: "ready",
   });
 });
 

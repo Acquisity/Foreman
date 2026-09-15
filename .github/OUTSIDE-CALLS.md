@@ -113,4 +113,12 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 `readFinEvidence` in `agent/lib/executor/dispatch.ts` uses the existing shared Executor transport with a 50-second deadline, caller cancellation and a 128 KiB response cap. It accepts only fixed outreach read purposes and validated local UUIDs, constructs its own SQL, and checks active owner/admin membership in the same statement as the evidence. Credentials retain the existing Vercel Connect exemption. No raw provider response or failure body is returned to the model.
 
-`agent/lib/fin-investigation-callback.ts` posts only the bounded final answer and status to an exact Intercom Procedure callback URL. The request rejects redirects and has a five-second deadline. `agent/lib/fin-investigation-slack.ts` posts and updates one receipt in the configured internal channel with a five-second HTTP deadline; Slack token resolution retains the Vercel Connect exemption above. These delivery calls carry no customer token, workspace identifier, provider result or tool output.
+`agent/lib/fin-investigation-callback.ts` posts only a generic ready signal to an allowlisted Intercom Procedure callback URL. The signal contains no findings or run reference; the receiving Procedure must authenticate a result lookup with its own saved reference and native conversation. The request rejects redirects and has a five-second deadline. `agent/lib/fin-investigation-slack.ts` posts and updates one receipt in the configured internal channel with a five-second HTTP deadline; Slack token resolution retains the Vercel Connect exemption above. These delivery calls carry no customer token, workspace identifier, provider result or tool output.
+
+## Fin run ownership additions (ENG-13766)
+
+| Call | Bound | Reason |
+| --- | --- | --- |
+| `fin-run-store.ts` operational run reads/writes | 15 seconds per private Postgres operation via `privateDatabase` | Atomic start ownership and immutable saved result; failure must not dispatch replacement work. |
+| `fin-delivery.ts` native conversation/contact reads | Shared 50-second AbortSignal plus existing Executor transport bounds | Recheck original destination and public human replies; failure suppresses customer delivery. |
+| Result recovery event stream | Eight-second observation bound | Reads the exact existing session only; cancellation closes the reader, never the investigation. |
