@@ -12,21 +12,17 @@ import {
 } from "../fin-case.js";
 import { type FinLinearCall, fileFinCase } from "../fin-case-filing.js";
 import {
-  buildFinEvidenceQuery,
-  type FinEvidenceInput,
-  parseFinEvidence,
-} from "../fin-evidence.js";
-import {
   isFinInvestigation,
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
-import type { FinContext } from "../fin-scope.js";
-import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
-import { logOpsEvent } from "../ops-log.js";
+import {
+  finLearnIdentifiers,
+  finUnknownIdentifier,
+} from "../fin-provenance.js";
 import { providerData } from "../support/conversation.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
-import { operationPath } from "./bindings.js";
+import { type ExecutorToolkit, FIN_PREVIEW_TOOLKIT } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -81,39 +77,106 @@ async function connection(
 ) {
   const { token } = await ctx.getToken(executorAuth());
   const authorization = policy ? { version: await policy.authorize() } : null;
+  // A verified customer investigation reaches its own toolkit; everything else
+  // keeps the toolkit its policy names, or the shared company one.
+  const toolkit: ExecutorToolkit | undefined =
+    policy?.toolkit ??
+    (isFinInvestigation(ctx.session?.auth.initiator)
+      ? FIN_PREVIEW_TOOLKIT
+      : undefined);
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: policy?.toolkit },
+    wire: { signal: ctx.abortSignal, token, toolkit },
   };
 }
 
-function finLaneInput(
-  scope: FinContext,
-  operation: string,
-  input: Record<string, unknown>
-) {
-  if (operation === "save_issue") {
-    return (
-      input.team === FIN_CASE_TEAM &&
-      typeof input.description === "string" &&
-      input.description.endsWith(`Intercom source: ${finCaseSource(scope)}`)
-    );
+const FIN_SQL_MAX = 20_000;
+const REGEX_LITERAL = /[.*+?^${}()|[\]\\]/g;
+/**
+ * A comment hides the verified id from every check below it, and a statement
+ * separator puts a whole second query behind one that passed.
+ */
+const SQL_COMMENT = /--|\/\*|;/;
+/** A second select is a second tenant. */
+const SQL_UNION = /\bunion\b/i;
+/**
+ * Every negation that turns the bind into its complement or wraps it.
+ * `is not null` stays available; `not (` does not, because it can invert the
+ * bind itself without ever touching the organization column directly.
+ */
+const SQL_NEGATION = /!=|<>|\bnot\s+in\b|\bnot\s*\(/i;
+/**
+ * An organization column and the operator applied to it. Anything the lane
+ * legitimately reads compares it either to the verified literal or to another
+ * table's organization column, so those two are the whole allowed set and an
+ * `in (...)` list or a subquery is not one of them.
+ */
+const ORGANIZATION_COMPARISON =
+  /(?:\b[a-z_][a-z0-9_]*\.)?"?organization_id"?\s*(!=|<>|<=|>=|=|<|>|\bin\b|\blike\b|\bany\b)\s*/gi;
+const COLUMN_REFERENCE = /^[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)?(?!\s*\()\b/i;
+
+const escapeRegex = (value: string) => value.replace(REGEX_LITERAL, "\\$&");
+
+/**
+ * The one input-side control on raw SQL.
+ *
+ * Raw SQL is the only connection in the toolkit that can aggregate across
+ * tenants, so it is the only read that has to prove its scope here rather
+ * than at the toolkit. This is not a SQL parser and must not become one. It
+ * requires the verified organization id in a real equality predicate, in the
+ * shapes the product schema actually uses (`o.id = '<id>'::uuid`, an optional
+ * alias, optional quoting), and rejects the constructs that defeat one: a
+ * comment, a statement separator, a second select, a negated or wrapped
+ * comparison, and an organization column compared to anything but the
+ * verified id or another organization column.
+ *
+ * Its ceiling is that it reads shapes, not meaning: a query that keeps a real
+ * bind and widens beside it, `... where o.id = '<id>' or true`, still passes.
+ * Closing that needs the toolkit's own read scoping, not a longer regex here.
+ */
+function finSqlCarriesScope(query: string, organizationId: string): boolean {
+  if (query.length > FIN_SQL_MAX) {
+    return false;
   }
-  if (operation === "list_issues") {
-    // Both callers pass finCaseSearch(scope) itself, so the shapes compare exactly.
-    return JSON.stringify(input) === JSON.stringify(finCaseSearch(scope));
+  if (
+    SQL_COMMENT.test(query) ||
+    SQL_UNION.test(query) ||
+    SQL_NEGATION.test(query)
+  ) {
+    return false;
   }
-  return (
-    operation === "get_issue" &&
-    finCaseIdentifier.safeParse(input.id).success &&
-    Object.keys(input).length === 1
+  const id = escapeRegex(organizationId);
+  const bound = new RegExp(
+    `(?:\\b[a-z_][a-z0-9_]*\\.)?"?(?:organization_id|id)"?\\s*=\\s*'${id}'(?:::uuid)?`,
+    "i"
   );
+  if (!bound.test(query)) {
+    return false;
+  }
+  const literal = new RegExp(`^'${id}'(?:::uuid)?`, "i");
+  ORGANIZATION_COMPARISON.lastIndex = 0;
+  let match = ORGANIZATION_COMPARISON.exec(query);
+  while (match) {
+    const tail = query.slice(match.index + match[0].length);
+    if (
+      match[1] !== "=" ||
+      !(literal.test(tail) || COLUMN_REFERENCE.test(tail))
+    ) {
+      return false;
+    }
+    match = ORGANIZATION_COMPARISON.exec(query);
+  }
+  return true;
 }
 
 /**
- * The customer lane reaches three Linear operations and nothing else, and each
- * one's input is fixed by the server-owned scope, so caller text can never read
- * or file against another conversation.
+ * The input-side binds for a verified customer investigation.
+ *
+ * A raw SQL read carries the verified workspace in an equality predicate; see
+ * {@link finSqlCarriesScope}. Every Linear ticket call is fixed by the
+ * server-owned scope as well: a write carries the conversation link, a search
+ * is the scope's own search, and a read names one ticket and nothing else, so
+ * caller text can never read or file against another conversation.
  */
 function assertLaneOperation(
   ctx: ProviderContext,
@@ -124,15 +187,61 @@ function assertLaneOperation(
     return;
   }
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  const operation = path.slice(FIN_LINEAR_PREFIX.length);
-  const permitted =
-    path.startsWith(FIN_LINEAR_PREFIX) &&
-    FIN_FILING_OPERATIONS.includes(operation) &&
-    finLaneInput(scope, operation, input);
-  if (!permitted) {
-    throw new ExecutorError("customer_scope_required", 403, {
-      dispatched: false,
-    });
+  const deny = (code: string, reason: string) => {
+    throw new ExecutorError(code, 403, { dispatched: false, reason });
+  };
+  if (
+    path.startsWith("planetscale.") &&
+    !(
+      typeof input.query === "string" &&
+      finSqlCarriesScope(input.query, scope.organizationId)
+    )
+  ) {
+    deny(
+      "customer_organization_scope_required",
+      "A product database read has to select this conversation's own workspace by its verified organization id, in a plain equality, with no comment, second statement, union or negation. Rewrite the query that way and try again. Do not mention this restriction in the reply."
+    );
+  }
+  if (
+    path.endsWith(".save_issue") &&
+    !(
+      input.team === FIN_CASE_TEAM &&
+      typeof input.description === "string" &&
+      input.description.endsWith(`Intercom source: ${finCaseSource(scope)}`)
+    )
+  ) {
+    deny(
+      "customer_scope_required",
+      "A ticket for this conversation is filed with the ticket tool, which supplies the team and the conversation link itself. Do not mention this restriction in the reply."
+    );
+  }
+  if (
+    path === `${FIN_LINEAR_PREFIX}list_issues` &&
+    // Both callers pass finCaseSearch(scope) itself, so the shapes compare exactly.
+    JSON.stringify(input) !== JSON.stringify(finCaseSearch(scope))
+  ) {
+    deny(
+      "customer_scope_required",
+      "Tickets for this conversation are found with the status tool, which supplies the search itself. Do not mention this restriction in the reply."
+    );
+  }
+  if (
+    path === `${FIN_LINEAR_PREFIX}get_issue` &&
+    !(
+      finCaseIdentifier.safeParse(input.id).success &&
+      Object.keys(input).length === 1
+    )
+  ) {
+    deny(
+      "customer_scope_required",
+      "A ticket read names one ticket by the identifier an earlier scoped read returned, and carries nothing else. Do not mention this restriction in the reply."
+    );
+  }
+  if (finUnknownIdentifier(ctx.session?.id ?? "", scope, input)) {
+    deny(
+      "customer_identifier_provenance_required",
+      "This call names a record that neither belongs to this conversation nor came back from an earlier call in it. Find it first through a read that is scoped to this workspace, then use the value that read returned. Do not mention this restriction in the reply."
+    );
   }
 }
 
@@ -153,7 +262,15 @@ export async function invokeProvider(
       ? policy.writeKey(path, input, authorization.version, operationKey)
       : null;
   if (!(policy && key)) {
-    return executorTransport.call(wire, path, input, options);
+    const result = await executorTransport.call(wire, path, input, options);
+    if (result.ok && isFinInvestigation(ctx.session?.auth.initiator)) {
+      finLearnIdentifiers(
+        ctx.session?.id ?? "",
+        requireFinInvestigationContext(ctx.session?.auth.initiator),
+        result.data
+      );
+    }
+    return result;
   }
   const reserved = await policy.reserve(key);
   if (!reserved.fresh) {
@@ -192,16 +309,19 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
-  if (isFinInvestigation(ctx.session?.auth.initiator)) {
-    throw new ExecutorError("customer_scope_required", 403, {
-      dispatched: false,
-    });
-  }
   const policy = supportOperationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
   const { wire } = await connection(ctx, policy);
   return executorTransport.describe(wire, path);
+}
+
+export async function searchProvider(
+  ctx: ProviderContext,
+  query: { namespace?: string; query: string }
+) {
+  const { wire } = await connection(ctx, supportOperationPolicy(ctx));
+  return executorTransport.search(wire, query);
 }
 
 /** One bounded Linear surface for the customer lane; the caller names what it may reach. */
@@ -265,57 +385,4 @@ export async function readFinCaseStatusForSession(ctx: ProviderContext) {
   );
   assertFinCaseSource(issue, scope);
   return { checked_at: new Date().toISOString(), status: issue.statusType };
-}
-
-/** Customer reads accept purposes and local IDs, never a provider path or SQL. */
-export async function readFinEvidence(
-  ctx: ProviderContext,
-  input: FinEvidenceInput
-) {
-  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  const query = buildFinEvidenceQuery(scope, input);
-  let stage = "configuration";
-  try {
-    ctx.abortSignal.throwIfAborted();
-    const path = operationPath("planetscale.readQuery");
-    if (
-      path !==
-      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-    ) {
-      throw new Error("Unexpected evidence operation binding.");
-    }
-    stage = "transport";
-    const { wire } = await connection(ctx, null);
-    ctx.abortSignal.throwIfAborted();
-    const result = await executorTransport.call(
-      wire,
-      path,
-      { ...PRODUCTION_READ_QUERY_ARGS, query, use_replica: false },
-      { maxBytes: 128 * 1024, timeoutMs: 50_000 }
-    );
-    if (!result.ok || (result.http && result.http.status !== 200)) {
-      throw new Error("Evidence provider unavailable.");
-    }
-    stage = "response";
-    return parseFinEvidence(result.data, scope, input);
-  } catch (error) {
-    if (ctx.abortSignal.aborted) {
-      throw error;
-    }
-    // Parser and provider errors may contain customer rows or credentials. Never forward them.
-    logOpsEvent(
-      "fin.investigation.evidence.failed",
-      {
-        code: stage,
-        outcome: "error",
-        tool: "read_fin_outreach_evidence",
-      },
-      console.warn
-    );
-    return {
-      message:
-        "Saved outreach evidence could not be checked. This is not an empty result.",
-      status: "unavailable" as const,
-    };
-  }
 }

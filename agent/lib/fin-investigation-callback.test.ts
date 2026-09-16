@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  boundedFinAnswer,
   createFinCallback,
   deliverFinCallback,
   isFinCallbackUrl,
@@ -73,4 +74,13 @@ test("reduces only complete final model messages into a successful outcome", () 
       status: "failed",
     }
   );
+});
+
+test("truncates an over-long answer at 12,000 characters", () => {
+  const finding = "a".repeat(12_050);
+  assert.equal(
+    boundedFinAnswer(` ${finding} `),
+    `${"a".repeat(12_000)}\n[Report truncated.]`
+  );
+  assert.equal(boundedFinAnswer(" short "), "short");
 });

@@ -203,7 +203,7 @@ test("support identity survives delegation and cannot use the broad Executor con
     policy({ ...ctx, toolName: "executor__execute" } as ApprovalContext),
     {
       reason:
-        "Use support_provider for the support toolkit and durable Linear writes.",
+        "Use this lane's own authored provider tool, which reaches its toolkit.",
       type: "denied",
     }
   );

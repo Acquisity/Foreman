@@ -7,6 +7,7 @@ import {
 } from "./fin-case.js";
 import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
+import { identifierPatterns } from "./fin-identifiers.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
 import {
   finInvestigationFailure,
@@ -71,23 +72,45 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
-/** The customer sees the ticket decision, never its identifier or its link. */
-const customerOutcome = <
+/**
+ * The customer sees the ticket decision, never its identifier or its link, and
+ * never an answer that carries an identifier of any kind. A blocked answer is
+ * withheld rather than redacted, because a mangled half sentence is worse for
+ * the customer than the plain failure. Only this customer-facing payload is
+ * affected: the saved outcome keeps the full finding for the internal Slack
+ * receipt, which is the only way a human can see what was withheld and why.
+ */
+export const customerOutcome = <
   T extends { message: string; status: string; ticket?: FinCaseOutcome },
 >(
   outcome: T
-) => ({
-  message: outcome.message,
-  status: outcome.status,
-  ...(outcome.ticket
-    ? {
-        ticket: {
-          message: outcome.ticket.message,
-          outcome: outcome.ticket.outcome,
-        },
-      }
-    : {}),
-});
+) => {
+  const blocked = identifierPatterns.find(([, pattern]) =>
+    pattern.test(outcome.message)
+  );
+  if (blocked) {
+    // Every block is logged so the false positive rate is visible in Preview.
+    // The allowlisted fields carry the category only, never the customer text.
+    logOpsEvent("fin.investigation.answer.withheld", {
+      code: blocked[0],
+      message: "Customer answer withheld because it carried an identifier.",
+      outcome: "blocked",
+    });
+    return { ...finInvestigationFailure };
+  }
+  return {
+    message: outcome.message,
+    status: outcome.status,
+    ...(outcome.ticket
+      ? {
+          ticket: {
+            message: outcome.ticket.message,
+            outcome: outcome.ticket.outcome,
+          },
+        }
+      : {}),
+  };
+};
 
 /** The durable outcome, ticket included, or null while the answer is still pending. */
 const settledFinOutcome = (

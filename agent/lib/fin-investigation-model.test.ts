@@ -9,7 +9,6 @@ const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
   outputTokens: { reasoning: 0, text: 1, total: 1 },
 };
-const BLOCKED = /Customer investigation capability is unavailable/;
 const toolCall = (toolName: string) => ({
   input: "{}",
   toolCallId: "call-1",
@@ -22,57 +21,42 @@ const result = (toolName: string) => ({
   usage,
   warnings: [],
 });
+const wrapped = (base: MockLanguageModelV4) =>
+  wrapLanguageModel({ middleware: finInvestigationMiddleware, model: base });
+const ticketTool = {
+  inputSchema: { type: "object" as const },
+  name: "file_fin_investigation_ticket",
+  type: "function" as const,
+};
 
-describe("Fin customer investigation model boundary", () => {
-  it("advertises scoped evidence and the bounded ticket write and removes a forced disallowed choice", async () => {
+describe("Fin customer investigation ticket decision", () => {
+  it("forces the decision while the tool is offered and the turn holds no result", async () => {
     const base = new MockLanguageModelV4({
       doGenerate: {
-        content: [{ text: "Unavailable.", type: "text" }],
+        content: [{ text: "Checking.", type: "text" }],
         finishReason: { raw: "stop", unified: "stop" },
         usage,
         warnings: [],
       },
     });
-    const model = wrapLanguageModel({
-      middleware: finInvestigationMiddleware,
-      model: base,
-    });
-    await model.doGenerate({
+    await wrapped(base).doGenerate({
       prompt: [],
-      toolChoice: { toolName: "executor__execute", type: "tool" },
+      toolChoice: { type: "auto" },
       tools: [
-        { inputSchema: { type: "object" }, name: "agent", type: "function" },
         {
           inputSchema: { type: "object" },
-          name: "read_fin_outreach_evidence",
+          name: "fin_provider",
           type: "function",
         },
-        {
-          inputSchema: { type: "object" },
-          name: "file_fin_investigation_ticket",
-          type: "function",
-        },
-        {
-          inputSchema: { type: "object" },
-          name: "task_cancel",
-          type: "function",
-        },
-        {
-          inputSchema: { type: "object" },
-          name: "executor__execute",
-          type: "function",
-        },
-        { inputSchema: { type: "object" }, name: "critic", type: "function" },
-        { inputSchema: { type: "object" }, name: "vision", type: "function" },
-        { inputSchema: { type: "object" }, name: "bash", type: "function" },
+        ticketTool,
       ],
     });
+    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "required" });
+    // The lane's tools are composed, not filtered here.
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["read_fin_outreach_evidence", "file_fin_investigation_ticket"]
+      ["fin_provider", "file_fin_investigation_ticket"]
     );
-    // The ticket tool is offered and this turn holds no result from it.
-    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "required" });
   });
 
   it("stops forcing the ticket decision once the turn carries its result", async () => {
@@ -84,11 +68,7 @@ describe("Fin customer investigation model boundary", () => {
         warnings: [],
       },
     });
-    const model = wrapLanguageModel({
-      middleware: finInvestigationMiddleware,
-      model: base,
-    });
-    await model.doGenerate({
+    await wrapped(base).doGenerate({
       prompt: [
         {
           content: [
@@ -102,14 +82,8 @@ describe("Fin customer investigation model boundary", () => {
           role: "tool",
         },
       ],
-      toolChoice: { toolName: "executor__execute", type: "tool" },
-      tools: [
-        {
-          inputSchema: { type: "object" },
-          name: "file_fin_investigation_ticket",
-          type: "function",
-        },
-      ],
+      toolChoice: { type: "auto" },
+      tools: [ticketTool],
     });
     assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
   });
@@ -142,7 +116,7 @@ describe("Fin customer investigation model boundary", () => {
                 toolCallId: `call-${step}`,
                 toolName: forced
                   ? "file_fin_investigation_ticket"
-                  : "read_fin_outreach_evidence",
+                  : "fin_provider",
                 type: "tool-call" as const,
               },
             ],
@@ -166,7 +140,7 @@ describe("Fin customer investigation model boundary", () => {
           }),
           inputSchema: z.object({ action: z.string(), reason: z.string() }),
         }),
-        read_fin_outreach_evidence: tool({
+        fin_provider: tool({
           execute: () => ({ rows: [] }),
           inputSchema: z.object({}),
         }),
@@ -179,44 +153,6 @@ describe("Fin customer investigation model boundary", () => {
     );
   });
 
-  for (const name of [
-    "agent",
-    "task_cancel",
-    "executor__execute",
-    "planetscale_execute_read_query",
-    "github__createPullRequest",
-    "browser__navigate",
-    "bash",
-    "critic",
-    "vision",
-  ]) {
-    it(`rejects an adversarial ${name} call before SDK dispatch`, async () => {
-      let executed = 0;
-      const model = wrapLanguageModel({
-        middleware: finInvestigationMiddleware,
-        model: new MockLanguageModelV4({ doGenerate: result(name) }),
-      });
-      await assert.rejects(
-        generateText({
-          maxRetries: 0,
-          model,
-          prompt: "Try it.",
-          tools: {
-            [name]: tool({
-              execute: () => {
-                executed += 1;
-                return "must not execute";
-              },
-              inputSchema: z.object({}),
-            }),
-          },
-        }),
-        BLOCKED
-      );
-      assert.equal(executed, 0);
-    });
-  }
-
   for (const reference of [
     "Please file an engineering ticket for this report.",
     "Please do not file another ticket for this issue.",
@@ -228,16 +164,9 @@ describe("Fin customer investigation model boundary", () => {
       const base = new MockLanguageModelV4({
         doGenerate: result("file_fin_investigation_ticket"),
       });
-      const model = wrapLanguageModel({
-        middleware: finInvestigationMiddleware,
-        model: base,
-      });
-      await model.doGenerate({
+      await wrapped(base).doGenerate({
         prompt: [
-          {
-            content: [{ text: reference, type: "text" }],
-            role: "user",
-          },
+          { content: [{ text: reference, type: "text" }], role: "user" },
         ],
         toolChoice: { type: "auto" },
       });

@@ -1,10 +1,13 @@
 const secretFinding = /SECRET/;
+const ticketIdentifier = /ENG-13933/;
 
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
+import type { FinCaseOutcome } from "./fin-case.js";
 import type { verifyFinContext } from "./fin-context.js";
 import {
+  customerOutcome,
   receiveFinInvestigation,
   waitForFinInvestigation,
 } from "./fin-investigation.js";
@@ -13,6 +16,7 @@ import {
   type FinInvestigationSlackReceipt,
   updateFinInvestigationReceipt,
 } from "./fin-investigation-slack.js";
+import { finishFinRun } from "./fin-run-completion.js";
 import { FIN_RESULT_WINDOW_MS, type FinRun } from "./fin-run-store.js";
 
 const context = Object.freeze({
@@ -428,7 +432,7 @@ test("authorized recovery preserves a completed ticket report and never starts w
   enabled(t);
   const deps = runDependencies();
   const outcome = {
-    message: "Ticket ENG-12345 was confirmed. The cause remains unverified.",
+    message: "The ticket was confirmed. The cause remains unverified.",
     status: "completed" as const,
   };
   await deps.complete(runId, outcome);
@@ -744,6 +748,146 @@ test("late checks run together and hung verification returns a reference without
   assert.equal(body.status, "pending");
   assert.equal(body.run_handle, runId);
   assert.doesNotMatch(JSON.stringify(body), secretFinding);
+});
+
+const withheld = {
+  message:
+    "The investigation could not be completed. No findings are available.",
+  status: "failed",
+};
+
+/** Runs one completed finding through the customer doorway and captures its log. */
+const customerPayloadFor = (
+  t: TestContext,
+  message: string,
+  ticket?: FinCaseOutcome
+) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: unknown) => {
+    lines.push(String(line));
+  });
+  return {
+    lines,
+    payload: customerOutcome({
+      message,
+      status: "completed",
+      ...(ticket ? { ticket } : {}),
+    }),
+  };
+};
+
+test("withholds a customer answer carrying an identifier", (t) => {
+  for (const [category, message] of [
+    ["email", "Sending is paused for casey.brooks+eu@trivox-ai.example.com."],
+    ["uuid", "Connection 3f2504e0-4f89-11d3-9a0c-0305e82c3301 has an error."],
+    ["numeric", "Your workspace 90210447281 could not authenticate."],
+    ["ticket", "This is tracked on ENG-1234 and a fix is on the way."],
+  ]) {
+    const { lines, payload } = customerPayloadFor(t, String(message));
+    assert.deepEqual(payload, withheld);
+    assert.equal(lines.length, 1);
+    assert.deepEqual(JSON.parse(String(lines[0])), {
+      code: category,
+      event: "fin.investigation.answer.withheld",
+      message: "Customer answer withheld because it carried an identifier.",
+      outcome: "blocked",
+    });
+  }
+});
+
+test("keeps the withheld message and its identifier out of the ops log", (t) => {
+  const { lines } = customerPayloadFor(
+    t,
+    "Sending is paused for owner casey.brooks@trivox-ai.example.com."
+  );
+  assert.equal(lines.length, 1);
+  for (const fragment of ["casey", "trivox", "brooks", "Sending is paused"]) {
+    assert.equal(String(lines[0]).includes(fragment), false);
+  }
+});
+
+test("passes a clean finding through byte-identical", (t) => {
+  const message =
+    "Your campaign is paused because your sending connection has an error. Reconnect the mailbox and the campaign resumes on its own.";
+  const { lines, payload } = customerPayloadFor(t, message);
+  assert.deepEqual(payload, { message, status: "completed" });
+  assert.equal(lines.length, 0);
+});
+
+test("lets ordinary numbers in prose through the identifier gate", (t) => {
+  const message =
+    "We sent 12500 emails, 43% were opened, your plan renews at $1,299.00 a month, and the workspace has been active since 2021.";
+  const { lines, payload } = customerPayloadFor(t, message);
+  assert.deepEqual(payload, { message, status: "completed" });
+  assert.equal(lines.length, 0);
+});
+
+test("gives the customer the ticket decision without its identifier", (t) => {
+  const message = "Your sending connection has an error and is now tracked.";
+  const { lines, payload } = customerPayloadFor(t, message, {
+    identifier: "ENG-13933",
+    message: "A ticket was created for the sending connection error.",
+    outcome: "newly-created",
+  });
+  assert.deepEqual(payload, {
+    message,
+    status: "completed",
+    ticket: {
+      message: "A ticket was created for the sending connection error.",
+      outcome: "newly-created",
+    },
+  });
+  assert.doesNotMatch(JSON.stringify(payload), ticketIdentifier);
+  assert.equal(lines.length, 0);
+});
+
+test("withholds the identifier from the customer while Slack keeps the finding", async (t) => {
+  enabled(t);
+  t.mock.method(console, "info", () => undefined);
+  const finding =
+    "Sending is paused because mailbox casey.brooks@trivox-ai.example.com rejected the connection.";
+  const deps = runDependencies();
+  const response = await receiveFinInvestigation(
+    request({
+      conversation_id: context.conversationId,
+      question: "Why is my campaign paused?",
+    }),
+    {
+      from: () =>
+        ({
+          send: () => Promise.resolve(completedSession(finding)),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    100,
+    (() => Promise.resolve(context)) satisfies typeof verifyFinContext,
+    deps
+  );
+  // The customer gets the plain failure, never a redacted half sentence.
+  assert.deepEqual(await response.json(), { run_handle: runId, ...withheld });
+  // The saved outcome is what the internal receipt reports, so a human can
+  // still see exactly what was withheld and judge the false positive.
+  const saved = (await deps.read()).outcome;
+  assert.deepEqual(saved, { message: finding, status: "completed" });
+  const receipts: unknown[] = [];
+  await finishFinRun(
+    null,
+    "session-1",
+    null,
+    saved as NonNullable<typeof saved>,
+    {
+      callback: () => Promise.resolve(),
+      complete: () => assert.fail("no run id means no completion write"),
+      inspect: () => assert.fail("no run id means no delivery inspection"),
+      mark: () => assert.fail("no run id means no callback mark"),
+      reserve: () => assert.fail("no run id means no callback reservation"),
+      slack: (_receipt: unknown, outcome: unknown) => {
+        receipts.push(outcome);
+        return Promise.resolve();
+      },
+    } as unknown as Parameters<typeof finishFinRun>[4]
+  );
+  assert.deepEqual(receipts, [{ message: finding, status: "completed" }]);
 });
 
 test("the filed ticket reaches the stored run and the customer payload", async (t) => {
