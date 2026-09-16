@@ -87,7 +87,14 @@ export async function deliverFinCallback(
       throw new Error("Invalid Fin callback destination.");
     }
     const response = await request(state.url, {
-      body: JSON.stringify(outcome),
+      // The connector supplies an untrusted opaque callback URL. Never put customer
+      // findings or run references here. The receiving Procedure must authenticate
+      // a result lookup using its own native conversation and saved run reference.
+      body: JSON.stringify({
+        message:
+          "Retrieve the investigation result for this conversation with Get Foreman Result before replying. This notification contains no findings.",
+        status: "ready",
+      }),
       headers: { "content-type": "application/json" },
       method: "POST",
       redirect: "error",

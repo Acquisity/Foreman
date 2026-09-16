@@ -1,3 +1,5 @@
+const secretFinding = /SECRET/;
+
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
@@ -7,6 +9,11 @@ import {
   waitForFinInvestigation,
 } from "./fin-investigation.js";
 import { FIN_INVESTIGATION_ISSUER } from "./fin-investigation-auth.js";
+import {
+  type FinInvestigationSlackReceipt,
+  updateFinInvestigationReceipt,
+} from "./fin-investigation-slack.js";
+import { FIN_RESULT_WINDOW_MS, type FinRun } from "./fin-run-store.js";
 
 const context = Object.freeze({
   contactId: "contact-1",
@@ -21,6 +28,37 @@ const context = Object.freeze({
   userId: "11111111-1111-4111-8111-111111111111",
   verifiedAt: "2026-09-15T12:00:00.000Z",
 });
+const runId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+function runDependencies() {
+  const run: FinRun = {
+    callback_attempts: 0,
+    callback_delivered: false,
+    callback_url: "",
+    completed_at: null,
+    created_at: new Date(),
+    id: runId,
+    outcome: null,
+    scope: context,
+    session_id: null,
+    slack: null,
+  };
+  return {
+    attach: async () => undefined,
+    claim: async () => ({ fresh: true, run }),
+    complete: (_id: string, outcome: NonNullable<FinRun["outcome"]>) => {
+      run.outcome = outcome;
+      return Promise.resolve(run);
+    },
+    inspect: async () => ({
+      humanReplied: false,
+      requestKey: "native-message",
+    }),
+    postReceipt: (): Promise<FinInvestigationSlackReceipt | null> =>
+      Promise.resolve(null),
+    read: async () => run,
+    updateReceipt: updateFinInvestigationReceipt,
+  };
+}
 const callback = "https://api.intercom.io/hooks/procedures/callback/callback-1";
 
 function setEnv(t: TestContext, key: string, value: string | undefined) {
@@ -194,7 +232,8 @@ for (const question of [
         waitUntil: () => undefined,
       },
       1,
-      (() => Promise.resolve(context)) satisfies typeof verifyFinContext
+      (() => Promise.resolve(context)) satisfies typeof verifyFinContext,
+      runDependencies()
     );
     assert.equal(sent, 1);
     assert.equal(response.status, 200);
@@ -233,13 +272,14 @@ test("ordinary requests retain immutable verified auth", async (t) => {
       waitUntil: () => undefined,
     },
     1,
-    (() => Promise.resolve(context)) satisfies typeof verifyFinContext
+    (() => Promise.resolve(context)) satisfies typeof verifyFinContext,
+    runDependencies()
   );
   assert.equal(sent, 1);
   assert.deepEqual(await response.json(), {
     message:
       "The investigation has started. Wait for its result before answering the customer.",
-    session_id: "customer-session-1",
+    run_handle: runId,
     status: "pending",
   });
 });
@@ -260,11 +300,12 @@ test("returns a completed bounded answer when no callback is requested", async (
       waitUntil: () => undefined,
     },
     100,
-    (() => Promise.resolve(context)) satisfies typeof verifyFinContext
+    (() => Promise.resolve(context)) satisfies typeof verifyFinContext,
+    runDependencies()
   );
   assert.deepEqual(await response.json(), {
     message: "Only your verified workspace.",
-    session_id: "customer-session-1",
+    run_handle: runId,
     status: "completed",
   });
 });
@@ -322,4 +363,347 @@ test("stream completion does not publish a length-truncated answer", async () =>
       "The investigation could not be completed. No findings are available.",
     status: "failed",
   });
+});
+
+test("duplicate starts return the existing run without sending another message", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  deps.claim = async () => ({ fresh: false, run: await deps.read() });
+  const response = await receiveFinInvestigation(
+    request({
+      callback_url: callback,
+      conversation_id: context.conversationId,
+      question: "Retry",
+    }),
+    {
+      from: () => assert.fail("duplicate must not start or steer work"),
+      waitUntil: () => assert.fail("duplicate must not observe another stream"),
+    },
+    1,
+    async () => context,
+    deps
+  );
+  assert.equal((await response.json()).run_handle, runId);
+});
+
+test("authorized recovery preserves a completed ticket report and never starts work", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  const outcome = {
+    message: "Ticket ENG-12345 was confirmed. The cause remains unverified.",
+    status: "completed" as const,
+  };
+  await deps.complete(runId, outcome);
+  for (let retry = 0; retry < 2; retry += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: exercise repeated request boundaries in order.
+    const response = await receiveFinInvestigation(
+      request({
+        action: "result",
+        conversation_id: context.conversationId,
+        run_handle: runId,
+      }),
+      {
+        from: () =>
+          assert.fail(
+            "recovery must never start work or create another ticket"
+          ),
+        waitUntil: () => undefined,
+      },
+      1,
+      async () => context,
+      deps
+    );
+    assert.deepEqual(await response.json(), { run_handle: runId, ...outcome });
+  }
+});
+
+test("swapped conversations, apps, users, workspaces and expired references disclose no saved result", async (t) => {
+  enabled(t);
+  const alterations = [
+    { conversationId: "999" },
+    { intercomAppId: "other" },
+    { userId: "33333333-3333-4333-8333-333333333333" },
+    { organizationId: "33333333-3333-4333-8333-333333333333" },
+  ];
+  for (const alteration of alterations) {
+    const deps = runDependencies();
+    // biome-ignore lint/performance/noAwaitInLoops: mutate and inspect one isolated failure fixture at a time.
+    const run = await deps.read();
+    run.scope = { ...context, ...alteration } as FinRun["scope"];
+    run.outcome = { message: "SECRET SAVED FINDING", status: "completed" };
+    const response = await receiveFinInvestigation(
+      request({
+        action: "result",
+        conversation_id: context.conversationId,
+        run_handle: runId,
+      }),
+      {
+        from: () => assert.fail("forbidden recovery must not dispatch"),
+        waitUntil: () => undefined,
+      },
+      1,
+      async () => context,
+      deps
+    );
+    assert.doesNotMatch(JSON.stringify(await response.json()), secretFinding);
+  }
+  const deps = runDependencies();
+  (await deps.read()).created_at = new Date(Date.now() - FIN_RESULT_WINDOW_MS);
+  const response = await receiveFinInvestigation(
+    request({
+      action: "result",
+      conversation_id: context.conversationId,
+      run_handle: runId,
+    }),
+    { from: () => assert.fail(), waitUntil: () => undefined },
+    1,
+    async () => context,
+    deps
+  );
+  assert.equal((await response.json()).status, "failed");
+});
+
+test("revoked access and human takeover prevent late synchronous disclosure", async (t) => {
+  enabled(t);
+  for (const revoked of [true, false]) {
+    let verified = 0;
+    let inspected = 0;
+    const deps = runDependencies();
+    deps.inspect = () => {
+      inspected += 1;
+      return Promise.resolve({
+        humanReplied: inspected > 1,
+        requestKey: "native-message",
+      });
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: exercise repeated request boundaries in order.
+    const response = await receiveFinInvestigation(
+      request({ conversation_id: context.conversationId, question: "Check" }),
+      {
+        from: () =>
+          ({
+            send: async () => completedSession("SECRET"),
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      100,
+      () => {
+        verified += 1;
+        if (verified > 1 && revoked) {
+          throw new Error("revoked");
+        }
+        return Promise.resolve(context);
+      },
+      deps
+    );
+    assert.doesNotMatch(JSON.stringify(await response.json()), secretFinding);
+    assert.equal(verified, 2);
+  }
+});
+
+test("a stream observation timeout leaves the investigation pending", async () => {
+  const session = {
+    getEventStream: async () => new ReadableStream<StreamEvent>(),
+  };
+  assert.equal((await waitForFinInvestigation(session, 1)).status, "pending");
+});
+
+test("recovery reads only the persisted session and rechecks access before disclosure", async (t) => {
+  enabled(t);
+  for (const revoked of [false, true]) {
+    const deps = runDependencies();
+    // biome-ignore lint/performance/noAwaitInLoops: each fixture tests its own authorization lifecycle.
+    const run = await deps.read();
+    run.session_id = "customer-session-1";
+    let verified = 0;
+    const response = await receiveFinInvestigation(
+      request({
+        action: "result",
+        conversation_id: context.conversationId,
+        run_handle: runId,
+      }),
+      {
+        attachSession: ((id: string) => {
+          assert.equal(id, run.session_id);
+          return completedSession("SECRET ticket report");
+        }) as RouteHandlerArgs["attachSession"],
+        from: () => assert.fail("recovery must not send a message"),
+        waitUntil: () => assert.fail("recovery must not start background work"),
+      },
+      100,
+      () => {
+        verified += 1;
+        if (revoked && verified > 1) {
+          throw new Error(
+            "Access revoked while observing the completed session"
+          );
+        }
+        return Promise.resolve(context);
+      },
+      deps
+    );
+    assert.equal(verified, 2);
+    const body = await response.json();
+    if (revoked) {
+      assert.doesNotMatch(JSON.stringify(body), secretFinding);
+    } else {
+      assert.deepEqual(body, {
+        message: "SECRET ticket report",
+        run_handle: runId,
+        status: "completed",
+      });
+    }
+    assert.equal(run.outcome?.message, "SECRET ticket report");
+  }
+});
+
+for (const failure of ["send", "attach", "complete"]) {
+  test(`a ${failure} failure after claim preserves recovery without another dispatch`, async (t) => {
+    enabled(t);
+    const deps = runDependencies();
+    let sends = 0;
+    const receipt = { channel: "preview", delivered: false, ts: "1.2" };
+    deps.postReceipt = async () => receipt;
+    const updates: string[] = [];
+    deps.updateReceipt = (received, outcome) => {
+      assert.equal(received, receipt);
+      updates.push(outcome?.message ?? "");
+      return Promise.resolve();
+    };
+    if (failure === "attach") {
+      deps.attach = () => Promise.reject(new Error("timeout"));
+    }
+    if (failure === "complete") {
+      deps.complete = () => Promise.reject(new Error("timeout"));
+    }
+    const response = await receiveFinInvestigation(
+      request({ conversation_id: context.conversationId, question: "Check" }),
+      {
+        from: () =>
+          ({
+            send: () => {
+              sends += 1;
+              if (failure === "send") {
+                return Promise.reject(new Error("ambiguous send"));
+              }
+              return Promise.resolve(completedSession("SECRET"));
+            },
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      100,
+      async () => context,
+      deps
+    );
+    const body = await response.json();
+    assert.equal(sends, 1);
+    assert.equal(updates.length, failure === "send" ? 1 : 0);
+    if (failure === "send") {
+      assert.ok(updates[0].includes(runId));
+      assert.ok(updates[0].includes("may still be running"));
+      assert.ok(updates[0].includes("do not start a replacement"));
+    }
+    assert.equal(body.run_handle, runId);
+    assert.equal(body.status, "pending");
+    assert.doesNotMatch(JSON.stringify(body), secretFinding);
+  });
+}
+
+test("a native read failure preserves only the authenticated recovery reference", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  await deps.complete(runId, { message: "SECRET", status: "completed" });
+  deps.inspect = () => Promise.reject(new Error("Intercom unavailable"));
+  const response = await receiveFinInvestigation(
+    request({
+      action: "result",
+      conversation_id: context.conversationId,
+      run_handle: runId,
+    }),
+    {
+      from: () => assert.fail("recovery cannot dispatch"),
+      waitUntil: () => undefined,
+    },
+    1,
+    async () => context,
+    deps
+  );
+  const body = await response.json();
+  assert.equal(body.run_handle, runId);
+  assert.equal(body.status, "pending");
+  assert.doesNotMatch(JSON.stringify(body), secretFinding);
+});
+
+test("known human takeover remains suppressed even if dispatch fails", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  deps.inspect = async () => ({
+    humanReplied: true,
+    requestKey: "native-message",
+  });
+  const response = await receiveFinInvestigation(
+    request({ conversation_id: context.conversationId, question: "Check" }),
+    {
+      from: () =>
+        ({
+          send: () => Promise.reject(new Error("ambiguous send")),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    1,
+    async () => context,
+    deps
+  );
+  assert.deepEqual(await response.json(), {
+    message: "",
+    status: "suppressed",
+  });
+});
+
+test("late checks run together and hung verification returns a reference without findings", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  let verified = 0;
+  let inspected = 0;
+  let startedLateInspection: (() => void) | undefined;
+  const lateInspection = new Promise<void>((resolve) => {
+    startedLateInspection = resolve;
+  });
+  deps.inspect = () => {
+    inspected += 1;
+    if (inspected > 1) {
+      startedLateInspection?.();
+    }
+    return Promise.resolve({
+      humanReplied: false,
+      requestKey: "native-message",
+    });
+  };
+  const start = Date.now();
+  const response = await receiveFinInvestigation(
+    request({ conversation_id: context.conversationId, question: "Check" }),
+    {
+      from: () =>
+        ({
+          send: async () => completedSession("SECRET"),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    100,
+    async () => {
+      verified += 1;
+      if (verified > 1) {
+        await lateInspection;
+        return new Promise<never>(() => undefined);
+      }
+      return context;
+    },
+    deps
+  );
+  assert.equal(inspected, 2);
+  assert.ok(Date.now() - start < 8000);
+  const body = await response.json();
+  assert.equal(body.status, "pending");
+  assert.equal(body.run_handle, runId);
+  assert.doesNotMatch(JSON.stringify(body), secretFinding);
 });
