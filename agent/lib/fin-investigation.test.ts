@@ -9,6 +9,10 @@ import {
   waitForFinInvestigation,
 } from "./fin-investigation.js";
 import { FIN_INVESTIGATION_ISSUER } from "./fin-investigation-auth.js";
+import {
+  type FinInvestigationSlackReceipt,
+  updateFinInvestigationReceipt,
+} from "./fin-investigation-slack.js";
 import { FIN_RESULT_WINDOW_MS, type FinRun } from "./fin-run-store.js";
 
 const context = Object.freeze({
@@ -49,7 +53,10 @@ function runDependencies() {
       humanReplied: false,
       requestKey: "native-message",
     }),
+    postReceipt: (): Promise<FinInvestigationSlackReceipt | null> =>
+      Promise.resolve(null),
     read: async () => run,
+    updateReceipt: updateFinInvestigationReceipt,
   };
 }
 const callback = "https://api.intercom.io/hooks/procedures/callback/callback-1";
@@ -555,6 +562,14 @@ for (const failure of ["send", "attach", "complete"]) {
     enabled(t);
     const deps = runDependencies();
     let sends = 0;
+    const receipt = { channel: "preview", delivered: false, ts: "1.2" };
+    deps.postReceipt = async () => receipt;
+    const updates: string[] = [];
+    deps.updateReceipt = (received, outcome) => {
+      assert.equal(received, receipt);
+      updates.push(outcome?.message ?? "");
+      return Promise.resolve();
+    };
     if (failure === "attach") {
       deps.attach = () => Promise.reject(new Error("timeout"));
     }
@@ -582,6 +597,12 @@ for (const failure of ["send", "attach", "complete"]) {
     );
     const body = await response.json();
     assert.equal(sends, 1);
+    assert.equal(updates.length, failure === "send" ? 1 : 0);
+    if (failure === "send") {
+      assert.ok(updates[0].includes(runId));
+      assert.ok(updates[0].includes("may still be running"));
+      assert.ok(updates[0].includes("do not start a replacement"));
+    }
     assert.equal(body.run_handle, runId);
     assert.equal(body.status, "pending");
     assert.doesNotMatch(JSON.stringify(body), secretFinding);

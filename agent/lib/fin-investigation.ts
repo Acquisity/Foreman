@@ -12,6 +12,7 @@ import {
   type FinInvestigationResult,
   type FinInvestigationSlackReceipt,
   postFinInvestigationReceipt,
+  updateFinInvestigationReceipt,
 } from "./fin-investigation-slack.js";
 import {
   assertFinRunOwner,
@@ -150,7 +151,9 @@ export async function receiveFinInvestigation(
     claim: claimFinRun,
     complete: completeFinRun,
     inspect: inspectFinDelivery,
+    postReceipt: postFinInvestigationReceipt,
     read: readFinRun,
+    updateReceipt: updateFinInvestigationReceipt,
   }
 ) {
   if (
@@ -202,6 +205,7 @@ export async function receiveFinInvestigation(
 
   let acceptedRun: FinRun | undefined;
   let acceptedSessionId: string | undefined;
+  let slack: FinInvestigationSlackReceipt | null = null;
   let humanReplied = false;
   const recheckDelivery = async (run: FinRun) => {
     const controller = new AbortController();
@@ -257,7 +261,7 @@ export async function receiveFinInvestigation(
     if (!fresh) {
       return finRunResponse(run, delivery.humanReplied);
     }
-    const slack = await postFinInvestigationReceipt(run.id);
+    slack = await dependencies.postReceipt(run.id);
     const session = await from(run.id).send(input.question, {
       auth: finInvestigationAuth(context),
       mode: "task",
@@ -311,6 +315,13 @@ export async function receiveFinInvestigation(
       clearTimeout(timeout);
     }
   } catch {
+    if (slack && !acceptedSessionId) {
+      // A rejected send can still have been accepted. Report uncertainty, not failure.
+      await dependencies.updateReceipt(slack, {
+        message: `Dispatch could not be confirmed for investigation ${acceptedRun?.id}. It may still be running. Operator recovery is required; do not start a replacement investigation.`,
+        status: "failed",
+      });
+    }
     // An ambiguous send is not permission to release the slot and start twice.
     return finRecoveryResponse(acceptedRun, acceptedSessionId, humanReplied);
   }
