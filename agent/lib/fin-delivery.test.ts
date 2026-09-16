@@ -66,6 +66,32 @@ test("only a public human reply suppresses customer delivery; later user replies
   assert.notEqual(after.requestKey, initial.requestKey);
 });
 
+test("Intercom's public reply combined with assignment is takeover, but a bare assignment is not", async () => {
+  const f = fixture();
+  const [part] = f.conversation.conversation_parts.conversation_parts;
+  Object.assign(part, {
+    author: { type: "admin" },
+    body: '<p class="no-margin">Can I help?</p>\n<p class="no-margin"></p>',
+    part_type: "assignment",
+  });
+  const reply = await inspectFinDelivery(scope, f.read);
+  assert.equal(reply.humanReplied, true);
+
+  part.author.type = "bot";
+  assert.equal((await inspectFinDelivery(scope, f.read)).humanReplied, false);
+  part.author.type = "admin";
+  part.part_type = "note";
+  assert.equal((await inspectFinDelivery(scope, f.read)).humanReplied, false);
+  part.part_type = "assignment";
+  for (const body of [null, "", " ", "<p></p>", "<p>&nbsp;&#160;</p>"]) {
+    Object.assign(part, { body });
+    // biome-ignore lint/performance/noAwaitInLoops: check each native assignment shape independently.
+    const bare = await inspectFinDelivery(scope, f.read);
+    assert.equal(bare.humanReplied, false);
+    assert.equal(bare.requestKey, reply.requestKey);
+  }
+});
+
 for (const authorType of ["lead", "contact"]) {
   test(`verified ${authorType} authors retain delivery access`, async () => {
     const f = fixture();

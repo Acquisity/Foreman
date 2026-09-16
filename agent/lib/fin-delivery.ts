@@ -4,7 +4,7 @@ import { readFinIntercom } from "./executor/dispatch.js";
 import { type FinContext, finContextSchema } from "./fin-scope.js";
 import { inspectConversation, providerData } from "./support/conversation.js";
 
-/** Read native ownership and complete history. Assignment and private notes are not takeover. */
+/** Read native ownership and complete history. Bare assignments and private notes are not takeover. */
 export async function inspectFinDelivery(
   context: FinContext,
   read = readFinIntercom,
@@ -59,7 +59,17 @@ export async function inspectFinDelivery(
   }
   return {
     humanReplied: conversation.conversation_parts.conversation_parts.some(
-      (part) => part.author.type === "admin" && part.part_type === "comment"
+      (part) =>
+        part.author.type === "admin" &&
+        (part.part_type === "comment" ||
+          // Intercom can combine a public reply and assignment into one part.
+          (part.part_type === "assignment" &&
+            Boolean(
+              part.body
+                ?.replace(/<[^>]*>/g, "")
+                .replace(/&nbsp;|&#160;/g, " ")
+                .trim()
+            )))
     ),
     // Message IDs identify retries; provider metadata and signed attachment URLs
     // can change without a new customer request. Keep support's revision separate.
