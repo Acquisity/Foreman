@@ -123,3 +123,12 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 | `fin-delivery.ts` native conversation/contact reads | Shared 50-second AbortSignal plus existing Executor transport bounds | Recheck original destination and public human replies; failure suppresses customer delivery. |
 | Result recovery event stream | Eight-second observation bound | Reads the exact existing session only; cancellation closes the reader, never the investigation. |
 `receiveFinInvestigation` runs late identity and delivery checks concurrently with a shared five-second abort signal and response race. The race also bounds response waiting if credential resolution ignores cancellation; it never authorizes disclosure on timeout. Initial checks retain their existing deadlines.
+
+## Fin case filing and status (ENG-13769)
+
+| Call | Bound | Reason |
+| --- | --- | --- |
+| `fileFinInvestigationCase` Linear operations | At most three fixed operations (`list_issues`, `save_issue`, `get_issue`) over the existing shared Executor transport, each under one 15-second deadline and a 256 KiB response cap | Searching before creating makes the Intercom conversation ID the idempotency key; the single read-back is what licenses a success claim. |
+| `readFinCaseStatusForSession` Linear operations | At most two of those same fixed operations (`list_issues`, `get_issue`), over the same transport and under the same deadline and cap | Answers a status question inside the conversation that filed; it creates and updates nothing. |
+
+This slice adds no new database call, no new HTTP route and no callback: the outcome is saved through the existing `fin_investigation_runs` write. Connect token resolution retains the existing SDK exemption documented above.

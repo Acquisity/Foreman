@@ -22,7 +22,11 @@ The check covers Foreman's delivery boundary. Intercom owns the later Fin messag
 
 ## ENG-13769 interface
 
-The saved bounded final report survives repeated retrieval and retains any confirmed ticket outcome already present in that report. Existing bounded ticket filing remains unchanged. This slice does not implement durable case/ticket association, uncertain ticket-write reconciliation, existing-case matching, or fresh-chat ticket status. Those remain ENG-13769. A later authenticated case lookup needs its own authorization; it must never loosen an expired or cross-conversation run reference. The current tool does not expose all four structured ticket outcomes, so this slice does not claim that interface is complete.
+The saved bounded final report survives repeated retrieval and retains any confirmed ticket outcome already present in that report. ENG-13769 ships case filing and same-conversation status on top of that; [FIN-CASES.md](./FIN-CASES.md) is the design record.
+
+Existing-case matching shipped. The Intercom conversation ID in the Linear issue description and link attachment is the idempotency key, so filing searches Linear before it creates, and Linear is the only record of the association. The four structured outcomes shipped as `newly-created`, `already-tracked`, `not-needed` and `failed`, saved inside the existing `outcome` jsonb on the `fin_investigation_runs` row. Ticket status shipped as the no-argument `read_fin_case_status` tool, offered in the Fin lane only.
+
+Durable case association in a second store and uncertain ticket-write reconciliation were cut rather than deferred. Linear already holds the association, so a second store adds a disagreement rather than a guarantee, and searching before creating already covers a retried attempt; a lost race costs one duplicate ticket. Fresh-chat ticket status is deferred: the status tool answers only within the conversation that filed, and this slice adds no HTTP status route and no cross-chat lookup. A later authenticated case lookup, if one is built, needs its own authorization and must never loosen an expired or cross-conversation run reference.
 
 ## Verification
 

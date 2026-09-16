@@ -1,3 +1,4 @@
+import type { FinCaseOutcome } from "./fin-case.js";
 import { logOpsEvent } from "./ops-log.js";
 
 export interface FinInvestigationCallbackState {
@@ -11,9 +12,11 @@ export const finInvestigationFailure = {
   status: "failed" as const,
 };
 
-export type FinInvestigationOutcome =
-  | typeof finInvestigationFailure
-  | { message: string; status: "completed" };
+export interface FinInvestigationOutcome {
+  message: string;
+  status: "completed" | "failed";
+  ticket?: FinCaseOutcome;
+}
 
 type FinInvestigationEvent =
   | {
