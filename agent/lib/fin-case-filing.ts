@@ -8,6 +8,7 @@ import {
   type FinCaseIssue,
   type FinCaseOutcome,
   finCaseFailed,
+  finCaseIdentifier,
   finCaseIssue,
   finCaseLabels,
   finCaseList,
@@ -23,7 +24,7 @@ export type FinLinearCall = (
   input: Record<string, unknown>
 ) => Promise<unknown>;
 
-const savedIssue = z.looseObject({ id: z.string() });
+const savedIssue = z.looseObject({ id: finCaseIdentifier });
 
 const report = (scope: FinContext, decision: FinCaseFiling) =>
   [
@@ -52,6 +53,9 @@ export async function fileFinCase(
   if (decision.action === "not-needed") {
     return { message: decision.reason, outcome: "not-needed" };
   }
+  // Set only once this lane's own write landed, so a later verification failure
+  // names the ticket it orphaned instead of leaving it unfindable.
+  let created: string | undefined;
   try {
     const found = finCaseList.parse(
       await call("list_issues", finCaseSearch(scope))
@@ -72,7 +76,7 @@ export async function fileFinCase(
         outcome: "already-tracked",
       };
     }
-    const created = savedIssue.parse(
+    const saved = savedIssue.parse(
       await call("save_issue", {
         assignee: decision.assignee,
         description: report(scope, decision),
@@ -85,7 +89,8 @@ export async function fileFinCase(
         title: decision.title,
       })
     );
-    const issue = await readCase(call, created.id);
+    created = saved.id;
+    const issue = await readCase(call, saved.id);
     assertFinCaseSource(issue, scope);
     assertFinCaseRouting(issue, decision);
     return {
@@ -98,6 +103,6 @@ export async function fileFinCase(
     if (signal.aborted) {
       throw error;
     }
-    return finCaseFailed;
+    return created ? { ...finCaseFailed, identifier: created } : finCaseFailed;
   }
 }

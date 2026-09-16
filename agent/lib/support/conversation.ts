@@ -5,7 +5,7 @@ import { conversationId } from "./config.js";
 import type { SupportSlackMessage } from "./slack.js";
 
 const CONVERSATION_PATH = /\/(?:conversation|conversations)\/(\d+)(?=\/|$)/g;
-const intercomLink = /https:\/\/app\.intercom\.com\/[^\s<>"|]+/g;
+export const intercomLink = /https:\/\/app\.intercom\.com\/[^\s<>"|]+/g;
 
 export function notificationConversation(
   message: SupportSlackMessage,

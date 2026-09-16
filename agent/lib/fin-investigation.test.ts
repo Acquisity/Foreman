@@ -115,6 +115,44 @@ const completedSession = (answer: string) =>
     id: "customer-session-1",
   }) as Session;
 
+const filedTicket = {
+  identifier: "ENG-13902",
+  message: "A ticket was opened for the team with the investigation findings.",
+  outcome: "newly-created" as const,
+};
+/** The same session, with the ticket decision on its stream before the answer. */
+const filingSession = (answer: string) =>
+  ({
+    getEventStream: () =>
+      Promise.resolve(
+        new ReadableStream<StreamEvent>({
+          start(controller) {
+            controller.enqueue({
+              data: {
+                result: {
+                  callId: "call-1",
+                  kind: "tool-result",
+                  output: filedTicket,
+                  toolName: "file_fin_investigation_ticket",
+                },
+              },
+              type: "action.result",
+            } as unknown as StreamEvent);
+            controller.enqueue({
+              data: { finishReason: "stop", message: answer },
+              type: "message.completed",
+            } as StreamEvent);
+            controller.enqueue({
+              data: {},
+              type: "session.completed",
+            } as unknown as StreamEvent);
+            controller.close();
+          },
+        })
+      ),
+    id: "customer-session-1",
+  }) as Session;
+
 const enabled = (t: TestContext) => {
   setEnv(t, "VERCEL_ENV", "preview");
   setEnv(t, "FIN_INVESTIGATION_ENABLED", "true");
@@ -706,4 +744,69 @@ test("late checks run together and hung verification returns a reference without
   assert.equal(body.status, "pending");
   assert.equal(body.run_handle, runId);
   assert.doesNotMatch(JSON.stringify(body), secretFinding);
+});
+
+test("the filed ticket reaches the stored run and the customer payload", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  const run = await deps.read();
+  const response = await receiveFinInvestigation(
+    request({
+      conversation_id: context.conversationId,
+      question: "Is this a known problem?",
+    }),
+    {
+      from: () =>
+        ({
+          send: async () => filingSession("Here is what I found."),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    1000,
+    () => Promise.resolve(context),
+    deps
+  );
+  // One durable write, and it is the one that carries the decision.
+  assert.deepEqual(run.outcome, {
+    message: "Here is what I found.",
+    status: "completed",
+    ticket: filedTicket,
+  });
+  assert.deepEqual(await response.json(), {
+    message: "Here is what I found.",
+    run_handle: runId,
+    status: "completed",
+    ticket: { message: filedTicket.message, outcome: filedTicket.outcome },
+  });
+});
+
+test("recovery keeps the filed ticket on the run it completes", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  const run = await deps.read();
+  run.session_id = "customer-session-1";
+  const response = await receiveFinInvestigation(
+    request({
+      action: "result",
+      conversation_id: context.conversationId,
+      run_handle: runId,
+    }),
+    {
+      attachSession: (() =>
+        filingSession(
+          "Here is what I found."
+        )) as RouteHandlerArgs["attachSession"],
+      from: () => assert.fail("recovery must not send a message"),
+      waitUntil: () => assert.fail("recovery must not start background work"),
+    },
+    1000,
+    () => Promise.resolve(context),
+    deps
+  );
+  assert.deepEqual(run.outcome?.ticket, filedTicket);
+  const body = (await response.json()) as { ticket?: unknown };
+  assert.deepEqual(body.ticket, {
+    message: filedTicket.message,
+    outcome: filedTicket.outcome,
+  });
 });

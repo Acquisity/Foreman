@@ -1,6 +1,10 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
-import type { FinCaseOutcome } from "./fin-case.js";
+import {
+  FIN_CASE_TOOL,
+  type FinCaseOutcome,
+  finCaseOutcome,
+} from "./fin-case.js";
 import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
@@ -45,6 +49,17 @@ const inputSchema = z.discriminatedUnion("action", [
     run_handle: z.uuid(),
   }),
 ]);
+/** The ticket decision as it appears on this session's own event stream. */
+const finCaseResult = z.looseObject({
+  isError: z.boolean().optional(),
+  kind: z.literal("tool-result"),
+  output: finCaseOutcome,
+  toolName: z.literal(FIN_CASE_TOOL),
+});
+const finCaseDecided = (result: unknown) => {
+  const filed = finCaseResult.safeParse(result);
+  return filed.success && !filed.data.isError ? filed.data.output : undefined;
+};
 const pending = {
   message:
     "The investigation has started. Wait for its result before answering the customer.",
@@ -73,6 +88,18 @@ const customerOutcome = <
       }
     : {}),
 });
+
+/** The durable outcome, ticket included, or null while the answer is still pending. */
+const settledFinOutcome = (
+  outcome: Awaited<ReturnType<typeof waitForFinInvestigation>>
+) =>
+  outcome.status === "pending"
+    ? null
+    : {
+        message: outcome.message,
+        status: outcome.status,
+        ...(outcome.ticket ? { ticket: outcome.ticket } : {}),
+      };
 
 const finRunResponse = (run: FinRun, humanReplied: boolean) =>
   json(
@@ -104,17 +131,26 @@ const readRequestBody = async (request: Request) => {
   }
 };
 
-/** Task completion, rather than an intermediate tool-call block, owns the answer. */
+/**
+ * Task completion, rather than an intermediate tool-call block, owns the answer.
+ * The ticket decision is read from the same stream so every writer of the run
+ * outcome carries it, whichever one reaches the single durable write first.
+ */
 export async function waitForFinInvestigation(
   session: Pick<Session, "getEventStream">,
   timeoutMs = 120_000
-): Promise<Pick<FinInvestigationResult, "message" | "status">> {
+): Promise<
+  Pick<FinInvestigationResult, "message" | "status"> & {
+    ticket?: FinCaseOutcome;
+  }
+> {
   const reader = (await session.getEventStream({ startIndex: 0 })).getReader();
   const timeout = setTimeout(
     () => reader.cancel().catch(() => undefined),
     timeoutMs
   );
   let answer = "";
+  let ticket: FinCaseOutcome | undefined;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -130,8 +166,11 @@ export async function waitForFinInvestigation(
         const reduced = reduceFinEvent(answer, { type: event.type });
         ({ answer } = reduced);
         if (reduced.outcome) {
-          return reduced.outcome;
+          return ticket ? { ...reduced.outcome, ticket } : reduced.outcome;
         }
+      } else if (event.type === "action.result") {
+        // A missing ticket outcome is ordinary. The last result of the turn wins.
+        ticket = finCaseDecided(event.data.result) ?? ticket;
       } else if (event.type === "message.completed") {
         ({ answer } = reduceFinEvent(answer, {
           finishReason: event.data.finishReason,
@@ -293,21 +332,15 @@ export async function receiveFinInvestigation(
     acceptedSessionId = session.id;
     await dependencies.attach(run.id, session.id, slack);
     const result = waitForFinInvestigation(session).then(async (outcome) => {
-      if (outcome.status !== "pending") {
-        const saved = await dependencies.complete(
-          run.id,
-          {
-            message: outcome.message,
-            status: outcome.status,
-          },
-          session.id
-        );
+      const settled = settledFinOutcome(outcome);
+      if (settled) {
+        const saved = await dependencies.complete(run.id, settled, session.id);
         return {
           run_handle: run.id,
           ...customerOutcome(saved.outcome ?? pending),
         };
       }
-      return { run_handle: run.id, ...outcome };
+      return { run_handle: run.id, ...customerOutcome(outcome) };
     });
     waitUntil(result);
     if (input.callback_url) {
@@ -389,15 +422,8 @@ async function recoverFinRun(
   if (run.outcome || !run.session_id || !attach) {
     return run;
   }
-  const outcome = await waitForFinInvestigation(
-    attach(run.session_id),
-    timeoutMs
+  const settled = settledFinOutcome(
+    await waitForFinInvestigation(attach(run.session_id), timeoutMs)
   );
-  return outcome.status === "pending"
-    ? run
-    : complete(
-        run.id,
-        { message: outcome.message, status: outcome.status },
-        run.session_id
-      );
+  return settled ? complete(run.id, settled, run.session_id) : run;
 }

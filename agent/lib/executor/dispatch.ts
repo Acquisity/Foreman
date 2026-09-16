@@ -4,6 +4,7 @@ import {
   assertFinCaseSource,
   FIN_CASE_TEAM,
   type FinCaseDecision,
+  finCaseIdentifier,
   finCaseIssue,
   finCaseList,
   finCaseSearch,
@@ -19,6 +20,7 @@ import {
   isFinInvestigation,
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
+import type { FinContext } from "../fin-scope.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { logOpsEvent } from "../ops-log.js";
 import { providerData } from "../support/conversation.js";
@@ -85,10 +87,33 @@ async function connection(
   };
 }
 
+function finLaneInput(
+  scope: FinContext,
+  operation: string,
+  input: Record<string, unknown>
+) {
+  if (operation === "save_issue") {
+    return (
+      input.team === FIN_CASE_TEAM &&
+      typeof input.description === "string" &&
+      input.description.endsWith(`Intercom source: ${finCaseSource(scope)}`)
+    );
+  }
+  if (operation === "list_issues") {
+    // Both callers pass finCaseSearch(scope) itself, so the shapes compare exactly.
+    return JSON.stringify(input) === JSON.stringify(finCaseSearch(scope));
+  }
+  return (
+    operation === "get_issue" &&
+    finCaseIdentifier.safeParse(input.id).success &&
+    Object.keys(input).length === 1
+  );
+}
+
 /**
- * The customer lane reaches three Linear operations and nothing else. A write
- * additionally has to carry the server-owned conversation link, so caller text
- * can never file a ticket against another conversation.
+ * The customer lane reaches three Linear operations and nothing else, and each
+ * one's input is fixed by the server-owned scope, so caller text can never read
+ * or file against another conversation.
  */
 function assertLaneOperation(
   ctx: ProviderContext,
@@ -103,12 +128,7 @@ function assertLaneOperation(
   const permitted =
     path.startsWith(FIN_LINEAR_PREFIX) &&
     FIN_FILING_OPERATIONS.includes(operation) &&
-    (operation !== "save_issue" ||
-      (input.team === FIN_CASE_TEAM &&
-        typeof input.description === "string" &&
-        input.description.endsWith(
-          `Intercom source: ${finCaseSource(scope)}`
-        )));
+    finLaneInput(scope, operation, input);
   if (!permitted) {
     throw new ExecutorError("customer_scope_required", 403, {
       dispatched: false,
@@ -230,17 +250,20 @@ export async function readFinCaseStatusForSession(ctx: ProviderContext) {
   const found = finCaseList.parse(
     await call("list_issues", finCaseSearch(scope))
   );
-  if (found.hasNextPage || found.issues.length !== 1) {
+  // Only an untruncated empty page proves no ticket exists. Anything else is
+  // unknown, and the caller reports that rather than asserting absence.
+  if (found.hasNextPage || found.issues.length > 1) {
+    throw new Error(
+      "The ticket for this conversation could not be identified."
+    );
+  }
+  if (!found.issues.length) {
     return null;
   }
   const issue = finCaseIssue.parse(
     await call("get_issue", { id: found.issues[0].id })
   );
-  try {
-    assertFinCaseSource(issue, scope);
-  } catch {
-    return null;
-  }
+  assertFinCaseSource(issue, scope);
   return { checked_at: new Date().toISOString(), status: issue.statusType };
 }
 

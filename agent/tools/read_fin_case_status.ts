@@ -11,7 +11,7 @@ const UNAVAILABLE =
 
 const tool = defineTool({
   description:
-    "Report what the team has done with the ticket for this conversation. It takes no arguments: the conversation comes from the immutable session. It answers with a customer-safe status sentence, or says no ticket is associated with this conversation. It never returns a ticket identifier or a link.",
+    "Report what the team has done with the ticket for this conversation. It takes no arguments: the conversation comes from the immutable session. It answers with a customer-safe status sentence, says no ticket is associated with this conversation when the search proved that, or says the status could not be checked. It never returns a ticket identifier or a link.",
   async execute(_input, ctx) {
     if (!isFinInvestigation(ctx.session.auth.initiator)) {
       return { message: UNAVAILABLE };

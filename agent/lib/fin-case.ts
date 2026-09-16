@@ -1,9 +1,15 @@
 import { z } from "zod";
 import type { FinContext } from "./fin-scope.js";
-import { intercomConversationIds } from "./support/conversation.js";
+import {
+  intercomConversationIds,
+  intercomLink,
+} from "./support/conversation.js";
 
 export const FIN_CASE_TEAM = "Engineering Team";
+export const FIN_CASE_TOOL = "file_fin_investigation_ticket";
 const ISSUE_IDENTIFIER = /^ENG-\d+$/u;
+
+export const finCaseIdentifier = z.string().regex(ISSUE_IDENTIFIER);
 
 export const finCaseDecision = z.discriminatedUnion("action", [
   z.strictObject({
@@ -27,7 +33,6 @@ export const finCaseDecision = z.discriminatedUnion("action", [
       "Platform Limitation",
       "Not settled",
     ]),
-    customerSummary: z.string().trim().min(1).max(300),
     priority: z.number().int().min(1).max(4),
     project: z.string().trim().min(1).max(120),
     summary: z.string().trim().min(1).max(4000),
@@ -38,7 +43,7 @@ export type FinCaseDecision = z.infer<typeof finCaseDecision>;
 export type FinCaseFiling = Extract<FinCaseDecision, { action: "file" }>;
 
 export const finCaseOutcome = z.strictObject({
-  identifier: z.string().regex(ISSUE_IDENTIFIER).optional(),
+  identifier: finCaseIdentifier.optional(),
   message: z.string(),
   outcome: z.enum(["newly-created", "already-tracked", "not-needed", "failed"]),
 });
@@ -71,16 +76,17 @@ export const finCaseSearch = (scope: FinContext) => ({
   team: FIN_CASE_TEAM,
 });
 
-export const finCaseList = z.looseObject({
-  hasNextPage: z.boolean().optional(),
-  issues: z.array(z.looseObject({ id: z.string() })),
-});
+const finCaseIssues = z.array(z.looseObject({ id: z.string() }));
+export const finCaseList = z.discriminatedUnion("hasNextPage", [
+  z.looseObject({ hasNextPage: z.literal(true), issues: finCaseIssues }),
+  z.looseObject({ hasNextPage: z.literal(false), issues: finCaseIssues }),
+]);
 
 export const finCaseIssue = z.looseObject({
   assignee: z.string().nullish(),
   attachments: z.array(z.looseObject({ url: z.string() })).default([]),
   description: z.string().nullish(),
-  id: z.string().regex(ISSUE_IDENTIFIER),
+  id: finCaseIdentifier,
   labels: z.array(z.string()).default([]),
   priority: z.looseObject({ value: z.number() }).nullish(),
   project: z.string().nullish(),
@@ -90,12 +96,15 @@ export const finCaseIssue = z.looseObject({
 export type FinCaseIssue = z.infer<typeof finCaseIssue>;
 
 export const formatFinCustomerReport = (summary: string) => {
+  // Only the authored source line may name a conversation, so quoted customer
+  // links cannot make the ticket ambiguous about which conversation it belongs to.
+  const quoted = summary.replace(intercomLink, "[link removed]");
   const longestRun = Math.max(
     0,
-    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
+    ...Array.from(quoted.matchAll(/`+/g), (match) => match[0].length)
   );
   const fence = "`".repeat(Math.max(3, longestRun + 1));
-  return `## Customer report\n\n${fence}text\n${summary}\n${fence}`;
+  return `## Customer report\n\n${fence}text\n${quoted}\n${fence}`;
 };
 
 /** Customer-safe wording for each Linear status type. No identifier, no link. */

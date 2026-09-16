@@ -8,6 +8,7 @@ import {
   invokeProvider,
 } from "./executor/dispatch.js";
 import { executorTransport } from "./executor/transport.js";
+import { finCaseSearch } from "./fin-case.js";
 import { verifiedFinContext } from "./fin-investigation.fixture.js";
 import {
   FIN_INVESTIGATION_ISSUER,
@@ -107,6 +108,28 @@ test("raw Executor and authored provider dispatch deny before auth or transport"
     (error: { code?: string; dispatched?: unknown }) =>
       error.code === "customer_scope_required" && error.dispatched === false
   );
+  // The reads are bounded by the policy, not only by their two current callers.
+  await Promise.all(
+    [
+      ["list_issues", { limit: 100, query: "other", team: "Engineering Team" }],
+      [
+        "list_issues",
+        { ...finCaseSearch(verifiedFinContext), query: "215475947807357" },
+      ],
+      ["get_issue", { id: "OPS-1" }],
+      ["get_issue", { id: "ENG-13902", includeArchived: true }],
+    ].map(([operation, input]) =>
+      assert.rejects(
+        invokeProvider(
+          ctx,
+          `linear.org.workspaceLinear.${operation}`,
+          input as Record<string, unknown>
+        ),
+        (error: { code?: string; dispatched?: unknown }) =>
+          error.code === "customer_scope_required" && error.dispatched === false
+      )
+    )
+  );
 });
 
 test("the bounded Linear filing derives its target and scope from the initiator", async () => {
@@ -155,7 +178,6 @@ test("the bounded Linear filing derives its target and scope from the initiator"
         action: "file",
         assignee: "Anuj Bhatt",
         classification: "Bug",
-        customerSummary: "The inbox does not load.",
         priority: 2,
         project: "Core Platform",
         summary: "The inbox is not loading.",

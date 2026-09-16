@@ -1,13 +1,15 @@
 import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+import { FIN_CASE_TOOL as TICKET_TOOL } from "./fin-case.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
-const TICKET_TOOL = "file_fin_investigation_ticket";
 const ALLOWED_TOOLS = new Set([
   TICKET_TOOL,
   "read_fin_case_status",
   "read_fin_outreach_evidence",
 ]);
 const BLOCKED = "Customer investigation capability is unavailable.";
+/** Evidence reads are free until this many results; then only the decision is left. */
+const FIN_EVIDENCE_STEPS = 8;
 
 const namedTool = (part: { toolName?: unknown }) =>
   typeof part.toolName === "string" && ALLOWED_TOOLS.has(part.toolName);
@@ -57,21 +59,25 @@ export const finInvestigationMiddleware: LanguageModelMiddleware = {
       !ALLOWED_TOOLS.has(requestedToolChoice.toolName)
         ? { type: "auto" as const }
         : requestedToolChoice;
-    // The ticket decision is mechanical, not a prompt instruction: while the
-    // tool is offered and the turn holds no result from it, a tool call is required.
+    // The ticket decision is mechanical, not a prompt instruction: while the tool
+    // is offered and the turn holds no result from it, a tool call is required.
+    // The read tools also satisfy "required", so the constraint narrows to the
+    // ticket tool once the evidence budget is spent and the turn can finish.
+    const results = params.prompt.flatMap((message) =>
+      message.role === "tool" ? message.content : []
+    );
     const undecided =
       tools?.some((tool) => tool.name === TICKET_TOOL) &&
-      !params.prompt.some(
-        (message) =>
-          message.role === "tool" &&
-          message.content.some(
-            (part) =>
-              part.type === "tool-result" && part.toolName === TICKET_TOOL
-          )
+      !results.some(
+        (part) => part.type === "tool-result" && part.toolName === TICKET_TOOL
       );
-    const toolChoice = undecided
-      ? { type: "required" as const }
-      : allowedChoice;
+    let toolChoice = allowedChoice;
+    if (undecided) {
+      toolChoice =
+        results.length < FIN_EVIDENCE_STEPS
+          ? { type: "required" as const }
+          : { toolName: TICKET_TOOL, type: "tool" as const };
+    }
     return Promise.resolve({ ...params, toolChoice, tools });
   },
   async wrapGenerate({ doGenerate }) {

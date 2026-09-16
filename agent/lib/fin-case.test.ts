@@ -15,7 +15,6 @@ const filing: FinCaseFiling = {
   action: "file",
   assignee: "Anuj Bhatt",
   classification: "Bug",
-  customerSummary: "The inbox does not load.",
   priority: 2,
   project: "Core Platform",
   summary: "The inbox is not loading.",
@@ -182,4 +181,55 @@ test("an aborted turn rethrows instead of reporting a verified outcome", async (
     fileFinCase(scope, filing, call, controller.signal),
     CANCELLED
   );
+});
+
+test("a search page that never says whether it is complete cannot prove absence", async () => {
+  const { operations, outcome } = await run(filing, {
+    list: { issues: [] },
+    save: assert.fail,
+  });
+  assert.equal(outcome.outcome, "failed");
+  assert.deepEqual(operations, ["list_issues"]);
+});
+
+test("a routing mismatch names the ticket it orphaned", async () => {
+  const { outcome } = await run(filing, {
+    get: trackedIssue({ project: "AI SDR" }),
+    list: { hasNextPage: false, issues: [] },
+  });
+  assert.equal(outcome.outcome, "failed");
+  assert.equal(outcome.identifier, "ENG-13902");
+});
+
+test("a failure before this lane's own write carries no identifier", async () => {
+  const { outcome } = await run(filing, {
+    get: trackedIssue({ attachments: [] }),
+    list: { hasNextPage: false, issues: [{ id: "ENG-13902" }] },
+  });
+  assert.equal(outcome.outcome, "failed");
+  assert.equal(outcome.identifier, undefined);
+});
+
+test("a customer who quotes an Intercom link still files against this conversation", async () => {
+  const quoted = `${source.replace(scope.conversationId, "999888777")} is the other chat.`;
+  const { call, operations } = recorder({
+    get: trackedIssue(),
+    list: { hasNextPage: false, issues: [] },
+  });
+  const written: string[] = [];
+  const outcome = await fileFinCase(
+    scope,
+    { ...filing, summary: quoted },
+    (operation, input) => {
+      if (operation === "save_issue") {
+        written.push(String(input.description));
+      }
+      return call(operation, input);
+    },
+    new AbortController().signal
+  );
+  assert.equal(outcome.outcome, "newly-created");
+  assert.deepEqual(operations, ["list_issues", "save_issue", "get_issue"]);
+  assert.ok(!written[0].includes("999888777"));
+  assert.ok(written[0].endsWith(`Intercom source: ${source}`));
 });
