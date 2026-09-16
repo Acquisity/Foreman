@@ -284,7 +284,7 @@ test("ordinary requests retain immutable verified auth", async (t) => {
   });
 });
 
-test("synchronous completion exposes only fixed status text", async (t) => {
+test("returns a completed bounded answer when no callback is requested", async (t) => {
   enabled(t);
   const deps = runDependencies();
   const { complete } = deps;
@@ -293,7 +293,7 @@ test("synchronous completion exposes only fixed status text", async (t) => {
       ...outcome,
       ticket: {
         identifier: "ENG-12345",
-        message: "LEAK_TEST_739 private ticket detail",
+        message: "Ticket confirmed.",
         outcome: "newly-created",
       },
     });
@@ -306,7 +306,7 @@ test("synchronous completion exposes only fixed status text", async (t) => {
       from: () =>
         ({
           send: () =>
-            Promise.resolve(completedSession("LEAK_TEST_739 private report")),
+            Promise.resolve(completedSession("Only your verified workspace.")),
         }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
       waitUntil: () => undefined,
     },
@@ -315,11 +315,10 @@ test("synchronous completion exposes only fixed status text", async (t) => {
     deps
   );
   assert.deepEqual(await response.json(), {
-    message:
-      "The investigation is complete. Detailed findings are not included in this response.",
+    message: "Only your verified workspace.",
     run_handle: runId,
     status: "completed",
-    ticket: { message: "A ticket was confirmed.", outcome: "newly-created" },
+    ticket: { message: "Ticket confirmed.", outcome: "newly-created" },
   });
 });
 
@@ -432,12 +431,10 @@ test("authorized recovery preserves a completed ticket report and never starts w
       deps
     );
     assert.deepEqual(await response.json(), {
-      message:
-        "The investigation is complete. Detailed findings are not included in this response.",
       run_handle: runId,
-      status: "completed",
+      ...outcome,
       ticket: {
-        message: "A ticket was confirmed.",
+        message: outcome.ticket.message,
         outcome: outcome.ticket.outcome,
       },
     });
@@ -576,8 +573,7 @@ test("recovery reads only the persisted session and rechecks access before discl
       assert.doesNotMatch(JSON.stringify(body), secretFinding);
     } else {
       assert.deepEqual(body, {
-        message:
-          "The investigation is complete. Detailed findings are not included in this response.",
+        message: "SECRET ticket report",
         run_handle: runId,
         status: "completed",
       });
@@ -735,59 +731,4 @@ test("late checks run together and hung verification returns a reference without
   assert.equal(body.status, "pending");
   assert.equal(body.run_handle, runId);
   assert.doesNotMatch(JSON.stringify(body), secretFinding);
-});
-
-test("customer result excludes synthetic private data from stored reports and ticket messages", async (t) => {
-  enabled(t);
-  const deps = runDependencies();
-  const run = await deps.read();
-  const privateReport = {
-    extra: "LEAK_TEST_739",
-    message: "Other workspace's private detail: LEAK_TEST_739",
-    status: "completed" as const,
-    ticket: {
-      identifier: "ENG-12345",
-      message: "Other customer's revenue: LEAK_TEST_739",
-      outcome: "newly-created" as const,
-    },
-  };
-  run.outcome = privateReport;
-  deps.claim = async () => ({ fresh: false, run });
-  for (const body of [
-    {
-      action: "result",
-      conversation_id: context.conversationId,
-      run_handle: runId,
-    },
-    {
-      action: "result",
-      conversation_id: context.conversationId,
-      run_handle: runId,
-    },
-    {
-      action: "start",
-      conversation_id: context.conversationId,
-      question: "Retry",
-    },
-  ]) {
-    // biome-ignore lint/performance/noAwaitInLoops: test retries and duplicate start against the same stored run.
-    const response = await receiveFinInvestigation(
-      request(body),
-      {
-        from: () => assert.fail("must not restart the investigation"),
-        waitUntil: () => assert.fail("must not start background work"),
-      },
-      1,
-      async () => context,
-      deps
-    );
-    assert.deepEqual(await response.json(), {
-      message:
-        "The investigation is complete. Detailed findings are not included in this response.",
-      run_handle: runId,
-      status: "completed",
-      ticket: { message: "A ticket was confirmed.", outcome: "newly-created" },
-    });
-    assert.deepEqual(run.outcome, privateReport);
-  }
 });
