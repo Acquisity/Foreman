@@ -5,6 +5,7 @@ import { executorAuth } from "./auth.js";
 import {
   type ExecutorToolkit,
   FIN_PREVIEW_TOOLKIT,
+  FOREMAN_TOOLKIT_SLUG,
   toolkitUrl,
 } from "./endpoint.js";
 
@@ -28,6 +29,7 @@ export const executorConnection = (toolkit?: ExecutorToolkit) =>
     auth: () => executorAuth(),
     description:
       "Foreman company connections. Discover tools inside execute using tools.search and tools.describe.tool. Prefer the authored helpers for bounded evidence reads. Personal Supermemory is separate.",
+    instanceKey: toolkit ?? FOREMAN_TOOLKIT_SLUG,
     tools: { allow: ["execute", "skills"] },
     url: toolkitUrl(toolkit),
   });

@@ -21,6 +21,7 @@ test("Fin uses the Preview toolkit without removing ordinary investigation capab
     { session },
   ])) as ReturnType<typeof executorConnection>;
   assert.equal(connection.url, toolkitUrl(FIN_PREVIEW_TOOLKIT));
+  assert.equal(connection.instanceKey, FIN_PREVIEW_TOOLKIT);
   assert.ok(typeof connection.approval === "function");
   assert.equal(
     Reflect.apply(connection.approval, undefined, [
