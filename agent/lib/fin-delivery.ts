@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { readFinIntercom } from "./executor/dispatch.js";
 import { type FinContext, finContextSchema } from "./fin-scope.js";
@@ -6,15 +7,15 @@ import { inspectConversation, providerData } from "./support/conversation.js";
 /** Read native ownership and complete history. Assignment and private notes are not takeover. */
 export async function inspectFinDelivery(
   context: FinContext,
-  read = readFinIntercom
+  read = readFinIntercom,
+  parentSignal?: AbortSignal
 ) {
   const scope = finContextSchema.parse(context);
-  const signal = AbortSignal.timeout(50_000);
+  const signal = parentSignal
+    ? AbortSignal.any([parentSignal, AbortSignal.timeout(50_000)])
+    : AbortSignal.timeout(50_000);
   const raw = await read("get_conversation", scope.conversationId, signal);
-  const { conversation, version } = inspectConversation(
-    raw,
-    scope.conversationId
-  );
+  const { conversation } = inspectConversation(raw, scope.conversationId);
   const owner = z
     .object({
       contacts: z.object({
@@ -60,7 +61,22 @@ export async function inspectFinDelivery(
     humanReplied: conversation.conversation_parts.conversation_parts.some(
       (part) => part.author.type === "admin" && part.part_type === "comment"
     ),
-    requestKey: version,
+    // Message IDs identify retries; provider metadata and signed attachment URLs
+    // can change without a new customer request. Keep support's revision separate.
+    requestKey: createHash("sha256")
+      .update(
+        JSON.stringify([
+          scope.conversationId,
+          conversation.created_at,
+          conversation.conversation_parts.conversation_parts
+            .filter((part) =>
+              ["user", "lead", "contact"].includes(part.author.type)
+            )
+            .map((part) => String(part.id))
+            .sort(),
+        ])
+      )
+      .digest("hex"),
   };
 }
 

@@ -10,7 +10,6 @@ import {
 } from "./fin-investigation-slack.js";
 import {
   assertFinRunOwner,
-  attachFinRun,
   completeFinRun,
   markFinCallback,
   reserveFinCallback,
@@ -23,7 +22,6 @@ export async function finishFinRun(
   slack: FinInvestigationSlackReceipt | null,
   outcome: FinInvestigationOutcome,
   operations = {
-    attach: attachFinRun,
     callback: deliverFinCallback,
     complete: completeFinRun,
     inspect: inspectFinDelivery,
@@ -40,8 +38,8 @@ export async function finishFinRun(
         return;
       }
       try {
-        await operations.attach(runId, sessionId, slack);
-        const run = await operations.complete(runId, outcome);
+        // Bind the emitting session and save its outcome in one fenced write.
+        const run = await operations.complete(runId, outcome, sessionId);
         assertFinRunOwner(run, run.scope);
         if ((await operations.inspect(run.scope)).humanReplied) {
           return;

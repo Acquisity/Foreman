@@ -9,6 +9,7 @@ import {
   attachFinRun,
   claimFinRun,
   completeFinRun,
+  FIN_RESULT_WINDOW_MS,
   readFinRun,
   reserveFinCallback,
 } from "../agent/lib/fin-run-store.js";
@@ -93,12 +94,24 @@ try {
     message: "Confirmed ticket ENG-12345; still open.",
     status: "completed" as const,
   };
-  await completeFinRun(second.run.id, {
-    message: "Second finishes first",
-    status: "completed",
-  });
-  await completeFinRun(first.id, outcome);
-  await completeFinRun(first.id, { message: "stale event", status: "failed" });
+  await completeFinRun(
+    second.run.id,
+    {
+      message: "Second finishes first",
+      status: "completed",
+    },
+    "session-2"
+  );
+  await assert.rejects(completeFinRun(first.id, outcome, "foreign-session"));
+  assert.equal((await readFinRun(first.id)).outcome, null);
+  await completeFinRun(first.id, outcome, "session-1");
+  await completeFinRun(
+    first.id,
+    { message: "stale event", status: "failed" },
+    "session-1"
+  );
+  await assert.rejects(completeFinRun(first.id, outcome, "foreign-session"));
+  assert.equal((await readFinRun(second.run.id)).session_id, "session-2");
   assert.deepEqual((await readFinRun(first.id)).outcome, outcome);
   assert.equal((await claimFinRun(scope, "message-1", "")).fresh, false);
   assert.equal((await claimFinRun(scope, "message-3", "")).fresh, true);
@@ -114,9 +127,34 @@ try {
     assertFinRunOwner(first, scope, first.created_at.getTime() + 11 * 60_000)
   );
   assert.throws(() =>
-    assertFinRunOwner(first, scope, first.created_at.getTime() + 60 * 60_000)
+    assertFinRunOwner(
+      first,
+      scope,
+      first.created_at.getTime() + FIN_RESULT_WINDOW_MS
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertFinRunOwner(first, scope, first.created_at.getTime() + 61 * 60_000)
   );
   assert.throws(() => assertFinRunOwner(first, concurrentScope));
+  await pool.query(
+    "UPDATE fin_investigation_runs SET created_at = now() - interval '61 minutes' WHERE id = $1",
+    [second.run.id]
+  );
+  assert.equal(await reserveFinCallback(second.run.id), true);
+  assert.doesNotThrow(() => assertFinRunOwner(second.run, concurrentScope));
+  await pool.query(
+    "UPDATE fin_investigation_runs SET created_at = now() - interval '121 minutes', callback_attempts = 0 WHERE id = $1",
+    [second.run.id]
+  );
+  assert.equal(await reserveFinCallback(second.run.id), false);
+  const expired = await readFinRun(second.run.id);
+  assert.throws(() => assertFinRunOwner(expired, concurrentScope));
+  await assert.rejects(claimFinRun(concurrentScope, "message-1", ""));
+  assert.equal(
+    (await claimFinRun(concurrentScope, "message-2", "")).fresh,
+    true
+  );
   const raceScope = { ...scope, conversationId: "998" };
   const active = await claimFinRun(raceScope, "old-request", "");
   completeBeforeRead = active.run.id;

@@ -85,3 +85,33 @@ test("incomplete history or changed native ownership fails closed", async () => 
   wrongContact.contact.external_id = "other-user";
   await assert.rejects(inspectFinDelivery(scope, wrongContact.read));
 });
+
+test("retry identity ignores mutable metadata but changes for a new customer message", async () => {
+  const f = fixture();
+  const initial = await inspectFinDelivery(scope, f.read);
+  Object.assign(f.conversation.source, {
+    attachments: [{ url: "https://cdn.example/one?signature=old" }],
+  });
+  f.conversation.updated_at += 1;
+  assert.equal(
+    (await inspectFinDelivery(scope, f.read)).requestKey,
+    initial.requestKey
+  );
+  f.conversation.conversation_parts.conversation_parts.push({
+    author: { type: "user" },
+    created_at: 30,
+    id: "customer-2",
+    part_type: "comment",
+  });
+  f.conversation.conversation_parts.total_count = 2;
+  const changed = await inspectFinDelivery(scope, f.read);
+  assert.notEqual(changed.requestKey, initial.requestKey);
+  Object.assign(f.conversation.conversation_parts.conversation_parts[1], {
+    attachments: [{ url: "https://cdn.example/two?signature=new" }],
+    updated_at: 99,
+  });
+  assert.equal(
+    (await inspectFinDelivery(scope, f.read)).requestKey,
+    changed.requestKey
+  );
+});

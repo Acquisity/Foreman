@@ -27,7 +27,10 @@ const conversationSchema = z.object({
   }),
   id: z.string().regex(/^\d{1,32}$/),
   source: z.object({
-    author: z.object({ id: contactId, type: z.literal("user") }),
+    author: z.object({
+      id: contactId,
+      type: z.enum(["user", "lead", "contact"]),
+    }),
     url: z.string().max(2048),
   }),
 });

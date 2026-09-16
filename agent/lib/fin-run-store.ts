@@ -5,7 +5,8 @@ import type { FinInvestigationSlackReceipt } from "./fin-investigation-slack.js"
 import { type FinContext, finContextSchema } from "./fin-scope.js";
 import { privateDatabase } from "./private-postgres.js";
 
-export const FIN_RESULT_WINDOW_MS = 60 * 60 * 1000;
+// Preserve the native one-hour wait and leave another hour for authenticated recovery.
+export const FIN_RESULT_WINDOW_MS = 2 * 60 * 60 * 1000;
 const runSchema = z.object({
   callback_attempts: z.number().int(),
   callback_delivered: z.boolean(),
@@ -116,14 +117,20 @@ export async function attachFinRun(
 /** Terminal result is immutable. Replayed terminal events cannot overwrite another outcome. */
 export async function completeFinRun(
   id: string,
-  outcome: FinInvestigationOutcome
+  outcome: FinInvestigationOutcome,
+  sessionId: string
 ) {
   await privateDatabase().query(
-    `UPDATE fin_investigation_runs SET outcome = $2::jsonb, completed_at = now()
-     WHERE id = $1 AND completed_at IS NULL`,
-    [id, JSON.stringify(outcome)]
+    `UPDATE fin_investigation_runs SET outcome = $2::jsonb, completed_at = now(),
+       session_id = COALESCE(session_id, $3)
+     WHERE id = $1 AND completed_at IS NULL AND (session_id IS NULL OR session_id = $3)`,
+    [id, JSON.stringify(outcome), sessionId]
   );
-  return readFinRun(id);
+  const run = await readFinRun(id);
+  if (run.session_id !== sessionId) {
+    throw new Error("Investigation session ownership mismatch.");
+  }
+  return run;
 }
 
 /** One signal attempt. Authenticated result reads recover a missed signal without retrying work. */
@@ -131,8 +138,8 @@ export async function reserveFinCallback(id: string) {
   const rows = await privateDatabase().query(
     `UPDATE fin_investigation_runs SET callback_attempts = callback_attempts + 1
      WHERE id = $1 AND completed_at IS NOT NULL AND callback_delivered = false
-       AND callback_attempts = 0 AND created_at > now() - interval '1 hour' RETURNING id`,
-    [id]
+       AND callback_attempts = 0 AND created_at > now() - ($2 * interval '1 millisecond') RETURNING id`,
+    [id, FIN_RESULT_WINDOW_MS]
   );
   return rows.length === 1;
 }

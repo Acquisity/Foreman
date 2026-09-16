@@ -9,7 +9,7 @@ import {
   waitForFinInvestigation,
 } from "./fin-investigation.js";
 import { FIN_INVESTIGATION_ISSUER } from "./fin-investigation-auth.js";
-import type { FinRun } from "./fin-run-store.js";
+import { FIN_RESULT_WINDOW_MS, type FinRun } from "./fin-run-store.js";
 
 const context = Object.freeze({
   contactId: "contact-1",
@@ -441,7 +441,7 @@ test("swapped conversations, apps, users, workspaces and expired references disc
     assert.doesNotMatch(JSON.stringify(await response.json()), secretFinding);
   }
   const deps = runDependencies();
-  (await deps.read()).created_at = new Date(Date.now() - 3_600_000);
+  (await deps.read()).created_at = new Date(Date.now() - FIN_RESULT_WINDOW_MS);
   const response = await receiveFinInvestigation(
     request({
       action: "result",
@@ -548,4 +548,141 @@ test("recovery reads only the persisted session and rechecks access before discl
     }
     assert.equal(run.outcome?.message, "SECRET ticket report");
   }
+});
+
+for (const failure of ["send", "attach", "complete"]) {
+  test(`a ${failure} failure after claim preserves recovery without another dispatch`, async (t) => {
+    enabled(t);
+    const deps = runDependencies();
+    let sends = 0;
+    if (failure === "attach") {
+      deps.attach = () => Promise.reject(new Error("timeout"));
+    }
+    if (failure === "complete") {
+      deps.complete = () => Promise.reject(new Error("timeout"));
+    }
+    const response = await receiveFinInvestigation(
+      request({ conversation_id: context.conversationId, question: "Check" }),
+      {
+        from: () =>
+          ({
+            send: () => {
+              sends += 1;
+              if (failure === "send") {
+                return Promise.reject(new Error("ambiguous send"));
+              }
+              return Promise.resolve(completedSession("SECRET"));
+            },
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      100,
+      async () => context,
+      deps
+    );
+    const body = await response.json();
+    assert.equal(sends, 1);
+    assert.equal(body.run_handle, runId);
+    assert.equal(body.status, "pending");
+    assert.doesNotMatch(JSON.stringify(body), secretFinding);
+  });
+}
+
+test("a native read failure preserves only the authenticated recovery reference", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  await deps.complete(runId, { message: "SECRET", status: "completed" });
+  deps.inspect = () => Promise.reject(new Error("Intercom unavailable"));
+  const response = await receiveFinInvestigation(
+    request({
+      action: "result",
+      conversation_id: context.conversationId,
+      run_handle: runId,
+    }),
+    {
+      from: () => assert.fail("recovery cannot dispatch"),
+      waitUntil: () => undefined,
+    },
+    1,
+    async () => context,
+    deps
+  );
+  const body = await response.json();
+  assert.equal(body.run_handle, runId);
+  assert.equal(body.status, "pending");
+  assert.doesNotMatch(JSON.stringify(body), secretFinding);
+});
+
+test("known human takeover remains suppressed even if dispatch fails", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  deps.inspect = async () => ({
+    humanReplied: true,
+    requestKey: "native-message",
+  });
+  const response = await receiveFinInvestigation(
+    request({ conversation_id: context.conversationId, question: "Check" }),
+    {
+      from: () =>
+        ({
+          send: () => Promise.reject(new Error("ambiguous send")),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    1,
+    async () => context,
+    deps
+  );
+  assert.deepEqual(await response.json(), {
+    message: "",
+    status: "suppressed",
+  });
+});
+
+test("late checks run together and hung verification returns a reference without findings", async (t) => {
+  enabled(t);
+  const deps = runDependencies();
+  let verified = 0;
+  let inspected = 0;
+  let startedLateInspection: (() => void) | undefined;
+  const lateInspection = new Promise<void>((resolve) => {
+    startedLateInspection = resolve;
+  });
+  deps.inspect = () => {
+    inspected += 1;
+    if (inspected > 1) {
+      startedLateInspection?.();
+    }
+    return Promise.resolve({
+      humanReplied: false,
+      requestKey: "native-message",
+    });
+  };
+  const start = Date.now();
+  const response = await receiveFinInvestigation(
+    request({ conversation_id: context.conversationId, question: "Check" }),
+    {
+      from: () =>
+        ({
+          send: async () => completedSession("SECRET"),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    100,
+    async () => {
+      verified += 1;
+      if (verified > 1) {
+        await lateInspection;
+        return new Promise<never>(() => undefined);
+      }
+      return context;
+    },
+    deps
+  );
+  assert.equal(inspected, 2);
+  assert.ok(Date.now() - start < 8000);
+  const body = await response.json();
+  assert.equal(body.status, "pending");
+  assert.equal(body.run_handle, runId);
+  assert.doesNotMatch(JSON.stringify(body), secretFinding);
 });

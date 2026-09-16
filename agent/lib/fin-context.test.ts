@@ -80,6 +80,33 @@ function dependencies(
   };
 }
 
+for (const authorType of ["lead", "contact"]) {
+  test(`native ${authorType} still requires matching app-verified identity`, async (t) => {
+    configure(t);
+    const native = {
+      ...conversation,
+      source: { ...conversation.source, author: { id, type: authorType } },
+    };
+    assert.equal(
+      (await verifyFinContext(input, dependencies({ conversation: native })))
+        .userId,
+      userId
+    );
+    await assert.rejects(
+      verifyFinContext(
+        input,
+        dependencies({
+          contact: {
+            ...contact,
+            external_id: "22222222-2222-4222-8222-222222222222",
+          },
+          conversation: native,
+        })
+      )
+    );
+  });
+}
+
 test("verifies native conversation scope and returns only immutable app-verified identity", async (context) => {
   configure(context);
   const deps = dependencies({

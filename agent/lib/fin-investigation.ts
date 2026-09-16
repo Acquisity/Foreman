@@ -21,6 +21,7 @@ import {
   type FinRun,
   readFinRun,
 } from "./fin-run-store.js";
+import { logOpsEvent } from "./ops-log.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const inputSchema = z.discriminatedUnion("action", [
@@ -199,32 +200,60 @@ export async function receiveFinInvestigation(
     );
   }
 
+  let acceptedRun: FinRun | undefined;
+  let acceptedSessionId: string | undefined;
+  let humanReplied = false;
+  const recheckDelivery = async (run: FinRun) => {
+    const controller = new AbortController();
+    const signal = AbortSignal.any([request.signal, controller.signal]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const [current, latest] = await Promise.race([
+        Promise.all([
+          verifyContext({
+            conversationId: input.conversation_id,
+            signal,
+            userToken,
+          }),
+          dependencies.inspect(context, undefined, signal),
+        ]),
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            controller.abort();
+            reject(new Error("Late delivery verification timed out."));
+          }, 5000);
+        }),
+      ]);
+      assertFinRunOwner(run, current);
+      return latest;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
   try {
-    const delivery = await dependencies.inspect(context);
     if (input.action === "result") {
       let run = await dependencies.read(input.run_handle);
       assertFinRunOwner(run, context);
+      acceptedRun = run;
+      ({ humanReplied } = await dependencies.inspect(context));
       run = await recoverFinRun(
         run,
         attachSession,
         responseWaitMs,
         dependencies.complete
       );
-      const latest = await dependencies.inspect(context);
-      const current = await verifyContext({
-        conversationId: input.conversation_id,
-        signal: request.signal,
-        userToken,
-      });
-      assertFinRunOwner(run, current);
+      const latest = await recheckDelivery(run);
       return finRunResponse(run, latest.humanReplied);
     }
+    const delivery = await dependencies.inspect(context);
+    ({ humanReplied } = delivery);
     const { fresh, run } = await dependencies.claim(
       context,
       delivery.requestKey,
       input.callback_url
     );
     assertFinRunOwner(run, context);
+    acceptedRun = run;
     if (!fresh) {
       return finRunResponse(run, delivery.humanReplied);
     }
@@ -238,13 +267,19 @@ export async function receiveFinInvestigation(
         slack,
       },
     });
+    acceptedSessionId = session.id;
     await dependencies.attach(run.id, session.id, slack);
     const result = waitForFinInvestigation(session).then(async (outcome) => {
       if (outcome.status !== "pending") {
-        await dependencies.complete(run.id, {
-          message: outcome.message,
-          status: outcome.status,
-        });
+        const saved = await dependencies.complete(
+          run.id,
+          {
+            message: outcome.message,
+            status: outcome.status,
+          },
+          session.id
+        );
+        return { run_handle: run.id, ...(saved.outcome ?? pending) };
       }
       return { run_handle: run.id, ...outcome };
     });
@@ -270,24 +305,46 @@ export async function receiveFinInvestigation(
         ),
       ]);
       // Never reuse intake authorization after waiting for a late answer.
-      const current = await verifyContext({
-        conversationId: input.conversation_id,
-        signal: request.signal,
-        userToken,
-      });
-      assertFinRunOwner(run, current);
-      return json(
-        (await dependencies.inspect(current)).humanReplied
-          ? finDeliverySuppressed
-          : response
-      );
+      const latest = await recheckDelivery(run);
+      return json(latest.humanReplied ? finDeliverySuppressed : response);
     } finally {
       clearTimeout(timeout);
     }
   } catch {
     // An ambiguous send is not permission to release the slot and start twice.
-    return json(finInvestigationFailure);
+    return finRecoveryResponse(acceptedRun, acceptedSessionId, humanReplied);
   }
+}
+
+function finRecoveryResponse(
+  acceptedRun: FinRun | undefined,
+  acceptedSessionId: string | undefined,
+  humanReplied: boolean
+) {
+  logOpsEvent(
+    "fin.investigation.recovery.required",
+    {
+      message: acceptedRun
+        ? `Investigation run ${acceptedRun.id} requires recovery.`
+        : "Investigation lookup unavailable.",
+      outcome: "error",
+      sessionId: acceptedSessionId ?? acceptedRun?.session_id,
+    },
+    console.warn
+  );
+  if (humanReplied) {
+    return json(finDeliverySuppressed);
+  }
+  if (acceptedRun) {
+    // A reference carries no findings or authorization, even if access lapsed.
+    return json({
+      message:
+        "The investigation result could not be retrieved. Retry Get Foreman Result with this reference; do not start another investigation.",
+      run_handle: acceptedRun.id,
+      status: "pending",
+    });
+  }
+  return json(finInvestigationFailure);
 }
 
 async function recoverFinRun(
@@ -305,5 +362,9 @@ async function recoverFinRun(
   );
   return outcome.status === "pending"
     ? run
-    : complete(run.id, { message: outcome.message, status: outcome.status });
+    : complete(
+        run.id,
+        { message: outcome.message, status: outcome.status },
+        run.session_id
+      );
 }
