@@ -1,5 +1,6 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
+import { finCaseOutcome } from "./fin-case.js";
 import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
@@ -55,21 +56,37 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
-const customerOutcome = (outcome: FinRun["outcome"]) =>
-  outcome
-    ? {
-        message: outcome.message,
-        status: outcome.status,
-        ...(outcome.ticket
-          ? {
-              ticket: {
-                message: outcome.ticket.message,
-                outcome: outcome.ticket.outcome,
-              },
-            }
-          : {}),
-      }
-    : pending;
+const ticketMessages = {
+  "already-tracked": "An existing ticket was confirmed.",
+  failed: "Ticket creation could not be verified.",
+  "newly-created": "A ticket was confirmed.",
+  "not-needed": "No ticket was needed for this investigation.",
+};
+
+// The customer endpoint constructs a fixed response. Internal prose never crosses it.
+const customerOutcome = (outcome: FinRun["outcome"]) => {
+  if (!outcome) {
+    return pending;
+  }
+  const ticket = finCaseOutcome.shape.outcome.safeParse(
+    outcome.ticket?.outcome
+  );
+  return {
+    message:
+      outcome.status === "completed"
+        ? "The investigation is complete. Detailed findings are not included in this response."
+        : finInvestigationFailure.message,
+    status: outcome.status === "completed" ? "completed" : "failed",
+    ...(ticket.success
+      ? {
+          ticket: {
+            message: ticketMessages[ticket.data],
+            outcome: ticket.data,
+          },
+        }
+      : {}),
+  };
+};
 
 const finRunResponse = (run: FinRun, humanReplied: boolean) =>
   json(
