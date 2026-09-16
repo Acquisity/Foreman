@@ -6,11 +6,15 @@ The investigation records a filing or not-needed decision against its persisted 
 
 The Fin model requests required tool use until a ticket-decision result appears in its tool history. Evidence reads do not satisfy this condition; all four ticket outcomes allow the final answer. This prevents an ordinary prose-only refusal from skipping the decision without forcing issue creation. Clearly labeled test reports follow the same evidence and routing rules as other reports.
 
+Saved source associations precede Linear full-text search, including after run expiry. An unbound uncertain creation still blocks replacement; a bound issue can be reverified by a later run. Reuse does not require rewriting a human-authored investigation document. For newly authored documents, verification checks the preserved report and exact case marker, allowing Linear to normalize Markdown links. Customer result payloads omit the internal ticket identifier while the stored result and Slack receipt retain it.
+
 ## Independent status connector
 
 `POST /internal/fin/case` uses the existing app-issued Bearer identity token. Its strict JSON body accepts the native `conversation_id`, an optional opaque UUID `case_reference`, and optional `previous_status`. Empty strings from uncollected Intercom inputs are treated as absent; other invalid references are rejected. The status values are `triage`, `backlog`, `unstarted`, `started`, `completed` and `canceled`.
 
 This entry reads existing cases without starting an investigation, taking a run slot or extending a run reference. Every lookup freshly verifies the current conversation and the saved original contact, app, user and workspace. Workspace membership alone and possession of a reference are insufficient. Original-chat cases take precedence; a fresh chat with several authorized reports returns bounded customer subjects and opaque references for clarification. Unavailable ownership or source evidence returns no ticket details. Public human replies suppress automated delivery.
+
+The original-conversation SQL query precedes the 21-row bound. Same-chat lookup verifies identity once before the provider read and again before disclosure; fresh-chat lookup additionally verifies the saved original source.
 
 Responses use `current`, `unchanged`, `clarification`, `unavailable` or `suppressed`. A current response includes `ticket_status`, `checked_at`, `case_reference` and a fixed customer-safe message. Fin must use that message, preserve unchanged wording, ask the clarification question when needed, and remain silent for `suppressed`. Internal descriptions, comments, parent/master details and Linear links are never returned. Completed means the ticket is marked done, not proof of deployment or resolution in the customer's workspace.
 

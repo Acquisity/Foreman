@@ -6,6 +6,7 @@ import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
 import { readRequestBody } from "./fin-investigation.js";
 import { sameFinOwner } from "./fin-run-store.js";
+import type { FinContext } from "./fin-scope.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const inputSchema = z.strictObject({
@@ -86,32 +87,16 @@ export async function receiveFinCaseStatus(
     if (!cases.length) {
       return json(unavailable);
     }
-    // Recheck the original native source before exposing even a candidate's customer-safe subject.
-    for (const record of cases) {
-      // biome-ignore lint/performance/noAwaitInLoops: bounded owner checks before disclosing candidate details.
-      const original = await deps.verify({
-        conversationId: record.scope.conversationId,
+    await verifyCaseSources(cases, context, deps, signal, userToken);
+    if (cases.length > 1) {
+      const current = await deps.verify({
+        conversationId: input.conversation_id,
         signal,
         userToken,
       });
-      if (
-        !(
-          sameFinOwner(original, record.scope) &&
-          sameFinCaseOwner(original, context)
-        )
-      ) {
+      if (!sameFinOwner(context, current)) {
         return json(unavailable);
       }
-    }
-    const current = await deps.verify({
-      conversationId: input.conversation_id,
-      signal,
-      userToken,
-    });
-    if (!sameFinOwner(context, current)) {
-      return json(unavailable);
-    }
-    if (cases.length > 1) {
       if ((await deps.inspect(current, undefined, signal)).humanReplied) {
         return json(finDeliverySuppressed);
       }
@@ -129,7 +114,7 @@ export async function receiveFinCaseStatus(
       });
     }
     const [selected] = cases;
-    const update = await deps.read(current, selected.id, signal);
+    const update = await deps.read(context, selected.id, signal);
     const latest = await deps.verify({
       conversationId: input.conversation_id,
       signal,
@@ -144,6 +129,35 @@ export async function receiveFinCaseStatus(
     return currentResponse(selected.id, update.state, input.previous_status);
   } catch {
     return json(unavailable);
+  }
+}
+
+/** Check each original source before exposing even its customer-safe subject. */
+async function verifyCaseSources(
+  cases: FinCase[],
+  context: FinContext,
+  deps: typeof dependencies,
+  signal: AbortSignal,
+  userToken: string
+) {
+  for (const record of cases) {
+    const original =
+      record.scope.conversationId === context.conversationId
+        ? context
+        : // biome-ignore lint/performance/noAwaitInLoops: bounded source checks share the request deadline.
+          await deps.verify({
+            conversationId: record.scope.conversationId,
+            signal,
+            userToken,
+          });
+    if (
+      !(
+        sameFinOwner(original, record.scope) &&
+        sameFinCaseOwner(original, context)
+      )
+    ) {
+      throw new Error("Case source ownership changed.");
+    }
   }
 }
 

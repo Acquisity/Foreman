@@ -7,6 +7,7 @@ import {
   bindFinCase,
   claimFinCase,
   findFinCases,
+  findFinSourceIssue,
   finishFinCase,
   reserveFinCaseCreation,
   reserveFinCaseDocument,
@@ -250,6 +251,29 @@ try {
   assert.equal(
     creationRace.filter((result) => result.status === "rejected").length,
     1
+  );
+  await Promise.all(
+    Array.from({ length: 22 }, async (_, index) => {
+      const otherScope = { ...scope, conversationId: String(7000 + index) };
+      const { run } = await claimFinRun(otherScope, "many-cases", "");
+      const sessionId = `many-cases-${index}`;
+      await attachFinRun(run.id, sessionId, null);
+      await claimFinCase(otherScope, sessionId, decision);
+      await bindFinCase(run.id, `ENG-${20_000 + index}`, false);
+    })
+  );
+  assert.equal(
+    (await findFinCases(scope))[0]?.id,
+    first.id,
+    "Original conversation lookup must precede the 21-case limit."
+  );
+  assert.equal(
+    await findFinSourceIssue(scope),
+    "ENG-12345",
+    "A later run must find its source association without provider search."
+  );
+  await assert.rejects(
+    findFinSourceIssue({ ...scope, contactId: "another-contact" })
   );
   console.log(
     "Passed: concurrent starts and case reservations, late-run creation exclusion, immutable completion, replay, owner isolation, callbacks and expiry."

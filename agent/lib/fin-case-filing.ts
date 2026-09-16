@@ -13,6 +13,7 @@ import {
   bindFinCase,
   claimFinCase,
   type FinCase,
+  findFinSourceIssue,
   finishFinCase,
   reserveFinCaseCreation,
   reserveFinCaseDocument,
@@ -43,6 +44,7 @@ const store = {
   finish: finishFinCase,
   reserveCreation: reserveFinCaseCreation,
   reserveDocument: reserveFinCaseDocument,
+  sourceIssue: findFinSourceIssue,
 };
 
 /** Provider results remain server-side until source and routing checks have passed. */
@@ -61,7 +63,15 @@ export async function readFinCaseIssue(
   return issue;
 }
 
-async function sourceMatches(call: FinLinearCall, record: FinCase) {
+async function sourceMatches(
+  call: FinLinearCall,
+  record: FinCase,
+  persistence: typeof store
+) {
+  const savedIssue = await persistence.sourceIssue(record.scope);
+  if (savedIssue) {
+    return [{ id: savedIssue }];
+  }
   const result = z
     .object({
       hasNextPage: z.boolean(),
@@ -100,6 +110,10 @@ async function verifyDocument(
   record: FinCase,
   persistence: typeof store
 ) {
+  // Reusing a verified source does not make Foreman the author of its report.
+  if (!record.created_here) {
+    return;
+  }
   const issue = await readFinCaseIssue(
     call,
     record.issue_id ?? "",
@@ -128,7 +142,13 @@ async function verifyDocument(
   const document = z
     .object({ content: z.string().min(1).max(100_000) })
     .parse(providerData(await call("get_document", { id: documents[0].id })));
-  if (record.created_here && document.content !== report(record)) {
+  if (
+    record.decision.action !== "file" ||
+    !document.content.includes(
+      formatFinCustomerReport(record.decision.summary)
+    ) ||
+    !document.content.split("\n").includes(finCaseMarker(record.id))
+  ) {
     throw new Error("Investigation document differs.");
   }
 }
@@ -156,7 +176,7 @@ async function fileFinCaseAttempt(
     }
     const input = record.decision;
     if (!record.issue_id) {
-      const matches = await sourceMatches(call, record);
+      const matches = await sourceMatches(call, record, persistence);
       if (matches.length > 1) {
         return failed;
       }

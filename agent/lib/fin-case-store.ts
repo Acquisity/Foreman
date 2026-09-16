@@ -41,7 +41,7 @@ export async function claimFinCase(
   }
   const unresolved = await db.query(
     `SELECT id FROM fin_cases WHERE id <> $1 AND scope->>'intercomAppId' = $2
-     AND scope->>'conversationId' = $3 AND creation_attempted = true AND outcome IS NULL LIMIT 1`,
+     AND scope->>'conversationId' = $3 AND creation_attempted = true AND issue_id IS NULL AND outcome IS NULL LIMIT 1`,
     [run.id, scope.intercomAppId, scope.conversationId]
   );
   if (unresolved.length) {
@@ -102,12 +102,52 @@ export async function finishFinCase(
 
 /** Original and fresh chats see only their opener's cases in the freshly verified workspace. */
 export async function findFinCases(scope: FinContext, caseId?: string) {
-  const rows = await privateDatabase().query(
-    `SELECT * FROM fin_cases WHERE scope->>'userId' = $1 AND scope->>'organizationId' = $2
-     AND issue_id IS NOT NULL AND ($3::uuid IS NULL OR id = $3::uuid) ORDER BY created_at DESC LIMIT 21`,
-    [scope.userId, scope.organizationId, caseId ?? null]
-  );
+  const db = privateDatabase();
+  const query = `SELECT * FROM fin_cases WHERE scope->>'userId' = $1 AND scope->>'organizationId' = $2
+     AND issue_id IS NOT NULL AND ($3::uuid IS NULL OR id = $3::uuid)`;
+  const values = [scope.userId, scope.organizationId, caseId ?? null];
+  const local = caseId
+    ? []
+    : await db.query(
+        `${query} AND scope->>'conversationId' = $4 ORDER BY created_at DESC LIMIT 21`,
+        [...values, scope.conversationId]
+      );
+  const rows = local.length
+    ? local
+    : await db.query(`${query} ORDER BY created_at DESC LIMIT 21`, values);
   return rows
     .map((row) => caseSchema.parse(row))
     .filter((row) => sameFinCaseOwner(row.scope, scope));
+}
+
+/** A saved source association takes precedence over provider search indexing. */
+export async function findFinSourceIssue(scope: FinContext) {
+  const rows = await privateDatabase().query(
+    `SELECT issue_id, bool_and(scope->>'userId' = $3 AND scope->>'organizationId' = $4
+       AND scope->>'contactId' = $5 AND scope->>'origin' = $6
+       AND scope->>'partnerId' = $7 AND scope->>'organizationSlug' = $8) AS owner_matches
+     FROM fin_cases WHERE scope->>'intercomAppId' = $1
+     AND scope->>'conversationId' = $2 AND issue_id IS NOT NULL GROUP BY issue_id LIMIT 2`,
+    [
+      scope.intercomAppId,
+      scope.conversationId,
+      scope.userId,
+      scope.organizationId,
+      scope.contactId,
+      scope.origin,
+      scope.partnerId,
+      scope.organizationSlug,
+    ]
+  );
+  const identifiers = new Set<string>();
+  for (const row of rows) {
+    if (row.owner_matches !== true) {
+      throw new Error("Saved source ownership mismatch.");
+    }
+    identifiers.add(z.string().regex(issueIdentifier).parse(row.issue_id));
+  }
+  if (identifiers.size > 1) {
+    throw new Error("Saved source is ambiguous.");
+  }
+  return identifiers.values().next().value ?? null;
 }

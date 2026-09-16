@@ -286,6 +286,17 @@ test("ordinary requests retain immutable verified auth", async (t) => {
 
 test("returns a completed bounded answer when no callback is requested", async (t) => {
   enabled(t);
+  const deps = runDependencies();
+  const { complete } = deps;
+  deps.complete = (id, outcome) =>
+    complete(id, {
+      ...outcome,
+      ticket: {
+        identifier: "ENG-12345",
+        message: "Ticket confirmed.",
+        outcome: "newly-created",
+      },
+    });
   const response = await receiveFinInvestigation(
     request({
       conversation_id: context.conversationId,
@@ -301,12 +312,13 @@ test("returns a completed bounded answer when no callback is requested", async (
     },
     100,
     (() => Promise.resolve(context)) satisfies typeof verifyFinContext,
-    runDependencies()
+    deps
   );
   assert.deepEqual(await response.json(), {
     message: "Only your verified workspace.",
     run_handle: runId,
     status: "completed",
+    ticket: { message: "Ticket confirmed.", outcome: "newly-created" },
   });
 });
 
@@ -390,8 +402,13 @@ test("authorized recovery preserves a completed ticket report and never starts w
   enabled(t);
   const deps = runDependencies();
   const outcome = {
-    message: "Ticket ENG-12345 was confirmed. The cause remains unverified.",
+    message: "A ticket was confirmed. The cause remains unverified.",
     status: "completed" as const,
+    ticket: {
+      identifier: "ENG-12345",
+      message: "A ticket was opened.",
+      outcome: "newly-created" as const,
+    },
   };
   await deps.complete(runId, outcome);
   for (let retry = 0; retry < 2; retry += 1) {
@@ -413,7 +430,15 @@ test("authorized recovery preserves a completed ticket report and never starts w
       async () => context,
       deps
     );
-    assert.deepEqual(await response.json(), { run_handle: runId, ...outcome });
+    assert.deepEqual(await response.json(), {
+      run_handle: runId,
+      ...outcome,
+      ticket: {
+        message: outcome.ticket.message,
+        outcome: outcome.ticket.outcome,
+      },
+    });
+    assert.equal((await deps.read()).outcome?.ticket?.identifier, "ENG-12345");
   }
 });
 

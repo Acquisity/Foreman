@@ -55,11 +55,27 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
+const customerOutcome = (outcome: FinRun["outcome"]) =>
+  outcome
+    ? {
+        message: outcome.message,
+        status: outcome.status,
+        ...(outcome.ticket
+          ? {
+              ticket: {
+                message: outcome.ticket.message,
+                outcome: outcome.ticket.outcome,
+              },
+            }
+          : {}),
+      }
+    : pending;
+
 const finRunResponse = (run: FinRun, humanReplied: boolean) =>
   json(
     humanReplied
       ? finDeliverySuppressed
-      : { run_handle: run.id, ...(run.outcome ?? pending) }
+      : { run_handle: run.id, ...customerOutcome(run.outcome) }
   );
 
 export const readRequestBody = async (request: Request) => {
@@ -283,7 +299,7 @@ export async function receiveFinInvestigation(
           },
           session.id
         );
-        return { run_handle: run.id, ...(saved.outcome ?? pending) };
+        return { run_handle: run.id, ...customerOutcome(saved.outcome) };
       }
       return { run_handle: run.id, ...outcome };
     });

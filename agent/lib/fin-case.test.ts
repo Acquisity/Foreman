@@ -42,6 +42,7 @@ function fixture() {
   let documentWrites = 0;
   let uncertainIssue = false;
   let uncertainDocument = false;
+  let normalizedDocument = false;
   const persistence = {
     bind: (_id: string, id: string, createdHere: boolean) => {
       record.issue_id = id;
@@ -67,6 +68,7 @@ function fixture() {
       record.document_attempted = true;
       return Promise.resolve(fresh);
     },
+    sourceIssue: () => Promise.resolve(null as string | null),
   };
   const call: FinLinearCall = (operation, input) =>
     Promise.resolve().then(() => {
@@ -94,6 +96,12 @@ function fixture() {
         case "save_document":
           documentWrites += 1;
           document = String(input.content);
+          if (normalizedDocument) {
+            document = document.replace(
+              finCaseSource(scope),
+              `[${finCaseSource(scope)}](<${finCaseSource(scope)}>)`
+            );
+          }
           if (issue) {
             issue.documents = [{ id: "doc-1", title: "Triage investigation" }];
           }
@@ -131,6 +139,9 @@ function fixture() {
     loseIssueResponse: () => {
       uncertainIssue = true;
     },
+    normalizeDocument: () => {
+      normalizedDocument = true;
+    },
     persistence,
     record,
   };
@@ -140,6 +151,47 @@ test("confirmed filing verifies source, routing and document and replays without
   const f = fixture();
   assert.equal((await f.file()).outcome, "newly-created");
   assert.equal((await f.file()).outcome, "newly-created");
+  assert.deepEqual(f.counts(), { documentWrites: 1, issueWrites: 1 });
+});
+
+test("Linear link normalization preserves verified document evidence", async () => {
+  const f = fixture();
+  f.normalizeDocument();
+  assert.equal((await f.file()).outcome, "newly-created");
+  assert.deepEqual(f.counts(), { documentWrites: 1, issueWrites: 1 });
+});
+
+test("saved source reuse does not depend on search or an authored document", async () => {
+  const f = fixture();
+  await f.file();
+  f.record.outcome = null;
+  f.record.issue_id = null;
+  const issue = f.issue();
+  assert.ok(issue);
+  issue.description = `Human report: ${finCaseSource(scope)}`;
+  issue.documents = [];
+  f.persistence.sourceIssue = () => Promise.resolve(issueId);
+  const result = await fileFinCase(
+    scope,
+    "session-1",
+    decision,
+    (operation, input) => {
+      assert.notEqual(
+        operation,
+        "list_issues",
+        "saved association must precede search"
+      );
+      assert.notEqual(
+        operation,
+        "save_document",
+        "reuse must not rewrite human reports"
+      );
+      return f.call(operation, input);
+    },
+    new AbortController().signal,
+    f.persistence
+  );
+  assert.equal(result.outcome, "already-tracked");
   assert.deepEqual(f.counts(), { documentWrites: 1, issueWrites: 1 });
 });
 
@@ -228,7 +280,7 @@ test("status is independent of expired runs; ambiguity, revoked access and takeo
       return Promise.resolve({ state: "completed" as const });
     },
     verify: ({ conversationId }: { conversationId: string }) => {
-      // biome-ignore lint/suspicious/noUnnecessaryConditions: the test revokes access between awaited requests below.
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: access changes between awaited requests.
       if (access.revoked) {
         throw new Error("Revoked");
       }
