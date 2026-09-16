@@ -1,5 +1,6 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
+import type { FinCaseOutcome } from "./fin-case.js";
 import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
@@ -55,11 +56,29 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
+/** The customer sees the ticket decision, never its identifier or its link. */
+const customerOutcome = <
+  T extends { message: string; status: string; ticket?: FinCaseOutcome },
+>(
+  outcome: T
+) => ({
+  message: outcome.message,
+  status: outcome.status,
+  ...(outcome.ticket
+    ? {
+        ticket: {
+          message: outcome.ticket.message,
+          outcome: outcome.ticket.outcome,
+        },
+      }
+    : {}),
+});
+
 const finRunResponse = (run: FinRun, humanReplied: boolean) =>
   json(
     humanReplied
       ? finDeliverySuppressed
-      : { run_handle: run.id, ...(run.outcome ?? pending) }
+      : { run_handle: run.id, ...customerOutcome(run.outcome ?? pending) }
   );
 
 const readRequestBody = async (request: Request) => {
@@ -283,7 +302,10 @@ export async function receiveFinInvestigation(
           },
           session.id
         );
-        return { run_handle: run.id, ...(saved.outcome ?? pending) };
+        return {
+          run_handle: run.id,
+          ...customerOutcome(saved.outcome ?? pending),
+        };
       }
       return { run_handle: run.id, ...outcome };
     });

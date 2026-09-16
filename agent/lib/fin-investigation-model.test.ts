@@ -71,6 +71,46 @@ describe("Fin customer investigation model boundary", () => {
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
       ["read_fin_outreach_evidence", "file_fin_investigation_ticket"]
     );
+    // The ticket tool is offered and this turn holds no result from it.
+    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "required" });
+  });
+
+  it("stops forcing the ticket decision once the turn carries its result", async () => {
+    const base = new MockLanguageModelV4({
+      doGenerate: {
+        content: [{ text: "Filed.", type: "text" }],
+        finishReason: { raw: "stop", unified: "stop" },
+        usage,
+        warnings: [],
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: finInvestigationMiddleware,
+      model: base,
+    });
+    await model.doGenerate({
+      prompt: [
+        {
+          content: [
+            {
+              output: { type: "json", value: { outcome: "not-needed" } },
+              toolCallId: "call-1",
+              toolName: "file_fin_investigation_ticket",
+              type: "tool-result",
+            },
+          ],
+          role: "tool",
+        },
+      ],
+      toolChoice: { toolName: "executor__execute", type: "tool" },
+      tools: [
+        {
+          inputSchema: { type: "object" },
+          name: "file_fin_investigation_ticket",
+          type: "function",
+        },
+      ],
+    });
     assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
   });
 

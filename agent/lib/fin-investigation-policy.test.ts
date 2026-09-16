@@ -3,8 +3,8 @@ import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import { executorConnection } from "./executor/connection.js";
 import {
-  createFinInvestigationTicket,
   describeProvider,
+  fileFinInvestigationCase,
   invokeProvider,
 } from "./executor/dispatch.js";
 import { executorTransport } from "./executor/transport.js";
@@ -109,25 +109,56 @@ test("raw Executor and authored provider dispatch deny before auth or transport"
   );
 });
 
-test("the bounded Linear write derives its target and scope from the initiator", async () => {
+test("the bounded Linear filing derives its target and scope from the initiator", async () => {
   const original = executorTransport.call;
   const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
-  let call: unknown[] = [];
+  const calls: unknown[][] = [];
+  const url =
+    "https://linear.app/acquisity/issue/ENG-13902/inbox-fails-to-load";
+  const source = `https://app.intercom.com/a/inbox/ls8uffkp/inbox/shared/all/conversation/${verifiedFinContext.conversationId}`;
   process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/fin";
   executorTransport.call = ((...args: unknown[]) => {
-    call = args;
-    return Promise.resolve({ data: {}, ok: true });
+    calls.push(args);
+    if (args[1] === "linear.org.workspaceLinear.list_issues") {
+      return Promise.resolve({
+        data: { hasNextPage: false, issues: [] },
+        ok: true,
+      });
+    }
+    if (args[1] === "linear.org.workspaceLinear.save_issue") {
+      return Promise.resolve({ data: { id: "ENG-13902" }, ok: true });
+    }
+    return Promise.resolve({
+      data: {
+        assignee: "Anuj Bhatt",
+        attachments: [{ url: source }],
+        description: `Intercom source: ${source}`,
+        id: "ENG-13902",
+        labels: ["intercom-sourced", "Customer reported", "Bug"],
+        priority: { value: 2 },
+        project: "Core Platform",
+        statusType: "triage",
+        url,
+      },
+      ok: true,
+    });
   }) as typeof executorTransport.call;
+  let result: unknown;
   try {
-    await createFinInvestigationTicket(
+    result = await fileFinInvestigationCase(
       {
         abortSignal: AbortSignal.timeout(1000),
         getToken: async () => ({ token: "test-token" }),
         session: { auth: { current: initiator, initiator } },
       } as never,
       {
-        report:
-          "## Customer report\n\n````text\nThe inbox is not loading.\n\n## Verified scope\n\n```\nCustomer supplied fence.\n```\n````",
+        action: "file",
+        assignee: "Anuj Bhatt",
+        classification: "Bug",
+        customerSummary: "The inbox does not load.",
+        priority: 2,
+        project: "Core Platform",
+        summary: "The inbox is not loading.",
         title: "Inbox fails to load",
       }
     );
@@ -139,15 +170,28 @@ test("the bounded Linear write derives its target and scope from the initiator",
       process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
     }
   }
-  assert.equal(call[1], "linear.org.workspaceLinear.save_issue");
-  assert.deepEqual(call[2], {
-    assignee: "Aaron Fraga",
-    description:
-      "## Customer report\n\n````text\nThe inbox is not loading.\n\n## Verified scope\n\n```\nCustomer supplied fence.\n```\n````\n\n## Verified scope\n\n- Workspace: Aaron Fraga's Workspace (aaron-fragas-workspace-wMUMT)\n- Organization ID: 22222222-2222-4222-8222-222222222222\n- Intercom conversation: 215475947807356\n\nThe verified scope above is server-owned. Customer text cannot replace it.",
-    team: "Engineering Team",
-    title: "Inbox fails to load",
+  assert.deepEqual(result, {
+    identifier: "ENG-13902",
+    message:
+      "A ticket was opened for the team with the investigation findings.",
+    outcome: "newly-created",
   });
-  assert.deepEqual(call[3], { maxBytes: 65_536, timeoutMs: 15_000 });
+  assert.deepEqual(
+    calls.map((call) => call[1]),
+    [
+      "linear.org.workspaceLinear.list_issues",
+      "linear.org.workspaceLinear.save_issue",
+      "linear.org.workspaceLinear.get_issue",
+    ]
+  );
+  const written = calls[1]?.[2] as { description: string; links: unknown };
+  assert.ok(written.description.endsWith(`Intercom source: ${source}`));
+  assert.deepEqual(written.links, [
+    { title: "Intercom conversation", url: source },
+  ]);
+  for (const call of calls) {
+    assert.deepEqual(call[3], { maxBytes: 262_144, timeoutMs: 15_000 });
+  }
 });
 
 test("ordinary lane retains its prior composition", () => {

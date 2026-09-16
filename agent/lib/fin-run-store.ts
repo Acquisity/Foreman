@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { finCaseOutcome } from "./fin-case.js";
 import type { FinInvestigationOutcome } from "./fin-investigation-callback.js";
 import type { FinInvestigationSlackReceipt } from "./fin-investigation-slack.js";
 import { type FinContext, finContextSchema } from "./fin-scope.js";
@@ -15,7 +16,11 @@ const runSchema = z.object({
   created_at: z.coerce.date(),
   id: z.uuid(),
   outcome: z
-    .object({ message: z.string(), status: z.enum(["completed", "failed"]) })
+    .object({
+      message: z.string(),
+      status: z.enum(["completed", "failed"]),
+      ticket: finCaseOutcome.optional(),
+    })
     .nullable(),
   scope: finContextSchema,
   session_id: z.string().nullable(),

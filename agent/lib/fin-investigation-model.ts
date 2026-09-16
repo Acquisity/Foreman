@@ -1,8 +1,10 @@
 import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
+const TICKET_TOOL = "file_fin_investigation_ticket";
 const ALLOWED_TOOLS = new Set([
-  "file_fin_investigation_ticket",
+  TICKET_TOOL,
+  "read_fin_case_status",
   "read_fin_outreach_evidence",
 ]);
 const BLOCKED = "Customer investigation capability is unavailable.";
@@ -50,11 +52,26 @@ export const finInvestigationMiddleware: LanguageModelMiddleware = {
     const tools = params.tools?.filter(
       (tool) => typeof tool.name === "string" && ALLOWED_TOOLS.has(tool.name)
     );
-    const toolChoice =
+    const allowedChoice =
       requestedToolChoice?.type === "tool" &&
       !ALLOWED_TOOLS.has(requestedToolChoice.toolName)
         ? { type: "auto" as const }
         : requestedToolChoice;
+    // The ticket decision is mechanical, not a prompt instruction: while the
+    // tool is offered and the turn holds no result from it, a tool call is required.
+    const undecided =
+      tools?.some((tool) => tool.name === TICKET_TOOL) &&
+      !params.prompt.some(
+        (message) =>
+          message.role === "tool" &&
+          message.content.some(
+            (part) =>
+              part.type === "tool-result" && part.toolName === TICKET_TOOL
+          )
+      );
+    const toolChoice = undecided
+      ? { type: "required" as const }
+      : allowedChoice;
     return Promise.resolve({ ...params, toolChoice, tools });
   },
   async wrapGenerate({ doGenerate }) {

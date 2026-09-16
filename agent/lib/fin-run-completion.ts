@@ -15,6 +15,19 @@ import {
 } from "./fin-run-store.js";
 import { logOpsEvent } from "./ops-log.js";
 
+/** Slack is the internal surface, so it keeps the ticket identifier. */
+const internalOutcome = (outcome: FinInvestigationOutcome) => {
+  const { ticket } = outcome;
+  if (!ticket) {
+    return outcome;
+  }
+  const identifier = ticket.identifier ? ` (${ticket.identifier})` : "";
+  return {
+    ...outcome,
+    message: `${outcome.message}\n\nTicket: ${ticket.outcome}. ${ticket.message}${identifier}`,
+  };
+};
+
 export async function finishFinRun(
   runId: string | null,
   sessionId: string,
@@ -31,7 +44,7 @@ export async function finishFinRun(
 ) {
   // Internal reporting is independent of customer authorization and callback failure.
   await Promise.all([
-    operations.slack(slack, outcome),
+    operations.slack(slack, internalOutcome(outcome)),
     (async () => {
       if (!runId) {
         return;
