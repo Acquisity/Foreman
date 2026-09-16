@@ -34,8 +34,12 @@ interface Connection {
   url?: unknown;
 }
 
-const load = async (path: string): Promise<Connection> =>
-  ((await import(path)) as { default: Connection }).default;
+const load = async (path: string): Promise<Connection> => {
+  const { default: definition } = await import(path);
+  return definition.events
+    ? definition.events["session.started"]({}, { session: { auth: {} } })
+    : definition;
+};
 
 // Every child connection beside its root, loaded once for the tests below.
 process.env.EXECUTOR_BASE_URL = "https://executor.acquisity.ai";

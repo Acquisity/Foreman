@@ -1,10 +1,15 @@
-import { defineMcpClientConnection } from "eve/connections";
+import { defineDynamic, defineMcpClientConnection } from "eve/connections";
+import { isFinInvestigation } from "../fin-investigation-auth.js";
 import { sessionLane } from "../session-lane.js";
 import { executorAuth } from "./auth.js";
-import { toolkitUrl } from "./endpoint.js";
+import {
+  type ExecutorToolkit,
+  FIN_PREVIEW_TOOLKIT,
+  toolkitUrl,
+} from "./endpoint.js";
 
 /** One company toolkit shared by root, critic, workflows, and authored helpers. */
-export const executorConnection = () =>
+export const executorConnection = (toolkit?: ExecutorToolkit) =>
   defineMcpClientConnection({
     approval: (ctx) => {
       if (!sessionLane(ctx.session.auth.initiator).broadExecutor) {
@@ -24,5 +29,17 @@ export const executorConnection = () =>
     description:
       "Foreman company connections. Discover tools inside execute using tools.search and tools.describe.tool. Prefer the authored helpers for bounded evidence reads. Personal Supermemory is separate.",
     tools: { allow: ["execute", "skills"] },
-    url: toolkitUrl(),
+    url: toolkitUrl(toolkit),
+  });
+
+export const sessionExecutorConnection = () =>
+  defineDynamic({
+    events: {
+      "session.started": (_event, ctx) =>
+        executorConnection(
+          isFinInvestigation(ctx.session.auth.initiator)
+            ? FIN_PREVIEW_TOOLKIT
+            : undefined
+        ),
+    },
   });

@@ -1,2 +1,2 @@
-import { executorConnection } from "../lib/executor/connection.js";
-export default executorConnection();
+import { sessionExecutorConnection } from "../lib/executor/connection.js";
+export default sessionExecutorConnection();

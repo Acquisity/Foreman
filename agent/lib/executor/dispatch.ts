@@ -1,7 +1,9 @@
 import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
+import { isFinInvestigation } from "../fin-investigation-auth.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
+import { type ExecutorToolkit, FIN_PREVIEW_TOOLKIT } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -52,9 +54,18 @@ async function connection(
 ) {
   const { token } = await ctx.getToken(executorAuth());
   const authorization = policy ? { version: await policy.authorize() } : null;
+  const toolkit: ExecutorToolkit | undefined =
+    policy?.toolkit ??
+    (isFinInvestigation(ctx.session?.auth.initiator)
+      ? FIN_PREVIEW_TOOLKIT
+      : undefined);
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: policy?.toolkit },
+    wire: {
+      signal: ctx.abortSignal,
+      token,
+      toolkit,
+    },
   };
 }
 
