@@ -75,6 +75,15 @@ try {
       "utf8"
     )
   );
+  await pool.query(
+    await readFile(
+      new URL(
+        "../migrations/0009_fin_case_creation_owner.sql",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  );
   const starts = await Promise.all(
     Array.from({ length: 12 }, () =>
       claimFinRun(
@@ -222,8 +231,28 @@ try {
   const afterCompletion = await claimFinRun(raceScope, "new-request", "");
   assert.equal(afterCompletion.fresh, true);
   assert.notEqual(afterCompletion.run.id, active.run.id);
+  await attachFinRun(active.run.id, "late-session", null);
+  await attachFinRun(afterCompletion.run.id, "new-session", null);
+  await Promise.all([
+    claimFinCase(raceScope, "late-session", decision),
+    claimFinCase(raceScope, "new-session", decision),
+  ]);
+  const creationRace = await Promise.allSettled([
+    reserveFinCaseCreation(active.run.id),
+    reserveFinCaseCreation(afterCompletion.run.id),
+  ]);
+  assert.equal(
+    creationRace.filter(
+      (result) => result.status === "fulfilled" && result.value
+    ).length,
+    1
+  );
+  assert.equal(
+    creationRace.filter((result) => result.status === "rejected").length,
+    1
+  );
   console.log(
-    "Passed: 12 racing starts, independent conversations, callback immutability, out-of-order completion, replay, completed-slot reuse with open ticket, single signal attempt, 11-minute validity, expiry and swapped conversation."
+    "Passed: concurrent starts and case reservations, late-run creation exclusion, immutable completion, replay, owner isolation, callbacks and expiry."
   );
 } finally {
   await pool.end();

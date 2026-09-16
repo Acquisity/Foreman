@@ -134,7 +134,7 @@ async function verifyDocument(
 }
 
 /** INSERT owns the one creation attempt. Replays reconcile but never repeat creation. */
-export async function fileFinCase(
+async function fileFinCaseAttempt(
   scope: FinContext,
   sessionId: string,
   decision: FinCaseDecision,
@@ -213,4 +213,34 @@ export async function fileFinCase(
     }
     return failed;
   }
+}
+
+/** Reconcile once before returning; durable reservations prevent repeating either write. */
+export async function fileFinCase(
+  scope: FinContext,
+  sessionId: string,
+  decision: FinCaseDecision,
+  call: FinLinearCall,
+  signal: AbortSignal,
+  persistence = store
+): Promise<FinCaseOutcome> {
+  const result = await fileFinCaseAttempt(
+    scope,
+    sessionId,
+    decision,
+    call,
+    signal,
+    persistence
+  );
+  if (result.outcome !== "failed") {
+    return result;
+  }
+  return fileFinCaseAttempt(
+    scope,
+    sessionId,
+    decision,
+    call,
+    signal,
+    persistence
+  );
 }

@@ -9,7 +9,10 @@ import { sameFinOwner } from "./fin-run-store.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const inputSchema = z.strictObject({
-  case_reference: z.uuid().optional(),
+  case_reference: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => value || undefined),
   conversation_id: z.string().regex(/^\d{1,32}$/),
   previous_status: z
     .enum([
@@ -19,8 +22,10 @@ const inputSchema = z.strictObject({
       "started",
       "completed",
       "canceled",
+      "",
     ])
-    .optional(),
+    .optional()
+    .transform((value) => value || undefined),
 });
 const unavailable = {
   message:

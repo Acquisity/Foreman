@@ -152,7 +152,7 @@ test("uncertain accepted issue and document writes reconcile without duplication
       f.loseDocumentResponse();
     }
     // biome-ignore lint/performance/noAwaitInLoops: each scenario tests a sequential retry.
-    assert.equal((await f.file()).outcome, "failed");
+    assert.equal((await f.file()).outcome, "newly-created");
     assert.equal((await f.file()).outcome, "newly-created");
     assert.deepEqual(f.counts(), { documentWrites: 1, issueWrites: 1 });
   }
@@ -180,6 +180,7 @@ test("mismatched routing and multiple customer sources never become confirmed su
   const f = fixture();
   f.loseIssueResponse();
   await f.file();
+  f.record.outcome = null;
   const issue = f.issue();
   assert.ok(issue);
   issue.project = "Foreign project";
@@ -256,6 +257,11 @@ test("status is independent of expired runs; ambiguity, revoked access and takeo
     (await request({ previous_status: "completed" })).status,
     "unchanged"
   );
+  // Intercom renders uncollected optional text inputs as empty strings.
+  assert.equal(
+    (await request({ case_reference: "", previous_status: "" })).status,
+    "current"
+  );
   assert.equal(
     (await request({ case_reference: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }))
       .status,
@@ -271,11 +277,11 @@ test("status is independent of expired runs; ambiguity, revoked access and takeo
     },
   ];
   assert.equal((await request()).status, "clarification");
-  assert.equal(reads, 2);
+  assert.equal(reads, 3);
   access.revoked = true;
   assert.equal((await request()).status, "unavailable");
   access.revoked = false;
   takeover = true;
   assert.equal((await request()).status, "suppressed");
-  assert.equal(reads, 2);
+  assert.equal(reads, 3);
 });
