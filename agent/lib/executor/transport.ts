@@ -48,10 +48,16 @@ export class ExecutorError extends Error {
   constructor(
     code: string,
     status?: number,
-    options?: ErrorOptions & { retryAfter?: string; dispatched?: false }
+    options?: ErrorOptions & {
+      retryAfter?: string;
+      dispatched?: false;
+      reason?: string;
+    }
   ) {
+    // A refusal the model has to work around carries its reason in the message.
+    // Never put a caller-supplied value in one: the message reaches the model.
     super(
-      `Executor operation failed (${code}${status === undefined ? "" : `, HTTP ${status}`}).`,
+      `Executor operation failed (${code}${status === undefined ? "" : `, HTTP ${status}`}).${options?.reason ? ` ${options.reason}` : ""}`,
       options
     );
     this.name = "ExecutorError";
@@ -272,6 +278,16 @@ async function executeExecutorRequest(
   return result.structuredContent.result;
 }
 
+function searchExecutorOperations(
+  ctx: ExecutorRequestContext,
+  query: { namespace?: string; query: string }
+) {
+  return executeExecutor(
+    ctx,
+    `return await tools.search(${JSON.stringify(query)});`
+  );
+}
+
 function describeExecutorOperation(ctx: ExecutorRequestContext, path: string) {
   if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
     throw new ExecutorError("invalid_operation_binding");
@@ -286,4 +302,5 @@ function describeExecutorOperation(ctx: ExecutorRequestContext, path: string) {
 export const executorTransport = {
   call: invokeExecutor,
   describe: describeExecutorOperation,
+  search: searchExecutorOperations,
 };

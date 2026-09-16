@@ -2,123 +2,36 @@ import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { FIN_CASE_TOOL as TICKET_TOOL } from "./fin-case.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
-const ALLOWED_TOOLS = new Set([
-  TICKET_TOOL,
-  "read_fin_case_status",
-  "read_fin_outreach_evidence",
-]);
-const BLOCKED = "Customer investigation capability is unavailable.";
 /** Evidence reads are free until this many results; then only the decision is left. */
 const FIN_EVIDENCE_STEPS = 8;
 
-const namedTool = (part: { toolName?: unknown }) =>
-  typeof part.toolName === "string" && ALLOWED_TOOLS.has(part.toolName);
-
-function assertAllowedStreamPart(
-  part: { id?: string; toolCallId?: string; toolName?: unknown; type: string },
-  allowedCalls: Set<string>
-) {
-  if (part.type === "tool-input-start" || part.type === "tool-call") {
-    if (!namedTool(part)) {
-      throw new Error(BLOCKED);
-    }
-    allowedCalls.add(
-      part.type === "tool-call" ? String(part.toolCallId) : String(part.id)
-    );
-    return;
-  }
-  if (part.type === "tool-input-delta" || part.type === "tool-input-end") {
-    if (!allowedCalls.has(String(part.id))) {
-      throw new Error(BLOCKED);
-    }
-    return;
-  }
-  if (
-    (part.type === "tool-result" || part.type === "tool-approval-request") &&
-    !allowedCalls.has(String(part.toolCallId))
-  ) {
-    throw new Error(BLOCKED);
-  }
-}
-
 /**
- * Keep the customer lane to authored scoped evidence and its bounded ticket write.
- * Native delegation is background-only, so this task-mode route cannot safely expose
- * it until the asynchronous result lifecycle owned by ENG-13766 is implemented.
- * The output checks also reject an adversarial model call that was not advertised.
+ * The ticket decision is mechanical, not a prompt instruction: while the tool
+ * is offered and the turn holds no result from it, a tool call is required.
+ * Every other offered tool also satisfies "required", so the constraint narrows
+ * to the ticket tool once the evidence budget is spent and the turn can finish.
  */
 export const finInvestigationMiddleware: LanguageModelMiddleware = {
   specificationVersion: "v4",
   transformParams({ params }) {
-    const { toolChoice: requestedToolChoice } = params;
-    const tools = params.tools?.filter(
-      (tool) => typeof tool.name === "string" && ALLOWED_TOOLS.has(tool.name)
-    );
-    const allowedChoice =
-      requestedToolChoice?.type === "tool" &&
-      !ALLOWED_TOOLS.has(requestedToolChoice.toolName)
-        ? { type: "auto" as const }
-        : requestedToolChoice;
-    // The ticket decision is mechanical, not a prompt instruction: while the tool
-    // is offered and the turn holds no result from it, a tool call is required.
-    // The read tools also satisfy "required", so the constraint narrows to the
-    // ticket tool once the evidence budget is spent and the turn can finish.
     const results = params.prompt.flatMap((message) =>
       message.role === "tool" ? message.content : []
     );
     const undecided =
-      tools?.some((tool) => tool.name === TICKET_TOOL) &&
+      params.tools?.some((tool) => tool.name === TICKET_TOOL) &&
       !results.some(
         (part) => part.type === "tool-result" && part.toolName === TICKET_TOOL
       );
-    let toolChoice = allowedChoice;
-    if (undecided) {
-      toolChoice =
+    if (!undecided) {
+      return Promise.resolve(params);
+    }
+    return Promise.resolve({
+      ...params,
+      toolChoice:
         results.length < FIN_EVIDENCE_STEPS
           ? { type: "required" as const }
-          : { toolName: TICKET_TOOL, type: "tool" as const };
-    }
-    return Promise.resolve({ ...params, toolChoice, tools });
-  },
-  async wrapGenerate({ doGenerate }) {
-    const result = await doGenerate();
-    let sawAllowedCall = false;
-    for (const part of result.content) {
-      if (part.type === "tool-call") {
-        if (!namedTool(part)) {
-          throw new Error(BLOCKED);
-        }
-        sawAllowedCall = true;
-      } else if (part.type.startsWith("tool-")) {
-        throw new Error(BLOCKED);
-      }
-    }
-    if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
-      throw new Error(BLOCKED);
-    }
-    return result;
-  },
-  async wrapStream({ doStream }) {
-    const result = await doStream();
-    const allowedCalls = new Set<string>();
-    return {
-      ...result,
-      stream: result.stream.pipeThrough(
-        new TransformStream({
-          transform(part, controller) {
-            assertAllowedStreamPart(part, allowedCalls);
-            if (
-              part.type === "finish" &&
-              part.finishReason.unified === "tool-calls" &&
-              allowedCalls.size === 0
-            ) {
-              throw new Error(BLOCKED);
-            }
-            controller.enqueue(part);
-          },
-        })
-      ),
-    };
+          : { toolName: TICKET_TOOL, type: "tool" as const },
+    });
   },
 };
 

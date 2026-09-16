@@ -1,4 +1,5 @@
 import type { ApprovalContext, ApprovalStatus } from "eve/tools/approval";
+import { isFinInvestigation } from "../fin-investigation-auth.js";
 import {
   canUseInvestigationMemory,
   isIntakeOnly,
@@ -147,6 +148,87 @@ export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
         type: "denied",
       }
     : "not-applicable";
+
+const FIN_WRITE_VERBS = new Set([
+  "add",
+  "archive",
+  "assign",
+  "attach",
+  "cancel",
+  "create",
+  "delete",
+  "merge",
+  "post",
+  "refund",
+  "remove",
+  "reply",
+  "restore",
+  "retire",
+  "save",
+  "send",
+  "set",
+  "share",
+  "submit",
+  "unshare",
+  "update",
+  "upload",
+  "write",
+]);
+
+const finWriteOperation = (path: string) => {
+  const operation = path.split(".").at(-1)?.toLowerCase() ?? "";
+  return (
+    FIN_WRITE_VERBS.has(operation.split("_")[0] ?? "") ||
+    operation.includes("_write") ||
+    operation.includes("_delete")
+  );
+};
+
+/**
+ * A provider operation reached from a verified Fin customer investigation.
+ *
+ * @remarks
+ * This is defense in depth, not the write boundary. It matches known write
+ * verbs on the last segment of the operation path, so an operation whose name
+ * does not start with one is permitted: `dangerouslyDeleteByTags`,
+ * `batchRemoveProjectEnv`, `clearRepositoryPermissions` and `requestDelete`
+ * are all real operation names of that shape, and the experimental `pr132`
+ * ref carries a `toolkit-policy.test.ts` that names them. A longer verb list
+ * does not fix that and should not be attempted here.
+ *
+ * The write boundary is the toolkit's server-side `connectionPolicies`, which
+ * an operator configures on `foreman-fin-preview` and which this code cannot
+ * assert. Until those policies are installed, this policy is the only thing
+ * standing in front of a provider write from a customer conversation, and it
+ * is not enough on its own.
+ *
+ * Denied rather than parked, like every other gate here: a customer in
+ * Intercom cannot answer an approval card. Reads stay open, because
+ * investigating is the whole point of the lane. A write is refused because
+ * the customer conversation is not where team state changes: the one write
+ * this lane performs is its bounded ticket, which has its own tool. The
+ * denial tells the model how to continue without turning an internal
+ * boundary into the customer-facing answer.
+ */
+export const finPolicy = (ctx: ApprovalContext): ApprovalStatus => {
+  const { auth } = ctx.session;
+  if (
+    !(
+      isFinInvestigation(auth.current) ||
+      isFinInvestigation(auth.initiator ?? null)
+    )
+  ) {
+    return "not-applicable";
+  }
+  const path = (ctx.toolInput as { path?: unknown } | undefined)?.path;
+  return typeof path === "string" && finWriteOperation(path)
+    ? {
+        reason:
+          "This operation changes provider state, which this conversation does not do. Keep reading the evidence you need, and record anything the team has to act on with the ticket tool instead. Do not mention this restriction, the operation, or internal routing in the reply.",
+        type: "denied",
+      }
+    : "not-applicable";
+};
 
 /**
  * Marking a pull request ready for review, which `updatePullRequest` performs

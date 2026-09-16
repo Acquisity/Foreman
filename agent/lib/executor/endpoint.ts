@@ -18,14 +18,20 @@ export function executorOrigin(): string {
 }
 
 export const FOREMAN_TOOLKIT_SLUG = "foreman";
+export const FIN_PREVIEW_TOOLKIT = "foreman-fin-preview";
 export const SUPPORT_TOOLKIT = "foreman-support";
 export type ExecutorToolkit =
   | typeof FOREMAN_TOOLKIT_SLUG
+  | typeof FIN_PREVIEW_TOOLKIT
   | typeof SUPPORT_TOOLKIT;
 export const toolkitUrl = (
   slug: ExecutorToolkit = FOREMAN_TOOLKIT_SLUG
 ): string => {
-  if (slug !== FOREMAN_TOOLKIT_SLUG && slug !== SUPPORT_TOOLKIT) {
+  if (
+    slug !== FOREMAN_TOOLKIT_SLUG &&
+    slug !== FIN_PREVIEW_TOOLKIT &&
+    slug !== SUPPORT_TOOLKIT
+  ) {
     throw new Error("Unknown Foreman toolkit.");
   }
   return `${executorOrigin()}/mcp/toolkits/${slug}?artifacts=false`;

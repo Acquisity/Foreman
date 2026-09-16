@@ -685,8 +685,8 @@ describe("capability report", () => {
           isAuthoredTool(tool) &&
           ![
             "tools/file_fin_investigation_ticket.ts",
+            "tools/fin_provider.ts",
             "tools/read_fin_case_status.ts",
-            "tools/read_fin_outreach_evidence.ts",
             "tools/support_investigation.ts",
             "tools/support_provider.ts",
           ].includes(tool.sourceId)
