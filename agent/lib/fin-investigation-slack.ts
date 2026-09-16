@@ -91,16 +91,9 @@ export async function updateFinInvestigationReceipt(
     const text = outcome
       ? `*${statusTitles[outcome.status]}*\n\n${escapeSlackText(outcome.message)}`
       : "*Investigation unavailable*\n\nThe investigation could not be started or completed.";
-    // Temporary Preview experiment: test whether editing in a self-mention starts a Slack session.
-    const probe =
-      process.env.VERCEL_ENV === "preview" &&
-      receipt.channel === "C0BUF4GU8C8" &&
-      outcome?.status === "completed"
-        ? "\n\n<@U0BTGKF57T7> Preview self-mention test: reply in this thread with SELF-MENTION RECEIVED only. Do not investigate, call tools, or tag yourself again."
-        : "";
     await request("chat.update", {
       channel: receipt.channel,
-      text: text + probe,
+      text,
       ts: receipt.ts,
     });
     receipt.delivered = true;
