@@ -35,6 +35,19 @@ describe("composePrompt", () => {
     );
   });
 
+  it("hands delegated-task waiting back to eve instead of polling", () => {
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "After a task receipt, never call `wait_for_external_state` or any other polling tool to wait for vision, critic, or native-agent work."
+      )
+    );
+    assert.ok(
+      GENERAL_PROMPT.includes(
+        "eve queues task lifecycle notifications for later turns, so keeping this turn alive prevents you from receiving them."
+      )
+    );
+  });
+
   it("limits the Slack wording skill to the two intended channels", () => {
     assert.ok(
       GENERAL_PROMPT.includes(
