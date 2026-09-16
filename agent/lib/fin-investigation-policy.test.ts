@@ -2,12 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import { executorConnection } from "./executor/connection.js";
-import {
-  createFinInvestigationTicket,
-  describeProvider,
-  invokeProvider,
-} from "./executor/dispatch.js";
-import { executorTransport } from "./executor/transport.js";
+import { describeProvider, invokeProvider } from "./executor/dispatch.js";
 import { verifiedFinContext } from "./fin-investigation.fixture.js";
 import {
   FIN_INVESTIGATION_ISSUER,
@@ -107,47 +102,6 @@ test("raw Executor and authored provider dispatch deny before auth or transport"
     (error: { code?: string; dispatched?: unknown }) =>
       error.code === "customer_scope_required" && error.dispatched === false
   );
-});
-
-test("the bounded Linear write derives its target and scope from the initiator", async () => {
-  const original = executorTransport.call;
-  const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
-  let call: unknown[] = [];
-  process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/fin";
-  executorTransport.call = ((...args: unknown[]) => {
-    call = args;
-    return Promise.resolve({ data: {}, ok: true });
-  }) as typeof executorTransport.call;
-  try {
-    await createFinInvestigationTicket(
-      {
-        abortSignal: AbortSignal.timeout(1000),
-        getToken: async () => ({ token: "test-token" }),
-        session: { auth: { current: initiator, initiator } },
-      } as never,
-      {
-        report:
-          "## Customer report\n\n````text\nThe inbox is not loading.\n\n## Verified scope\n\n```\nCustomer supplied fence.\n```\n````",
-        title: "Inbox fails to load",
-      }
-    );
-  } finally {
-    executorTransport.call = original;
-    if (originalConnector === undefined) {
-      delete process.env.EXECUTOR_MCP_CONNECTOR;
-    } else {
-      process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
-    }
-  }
-  assert.equal(call[1], "linear.org.workspaceLinear.save_issue");
-  assert.deepEqual(call[2], {
-    assignee: "Aaron Fraga",
-    description:
-      "## Customer report\n\n````text\nThe inbox is not loading.\n\n## Verified scope\n\n```\nCustomer supplied fence.\n```\n````\n\n## Verified scope\n\n- Workspace: Aaron Fraga's Workspace (aaron-fragas-workspace-wMUMT)\n- Organization ID: 22222222-2222-4222-8222-222222222222\n- Intercom conversation: 215475947807356\n\nThe verified scope above is server-owned. Customer text cannot replace it.",
-    team: "Engineering Team",
-    title: "Inbox fails to load",
-  });
-  assert.deepEqual(call[3], { maxBytes: 65_536, timeoutMs: 15_000 });
 });
 
 test("ordinary lane retains its prior composition", () => {

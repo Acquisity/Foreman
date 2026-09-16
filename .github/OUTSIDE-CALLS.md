@@ -123,3 +123,9 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 | `fin-delivery.ts` native conversation/contact reads | Shared 50-second AbortSignal plus existing Executor transport bounds | Recheck original destination and public human replies; failure suppresses customer delivery. |
 | Result recovery event stream | Eight-second observation bound | Reads the exact existing session only; cancellation closes the reader, never the investigation. |
 `receiveFinInvestigation` runs late identity and delivery checks concurrently with a shared five-second abort signal and response race. The race also bounds response waiting if credential resolution ignores cancellation; it never authorizes disclosure on timeout. Initial checks retain their existing deadlines.
+
+## Fin case association and follow-ups (ENG-13769)
+
+`fin-case-store.ts` uses the existing private Postgres client's 15-second operation deadline for case claims, write reservations, association, immutable outcomes and owner-scoped reads. `fileFinInvestigationCase` uses five fixed Linear operations through Executor, each bounded to 15 seconds and 256 KiB: source search, issue read/write and document read/write. Generic provider invocation remains denied in the Fin lane. `readFinCaseStatus` permits only the saved issue's read after association validation, with the same transport bounds. Connect token resolution retains the SDK exemption above.
+
+`receiveFinCaseStatus` shares a 50-second abort signal across native identity/source and takeover checks and the status provider read. Database operations retain their own bounds and Connect authorization cannot be cancelled; this is not a strict whole-request wall-clock guarantee. No background polling, replacement investigation or callback is started.

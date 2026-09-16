@@ -1,81 +1,33 @@
 import { defineDynamic, defineTool } from "eve/tools";
-import { z } from "zod";
-import { createFinInvestigationTicket } from "#lib/executor/dispatch.js";
+import { fileFinInvestigationCase } from "#lib/executor/dispatch.js";
+import { finCaseDecision, finCaseOutcome } from "#lib/fin-case.js";
 import { isFinInvestigation } from "#lib/fin-investigation-auth.js";
-import { providerData } from "#lib/support/conversation.js";
-
-const issueUrl =
-  /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:\/[^\s?#]*)?(?:[?#][^\s]*)?$/u;
-const issueIdentifier = /^ENG-\d+$/u;
-const writtenIssue = z
-  .object({
-    id: z.string().regex(issueIdentifier),
-    url: z.string().regex(issueUrl),
-  })
-  .transform((issue, ctx) => {
-    if (issueUrl.exec(issue.url)?.[1] !== issue.id) {
-      ctx.addIssue({ code: "custom", message: "Issue URL does not match." });
-      return z.NEVER;
-    }
-    return { identifier: issue.id, url: issue.url };
-  });
-
-export const confirmedFinIssue = (data: unknown) =>
-  writtenIssue.parse(providerData(data));
-
-export const formatFinCustomerReport = (summary: string) => {
-  const longestRun = Math.max(
-    0,
-    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
-  );
-  const fence = "`".repeat(Math.max(3, longestRun + 1));
-  return `## Customer report\n\n${fence}text\n${summary}\n${fence}`;
-};
 
 const tool = defineTool({
   description:
-    "File one bounded internal Linear ticket for this verified customer investigation. The team, assignee, conversation and workspace scope are taken from the immutable session, never from this input. Use only when a ticket is warranted; all other Linear operations remain unavailable.",
+    "Record the final ticket decision for this investigation. Use not-needed for an answered question with no follow-up. Use file for a warranted, evidence-backed report, with symptoms, findings, uncertainty and next step in summary and a short customer-safe subject in customerSummary. Choose the established product project and area owner; Support goes to Aaron Fraga. A suspected issue is Not settled, never a verified Bug. The server verifies source, routing and documentation and reconciles uncertain writes. Repeated calls reuse the saved decision and never create a replacement ticket.",
   async execute(input, ctx) {
     if (!isFinInvestigation(ctx.session.auth.initiator)) {
       return {
-        error:
-          "This operation is available only to a verified Fin investigation.",
+        message: "This operation requires a verified investigation.",
+        outcome: "failed" as const,
       };
     }
     try {
-      const result = await createFinInvestigationTicket(ctx, {
-        report: formatFinCustomerReport(input.summary),
-        title: input.title,
-      });
-      if (!result.ok) {
-        return { error: "Linear did not accept the ticket." };
-      }
-      try {
-        return confirmedFinIssue(result.data);
-      } catch {
-        return {
-          error:
-            "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
-        };
-      }
+      return await fileFinInvestigationCase(ctx, input);
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
       }
       return {
-        error:
-          "The ticket outcome could not be confirmed. Do not retry automatically.",
+        message:
+          "The ticket outcome could not be confirmed. Do not create a replacement.",
+        outcome: "failed" as const,
       };
     }
   },
-  inputSchema: z.strictObject({
-    summary: z.string().trim().min(1).max(4000),
-    title: z.string().trim().min(1).max(160),
-  }),
-  outputSchema: z.union([
-    z.object({ identifier: z.string(), url: z.string() }),
-    z.object({ error: z.string() }),
-  ]),
+  inputSchema: finCaseDecision,
+  outputSchema: finCaseOutcome,
 });
 
 export default defineDynamic({

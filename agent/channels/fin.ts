@@ -1,4 +1,5 @@
 import { defineChannel, POST } from "eve/channels";
+import { receiveFinCaseStatus } from "../lib/fin-case-route.js";
 import { receiveFinContext } from "../lib/fin-context-route.js";
 import { receiveFinInvestigation } from "../lib/fin-investigation.js";
 import {
@@ -44,6 +45,7 @@ export default defineChannel({
     },
   },
   routes: [
+    POST("/internal/fin/case", (request) => receiveFinCaseStatus(request)),
     POST("/internal/fin/context", (request) => receiveFinContext(request)),
     POST("/internal/fin/investigation", receiveFinInvestigation),
   ],

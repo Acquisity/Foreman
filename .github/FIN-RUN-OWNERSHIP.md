@@ -22,7 +22,7 @@ The check covers Foreman's delivery boundary. Intercom owns the later Fin messag
 
 ## ENG-13769 interface
 
-The saved bounded final report survives repeated retrieval and retains any confirmed ticket outcome already present in that report. Existing bounded ticket filing remains unchanged. This slice does not implement durable case/ticket association, uncertain ticket-write reconciliation, existing-case matching, or fresh-chat ticket status. Those remain ENG-13769. A later authenticated case lookup needs its own authorization; it must never loosen an expired or cross-conversation run reference. The current tool does not expose all four structured ticket outcomes, so this slice does not claim that interface is complete.
+The saved bounded final report now includes the verified structured ticket outcome from the run's durable case association. ENG-13769 adds separately authenticated current-status reads without extending run references, starting work or changing saved results. Apply `0008_fin_cases.sql` as well as the run migration. See [FIN-CASES.md](./FIN-CASES.md) for source matching, uncertain-write reconciliation and the independent status connector.
 
 ## Verification
 
@@ -34,7 +34,7 @@ Late result disclosure runs fresh identity/access verification and native delive
 
 The Fin request key uses the conversation ID, creation time, and sorted native customer-message IDs. Provider metadata, expiring attachment URLs, bot replies and repeated model wording cannot create a new request. Editing an existing message is not a new start; a new native customer message is. This changes the fingerprint format only for this unreleased, disabled Preview slice; do not enable ingress over old test rows without draining and inspecting them first. Support's existing revision/fingerprint behavior is unchanged.
 
-For a stuck run, locate its row by the UUID in `fin.investigation.recovery.required`, or inspect the isolated database for `completed_at IS NULL`. Check the exact persisted Eve session and its terminal history. A valid unexpired reference can recover the saved session's outcome through `action=result`. If the session ID is missing, establish dispatch provenance from the exact run channel before any manual repair; do not infer that a timeout means nothing started. If dispatch cannot be reconciled, keep the slot blocked and escalate. This PR intentionally adds no automatic lease release, replacement investigation, or uncertain ticket-write reconciliation. The latter remains ENG-13769.
+For a stuck run, locate its row by the UUID in `fin.investigation.recovery.required`, or inspect the isolated database for `completed_at IS NULL`. Check the exact persisted Eve session and its terminal history. A valid unexpired reference can recover the saved session's outcome through `action=result`. If the session ID is missing, establish dispatch provenance from the exact run channel before any manual repair; do not infer that a timeout means nothing started. If dispatch cannot be reconciled, keep the slot blocked and escalate. There is no automatic lease release or replacement investigation. Case write reconciliation is described in [FIN-CASES.md](./FIN-CASES.md).
 
 The review suggestion to replay only the event-stream tail was not adopted: no measured slow replay established the need, and omitting preceding answer events can break reconstruction. Completion retains its replay read because an immutable already-completed row is not updated and still must return its original outcome.
 

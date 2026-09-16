@@ -3,6 +3,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { neonConfig } from "@neondatabase/serverless";
 import pg from "pg";
+import {
+  bindFinCase,
+  claimFinCase,
+  findFinCases,
+  finishFinCase,
+  reserveFinCaseCreation,
+  reserveFinCaseDocument,
+} from "../agent/lib/fin-case-store.js";
 import { verifiedFinContext as scope } from "../agent/lib/fin-investigation.fixture.js";
 import {
   assertFinRunOwner,
@@ -61,6 +69,12 @@ try {
       "utf8"
     )
   );
+  await pool.query(
+    await readFile(
+      new URL("../migrations/0008_fin_cases.sql", import.meta.url),
+      "utf8"
+    )
+  );
   const starts = await Promise.all(
     Array.from({ length: 12 }, () =>
       claimFinRun(
@@ -82,6 +96,52 @@ try {
   assert.equal(second.fresh, true);
   assert.notEqual(first.id, second.run.id);
   await attachFinRun(first.id, "session-1", null);
+  const decision = {
+    action: "file" as const,
+    assignee: "Aaron Fraga" as const,
+    classification: "Not settled" as const,
+    customerSummary: "Test report",
+    priority: 4,
+    project: "Support",
+    summary: "Synthetic evidence",
+    title: "Test only",
+  };
+  const cases = await Promise.all(
+    Array.from({ length: 12 }, () => claimFinCase(scope, "session-1", decision))
+  );
+  assert.equal(cases.filter((entry) => entry.fresh).length, 1);
+  assert.equal(
+    (
+      await Promise.all(cases.map(() => reserveFinCaseCreation(first.id)))
+    ).filter(Boolean).length,
+    1
+  );
+  assert.equal(
+    (
+      await Promise.all(cases.map(() => reserveFinCaseDocument(first.id)))
+    ).filter(Boolean).length,
+    1
+  );
+  await bindFinCase(first.id, "ENG-12345", true);
+  const ticket = {
+    identifier: "ENG-12345",
+    message: "Test ticket confirmed.",
+    outcome: "newly-created" as const,
+  };
+  await finishFinCase(first.id, ticket);
+  assert.equal(
+    (await findFinCases({ ...scope, conversationId: "123" })).length,
+    1
+  );
+  assert.equal(
+    (
+      await findFinCases({
+        ...scope,
+        userId: "33333333-3333-4333-8333-333333333333",
+      })
+    ).length,
+    0
+  );
   await assert.rejects(attachFinRun(first.id, "another-session", null));
   const duplicate = await claimFinRun(
     scope,
@@ -93,6 +153,7 @@ try {
   const outcome = {
     message: "Confirmed ticket ENG-12345; still open.",
     status: "completed" as const,
+    ticket,
   };
   await completeFinRun(
     second.run.id,

@@ -62,7 +62,7 @@ const finRunResponse = (run: FinRun, humanReplied: boolean) =>
       : { run_handle: run.id, ...(run.outcome ?? pending) }
   );
 
-const readRequestBody = async (request: Request) => {
+export const readRequestBody = async (request: Request) => {
   if (!request.body) {
     return "";
   }

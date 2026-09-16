@@ -12,3 +12,5 @@ dist
 *-oauth-client*.json
 .context/
 .planning/
+
+.vercel

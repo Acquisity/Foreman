@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { finCaseOutcome } from "./fin-case.js";
 import type { FinInvestigationOutcome } from "./fin-investigation-callback.js";
 import type { FinInvestigationSlackReceipt } from "./fin-investigation-slack.js";
 import { type FinContext, finContextSchema } from "./fin-scope.js";
@@ -15,7 +16,11 @@ const runSchema = z.object({
   created_at: z.coerce.date(),
   id: z.uuid(),
   outcome: z
-    .object({ message: z.string(), status: z.enum(["completed", "failed"]) })
+    .object({
+      message: z.string(),
+      status: z.enum(["completed", "failed"]),
+      ticket: finCaseOutcome.optional(),
+    })
     .nullable(),
   scope: finContextSchema,
   session_id: z.string().nullable(),
@@ -121,7 +126,9 @@ export async function completeFinRun(
   sessionId: string
 ) {
   await privateDatabase().query(
-    `UPDATE fin_investigation_runs SET outcome = $2::jsonb, completed_at = now(),
+    `UPDATE fin_investigation_runs SET outcome = $2::jsonb || jsonb_build_object('ticket',
+       COALESCE((SELECT outcome FROM fin_cases WHERE id = $1),
+       '{"outcome":"failed","message":"No verified ticket decision is available. Do not claim a ticket was created."}'::jsonb)), completed_at = now(),
        session_id = COALESCE(session_id, $3)
      WHERE id = $1 AND completed_at IS NULL AND (session_id IS NULL OR session_id = $3)`,
     [id, JSON.stringify(outcome), sessionId]

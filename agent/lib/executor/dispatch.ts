@@ -1,6 +1,13 @@
 import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
-import { z } from "zod";
+import type { z } from "zod";
+import { finCaseDecision } from "../fin-case.js";
+import {
+  type FinLinearCall,
+  fileFinCase,
+  readFinCaseIssue,
+} from "../fin-case-filing.js";
+import { findFinCases } from "../fin-case-store.js";
 import {
   buildFinEvidenceQuery,
   type FinEvidenceInput,
@@ -10,6 +17,7 @@ import {
   isFinInvestigation,
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
+import type { FinContext } from "../fin-scope.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { logOpsEvent } from "../ops-log.js";
 import { supportOperationPolicy } from "../support/policy.js";
@@ -24,14 +32,6 @@ export type ExecutorOutcome = Awaited<
 >;
 
 const FIN_INTERCOM_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
-const FIN_LINEAR_MAX_BYTES = 64 * 1024;
-const finLinearTicketInput = z.strictObject({
-  assignee: z.literal("Aaron Fraga"),
-  description: z.string().min(1).max(16_000),
-  team: z.literal("Engineering Team"),
-  title: z.string().min(1).max(160),
-});
 
 /** Intake has no Eve session. Only these fixed identity reads are available. */
 export async function readFinIntercom(
@@ -79,26 +79,8 @@ async function connection(
   };
 }
 
-const verifiedScopeBlock = (
-  scope: ReturnType<typeof requireFinInvestigationContext>
-) =>
-  `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`;
-
-function assertLaneOperation(
-  ctx: ProviderContext,
-  path: string,
-  input: Record<string, unknown>
-) {
-  if (!isFinInvestigation(ctx.session?.auth.initiator)) {
-    return;
-  }
-  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  const parsed = finLinearTicketInput.safeParse(input);
-  if (
-    path !== FIN_LINEAR_TICKET_PATH ||
-    !parsed.success ||
-    !parsed.data.description.endsWith(verifiedScopeBlock(scope))
-  ) {
+function assertLaneOperation(ctx: ProviderContext) {
+  if (isFinInvestigation(ctx.session?.auth.initiator)) {
     throw new ExecutorError("customer_scope_required", 403, {
       dispatched: false,
     });
@@ -113,7 +95,7 @@ export async function invokeProvider(
   operationKey?: string,
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
-  assertLaneOperation(ctx, path, input);
+  assertLaneOperation(ctx);
   const policy = supportOperationPolicy(ctx);
   policy?.assert(path, input);
   const { wire, authorization } = await connection(ctx, policy);
@@ -173,24 +155,69 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
   return executorTransport.describe(wire, path);
 }
 
-/** The one customer-lane provider write. Its target and scope come only from the session initiator. */
-export async function createFinInvestigationTicket(
+/** Authored case workflow owns every operation and identifier. Generic customer dispatch stays denied. */
+export function fileFinInvestigationCase(
   ctx: ProviderContext,
-  input: { report: string; title: string }
-): Promise<ExecutorOutcome> {
+  input: z.infer<typeof finCaseDecision>
+) {
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  return await invokeProvider(
-    ctx,
-    FIN_LINEAR_TICKET_PATH,
-    {
-      assignee: "Aaron Fraga",
-      description: `${input.report}\n\n${verifiedScopeBlock(scope)}`,
-      team: "Engineering Team",
-      title: input.title,
-    },
-    undefined,
-    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+  if (!ctx.session?.id) {
+    throw new Error("Investigation session missing.");
+  }
+  const call: FinLinearCall = async (operation, args) => {
+    const { wire } = await connection(ctx, null);
+    const result = await executorTransport.call(
+      wire,
+      `linear.org.workspaceLinear.${operation}`,
+      args,
+      { maxBytes: 256 * 1024, timeoutMs: 15_000 }
+    );
+    if (!result.ok) {
+      throw new Error("Case provider unavailable.");
+    }
+    return result.data;
+  };
+  return fileFinCase(
+    scope,
+    ctx.session.id,
+    finCaseDecision.parse(input),
+    call,
+    ctx.abortSignal
   );
+}
+
+/** Intake can read only an association already selected inside the verified owner boundary. */
+export async function readFinCaseStatus(
+  scope: FinContext,
+  caseId: string,
+  signal: AbortSignal
+) {
+  const [record] = await findFinCases(scope, caseId);
+  if (!record?.issue_id) {
+    throw new Error("Case unavailable.");
+  }
+  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
+  if (!connector) {
+    throw new Error("Case provider unavailable.");
+  }
+  const token = await getConnectToken(connector, { subject: { type: "app" } });
+  const call: FinLinearCall = async (operation, input) => {
+    if (operation !== "get_issue" || input.id !== record.issue_id) {
+      throw new Error("Case read denied.");
+    }
+    const result = await executorTransport.call(
+      { signal, token },
+      `linear.org.workspaceLinear.${operation}`,
+      input,
+      { maxBytes: 256 * 1024, timeoutMs: 15_000 }
+    );
+    if (!result.ok) {
+      throw new Error("Case provider unavailable.");
+    }
+    return result.data;
+  };
+  const issue = await readFinCaseIssue(call, record.issue_id, record.scope);
+  return { state: issue.statusType };
 }
 
 /** Customer reads accept purposes and local IDs, never a provider path or SQL. */

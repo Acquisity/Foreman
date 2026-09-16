@@ -30,15 +30,33 @@ export async function finishFinRun(
   }
 ) {
   // Internal reporting is independent of customer authorization and callback failure.
+  const completed = runId
+    ? operations.complete(runId, outcome, sessionId).catch(() => null)
+    : Promise.resolve(null);
   await Promise.all([
-    operations.slack(slack, outcome),
+    completed.then((run) => {
+      const saved = run?.outcome ?? outcome;
+      const { ticket } = saved;
+      return operations.slack(
+        slack,
+        ticket
+          ? {
+              ...saved,
+              message: `${saved.message}\n\nTicket: ${ticket.outcome}. ${ticket.message}${ticket.identifier ? ` (${ticket.identifier})` : ""}`,
+            }
+          : saved
+      );
+    }),
     (async () => {
       if (!runId) {
         return;
       }
       try {
         // Bind the emitting session and save its outcome in one fenced write.
-        const run = await operations.complete(runId, outcome, sessionId);
+        const run = await completed;
+        if (!run) {
+          throw new Error("Run completion unavailable.");
+        }
         if ((await operations.inspect(run.scope)).humanReplied) {
           return;
         }
