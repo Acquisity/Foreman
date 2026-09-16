@@ -50,11 +50,28 @@ export const finInvestigationMiddleware: LanguageModelMiddleware = {
     const tools = params.tools?.filter(
       (tool) => typeof tool.name === "string" && ALLOWED_TOOLS.has(tool.name)
     );
-    const toolChoice =
+    // A decision can record not-needed or failed without creating an issue.
+    // Require tool use until that decision has returned, rather than trusting
+    // a prose instruction that the model can skip when it answers directly.
+    const needsDecision =
+      tools?.some((tool) => tool.name === "file_fin_investigation_ticket") &&
+      !params.prompt.some(
+        (message) =>
+          message.role === "tool" &&
+          message.content.some(
+            (part) =>
+              part.type === "tool-result" &&
+              part.toolName === "file_fin_investigation_ticket"
+          )
+      );
+    const allowedChoice =
       requestedToolChoice?.type === "tool" &&
       !ALLOWED_TOOLS.has(requestedToolChoice.toolName)
         ? { type: "auto" as const }
         : requestedToolChoice;
+    const toolChoice = needsDecision
+      ? { type: "required" as const }
+      : allowedChoice;
     return Promise.resolve({ ...params, toolChoice, tools });
   },
   async wrapGenerate({ doGenerate }) {

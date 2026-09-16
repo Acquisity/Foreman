@@ -71,7 +71,67 @@ describe("Fin customer investigation model boundary", () => {
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
       ["read_fin_outreach_evidence", "file_fin_investigation_ticket"]
     );
-    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "auto" });
+    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "required" });
+  });
+
+  it("requires a decision after evidence and permits an answer after any returned ticket outcome", async () => {
+    const base = new MockLanguageModelV4({
+      doGenerate: result("file_fin_investigation_ticket"),
+    });
+    const model = wrapLanguageModel({
+      middleware: finInvestigationMiddleware,
+      model: base,
+    });
+    const tools = [
+      {
+        inputSchema: { type: "object" },
+        name: "file_fin_investigation_ticket",
+        type: "function" as const,
+      },
+    ];
+    await model.doGenerate({
+      prompt: [
+        {
+          content: [
+            {
+              output: { type: "json", value: { outcome: "not-needed" } },
+              toolCallId: "evidence",
+              toolName: "read_fin_outreach_evidence",
+              type: "tool-result",
+            },
+          ],
+          role: "tool",
+        },
+      ],
+      tools,
+    });
+    assert.deepEqual(base.doGenerateCalls[0]?.toolChoice, { type: "required" });
+    await Promise.all(
+      ["not-needed", "newly-created", "already-tracked", "failed"].map(
+        (outcome) =>
+          model.doGenerate({
+            prompt: [
+              {
+                content: [
+                  {
+                    output: { type: "json", value: { outcome } },
+                    toolCallId: "decision",
+                    toolName: "file_fin_investigation_ticket",
+                    type: "tool-result",
+                  },
+                ],
+                role: "tool",
+              },
+            ],
+            toolChoice: { type: "auto" },
+            tools,
+          })
+      )
+    );
+    assert.deepEqual(
+      base.doGenerateCalls.slice(1).map((call) => call.toolChoice),
+      Array.from({ length: 4 }, () => ({ type: "auto" }))
+    );
   });
 
   for (const name of [
