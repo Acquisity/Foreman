@@ -19,19 +19,16 @@ export function executorOrigin(): string {
 
 export const FOREMAN_TOOLKIT_SLUG = "foreman";
 export const SUPPORT_TOOLKIT = "foreman-support";
-export const WIDGET_TOOLKIT = "foreman-widget";
+// The in-app support widget lane reuses the deployed support read toolkit; its
+// own curated read allowlist (WIDGET_PATHS) still narrows what it may call.
+export const WIDGET_TOOLKIT = SUPPORT_TOOLKIT;
 export type ExecutorToolkit =
   | typeof FOREMAN_TOOLKIT_SLUG
-  | typeof SUPPORT_TOOLKIT
-  | typeof WIDGET_TOOLKIT;
+  | typeof SUPPORT_TOOLKIT;
 export const toolkitUrl = (
   slug: ExecutorToolkit = FOREMAN_TOOLKIT_SLUG
 ): string => {
-  if (
-    slug !== FOREMAN_TOOLKIT_SLUG &&
-    slug !== SUPPORT_TOOLKIT &&
-    slug !== WIDGET_TOOLKIT
-  ) {
+  if (slug !== FOREMAN_TOOLKIT_SLUG && slug !== SUPPORT_TOOLKIT) {
     throw new Error("Unknown Foreman toolkit.");
   }
   return `${executorOrigin()}/mcp/toolkits/${slug}?artifacts=false`;
