@@ -37,7 +37,7 @@ const mockFindHelpArticles = async (
 
 describe("widget_help_article tool", () => {
   it("tool is exposed only for widget support auth", async () => {
-    const toolModule = await import("./widget_help_article.js");
+    const toolModule = await import("../tools/widget_help_article.js");
     const dynamic = toolModule.default;
 
     // Widget auth context

@@ -13,7 +13,7 @@ import definition, {
   readWidgetOutreachHealth,
   widgetOutreachHealthInput,
   widgetOutreachHealthOutput,
-} from "./widget_outreach_health.js";
+} from "../tools/widget_outreach_health.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;

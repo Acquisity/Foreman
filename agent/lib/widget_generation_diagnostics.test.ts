@@ -15,7 +15,7 @@ import definition, {
   toSignals,
   widgetGenerationDiagnosticsInput,
   widgetGenerationDiagnosticsOutput,
-} from "./widget_generation_diagnostics.js";
+} from "../tools/widget_generation_diagnostics.js";
 
 const scope = verifiedWidgetContext;
 const foreignOrg = "99999999-9999-4999-8999-999999999999";

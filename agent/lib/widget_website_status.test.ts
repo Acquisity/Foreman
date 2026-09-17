@@ -6,7 +6,7 @@ import definition, {
   buildWidgetWebsiteStatusQuery,
   parseWidgetWebsiteStatus,
   readWidgetWebsiteStatus,
-} from "./widget_website_status.js";
+} from "../tools/widget_website_status.js";
 
 const CANCELLED_RE = /cancelled/;
 

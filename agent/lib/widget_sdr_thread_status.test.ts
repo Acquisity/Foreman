@@ -13,7 +13,7 @@ import definition, {
   readWidgetSdrThreadStatus,
   widgetSdrInput,
   widgetSdrOutput,
-} from "./widget_sdr_thread_status.js";
+} from "../tools/widget_sdr_thread_status.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;

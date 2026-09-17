@@ -8,7 +8,7 @@ import definition, {
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
   widgetBillingSummaryOutputSchema,
-} from "./widget_billing_summary.js";
+} from "../tools/widget_billing_summary.js";
 
 const widgetCtx = {
   session: {

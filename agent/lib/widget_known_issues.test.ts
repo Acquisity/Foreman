@@ -80,7 +80,7 @@ async function searchKnownIssuesForTest(query: string) {
 
 describe("widget_known_issues tool", () => {
   it("is exposed only for widget support auth", async () => {
-    const toolModule = await import("./widget_known_issues.js");
+    const toolModule = await import("../tools/widget_known_issues.js");
     const dynamic = toolModule.default;
 
     const widgetCtx = {

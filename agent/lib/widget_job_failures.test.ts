@@ -11,7 +11,7 @@ import definition, {
   buildQuery,
   readWidgetJobFailures,
   widgetJobFailuresInput,
-} from "./widget_job_failures.js";
+} from "../tools/widget_job_failures.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;

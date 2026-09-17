@@ -13,7 +13,7 @@ import definition, {
   readWidgetLeadPipelineStatus,
   widgetLeadPipelineInput,
   widgetLeadPipelineOutput,
-} from "./widget_lead_pipeline_status.js";
+} from "../tools/widget_lead_pipeline_status.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;

@@ -12,7 +12,7 @@ import definition, {
   readWidgetInboxHealth,
   widgetInboxHealthInput,
   widgetInboxHealthOutput,
-} from "./widget_inbox_health.js";
+} from "../tools/widget_inbox_health.js";
 
 const scope = verifiedWidgetContext;
 const DB_PATH =

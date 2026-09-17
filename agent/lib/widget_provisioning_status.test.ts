@@ -13,7 +13,7 @@ import definition, {
   readWidgetProvisioningStatus,
   widgetProvisioningInput,
   widgetProvisioningOutput,
-} from "./widget_provisioning_status.js";
+} from "../tools/widget_provisioning_status.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;

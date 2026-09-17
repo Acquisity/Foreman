@@ -14,7 +14,7 @@ import definition, {
   readWidgetAccountAccess,
   widgetAccountAccessInput,
   widgetAccountAccessOutput,
-} from "./widget_account_access.js";
+} from "../tools/widget_account_access.js";
 
 const scope = verifiedWidgetContext;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
