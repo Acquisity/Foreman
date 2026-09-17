@@ -2,7 +2,7 @@ import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
-import { type WidgetFindings, parseFindings } from "./widget-findings.js";
+import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 /**
@@ -14,27 +14,27 @@ import type { WidgetContext } from "./widget-scope.js";
  */
 const extractionSchema = z.object({
   confidence: z.enum(["low", "medium", "high"]).optional(),
-  needsHuman: z.boolean().optional(),
-  recommendation: z.string().optional(),
-  report: z.string().optional(),
-  needsWrite: z.string().optional(),
-  ticketId: z.string().optional(),
-  ticketUrl: z.string().optional(),
   facts: z
     .array(
       z.object({
         claim: z.string(),
-        evidenceTool: z.string().optional(),
-        evidenceRef: z.string().optional(),
         entityIds: z.array(z.string()).optional(),
+        evidenceRef: z.string().optional(),
+        evidenceTool: z.string().optional(),
       })
     )
     .optional(),
+  needsHuman: z.boolean().optional(),
+  needsWrite: z.string().optional(),
+  recommendation: z.string().optional(),
+  report: z.string().optional(),
+  ticketId: z.string().optional(),
+  ticketUrl: z.string().optional(),
 });
 type LenientFindings = z.infer<typeof extractionSchema>;
 type LenientFinding = NonNullable<LenientFindings["facts"]>[number];
 
-const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true when the investigator said a person should take over or could not verify), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator filed an ENG-#### ticket, and report (the investigator's plain-English summary for a teammate). Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If there were no usable findings, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
+const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true only when the investigator concluded it cannot give a useful answer and a person must take over, e.g. wrong workspace or no usable findings; do NOT set it merely because one detail could not be verified while the main question was still answered), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator filed an ENG-#### ticket, and report (the investigator's plain-English summary for a teammate). Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If there were no usable findings, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
 
 const str = (v: unknown, max: number): string =>
   typeof v === "string" ? v.slice(0, max) : "";
@@ -92,7 +92,9 @@ function normalize(
     needsHuman,
     recommendation,
     report,
-    ...(str(raw.needsWrite, 2000) ? { needsWrite: str(raw.needsWrite, 2000) } : {}),
+    ...(str(raw.needsWrite, 2000)
+      ? { needsWrite: str(raw.needsWrite, 2000) }
+      : {}),
     ...(typeof raw.ticketId === "string" &&
     /^ENG-\d+$/.test(raw.ticketId) &&
     typeof raw.ticketUrl === "string"
@@ -115,12 +117,12 @@ export const defaultExtractDeps: ExtractDeps = {
   async generate({ investigatorText, question, scope }) {
     const { object } = await generateObject({
       model: gateway(await resolveModel("gate")),
-      schema: extractionSchema,
       prompt: JSON.stringify({
         findings: investigatorText,
         question,
         workspace: scope.organizationName,
       }),
+      schema: extractionSchema,
       system: EXTRACT_PROMPT,
     });
     return object;
@@ -156,7 +158,8 @@ export async function extractWidgetFindings(
       "widget.extract.generate_failed",
       {
         conversationId: input.scope.conversationId,
-        message: error instanceof Error ? error.message.slice(0, 300) : "unknown",
+        message:
+          error instanceof Error ? error.message.slice(0, 300) : "unknown",
         outcome: "error",
       },
       console.warn
