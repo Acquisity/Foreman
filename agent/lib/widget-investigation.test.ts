@@ -8,6 +8,7 @@ import type { WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
   receiveWidgetMessage,
+  WIDGET_DEADLINE_MS,
   type WidgetDependencies,
   waitForWidgetInvestigation,
 } from "./widget-investigation.js";
@@ -26,7 +27,8 @@ const findings: WidgetFindings = {
   ],
   needsHuman: false,
   recommendation: "Reconnect the inbox.",
-  report: "The sending inbox is disconnected. Have the customer reconnect it and the campaign resumes.",
+  report:
+    "The sending inbox is disconnected. Have the customer reconnect it and the campaign resumes.",
 };
 const allowed: GateResult = {
   decision: "allow",
@@ -446,7 +448,11 @@ test("stream observation starts at the turn's index, resets on a new turn, and r
     ]),
     7
   );
-  assert.deepEqual(outcome, { findings: null, status: "completed" });
+  assert.deepEqual(outcome, {
+    findings: null,
+    status: "completed",
+    text: null,
+  });
   assert.deepEqual(indexes, [7]);
   const open = {
     getEventStream: () => Promise.resolve(new ReadableStream<StreamEvent>()),
@@ -454,4 +460,62 @@ test("stream observation starts at the turn's index, resets on a new turn, and r
   assert.deepEqual(await waitForWidgetInvestigation(open, 0, 5), {
     status: "pending",
   });
+});
+
+test("a finish that narrated instead of returning findings hands a note to a human", async (t) => {
+  enabled(t);
+  const { deps, gated } = dependencies();
+  const prose =
+    "Your sending inbox looks disconnected, so nothing is going out right now.";
+  const proseSession = session([
+    event("message.completed", { finishReason: "stop", message: prose }),
+    event("session.completed"),
+  ]);
+  const response = await receiveWidgetMessage(
+    request(start),
+    {
+      from: () =>
+        ({
+          send: () => Promise.resolve(proseSession),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    200,
+    verify,
+    deps
+  );
+  const body = await response.json();
+  assert.equal(body.decision, "block");
+  assert.equal(body.message, null);
+  assert.equal(body.status, "completed");
+  assert.equal(body.findings.needsHuman, true);
+  assert.equal(body.findings.report, prose);
+  assert.equal(gated.length, 0);
+});
+
+test("an overdue run with no answer is force-finished for a human, not left hanging", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  run.session_id = "widget-session-old";
+  run.created_at = new Date(Date.now() - WIDGET_DEADLINE_MS - 1000);
+  const result = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      attachSession: () => session([], "widget-session-old"),
+      ...noWork(),
+    },
+    5,
+    verify,
+    deps
+  );
+  const body = await result.json();
+  assert.equal(body.decision, "block");
+  assert.equal(body.status, "completed");
+  assert.equal(body.findings.needsHuman, true);
+  assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
 });

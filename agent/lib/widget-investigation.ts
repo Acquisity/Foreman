@@ -60,9 +60,24 @@ export const widgetAddress = (scope: {
 export type WaitOutcome =
   | { status: "pending" }
   | { status: "failed" }
-  | { findings: WidgetFindings | null; status: "completed" };
+  | {
+      findings: WidgetFindings | null;
+      status: "completed";
+      text: string | null;
+    };
 
-/** Task completion owns the answer; the structured result is the only findings channel. */
+const TEXT_MAX = 4000;
+const messageText = (data: unknown): string | null => {
+  const value = (data as { message?: unknown } | null | undefined)?.message;
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed ? trimmed.slice(0, TEXT_MAX) : null;
+};
+
+/**
+ * Task completion owns the answer. The structured result is the findings
+ * channel; the last assistant message is kept as a fallback so a finish that
+ * narrated instead of returning the schema still hands the teammate real prose.
+ */
 export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
   startIndex = 0,
@@ -74,6 +89,7 @@ export async function waitForWidgetInvestigation(
     timeoutMs
   );
   let findings: WidgetFindings | null = null;
+  let text: string | null = null;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -83,10 +99,13 @@ export async function waitForWidgetInvestigation(
       }
       if (event.type === "turn.started") {
         findings = null;
+        text = null;
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
+      } else if (event.type === "message.completed") {
+        text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return { findings, status: "completed" };
+        return { findings, status: "completed", text };
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -132,6 +151,41 @@ const blockedOutcome = (
   status: WidgetOutcome["status"]
 ): WidgetOutcome => ({ decision: "block", message: null, reason, status });
 
+/** A run with no answer after this long is force-finished so the customer never waits forever. */
+export const WIDGET_DEADLINE_MS = 90_000;
+const DEADLINE_FALLBACK =
+  "The investigation did not finish in time. Please review and reply.";
+
+/**
+ * A finish that produced no valid structured findings still hands the teammate
+ * a note and routes to a human, instead of an empty block or an endless wait.
+ * The prose is never composed to the customer; it only fills the CS inbox note.
+ */
+function humanHandoff(
+  text: string | null,
+  reason: string
+): { findings: WidgetFindings; result: WidgetOutcome } | null {
+  const body = (text?.trim() || DEADLINE_FALLBACK).slice(0, 4000);
+  const findings = parseFindings({
+    confidence: "low",
+    facts: [],
+    needsHuman: true,
+    recommendation: body,
+    report: body.slice(0, 1000),
+  });
+  return findings
+    ? {
+        findings,
+        result: {
+          decision: "block",
+          message: null,
+          reason,
+          status: "completed",
+        },
+      }
+    : null;
+}
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<WidgetRun, "id" | "question" | "scope">,
@@ -156,7 +210,14 @@ export async function finishWidgetRun(
       status: "completed",
     };
   } else {
-    result = blockedOutcome("invalid_findings", "completed");
+    const handoff = outcome.text
+      ? humanHandoff(outcome.text, "no_structured_findings")
+      : null;
+    if (handoff) {
+      ({ findings, result } = handoff);
+    } else {
+      result = blockedOutcome("invalid_findings", "completed");
+    }
   }
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -170,6 +231,41 @@ const requestKey = (input: Extract<WidgetInput, { action: "start" }>) =>
   createHash("sha256")
     .update(JSON.stringify([input.conversation_id, input.question]))
     .digest("hex");
+
+/** Advance a still-open run: finish it if it settled, or force a human handoff once overdue. */
+async function settleResultRun(
+  run: WidgetRun,
+  sessionId: string,
+  attach: NonNullable<RouteHandlerArgs["attachSession"]>,
+  responseWaitMs: number,
+  deps: WidgetDependencies
+): Promise<WidgetRun> {
+  const outcome = await waitForWidgetInvestigation(
+    attach(sessionId),
+    run.stream_index,
+    responseWaitMs
+  );
+  const overdue = Date.now() - run.created_at.getTime() > WIDGET_DEADLINE_MS;
+  const handoff =
+    outcome.status === "pending" && overdue
+      ? humanHandoff(null, "deadline")
+      : null;
+  if (handoff) {
+    logGateDecision(
+      { conversationId: run.scope.conversationId, runId: run.id, sessionId },
+      handoff.result
+    );
+    return (
+      (await deps.complete(
+        run.id,
+        handoff.result,
+        handoff.findings,
+        sessionId
+      )) ?? run
+    );
+  }
+  return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
+}
 
 export async function receiveWidgetMessage(
   request: Request,
@@ -220,17 +316,13 @@ export async function receiveWidgetMessage(
       let run = await deps.read(input.run_id);
       assertWidgetRunOwner(run, scope);
       if (!run.outcome && run.session_id && attachSession) {
-        run =
-          (await finishWidgetRun(
-            run,
-            run.session_id,
-            await waitForWidgetInvestigation(
-              attachSession(run.session_id),
-              run.stream_index,
-              responseWaitMs
-            ),
-            deps
-          )) ?? run;
+        run = await settleResultRun(
+          run,
+          run.session_id,
+          attachSession,
+          responseWaitMs,
+          deps
+        );
       }
       return json(widgetRunResponse(run));
     }
