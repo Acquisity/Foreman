@@ -1,22 +1,26 @@
 import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 
-/** Read-only evidence for the in-app support lane. No web, browser, sandbox, repo, memory, delegation, or writes. */
+/**
+ * Read-only, org-scoped evidence for the in-app support lane: only the curated
+ * widget_* tools, each returning a structured, bounded, org-locked object.
+ * The raw exploratory tools (planetscale_execute_read_query, widget_provider,
+ * describe_table) are deliberately excluded so the model cannot write its own
+ * SQL or wander. No web, browser, sandbox, repo, memory, delegation, or writes.
+ */
 const ALLOWED_TOOLS = new Set([
-  "describe_table",
-  "find_function_runs",
-  "find_help_article",
-  "find_related_issues",
-  "list_instantly_subworkspaces",
-  "lookup_customer",
-  "planetscale_execute_read_query",
-  "read_ai_sdr_weekly_report",
-  "read_autumn_billing",
-  "read_billing_account",
-  "read_fin_outreach_evidence",
-  "read_instantly_subworkspace",
-  "read_stripe_billing",
-  "widget_provider",
+  "widget_account_access",
+  "widget_billing_summary",
+  "widget_generation_diagnostics",
+  "widget_help_article",
+  "widget_inbox_health",
+  "widget_job_failures",
+  "widget_known_issues",
+  "widget_lead_pipeline_status",
+  "widget_outreach_health",
+  "widget_provisioning_status",
+  "widget_sdr_thread_status",
+  "widget_website_status",
 ]);
 /** Past this many tool calls the model is told to stop gathering and answer. */
 const MAX_WIDGET_TOOL_CALLS = 14;

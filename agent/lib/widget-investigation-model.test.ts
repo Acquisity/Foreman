@@ -43,12 +43,12 @@ describe("widget support investigation model boundary", () => {
       tools: [
         {
           inputSchema: { type: "object" },
-          name: "widget_provider",
+          name: "widget_outreach_health",
           type: "function",
         },
         {
           inputSchema: { type: "object" },
-          name: "planetscale_execute_read_query",
+          name: "widget_billing_summary",
           type: "function",
         },
         {
@@ -66,7 +66,7 @@ describe("widget support investigation model boundary", () => {
     });
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["widget_provider", "planetscale_execute_read_query"]
+      ["widget_outreach_health", "widget_billing_summary"]
     );
     assert.equal(base.doGenerateCalls[0]?.toolChoice, undefined);
   });
@@ -110,7 +110,7 @@ describe("widget support investigation model boundary", () => {
 
   it("stops advertising tools once the tool-call budget is spent", async () => {
     const middleware = widgetInvestigationMiddleware();
-    const doGenerate = () => Promise.resolve(result("widget_provider"));
+    const doGenerate = () => Promise.resolve(result("widget_outreach_health"));
     for (let i = 0; i < 14; i += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: sequential budget accrual.
       await middleware.wrapGenerate?.({ doGenerate } as never);
@@ -121,7 +121,7 @@ describe("widget support investigation model boundary", () => {
         tools: [
           {
             inputSchema: { type: "object" },
-            name: "widget_provider",
+            name: "widget_outreach_health",
             type: "function",
           },
         ],
