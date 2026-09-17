@@ -34,8 +34,8 @@ export interface GateDeps {
   ) => Promise<OwnedIdentifiers>;
 }
 
-/** The composer never sees evidence references: those name internal tools and records. */
-export type ComposerInput = Omit<WidgetFindings, "facts"> & {
+/** The composer never sees evidence references or the CS report: those are internal-only. */
+export type ComposerInput = Omit<WidgetFindings, "facts" | "report"> & {
   facts: { claim: string }[];
 };
 

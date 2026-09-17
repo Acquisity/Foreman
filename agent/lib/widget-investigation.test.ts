@@ -26,6 +26,7 @@ const findings: WidgetFindings = {
   ],
   needsHuman: false,
   recommendation: "Reconnect the inbox.",
+  report: "The sending inbox is disconnected. Have the customer reconnect it and the campaign resumes.",
 };
 const allowed: GateResult = {
   decision: "allow",

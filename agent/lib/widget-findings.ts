@@ -19,6 +19,7 @@ export const findingsSchema = z.strictObject({
   needsHuman: z.boolean(),
   needsWrite: z.string().max(2000).optional(),
   recommendation: z.string().max(4000),
+  report: z.string().min(1).max(1000),
   ticket: z
     .strictObject({
       id: z.string().regex(/^ENG-\d+$/),

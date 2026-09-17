@@ -31,6 +31,7 @@ const findings = (overrides: Partial<WidgetFindings> = {}): WidgetFindings => ({
   needsHuman: false,
   recommendation:
     "Reconnect the inbox from the email accounts page, then resume the campaign.",
+  report: "The campaign paused because the sending inbox disconnected. Ask the customer to reconnect it, then resume the campaign.",
   ...overrides,
 });
 const question = "Why did my campaign stop sending?";

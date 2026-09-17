@@ -64,6 +64,7 @@ const leaks = (message: string) => {
     facts: [],
     needsHuman: false,
     recommendation: message,
+    report: "",
   });
   return [
     ...internal,
