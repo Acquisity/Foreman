@@ -1,13 +1,106 @@
 import { gateway, generateObject } from "ai";
+import { z } from "zod";
 import { resolveModel } from "./models.js";
-import {
-  findingsSchema,
-  parseFindings,
-  type WidgetFindings,
-} from "./widget-findings.js";
+import { logOpsEvent } from "./ops-log.js";
+import { type WidgetFindings, parseFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
-const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. Produce: facts (each a claim, the tool or record it cited in evidence, and any identifiers it named in entityIds), a recommendation, confidence (low, medium or high), needsHuman (true when the investigator said a person should take over or could not verify the answer), needsWrite when a change is required that could not be made, ticket only if the investigator filed one (an ENG-#### id and its url), and report (the investigator's plain-English summary for a teammate, at most 1000 characters). Copy faithfully from the investigator's text: never invent a fact, identifier, evidence reference, link or ticket the investigator did not state. If the investigator gave no usable findings, set needsHuman true, facts to an empty array, and put whatever they did say into recommendation and report.`;
+/**
+ * A deliberately lenient shape for the extraction model. The strict
+ * findingsSchema (nested strictObjects, every field required) is hard for a
+ * small model to satisfy through generateObject; asking for this loose shape
+ * and normalizing it ourselves is far more reliable. The gate re-validates
+ * everything downstream, so leniency here costs no safety.
+ */
+const extractionSchema = z.object({
+  confidence: z.enum(["low", "medium", "high"]).optional(),
+  needsHuman: z.boolean().optional(),
+  recommendation: z.string().optional(),
+  report: z.string().optional(),
+  needsWrite: z.string().optional(),
+  ticketId: z.string().optional(),
+  ticketUrl: z.string().optional(),
+  facts: z
+    .array(
+      z.object({
+        claim: z.string(),
+        evidenceTool: z.string().optional(),
+        evidenceRef: z.string().optional(),
+        entityIds: z.array(z.string()).optional(),
+      })
+    )
+    .optional(),
+});
+type LenientFindings = z.infer<typeof extractionSchema>;
+type LenientFinding = NonNullable<LenientFindings["facts"]>[number];
+
+const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true when the investigator said a person should take over or could not verify), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator filed an ENG-#### ticket, and report (the investigator's plain-English summary for a teammate). Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If there were no usable findings, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
+
+const str = (v: unknown, max: number): string =>
+  typeof v === "string" ? v.slice(0, max) : "";
+
+const strArr = (v: unknown, maxItems: number, maxLen: number): string[] =>
+  Array.isArray(v)
+    ? v
+        .filter((x): x is string => typeof x === "string" && x.length > 0)
+        .map((x) => x.slice(0, maxLen))
+        .slice(0, maxItems)
+    : [];
+
+/** Build the strict WidgetFindings from the lenient model output, filling required fields. */
+function normalize(
+  raw: LenientFindings,
+  question: string
+): WidgetFindings | null {
+  const facts = (Array.isArray(raw.facts) ? raw.facts : [])
+    .map((f: LenientFinding) => ({
+      claim: str(f.claim, 2000),
+      entityIds: strArr(f.entityIds, 50, 200),
+      evidence: {
+        ref: str(f.evidenceRef, 500),
+        tool: str(f.evidenceTool, 200) || "investigation",
+      },
+    }))
+    .filter((f) => f.claim.length > 0)
+    .slice(0, 50);
+
+  const modelRec = str(raw.recommendation, 4000);
+  const modelReport = str(raw.report, 1000);
+  // Nothing usable — let the caller hand the raw investigator prose to a human
+  // instead of a hollow default-filled note.
+  if (facts.length === 0 && !modelRec && !modelReport) {
+    return null;
+  }
+  const recommendation =
+    modelRec ||
+    modelReport ||
+    "The investigator did not record a recommendation.";
+  const report =
+    modelReport ||
+    str(raw.recommendation, 1000) ||
+    `No summary was produced for: ${question}`.slice(0, 1000);
+  const confidence =
+    raw.confidence === "medium" || raw.confidence === "high"
+      ? raw.confidence
+      : "low";
+  // No usable facts always means a human should look.
+  const needsHuman = raw.needsHuman === true || facts.length === 0;
+
+  const candidate: WidgetFindings = {
+    confidence,
+    facts,
+    needsHuman,
+    recommendation,
+    report,
+    ...(str(raw.needsWrite, 2000) ? { needsWrite: str(raw.needsWrite, 2000) } : {}),
+    ...(typeof raw.ticketId === "string" &&
+    /^ENG-\d+$/.test(raw.ticketId) &&
+    typeof raw.ticketUrl === "string"
+      ? { ticket: { id: raw.ticketId, url: raw.ticketUrl.slice(0, 500) } }
+      : {}),
+  };
+  return parseFindings(candidate);
+}
 
 export interface ExtractInput {
   investigatorText: string;
@@ -22,12 +115,12 @@ export const defaultExtractDeps: ExtractDeps = {
   async generate({ investigatorText, question, scope }) {
     const { object } = await generateObject({
       model: gateway(await resolveModel("gate")),
+      schema: extractionSchema,
       prompt: JSON.stringify({
         findings: investigatorText,
         question,
         workspace: scope.organizationName,
       }),
-      schema: findingsSchema,
       system: EXTRACT_PROMPT,
     });
     return object;
@@ -48,8 +141,26 @@ export async function extractWidgetFindings(
     return null;
   }
   try {
-    return parseFindings(await deps.generate(input));
-  } catch {
+    const raw = (await deps.generate(input)) as LenientFindings;
+    const findings = normalize(raw, input.question);
+    if (!findings) {
+      logOpsEvent(
+        "widget.extract.normalize_failed",
+        { conversationId: input.scope.conversationId, outcome: "error" },
+        console.warn
+      );
+    }
+    return findings;
+  } catch (error) {
+    logOpsEvent(
+      "widget.extract.generate_failed",
+      {
+        conversationId: input.scope.conversationId,
+        message: error instanceof Error ? error.message.slice(0, 300) : "unknown",
+        outcome: "error",
+      },
+      console.warn
+    );
     return null;
   }
 }
