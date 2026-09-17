@@ -5,11 +5,8 @@ import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import { gate as egressGate, logGateDecision } from "./widget-egress.js";
-import {
-  findingsJsonSchema,
-  parseFindings,
-  type WidgetFindings,
-} from "./widget-findings.js";
+import { extractWidgetFindings } from "./widget-extract.js";
+import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   assertWidgetRunOwner,
   attachWidgetRun,
@@ -122,6 +119,7 @@ export const defaultWidgetDependencies = {
   attach: attachWidgetRun,
   claim: claimWidgetRun,
   complete: completeWidgetRun,
+  extract: extractWidgetFindings,
   gate: egressGate,
   latestScope: latestWidgetScope,
   read: readWidgetRun,
@@ -151,8 +149,13 @@ const blockedOutcome = (
   status: WidgetOutcome["status"]
 ): WidgetOutcome => ({ decision: "block", message: null, reason, status });
 
-/** A run with no answer after this long is force-finished so the customer never waits forever. */
-export const WIDGET_DEADLINE_MS = 90_000;
+/**
+ * A run with no answer after this long is force-finished so the customer never waits forever.
+ * ponytail: temporarily raised to just under the Acquisity 4-min poll cap while the findings
+ * extractor is being tuned (don't cut real investigations off early). Tune back down (~90s)
+ * once extraction latency is understood. The session-failure / no-prose fallback is unaffected.
+ */
+export const WIDGET_DEADLINE_MS = 280_000;
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -191,7 +194,7 @@ export async function finishWidgetRun(
   run: Pick<WidgetRun, "id" | "question" | "scope">,
   sessionId: string,
   outcome: WaitOutcome,
-  deps: Pick<WidgetDependencies, "complete" | "gate">
+  deps: Pick<WidgetDependencies, "complete" | "extract" | "gate">
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
@@ -200,20 +203,33 @@ export async function finishWidgetRun(
   let findings: unknown = null;
   if (outcome.status === "failed") {
     result = blockedOutcome("session_failed", "failed");
-  } else if (outcome.findings) {
-    ({ findings } = outcome);
-    const gated = await deps.gate(run.scope, run.question, outcome.findings);
-    result = {
-      decision: gated.decision,
-      message: gated.message,
-      reason: gated.reason,
-      status: "completed",
-    };
   } else {
-    const handoff = outcome.text
-      ? humanHandoff(outcome.text, "no_structured_findings")
-      : null;
-    if (handoff) {
+    // The investigator writes prose; a separate pass structures it. Any leftover
+    // stream-carried findings still work, but the schema no longer fails the session.
+    const structured =
+      outcome.findings ??
+      (outcome.text
+        ? await deps.extract({
+            investigatorText: outcome.text,
+            question: run.question,
+            scope: run.scope,
+          })
+        : null);
+    const handoff = structured
+      ? null
+      : (outcome.text &&
+          humanHandoff(outcome.text, "no_structured_findings")) ||
+        null;
+    if (structured) {
+      findings = structured;
+      const gated = await deps.gate(run.scope, run.question, structured);
+      result = {
+        decision: gated.decision,
+        message: gated.message,
+        reason: gated.reason,
+        status: "completed",
+      };
+    } else if (handoff) {
       ({ findings, result } = handoff);
     } else {
       result = blockedOutcome("invalid_findings", "completed");
@@ -345,7 +361,6 @@ export async function receiveWidgetMessage(
     const session = await from(address).send(input.question, {
       auth: widgetAuth(scope),
       mode: "task",
-      outputSchema: findingsJsonSchema,
       state: { runId: run.id },
     });
     await deps.attach(run.id, session.id, startIndex);
@@ -396,6 +411,7 @@ export async function failWidgetRun(
         { status: "failed" },
         {
           complete: deps.complete,
+          extract: extractWidgetFindings,
           gate: egressGate,
         }
       );

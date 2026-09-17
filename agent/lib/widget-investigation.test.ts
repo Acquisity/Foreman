@@ -81,6 +81,7 @@ function dependencies(gateResult: GateResult = allowed) {
       run.completed_at = new Date();
       return Promise.resolve(run);
     },
+    extract: () => Promise.resolve(findings),
     gate: (_scope, _question, raw) => {
       gated.push(raw);
       return Promise.resolve(gateResult);
@@ -126,8 +127,17 @@ const session = (events: StreamEvent[], id = "widget-session-1") =>
       ),
     id,
   }) as unknown as Session;
-const completedSession = (result: unknown = findings) =>
-  session([event("result.completed", { result }), event("session.completed")]);
+const completedSession = (id = "widget-session-1") =>
+  session(
+    [
+      event("message.completed", {
+        finishReason: "stop",
+        message: "The inbox disconnected; reconnect it to resume sending.",
+      }),
+      event("session.completed"),
+    ],
+    id
+  );
 
 const verify = () => Promise.resolve(scope);
 const noWork = (): Pick<RouteHandlerArgs, "from" | "waitUntil"> => ({
@@ -272,7 +282,7 @@ test("a completed investigation is gated and answered with the composed reply on
   assert.equal(isUnattended(auth as never), true);
   assert.equal(auth.attributes.organizationId, scope.organizationId);
   assert.equal(sent.options.mode, "task");
-  assert.ok(sent.options.outputSchema);
+  assert.equal(sent.options.outputSchema, undefined);
   assert.deepEqual(gated, [findings]);
   assert.deepEqual(await response.json(), {
     decision: "allow",
@@ -391,7 +401,7 @@ test("a result read from another user or a duplicate start never starts work", a
   });
 });
 
-test("missing or invalid structured findings block instead of composing", async (t) => {
+test("a finish with no prose at all blocks with no findings", async (t) => {
   enabled(t);
   const { deps, gated } = dependencies();
   const response = await receiveWidgetMessage(
@@ -399,8 +409,7 @@ test("missing or invalid structured findings block instead of composing", async 
     {
       from: () =>
         ({
-          send: () =>
-            Promise.resolve(completedSession({ answer: "free text" })),
+          send: () => Promise.resolve(session([event("session.completed")])),
         }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
       waitUntil: () => undefined,
     },
@@ -462,9 +471,10 @@ test("stream observation starts at the turn's index, resets on a new turn, and r
   });
 });
 
-test("a finish that narrated instead of returning findings hands a note to a human", async (t) => {
+test("a finish the extractor cannot structure hands the prose to a human", async (t) => {
   enabled(t);
   const { deps, gated } = dependencies();
+  deps.extract = () => Promise.resolve(null);
   const prose =
     "Your sending inbox looks disconnected, so nothing is going out right now.";
   const proseSession = session([
