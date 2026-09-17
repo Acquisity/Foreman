@@ -31,7 +31,8 @@ const findings = (overrides: Partial<WidgetFindings> = {}): WidgetFindings => ({
   needsHuman: false,
   recommendation:
     "Reconnect the inbox from the email accounts page, then resume the campaign.",
-  report: "The campaign paused because the sending inbox disconnected. Ask the customer to reconnect it, then resume the campaign.",
+  report:
+    "The campaign paused because the sending inbox disconnected. Ask the customer to reconnect it, then resume the campaign.",
   ...overrides,
 });
 const question = "Why did my campaign stop sending?";
@@ -135,16 +136,16 @@ test("the findings' own ticket and public help links are not internal artifacts"
   assert.deepEqual(internal, []);
 });
 
-test("a claim without an evidence reference blocks", async () => {
+test("a claim with no evidence reference is judged by the model gate, not blocked deterministically", async () => {
+  // Backing is now the model gate's call: the prose->extract flow can't restate
+  // a ref per fact, so an empty ref must not deterministically block. The
+  // deterministic layer owns cross-tenant identifiers only.
   const { calls, deps: d } = deps();
-  const unbacked = findings();
-  unbacked.facts[0].evidence.ref = " ";
-  const result = await gate(scope, question, unbacked, d);
-  assert.deepEqual(
-    [result.decision, result.reason],
-    ["block", "unbacked_claim"]
-  );
-  assert.equal(calls.judge.length, 0);
+  const noRef = findings();
+  noRef.facts[0].evidence.ref = " ";
+  const result = await gate(scope, question, noRef, d);
+  assert.equal(result.decision, "allow");
+  assert.equal(calls.judge.length, 1);
 });
 
 test("needsHuman blocks with the raw findings and no reply", async () => {

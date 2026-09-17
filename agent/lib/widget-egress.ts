@@ -159,9 +159,12 @@ async function deterministicReason(
   findings: WidgetFindings,
   resolve: GateDeps["resolve"]
 ): Promise<string | null> {
-  if (findings.facts.some((fact) => !fact.evidence.ref.trim())) {
-    return "unbacked_claim";
-  }
+  // Whether a claim is actually backed by its evidence is judged by the model
+  // gate below. The deterministic layer owns the cross-tenant guarantee only:
+  // foreign identifiers and internal-only artifacts. (A per-fact evidence.ref
+  // requirement was incompatible with the prose->extract flow, where a small
+  // model reformats the investigator's write-up and cannot restate a ref per
+  // fact even though the claim came from a real tool result.)
   const { candidates, internal } = extractIdentifiers(findings);
   if (internal.length) {
     return `internal_artifact:${internal[0]}`;
