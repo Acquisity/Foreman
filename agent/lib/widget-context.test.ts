@@ -7,7 +7,7 @@ const origin = "https://pr-13999-acquisity.vercel.app";
 const userToken = "signed.user.identity";
 const { conversationId, organizationId } = verifiedWidgetContext;
 const appContext = {
-  intercomAppId: "ls8uffkp",
+  intercomAppId: "local-dev-placeholder",
   organizationId,
   organizationName: verifiedWidgetContext.organizationName,
   organizationSlug: verifiedWidgetContext.organizationSlug,

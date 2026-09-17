@@ -1,8 +1,18 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./fin-context.js";
-import { finAppContextSchema } from "./fin-scope.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
+
+/** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
+const appContextSchema = z.looseObject({
+  organizationId: z.uuid(),
+  organizationName: z.string().min(1).max(500),
+  organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
+  partnerId: z.literal(DEFAULT_PARTNER_ID),
+  role: z.enum(["owner", "admin"]),
+  userId: z.uuid(),
+  verifiedAt: z.iso.datetime(),
+});
 
 const inputSchema = z.object({
   conversationId: z.uuid(),
@@ -44,7 +54,7 @@ export async function verifyWidgetContext(
     response.body?.cancel().catch(() => undefined);
     throw new Error("Workspace support access could not be verified.");
   }
-  const verified = finAppContextSchema.parse(
+  const verified = appContextSchema.parse(
     await readContextBody(response, signal)
   );
   if (verified.organizationId !== parsed.organizationId) {
