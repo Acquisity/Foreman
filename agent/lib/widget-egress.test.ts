@@ -148,9 +148,17 @@ test("a claim with no evidence reference is judged by the model gate, not blocke
   assert.equal(calls.judge.length, 1);
 });
 
-test("needsHuman blocks with the raw findings and no reply", async () => {
+test("needsHuman with concrete facts still answers the customer and flags CS separately", async () => {
   const { calls, deps: d } = deps();
-  const raw = findings({ needsHuman: true });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.equal(result.decision, "allow");
+  assert.match(result.message ?? "", RECONNECT);
+  assert.equal(calls.compose.length, 1);
+});
+
+test("needsHuman with no concrete facts hands off with no reply", async () => {
+  const { calls, deps: d } = deps();
+  const raw = findings({ facts: [], needsHuman: true });
   const result = await gate(scope, question, raw, d);
   assert.deepEqual(
     [result.decision, result.reason, result.message],

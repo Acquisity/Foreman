@@ -249,7 +249,11 @@ export async function gate(
     if (reason) {
       return blocked(findings, reason);
     }
-    if (findings.needsHuman) {
+    // needsHuman flags the CS inbox; it does not by itself wall off the
+    // customer. When Foreman found concrete facts, it answers autonomously and
+    // routes any teammate follow-up through needsWrite/the note. Only hand off
+    // fully when there is nothing concrete to say (no facts at all).
+    if (findings.needsHuman && findings.facts.length === 0) {
       return blocked(findings, "needs_human");
     }
     const verdict = await deps.judge({ findings, question, scope });
