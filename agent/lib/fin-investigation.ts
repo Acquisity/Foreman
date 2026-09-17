@@ -1,5 +1,6 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
+import { readRequestBody } from "./bounded-body.js";
 import { verifyFinContext } from "./fin-context.js";
 import { finDeliverySuppressed, inspectFinDelivery } from "./fin-delivery.js";
 import { finInvestigationAuth } from "./fin-investigation-auth.js";
@@ -61,29 +62,6 @@ const finRunResponse = (run: FinRun, humanReplied: boolean) =>
       ? finDeliverySuppressed
       : { run_handle: run.id, ...(run.outcome ?? pending) }
   );
-
-const readRequestBody = async (request: Request) => {
-  if (!request.body) {
-    return "";
-  }
-  const reader = request.body.pipeThrough(new TextDecoderStream()).getReader();
-  let body = "";
-  try {
-    for (;;) {
-      // biome-ignore lint/performance/noAwaitInLoops: bound the streamed request before parsing it.
-      const { done, value } = await reader.read();
-      if (done) {
-        return body;
-      }
-      if (body.length + value.length > 8192) {
-        return null;
-      }
-      body += value;
-    }
-  } finally {
-    reader.cancel().catch(() => undefined);
-  }
-};
 
 /** Task completion, rather than an intermediate tool-call block, owns the answer. */
 export async function waitForFinInvestigation(

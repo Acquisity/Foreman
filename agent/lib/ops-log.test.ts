@@ -124,7 +124,7 @@ describe("formatOpsEvent", () => {
       sessionId: "s1",
       turnId: "t1",
     });
-    assert.equal(descriptorReads, 9);
+    assert.equal(descriptorReads, 12);
     assert.equal(ownKeysCalls, 0);
   });
 

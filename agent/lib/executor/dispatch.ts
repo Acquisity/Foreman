@@ -13,8 +13,10 @@ import {
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { logOpsEvent } from "../ops-log.js";
 import { supportOperationPolicy } from "../support/policy.js";
+import { widgetOperationPolicy } from "../widget-policy.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
+import { WIDGET_TOOLKIT } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -67,10 +69,40 @@ export async function readFinIntercom(
   return result.data;
 }
 
-async function connection(
-  ctx: ProviderContext,
-  policy: ReturnType<typeof supportOperationPolicy>
-) {
+type OperationPolicy =
+  | ReturnType<typeof supportOperationPolicy>
+  | ReturnType<typeof widgetOperationPolicy>;
+
+/** Lanes with their own toolkit select it here; every other session uses the shared toolkit. */
+const operationPolicy = (ctx: ProviderContext): OperationPolicy =>
+  supportOperationPolicy(ctx) ?? widgetOperationPolicy(ctx);
+
+/** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
+export async function readWidgetOwnership(
+  query: string,
+  signal: AbortSignal
+): Promise<unknown> {
+  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
+  if (!connector) {
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  const path = operationPath("planetscale.readQuery");
+  signal.throwIfAborted();
+  const token = await getConnectToken(connector, { subject: { type: "app" } });
+  signal.throwIfAborted();
+  const result = await executorTransport.call(
+    { signal, token, toolkit: WIDGET_TOOLKIT },
+    path,
+    { ...PRODUCTION_READ_QUERY_ARGS, query, use_replica: false },
+    { maxBytes: 64 * 1024, timeoutMs: 50_000 }
+  );
+  if (!result.ok || (result.http && result.http.status !== 200)) {
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  return result.data;
+}
+
+async function connection(ctx: ProviderContext, policy: OperationPolicy) {
   const { token } = await ctx.getToken(executorAuth());
   const authorization = policy ? { version: await policy.authorize() } : null;
   return {
@@ -114,7 +146,7 @@ export async function invokeProvider(
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
   assertLaneOperation(ctx, path, input);
-  const policy = supportOperationPolicy(ctx);
+  const policy = operationPolicy(ctx);
   policy?.assert(path, input);
   const { wire, authorization } = await connection(ctx, policy);
   const key =
@@ -166,7 +198,7 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
       dispatched: false,
     });
   }
-  const policy = supportOperationPolicy(ctx);
+  const policy = operationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
   const { wire } = await connection(ctx, policy);

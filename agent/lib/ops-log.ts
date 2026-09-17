@@ -14,9 +14,12 @@ const TRUNCATION_MARKER = "...";
 const OPS_FIELD_KEYS = [
   "code",
   "connection",
+  "conversationId",
+  "decision",
   "message",
   "outcome",
   "requests",
+  "runId",
   "sessionId",
   "stepIndex",
   "tool",
