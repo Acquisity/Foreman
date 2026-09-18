@@ -1113,7 +1113,7 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.deepEqual(postsOf(calls), [
-      "post:I hit an error while handling your request (AIError: Model call failed).\n\nPlease try again, rephrase, or reach out if it keeps failing.\n\n_Error id: `err_123`_",
+      "post:I hit an error while handling your request.\n\nPlease try again, rephrase, or reach out if it keeps failing.\n\n_Error id: `err_123`_",
     ]);
     assert.equal(eventChannel.state.progress, undefined);
     // A late result after the failure cannot resurrect tracking or post.
@@ -1149,6 +1149,31 @@ describe("slack channel progress", () => {
     );
     assert.deepEqual(postsOf(calls), ["post:All done."]);
     assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("posts nothing when a late result turn ends with an empty delivery", async () => {
+    // eve reports an empty delivery as a null message; this covers only the
+    // channel branch, not the model choosing the marker.
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("message.completed")(
+      finalMessageEvent("The answer."),
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("turn.started")(
+      { ...turnStartedEvent, turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    await handlerFor("message.completed")(
+      { ...finalMessageEvent(""), message: null, turnId: "t2" },
+      eventChannel,
+      trustedCtx
+    );
+    assert.deepEqual(postsOf(calls), ["post:The answer."]);
+    // No typing indicator is left hanging after the silent turn.
+    assert.equal(calls.at(-1), "typing:Working...");
   });
 
   it("clears progress state when the turn is cancelled", async () => {

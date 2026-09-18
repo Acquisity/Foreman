@@ -212,30 +212,6 @@ const truncateTypingStatus = (text: string): string =>
     SLACK_TYPING_STATUS_MAX_LENGTH
   );
 
-const ERROR_HINT_MAX_LENGTH = 160;
-
-const truncateForDisplay = (text: string): string =>
-  text.length <= ERROR_HINT_MAX_LENGTH
-    ? text
-    : `${text.slice(0, ERROR_HINT_MAX_LENGTH - 1).trimEnd()}…`;
-
-const formatErrorHint = (data: {
-  readonly message: string;
-  readonly details?: Record<string, unknown> | undefined;
-}): string => {
-  const rawName = data.details?.name;
-  const name =
-    typeof rawName === "string" && rawName.length > 0 ? rawName : undefined;
-  const message = data.message.trim();
-  if (name && message.length > 0) {
-    return ` (${name}: ${truncateForDisplay(message)})`;
-  }
-  if (name) {
-    return ` (${name})`;
-  }
-  return message.length > 0 ? ` (${truncateForDisplay(message)})` : "";
-};
-
 const extractErrorId = (
   details: Record<string, unknown> | undefined
 ): string | undefined => {
@@ -351,6 +327,11 @@ export const slackChannelEvents: SlackChannelEvents = {
     channel.state.progress = undefined;
     // Blankness decides the typing fallback, but the post itself is verbatim:
     // trimming would destroy leading Markdown indentation in the reply.
+    // A null message is eve's empty delivery: the turn chose to say nothing,
+    // so no typing indicator is left hanging with no turn behind it.
+    if (data.message === null) {
+      return;
+    }
     if (!data.message?.trim()) {
       await channel.thread.startTyping();
       return;
@@ -418,13 +399,14 @@ export const slackChannelEvents: SlackChannelEvents = {
   },
   async "turn.failed"(data, channel) {
     clearReasoning(channel);
-    // A failed turn leaves no progress state behind. Preserve Foreman's
-    // existing error post while clearing its local rendering state.
+    // A failed turn leaves no progress state behind. The thread gets a short
+    // outcome and the error id only; the raw error name and message stay in
+    // operator records, never in a requester-facing post.
     channel.state.progress = undefined;
     const errorId = extractErrorId(data.details);
     await channel.thread.post(
       [
-        `I hit an error while handling your request${formatErrorHint(data)}.`,
+        "I hit an error while handling your request.",
         "",
         "Please try again, rephrase, or reach out if it keeps failing.",
         ...(errorId ? ["", `_Error id: \`${errorId}\`_`] : []),

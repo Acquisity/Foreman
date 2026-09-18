@@ -47,7 +47,7 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
 // channel injects it into every session, the intake boundary below carries the
 // same rule, and workflow skills defer instead of restating it.
 export const FINAL_SLACK_POST_RULE =
-  "The final post in the Slack thread must contain only the requester-facing answer, with no internal summary or action log. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Normal conversational progress updates are allowed; this boundary applies to the closing post.";
+  "The final post in the Slack thread must contain only the requester-facing answer, with no internal summary or action log. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Every message that ends a turn is posted to the thread. While a delegated task is still running, do not send the requester-facing answer: end that turn with one short acknowledgement that carries no findings, ticket details, or review narration, and send the answer in the turn its results trigger. When the answer was already posted and a later background result does not change it, reply with exactly <eve-empty-delivery/> and nothing else; in this thread that overrides the runtime Background task reporting instruction. When it changes the answer, post only the short correction.";
 
 // eve stages each image and file attachment under /workspace/attachments
 // before the first model step, inside a directory named by the content hash,
