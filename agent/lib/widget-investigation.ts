@@ -200,8 +200,18 @@ const blockedOutcome = (
  * once extraction latency is understood. The session-failure / no-prose fallback is unaffected.
  */
 export const WIDGET_DEADLINE_MS = 280_000;
-/** Below this the router is unsure, and an unsure message is investigated. */
-const KB_ROUTE_CONFIDENCE = 0.8;
+/**
+ * How sure the router must be before the fast lane gets the first try.
+ *
+ * The two mistakes are not equal. A wrongly fast-laned message costs a few
+ * seconds: the lane answers only from articles it can cite and otherwise hands
+ * over to the investigation. A wrongly investigated how-to costs the customer
+ * minutes. So the bar is low. In practice clear how-tos score 0.93 to 1.00, and
+ * "how do I find my billing settings?" scored 0.70 only because "my" reads as
+ * an account question, while a real account question is routed `investigate`
+ * outright and never reaches this check.
+ */
+const KB_ROUTE_CONFIDENCE = 0.6;
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
