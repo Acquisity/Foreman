@@ -94,6 +94,40 @@ export function customerText(findings: WidgetFindings): string {
   ].join("\n");
 }
 
+const isInternalHost = (host: string) =>
+  INTERNAL_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+
+/**
+ * A bare domain is either one of ours (internal, always blocked) or something
+ * the ownership check must vouch for, such as the customer's own sending domain.
+ * One it cannot vouch for is foreign and blocks, as it always did. Domains that
+ * are public, part of a url, or the domain of an email already in the text are
+ * covered by those checks and skipped here.
+ */
+function classifyDomains(
+  text: string,
+  urls: string[],
+  emailDomains: Set<string>,
+  internal: string[]
+): string[] {
+  const domains: string[] = [];
+  for (const domain of uniqueLower(text.match(DOMAIN))) {
+    const covered =
+      PUBLIC_HOSTS.has(domain) ||
+      emailDomains.has(domain) ||
+      urls.some((value) => value.toLowerCase().includes(domain));
+    if (covered) {
+      continue;
+    }
+    if (isInternalHost(domain)) {
+      internal.push(domain);
+    } else {
+      domains.push(domain);
+    }
+  }
+  return domains;
+}
+
 /** Everything identifier-shaped in an arbitrary customer-bound string. */
 export function scanIdentifiers(
   text: string,
@@ -108,7 +142,7 @@ export function scanIdentifiers(
   for (const value of urls) {
     const url = URL.parse(value);
     const host = url?.hostname.toLowerCase() ?? "";
-    if (INTERNAL_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    if (isInternalHost(host)) {
       internal.push(value);
     }
     for (const match of value.matchAll(WORKSPACE_PATH)) {
@@ -117,17 +151,7 @@ export function scanIdentifiers(
   }
   const emails = uniqueLower(text.match(EMAIL));
   const emailDomains = new Set(emails.map((email) => email.split("@")[1]));
-  for (const domain of uniqueLower(text.match(DOMAIN))) {
-    if (
-      !(
-        PUBLIC_HOSTS.has(domain) ||
-        emailDomains.has(domain) ||
-        urls.some((value) => value.toLowerCase().includes(domain))
-      )
-    ) {
-      internal.push(domain);
-    }
-  }
+  const domains = classifyDomains(text, urls, emailDomains, internal);
   if (STACK_TRACE.test(text)) {
     internal.push("stack trace");
   }
@@ -146,6 +170,7 @@ export function scanIdentifiers(
   }
   return {
     candidates: {
+      domains,
       emails,
       slugs: Array.from(slugs),
       uuids: uniqueLower(text.match(UUID)),
@@ -189,10 +214,12 @@ async function deterministicTextReason(
   if (internal.length) {
     return `internal_artifact:${internal[0]}`;
   }
+  const domains = candidates.domains ?? [];
   if (
     candidates.uuids.length +
       candidates.slugs.length +
-      candidates.emails.length ===
+      candidates.emails.length +
+      domains.length ===
     0
   ) {
     return null;
@@ -201,7 +228,8 @@ async function deterministicTextReason(
   const foreign =
     candidates.uuids.find((id) => !owned.uuids.has(id)) ??
     candidates.slugs.find((slug) => !owned.slugs.has(slug)) ??
-    candidates.emails.find((email) => !owned.emails.has(email));
+    candidates.emails.find((email) => !owned.emails.has(email)) ??
+    domains.find((domain) => !owned.domains.has(domain));
   return foreign ? `foreign_identifier:${foreign}` : null;
 }
 

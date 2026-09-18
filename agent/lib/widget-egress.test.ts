@@ -59,6 +59,7 @@ function deps(overrides: Partial<GateDeps> = {}) {
     resolve: (_scope, candidates) => {
       calls.resolve.push(candidates);
       return Promise.resolve({
+        domains: new Set<string>(),
         emails: new Set<string>(),
         slugs: new Set<string>(),
         uuids: new Set([campaignId]),
@@ -74,7 +75,7 @@ test("own-workspace identifiers pass and the composer sees no evidence reference
   assert.equal(result.decision, "allow");
   assert.match(result.message ?? "", RECONNECT);
   assert.deepEqual(calls.resolve, [
-    { emails: [], slugs: [], uuids: [campaignId] },
+    { domains: [], emails: [], slugs: [], uuids: [campaignId] },
   ]);
   const [composed] = calls.compose as { findings: unknown }[];
   assert.deepEqual(composed.findings, composerInput(findings()));
@@ -107,7 +108,7 @@ for (const [label, text] of [
   ["an Inngest run id", "Run 01J8ZQ3K4M5N6P7Q8R9S0T1V2W failed twice."],
   ["a stack trace", "It threw:\n    at sendCampaign (campaign.ts:12:5)"],
   ["another Linear ticket", "Tracked in ENG-13999 and ENG-12140."],
-  ["an unknown domain", "Your inbox at mail.example-sender.com bounced."],
+  ["a bare internal host", "The failure is visible on sentry.io."],
 ] as const) {
   test(`${label} in a claim blocks without resolving identifiers`, async () => {
     const { calls, deps: d } = deps();
@@ -123,6 +124,46 @@ for (const [label, text] of [
     assert.equal(calls.judge.length, 0);
   });
 }
+
+test("the customer's own lead, inbox and sending domain pass; ones the workspace does not own block", async () => {
+  const mine = {
+    domains: new Set(["outreach-diamond.com"]),
+    emails: new Set(["sarah@cyberdyne.com", "hello@outreach-diamond.com"]),
+    slugs: new Set<string>(),
+    uuids: new Set([campaignId]),
+  };
+  const owned = deps({ resolve: () => Promise.resolve(mine) });
+  const allowed = await gate(
+    scope,
+    question,
+    findings({
+      recommendation:
+        "Your lead sarah@cyberdyne.com replied, but hello@outreach-diamond.com is disconnected and outreach-diamond.com is unverified.",
+    }),
+    owned.deps
+  );
+  assert.equal(allowed.decision, "allow");
+
+  for (const [text, foreign] of [
+    ["The lead john@elsewhere.com bounced.", "john@elsewhere.com"],
+    [
+      "Your inbox at mail.example-sender.com bounced.",
+      "mail.example-sender.com",
+    ],
+  ] as const) {
+    const { calls, deps: d } = deps({ resolve: () => Promise.resolve(mine) });
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own gate run.
+    const result = await gate(
+      scope,
+      question,
+      findings({ recommendation: text }),
+      d
+    );
+    assert.equal(result.reason, `foreign_identifier:${foreign}`);
+    assert.equal(result.message, null);
+    assert.equal(calls.judge.length, 0);
+  }
+});
 
 test("the findings' own ticket and public help links are not internal artifacts", () => {
   const { internal } = extractIdentifiers(
@@ -313,5 +354,50 @@ test("the ownership query binds the verified scope and only validated literals",
   );
   assert.throws(() =>
     buildOwnershipQuery(scope, { emails: [], slugs: [], uuids: ["not-a-uuid"] })
+  );
+  assert.throws(() =>
+    buildOwnershipQuery(scope, {
+      domains: ["a.com'); drop table member; --"],
+      emails: [],
+      slugs: [],
+      uuids: [],
+    })
+  );
+});
+
+test("every table the ownership query reads is reached only through the verified workspace", () => {
+  const query = buildOwnershipQuery(scope, {
+    domains: ["outreach-diamond.com"],
+    emails: ["sarah@cyberdyne.com"],
+    slugs: [],
+    uuids: [campaignId],
+  });
+  // A table read without the join would resolve another tenant's identifiers.
+  for (const table of [
+    "outreach_campaign c",
+    "crm_message_thread t",
+    "crm_contact ct",
+    "crm_lead l",
+    "mail_inbox i",
+    "mail_domain d",
+  ]) {
+    const alias = table.split(" ")[1];
+    assert.ok(
+      query.includes(
+        `${table} join authorized a on a.id = ${alias}.organization_id`
+      ) ||
+        query.includes(`join authorized a on a.id = ${alias}.organization_id`),
+      `${table} must join authorized`
+    );
+  }
+  // crm_email has no organization column: it is only reachable via a scoped parent.
+  assert.equal(query.split("from crm_email ce").length - 1, 2);
+  assert.ok(
+    query.includes(
+      "join crm_contact ct on ct.id = ce.contact_id join authorized"
+    )
+  );
+  assert.ok(
+    query.includes("join crm_lead l on l.id = ce.lead_id join authorized")
   );
 });
