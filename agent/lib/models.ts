@@ -120,6 +120,18 @@ export const gatewayRouting = (modelId: string) =>
       }
     : undefined;
 
+// For calls that reformat or summarise text they were handed rather than reason
+// about it. Measured on the support widget: on its defaults the fast model spends
+// about 90% of its output on hidden reasoning (8 to 12s a call); with reasoning
+// minimal the same call takes 1 to 3s with the same result. Providers that do not
+// recognise the option ignore it, so a slot override stays safe.
+export const fastCallOptions = (modelId: string) => ({
+  providerOptions: {
+    ...gatewayRouting(modelId)?.providerOptions,
+    google: { thinkingConfig: { thinkingLevel: "minimal" } },
+  },
+});
+
 // The gateway catalog, through the same authenticated provider eve's model calls use.
 // set_agent_models checks membership here before storing an id: a stored id the gateway
 // doesn't know would fail every future session at start, with no session left to undo it.

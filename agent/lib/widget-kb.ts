@@ -1,7 +1,7 @@
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { getHelpArticleContent, HELP_CENTER_BASE_URL } from "./help-center.js";
-import { gatewayRouting, resolveModel } from "./models.js";
+import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 
 /**
@@ -77,15 +77,6 @@ const answerSchema = z.object({
   kind: z.enum(["answer", "chat", "none"]),
 });
 
-// Measured on this lane: left to its default, the model spends about 90% of its
-// output on hidden reasoning (roughly 1,900 tokens for a 300-token reply, 8 to
-// 12s). These are retrieval-grounded rewrites and summaries, so reasoning is
-// turned down: about 3s, with the same grounded, cited answers. Ignored by
-// providers that do not recognise it if the `kb` slot is ever overridden.
-const FAST_OPTIONS = {
-  google: { thinkingConfig: { thinkingLevel: "minimal" } },
-} as const;
-
 const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
 
 // Choosing from the real list of titles beats guessing search keywords: a
@@ -136,10 +127,7 @@ export const defaultKbDeps: KbDeps = {
         })),
         question,
       }),
-      providerOptions: {
-        ...gatewayRouting(model)?.providerOptions,
-        ...FAST_OPTIONS,
-      },
+      ...fastCallOptions(model),
       schema: answerSchema,
       system: KB_PROMPT,
     });
@@ -178,10 +166,7 @@ export const defaultKbDeps: KbDeps = {
       abortSignal: signal,
       model: gateway(model),
       prompt: question,
-      providerOptions: {
-        ...gatewayRouting(model)?.providerOptions,
-        ...FAST_OPTIONS,
-      },
+      ...fastCallOptions(model),
       schema: rewriteSchema,
       system: REWRITE_PROMPT,
     });
@@ -222,10 +207,7 @@ export const defaultKbDeps: KbDeps = {
       prompt: `${index
         .map((article, n) => `${n + 1}. ${article.title} (${article.id})`)
         .join("\n")}\n\nCustomer question: ${question}`,
-      providerOptions: {
-        ...gatewayRouting(model)?.providerOptions,
-        ...FAST_OPTIONS,
-      },
+      ...fastCallOptions(model),
       schema: selectSchema,
       system: SELECT_PROMPT,
     });

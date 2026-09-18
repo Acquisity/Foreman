@@ -16,6 +16,8 @@ export interface GateResult {
   findings: WidgetFindings;
   message: string | null;
   reason: string;
+  /** Milliseconds spent in each gate step, for the finish timing log. */
+  timings?: Record<string, number>;
 }
 export interface GateDeps {
   compose: (input: {
@@ -277,56 +279,76 @@ export async function gate(
   findings: WidgetFindings,
   deps: GateDeps = defaultGateDeps
 ): Promise<GateResult> {
+  const timings: Record<string, number> = {};
+  const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      timings[step] = (timings[step] ?? 0) + Date.now() - startedAt;
+    }
+  };
+  const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
-    const reason = await deterministicReason(scope, findings, deps.resolve);
+    const reason = await timed("scan", () =>
+      deterministicReason(scope, findings, deps.resolve)
+    );
     if (reason) {
-      return blocked(findings, reason);
+      return done(blocked(findings, reason));
     }
     // needsHuman flags the CS inbox; it does not by itself wall off the
     // customer. When Foreman found concrete facts, it answers autonomously and
     // routes any teammate follow-up through needsWrite/the note. Only hand off
     // fully when there is nothing concrete to say (no facts at all).
     if (findings.needsHuman && findings.facts.length === 0) {
-      return blocked(findings, "needs_human");
+      return done(blocked(findings, "needs_human"));
     }
-    const verdict = await deps.judge({ findings, question, scope });
+    const verdict = await timed("judge", () =>
+      deps.judge({ findings, question, scope })
+    );
     if (verdict.decision === "block") {
-      return blocked(findings, `model_gate:${verdict.reason}`);
+      return done(blocked(findings, `model_gate:${verdict.reason}`));
     }
     let gated = findings;
     if (verdict.decision === "rewrite") {
       const rewritten = findingsSchema.safeParse(verdict.findings);
       if (!rewritten.success) {
-        return blocked(findings, "model_gate:invalid_rewrite");
+        return done(blocked(findings, "model_gate:invalid_rewrite"));
       }
       gated = rewritten.data;
-      const again = await deterministicReason(scope, gated, deps.resolve);
+      const again = await timed("scan", () =>
+        deterministicReason(scope, gated, deps.resolve)
+      );
       if (again) {
-        return blocked(findings, again);
+        return done(blocked(findings, again));
       }
     }
-    const message = await deps.compose({
-      findings: composerInput(gated),
-      organizationName: scope.organizationName,
-      question,
-    });
+    const message = await timed("compose", () =>
+      deps.compose({
+        findings: composerInput(gated),
+        organizationName: scope.organizationName,
+        question,
+      })
+    );
     if (!message) {
-      return blocked(findings, "empty_reply");
+      return done(blocked(findings, "empty_reply"));
     }
     // Final guarantee: scan the actual customer-bound text. The composer is a
     // model and can introduce an identifier or internal artifact that was never
     // in the gated findings; the customer message must contain no foreign
     // identifier and no ticket reference at all.
-    const egress = await deterministicTextReason(scope, message, deps.resolve);
+    const egress = await timed("scan", () =>
+      deterministicTextReason(scope, message, deps.resolve)
+    );
     if (egress) {
-      return blocked(findings, `composed:${egress}`);
+      return done(blocked(findings, `composed:${egress}`));
     }
-    return {
+    return done({
       decision: verdict.decision,
       findings: gated,
       message,
       reason: verdict.reason,
-    };
+    });
   } catch (error) {
     // The gate fails closed, but log why: a swallowed error here (a gate-model
     // failure, an ownership-resolution failure) is otherwise invisible and every
@@ -340,7 +362,7 @@ export async function gate(
       },
       console.warn
     );
-    return blocked(findings, "gate_unavailable");
+    return done(blocked(findings, "gate_unavailable"));
   }
 }
 

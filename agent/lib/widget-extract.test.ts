@@ -7,17 +7,17 @@ import type { WidgetFindings } from "./widget-findings.js";
 // What the small model returns: the lenient extraction shape.
 const lenient = {
   confidence: "high",
-  needsHuman: false,
-  recommendation: "Reconnect the inbox to resume sending.",
-  report: "The inbox is disconnected; reconnect it and sending resumes.",
   facts: [
     {
       claim: "The sending inbox is disconnected.",
-      evidenceTool: "widget_inbox_health",
-      evidenceRef: "row-1",
       entityIds: [],
+      evidenceRef: "row-1",
+      evidenceTool: "widget_inbox_health",
     },
   ],
+  needsHuman: false,
+  recommendation: "Reconnect the inbox to resume sending.",
+  report: "The inbox is disconnected; reconnect it and sending resumes.",
 };
 // What normalize should produce: the strict findings.
 const expected: WidgetFindings = {
@@ -50,9 +50,9 @@ test("a fact with no evidence tool defaults to 'investigation'", async () => {
   const out = await extractWidgetFindings(input, {
     generate: () =>
       Promise.resolve({
+        facts: [{ claim: "A campaign is paused." }],
         recommendation: "Check it.",
         report: "Something is off.",
-        facts: [{ claim: "A campaign is paused." }],
       }),
   });
   assert.equal(out?.facts[0].evidence.tool, "investigation");
@@ -86,4 +86,28 @@ test("empty investigator text returns null without calling the model", async () 
   );
   assert.equal(out, null);
   assert.equal(called, false);
+});
+
+test("a clarifying question is a normal reply, and only an explicit conclusion hands off to a person", async () => {
+  const asked = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        facts: [],
+        needsHuman: false,
+        recommendation: "Could you tell me which campaign you mean?",
+      }),
+  });
+  assert.equal(asked?.needsHuman, false);
+  assert.deepEqual(asked?.facts, []);
+
+  const stuck = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        facts: [],
+        needsHuman: true,
+        recommendation:
+          "This needs a person: the workspace could not be verified.",
+      }),
+  });
+  assert.equal(stuck?.needsHuman, true);
 });

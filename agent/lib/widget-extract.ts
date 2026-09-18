@@ -1,6 +1,6 @@
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
-import { gatewayRouting, resolveModel } from "./models.js";
+import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -34,7 +34,7 @@ const extractionSchema = z.object({
 type LenientFindings = z.infer<typeof extractionSchema>;
 type LenientFinding = NonNullable<LenientFindings["facts"]>[number];
 
-const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true only when the investigator concluded it cannot give a useful answer and a person must take over, e.g. wrong workspace or no usable findings; do NOT set it merely because one detail could not be verified while the main question was still answered), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator filed an ENG-#### ticket, and report (the investigator's plain-English summary for a teammate). Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If there were no usable findings, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
+const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true only when the investigator concluded it cannot give a useful answer and a person must take over, e.g. wrong workspace or no usable findings; do NOT set it merely because one detail could not be verified while the main question was still answered), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator filed an ENG-#### ticket, and report (the investigator's plain-English summary for a teammate). Always include, as its own fact, anything the investigator said it could not check or verify, because the customer must be told what remains uncertain. Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If the investigator only asked the customer a clarifying question, or simply replied to a message that needed nothing looked up, that is a normal reply and not a failure: return an empty facts array, needsHuman false, and put what it said to the customer into recommendation and report. If instead the investigator could not produce any useful answer, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
 
 const str = (v: unknown, max: number): string =>
   typeof v === "string" ? v.slice(0, max) : "";
@@ -83,8 +83,11 @@ function normalize(
     raw.confidence === "medium" || raw.confidence === "high"
       ? raw.confidence
       : "low";
-  // No usable facts always means a human should look.
-  const needsHuman = raw.needsHuman === true || facts.length === 0;
+  // A handoff is an explicit conclusion, never a fallback. Having no facts is
+  // normal when the investigator asked a clarifying question or just replied, so
+  // it no longer forces a human; the gate still hands off when the investigator
+  // did ask for one and there is nothing to tell the customer.
+  const needsHuman = raw.needsHuman === true;
 
   const candidate: WidgetFindings = {
     confidence,
@@ -115,10 +118,12 @@ export interface ExtractDeps {
 
 export const defaultExtractDeps: ExtractDeps = {
   async generate({ investigatorText, question, scope }) {
-    const model = await resolveModel("gate");
+    // Reformatting the investigator's prose needs no reasoning, and the gate
+    // re-validates everything downstream, so this runs on the fast slot.
+    const model = await resolveModel("kb");
     const { object } = await generateObject({
       model: gateway(model),
-      ...gatewayRouting(model),
+      ...fastCallOptions(model),
       prompt: JSON.stringify({
         findings: investigatorText,
         question,

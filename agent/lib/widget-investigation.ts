@@ -262,6 +262,7 @@ export async function finishWidgetRun(
   } else {
     // The investigator writes prose; a separate pass structures it. Any leftover
     // stream-carried findings still work, but the schema no longer fails the session.
+    const extractStartedAt = Date.now();
     const structured =
       outcome.findings ??
       (outcome.text
@@ -271,6 +272,7 @@ export async function finishWidgetRun(
             scope: run.scope,
           })
         : null);
+    const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
       ? null
       : (outcome.text &&
@@ -279,6 +281,18 @@ export async function finishWidgetRun(
     if (structured) {
       findings = structured;
       const gated = await deps.gate(run.scope, run.question, structured);
+      // Where the wait after an investigation goes: three model calls in a row.
+      logOpsEvent("widget.finish.timing", {
+        conversationId: run.scope.conversationId,
+        message: [
+          `extract=${extractMs}`,
+          ...Object.entries(gated.timings ?? {}).map(
+            ([step, ms]) => `${step}=${ms}`
+          ),
+        ].join(" "),
+        runId: run.id,
+        sessionId,
+      });
       result = {
         decision: gated.decision,
         message: gated.message,
