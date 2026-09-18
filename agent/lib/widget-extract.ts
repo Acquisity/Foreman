@@ -1,6 +1,6 @@
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
-import { resolveModel } from "./models.js";
+import { gatewayRouting, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -115,8 +115,10 @@ export interface ExtractDeps {
 
 export const defaultExtractDeps: ExtractDeps = {
   async generate({ investigatorText, question, scope }) {
+    const model = await resolveModel("gate");
     const { object } = await generateObject({
-      model: gateway(await resolveModel("gate")),
+      model: gateway(model),
+      ...gatewayRouting(model),
       prompt: JSON.stringify({
         findings: investigatorText,
         question,

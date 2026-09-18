@@ -1,6 +1,6 @@
 import { gateway, generateObject, generateText } from "ai";
 import { z } from "zod";
-import { resolveModel } from "./models.js";
+import { gatewayRouting, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   type IdentifierCandidates,
@@ -227,8 +227,10 @@ const judgeSchema = z.object({
 
 export const defaultGateDeps: GateDeps = {
   async compose({ findings, organizationName, question }) {
+    const model = await resolveModel("gate");
     const { text } = await generateText({
-      model: gateway(await resolveModel("gate")),
+      model: gateway(model),
+      ...gatewayRouting(model),
       prompt: JSON.stringify({
         findings,
         question,
@@ -239,8 +241,10 @@ export const defaultGateDeps: GateDeps = {
     return text.trim();
   },
   async judge({ findings, question, scope }) {
+    const model = await resolveModel("gate");
     const { object } = await generateObject({
-      model: gateway(await resolveModel("gate")),
+      model: gateway(model),
+      ...gatewayRouting(model),
       prompt: JSON.stringify({
         findings,
         question,

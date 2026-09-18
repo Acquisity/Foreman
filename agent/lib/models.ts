@@ -9,8 +9,10 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 export const MODELS = {
   // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
-  // Support widget egress gate and composer: small, cheap, never investigates.
-  gate: "google/gemini-3.5-flash",
+  // Support widget egress gate and composer: never investigates. On the same
+  // DeepSeek id as the orchestrator so it rides the working gateway routing;
+  // callers must apply gatewayRouting(id) since it is a deepseek/ model.
+  gate: "deepseek/deepseek-v4-pro-0813",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
