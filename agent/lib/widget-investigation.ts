@@ -355,30 +355,48 @@ export async function receiveWidgetMessage(
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
-    const address = widgetAddress(scope);
-    const existing = resolveSession ? await resolveSession(address) : null;
-    const startIndex = existing ? await existing.getStreamTailIndex() : 0;
-    const session = await from(address).send(input.question, {
-      auth: widgetAuth(scope),
-      mode: "task",
-      state: { runId: run.id },
-    });
-    await deps.attach(run.id, session.id, startIndex);
-    const settled = waitForWidgetInvestigation(session, startIndex).then(
-      (outcome) => finishWidgetRun(run, session.id, outcome, deps)
-    );
-    waitUntil(settled.catch(() => null));
-    let timeout: ReturnType<typeof setTimeout> | undefined;
+    // A claimed run is persisted pending. If session creation then fails, it
+    // must be terminalized, or a retry with the same key returns it as
+    // permanently pending. Use the run id as the fencing session id when no
+    // session exists yet, so the terminal write is owned and settles the row.
+    let sessionId: string | undefined;
     try {
-      const finished = await Promise.race([
-        settled,
-        new Promise<null>((resolve) => {
-          timeout = setTimeout(() => resolve(null), responseWaitMs);
-        }),
-      ]);
-      return json(widgetRunResponse(finished ?? run));
-    } finally {
-      clearTimeout(timeout);
+      const address = widgetAddress(scope);
+      const existing = resolveSession ? await resolveSession(address) : null;
+      const startIndex = existing ? await existing.getStreamTailIndex() : 0;
+      const session = await from(address).send(input.question, {
+        auth: widgetAuth(scope),
+        mode: "task",
+        state: { runId: run.id },
+      });
+      sessionId = session.id;
+      await deps.attach(run.id, session.id, startIndex);
+      const settled = waitForWidgetInvestigation(session, startIndex).then(
+        (outcome) => finishWidgetRun(run, session.id, outcome, deps)
+      );
+      waitUntil(settled.catch(() => null));
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const finished = await Promise.race([
+          settled,
+          new Promise<null>((resolve) => {
+            timeout = setTimeout(() => resolve(null), responseWaitMs);
+          }),
+        ]);
+        return json(widgetRunResponse(finished ?? run));
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      await deps
+        .complete(
+          run.id,
+          blockedOutcome("session_unavailable", "failed"),
+          null,
+          sessionId ?? run.id
+        )
+        .catch(() => undefined);
+      throw error;
     }
   } catch {
     logOpsEvent(

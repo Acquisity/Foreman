@@ -34,6 +34,19 @@ const truncate = (value: string): string =>
     ? `${value.slice(0, OPS_LOG_STRING_LIMIT)}${TRUNCATION_MARKER}`
     : value;
 
+// `message` is the one field that may carry a raw provider/runtime error string,
+// so redact the secret/PII classes that can appear there before it reaches the
+// logs. Structural fields (code, tool, ids) are authored and left as-is.
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const SECRET_RE =
+  /\b(?:eyJ[A-Za-z0-9._-]{10,}|[A-Fa-f0-9]{32,}|(?:sk|pk|rk)_[A-Za-z0-9_]{12,})\b/g;
+const URL_QUERY_RE = /(https?:\/\/[^\s?]+)\?\S*/g;
+const redactSensitive = (value: string): string =>
+  value
+    .replace(EMAIL_RE, "[email]")
+    .replace(SECRET_RE, "[redacted]")
+    .replace(URL_QUERY_RE, "$1?[redacted]");
+
 /** Converts one value without executing caller-controlled conversion code. */
 const sanitizeValue = (value: unknown): unknown => {
   if (typeof value === "string") {
@@ -80,7 +93,11 @@ export const formatOpsEvent = (
     for (const key of OPS_FIELD_KEYS) {
       const descriptor = Object.getOwnPropertyDescriptor(fields, key);
       if (descriptor && "value" in descriptor) {
-        record[key] = sanitizeValue(descriptor.value);
+        const raw = descriptor.value;
+        record[key] =
+          key === "message" && typeof raw === "string"
+            ? sanitizeValue(redactSensitive(raw))
+            : sanitizeValue(raw);
       }
     }
     record.event = truncate(event);

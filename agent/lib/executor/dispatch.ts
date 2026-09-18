@@ -87,6 +87,14 @@ export async function readWidgetOwnership(
     throw new Error("Support identifier resolution is unavailable.");
   }
   const path = operationPath("planetscale.readQuery");
+  // Defense in depth: this app-principal read runs outside any eve session and
+  // its policy/allowlist, so assert the binding still resolves to the expected
+  // planetscale read (mirrors readFinEvidence) before dispatching.
+  if (
+    path !== "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
+  ) {
+    throw new Error("Unexpected ownership operation binding.");
+  }
   signal.throwIfAborted();
   const token = await getConnectToken(connector, { subject: { type: "app" } });
   signal.throwIfAborted();
