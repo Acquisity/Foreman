@@ -11,6 +11,7 @@ import {
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
   waitForWidgetInvestigation,
+  withHistory,
 } from "./widget-investigation.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
@@ -367,6 +368,44 @@ test("an unsure knowledge-base route, or a help-center miss, is investigated ins
     assert.equal(body.message, allowed.message);
     assert.equal(body.citations, undefined);
     assert.deepEqual(gated, [findings]);
+  }
+});
+
+test('a follow-up reaches the router and the fast lane with the earlier turns, so "that" can be resolved', async (t) => {
+  enabled(t);
+  const history = [
+    { role: "customer" as const, text: "how do i add new inboxes?" },
+    { role: "assistant" as const, text: "Open Email Accounts [1]." },
+  ];
+  assert.equal(withHistory("where is that?", []), "where is that?");
+  const seen: string[] = [];
+  const { deps } = dependencies();
+  deps.route = (message) => {
+    seen.push(message);
+    return kbRoute(0.98)();
+  };
+  deps.answerKb = (message) => {
+    seen.push(message);
+    return Promise.resolve(kbAnswer);
+  };
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      history,
+      message_id: "99999999-9999-4999-8999-999999999999",
+      question: "where is that?",
+    }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(seen.length, 2);
+  for (const message of seen) {
+    assert.ok(message.includes("Customer: how do i add new inboxes?"));
+    assert.ok(message.includes("Support: Open Email Accounts [1]."));
+    assert.ok(message.endsWith("where is that?"));
   }
 });
 

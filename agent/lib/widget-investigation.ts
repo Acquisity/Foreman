@@ -30,10 +30,47 @@ const scopeFields = {
   conversation_id: z.uuid(),
   organization_id: z.uuid(),
 };
+/**
+ * Recent customer-visible turns of the same conversation, oldest first. The
+ * fast lane answers without a session, so without this a follow-up such as
+ * "where is that?" reaches the router, the fast lane and the investigator with
+ * nothing to resolve "that" against.
+ */
+const historySchema = z
+  .array(
+    z.strictObject({
+      role: z.enum(["customer", "assistant"]),
+      text: z.string().max(4000),
+    })
+  )
+  .max(12);
+export type WidgetHistory = z.infer<typeof historySchema>;
+
+const HISTORY_TURN_CHARS = 1200;
+
+/** The message as each lane should read it: the earlier turns as context, then the question. */
+export const withHistory = (
+  question: string,
+  history: WidgetHistory | undefined
+): string => {
+  const turns = (history ?? []).filter((turn) => turn.text.trim());
+  if (turns.length === 0) {
+    return question;
+  }
+  const transcript = turns
+    .map(
+      (turn) =>
+        `${turn.role === "customer" ? "Customer" : "Support"}: ${turn.text.trim().slice(0, HISTORY_TURN_CHARS)}`
+    )
+    .join("\n");
+  return `Earlier in this conversation:\n${transcript}\n\nThe customer's latest message, which is the one to answer:\n${question}`;
+};
+
 const inputSchema = z.discriminatedUnion("action", [
   z.strictObject({
     ...scopeFields,
     action: z.literal("start"),
+    history: historySchema.optional(),
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
   }),
@@ -470,10 +507,11 @@ export async function receiveWidgetMessage(
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
+    const message = withHistory(input.question, input.history);
     const answered = await answerFromKnowledgeBase(
       run,
       scope,
-      input.question,
+      message,
       request.signal,
       deps
     );
@@ -485,7 +523,7 @@ export async function receiveWidgetMessage(
         await startInvestigation(
           run,
           scope,
-          input.question,
+          message,
           { from, resolveSession, waitUntil },
           responseWaitMs,
           deps
