@@ -11,6 +11,17 @@ import {
 export const WIDGET_RESULT_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 export const widgetOutcomeSchema = z.object({
+  // Help-center sources behind a knowledge-base lane answer, numbered to match
+  // the [n] markers in `message`. Absent on investigation outcomes.
+  citations: z
+    .array(
+      z.object({
+        n: z.number().int().positive(),
+        title: z.string(),
+        url: z.string(),
+      })
+    )
+    .optional(),
   decision: z.enum(["allow", "rewrite", "block"]),
   message: z.string().nullable(),
   reason: z.string(),

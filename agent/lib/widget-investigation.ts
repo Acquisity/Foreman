@@ -7,6 +7,7 @@ import { verifyWidgetContext } from "./widget-context.js";
 import { gate as egressGate, logGateDecision } from "./widget-egress.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import { answerFromHelpCenter } from "./widget-kb.js";
 import { logRouteDecision, routeWidgetMessage } from "./widget-router.js";
 import {
   assertWidgetRunOwner,
@@ -117,6 +118,7 @@ export async function waitForWidgetInvestigation(
 }
 
 export const defaultWidgetDependencies = {
+  answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
   claim: claimWidgetRun,
   complete: completeWidgetRun,
@@ -124,6 +126,7 @@ export const defaultWidgetDependencies = {
   gate: egressGate,
   latestScope: latestWidgetScope,
   read: readWidgetRun,
+  route: routeWidgetMessage,
 };
 export type WidgetDependencies = typeof defaultWidgetDependencies;
 
@@ -141,6 +144,9 @@ export function widgetRunResponse(run: WidgetRun) {
     message: run.outcome.message,
     run_id: run.id,
     status: run.outcome.status,
+    ...(run.outcome.citations?.length
+      ? { citations: run.outcome.citations }
+      : {}),
     ...(disclose(run.outcome, run.findings) ? { findings: run.findings } : {}),
   };
 }
@@ -157,6 +163,8 @@ const blockedOutcome = (
  * once extraction latency is understood. The session-failure / no-prose fallback is unaffected.
  */
 export const WIDGET_DEADLINE_MS = 280_000;
+/** Below this the router is unsure, and an unsure message is investigated. */
+const KB_ROUTE_CONFIDENCE = 0.8;
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -284,6 +292,112 @@ async function settleResultRun(
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
 }
 
+/**
+ * Front door: a confident general product question is answered from the help
+ * center without starting an investigation. Returns null for every other route,
+ * a router failure (which falls open to `investigate`), and any knowledge-base
+ * miss, so those take the investigation lane exactly as before.
+ */
+async function answerFromKnowledgeBase(
+  run: WidgetRun,
+  scope: WidgetContext,
+  question: string,
+  signal: AbortSignal,
+  deps: WidgetDependencies
+): Promise<WidgetRun | null> {
+  const route = await deps.route(question, { signal });
+  logRouteDecision(
+    { conversationId: scope.conversationId, runId: run.id },
+    route
+  );
+  if (route.lane !== "kb" || route.confidence < KB_ROUTE_CONFIDENCE) {
+    return null;
+  }
+  const answer = await deps.answerKb(question, {
+    conversationId: scope.conversationId,
+    runId: run.id,
+  });
+  if (!answer) {
+    return null;
+  }
+  // No session exists on this lane, so the run id is the fencing session id.
+  return deps.complete(
+    run.id,
+    {
+      citations: answer.citations,
+      decision: "allow",
+      message: answer.message,
+      reason: "kb",
+      status: "completed",
+    },
+    null,
+    run.id
+  );
+}
+
+/**
+ * Start the investigator session for a claimed run and wait briefly for a fast
+ * finish; the rest settles in the background and is read by the result poll.
+ *
+ * A claimed run is persisted pending. If session creation then fails, it must
+ * be terminalized, or a retry with the same key returns it as permanently
+ * pending. Use the run id as the fencing session id when no session exists yet,
+ * so the terminal write is owned and settles the row.
+ */
+async function startInvestigation(
+  run: WidgetRun,
+  scope: WidgetContext,
+  question: string,
+  {
+    from,
+    resolveSession,
+    waitUntil,
+  }: Pick<RouteHandlerArgs<{ runId: string | null }>, "from" | "waitUntil"> &
+    Partial<Pick<RouteHandlerArgs, "resolveSession">>,
+  responseWaitMs: number,
+  deps: WidgetDependencies
+): Promise<WidgetRun> {
+  let sessionId: string | undefined;
+  try {
+    const address = widgetAddress(scope);
+    const existing = resolveSession ? await resolveSession(address) : null;
+    const startIndex = existing ? await existing.getStreamTailIndex() : 0;
+    const session = await from(address).send(question, {
+      auth: widgetAuth(scope),
+      mode: "task",
+      state: { runId: run.id },
+    });
+    sessionId = session.id;
+    await deps.attach(run.id, session.id, startIndex);
+    const settled = waitForWidgetInvestigation(session, startIndex).then(
+      (outcome) => finishWidgetRun(run, session.id, outcome, deps)
+    );
+    waitUntil(settled.catch(() => null));
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const finished = await Promise.race([
+        settled,
+        new Promise<null>((resolve) => {
+          timeout = setTimeout(() => resolve(null), responseWaitMs);
+        }),
+      ]);
+      return finished ?? run;
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    await deps
+      .complete(
+        run.id,
+        blockedOutcome("session_unavailable", "failed"),
+        null,
+        sessionId ?? run.id
+      )
+      .catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function receiveWidgetMessage(
   request: Request,
   {
@@ -356,60 +470,28 @@ export async function receiveWidgetMessage(
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
-    // Shadow mode: log Jev's lane decision beside the run, never act on it yet.
-    waitUntil(
-      routeWidgetMessage(input.question, { signal: request.signal })
-        .then((route) =>
-          logRouteDecision(
-            { conversationId: scope.conversationId, runId: run.id },
-            route
-          )
-        )
-        .catch(() => null)
+    const answered = await answerFromKnowledgeBase(
+      run,
+      scope,
+      input.question,
+      request.signal,
+      deps
     );
-    // A claimed run is persisted pending. If session creation then fails, it
-    // must be terminalized, or a retry with the same key returns it as
-    // permanently pending. Use the run id as the fencing session id when no
-    // session exists yet, so the terminal write is owned and settles the row.
-    let sessionId: string | undefined;
-    try {
-      const address = widgetAddress(scope);
-      const existing = resolveSession ? await resolveSession(address) : null;
-      const startIndex = existing ? await existing.getStreamTailIndex() : 0;
-      const session = await from(address).send(input.question, {
-        auth: widgetAuth(scope),
-        mode: "task",
-        state: { runId: run.id },
-      });
-      sessionId = session.id;
-      await deps.attach(run.id, session.id, startIndex);
-      const settled = waitForWidgetInvestigation(session, startIndex).then(
-        (outcome) => finishWidgetRun(run, session.id, outcome, deps)
-      );
-      waitUntil(settled.catch(() => null));
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const finished = await Promise.race([
-          settled,
-          new Promise<null>((resolve) => {
-            timeout = setTimeout(() => resolve(null), responseWaitMs);
-          }),
-        ]);
-        return json(widgetRunResponse(finished ?? run));
-      } finally {
-        clearTimeout(timeout);
-      }
-    } catch (error) {
-      await deps
-        .complete(
-          run.id,
-          blockedOutcome("session_unavailable", "failed"),
-          null,
-          sessionId ?? run.id
-        )
-        .catch(() => undefined);
-      throw error;
+    if (answered) {
+      return json(widgetRunResponse(answered));
     }
+    return json(
+      widgetRunResponse(
+        await startInvestigation(
+          run,
+          scope,
+          input.question,
+          { from, resolveSession, waitUntil },
+          responseWaitMs,
+          deps
+        )
+      )
+    );
   } catch {
     logOpsEvent(
       "widget.investigation.unavailable",

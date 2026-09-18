@@ -10,8 +10,9 @@ import { logOpsEvent } from "./ops-log.js";
  * It never calls tools, never sees account data, and never writes the reply;
  * it only says which lane the message belongs in and how sure it is. Any
  * failure, including a missing key, falls open to `investigate`, which is
- * today's single pipeline, so removing `TYPESAFE_API_KEY` restores the old
- * behavior exactly. Shadow mode: the decision is logged and not yet acted on.
+ * the investigation pipeline, so removing `TYPESAFE_API_KEY` restores the old
+ * single-lane behavior exactly. A confident `kb` decision is acted on by the
+ * knowledge-base lane (`widget-kb.ts`); `human` is logged and still investigated.
  */
 
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";

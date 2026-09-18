@@ -69,6 +69,7 @@ function dependencies(gateResult: GateResult = allowed) {
   };
   const gated: unknown[] = [];
   const deps: WidgetDependencies = {
+    answerKb: () => assert.fail("must not answer from the help center"),
     attach: (_id, sessionId, streamIndex) => {
       run.session_id = sessionId;
       run.stream_index = streamIndex;
@@ -88,6 +89,14 @@ function dependencies(gateResult: GateResult = allowed) {
     },
     latestScope: () => Promise.resolve(null),
     read: () => Promise.resolve(run),
+    route: () =>
+      Promise.resolve({
+        asksForHuman: 0,
+        asksOwnData: 1,
+        confidence: 0,
+        lane: "investigate",
+        source: "fallback",
+      }),
   };
   return { deps, gated, run };
 }
@@ -291,6 +300,74 @@ test("a completed investigation is gated and answered with the composed reply on
     status: "completed",
   });
   assert.equal(run.session_id, "widget-session-1");
+});
+
+const kbRoute = (confidence: number) => () =>
+  Promise.resolve({
+    asksForHuman: 0,
+    asksOwnData: 0,
+    confidence,
+    lane: "kb" as const,
+    source: "jev" as const,
+  });
+const kbAnswer = {
+  citations: [
+    { n: 1, title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
+  ],
+  message: "Connect your calendar first [1].",
+};
+
+test("a confident knowledge-base route answers with citations and never starts a session or the gate", async (t) => {
+  enabled(t);
+  const { deps, gated, run } = dependencies();
+  deps.route = kbRoute(0.98);
+  deps.answerKb = () => Promise.resolve(kbAnswer);
+  const response = await receiveWidgetMessage(
+    request({ ...start, message_id: "77777777-7777-4777-8777-777777777777" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.deepEqual(await response.json(), {
+    citations: kbAnswer.citations,
+    decision: "allow",
+    message: kbAnswer.message,
+    run_id: runId,
+    status: "completed",
+  });
+  assert.deepEqual(gated, []);
+  assert.equal(run.outcome?.reason, "kb");
+});
+
+test("an unsure knowledge-base route, or a help-center miss, is investigated instead", async (t) => {
+  enabled(t);
+  for (const [confidence, answer] of [
+    [0.5, kbAnswer],
+    [0.98, null],
+  ] as const) {
+    const { deps, gated } = dependencies();
+    deps.route = kbRoute(confidence);
+    deps.answerKb = () => Promise.resolve(answer);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: "88888888-8888-4888-8888-888888888888" }),
+      {
+        from: () =>
+          ({
+            send: () => Promise.resolve(completedSession()),
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.message, allowed.message);
+    assert.equal(body.citations, undefined);
+    assert.deepEqual(gated, [findings]);
+  }
 });
 
 test("a blocked investigation returns the raw findings and no customer message", async (t) => {
