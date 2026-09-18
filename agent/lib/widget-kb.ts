@@ -23,7 +23,10 @@ const MAX_ARTICLES = 4;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
 const SEARCH_TIMEOUT_MS = 5000;
-const KB_TIMEOUT_MS = 15_000;
+// Two model calls (rewrite, then answer) measured at roughly 6s each. A slow
+// answer with sources still beats falling through to a multi-minute
+// investigation, so the cap leaves room for both.
+const KB_TIMEOUT_MS = 25_000;
 const MAX_ANSWER_CHARS = 4000;
 const MARKER = /\[(\d{1,2})\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
@@ -289,9 +292,10 @@ export async function answerFromHelpCenter(
     );
     return answer;
   } catch (error) {
+    mark("failed");
     finish(
       "error",
-      error instanceof Error ? error.message.slice(0, 150) : "unknown"
+      `${error instanceof Error ? error.message.slice(0, 100) : "unknown"} ${marks.join(" ")}`
     );
     return null;
   }
