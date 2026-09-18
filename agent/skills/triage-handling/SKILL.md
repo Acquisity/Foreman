@@ -73,7 +73,7 @@ Every decision above is provisional until the review below has settled the docum
 
 This review runs only when the classification is `Bug` and the handling path is not `Duplicate`. `User Error`, `Platform Limitation`, the unproven stop, and a `Duplicate` go straight to Stage 6: a duplicate routes nothing new to engineering, and the master it attaches to already carries the reviewed root cause.
 
-The critic runs exactly once per ticket. Foreman posts one progress line, delegates once, and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane in the protocol stops a reviewed ticket for a person. Read [references/critic-review.md](references/critic-review.md) and follow it before Stage 6.
+The critic runs exactly once per ticket. Foreman delegates once and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane in the protocol stops a reviewed ticket for a person. Read [references/critic-review.md](references/critic-review.md) and follow it before Stage 6.
 
 Completion: either the unproven branch has made the unblock explicit, preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, the final Linear state, numeric priority, and complete label union are decided, and, for a `Bug` other than a `Duplicate`, the review has settled the exact document version that records them or the hotlane stopped the review and the ticket is with a person.
 
@@ -130,11 +130,11 @@ Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
 
 ### Slack-facing reply
 
-Load slack-wording only in C0BBPVC3N2X or C0BC011NAQL. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Follow the final-post stamp from `slack-intake.ts`.
+Load slack-wording only in C0BBPVC3N2X or C0BC011NAQL. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Follow the final-post stamp from `slack-intake.ts`. Send it once, last, after the memory bookkeeping below; a later result never earns a recap.
 
 ### Record the investigation in memory
 
-Last, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
+Before the reply, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
 
 Send the pattern, not the customer: the claim, root cause, symptoms in the product's own words, identifier-stripped error signatures, the Stage 4 code path and commit, conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), counts with the date counted, and links back to the ticket. Never an email address, organization or user id, production row, log, or anything credential-shaped; the tool refuses them and they stay in the document.
 

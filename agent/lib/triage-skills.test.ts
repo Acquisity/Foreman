@@ -966,7 +966,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
     "a duplicate routes nothing new to engineering",
     "The critic runs exactly once per ticket",
-    "Foreman posts one progress line, delegates once, and adjudicates the result once",
+    "Foreman delegates once and adjudicates the result once",
     "never parks the ticket on a person",
     "Foreman settles the findings against the Stage 4 evidence record and continues routing",
     "[references/critic-review.md](references/critic-review.md)",
@@ -977,7 +977,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
-    "Post one progress line to the attended thread",
+    "Post nothing about the review to the attended thread",
     "the next message the thread receives is the final reply",
     "Delegate to the `critic` subagent exactly once",
     "the full 40-character SHA",
@@ -1001,14 +1001,10 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ]) {
     assert.ok(criticReviewReference.includes(rule), rule);
   }
-  assert.ok(
-    criticReviewReference.indexOf(
-      "Post one progress line to the attended thread"
-    ) <
-      criticReviewReference.indexOf(
-        "Delegate to the `critic` subagent exactly once"
-      ),
-    "the progress line precedes the delegation"
+  assert.equal(
+    criticReviewReference.includes("Post one progress line"),
+    false,
+    "the review posts no progress line to the thread"
   );
   const retryWording = [
     "attempt 1",
