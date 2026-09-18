@@ -7,7 +7,7 @@ import {
   type OwnedIdentifiers,
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
-import { findingsSchema, type WidgetFindings } from "./widget-findings.js";
+import type { WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
@@ -27,9 +27,11 @@ export interface GateDeps {
   }) => Promise<string>;
   judge: (input: {
     findings: WidgetFindings;
+    /** The customer-visible parts of the findings, numbered for `remove`. */
+    items: RedactableItem[];
     question: string;
     scope: WidgetContext;
-  }) => Promise<{ decision: GateDecision; findings?: unknown; reason: string }>;
+  }) => Promise<{ decision: GateDecision; reason: string; remove?: number[] }>;
   resolve: (
     scope: WidgetContext,
     candidates: IdentifierCandidates
@@ -216,6 +218,82 @@ function deterministicReason(
   );
 }
 
+export interface RedactableItem {
+  kind: "fact" | "recommendation" | "needsWrite";
+  n: number;
+  text: string;
+}
+
+const SENTENCE = /[^.!?\n]+[.!?]*\s*/gu;
+const sentences = (text: string): string[] =>
+  (text.match(SENTENCE) ?? []).filter((part) => part.trim());
+
+/**
+ * Everything the customer could end up reading, numbered: each fact, each
+ * sentence of the recommendation, and the needed change. The report, the
+ * ticket and the evidence never reach the composer, so they are not listed.
+ */
+export function redactableItems(findings: WidgetFindings): RedactableItem[] {
+  const items: Omit<RedactableItem, "n">[] = [
+    ...findings.facts.map((fact) => ({
+      kind: "fact" as const,
+      text: fact.claim,
+    })),
+    ...sentences(findings.recommendation).map((text) => ({
+      kind: "recommendation" as const,
+      text: text.trim(),
+    })),
+    ...(findings.needsWrite
+      ? [{ kind: "needsWrite" as const, text: findings.needsWrite }]
+      : []),
+  ];
+  return items.map((item, index) => ({ ...item, n: index + 1 }));
+}
+
+/**
+ * Apply a rewrite by deletion only. The judge names item numbers and this
+ * removes them, so a rewrite can drop content but can never add or reword any:
+ * whatever survives is text the investigator wrote. Returns null when the
+ * numbers are unusable or nothing would be left to tell the customer, and the
+ * caller then blocks.
+ */
+export function removeItems(
+  findings: WidgetFindings,
+  remove: number[]
+): WidgetFindings | null {
+  const items = redactableItems(findings);
+  const drop = new Set(remove);
+  if (
+    drop.size === 0 ||
+    [...drop].some((n) => !Number.isInteger(n) || n < 1 || n > items.length)
+  ) {
+    return null;
+  }
+  const kept = items.filter((item) => !drop.has(item.n));
+  const keptFacts = new Set(
+    kept.filter((item) => item.kind === "fact").map((item) => item.n)
+  );
+  const recommendation = kept
+    .filter((item) => item.kind === "recommendation")
+    .map((item) => item.text)
+    .join(" ");
+  const facts = findings.facts.filter((_fact, index) =>
+    keptFacts.has(index + 1)
+  );
+  if (facts.length === 0 && !recommendation) {
+    return null;
+  }
+  const { needsWrite, ...rest } = findings;
+  return {
+    ...rest,
+    facts,
+    recommendation,
+    ...(needsWrite && kept.some((item) => item.kind === "needsWrite")
+      ? { needsWrite }
+      : {}),
+  };
+}
+
 // Two false blocks shaped this wording, both measured against the gate model.
 // A customer's own campaign named after a person ("James Rea") was read as data
 // about another person, and an empty evidence reference was read as an unbacked
@@ -225,20 +303,20 @@ function deterministicReason(
 const JUDGE_PROMPT = `You are the egress gate between an internal investigator and a customer of Acquisity. You receive the verified customer scope, the customer's question, and the investigator's findings. Decide whether the findings can be shown to this customer.
 Block when any fact or the recommendation discloses data belonging to a different workspace or customer, personal details of an individual who is not part of the verified workspace (another customer, another user's account, an Acquisity employee), or internal operations detail (systems, dashboards, logs, employees, deployments, error traces, tickets other than findings.ticket).
 Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block.
-Rewrite when removing a few sentences makes the rest safe. Allow when everything is about the verified workspace and its own user. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
+Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
 
 const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Never add facts, links, or identifiers that are not in the findings. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give them the steps to make it in the product. If needsWrite is present, treat it as a description of a change that is needed and turn it into steps for the customer, never into a promise. If the customer asked you to make a change for them, apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If confidence is low, say what is uncertain. No greetings, no sign-off, no em dashes.`;
 
-// The verdict is asked for on its own. With the findings in the same schema the
-// model re-emitted every finding even when it simply allowed them (measured:
-// 2 of 3 allows, up to 1,300 output tokens and 16s against about 5s), and on a
-// slow reasoning model that was most of the customer's wait after an
-// investigation. Same model, same prompt, same decision.
+// The judge returns a verdict and, for a rewrite, the numbers of the items to
+// remove. It used to return the findings themselves, and re-emitted every one of
+// them on a slow reasoning model: measured at up to 1,300 output tokens on a
+// plain allow, and 60 to 90 seconds in production when it rewrote. Numbers are a
+// few tokens, and deletion by number is also stricter than a free rewrite.
 const verdictSchema = z.object({
   decision: z.enum(["allow", "rewrite", "block"]),
   reason: z.string().max(500),
+  remove: z.array(z.number().int()).max(60).optional(),
 });
-const rewriteSchema = z.object({ findings: findingsSchema });
 
 export const defaultGateDeps: GateDeps = {
   async compose({ findings, organizationName, question }) {
@@ -255,38 +333,26 @@ export const defaultGateDeps: GateDeps = {
     });
     return text.trim();
   },
-  async judge({ findings, question, scope }) {
+  async judge({ findings, items, question, scope }) {
     const model = await resolveModel("gate");
-    const prompt = JSON.stringify({
-      findings,
-      question,
-      scope: {
-        organizationId: scope.organizationId,
-        organizationName: scope.organizationName,
-        organizationSlug: scope.organizationSlug,
-        userId: scope.userId,
-      },
-    });
-    const { object: verdict } = await generateObject({
+    const { object } = await generateObject({
       model: gateway(model),
       ...gatewayRouting(model),
-      prompt,
+      prompt: JSON.stringify({
+        findings,
+        items,
+        question,
+        scope: {
+          organizationId: scope.organizationId,
+          organizationName: scope.organizationName,
+          organizationSlug: scope.organizationSlug,
+          userId: scope.userId,
+        },
+      }),
       schema: verdictSchema,
       system: JUDGE_PROMPT,
     });
-    if (verdict.decision !== "rewrite") {
-      return verdict;
-    }
-    // Only a rewrite needs the findings back. The caller re-validates them and
-    // re-runs the deterministic scan, exactly as before.
-    const { object: redacted } = await generateObject({
-      model: gateway(model),
-      ...gatewayRouting(model),
-      prompt,
-      schema: rewriteSchema,
-      system: `${JUDGE_PROMPT}\nYou have already decided to rewrite, for this reason: ${verdict.reason}\nReturn only the redacted findings, with the same shape.`,
-    });
-    return { ...verdict, findings: redacted.findings };
+    return object;
   },
   resolve: resolveOwnedIdentifiers,
 };
@@ -330,18 +396,23 @@ export async function gate(
       return done(blocked(findings, "needs_human"));
     }
     const verdict = await timed("judge", () =>
-      deps.judge({ findings, question, scope })
+      deps.judge({
+        findings,
+        items: redactableItems(findings),
+        question,
+        scope,
+      })
     );
     if (verdict.decision === "block") {
       return done(blocked(findings, `model_gate:${verdict.reason}`));
     }
     let gated = findings;
     if (verdict.decision === "rewrite") {
-      const rewritten = findingsSchema.safeParse(verdict.findings);
-      if (!rewritten.success) {
+      const rewritten = removeItems(findings, verdict.remove ?? []);
+      if (!rewritten) {
         return done(blocked(findings, "model_gate:invalid_rewrite"));
       }
-      gated = rewritten.data;
+      gated = rewritten;
       const again = await timed("scan", () =>
         deterministicReason(scope, gated, deps.resolve)
       );

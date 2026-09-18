@@ -6,6 +6,8 @@ import {
   extractIdentifiers,
   type GateDeps,
   gate,
+  redactableItems,
+  removeItems,
 } from "./widget-egress.js";
 import { buildOwnershipQuery } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
@@ -204,8 +206,8 @@ test("a model block, an invalid rewrite, and a gate outage all fail closed", asy
     judge: () =>
       Promise.resolve({
         decision: "rewrite",
-        findings: { nope: true },
         reason: "trimmed",
+        remove: [99],
       }),
   });
   assert.equal(
@@ -221,23 +223,76 @@ test("a model block, an invalid rewrite, and a gate outage all fail closed", asy
   );
 });
 
-test("a rewrite is re-checked deterministically and composed from the redacted findings", async () => {
-  const redacted = findings({ recommendation: "Reconnect the inbox." });
-  const { calls, deps: d } = deps({
-    judge: () =>
-      Promise.resolve({
-        decision: "rewrite",
-        findings: redacted,
-        reason: "dropped a comparison",
-      }),
+test("a rewrite deletes the numbered items, is re-checked, and is composed from what is left", async () => {
+  const twoFacts = findings({
+    facts: [
+      ...findings().facts,
+      {
+        claim: "An engineer saw a related error in the logging dashboard.",
+        entityIds: [],
+        evidence: { ref: "", tool: "investigation" },
+      },
+    ],
   });
-  const result = await gate(scope, question, findings(), d);
+  const seen: unknown[] = [];
+  const { calls, deps: d } = deps({
+    judge: (input) => {
+      seen.push(input.items);
+      return Promise.resolve({
+        decision: "rewrite",
+        reason: "dropped internal detail",
+        remove: [2],
+      });
+    },
+  });
+  const result = await gate(scope, question, twoFacts, d);
   assert.equal(result.decision, "rewrite");
-  assert.deepEqual(result.findings, redacted);
+  // The judge saw every customer-visible part, numbered.
+  assert.deepEqual(
+    (seen[0] as { kind: string; n: number }[]).map((i) => [i.n, i.kind]),
+    [
+      [1, "fact"],
+      [2, "fact"],
+      [3, "recommendation"],
+    ]
+  );
+  // Only the named fact is gone; the rest is the investigator's text, untouched.
+  assert.deepEqual(result.findings.facts, findings().facts);
+  assert.equal(result.findings.recommendation, twoFacts.recommendation);
   assert.deepEqual(
     (calls.compose[0] as { findings: unknown }).findings,
-    composerInput(redacted)
+    composerInput(result.findings)
   );
+});
+
+test("redaction can only delete: sentences, facts and the needed change, never reword", () => {
+  const base = findings({
+    needsWrite: "Raise the plan limit.",
+    recommendation:
+      "Reconnect the inbox. Ask Dave in ops to check. Then resume.",
+  });
+  assert.deepEqual(
+    redactableItems(base).map((i) => [i.n, i.kind, i.text]),
+    [
+      [1, "fact", base.facts[0].claim],
+      [2, "recommendation", "Reconnect the inbox."],
+      [3, "recommendation", "Ask Dave in ops to check."],
+      [4, "recommendation", "Then resume."],
+      [5, "needsWrite", "Raise the plan limit."],
+    ]
+  );
+  const redacted = removeItems(base, [3, 5]);
+  assert.equal(redacted?.recommendation, "Reconnect the inbox. Then resume.");
+  assert.equal(redacted?.needsWrite, undefined);
+  assert.deepEqual(redacted?.facts, base.facts);
+  assert.equal(redacted?.report, base.report);
+
+  // Unusable numbers, an empty list, or nothing left to say all refuse, and the gate blocks.
+  assert.equal(removeItems(base, []), null);
+  assert.equal(removeItems(base, [0]), null);
+  assert.equal(removeItems(base, [6]), null);
+  assert.equal(removeItems(base, [1.5]), null);
+  assert.equal(removeItems(base, [1, 2, 3, 4]), null);
 });
 
 test("the ownership query binds the verified scope and only validated literals", () => {
