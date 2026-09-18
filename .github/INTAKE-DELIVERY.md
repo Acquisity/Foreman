@@ -39,7 +39,13 @@ Instructed causes found in authored text (addressed in slice 1 by prompt rule; m
 - Slice 1 works with eve's policy: no requester answer while a delegated task is running, one short acknowledgement with no findings instead, and the answer in the settled-task turn. Suppression after an answer uses eve's `<eve-empty-delivery/>`, against eve's settled-turn instruction, so it is best effort: when it is the whole response, eve emits `message.completed` with a null message and the existing blank branch posts nothing. Covered by a channel test.
 - The Linear channel (`agent/channels/linear.ts`) stamps trusted plus investigation memory, never intake-only, injects no skill list, uses eve's default rendering (final text becomes a durable `response` activity), and uses the default `steer` turn policy, so a follow-up prompt cancels the running turn. There is no stop interception on Linear.
 - The root has no Slack write tool. Posting to an arbitrary thread exists only in server code (`agent/lib/support/slack.ts` `postSupportMessage`, idempotent through `client_msg_id`).
-- The Asks receiver (`acquisity-asks-receiver.vercel.app`) is not in this repository. Its repository, template settings, Foreman mention, issue-to-thread mapping, and reply sync are unverified. This is the external dependency for the pilot.
+- The Asks receiver is the Vercel project `acquisity-asks-receiver`, deployed from `Acquisity/acquisity-agents` `main` at `834add1`. Read from its code on 2026-09-18, read-only:
+  - The receiver creates the Linear issue itself with `createIssue` (team, Triage state, default assignee, priority, optional project). It uses no Linear template, no labels, and no agent delegation. Native Linear Asks is disconnected. So "set Foreman as delegate in the template editor" has nothing to attach to today: delegation would need a receiver change or a Linear-side rule.
+  - The Foreman Slack mention is sent on every successful form submission, for both templates and every allowed channel. The only switch is `FOREMAN_BOT_USER_ID`; there is no per-template or per-channel switch. It is idempotent through a `client_msg_id` derived from the Slack view id plus a durable intake record.
+  - Issue to Slack thread mapping is the issue's attachment with metadata `source: "linear-asks-bot"`, whose URL is the Slack permalink. No route exposes it, but it is derivable from the Linear API.
+  - Reply sync is the receiver's own code in both directions. A Linear comment reaches Slack only when it is a reply under one of the receiver's own comments, and comments headed `## Internal`, `## Triage investigation`, or `## Refund investigation` are filtered. Agent Session activities and top-level comments do not reach Slack. Slack thread replies are mirrored into Linear as comments under the anchor comment; they do not prompt an Agent Session.
+  - Nothing cancels an in-flight investigation. Reactions only move the issue state.
+  - The legacy in-repo investigation agent is intact. Only the same `FOREMAN_BOT_USER_ID` on both the receiver and the `acquisity-asks` agent project avoids a dual trigger. The live values were not read.
 
 ## Conflict register
 
@@ -47,7 +53,7 @@ Paths are under `agent/skills/`. TH is `triage-handling`, EH `engineering-handof
 
 | Id | Where | Conflict | Class | Status |
 | -- | -- | -- | -- | -- |
-| A1 | TH Stage 5 Bug bar, HL, CR gate | Bug needs a counted blast radius; hotlane allows `Unknown` and `NEEDS_HUMAN_URGENT`, but loads only after a Bug is selected, so an unproven high-risk case stops before it | contradiction and ordering | Open. Proposed: let the unproven branch run the hotlane assessment when the condition is high-risk. The Bug bar stays. Needs Aaron, because it changes who is paged |
+| A1 | TH Stage 5 Bug bar, HL, CR gate | Bug needs a counted blast radius; hotlane allows `Unknown` and `NEEDS_HUMAN_URGENT`, but loads only after a Bug is selected, so an unproven high-risk case stops before it | contradiction and ordering | Open. Proposed: let the unproven branch run the hotlane assessment when the condition is high-risk. The Bug bar stays. Left as is per Aaron, 2026-09-18 |
 | A2 | `triage-investigate` blast radius, TH Bug bar | "tightest bound with the blocker named" against "counted by a query" | unclear exception | Open, resolve with A1 |
 | B1 | RP line 7, TH Stage 6 order | Reporting says state, priority, and labels are already saved; the comment is written before routing | ordering | Open. Proposed: reword RP, no behavior change |
 | C1 | TH Stage 6, EH return text | TH treats the requester comment as already written; EH says Stage 6 writes it after the return | duplicate responsibility | Open, resolve with B1 |
