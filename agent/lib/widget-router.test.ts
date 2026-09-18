@@ -6,6 +6,7 @@ const jevReply = (lane: string, confidence: number) => ({
   json: () =>
     Promise.resolve({
       answers: {
+        asks_for_action: { noul: 0.07 },
         asks_for_human: { noul: 0.04 },
         asks_own_data: { noul: 0.91 },
         lane: { choice: lane, confidence, probabilities: { [lane]: 0.9 } },
@@ -27,6 +28,7 @@ describe("routeWidgetMessage", () => {
       },
     });
     assert.deepEqual(route, {
+      asksForAction: 0.07,
       asksForHuman: 0.04,
       asksOwnData: 0.91,
       confidence: 0.87,
@@ -37,6 +39,7 @@ describe("routeWidgetMessage", () => {
     const body = JSON.parse((sent as { body: string }).body);
     assert.equal(body.state, "why did my campaign stop?");
     assert.deepEqual(Object.keys(body.questions).sort(), [
+      "asks_for_action",
       "asks_for_human",
       "asks_own_data",
       "lane",

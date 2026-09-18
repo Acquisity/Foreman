@@ -92,6 +92,7 @@ function dependencies(gateResult: GateResult = allowed) {
     read: () => Promise.resolve(run),
     route: () =>
       Promise.resolve({
+        asksForAction: 0,
         asksForHuman: 0,
         asksOwnData: 1,
         confidence: 0,
@@ -305,6 +306,7 @@ test("a completed investigation is gated and answered with the composed reply on
 
 const kbRoute = (confidence: number) => () =>
   Promise.resolve({
+    asksForAction: 0,
     asksForHuman: 0,
     asksOwnData: 0,
     confidence,
@@ -339,6 +341,51 @@ test("a confident knowledge-base route answers with citations and never starts a
   });
   assert.deepEqual(gated, []);
   assert.equal(run.outcome?.reason, "kb");
+});
+
+test("a request to act skips the investigation, unless the customer asked for a person", async (t) => {
+  enabled(t);
+  const route = (lane: "investigate" | "human") => () =>
+    Promise.resolve({
+      asksForAction: 0.95,
+      asksForHuman: lane === "human" ? 0.95 : 0,
+      asksOwnData: 0.97,
+      confidence: 0.4,
+      lane,
+      source: "jev" as const,
+    });
+  const { deps, gated } = dependencies();
+  deps.route = route("investigate");
+  deps.answerKb = () => Promise.resolve(kbAnswer);
+  const acted = await receiveWidgetMessage(
+    request({ ...start, message_id: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = (await acted.json()) as Record<string, unknown>;
+  assert.equal(body.message, kbAnswer.message);
+  assert.deepEqual(gated, []);
+
+  const human = dependencies();
+  human.deps.route = route("human");
+  human.deps.answerKb = () =>
+    assert.fail("an explicit ask for a person is not fast-laned");
+  await receiveWidgetMessage(
+    request({ ...start, message_id: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb" }),
+    {
+      from: () =>
+        ({
+          send: () => Promise.resolve(completedSession()),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    200,
+    verify,
+    human.deps
+  );
+  assert.deepEqual(human.gated, [findings]);
 });
 
 test("an unsure knowledge-base route, or a help-center miss, is investigated instead", async (t) => {

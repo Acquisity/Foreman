@@ -212,6 +212,12 @@ export const WIDGET_DEADLINE_MS = 280_000;
  * outright and never reaches this check.
  */
 const KB_ROUTE_CONFIDENCE = 0.6;
+/**
+ * How sure the router must be that the customer wants something done for them.
+ * High on purpose: a lookup wrongly read as a request to act would get general
+ * steps instead of a look at the account.
+ */
+const ACTION_REQUEST_SCORE = 0.8;
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -282,13 +288,17 @@ export async function finishWidgetRun(
       findings = structured;
       const gated = await deps.gate(run.scope, run.question, structured);
       // Where the wait after an investigation goes: three model calls in a row.
+      // Decision and reason ride along because log search surfaces one line per
+      // request, and this line would otherwise hide why a reply was blocked.
       logOpsEvent("widget.finish.timing", {
         conversationId: run.scope.conversationId,
+        decision: gated.decision,
         message: [
           `extract=${extractMs}`,
           ...Object.entries(gated.timings ?? {}).map(
             ([step, ms]) => `${step}=${ms}`
           ),
+          `| ${gated.reason}`,
         ].join(" "),
         runId: run.id,
         sessionId,
@@ -371,7 +381,13 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
-  if (route.lane !== "kb" || route.confidence < KB_ROUTE_CONFIDENCE) {
+  const generalQuestion =
+    route.lane === "kb" && route.confidence >= KB_ROUTE_CONFIDENCE;
+  // A request to act never needs an investigation: the fast lane apologises and
+  // gives the steps. An explicit ask for a person is left alone.
+  const actionRequest =
+    route.lane !== "human" && route.asksForAction >= ACTION_REQUEST_SCORE;
+  if (!(generalQuestion || actionRequest)) {
     return null;
   }
   const answer = await deps.answerKb(question, {

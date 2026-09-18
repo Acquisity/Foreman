@@ -24,6 +24,14 @@ export const WIDGET_LANES = ["kb", "investigate", "human"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
 
 const QUESTIONS = {
+  // Foreman can never act on an account, and the reply to a request to act is
+  // always the same: a short apology and the steps. Knowing this up front keeps
+  // such a message out of a minutes-long investigation it cannot benefit from.
+  asks_for_action: {
+    instructions:
+      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect, refund or set something up for them. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
+    type: "noul",
+  },
   asks_for_human: {
     instructions:
       "The customer explicitly asks to talk to a person, a human, an agent, or the support team.",
@@ -49,6 +57,7 @@ const QUESTIONS = {
 
 const responseSchema = z.object({
   answers: z.object({
+    asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
     lane: z.object({
@@ -60,6 +69,7 @@ const responseSchema = z.object({
 });
 
 export interface WidgetRoute {
+  asksForAction: number;
   asksForHuman: number;
   asksOwnData: number;
   confidence: number;
@@ -68,6 +78,7 @@ export interface WidgetRoute {
 }
 
 const FALLBACK: WidgetRoute = {
+  asksForAction: 0,
   asksForHuman: 0,
   asksOwnData: 0,
   confidence: 0,
@@ -121,6 +132,7 @@ export async function routeWidgetMessage(
     }
     const { answers } = responseSchema.parse(await response.json());
     return {
+      asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
       confidence: answers.lane.confidence ?? 0,
@@ -139,7 +151,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)}`,
     runId: fields.runId,
   });
 }
