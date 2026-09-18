@@ -19,6 +19,7 @@ const ALLOWED_TOOLS = new Set([
   "widget_lead_pipeline_status",
   "widget_outreach_health",
   "widget_provisioning_status",
+  "widget_read_help_article",
   "widget_sdr_thread_status",
   "widget_website_status",
 ]);

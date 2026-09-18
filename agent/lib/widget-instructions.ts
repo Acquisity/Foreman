@@ -2,7 +2,7 @@ import type { SessionAuthContext } from "eve/context";
 import { widgetContext } from "./widget-scope.js";
 
 export const WIDGET_DISCOVERY =
-  "Company evidence is available through widget_provider: search paths, describe one, then call it. The authored helpers (planetscale_execute_read_query, describe_table, lookup_customer, read_billing_account, read_autumn_billing, read_stripe_billing, find_function_runs, find_help_article, read_instantly_subworkspace, list_instantly_subworkspaces) use the same read-only toolkit. The broad Executor connection, repository tools, sandbox commands, browser, delegation, and memory writes are unavailable in this lane.";
+  "Help-center articles are available through find_help_article (search) then widget_read_help_article (read one article's full text by its url) so you can answer from and cite the article. Company evidence is available through widget_provider: search paths, describe one, then call it. The authored helpers (planetscale_execute_read_query, describe_table, lookup_customer, read_billing_account, read_autumn_billing, read_stripe_billing, find_function_runs, find_help_article, read_instantly_subworkspace, list_instantly_subworkspaces) use the same read-only toolkit. The broad Executor connection, repository tools, sandbox commands, browser, delegation, and memory writes are unavailable in this lane.";
 
 export const widgetInstructions = (
   auth: SessionAuthContext | null | undefined

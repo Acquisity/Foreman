@@ -89,3 +89,82 @@ export async function findHelpArticles(
     };
   }
 }
+
+const CONTENT_TIMEOUT_MS = 10_000;
+const MAX_CONTENT_CHARS = 60_000;
+const DOCS_SLUG = /^\/docs\/([A-Za-z0-9][A-Za-z0-9/_-]*)$/u;
+
+export const helpArticleContentSchema = z.object({
+  content: z.string(),
+  title: z.string().optional(),
+  url: z.string(),
+});
+
+export type HelpArticleContent =
+  | { content: string; title?: string; url: string }
+  | { error: string; url: string };
+
+type FetchLike = (
+  input: string,
+  init?: { headers?: Record<string, string>; signal?: AbortSignal }
+) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+
+/**
+ * Fetch one help-center article's full markdown by the url `find_help_article`
+ * returned, for a search -> read -> answer chat flow. The help center is public,
+ * so this goes straight to the docs app rather than through the per-tenant
+ * executor. Same-origin `/docs/<slug>` urls only; a failure returns `{ error }`
+ * rather than throwing.
+ */
+export async function getHelpArticleContent(
+  articleUrl: string,
+  opts?: { baseUrl?: string; fetch?: FetchLike; signal?: AbortSignal }
+): Promise<HelpArticleContent> {
+  const base = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
+  const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
+  let slug: string | null = null;
+  try {
+    const target = new URL(articleUrl, base);
+    if (target.host === new URL(base).host) {
+      slug = DOCS_SLUG.exec(target.pathname)?.[1] ?? null;
+    }
+  } catch {
+    slug = null;
+  }
+  if (!slug) {
+    return {
+      error: "Not an Acquisity help-center article url.",
+      url: articleUrl,
+    };
+  }
+  try {
+    const signal = opts?.signal
+      ? AbortSignal.any([opts.signal, AbortSignal.timeout(CONTENT_TIMEOUT_MS)])
+      : AbortSignal.timeout(CONTENT_TIMEOUT_MS);
+    const response = await doFetch(
+      `${base}/api/docs-content?id=${encodeURIComponent(slug)}`,
+      { headers: { accept: "application/json" }, signal }
+    );
+    if (response.status === 404) {
+      return { error: "Article not found.", url: articleUrl };
+    }
+    if (!response.ok) {
+      return {
+        error: `Help-center content failed: HTTP ${response.status}.`,
+        url: articleUrl,
+      };
+    }
+    const data = helpArticleContentSchema.parse(await response.json());
+    return {
+      content: data.content.slice(0, MAX_CONTENT_CHARS),
+      ...(data.title ? { title: data.title } : {}),
+      url: articleUrl,
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Help-center content failed.",
+      url: articleUrl,
+    };
+  }
+}
