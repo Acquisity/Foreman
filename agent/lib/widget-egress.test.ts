@@ -168,6 +168,29 @@ test("needsHuman with no concrete facts hands off with no reply", async () => {
   assert.equal(calls.compose.length, 0);
 });
 
+test("a composed message that leaks a foreign identifier is blocked after composition", async () => {
+  const { deps: d } = deps({
+    compose: () => Promise.resolve(`See workspace ${foreignId} for details.`),
+  });
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.decision, "block");
+  assert.match(result.reason, /^composed:foreign_identifier:/);
+  assert.equal(result.message, null);
+});
+
+test("a composed message that leaks an internal host is blocked after composition", async () => {
+  const { deps: d } = deps({
+    compose: () =>
+      Promise.resolve(
+        "See https://acquisity.sentry.io/issues/1 for the trace."
+      ),
+  });
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.decision, "block");
+  assert.match(result.reason, /^composed:internal_artifact:/);
+  assert.equal(result.message, null);
+});
+
 test("a model block, an invalid rewrite, and a gate outage all fail closed", async () => {
   const blocked = deps({
     judge: () =>

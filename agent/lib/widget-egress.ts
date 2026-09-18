@@ -34,8 +34,11 @@ export interface GateDeps {
   ) => Promise<OwnedIdentifiers>;
 }
 
-/** The composer never sees evidence references or the CS report: those are internal-only. */
-export type ComposerInput = Omit<WidgetFindings, "facts" | "report"> & {
+/** The composer never sees evidence references, the CS report, or the internal ticket. */
+export type ComposerInput = Omit<
+  WidgetFindings,
+  "facts" | "report" | "ticket"
+> & {
   facts: { claim: string }[];
 };
 
@@ -87,12 +90,14 @@ export function customerText(findings: WidgetFindings): string {
   ].join("\n");
 }
 
-/** Everything identifier-shaped in the text the composer could ever see. */
-export function extractIdentifiers(findings: WidgetFindings): {
+/** Everything identifier-shaped in an arbitrary customer-bound string. */
+export function scanIdentifiers(
+  text: string,
+  exemptTicketId?: string
+): {
   candidates: IdentifierCandidates;
   internal: string[];
 } {
-  const text = customerText(findings);
   const internal: string[] = [];
   const urls = text.match(URL_PATTERN) ?? [];
   const slugs = new Set<string>();
@@ -126,7 +131,7 @@ export function extractIdentifiers(findings: WidgetFindings): {
     internal.push(id);
   }
   for (const ref of new Set(text.match(LINEAR_REF) ?? [])) {
-    if (ref !== findings.ticket?.id) {
+    if (ref !== exemptTicketId) {
       internal.push(ref);
     }
   }
@@ -145,27 +150,38 @@ export function extractIdentifiers(findings: WidgetFindings): {
   };
 }
 
+/** Everything identifier-shaped in the findings the composer could ever see. */
+export function extractIdentifiers(findings: WidgetFindings): {
+  candidates: IdentifierCandidates;
+  internal: string[];
+} {
+  return scanIdentifiers(customerText(findings), findings.ticket?.id);
+}
+
+// The composer never sees the internal ticket: its id and its linear.app URL are
+// internal artifacts, and needsWrite/the recommendation already carry any
+// follow-up the customer should hear about.
 export const composerInput = (findings: WidgetFindings): ComposerInput => ({
   confidence: findings.confidence,
   facts: findings.facts.map((fact) => ({ claim: fact.claim })),
   needsHuman: findings.needsHuman,
   ...(findings.needsWrite ? { needsWrite: findings.needsWrite } : {}),
   recommendation: findings.recommendation,
-  ...(findings.ticket ? { ticket: findings.ticket } : {}),
 });
 
-async function deterministicReason(
+// The deterministic layer owns the cross-tenant guarantee: internal-only
+// artifacts and identifiers that do not belong to the verified workspace. Claim
+// backing is judged by the model gate below. (A per-fact evidence.ref
+// requirement was incompatible with the prose->extract flow, where a small model
+// reformats the investigator's write-up and cannot restate a ref per fact even
+// though the claim came from a real tool result.)
+async function deterministicTextReason(
   scope: WidgetContext,
-  findings: WidgetFindings,
-  resolve: GateDeps["resolve"]
+  text: string,
+  resolve: GateDeps["resolve"],
+  exemptTicketId?: string
 ): Promise<string | null> {
-  // Whether a claim is actually backed by its evidence is judged by the model
-  // gate below. The deterministic layer owns the cross-tenant guarantee only:
-  // foreign identifiers and internal-only artifacts. (A per-fact evidence.ref
-  // requirement was incompatible with the prose->extract flow, where a small
-  // model reformats the investigator's write-up and cannot restate a ref per
-  // fact even though the claim came from a real tool result.)
-  const { candidates, internal } = extractIdentifiers(findings);
+  const { candidates, internal } = scanIdentifiers(text, exemptTicketId);
   if (internal.length) {
     return `internal_artifact:${internal[0]}`;
   }
@@ -183,6 +199,19 @@ async function deterministicReason(
     candidates.slugs.find((slug) => !owned.slugs.has(slug)) ??
     candidates.emails.find((email) => !owned.emails.has(email));
   return foreign ? `foreign_identifier:${foreign}` : null;
+}
+
+function deterministicReason(
+  scope: WidgetContext,
+  findings: WidgetFindings,
+  resolve: GateDeps["resolve"]
+): Promise<string | null> {
+  return deterministicTextReason(
+    scope,
+    customerText(findings),
+    resolve,
+    findings.ticket?.id
+  );
 }
 
 const JUDGE_PROMPT = `You are the egress gate between an internal investigator and a customer of Acquisity. You receive the verified customer scope, the customer's question, and the investigator's findings. Decide whether the findings can be shown to this customer.
@@ -279,6 +308,14 @@ export async function gate(
     });
     if (!message) {
       return blocked(findings, "empty_reply");
+    }
+    // Final guarantee: scan the actual customer-bound text. The composer is a
+    // model and can introduce an identifier or internal artifact that was never
+    // in the gated findings; the customer message must contain no foreign
+    // identifier and no ticket reference at all.
+    const egress = await deterministicTextReason(scope, message, deps.resolve);
+    if (egress) {
+      return blocked(findings, `composed:${egress}`);
     }
     return {
       decision: verdict.decision,
