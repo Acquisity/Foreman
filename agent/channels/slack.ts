@@ -327,6 +327,11 @@ export const slackChannelEvents: SlackChannelEvents = {
     channel.state.progress = undefined;
     // Blankness decides the typing fallback, but the post itself is verbatim:
     // trimming would destroy leading Markdown indentation in the reply.
+    // A null message is eve's empty delivery: the turn chose to say nothing,
+    // so no typing indicator is left hanging with no turn behind it.
+    if (data.message === null) {
+      return;
+    }
     if (!data.message?.trim()) {
       await channel.thread.startTyping();
       return;

@@ -25,7 +25,9 @@ Inferred or unknown:
 - Whether the critic verdict preceded the requester answer. The recap says the "background assessment confirmed my applied decisions", which suggests routing was applied before it returned. Not proven.
 - The reasoning setting used by the run.
 
-Instructed causes found in authored text (all fixed in slice 1):
+Framework cause, found in review: eve 0.54.2 appends a "Background task reporting" instruction to root turns. A turn that launches a task must end with an acknowledgement, and a turn started by settled tasks is told not to use the empty delivery and to send one user-facing response. The 18:20 answer went out while a child was running, so the 18:21 settled-task turn had to say something. See the EVE-PROPOSALS.md section on background task reporting.
+
+Instructed causes found in authored text (addressed in slice 1 by prompt rule; model compliance is unproven until live UAT):
 
 - `critic-review.md` step 3 and `triage-handling` told Foreman to post a progress line before the critic, and the Slack final-post rule allowed "normal conversational progress updates".
 - Stage 7 placed the reply before memory bookkeeping, and the delegation prompt said to use later completions to "answer the user", with nothing forbidding a second closing message.
@@ -33,8 +35,8 @@ Instructed causes found in authored text (all fixed in slice 1):
 
 ## Delivery facts that bound the design
 
-- eve gives authored Slack channel code no way to tell a user turn from a turn started by a delegated result: `turn.started` carries only `turnId`, and the task-triggered `message.received` is not a Slack channel event. A code-side "already answered" flag would therefore also swallow the real answer after an interim post. It was not built.
-- The supported suppression is eve's `<eve-empty-delivery/>`: when it is the whole response, eve emits `message.completed` with a null message and the existing blank branch posts nothing. Covered by a channel test.
+- eve knows the delivery phase internally (`taskDeliveryPhase`) but gives authored Slack channel code no way to tell a user turn from a turn started by a delegated result: `turn.started` carries only `turnId`, and the task-triggered `message.received` is not a Slack channel event. A code-side "already answered" flag would therefore also swallow the real answer after an interim post. It was not built.
+- Slice 1 works with eve's policy: no requester answer while a delegated task is running, one short acknowledgement with no findings instead, and the answer in the settled-task turn. Suppression after an answer uses eve's `<eve-empty-delivery/>`, against eve's settled-turn instruction, so it is best effort: when it is the whole response, eve emits `message.completed` with a null message and the existing blank branch posts nothing. Covered by a channel test.
 - The Linear channel (`agent/channels/linear.ts`) stamps trusted plus investigation memory, never intake-only, injects no skill list, uses eve's default rendering (final text becomes a durable `response` activity), and uses the default `steer` turn policy, so a follow-up prompt cancels the running turn. There is no stop interception on Linear.
 - The root has no Slack write tool. Posting to an arbitrary thread exists only in server code (`agent/lib/support/slack.ts` `postSupportMessage`, idempotent through `client_msg_id`).
 - The Asks receiver (`acquisity-asks-receiver.vercel.app`) is not in this repository. Its repository, template settings, Foreman mention, issue-to-thread mapping, and reply sync are unverified. This is the external dependency for the pilot.
@@ -53,8 +55,8 @@ Paths are under `agent/skills/`. TH is `triage-handling`, EH `engineering-handof
 | E1 | SW Bug wording against SW promise rule | "the team is working on a fix" against no unverified promises | contradiction | Fixed in slice 1 with Aaron's rule: only when a matching engineering issue is In Progress or there is current explicit evidence of active work; no date, no deployed-fix claim |
 | F1 | TH state sentence against TH non-engineering close | Support paths are Todo, yet prose says the report closes | wording | Open |
 | F2 | `triage-investigate` duplicate step against TH | "comment and route in one update" against comment then one route call | wording | Open |
-| G1 | CR step 3, TH review paragraph, Slack final-post rule | Instructed interim progress post | duplicate responsibility | Fixed in slice 1 |
-| G2 | TH Stage 7 order, delegation prompt | Reply before memory work; late results produce a second terminal message | ordering | Fixed in slice 1 |
+| G1 | CR step 3, TH review paragraph, Slack final-post rule | Instructed interim progress post | duplicate responsibility | Addressed in slice 1, live UAT pending |
+| G2 | TH Stage 7 order, delegation prompt | Reply before memory work; late results produce a second terminal message | ordering | Addressed in slice 1, live UAT pending |
 | H1 | EH master window, `agent/tools/find_related_issues.ts` | The 30-day master window is keyed to the Slack intake-only stamp; a Linear session has no cutoff | unclear exception | Open. The pilot must carry a verified intake stamp into Linear |
 | H2 | `agent/lib/slack-intake.ts` boundary against `agent/lib/linear-context.ts` | No-implementation boundary, skill list, and single-issue rule are injected only on Slack | unclear exception | Open, same slice as H1 |
 | H3 | TH Stage 7 | The reply rule points at a Slack stamp a Linear session never receives | unclear exception | Open, same slice as H1 |

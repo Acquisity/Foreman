@@ -1152,7 +1152,8 @@ describe("slack channel progress", () => {
   });
 
   it("posts nothing when a late result turn ends with an empty delivery", async () => {
-    // eve turns a whole-response <eve-empty-delivery/> into a null message.
+    // eve reports an empty delivery as a null message; this covers only the
+    // channel branch, not the model choosing the marker.
     const calls: string[] = [];
     const eventChannel = progressChannel(calls);
     await handlerFor("message.completed")(
@@ -1171,6 +1172,8 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.deepEqual(postsOf(calls), ["post:The answer."]);
+    // No typing indicator is left hanging after the silent turn.
+    assert.equal(calls.at(-1), "typing:Working...");
   });
 
   it("clears progress state when the turn is cancelled", async () => {
