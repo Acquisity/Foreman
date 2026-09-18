@@ -68,6 +68,34 @@ export async function latestWidgetScope(
   return rows.length ? widgetContextSchema.parse(rows[0].scope) : null;
 }
 
+const RECENT_TURNS = 4;
+
+/**
+ * The earlier turns of this run's conversation, oldest first, rebuilt from the
+ * runs themselves: each holds the customer's message and the reply that went
+ * out. The reply is often written in a later request than the one that started
+ * the run, so the conversation is read here rather than carried from the client.
+ * Turns that were blocked have no reply and contribute only the question.
+ */
+export async function recentWidgetTurns(
+  run: Pick<WidgetRun, "created_at" | "id" | "scope">
+): Promise<{ role: "customer" | "assistant"; text: string }[]> {
+  const rows = await privateDatabase().query(
+    `SELECT question, outcome FROM widget_support_runs
+     WHERE organization_id = $1 AND conversation_id = $2 AND id <> $3 AND created_at < $4
+     ORDER BY created_at DESC LIMIT ${RECENT_TURNS}`,
+    [run.scope.organizationId, run.scope.conversationId, run.id, run.created_at]
+  );
+  return rows.reverse().flatMap((row) => {
+    const reply = widgetOutcomeSchema.nullable().safeParse(row.outcome);
+    const message = reply.success ? reply.data?.message : null;
+    return [
+      { role: "customer" as const, text: String(row.question) },
+      ...(message ? [{ role: "assistant" as const, text: message }] : []),
+    ];
+  });
+}
+
 /** SQL uniqueness, not a process-local lock, arbitrates overlapping HTTP requests. */
 export async function claimWidgetRun(
   scope: WidgetContext,

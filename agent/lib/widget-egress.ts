@@ -333,7 +333,7 @@ Block when any fact or the recommendation discloses data belonging to a differen
 Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block.
 Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
 
-const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Never add facts, links, or identifiers that are not in the findings. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give them the steps to make it in the product. If needsWrite is present, treat it as a description of a change that is needed and turn it into steps for the customer, never into a promise. If the customer asked you to make a change for them, apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If confidence is low, say what is uncertain. No greetings, no sign-off, no em dashes.`;
+const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Never add facts, links, or identifiers that are not in the findings. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give them the steps to make it in the product. If needsWrite is present, treat it as a description of a change that is needed and turn it into steps for the customer, never into a promise. If the customer asked you to make a change for them, apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If confidence is low, say what is uncertain. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. No greetings, no sign-off, no em dashes.`;
 
 // The judge returns a verdict and, for a rewrite, the numbers of the items to
 // remove. It used to return the findings themselves, and re-emitted every one of
@@ -397,7 +397,9 @@ export async function gate(
   scope: WidgetContext,
   question: string,
   findings: WidgetFindings,
-  deps: GateDeps = defaultGateDeps
+  deps: GateDeps = defaultGateDeps,
+  /** The question within its conversation, for the composer only. */
+  conversation: string = question
 ): Promise<GateResult> {
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
@@ -452,7 +454,7 @@ export async function gate(
       deps.compose({
         findings: composerInput(gated),
         organizationName: scope.organizationName,
-        question,
+        question: conversation,
       })
     );
     if (!message) {

@@ -88,6 +88,7 @@ function dependencies(gateResult: GateResult = allowed) {
       gated.push(raw);
       return Promise.resolve(gateResult);
     },
+    history: () => Promise.resolve([]),
     latestScope: () => Promise.resolve(null),
     read: () => Promise.resolve(run),
     route: () =>

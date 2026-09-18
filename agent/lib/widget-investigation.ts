@@ -16,6 +16,7 @@ import {
   completeWidgetRun,
   latestWidgetScope,
   readWidgetRun,
+  recentWidgetTurns,
   type WidgetOutcome,
   type WidgetRun,
 } from "./widget-run-store.js";
@@ -161,6 +162,7 @@ export const defaultWidgetDependencies = {
   complete: completeWidgetRun,
   extract: extractWidgetFindings,
   gate: egressGate,
+  history: recentWidgetTurns,
   latestScope: latestWidgetScope,
   read: readWidgetRun,
   route: routeWidgetMessage,
@@ -253,10 +255,10 @@ function humanHandoff(
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
-  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  run: Pick<WidgetRun, "created_at" | "id" | "question" | "scope">,
   sessionId: string,
   outcome: WaitOutcome,
-  deps: Pick<WidgetDependencies, "complete" | "extract" | "gate">
+  deps: Pick<WidgetDependencies, "complete" | "extract" | "gate" | "history">
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
@@ -268,13 +270,21 @@ export async function finishWidgetRun(
   } else {
     // The investigator writes prose; a separate pass structures it. Any leftover
     // stream-carried findings still work, but the schema no longer fails the session.
+    // The extractor and the composer read the latest message in its
+    // conversation, so a reply continues the thread instead of starting over.
+    // A failed read costs only that context, never the reply. The judge still
+    // gets the question alone: it rules on the findings, not the conversation.
+    const conversation = withHistory(
+      run.question,
+      await deps.history(run).catch(() => [])
+    );
     const extractStartedAt = Date.now();
     const structured =
       outcome.findings ??
       (outcome.text
         ? await deps.extract({
             investigatorText: outcome.text,
-            question: run.question,
+            question: conversation,
             scope: run.scope,
           })
         : null);
@@ -286,7 +296,13 @@ export async function finishWidgetRun(
         null;
     if (structured) {
       findings = structured;
-      const gated = await deps.gate(run.scope, run.question, structured);
+      const gated = await deps.gate(
+        run.scope,
+        run.question,
+        structured,
+        undefined,
+        conversation
+      );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
       // request, and this line would otherwise hide why a reply was blocked.
@@ -603,6 +619,7 @@ export async function failWidgetRun(
           complete: deps.complete,
           extract: extractWidgetFindings,
           gate: egressGate,
+          history: recentWidgetTurns,
         }
       );
     }
