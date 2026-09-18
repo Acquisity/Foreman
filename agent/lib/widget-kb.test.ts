@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   answerFromHelpCenter,
   type KbDeps,
+  mergeHits,
   resolveCitations,
 } from "./widget-kb.js";
 
@@ -21,6 +22,7 @@ const deps = (answer: unknown, hits = articles): KbDeps => ({
       title: hits.find((h) => h.url === url)?.title ?? url,
       url,
     }),
+  rewrite: () => Promise.resolve({ queries: ["ai sdr setup"] }),
   search: () => Promise.resolve(hits),
 });
 
@@ -68,4 +70,43 @@ test("no hits, an unanswerable question, an uncited answer, and a failure all fa
     // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
     assert.equal(await answerFromHelpCenter("q", log, kbDeps), null);
   }
+});
+
+test("hits from several queries merge by agreement and rank, capped at four", () => {
+  const hit = (name: string) => ({
+    title: name,
+    url: `https://x/docs/${name}`,
+  });
+  const merged = mergeHits([
+    [hit("ad-writer"), hit("workspace"), hit("buying-inboxes")],
+    [hit("buying-inboxes"), hit("inbox-cost"), hit("pre-warmed")],
+    [hit("email-accounts"), hit("buying-inboxes")],
+  ]);
+  assert.deepEqual(
+    merged.map((h) => h.title),
+    ["buying-inboxes", "ad-writer", "email-accounts", "workspace"]
+  );
+});
+
+test("the message is searched as keyword queries, and as itself when the rewrite fails", async () => {
+  const searched: string[] = [];
+  const base = deps({ answer: "Do this [1].", answerable: true });
+  const recording: KbDeps = {
+    ...base,
+    rewrite: () =>
+      Promise.resolve({ queries: ["buy inboxes", " email accounts "] }),
+    search: (query, signal) => {
+      searched.push(query);
+      return base.search(query, signal);
+    },
+  };
+  await answerFromHelpCenter("how do i add inboxes?", log, recording);
+  assert.deepEqual(searched, ["buy inboxes", "email accounts"]);
+
+  searched.length = 0;
+  await answerFromHelpCenter("how do i add inboxes?", log, {
+    ...recording,
+    rewrite: () => Promise.reject(new Error("gateway down")),
+  });
+  assert.deepEqual(searched, ["how do i add inboxes?"]);
 });
