@@ -323,7 +323,19 @@ export async function gate(
       message,
       reason: verdict.reason,
     };
-  } catch {
+  } catch (error) {
+    // The gate fails closed, but log why: a swallowed error here (a gate-model
+    // failure, an ownership-resolution failure) is otherwise invisible and every
+    // reply just blocks as "gate_unavailable". The message field is redacted.
+    logOpsEvent(
+      "widget.egress.gate_error",
+      {
+        conversationId: scope.conversationId,
+        message: error instanceof Error ? error.message : "unknown",
+        outcome: "error",
+      },
+      console.warn
+    );
     return blocked(findings, "gate_unavailable");
   }
 }
