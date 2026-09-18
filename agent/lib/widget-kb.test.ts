@@ -16,6 +16,7 @@ const log = { conversationId: "c", runId: "r" };
 
 const deps = (answer: unknown, hits = articles): KbDeps => ({
   generate: () => Promise.resolve(answer),
+  index: () => Promise.resolve(null),
   read: (url) =>
     Promise.resolve({
       content: "body",
@@ -24,6 +25,7 @@ const deps = (answer: unknown, hits = articles): KbDeps => ({
     }),
   rewrite: () => Promise.resolve({ queries: ["ai sdr setup"] }),
   search: () => Promise.resolve(hits),
+  select: () => assert.fail("no index, so nothing to select from"),
 });
 
 test("citations are renumbered by first use, and markers for unknown articles are dropped", () => {
@@ -109,4 +111,51 @@ test("the message is searched as keyword queries, and as itself when the rewrite
     rewrite: () => Promise.reject(new Error("gateway down")),
   });
   assert.deepEqual(searched, ["how do i add inboxes?"]);
+});
+
+test("articles are picked from the title index, with keyword search only as the fallback", async () => {
+  const index = [
+    { id: "ad-writer", title: "AI Ads Maker" },
+    {
+      id: "cold-email-agent/email-accounts/buying-inboxes",
+      title: "Buying inboxes",
+    },
+  ];
+  const read: string[] = [];
+  const base = deps({ answer: "Open Add New Inboxes [1].", answerable: true });
+  const picking: KbDeps = {
+    ...base,
+    index: () => Promise.resolve(index),
+    read: (url) => {
+      read.push(url);
+      return Promise.resolve({ content: "body", title: "Buying inboxes", url });
+    },
+    search: () => assert.fail("must not search when the index answers"),
+    select: () => Promise.resolve({ articles: [2, 2, 99] }),
+  };
+  const result = await answerFromHelpCenter(
+    "how do i add inboxes?",
+    log,
+    picking
+  );
+  assert.equal(read.length, 1);
+  assert.equal(
+    new URL(read[0]).pathname,
+    "/docs/cold-email-agent/email-accounts/buying-inboxes"
+  );
+  assert.equal(result?.citations[0].title, "Buying inboxes");
+
+  // An empty pick, or a failing one, falls back to keyword search.
+  for (const select of [
+    () => Promise.resolve({ articles: [] }),
+    () => Promise.reject(new Error("gateway down")),
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
+    const fallback = await answerFromHelpCenter("q", log, {
+      ...base,
+      index: () => Promise.resolve(index),
+      select,
+    });
+    assert.equal(fallback?.citations[0].title, "Setup");
+  }
 });

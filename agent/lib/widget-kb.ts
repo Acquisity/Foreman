@@ -20,6 +20,8 @@ import { logOpsEvent } from "./ops-log.js";
  */
 
 const MAX_ARTICLES = 4;
+const INDEX_TIMEOUT_MS = 5000;
+const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
 const SEARCH_TIMEOUT_MS = 5000;
@@ -54,6 +56,15 @@ const hitSchema = z.looseObject({
   url: z.string(),
 });
 
+const indexSchema = z.array(
+  z.object({ id: z.string().min(1).max(300), title: z.string().min(1) })
+);
+type KbIndex = z.infer<typeof indexSchema>;
+
+const selectSchema = z.object({
+  articles: z.array(z.number().int()).max(MAX_ARTICLES),
+});
+
 const rewriteSchema = z.object({
   queries: z.array(z.string()).min(1).max(MAX_QUERIES),
 });
@@ -72,7 +83,12 @@ const FAST_OPTIONS = {
   google: { thinkingConfig: { thinkingLevel: "minimal" } },
 } as const;
 
-const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Plain text only: no markdown, no asterisks, no headings. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set answerable to false and leave answer empty only when none of the articles covers the topic of the question; ignore articles that are irrelevant. No greetings, no sign-off, no em dashes.`;
+const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set answerable to false and leave answer empty only when none of the articles covers the topic of the question; ignore articles that are irrelevant. No greetings, no sign-off, no em dashes.`;
+
+// Choosing from the real list of titles beats guessing search keywords: a
+// customer asking how to "add" inboxes never matches a guide titled "Buying
+// inboxes" lexically, but a model reading both sees they are the same thing.
+const SELECT_PROMPT = `You pick help-center articles for a customer's support question. You are given the full numbered list of articles as "number. title (path)". Return the numbers of up to ${MAX_ARTICLES} articles most likely to contain the answer, best first. Prefer a specific how-to guide over an index, overview or FAQ listing page. Return an empty list if nothing fits.`;
 
 // The help-center search is lexical and matches short keyword queries against
 // article titles. A whole conversational sentence ranks on its filler words
@@ -86,13 +102,22 @@ export interface KbDeps {
     question: string;
     signal: AbortSignal;
   }) => Promise<unknown>;
+  /** Every article's id and title, or null where the web app has no index route yet. */
+  index: (signal: AbortSignal) => Promise<KbIndex | null>;
   read: (url: string, signal: AbortSignal) => Promise<KbArticle | null>;
   rewrite: (question: string, signal: AbortSignal) => Promise<unknown>;
   search: (
     question: string,
     signal: AbortSignal
   ) => Promise<{ title: string; url: string }[]>;
+  select: (input: {
+    index: KbIndex;
+    question: string;
+    signal: AbortSignal;
+  }) => Promise<unknown>;
 }
+
+let indexCache: { at: number; value: KbIndex } | null = null;
 
 export const defaultKbDeps: KbDeps = {
   async generate({ articles, question, signal }) {
@@ -116,6 +141,22 @@ export const defaultKbDeps: KbDeps = {
       system: KB_PROMPT,
     });
     return object;
+  },
+  // The list changes only when docs ship, so one warm instance fetches it rarely.
+  async index(signal) {
+    if (indexCache && Date.now() - indexCache.at < INDEX_CACHE_MS) {
+      return indexCache.value;
+    }
+    const response = await fetch(`${HELP_CENTER_BASE_URL}/api/docs-index`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(INDEX_TIMEOUT_MS)]),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const value = indexSchema.parse(await response.json());
+    indexCache = { at: Date.now(), value };
+    return value;
   },
   async read(url, signal) {
     const article = await getHelpArticleContent(url, { signal });
@@ -169,6 +210,24 @@ export const defaultKbDeps: KbDeps = {
         url: new URL(hit.url, HELP_CENTER_BASE_URL).toString(),
       }));
   },
+  async select({ index, question, signal }) {
+    const model = await resolveModel("kb");
+    const { object } = await generateObject({
+      abortSignal: signal,
+      model: gateway(model),
+      // The listing comes first so the long, stable prefix can be cached.
+      prompt: `${index
+        .map((article, n) => `${n + 1}. ${article.title} (${article.id})`)
+        .join("\n")}\n\nCustomer question: ${question}`,
+      providerOptions: {
+        ...gatewayRouting(model)?.providerOptions,
+        ...FAST_OPTIONS,
+      },
+      schema: selectSchema,
+      system: SELECT_PROMPT,
+    });
+    return object;
+  },
 };
 
 /**
@@ -194,6 +253,47 @@ export function mergeHits(
     .sort((left, right) => right.score - left.score)
     .slice(0, MAX_ARTICLES)
     .map((entry) => entry.hit);
+}
+
+/**
+ * The articles to read for a question. Picks from the title index when the web
+ * app serves one, and otherwise, or when the pick fails or comes back empty,
+ * falls back to keyword search so the lane still works against an older deploy.
+ */
+async function findArticles(
+  question: string,
+  signal: AbortSignal,
+  deps: KbDeps
+): Promise<{ hits: { title: string; url: string }[]; via: string }> {
+  try {
+    const index = await deps.index(signal);
+    if (index) {
+      const { articles } = selectSchema.parse(
+        await deps.select({ index, question, signal })
+      );
+      const hits = [...new Set(articles)]
+        .map((n) => index[n - 1])
+        .filter((article) => article !== undefined)
+        .map((article) => ({
+          title: article.title,
+          url: new URL(`/docs/${article.id}`, HELP_CENTER_BASE_URL).toString(),
+        }));
+      if (hits.length > 0) {
+        return { hits, via: "index" };
+      }
+    }
+  } catch {
+    // fall through to keyword search
+  }
+  const queries = await searchQueries(question, signal, deps);
+  return {
+    hits: mergeHits(
+      await Promise.all(
+        queries.map((query) => deps.search(query, signal).catch(() => []))
+      )
+    ),
+    via: "search",
+  };
 }
 
 /** Keyword queries for the message; the raw message is the fallback if the rewrite fails. */
@@ -269,14 +369,8 @@ export async function answerFromHelpCenter(
     lap = Date.now();
   };
   try {
-    const queries = await searchQueries(question, signal, deps);
-    mark("rewrite");
-    const hits = mergeHits(
-      await Promise.all(
-        queries.map((query) => deps.search(query, signal).catch(() => []))
-      )
-    );
-    mark("search");
+    const { hits, via } = await findArticles(question, signal, deps);
+    mark(`find:${via}`);
     const articles = (
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
