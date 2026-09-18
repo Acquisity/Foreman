@@ -7,6 +7,7 @@ import { verifyWidgetContext } from "./widget-context.js";
 import { gate as egressGate, logGateDecision } from "./widget-egress.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import { logRouteDecision, routeWidgetMessage } from "./widget-router.js";
 import {
   assertWidgetRunOwner,
   attachWidgetRun,
@@ -355,6 +356,17 @@ export async function receiveWidgetMessage(
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
+    // Shadow mode: log Jev's lane decision beside the run, never act on it yet.
+    waitUntil(
+      routeWidgetMessage(input.question, { signal: request.signal })
+        .then((route) =>
+          logRouteDecision(
+            { conversationId: scope.conversationId, runId: run.id },
+            route
+          )
+        )
+        .catch(() => null)
+    );
     // A claimed run is persisted pending. If session creation then fails, it
     // must be terminalized, or a retry with the same key returns it as
     // permanently pending. Use the run id as the fencing session id when no
