@@ -23,9 +23,8 @@ const MAX_ARTICLES = 4;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
 const SEARCH_TIMEOUT_MS = 5000;
-// Two model calls (rewrite, then answer) measured at roughly 6s each. A slow
-// answer with sources still beats falling through to a multi-minute
-// investigation, so the cap leaves room for both.
+// The whole lane measures about 4 to 5s. The cap is generous on purpose: a slow
+// answer with sources still beats falling through to a multi-minute investigation.
 const KB_TIMEOUT_MS = 25_000;
 const MAX_ANSWER_CHARS = 4000;
 const MARKER = /\[(\d{1,2})\]/gu;
@@ -64,7 +63,16 @@ const answerSchema = z.object({
   answerable: z.boolean(),
 });
 
-const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. You cannot see the customer's account, so never claim to know how their workspace is configured. If the articles do not answer the question, set answerable to false and leave answer empty. No greetings, no sign-off, no em dashes.`;
+// Measured on this lane: left to its default, the model spends about 90% of its
+// output on hidden reasoning (roughly 1,900 tokens for a 300-token reply, 8 to
+// 12s). These are retrieval-grounded rewrites and summaries, so reasoning is
+// turned down: about 3s, with the same grounded, cited answers. Ignored by
+// providers that do not recognise it if the `kb` slot is ever overridden.
+const FAST_OPTIONS = {
+  google: { thinkingConfig: { thinkingLevel: "minimal" } },
+} as const;
+
+const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Plain text only: no markdown, no asterisks, no headings. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set answerable to false and leave answer empty only when none of the articles covers the topic of the question; ignore articles that are irrelevant. No greetings, no sign-off, no em dashes.`;
 
 // The help-center search is lexical and matches short keyword queries against
 // article titles. A whole conversational sentence ranks on its filler words
@@ -92,7 +100,6 @@ export const defaultKbDeps: KbDeps = {
     const { object } = await generateObject({
       abortSignal: signal,
       model: gateway(model),
-      ...gatewayRouting(model),
       prompt: JSON.stringify({
         articles: articles.map((article, index) => ({
           content: article.content,
@@ -101,6 +108,10 @@ export const defaultKbDeps: KbDeps = {
         })),
         question,
       }),
+      providerOptions: {
+        ...gatewayRouting(model)?.providerOptions,
+        ...FAST_OPTIONS,
+      },
       schema: answerSchema,
       system: KB_PROMPT,
     });
@@ -122,8 +133,11 @@ export const defaultKbDeps: KbDeps = {
     const { object } = await generateObject({
       abortSignal: signal,
       model: gateway(model),
-      ...gatewayRouting(model),
       prompt: question,
+      providerOptions: {
+        ...gatewayRouting(model)?.providerOptions,
+        ...FAST_OPTIONS,
+      },
       schema: rewriteSchema,
       system: REWRITE_PROMPT,
     });
