@@ -29,7 +29,8 @@ const SEARCH_TIMEOUT_MS = 5000;
 // answer with sources still beats falling through to a multi-minute investigation.
 const KB_TIMEOUT_MS = 25_000;
 const MAX_ANSWER_CHARS = 4000;
-const MARKER = /\[(\d{1,2})\]/gu;
+// One marker, or a group such as [1, 2], which the model also writes.
+const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
 
 export const kbCitationSchema = z.object({
@@ -71,7 +72,9 @@ const rewriteSchema = z.object({
 
 const answerSchema = z.object({
   answer: z.string(),
-  answerable: z.boolean(),
+  // answer: grounded in the articles. chat: a reaction, thanks or small talk
+  // that asks nothing. none: a question the articles do not cover.
+  kind: z.enum(["answer", "chat", "none"]),
 });
 
 // Measured on this lane: left to its default, the model spends about 90% of its
@@ -83,7 +86,7 @@ const FAST_OPTIONS = {
   google: { thinkingConfig: { thinkingLevel: "minimal" } },
 } as const;
 
-const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set answerable to false and leave answer empty only when none of the articles covers the topic of the question; ignore articles that are irrelevant. No greetings, no sign-off, no em dashes.`;
+const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
 
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
@@ -316,25 +319,63 @@ async function searchQueries(
 }
 
 /**
- * Keep only markers that point at a supplied article, and renumber them in
- * order of first use so the Source list reads 1, 2, 3 with no gaps. The model
- * only ever emits numbers; every url comes from the search hits.
+ * Turn the model's markers into clean, numbered citations.
+ *
+ * - Markers may be single ([1]) or grouped ([1, 2]); either way only numbers
+ *   that point at a supplied article survive.
+ * - Sources are renumbered in order of first use, so the list reads 1, 2, 3.
+ * - An answer drawn from one article carries no numbers at all: the Sources list
+ *   says everything a marker would.
+ * - With several sources, a run of identical markers collapses to its last one,
+ *   so a number appears only where the source changes instead of on every line.
+ *
+ * The model only ever emits numbers; every url comes from the chosen articles.
  */
 export function resolveCitations(
   answer: string,
   articles: { title: string; url: string }[]
 ): KbAnswer {
   const order: number[] = [];
-  const message = answer.replace(MARKER, (_match, digits: string) => {
-    const index = Number(digits) - 1;
-    if (!articles[index]) {
-      return "";
+  const pieces: { key: string; text: string }[] = [];
+  let last = 0;
+  for (const match of answer.matchAll(MARKER)) {
+    const cited = [
+      ...new Set(
+        match[1]
+          .split(",")
+          .map((digits) => Number(digits.trim()) - 1)
+          .filter((index) => articles[index] !== undefined)
+      ),
+    ];
+    for (const index of cited) {
+      if (!order.includes(index)) {
+        order.push(index);
+      }
     }
-    if (!order.includes(index)) {
-      order.push(index);
+    const numbers = cited
+      .map((index) => order.indexOf(index) + 1)
+      .sort((left, right) => left - right);
+    pieces.push({
+      key: numbers.join(","),
+      text: answer.slice(last, match.index),
+    });
+    last = match.index + match[0].length;
+  }
+  // With a single source every marker says the same thing as the Sources list,
+  // so the numbers are dropped and the list alone carries the attribution.
+  const numbered = order.length > 1;
+  let message = "";
+  pieces.forEach((piece, position) => {
+    const endsRun = pieces[position + 1]?.key !== piece.key;
+    message += piece.text;
+    if (numbered && piece.key && endsRun) {
+      message += piece.key
+        .split(",")
+        .map((n) => `[${n}]`)
+        .join("");
     }
-    return `[${order.indexOf(index) + 1}]`;
   });
+  message += answer.slice(last);
   return {
     citations: order.map((index, position) => ({
       n: position + 1,
@@ -344,6 +385,7 @@ export function resolveCitations(
     message: message
       .replace(/[ \t]+([.,;:!?])/gu, "$1")
       .replace(/[ \t]{2,}/gu, " ")
+      .replace(/[ \t]+$/gmu, "")
       .trim()
       .slice(0, MAX_ANSWER_CHARS),
   };
@@ -375,22 +417,28 @@ export async function answerFromHelpCenter(
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
     mark("read");
-    if (articles.length === 0) {
-      finish("miss", `hits=${hits.length} articles=0 ${marks.join(" ")}`);
-      return null;
-    }
     const raw = answerSchema.parse(
       await deps.generate({ articles, question, signal })
     );
     mark("generate");
-    const answer = raw.answerable
-      ? resolveCitations(raw.answer, articles)
-      : null;
+    if (raw.kind === "chat" && raw.answer.trim()) {
+      // Conversation, not information: nothing to ground, so nothing to cite.
+      finish("chat", marks.join(" "));
+      return {
+        citations: [],
+        message: raw.answer
+          .replace(MARKER, "")
+          .trim()
+          .slice(0, MAX_ANSWER_CHARS),
+      };
+    }
+    const answer =
+      raw.kind === "answer" ? resolveCitations(raw.answer, articles) : null;
     // An answer that cites nothing is not grounded in the articles; investigate instead.
     if (!answer?.message || answer.citations.length === 0) {
       finish(
         "miss",
-        `articles=${articles.length} answerable=${raw.answerable} ${marks.join(" ")}`
+        `articles=${articles.length} kind=${raw.kind} ${marks.join(" ")}`
       );
       return null;
     }

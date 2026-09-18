@@ -46,23 +46,56 @@ test("citations are renumbered by first use, and markers for unknown articles ar
   );
 });
 
+test("grouped markers are understood, so every cited source reaches the list", () => {
+  const result = resolveCitations(
+    "Pre-warmed inboxes are ready on day one [1, 2]. DFY inboxes warm up first [3].",
+    articles
+  );
+  assert.equal(
+    result.message,
+    "Pre-warmed inboxes are ready on day one [1][2]. DFY inboxes warm up first [3]."
+  );
+  assert.deepEqual(
+    result.citations.map((c) => c.title),
+    ["Setup", "Settings", "Availability"]
+  );
+});
+
+test("one source means no numbers at all; several sources are numbered only where the source changes", () => {
+  const result = resolveCitations(
+    "1. Open your workspace [1].\n2. Click Website Builder [1].\n3. Write your prompt [1].",
+    articles
+  );
+  assert.equal(
+    result.message,
+    "1. Open your workspace.\n2. Click Website Builder.\n3. Write your prompt."
+  );
+  assert.equal(result.citations.length, 1);
+
+  // A marker still appears mid-answer where the source changes.
+  assert.equal(
+    resolveCitations("A [1]. B [1]. C [2]. D [2].", articles).message,
+    "A. B [1]. C. D [2]."
+  );
+});
+
 test("a grounded answer is returned with the urls of the searched articles only", async () => {
   const result = await answerFromHelpCenter(
     "how do i set up my ai sdr?",
     log,
-    deps({ answer: "Connect your calendar [1].", answerable: true })
+    deps({ answer: "Connect your calendar [1].", kind: "answer" })
   );
   assert.deepEqual(result, {
     citations: [{ n: 1, title: "Setup", url: articles[0].url }],
-    message: "Connect your calendar [1].",
+    message: "Connect your calendar.",
   });
 });
 
 test("no hits, an unanswerable question, an uncited answer, and a failure all fall back to null", async () => {
   const cases: KbDeps[] = [
-    deps({ answer: "x [1]", answerable: true }, []),
-    deps({ answer: "", answerable: false }),
-    deps({ answer: "Just trust me.", answerable: true }),
+    deps({ answer: "x [1]", kind: "answer" }, []),
+    deps({ answer: "", kind: "none" }),
+    deps({ answer: "Just trust me.", kind: "answer" }),
     {
       ...deps(null),
       generate: () => Promise.reject(new Error("gateway down")),
@@ -92,7 +125,7 @@ test("hits from several queries merge by agreement and rank, capped at four", ()
 
 test("the message is searched as keyword queries, and as itself when the rewrite fails", async () => {
   const searched: string[] = [];
-  const base = deps({ answer: "Do this [1].", answerable: true });
+  const base = deps({ answer: "Do this [1].", kind: "answer" });
   const recording: KbDeps = {
     ...base,
     rewrite: () =>
@@ -122,7 +155,7 @@ test("articles are picked from the title index, with keyword search only as the 
     },
   ];
   const read: string[] = [];
-  const base = deps({ answer: "Open Add New Inboxes [1].", answerable: true });
+  const base = deps({ answer: "Open Add New Inboxes [1].", kind: "answer" });
   const picking: KbDeps = {
     ...base,
     index: () => Promise.resolve(index),
@@ -158,4 +191,22 @@ test("articles are picked from the title index, with keyword search only as the 
     });
     assert.equal(fallback?.citations[0].title, "Setup");
   }
+});
+
+test("a reaction gets a short conversational reply with no citations, not an investigation", async () => {
+  const result = await answerFromHelpCenter(
+    "oh thats cool",
+    log,
+    deps(
+      {
+        answer: "Glad that helps! Anything else you want to set up? [1]",
+        kind: "chat",
+      },
+      []
+    )
+  );
+  assert.deepEqual(result, {
+    citations: [],
+    message: "Glad that helps! Anything else you want to set up?",
+  });
 });
