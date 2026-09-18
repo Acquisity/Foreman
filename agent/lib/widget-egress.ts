@@ -221,11 +221,16 @@ Block when any fact or the recommendation mentions data about another workspace 
 
 const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Never add facts, links, or identifiers that are not in the findings. If needsWrite is present, tell the customer a teammate will make that change. If confidence is low, say what is uncertain. No greetings, no sign-off, no em dashes.`;
 
-const judgeSchema = z.object({
+// The verdict is asked for on its own. With the findings in the same schema the
+// model re-emitted every finding even when it simply allowed them (measured:
+// 2 of 3 allows, up to 1,300 output tokens and 16s against about 5s), and on a
+// slow reasoning model that was most of the customer's wait after an
+// investigation. Same model, same prompt, same decision.
+const verdictSchema = z.object({
   decision: z.enum(["allow", "rewrite", "block"]),
-  findings: findingsSchema.optional(),
   reason: z.string().max(500),
 });
+const rewriteSchema = z.object({ findings: findingsSchema });
 
 export const defaultGateDeps: GateDeps = {
   async compose({ findings, organizationName, question }) {
@@ -244,23 +249,36 @@ export const defaultGateDeps: GateDeps = {
   },
   async judge({ findings, question, scope }) {
     const model = await resolveModel("gate");
-    const { object } = await generateObject({
+    const prompt = JSON.stringify({
+      findings,
+      question,
+      scope: {
+        organizationId: scope.organizationId,
+        organizationName: scope.organizationName,
+        organizationSlug: scope.organizationSlug,
+        userId: scope.userId,
+      },
+    });
+    const { object: verdict } = await generateObject({
       model: gateway(model),
       ...gatewayRouting(model),
-      prompt: JSON.stringify({
-        findings,
-        question,
-        scope: {
-          organizationId: scope.organizationId,
-          organizationName: scope.organizationName,
-          organizationSlug: scope.organizationSlug,
-          userId: scope.userId,
-        },
-      }),
-      schema: judgeSchema,
+      prompt,
+      schema: verdictSchema,
       system: JUDGE_PROMPT,
     });
-    return object;
+    if (verdict.decision !== "rewrite") {
+      return verdict;
+    }
+    // Only a rewrite needs the findings back. The caller re-validates them and
+    // re-runs the deterministic scan, exactly as before.
+    const { object: redacted } = await generateObject({
+      model: gateway(model),
+      ...gatewayRouting(model),
+      prompt,
+      schema: rewriteSchema,
+      system: `${JUDGE_PROMPT}\nYou have already decided to rewrite, for this reason: ${verdict.reason}\nReturn only the redacted findings, with the same shape.`,
+    });
+    return { ...verdict, findings: redacted.findings };
   },
   resolve: resolveOwnedIdentifiers,
 };
