@@ -8,6 +8,7 @@ import {
   gate,
   redactableItems,
   removeItems,
+  withoutTicketRefs,
 } from "./widget-egress.js";
 import { buildOwnershipQuery } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
@@ -108,7 +109,6 @@ for (const [label, text] of [
   ],
   ["an Inngest run id", "Run 01J8ZQ3K4M5N6P7Q8R9S0T1V2W failed twice."],
   ["a stack trace", "It threw:\n    at sendCampaign (campaign.ts:12:5)"],
-  ["another Linear ticket", "Tracked in ENG-13999 and ENG-12140."],
   ["a bare internal host", "The failure is visible on sentry.io."],
 ] as const) {
   test(`${label} in a claim blocks without resolving identifiers`, async () => {
@@ -164,6 +164,32 @@ test("the customer's own lead, inbox and sending domain pass; ones the workspace
     assert.equal(result.message, null);
     assert.equal(calls.judge.length, 0);
   }
+});
+
+test("another ticket's number is removed from customer-bound findings, not grounds to block", () => {
+  const cleaned = withoutTicketRefs(
+    findings({
+      recommendation:
+        "Click Launch. If it stays in Draft, it is a known issue (ENG-14065). See ENG-1.",
+      ticket: { id: "ENG-1", url: "https://linear.app/acquisity/issue/ENG-1" },
+    })
+  );
+  assert.equal(
+    cleaned.recommendation,
+    "Click Launch. If it stays in Draft, it is a known issue. See ENG-1."
+  );
+});
+
+test("the gate lets an answer through with another ticket's number removed", async () => {
+  const { calls, deps: d } = deps();
+  const result = await gate(
+    scope,
+    question,
+    findings({ recommendation: "Tracked in ENG-13999 and ENG-12140." }),
+    d
+  );
+  assert.notEqual(result.decision, "block");
+  assert.ok(!JSON.stringify(calls.compose).includes("ENG-"));
 });
 
 test("the composer learns a ticket was filed, never which one", () => {

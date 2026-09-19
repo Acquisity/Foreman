@@ -404,15 +404,37 @@ const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
   reason,
 });
 
+// A good answer was blocked whole because the recommendation cited a known
+// issue as "(ENG-14065)". A ticket number is never the customer's to see, and
+// deleting it loses nothing they need, so it is removed instead of blocking. The
+// teammate's report keeps it, and the composed reply is still scanned below.
+const TICKET_MENTION = /\s*\(\s*ENG-\d+\s*\)|\bENG-\d+\b/g;
+export function withoutTicketRefs(findings: WidgetFindings): WidgetFindings {
+  const strip = (text: string) =>
+    text.replace(TICKET_MENTION, (match) =>
+      match.match(LINEAR_REF)?.[0] === findings.ticket?.id ? match : ""
+    );
+  return {
+    ...findings,
+    facts: findings.facts.map((fact) => ({
+      ...fact,
+      claim: strip(fact.claim),
+    })),
+    ...(findings.needsWrite ? { needsWrite: strip(findings.needsWrite) } : {}),
+    recommendation: strip(findings.recommendation),
+  };
+}
+
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
 export async function gate(
   scope: WidgetContext,
   question: string,
-  findings: WidgetFindings,
+  investigated: WidgetFindings,
   deps: GateDeps = defaultGateDeps,
   /** The question within its conversation, for the composer only. */
   conversation: string = question
 ): Promise<GateResult> {
+  const findings = withoutTicketRefs(investigated);
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     const startedAt = Date.now();
