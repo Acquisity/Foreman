@@ -20,6 +20,9 @@ const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
 const MAX_STATE_CHARS = 8000;
 
+/** Below this, an explicit ask for a person was not what the customer wrote. */
+const HUMAN_AGREEMENT = 0.5;
+
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
 
@@ -55,12 +58,14 @@ const QUESTIONS = {
       // other lanes, and with an account conversation as context it chose
       // investigate: minutes of work to answer nothing.
       chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account.",
+      // "can you open up a ticket for me" was filed here at 0.96 and handed off
+      // with nothing looked up and no ticket filed.
       human:
-        "The customer explicitly asks for a person, a human, an agent, or the support team.",
+        "The customer explicitly asks for a person, a human, an agent, or the support team. Asking to open, file or raise a ticket, or to report a bug, is NOT this.",
       // "where are my campaigns" read as an account lookup at 0.94: "my" alone
       // says nothing about whether the answer needs the customer's data.
       investigate:
-        "A question that can only be answered by looking up this customer's actual data or current status: their numbers, their balance, a specific charge, or why something of theirs is failing right now.",
+        "A question that can only be answered by looking up this customer's actual data or current status: their numbers, their balance, a specific charge, or why something of theirs is failing right now. A request to open, file or raise a ticket, or to report a bug, is also this kind.",
       kb: "A how-to or product question that a help-center article can answer: how to do something, where to find a page or setting in the app, what a feature or page is for, or what a term means. It is still this kind when phrased with 'my', as in 'where are my campaigns' or 'how do I change my sender name'.",
     },
     instructions: "Which kind of help does the customer's message need?",
@@ -160,7 +165,13 @@ export async function routeWidgetMessage(
       kbScore:
         answers.lane.probabilities?.kb ??
         (answers.lane.choice === "kb" ? confidence : 0),
-      lane: answers.lane.choice,
+      // The lane choice and the direct question must agree before a handoff: the
+      // human lane skips the investigation, so a wrong guess costs the customer an answer.
+      lane:
+        answers.lane.choice === "human" &&
+        answers.asks_for_human.noul < HUMAN_AGREEMENT
+          ? "investigate"
+          : answers.lane.choice,
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };

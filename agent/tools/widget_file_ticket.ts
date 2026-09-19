@@ -16,7 +16,7 @@ const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "File one internal Engineering ticket for this verified support conversation, into Triage. Use only after you have investigated and found a platform fault that Engineering must fix, or when a support teammate asks you to file one. Never file a ticket for a how-to question, a customer-side setup problem, or something a known issue already covers. The team, state, workspace and conversation are taken from the verified session, never from this input. A conversation gets one ticket: if one already exists it is returned instead of a second being created. Put the ticket you get back in your findings as the ticket you created.",
+    "File one internal Engineering ticket for this verified support conversation, into Triage. Use only after you have investigated and found a platform fault that Engineering must fix, or when the customer or a support teammate explicitly asks you to file one; investigate first so the ticket carries what you found. Never file a ticket for a how-to question, a customer-side setup problem, or something a known issue already covers. The team, state, workspace and conversation are taken from the verified session, never from this input. A conversation gets one ticket: if one already exists it is returned instead of a second being created. Put the ticket you get back in your findings as the ticket you created.",
   async execute(input, ctx) {
     const scope = requireWidgetContext(ctx.session.auth.initiator);
     try {

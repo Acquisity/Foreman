@@ -84,6 +84,33 @@ describe("routeWidgetMessage", () => {
     assert.equal(winner.kbScore, 0.54);
   });
 
+  it("hands off only when the direct question agrees a person was asked for", async () => {
+    // Measured on "can you open up a ticket for me please": lane human at 0.96
+    // while asks_for_human scored 0.14.
+    const route = await routeWidgetMessage("can you open up a ticket for me", {
+      apiKey: "test-key",
+      fetch: () => Promise.resolve(jevReply("human", 0.96)),
+    });
+    assert.equal(route.lane, "investigate");
+    const agreed = await routeWidgetMessage("let me talk to a person", {
+      apiKey: "test-key",
+      fetch: () =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              answers: {
+                asks_for_human: { noul: 0.97 },
+                asks_own_data: { noul: 0.1 },
+                lane: { choice: "human", confidence: 0.95 },
+              },
+            }),
+          ok: true,
+          status: 200,
+        }),
+    });
+    assert.equal(agreed.lane, "human");
+  });
+
   it("falls open to investigate without a key and never calls out", async () => {
     let called = false;
     const route = await routeWidgetMessage("hello", {
