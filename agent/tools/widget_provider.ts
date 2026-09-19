@@ -3,6 +3,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { describeProvider, invokeProvider } from "../lib/executor/dispatch.js";
 import { WIDGET_PATHS } from "../lib/widget-catalog.js";
+import { assertWidgetPath } from "../lib/widget-policy.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
 const WORDS = /\s+/;
@@ -41,6 +42,8 @@ const tool = defineTool({
     if (JSON.stringify(input.input).length > 100_000) {
       throw new Error("Provider input exceeds its bound.");
     }
+    // Reads only: the lane's ticket write is reachable through widget_file_ticket alone.
+    assertWidgetPath(input.path);
     return invokeProvider(ctx, input.path, input.input);
   },
   inputSchema,

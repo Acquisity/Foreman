@@ -683,6 +683,8 @@ describe("capability report", () => {
       manifest.dynamicTools.filter(
         (tool) =>
           isAuthoredTool(tool) &&
+          // Every tools/widget_* module is offered to the support widget lane alone.
+          !tool.sourceId.startsWith("tools/widget_") &&
           ![
             "tools/file_fin_investigation_ticket.ts",
             "tools/read_fin_outreach_evidence.ts",

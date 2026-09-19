@@ -14,6 +14,11 @@ import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { logOpsEvent } from "../ops-log.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
+import {
+  isWidgetSupport,
+  requireWidgetContext,
+  type WidgetContext,
+} from "../widget-scope.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
 import { WIDGET_TOOLKIT } from "./endpoint.js";
@@ -31,6 +36,13 @@ const FIN_LINEAR_MAX_BYTES = 64 * 1024;
 const finLinearTicketInput = z.strictObject({
   assignee: z.literal("Aaron Fraga"),
   description: z.string().min(1).max(16_000),
+  team: z.literal("Engineering Team"),
+  title: z.string().min(1).max(160),
+});
+
+const widgetLinearTicketInput = z.strictObject({
+  description: z.string().min(1).max(16_000),
+  state: z.literal("Triage"),
   team: z.literal("Engineering Team"),
   title: z.string().min(1).max(160),
 });
@@ -124,11 +136,33 @@ const verifiedScopeBlock = (
 ) =>
   `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`;
 
+export const widgetScopeBlock = (scope: WidgetContext) =>
+  `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Support conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`;
+
 function assertLaneOperation(
   ctx: ProviderContext,
   path: string,
   input: Record<string, unknown>
 ) {
+  // The widget lane's only write: a ticket whose scope block the server wrote.
+  if (
+    isWidgetSupport(ctx.session?.auth.initiator) &&
+    path === FIN_LINEAR_TICKET_PATH
+  ) {
+    const scope = requireWidgetContext(ctx.session?.auth.initiator);
+    const parsed = widgetLinearTicketInput.safeParse(input);
+    if (
+      !(
+        parsed.success &&
+        parsed.data.description.endsWith(widgetScopeBlock(scope))
+      )
+    ) {
+      throw new ExecutorError("customer_scope_required", 403, {
+        dispatched: false,
+      });
+    }
+    return;
+  }
   if (!isFinInvestigation(ctx.session?.auth.initiator)) {
     return;
   }
@@ -225,6 +259,26 @@ export async function createFinInvestigationTicket(
     {
       assignee: "Aaron Fraga",
       description: `${input.report}\n\n${verifiedScopeBlock(scope)}`,
+      team: "Engineering Team",
+      title: input.title,
+    },
+    undefined,
+    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+  );
+}
+
+/** The widget lane's one provider write. Team, state and scope come only from the session initiator. */
+export async function createWidgetTicket(
+  ctx: ProviderContext,
+  input: { report: string; title: string }
+): Promise<ExecutorOutcome> {
+  const scope = requireWidgetContext(ctx.session?.auth.initiator);
+  return await invokeProvider(
+    ctx,
+    FIN_LINEAR_TICKET_PATH,
+    {
+      description: `${input.report}\n\n${widgetScopeBlock(scope)}`,
+      state: "Triage",
       team: "Engineering Team",
       title: input.title,
     },
