@@ -159,6 +159,30 @@ export async function attachWidgetRun(
   }
 }
 
+/**
+ * How long a finish claim holds. Longer than the slowest finish seen (about
+ * 100s of model calls), shorter than the web app's 4-minute poll cap, so a
+ * finisher that died is taken over while the customer is still waiting.
+ */
+const FINISH_CLAIM_SECONDS = 150;
+
+/**
+ * Only one caller finishes a run. The background watcher and the result poll
+ * both see the investigation end, and each ran the full extract, gate and
+ * compose: double the model spend, and two verdicts that could disagree. SQL
+ * picks the winner; the loser reports pending and the next poll reads the
+ * saved outcome. A stale claim is retaken, so a dead finisher still recovers.
+ */
+export async function claimWidgetFinish(id: string): Promise<boolean> {
+  const rows = await privateDatabase().query(
+    `UPDATE widget_support_runs SET finishing_at = now()
+     WHERE id = $1 AND completed_at IS NULL AND (finishing_at IS NULL
+       OR finishing_at < now() - interval '${FINISH_CLAIM_SECONDS} seconds') RETURNING id`,
+    [id]
+  );
+  return rows.length === 1;
+}
+
 /** Terminal result is immutable. Replayed terminal events cannot overwrite another outcome. */
 export async function completeWidgetRun(
   id: string,

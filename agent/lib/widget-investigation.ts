@@ -16,6 +16,7 @@ import { logRouteDecision, routeWidgetMessage } from "./widget-router.js";
 import {
   assertWidgetRunOwner,
   attachWidgetRun,
+  claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
   latestWidgetScope,
@@ -164,6 +165,7 @@ export const defaultWidgetDependencies = {
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
   claim: claimWidgetRun,
+  claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
   extract: extractWidgetFindings,
   gate: egressGate,
@@ -266,9 +268,22 @@ export async function finishWidgetRun(
   run: Pick<WidgetRun, "created_at" | "id" | "question" | "scope">,
   sessionId: string,
   outcome: WaitOutcome,
-  deps: Pick<WidgetDependencies, "complete" | "extract" | "gate" | "history">
+  deps: Pick<
+    WidgetDependencies,
+    "claimFinish" | "complete" | "extract" | "gate" | "history"
+  >
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
+    return null;
+  }
+  // Someone else is already finishing this run: report pending and let the next
+  // poll read what they save. Only the model work is worth claiming; a failed
+  // session is recorded at once. A claim that cannot be checked never costs the
+  // customer their reply, so it falls open to finishing twice as before.
+  if (
+    outcome.status === "completed" &&
+    !(await deps.claimFinish(run.id).catch(() => true))
+  ) {
     return null;
   }
   let result: WidgetOutcome;
@@ -631,6 +646,7 @@ export async function failWidgetRun(
         sessionId,
         { status: "failed" },
         {
+          claimFinish: claimWidgetFinish,
           complete: deps.complete,
           extract: extractWidgetFindings,
           gate: egressGate,

@@ -78,6 +78,7 @@ function dependencies(gateResult: GateResult = allowed) {
       return Promise.resolve();
     },
     claim: () => Promise.resolve({ fresh: true, run }),
+    claimFinish: () => Promise.resolve(true),
     complete: (_id, outcome, stored) => {
       run.outcome = outcome;
       run.findings = stored;
@@ -576,6 +577,40 @@ test("a blocked investigation returns the raw findings and no customer message",
     run_id: runId,
     status: "completed",
   });
+});
+
+test("a finished investigation is finished by one caller: the other reports pending, and an unreadable claim still finishes", async (t) => {
+  enabled(t);
+  const poll = (deps: WidgetDependencies) =>
+    receiveWidgetMessage(
+      request({
+        action: "result",
+        conversation_id: scope.conversationId,
+        organization_id: scope.organizationId,
+        run_id: runId,
+      }),
+      { attachSession: () => completedSession(), ...noWork() },
+      100,
+      verify,
+      deps
+    );
+  const claimed = dependencies();
+  claimed.run.session_id = "widget-session-1";
+  claimed.deps.claimFinish = () => Promise.resolve(false);
+  claimed.deps.extract = () =>
+    assert.fail("the claimed run must not be finished again");
+  assert.equal((await (await poll(claimed.deps)).json()).status, "pending");
+  assert.deepEqual(claimed.gated, []);
+  assert.equal(claimed.run.outcome, null);
+
+  const unreadable = dependencies();
+  unreadable.run.session_id = "widget-session-1";
+  unreadable.deps.claimFinish = () => Promise.reject(new Error("no column"));
+  assert.equal(
+    (await (await poll(unreadable.deps)).json()).status,
+    "completed"
+  );
+  assert.deepEqual(unreadable.gated, [findings]);
 });
 
 test("a slow investigation answers pending, then the result action recovers the gated outcome", async (t) => {
