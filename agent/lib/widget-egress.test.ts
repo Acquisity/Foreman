@@ -166,6 +166,17 @@ test("the customer's own lead, inbox and sending domain pass; ones the workspace
   }
 });
 
+test("the composer learns a ticket was filed, never which one", () => {
+  const ticket = {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1",
+  };
+  const composed = composerInput(findings({ ticket }));
+  assert.equal(composed.ticketFiled, true);
+  assert.ok(!JSON.stringify(composed).includes("ENG-1"));
+  assert.equal("ticketFiled" in composerInput(findings()), false);
+});
+
 test("the findings' own ticket and public help links are not internal artifacts", () => {
   const { internal } = extractIdentifiers(
     findings({
