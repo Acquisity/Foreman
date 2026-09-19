@@ -21,6 +21,7 @@ import { logOpsEvent } from "./ops-log.js";
 
 const MAX_ARTICLES = 4;
 const INDEX_TIMEOUT_MS = 5000;
+const CHAT_TIMEOUT_MS = 12_000;
 const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
@@ -89,6 +90,50 @@ const SELECT_PROMPT = `You pick help-center articles for a customer's support qu
 // ("workspace", "new", "add" matching "ad") and misses the right article, so the
 // message is turned into keyword queries first.
 const REWRITE_PROMPT = `You turn a customer's support message into search queries for a help-center search engine that matches short keywords against article titles. Return 1 to ${MAX_QUERIES} queries of 1 to 3 words each, most specific first. Use the product nouns the customer means, and include the likely title wording as well as their wording, for example "buy inboxes" and "email accounts" for someone asking how to add inboxes. No filler words, no punctuation, no questions.`;
+
+const chatSchema = z.object({ reply: z.string() });
+
+const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes.`;
+
+/**
+ * A short conversational reply to a message that asks nothing. No retrieval, no
+ * tools, no account data, so like the rest of this lane there is nothing to
+ * gate. Returns null on any failure and the caller carries on as before.
+ * Default reasoning on purpose: "minimal" showed 14 to 21s spikes on replies
+ * this small, against 1.4 to 3s.
+ */
+export async function replyToChat(
+  message: string,
+  log: { conversationId: string; runId: string }
+): Promise<KbAnswer | null> {
+  const startedAt = Date.now();
+  try {
+    const model = await resolveModel("kb");
+    const { object } = await generateObject({
+      abortSignal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
+      model: gateway(model),
+      prompt: message,
+      schema: chatSchema,
+      system: CHAT_PROMPT,
+    });
+    const reply = object.reply.replace(MARKER, "").trim();
+    logOpsEvent("widget.kb.answer", {
+      ...log,
+      message: `direct ms=${Date.now() - startedAt}`,
+      outcome: reply ? "chat" : "miss",
+    });
+    return reply
+      ? { citations: [], message: reply.slice(0, MAX_ANSWER_CHARS) }
+      : null;
+  } catch (error) {
+    logOpsEvent("widget.kb.answer", {
+      ...log,
+      message: `${error instanceof Error ? error.message.slice(0, 120) : "unknown"} direct ms=${Date.now() - startedAt}`,
+      outcome: "error",
+    });
+    return null;
+  }
+}
 
 export interface KbDeps {
   generate: (input: {

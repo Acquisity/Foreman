@@ -20,7 +20,7 @@ const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
 const MAX_STATE_CHARS = 8000;
 
-export const WIDGET_LANES = ["kb", "investigate", "human"] as const;
+export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
 
 const QUESTIONS = {
@@ -44,6 +44,10 @@ const QUESTIONS = {
   },
   lane: {
     criteria: {
+      // Without this the router had to file a plain "thank you" under one of the
+      // other lanes, and with an account conversation as context it chose
+      // investigate: minutes of work to answer nothing.
+      chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account.",
       human:
         "The customer explicitly asks for a person, a human, an agent, or the support team.",
       investigate:

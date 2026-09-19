@@ -42,6 +42,12 @@ const literalArray = (values: string[], pattern: RegExp, cast: string) => {
  * `authorized`, which is the single place the verified organization enters the
  * query: an identifier that exists only in another workspace resolves to
  * nothing, exactly as an unknown one does.
+ *
+ * A domain is the customer's own when it is a sending domain they bought, the
+ * domain their members sign in with, or the domain of one of their inboxes: a
+ * reply naming the customer's own company domain was being blocked as foreign.
+ * These are small per-workspace tables; prospect and contact domains are left
+ * out on purpose, since vouching for them means scanning every lead.
  */
 export function buildOwnershipQuery(
   context: WidgetContext,
@@ -81,9 +87,13 @@ export function buildOwnershipQuery(
         join crm_lead l on l.id = ce.lead_id join authorized a on a.id = l.organization_id
       union select lower(i.email) from mail_inbox i join authorized a on a.id = i.organization_id
     ) e where e.email = any(${emails})), '[]'::jsonb) as emails,
-    coalesce((select jsonb_agg(distinct lower(d.domain)) from mail_domain d
-      join authorized a on a.id = d.organization_id
-      where lower(d.domain) = any(${domains})), '[]'::jsonb) as domains`;
+    coalesce((select jsonb_agg(distinct x.domain) from (
+      select lower(d.domain) as domain from mail_domain d join authorized a on a.id = d.organization_id
+      union select split_part(lower(u.email), '@', 2) from "user" u
+        join member m on m.user_id = u.id and m.deleted_at is null
+        join authorized a on a.id = m.organization_id
+      union select split_part(lower(i.email), '@', 2) from mail_inbox i join authorized a on a.id = i.organization_id
+    ) x where x.domain = any(${domains})), '[]'::jsonb) as domains`;
 }
 
 const resultSchema = z.object({

@@ -70,6 +70,7 @@ function dependencies(gateResult: GateResult = allowed) {
   };
   const gated: unknown[] = [];
   const deps: WidgetDependencies = {
+    answerChat: () => assert.fail("must not reply as small talk"),
     answerKb: () => assert.fail("must not answer from the help center"),
     attach: (_id, sessionId, streamIndex) => {
       run.session_id = sessionId;
@@ -387,6 +388,53 @@ test("a request to act skips the investigation, unless the customer asked for a 
     human.deps
   );
   assert.deepEqual(human.gated, [findings]);
+});
+
+test("a thank you gets a sentence back, and is investigated only if that reply cannot be written", async (t) => {
+  enabled(t);
+  const chatRoute = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0.9,
+      confidence: 0.97,
+      lane: "chat" as const,
+      source: "jev" as const,
+    });
+  const { deps, gated, run } = dependencies();
+  deps.route = chatRoute;
+  deps.answerChat = () =>
+    Promise.resolve({ citations: [], message: "You're welcome!" });
+  const response = await receiveWidgetMessage(
+    request({ ...start, message_id: "cccccccc-3333-4333-8333-cccccccccccc" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.message, "You're welcome!");
+  assert.equal(body.citations, undefined);
+  assert.equal(run.outcome?.reason, "chat");
+  assert.deepEqual(gated, []);
+
+  const failing = dependencies();
+  failing.deps.route = chatRoute;
+  failing.deps.answerChat = () => Promise.resolve(null);
+  await receiveWidgetMessage(
+    request({ ...start, message_id: "dddddddd-4444-4444-8444-dddddddddddd" }),
+    {
+      from: () =>
+        ({
+          send: () => Promise.resolve(completedSession()),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    200,
+    verify,
+    failing.deps
+  );
+  assert.deepEqual(failing.gated, [findings]);
 });
 
 test("an unsure knowledge-base route, or a help-center miss, is investigated instead", async (t) => {

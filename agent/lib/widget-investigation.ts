@@ -7,7 +7,11 @@ import { verifyWidgetContext } from "./widget-context.js";
 import { gate as egressGate, logGateDecision } from "./widget-egress.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
-import { answerFromHelpCenter } from "./widget-kb.js";
+import {
+  answerFromHelpCenter,
+  type KbAnswer,
+  replyToChat,
+} from "./widget-kb.js";
 import { logRouteDecision, routeWidgetMessage } from "./widget-router.js";
 import {
   assertWidgetRunOwner,
@@ -156,6 +160,7 @@ export async function waitForWidgetInvestigation(
 }
 
 export const defaultWidgetDependencies = {
+  answerChat: replyToChat,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
   claim: claimWidgetRun,
@@ -397,6 +402,29 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
+  const ids = { conversationId: scope.conversationId, runId: run.id };
+  const finish = (written: KbAnswer) =>
+    deps.complete(
+      run.id,
+      {
+        citations: written.citations,
+        decision: "allow",
+        message: written.message,
+        reason: route.lane === "chat" ? "chat" : "kb",
+        status: "completed",
+      },
+      null,
+      // No session exists on this lane, so the run id is the fencing session id.
+      run.id
+    );
+  // A thank you or a reaction gets a sentence back, not an investigation. If
+  // that reply cannot be written the message falls through as it always did.
+  if (route.lane === "chat" && route.confidence >= KB_ROUTE_CONFIDENCE) {
+    const reply = await deps.answerChat(question, ids);
+    if (reply) {
+      return finish(reply);
+    }
+  }
   const generalQuestion =
     route.lane === "kb" && route.confidence >= KB_ROUTE_CONFIDENCE;
   // A request to act never needs an investigation: the fast lane apologises and
@@ -406,26 +434,8 @@ async function answerFromKnowledgeBase(
   if (!(generalQuestion || actionRequest)) {
     return null;
   }
-  const answer = await deps.answerKb(question, {
-    conversationId: scope.conversationId,
-    runId: run.id,
-  });
-  if (!answer) {
-    return null;
-  }
-  // No session exists on this lane, so the run id is the fencing session id.
-  return deps.complete(
-    run.id,
-    {
-      citations: answer.citations,
-      decision: "allow",
-      message: answer.message,
-      reason: "kb",
-      status: "completed",
-    },
-    null,
-    run.id
-  );
+  const answer = await deps.answerKb(question, ids);
+  return answer ? finish(answer) : null;
 }
 
 /**
