@@ -136,6 +136,18 @@ export const defaultExtractDeps: ExtractDeps = {
   },
 };
 
+// The line widget_file_ticket tells the investigator to end its write-up with.
+// Read by pattern, never by a model, and only a link whose path names the same
+// ticket counts, so a known issue mentioned in passing is never linked.
+const FILED_TICKET =
+  /^Ticket filed: (ENG-\d+) (https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)[^\s]*)\s*$/mu;
+export function filedTicket(text: string): { id: string; url: string } | null {
+  const match = FILED_TICKET.exec(text);
+  return match && match[1] === match[3]
+    ? { id: match[1], url: match[2].slice(0, 500) }
+    : null;
+}
+
 /**
  * One small-model pass turns the investigator's prose into validated findings.
  * The investigator no longer emits the strict schema itself, so a normal
@@ -150,8 +162,19 @@ export async function extractWidgetFindings(
     return null;
   }
   try {
-    const raw = (await deps.generate(input)) as LenientFindings;
-    const findings = normalize(raw, input.question);
+    // The closing ticket line is for the pattern below alone: left in, the model
+    // pass can copy its link into a fact, and the gate blocks any linear.app link.
+    const raw = (await deps.generate({
+      ...input,
+      investigatorText: input.investigatorText.replace(FILED_TICKET, "").trim(),
+    })) as LenientFindings;
+    const extracted = normalize(raw, input.question);
+    // The model pass is asked for the ticket too, but a filed ticket is never left
+    // to it: ENG-14067 was filed, the write-up said only "ticket filed", and the
+    // customer was told it could not be opened.
+    const filed = filedTicket(input.investigatorText);
+    const findings =
+      extracted && filed ? { ...extracted, ticket: filed } : extracted;
     if (!findings) {
       logOpsEvent(
         "widget.extract.normalize_failed",

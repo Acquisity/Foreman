@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { extractWidgetFindings } from "./widget-extract.js";
+import { extractWidgetFindings, filedTicket } from "./widget-extract.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
 // What the small model returns: the lenient extraction shape.
@@ -110,4 +110,23 @@ test("a clarifying question is a normal reply, and only an explicit conclusion h
       }),
   });
   assert.equal(stuck?.needsHuman, true);
+});
+
+test("a filed ticket is read from the closing line; a ticket merely mentioned is not", () => {
+  assert.deepEqual(
+    filedTicket(
+      "Report: orders never provisioned. Related to ENG-14065.\nTicket filed: ENG-14067 https://linear.app/acquisity/issue/ENG-14067/pre-warmed\n"
+    ),
+    {
+      id: "ENG-14067",
+      url: "https://linear.app/acquisity/issue/ENG-14067/pre-warmed",
+    }
+  );
+  assert.equal(filedTicket("Engineering ticket filed. See ENG-14065."), null);
+  assert.equal(
+    filedTicket(
+      "Ticket filed: ENG-1 https://linear.app/acquisity/issue/ENG-2/x"
+    ),
+    null
+  );
 });
