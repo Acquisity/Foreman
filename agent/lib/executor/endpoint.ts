@@ -19,6 +19,9 @@ export function executorOrigin(): string {
 
 export const FOREMAN_TOOLKIT_SLUG = "foreman";
 export const SUPPORT_TOOLKIT = "foreman-support";
+// The in-app support widget lane reuses the deployed support read toolkit; its
+// own curated read allowlist (WIDGET_PATHS) still narrows what it may call.
+export const WIDGET_TOOLKIT = SUPPORT_TOOLKIT;
 export type ExecutorToolkit =
   | typeof FOREMAN_TOOLKIT_SLUG
   | typeof SUPPORT_TOOLKIT;
