@@ -178,10 +178,14 @@ export const defaultWidgetDependencies = {
 export type WidgetDependencies = typeof defaultWidgetDependencies;
 
 const disclose = (outcome: WidgetOutcome, findings: unknown) =>
-  outcome.decision === "block" ||
-  (findings as { needsHuman?: unknown } | null)?.needsHuman === true;
+  outcome.decision === "block" || Boolean(findings);
 
-/** Raw findings leave Foreman only on the block path, for the CS inbox note. */
+/**
+ * Every investigation returns its findings, answered or blocked, so the CS
+ * inbox always has a team-only note for it. They go server to server and are
+ * never shown to the customer; only the gated, composed `message` is. The
+ * help-center and small-talk lanes have no findings to return.
+ */
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
     return { run_id: run.id, status: "pending" as const };
@@ -237,6 +241,14 @@ const ACTION_REQUEST_SCORE = 0.8;
  * but it must not get in the way of a real, answerable account question.
  */
 const UNCLEAR_SCORE = 0.8;
+/**
+ * How sure the router must be that the customer asked for a person before the
+ * run hands off without investigating. High on purpose: a wrong handoff costs a
+ * teammate's time on something Foreman could have answered.
+ */
+const HUMAN_REQUEST_SCORE = 0.8;
+const HUMAN_REQUEST_NOTE =
+  "The customer asked to speak with a person. Nothing was investigated for this message.";
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -410,8 +422,9 @@ async function settleResultRun(
 }
 
 /**
- * Front door: a general product question is answered from the help center
- * without starting an investigation. Returns null for every other route,
+ * Front door: an ask for a person hands off at once, and a general product
+ * question is answered from the help center, both without starting an
+ * investigation. Returns null for every other route,
  * a router failure (which falls open to `investigate`), and any knowledge-base
  * miss, so those take the investigation lane exactly as before.
  */
@@ -442,6 +455,14 @@ async function answerFromKnowledgeBase(
       // No session exists on this lane, so the run id is the fencing session id.
       run.id
     );
+  // An explicit ask for a person is honoured at once: no investigation stands
+  // between the customer and the handoff. The note tells the teammate why.
+  if (route.lane === "human" || route.asksForHuman >= HUMAN_REQUEST_SCORE) {
+    const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
+    if (handoff) {
+      return deps.complete(run.id, handoff.result, handoff.findings, run.id);
+    }
+  }
   // A thank you or a reaction gets a sentence back, not an investigation. If
   // that reply cannot be written the message falls through as it always did.
   if (route.lane === "chat" && route.confidence >= CHAT_ROUTE_CONFIDENCE) {

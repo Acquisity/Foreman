@@ -254,7 +254,7 @@ test("a changed identity on an existing conversation is refused, not continued",
   assert.equal(response.status, 403);
 });
 
-test("a completed investigation is gated and answered with the composed reply only", async (t) => {
+test("a completed investigation is gated, answered with the composed reply, and returns its findings for the inbox note", async (t) => {
   enabled(t);
   const { deps, gated, run } = dependencies();
   const sends: {
@@ -301,6 +301,7 @@ test("a completed investigation is gated and answered with the composed reply on
   assert.deepEqual(gated, [findings]);
   assert.deepEqual(await response.json(), {
     decision: "allow",
+    findings,
     message: allowed.message,
     run_id: runId,
     status: "completed",
@@ -348,7 +349,7 @@ test("a confident knowledge-base route answers with citations and never starts a
   assert.equal(run.outcome?.reason, "kb");
 });
 
-test("a request to act skips the investigation, unless the customer asked for a person", async (t) => {
+test("a request to act skips the investigation, and an ask for a person hands off at once without one", async (t) => {
   enabled(t);
   const route = (lane: "investigate" | "human") => () =>
     Promise.resolve({
@@ -378,20 +379,23 @@ test("a request to act skips the investigation, unless the customer asked for a 
   human.deps.route = route("human");
   human.deps.answerKb = () =>
     assert.fail("an explicit ask for a person is not fast-laned");
-  await receiveWidgetMessage(
+  const handed = await receiveWidgetMessage(
     request({ ...start, message_id: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb" }),
-    {
-      from: () =>
-        ({
-          send: () => Promise.resolve(completedSession()),
-        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
-      waitUntil: () => undefined,
-    },
+    noWork(),
     200,
     verify,
     human.deps
   );
-  assert.deepEqual(human.gated, [findings]);
+  const handedBody = (await handed.json()) as {
+    decision: string;
+    findings: { needsHuman: boolean };
+    message: string | null;
+  };
+  assert.equal(handedBody.decision, "block");
+  assert.equal(handedBody.message, null);
+  assert.equal(handedBody.findings.needsHuman, true);
+  assert.deepEqual(human.gated, []);
+  assert.equal(human.run.outcome?.reason, "asked_for_human");
 });
 
 test("a thank you gets a sentence back, and is investigated only if that reply cannot be written", async (t) => {
@@ -442,10 +446,10 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
   assert.deepEqual(failing.gated, [findings]);
 });
 
-const routeWith = (lane: "investigate" | "human", kbScore: number) => () =>
+const routeWith = (lane: "investigate", kbScore: number) => () =>
   Promise.resolve({
     asksForAction: 0,
-    asksForHuman: lane === "human" ? 0.95 : 0,
+    asksForHuman: 0,
     asksOwnData: 0.8,
     confidence: 0.55,
     kbScore,
@@ -479,12 +483,11 @@ test("the help center gets the first try when it is the router's pick however un
   }
 });
 
-test("a help-center miss, a distant second, or an ask for a person is investigated instead", async (t) => {
+test("a help-center miss or a distant second is investigated instead", async (t) => {
   enabled(t);
   for (const [route, answer] of [
     [kbRoute(0.98), null],
     [routeWith("investigate", 0.4), kbAnswer],
-    [routeWith("human", 0.9), kbAnswer],
   ] as const) {
     const { deps, gated } = dependencies();
     deps.route = route;

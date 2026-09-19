@@ -12,7 +12,7 @@ import { logOpsEvent } from "./ops-log.js";
  * failure, including a missing key, falls open to `investigate`, which is
  * the investigation pipeline, so removing `TYPESAFE_API_KEY` restores the old
  * single-lane behavior exactly. A confident `kb` decision is acted on by the
- * knowledge-base lane (`widget-kb.ts`); `human` is logged and still investigated.
+ * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
  */
 
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
