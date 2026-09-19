@@ -6,11 +6,13 @@ import { ticketLinkedModel } from "./ticket-link-model.js";
  * widget_* tools, each returning a structured, bounded, org-locked object.
  * The raw exploratory tools (planetscale_execute_read_query, widget_provider,
  * describe_table) are deliberately excluded so the model cannot write its own
- * SQL or wander. No web, browser, sandbox, repo, memory, delegation, or writes.
+ * SQL or wander. No web, browser, sandbox, repo, memory, or delegation. The one
+ * write is widget_file_ticket, whose target and scope come from the session.
  */
 const ALLOWED_TOOLS = new Set([
   "widget_account_access",
   "widget_billing_summary",
+  "widget_file_ticket",
   "widget_generation_diagnostics",
   "widget_help_article",
   "widget_inbox_health",

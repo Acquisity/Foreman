@@ -24,7 +24,7 @@ const result = (toolName: string) => ({
 });
 
 describe("widget support investigation model boundary", () => {
-  it("advertises only the read evidence tools and drops a forced disallowed choice", async () => {
+  it("advertises only the evidence tools and the ticket tool, and drops a forced disallowed choice", async () => {
     const base = new MockLanguageModelV4({
       doGenerate: {
         content: [{ text: "ok", type: "text" }],
@@ -53,6 +53,11 @@ describe("widget support investigation model boundary", () => {
         },
         {
           inputSchema: { type: "object" },
+          name: "widget_file_ticket",
+          type: "function",
+        },
+        {
+          inputSchema: { type: "object" },
           name: "web_fetch",
           type: "function",
         },
@@ -66,7 +71,7 @@ describe("widget support investigation model boundary", () => {
     });
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["widget_outreach_health", "widget_billing_summary"]
+      ["widget_outreach_health", "widget_billing_summary", "widget_file_ticket"]
     );
     assert.equal(base.doGenerateCalls[0]?.toolChoice, undefined);
   });
