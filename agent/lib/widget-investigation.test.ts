@@ -98,6 +98,7 @@ function dependencies(gateResult: GateResult = allowed) {
         asksForHuman: 0,
         asksOwnData: 1,
         confidence: 0,
+        kbScore: 0,
         lane: "investigate",
         source: "fallback",
       }),
@@ -312,6 +313,7 @@ const kbRoute = (confidence: number) => () =>
     asksForHuman: 0,
     asksOwnData: 0,
     confidence,
+    kbScore: confidence,
     lane: "kb" as const,
     source: "jev" as const,
   });
@@ -353,6 +355,7 @@ test("a request to act skips the investigation, unless the customer asked for a 
       asksForHuman: lane === "human" ? 0.95 : 0,
       asksOwnData: 0.97,
       confidence: 0.4,
+      kbScore: 0,
       lane,
       source: "jev" as const,
     });
@@ -398,6 +401,7 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
       asksForHuman: 0,
       asksOwnData: 0.9,
       confidence: 0.97,
+      kbScore: 0,
       lane: "chat" as const,
       source: "jev" as const,
     });
@@ -437,14 +441,52 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
   assert.deepEqual(failing.gated, [findings]);
 });
 
-test("an unsure knowledge-base route, or a help-center miss, is investigated instead", async (t) => {
+const routeWith = (lane: "investigate" | "human", kbScore: number) => () =>
+  Promise.resolve({
+    asksForAction: 0,
+    asksForHuman: lane === "human" ? 0.95 : 0,
+    asksOwnData: 0.8,
+    confidence: 0.55,
+    kbScore,
+    lane,
+    source: "jev" as const,
+  });
+
+test("the help center gets the first try when it is the router's pick however unsure, or a close second", async (t) => {
   enabled(t);
-  for (const [confidence, answer] of [
-    [0.5, kbAnswer],
-    [0.98, null],
+  for (const route of [kbRoute(0.39), routeWith("investigate", 0.5)]) {
+    const { deps, gated, run } = dependencies();
+    deps.route = route;
+    deps.answerKb = () => Promise.resolve(kbAnswer);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: "99999999-9999-4999-8999-999999999999" }),
+      {
+        from: () => {
+          throw new Error("the fast lane must not start a session");
+        },
+        waitUntil: () => undefined,
+      },
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.message, kbAnswer.message);
+    assert.deepEqual(gated, []);
+    assert.equal(run.outcome?.reason, "kb");
+  }
+});
+
+test("a help-center miss, a distant second, or an ask for a person is investigated instead", async (t) => {
+  enabled(t);
+  for (const [route, answer] of [
+    [kbRoute(0.98), null],
+    [routeWith("investigate", 0.4), kbAnswer],
+    [routeWith("human", 0.9), kbAnswer],
   ] as const) {
     const { deps, gated } = dependencies();
-    deps.route = kbRoute(confidence);
+    deps.route = route;
     deps.answerKb = () => Promise.resolve(answer);
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const response = await receiveWidgetMessage(

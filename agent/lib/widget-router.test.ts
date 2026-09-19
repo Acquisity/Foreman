@@ -32,6 +32,7 @@ describe("routeWidgetMessage", () => {
       asksForHuman: 0.04,
       asksOwnData: 0.91,
       confidence: 0.87,
+      kbScore: 0,
       lane: "investigate",
       source: "jev",
     });
@@ -48,6 +49,37 @@ describe("routeWidgetMessage", () => {
       (sent as { headers: Record<string, string> }).headers.authorization,
       "Bearer test-key"
     );
+  });
+
+  it("reports how likely the help center is, whichever lane won", async () => {
+    const reply = (lane: object) => () =>
+      Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              asks_for_human: { noul: 0 },
+              asks_own_data: { noul: 0.8 },
+              lane,
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    const second = await routeWidgetMessage("when do my credits reset", {
+      apiKey: "test-key",
+      fetch: reply({
+        choice: "investigate",
+        confidence: 0.55,
+        probabilities: { investigate: 0.55, kb: 0.42 },
+      }),
+    });
+    assert.equal(second.kbScore, 0.42);
+    // Without per-lane probabilities the winner's confidence stands in.
+    const winner = await routeWidgetMessage("what is my dashboard for", {
+      apiKey: "test-key",
+      fetch: reply({ choice: "kb", confidence: 0.54 }),
+    });
+    assert.equal(winner.kbScore, 0.54);
   });
 
   it("falls open to investigate without a key and never calls out", async () => {

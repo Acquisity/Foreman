@@ -50,9 +50,11 @@ const QUESTIONS = {
       chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account.",
       human:
         "The customer explicitly asks for a person, a human, an agent, or the support team.",
+      // "where are my campaigns" read as an account lookup at 0.94: "my" alone
+      // says nothing about whether the answer needs the customer's data.
       investigate:
-        "A question about this customer's own account, data, campaigns, billing, or something not working for them, which needs their account checked.",
-      kb: "A general how-to or product question that a public help-center article can answer without looking at this customer's account.",
+        "A question that can only be answered by looking up this customer's actual data or current status: their numbers, their balance, a specific charge, or why something of theirs is failing right now.",
+      kb: "A how-to or product question that a help-center article can answer: how to do something, where to find a page or setting in the app, what a feature or page is for, or what a term means. It is still this kind when phrased with 'my', as in 'where are my campaigns' or 'how do I change my sender name'.",
     },
     instructions: "Which kind of help does the customer's message need?",
     type: "choice",
@@ -77,6 +79,8 @@ export interface WidgetRoute {
   asksForHuman: number;
   asksOwnData: number;
   confidence: number;
+  /** How likely the help center is the right lane, even when another lane won. */
+  kbScore: number;
   lane: WidgetLane;
   source: "jev" | "fallback";
 }
@@ -86,6 +90,7 @@ const FALLBACK: WidgetRoute = {
   asksForHuman: 0,
   asksOwnData: 0,
   confidence: 0,
+  kbScore: 0,
   lane: "investigate",
   source: "fallback",
 };
@@ -135,11 +140,16 @@ export async function routeWidgetMessage(
       return FALLBACK;
     }
     const { answers } = responseSchema.parse(await response.json());
+    const confidence = answers.lane.confidence ?? 0;
     return {
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
-      confidence: answers.lane.confidence ?? 0,
+      confidence,
+      // Jev may omit the per-lane probabilities; the winner's confidence stands in.
+      kbScore:
+        answers.lane.probabilities?.kb ??
+        (answers.lane.choice === "kb" ? confidence : 0),
       lane: answers.lane.choice,
       source: "jev",
     };
@@ -155,7 +165,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)}`,
     runId: fields.runId,
   });
 }

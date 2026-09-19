@@ -207,18 +207,21 @@ const blockedOutcome = (
  * once extraction latency is understood. The session-failure / no-prose fallback is unaffected.
  */
 export const WIDGET_DEADLINE_MS = 280_000;
+/** How sure the router must be that a message is small talk before it gets a one-line reply. */
+const CHAT_ROUTE_CONFIDENCE = 0.6;
 /**
- * How sure the router must be before the fast lane gets the first try.
+ * How likely the help center must be before the fast lane gets the first try
+ * when another lane won. When `kb` is the router's pick it always gets the
+ * first try, however unsure.
  *
  * The two mistakes are not equal. A wrongly fast-laned message costs a few
- * seconds: the lane answers only from articles it can cite and otherwise hands
- * over to the investigation. A wrongly investigated how-to costs the customer
- * minutes. So the bar is low. In practice clear how-tos score 0.93 to 1.00, and
- * "how do I find my billing settings?" scored 0.70 only because "my" reads as
- * an account question, while a real account question is routed `investigate`
- * outright and never reaches this check.
+ * seconds and a follow-up ("can you check my actual data?"). A wrongly
+ * investigated how-to costs the customer minutes and an answer about account
+ * details they never asked for: "what is my dashboard for?" won `kb` at 0.54,
+ * and "when do my credits reset" at 0.39, and both were investigated under the
+ * old 0.6 bar. A real account question scores near zero here.
  */
-const KB_ROUTE_CONFIDENCE = 0.6;
+const KB_SCORE = 0.5;
 /**
  * How sure the router must be that the customer wants something done for them.
  * High on purpose: a lookup wrongly read as a request to act would get general
@@ -385,8 +388,8 @@ async function settleResultRun(
 }
 
 /**
- * Front door: a confident general product question is answered from the help
- * center without starting an investigation. Returns null for every other route,
+ * Front door: a general product question is answered from the help center
+ * without starting an investigation. Returns null for every other route,
  * a router failure (which falls open to `investigate`), and any knowledge-base
  * miss, so those take the investigation lane exactly as before.
  */
@@ -419,14 +422,16 @@ async function answerFromKnowledgeBase(
     );
   // A thank you or a reaction gets a sentence back, not an investigation. If
   // that reply cannot be written the message falls through as it always did.
-  if (route.lane === "chat" && route.confidence >= KB_ROUTE_CONFIDENCE) {
+  if (route.lane === "chat" && route.confidence >= CHAT_ROUTE_CONFIDENCE) {
     const reply = await deps.answerChat(question, ids);
     if (reply) {
       return finish(reply);
     }
   }
+  // An explicit ask for a person is never overridden by a help-center guess.
   const generalQuestion =
-    route.lane === "kb" && route.confidence >= KB_ROUTE_CONFIDENCE;
+    route.lane === "kb" ||
+    (route.lane !== "human" && route.kbScore >= KB_SCORE);
   // A request to act never needs an investigation: the fast lane apologises and
   // gives the steps. An explicit ask for a person is left alone.
   const actionRequest =
