@@ -9,6 +9,7 @@ import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   answerFromHelpCenter,
+  CLARIFY_PROMPT,
   type KbAnswer,
   replyToChat,
 } from "./widget-kb.js";
@@ -230,6 +231,12 @@ const KB_SCORE = 0.5;
  * steps instead of a look at the account.
  */
 const ACTION_REQUEST_SCORE = 0.8;
+/**
+ * How sure the router must be that nobody could help without first asking what
+ * the customer means. High on purpose: a wrongly asked question costs one turn,
+ * but it must not get in the way of a real, answerable account question.
+ */
+const UNCLEAR_SCORE = 0.8;
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -441,6 +448,25 @@ async function answerFromKnowledgeBase(
     const reply = await deps.answerChat(question, ids);
     if (reply) {
       return finish(reply);
+    }
+  }
+  // Nothing to look up yet: ask what they mean instead of spending minutes on
+  // a broad account investigation. If that reply cannot be written, fall through.
+  if (route.lane !== "human" && (route.unclear ?? 0) >= UNCLEAR_SCORE) {
+    const reply = await deps.answerChat(question, ids, CLARIFY_PROMPT);
+    if (reply) {
+      return deps.complete(
+        run.id,
+        {
+          citations: [],
+          decision: "allow",
+          message: reply.message,
+          reason: "clarify",
+          status: "completed",
+        },
+        null,
+        run.id
+      );
     }
   }
   // An explicit ask for a person is never overridden by a help-center guess.

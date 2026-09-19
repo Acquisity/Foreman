@@ -35,6 +35,7 @@ describe("routeWidgetMessage", () => {
       kbScore: 0,
       lane: "investigate",
       source: "jev",
+      unclear: 0,
     });
     assert.ok(sent, "should have called Jev");
     const body = JSON.parse((sent as { body: string }).body);
@@ -43,6 +44,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_action",
       "asks_for_human",
       "asks_own_data",
+      "is_unclear",
       "lane",
     ]);
     assert.equal(

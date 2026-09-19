@@ -14,6 +14,7 @@ import type { WidgetFindings } from "./widget-findings.js";
 
 const RECONNECT = /Reconnect/;
 const INTERNAL = /^internal_artifact:/;
+const STRIPE_CUSTOMER_ID = /cus_/;
 const EMAIL_LITERAL = /'\{someone@example\.com\}'::text\[\]/;
 
 const campaignId = "44444444-4444-4444-8444-444444444444";
@@ -403,4 +404,44 @@ test("every table the ownership query reads is reached only through the verified
   assert.ok(
     query.includes("join crm_lead l on l.id = ce.lead_id join authorized")
   );
+});
+
+test("a provider id in entityIds never reaches the customer, so it does not block the answer", async () => {
+  const { calls, deps: d } = deps();
+  const result = await gate(
+    scope,
+    "What plan am I on?",
+    findings({
+      facts: [
+        {
+          claim: "The workspace is on the Legacy plan.",
+          entityIds: ["cus_AbCdEfGh12345678"],
+          evidence: { ref: "", tool: "read_billing_account" },
+        },
+      ],
+    }),
+    d
+  );
+  assert.equal(result.decision, "allow");
+  assert.doesNotMatch(JSON.stringify(calls.compose), STRIPE_CUSTOMER_ID);
+});
+
+test("the same provider id inside a claim still blocks", async () => {
+  const { deps: d } = deps();
+  const result = await gate(
+    scope,
+    "What plan am I on?",
+    findings({
+      facts: [
+        {
+          claim: "Customer cus_AbCdEfGh12345678 is on the Legacy plan.",
+          entityIds: [],
+          evidence: { ref: "", tool: "read_billing_account" },
+        },
+      ],
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.match(result.reason, INTERNAL);
 });

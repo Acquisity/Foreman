@@ -42,6 +42,13 @@ const QUESTIONS = {
       "The customer is asking about their own account, workspace, campaigns, billing, or activity, rather than how the product works in general.",
     type: "noul",
   },
+  // "what about the limit?" and "nothing works!!" were investigated for two to
+  // three minutes before anyone asked what the customer meant.
+  is_unclear: {
+    instructions:
+      "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could help. A short follow-up whose subject is clear from the earlier turns is NOT this.",
+    type: "noul",
+  },
   lane: {
     criteria: {
       // Without this the router had to file a plain "thank you" under one of the
@@ -66,6 +73,7 @@ const responseSchema = z.object({
     asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
+    is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     lane: z.object({
       choice: z.enum(WIDGET_LANES),
       confidence: z.number().min(0).max(1).optional(),
@@ -83,6 +91,8 @@ export interface WidgetRoute {
   kbScore: number;
   lane: WidgetLane;
   source: "jev" | "fallback";
+  /** How likely the message cannot be helped without first asking what it means. */
+  unclear?: number;
 }
 
 const FALLBACK: WidgetRoute = {
@@ -152,6 +162,7 @@ export async function routeWidgetMessage(
         (answers.lane.choice === "kb" ? confidence : 0),
       lane: answers.lane.choice,
       source: "jev",
+      unclear: answers.is_unclear?.noul ?? 0,
     };
   } catch {
     return FALLBACK;
@@ -165,7 +176,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)}`,
     runId: fields.runId,
   });
 }

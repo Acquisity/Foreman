@@ -818,3 +818,39 @@ test("an overdue run with no answer is force-finished for a human, not left hang
   assert.equal(body.findings.needsHuman, true);
   assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
 });
+
+test("an unclear message gets one clarifying question instead of an investigation", async (t) => {
+  enabled(t);
+  const { deps, gated, run } = dependencies();
+  deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0.7,
+      confidence: 0.6,
+      kbScore: 0.1,
+      lane: "investigate" as const,
+      source: "jev" as const,
+      unclear: 0.93,
+    });
+  let system: string | undefined;
+  deps.answerChat = (_message, _log, prompt) => {
+    system = prompt;
+    return Promise.resolve({
+      citations: [],
+      message: "Which limit do you mean?",
+    });
+  };
+  const response = await receiveWidgetMessage(
+    request({ ...start, message_id: "eeeeeeee-5555-4555-8555-eeeeeeeeeeee" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.message, "Which limit do you mean?");
+  assert.equal(run.outcome?.reason, "clarify");
+  assert.ok(system && system !== undefined);
+  assert.deepEqual(gated, []);
+});
