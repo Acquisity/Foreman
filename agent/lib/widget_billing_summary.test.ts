@@ -262,6 +262,19 @@ test("resolves the org's customer only from the organization id it was given", a
   assert.equal(deps.calls.organizationId, verifiedWidgetContext.organizationId);
 });
 
+test("membership is checked for the same organization the billing read targets", async () => {
+  let checked: string | undefined;
+  const deps = fakeDeps({
+    isAuthorized: (organizationId) => {
+      checked = organizationId;
+      return Promise.resolve(true);
+    },
+  });
+  await composeWidgetBillingSummary(verifiedWidgetContext.organizationId, deps);
+  assert.equal(checked, verifiedWidgetContext.organizationId);
+  assert.equal(checked, deps.calls.organizationId);
+});
+
 test("a reconciled summary validates against its own output schema", async () => {
   const result = await composeWidgetBillingSummary(
     verifiedWidgetContext.organizationId,

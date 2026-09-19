@@ -199,8 +199,12 @@ export interface WidgetBillingSummaryDeps {
   getAutumnCustomer: (customerId: string) => Promise<unknown>;
   getBillingAccount: (organizationId: string) => Promise<BillingAccountResult>;
   getStripeCustomerBilling: (customerId: string) => Promise<StripeBilling>;
-  /** Whether the asking user is a live owner or admin of the organization, read from production. */
-  isAuthorized: () => Promise<boolean>;
+  /**
+   * Whether the asking user is a live owner or admin of this organization, read
+   * from production. It takes the same id the billing read takes, so the check
+   * and the read cannot be pointed at different workspaces.
+   */
+  isAuthorized: (organizationId: string) => Promise<boolean>;
 }
 
 const EMPTY_SUMMARY: Omit<WidgetBillingSummary, "available" | "unavailable"> = {
@@ -335,7 +339,7 @@ export async function composeWidgetBillingSummary(
   // Every other widget tool hangs its reads off a live membership check. The
   // billing reads are keyed by organization id alone, so the check runs first,
   // and a check that fails or cannot run reads nothing.
-  if (!(await deps.isAuthorized().catch(() => false))) {
+  if (!(await deps.isAuthorized(organizationId).catch(() => false))) {
     unavailable.push("workspace could not be verified");
     return { ...EMPTY_SUMMARY, available: false, unavailable };
   }
@@ -465,11 +469,11 @@ const tool = defineTool({
           client: executorClient(ctx),
           signal: ctx.abortSignal,
         }),
-      isAuthorized: async () => {
+      isAuthorized: async (organizationId) => {
         const [row] = parseReadQueryResult(
           await callPlanetscaleReadQuery(ctx, {
             ...PRODUCTION_READ_QUERY_ARGS,
-            query: buildBillingAuthorizationQuery(scope),
+            query: buildBillingAuthorizationQuery({ ...scope, organizationId }),
           })
         ).rows as { authorized?: unknown }[];
         return row?.authorized === true;
