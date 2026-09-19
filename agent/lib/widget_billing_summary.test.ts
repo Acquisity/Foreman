@@ -4,6 +4,7 @@ import type { BillingAccountResult } from "#lib/billing-account.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
+  buildBillingAuthorizationQuery,
   composeWidgetBillingSummary,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
@@ -216,9 +217,44 @@ const fakeDeps = (
       return Promise.resolve(dbAccount());
     },
     getStripeCustomerBilling: () => Promise.resolve(stripeFixture),
+    isAuthorized: () => Promise.resolve(true),
     ...overrides,
   };
 };
+
+test("a user who is not a live owner or admin, or whose membership cannot be checked, reads no billing at all", async () => {
+  for (const isAuthorized of [
+    () => Promise.resolve(false),
+    () => Promise.reject(new Error("read failed")),
+  ]) {
+    const deps = fakeDeps({
+      getAutumnCustomer: () => assert.fail("must not read Autumn"),
+      getBillingAccount: () => assert.fail("must not read the billing account"),
+      getStripeCustomerBilling: () => assert.fail("must not read Stripe"),
+      isAuthorized,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each case is its own call.
+    const result = await composeWidgetBillingSummary(
+      verifiedWidgetContext.organizationId,
+      deps
+    );
+    assert.equal(result.available, false);
+    assert.equal(result.organization, null);
+    assert.deepEqual(result.unavailable, ["workspace could not be verified"]);
+  }
+});
+
+test("the membership check is scoped to the verified user and workspace", () => {
+  const query = buildBillingAuthorizationQuery(verifiedWidgetContext);
+  assert.ok(
+    query.includes(`o.id = '${verifiedWidgetContext.organizationId}'::uuid`)
+  );
+  assert.ok(
+    query.includes(`m.user_id = '${verifiedWidgetContext.userId}'::uuid`)
+  );
+  assert.ok(query.includes("m.role in ('owner', 'admin')"));
+  assert.ok(query.includes("m.deleted_at is null"));
+});
 
 test("resolves the org's customer only from the organization id it was given", async () => {
   const deps = fakeDeps();

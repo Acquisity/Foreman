@@ -10,8 +10,16 @@ import {
 } from "#lib/billing-api.js";
 import { executorClient } from "#lib/executor/client.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
-import { callPlanetscaleReadQuery } from "#lib/planetscale.js";
-import { isWidgetSupport, widgetContext } from "#lib/widget-scope.js";
+import {
+  callPlanetscaleReadQuery,
+  parseReadQueryResult,
+} from "#lib/planetscale.js";
+import {
+  isWidgetSupport,
+  type WidgetContext,
+  widgetContext,
+  widgetContextSchema,
+} from "#lib/widget-scope.js";
 
 /** Subscription statuses read as "the customer is currently paying for this". */
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
@@ -191,6 +199,8 @@ export interface WidgetBillingSummaryDeps {
   getAutumnCustomer: (customerId: string) => Promise<unknown>;
   getBillingAccount: (organizationId: string) => Promise<BillingAccountResult>;
   getStripeCustomerBilling: (customerId: string) => Promise<StripeBilling>;
+  /** Whether the asking user is a live owner or admin of the organization, read from production. */
+  isAuthorized: () => Promise<boolean>;
 }
 
 const EMPTY_SUMMARY: Omit<WidgetBillingSummary, "available" | "unavailable"> = {
@@ -322,6 +332,13 @@ export async function composeWidgetBillingSummary(
   deps: WidgetBillingSummaryDeps
 ): Promise<WidgetBillingSummary> {
   const unavailable: string[] = [];
+  // Every other widget tool hangs its reads off a live membership check. The
+  // billing reads are keyed by organization id alone, so the check runs first,
+  // and a check that fails or cannot run reads nothing.
+  if (!(await deps.isAuthorized().catch(() => false))) {
+    unavailable.push("workspace could not be verified");
+    return { ...EMPTY_SUMMARY, available: false, unavailable };
+  }
   const account = await deps.getBillingAccount(organizationId);
   if (account.error) {
     unavailable.push("productDb read failed");
@@ -406,6 +423,18 @@ export async function composeWidgetBillingSummary(
   };
 }
 
+/** The same live owner/admin membership check the other widget tools read through. */
+export function buildBillingAuthorizationQuery(context: WidgetContext): string {
+  const scope = widgetContextSchema.parse(context);
+  return `with authorized as (
+    select o.id from organization o join member m on m.organization_id = o.id
+    where o.id = '${scope.organizationId}'::uuid and m.user_id = '${scope.userId}'::uuid
+      and o.deleted_at is null and m.deleted_at is null and m.role in ('owner', 'admin')
+      and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
+  )
+  select (select count(*) = 1 from authorized) as authorized`;
+}
+
 const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
@@ -436,6 +465,15 @@ const tool = defineTool({
           client: executorClient(ctx),
           signal: ctx.abortSignal,
         }),
+      isAuthorized: async () => {
+        const [row] = parseReadQueryResult(
+          await callPlanetscaleReadQuery(ctx, {
+            ...PRODUCTION_READ_QUERY_ARGS,
+            query: buildBillingAuthorizationQuery(scope),
+          })
+        ).rows as { authorized?: unknown }[];
+        return row?.authorized === true;
+      },
     });
   },
   inputSchema: widgetBillingSummaryInputSchema,
