@@ -12,7 +12,9 @@ const shape = {
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
   role: z.enum(["owner", "admin"]),
-  source: z.literal("widget"),
+  // "inbox" marks a run a teammate started from the support inbox: its result is
+  // team-only and it never becomes context for a customer reply.
+  source: z.enum(["widget", "inbox"]),
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
 };

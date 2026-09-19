@@ -31,6 +31,9 @@ export async function verifyWidgetContext(
     organizationId: string;
     userToken: string;
     signal?: AbortSignal;
+    // The token belongs to a support teammate, not the customer. The app then
+    // checks the teammate and returns the conversation's customer as the scope.
+    staff?: boolean;
   },
   request: typeof fetch = fetch
 ): Promise<WidgetContext> {
@@ -40,7 +43,10 @@ export async function verifyWidgetContext(
     ? AbortSignal.any([input.signal, AbortSignal.timeout(50_000)])
     : AbortSignal.timeout(50_000);
   const response = await request(`${origin}/api/internal/foreman/context`, {
-    body: JSON.stringify({ organizationId: parsed.organizationId }),
+    body: JSON.stringify({
+      organizationId: parsed.organizationId,
+      ...(input.staff ? { conversationId: parsed.conversationId } : {}),
+    }),
     headers: {
       authorization: `Bearer ${parsed.userToken}`,
       "content-type": "application/json",
@@ -68,7 +74,7 @@ export async function verifyWidgetContext(
       organizationSlug: verified.organizationSlug,
       partnerId: verified.partnerId,
       role: verified.role,
-      source: "widget",
+      source: input.staff ? "inbox" : "widget",
       userId: verified.userId,
       verifiedAt: verified.verifiedAt,
     })

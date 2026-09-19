@@ -76,6 +76,7 @@ const RECENT_TURNS = 4;
  * out. The reply is often written in a later request than the one that started
  * the run, so the conversation is read here rather than carried from the client.
  * Turns that were blocked have no reply and contribute only the question.
+ * A teammate's inbox run is never a turn: its instruction is team-only.
  */
 export async function recentWidgetTurns(
   run: Pick<WidgetRun, "created_at" | "id" | "scope">
@@ -83,6 +84,7 @@ export async function recentWidgetTurns(
   const rows = await privateDatabase().query(
     `SELECT question, outcome FROM widget_support_runs
      WHERE organization_id = $1 AND conversation_id = $2 AND id <> $3 AND created_at < $4
+       AND scope->>'source' IS DISTINCT FROM 'inbox'
      ORDER BY created_at DESC LIMIT ${RECENT_TURNS}`,
     [run.scope.organizationId, run.scope.conversationId, run.id, run.created_at]
   );
@@ -121,8 +123,9 @@ export async function claimWidgetRun(
   }
   const rows = await db.query(
     `SELECT * FROM widget_support_runs WHERE organization_id = $1 AND conversation_id = $2
+     AND scope->>'source' = $4
      AND (request_key = $3 OR completed_at IS NULL) ORDER BY (request_key = $3) DESC LIMIT 1`,
-    [scope.organizationId, scope.conversationId, requestKey]
+    [scope.organizationId, scope.conversationId, requestKey, scope.source]
   );
   if (!rows.length) {
     if (retry) {

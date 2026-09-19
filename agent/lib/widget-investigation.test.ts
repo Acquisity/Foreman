@@ -857,3 +857,50 @@ test("an unclear message gets one clarifying question instead of an investigatio
   assert.ok(system && system !== undefined);
   assert.deepEqual(gated, []);
 });
+
+test("a teammate's inbox run skips the front door, verifies as staff, and keeps its own session", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const inbox = { ...scope, source: "inbox" as const };
+  run.scope = inbox;
+  deps.route = () => assert.fail("must not route a teammate's request");
+  let verifiedAsStaff: boolean | undefined;
+  let address = "";
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "can i speak with a human", staff: true }),
+    {
+      from: (to: string) => {
+        address = to;
+        return { send: () => Promise.resolve(completedSession()) };
+      },
+      waitUntil: () => undefined,
+    } as unknown as Pick<RouteHandlerArgs, "from" | "waitUntil">,
+    200,
+    (input) => {
+      verifiedAsStaff = input.staff;
+      return Promise.resolve(inbox);
+    },
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(verifiedAsStaff, true);
+  assert.equal(
+    address,
+    `${scope.organizationId}:${scope.conversationId}:inbox`
+  );
+
+  // The customer's own token never reads a teammate's run.
+  const read = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.equal(read.status, 503);
+});

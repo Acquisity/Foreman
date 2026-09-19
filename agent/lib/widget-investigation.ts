@@ -36,6 +36,9 @@ const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
   conversation_id: z.uuid(),
   organization_id: z.uuid(),
+  // A support teammate started this from the inbox. It always investigates,
+  // and the caller keeps the result team-only.
+  staff: z.boolean().optional(),
 };
 /**
  * Recent customer-visible turns of the same conversation, oldest first. The
@@ -95,10 +98,13 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
+/** Inbox runs get their own session, so a teammate's instruction never sits in the customer's. */
 export const widgetAddress = (scope: {
   organizationId: string;
   conversationId: string;
-}) => `${scope.organizationId}:${scope.conversationId}`;
+  source?: "widget" | "inbox";
+}) =>
+  `${scope.organizationId}:${scope.conversationId}${scope.source === "inbox" ? ":inbox" : ""}`;
 
 export type WaitOutcome =
   | { status: "pending" }
@@ -383,7 +389,13 @@ export async function finishWidgetRun(
 const requestKey = (input: Extract<WidgetInput, { action: "start" }>) =>
   input.message_id ??
   createHash("sha256")
-    .update(JSON.stringify([input.conversation_id, input.question]))
+    .update(
+      JSON.stringify([
+        input.conversation_id,
+        input.question,
+        ...(input.staff ? ["inbox"] : []),
+      ])
+    )
     .digest("hex");
 
 /** Advance a still-open run: finish it if it settled, or force a human handoff once overdue. */
@@ -607,6 +619,7 @@ export async function receiveWidgetMessage(
       conversationId: input.conversation_id,
       organizationId: input.organization_id,
       signal: request.signal,
+      staff: input.staff,
       userToken,
     });
   } catch {
@@ -616,6 +629,10 @@ export async function receiveWidgetMessage(
     if (input.action === "result") {
       let run = await deps.read(input.run_id);
       assertWidgetRunOwner(run, scope);
+      // A teammate's run is read only through the teammate's verified path.
+      if (run.scope.source !== scope.source) {
+        throw new Error("Investigation unavailable for this conversation.");
+      }
       if (!run.outcome && run.session_id && attachSession) {
         run = await settleResultRun(
           run,
@@ -641,13 +658,16 @@ export async function receiveWidgetMessage(
       return json(widgetRunResponse(run));
     }
     const message = withHistory(input.question, input.history);
-    const answered = await answerFromKnowledgeBase(
-      run,
-      scope,
-      message,
-      request.signal,
-      deps
-    );
+    // A teammate asked for an investigation: no help-center or handoff front door.
+    const answered = input.staff
+      ? null
+      : await answerFromKnowledgeBase(
+          run,
+          scope,
+          message,
+          request.signal,
+          deps
+        );
     if (answered) {
       return json(widgetRunResponse(answered));
     }
