@@ -43,6 +43,7 @@ describe("routeWidgetMessage", () => {
     assert.deepEqual(Object.keys(body.questions).sort(), [
       "asks_for_action",
       "asks_for_human",
+      "asks_for_ticket",
       "asks_own_data",
       "is_unclear",
       "lane",
@@ -82,6 +83,37 @@ describe("routeWidgetMessage", () => {
       fetch: reply({ choice: "kb", confidence: 0.54 }),
     });
     assert.equal(winner.kbScore, 0.54);
+  });
+
+  it("investigates a request for a ticket whatever else it looks like", async () => {
+    // Measured on "can you please open up a tech ticket for me": action 0.86.
+    const route = await routeWidgetMessage("please open a tech ticket", {
+      apiKey: "test-key",
+      fetch: () =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              answers: {
+                asks_for_action: { noul: 0.86 },
+                asks_for_human: { noul: 0.16 },
+                asks_for_ticket: { noul: 0.95 },
+                asks_own_data: { noul: 0.95 },
+                is_unclear: { noul: 0.9 },
+                lane: {
+                  choice: "kb",
+                  confidence: 0.9,
+                  probabilities: { kb: 0.9 },
+                },
+              },
+            }),
+          ok: true,
+          status: 200,
+        }),
+    });
+    assert.equal(route.lane, "investigate");
+    assert.equal(route.asksForAction, 0);
+    assert.equal(route.kbScore, 0);
+    assert.equal(route.unclear, 0);
   });
 
   it("hands off only when the direct question agrees a person was asked for", async () => {

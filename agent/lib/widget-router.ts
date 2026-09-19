@@ -22,6 +22,8 @@ const MAX_STATE_CHARS = 8000;
 
 /** Below this, an explicit ask for a person was not what the customer wrote. */
 const HUMAN_AGREEMENT = 0.5;
+/** At or above this, the customer asked for a ticket. */
+const TICKET_REQUEST = 0.5;
 
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
@@ -32,12 +34,20 @@ const QUESTIONS = {
   // such a message out of a minutes-long investigation it cannot benefit from.
   asks_for_action: {
     instructions:
-      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect, refund or set something up for them. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
+      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect, refund or set something up for them. Asking for a ticket to be opened or a bug to be reported is NOT this. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
     type: "noul",
   },
   asks_for_human: {
     instructions:
       "The customer explicitly asks to talk to a person, a human, an agent, or the support team.",
+    type: "noul",
+  },
+  // Filing a ticket is the one thing Foreman can do for a customer. "can you open
+  // up a tech ticket for me" scored asks_for_action 0.86 and got the fast lane's
+  // "I am not able to open tickets"; an earlier one was handed to a person.
+  asks_for_ticket: {
+    instructions:
+      "The customer asks for a ticket to be opened, filed, raised or escalated to engineering or the technical team, or asks to report a bug.",
     type: "noul",
   },
   asks_own_data: {
@@ -77,6 +87,7 @@ const responseSchema = z.object({
   answers: z.object({
     asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
+    asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
     is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     lane: z.object({
@@ -156,6 +167,23 @@ export async function routeWidgetMessage(
     }
     const { answers } = responseSchema.parse(await response.json());
     const confidence = answers.lane.confidence ?? 0;
+    // A ticket can only be filed from an investigation, so a request for one is
+    // never a change to apologise for, a help-center question or a handoff.
+    const wantsTicket =
+      (answers.asks_for_ticket?.noul ?? 0) >= TICKET_REQUEST &&
+      answers.asks_for_human.noul < HUMAN_AGREEMENT;
+    if (wantsTicket) {
+      return {
+        asksForAction: 0,
+        asksForHuman: answers.asks_for_human.noul,
+        asksOwnData: answers.asks_own_data.noul,
+        confidence,
+        kbScore: 0,
+        lane: "investigate",
+        source: "jev",
+        unclear: 0,
+      };
+    }
     return {
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
