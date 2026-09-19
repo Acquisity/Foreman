@@ -89,8 +89,11 @@ const uniqueLower = (matches: RegExpMatchArray | string[] | null) =>
 
 const OPS_ID_ONLY = new RegExp(`^(?:${OPS_IDS.source})$`);
 
+/** A fact's identifier that is a ticket number and nothing else: the composer never sees it, so it cannot leak from there. */
+const TICKET_ID_ONLY = /^ENG-\d+$/u;
+
 // entityIds exist so the ownership check can vouch for them; the composer never
-// sees them. An outside-service id (Stripe cus_, a run id) cannot be vouched for
+// sees them. An outside-service id (Stripe cus_, a run id) or a ticket number cannot be vouched for
 // and cannot leak from here, so it is left out instead of blocking a safe
 // answer. The same id inside a claim, the recommendation or the composed reply
 // still blocks.
@@ -98,7 +101,9 @@ export function customerText(findings: WidgetFindings): string {
   return [
     ...findings.facts.flatMap((fact) => [
       fact.claim,
-      ...fact.entityIds.filter((id) => !OPS_ID_ONLY.test(id.trim())),
+      ...fact.entityIds.filter(
+        (id) => !(OPS_ID_ONLY.test(id.trim()) || TICKET_ID_ONLY.test(id.trim()))
+      ),
     ]),
     findings.recommendation,
     findings.needsWrite ?? "",

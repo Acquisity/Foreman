@@ -191,6 +191,26 @@ test("the gate drops the sentence citing another ticket and answers with the res
   assert.ok(!JSON.stringify(calls.compose).includes("ENG-"));
 });
 
+test("a ticket number held only in a fact's identifiers does not block the answer", async () => {
+  // Measured: a filed-ticket reply blocked as internal_artifact:ENG-14065 with the
+  // number nowhere in a claim, only in the extractor's entityIds.
+  const base = findings();
+  const { deps: d } = deps();
+  const result = await gate(
+    scope,
+    question,
+    {
+      ...base,
+      facts: base.facts.map((fact) => ({
+        ...fact,
+        entityIds: [...fact.entityIds, "ENG-14065"],
+      })),
+    },
+    d
+  );
+  assert.notEqual(result.decision, "block");
+});
+
 test("findings that are nothing but another ticket still block", async () => {
   const { deps: d } = deps();
   const result = await gate(
