@@ -166,7 +166,7 @@ test("the customer's own lead, inbox and sending domain pass; ones the workspace
   }
 });
 
-test("another ticket's number is removed from customer-bound findings, not grounds to block", () => {
+test("an item citing another ticket is dropped whole; the conversation's own ticket stays", () => {
   const cleaned = withoutTicketRefs(
     findings({
       recommendation:
@@ -174,22 +174,33 @@ test("another ticket's number is removed from customer-bound findings, not groun
       ticket: { id: "ENG-1", url: "https://linear.app/acquisity/issue/ENG-1" },
     })
   );
-  assert.equal(
-    cleaned.recommendation,
-    "Click Launch. If it stays in Draft, it is a known issue. See ENG-1."
-  );
+  assert.equal(cleaned?.recommendation, "Click Launch. See ENG-1.");
 });
 
-test("the gate lets an answer through with another ticket's number removed", async () => {
+test("the gate drops the sentence citing another ticket and answers with the rest", async () => {
   const { calls, deps: d } = deps();
   const result = await gate(
     scope,
     question,
-    findings({ recommendation: "Tracked in ENG-13999 and ENG-12140." }),
+    findings({
+      recommendation: "Set a daily limit. Tracked in ENG-13999 and ENG-12140.",
+    }),
     d
   );
   assert.notEqual(result.decision, "block");
   assert.ok(!JSON.stringify(calls.compose).includes("ENG-"));
+});
+
+test("findings that are nothing but another ticket still block", async () => {
+  const { deps: d } = deps();
+  const result = await gate(
+    scope,
+    question,
+    findings({ facts: [], recommendation: "Tracked in ENG-13999." }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.match(result.reason, INTERNAL);
 });
 
 test("the composer learns a ticket was filed, never which one", () => {
