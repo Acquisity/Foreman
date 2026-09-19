@@ -380,6 +380,9 @@ test("every table the ownership query reads is reached only through the verified
     "crm_lead l",
     "mail_inbox i",
     "mail_domain d",
+    "lead_scrape_run sr",
+    "agent_executions ae",
+    "domain_purchase_order dpo",
   ]) {
     const alias = table.split(" ")[1];
     assert.ok(

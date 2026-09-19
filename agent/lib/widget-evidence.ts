@@ -43,6 +43,10 @@ const literalArray = (values: string[], pattern: RegExp, cast: string) => {
  * query: an identifier that exists only in another workspace resolves to
  * nothing, exactly as an unknown one does.
  *
+ * Scrape runs, agent executions and domain orders are here because
+ * `widget_job_failures` returns their ids: a customer's own failed scrape run
+ * was blocking the whole reply as foreign.
+ *
  * A domain is the customer's own when it is a sending domain they bought, the
  * domain their members sign in with, or the domain of one of their inboxes: a
  * reply naming the customer's own company domain was being blocked as foreign.
@@ -74,6 +78,9 @@ export function buildOwnershipQuery(
       union select l.id from crm_lead l join authorized a on a.id = l.organization_id
       union select i.id from mail_inbox i join authorized a on a.id = i.organization_id
       union select d.id from mail_domain d join authorized a on a.id = d.organization_id
+      union select sr.id from lead_scrape_run sr join authorized a on a.id = sr.organization_id
+      union select ae.id from agent_executions ae join authorized a on a.id = ae.organization_id
+      union select dpo.id from domain_purchase_order dpo join authorized a on a.id = dpo.organization_id
     ) x where x.id = any(${uuids})), '[]'::jsonb) as uuids,
     coalesce((select jsonb_agg(lower(a.slug)) from authorized a where lower(a.slug) = any(${slugs})), '[]'::jsonb) as slugs,
     coalesce((select jsonb_agg(distinct e.email) from (
