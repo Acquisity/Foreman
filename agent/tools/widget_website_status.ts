@@ -169,8 +169,12 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
   // guard the cast so malformed JSON resolves to no linked domains, not an error.
   const legacyWebsiteId = `(case when p.metadata->>'legacyWebsiteId' ~ '^[0-9a-fA-F-]{36}$'
     then (p.metadata->>'legacyWebsiteId')::uuid else null end)`;
+  // The hosting id resolves in the app's own order, minus its v0 lookup (no v0
+  // access here): the project's column, then its linked legacy website's.
   const projectRows = `select 'website_project' as source, p.id, left(p.name, ${NAME_SQL_LIMIT}) as name,
-      p.updated_at as "updatedAt", nullif(p.vercel_project_id, '') as "vercelProjectId",
+      p.updated_at as "updatedAt",
+      coalesce(nullif(p.vercel_project_id, ''), (select nullif(lw.vercel_project_id, '') from website lw
+        where lw.id = ${legacyWebsiteId} and lw.organization_id = a.id and lw.deleted_at is null)) as "vercelProjectId",
       exists(select 1 from website_deployment wd where wd.project_id = p.id
         and wd.organization_id = a.id and wd.deleted_at is null and wd.status = 'deployed') as "everPublished",
       coalesce((select wd.status::text from website_deployment wd
