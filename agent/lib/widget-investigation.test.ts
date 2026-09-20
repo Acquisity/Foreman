@@ -677,6 +677,58 @@ test("a confident help-center question that misses gets a clarifying reply: no i
   }
 });
 
+test("the replies written at the front door read the latest message first with four bounded turns, never the full transcript", async (t) => {
+  enabled(t);
+  const history = Array.from({ length: 8 }, (_, n) => ({
+    role: n % 2 ? ("assistant" as const) : ("customer" as const),
+    text: `turn ${n} about growth plans`,
+  }));
+  const chatRoute = () =>
+    Promise.resolve({
+      ...followUpBase,
+      confidence: 0.9,
+      kbScore: 0,
+      lane: "chat" as const,
+    });
+  const unclearRoute = () =>
+    Promise.resolve({
+      ...followUpBase,
+      confidence: 0.2,
+      kbScore: 0,
+      lane: "investigate" as const,
+      unclear: 0.95,
+    });
+  for (const route of [followUpRoute(0, 0.9), chatRoute, unclearRoute]) {
+    const { deps } = dependencies();
+    deps.route = route;
+    deps.answerKb = () => Promise.resolve(null);
+    let prompt = "";
+    deps.answerChat = (message) => {
+      prompt = message;
+      return Promise.resolve({ citations: [], message: "ok" });
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history,
+        message_id: crypto.randomUUID(),
+        question: "how do i pause a campaign?",
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.ok(prompt.startsWith("LATEST CUSTOMER MESSAGE"));
+    assert.ok(
+      prompt.indexOf("how do i pause a campaign?") < prompt.indexOf("turn 4")
+    );
+    assert.ok(prompt.includes("turn 7"));
+    assert.ok(!prompt.includes("turn 3"), "only four earlier turns ride along");
+  }
+});
+
 test("a miss the router was unsure about, or an account question, still investigates", async (t) => {
   enabled(t);
   for (const route of [

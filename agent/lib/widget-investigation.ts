@@ -17,6 +17,7 @@ import {
 } from "./widget-kb.js";
 import {
   logRouteDecision,
+  renderAsk,
   routeWidgetMessage,
   type WidgetAsk,
   type WidgetRoute,
@@ -526,12 +527,12 @@ async function settleResultRun(
 /** The reply to a confident help-center question nothing answered: a question back, never blank. */
 async function kbMissReply(
   run: WidgetRun,
-  question: string,
+  ask: WidgetAsk,
   deps: Pick<WidgetDependencies, "answerChat" | "complete">
 ): Promise<WidgetRun | null> {
   const reply = await deps
     .answerChat(
-      question,
+      renderAsk(ask),
       { conversationId: run.scope.conversationId, runId: run.id },
       KB_MISS_PROMPT
     )
@@ -563,11 +564,13 @@ async function answerFromKnowledgeBase(
   run: WidgetRun,
   scope: WidgetContext,
   ask: WidgetAsk,
-  question: string,
   signal: AbortSignal,
   deps: WidgetDependencies
 ): Promise<WidgetRun | null> {
   const route = await deps.route(ask, { signal });
+  // Every reply written at the front door reads the latest message first with
+  // a few bounded turns; the full transcript is for a real investigation only.
+  const question = renderAsk(ask);
   logRouteDecision(
     { conversationId: scope.conversationId, runId: run.id },
     route
@@ -622,7 +625,7 @@ async function answerFromKnowledgeBase(
       );
     }
   }
-  return answerGeneralQuestion(run, route, ask, question, finish, deps);
+  return answerGeneralQuestion(run, route, ask, finish, deps);
 }
 
 /** The help-center try, for a general question or a request to act; null sends the message on to an investigation. */
@@ -630,7 +633,6 @@ async function answerGeneralQuestion(
   run: WidgetRun,
   route: WidgetRoute,
   ask: WidgetAsk,
-  question: string,
   finish: (written: KbAnswer) => Promise<WidgetRun | null>,
   deps: WidgetDependencies
 ): Promise<WidgetRun | null> {
@@ -655,7 +657,7 @@ async function answerGeneralQuestion(
   const strongKb =
     actionRequest ||
     (route.lane === "kb" && route.confidence >= STRONG_KB_CONFIDENCE);
-  return strongKb ? kbMissReply(run, question, deps) : null;
+  return strongKb ? kbMissReply(run, ask, deps) : null;
 }
 
 /**
@@ -806,7 +808,6 @@ export async function receiveWidgetMessage(
           run,
           scope,
           toWidgetAsk(input.question, input.history),
-          message,
           request.signal,
           deps
         );
