@@ -56,6 +56,8 @@ export type KbCitation = z.infer<typeof kbCitationSchema>;
 export interface KbAnswer {
   citations: KbCitation[];
   message: string;
+  /** Only for an `accountLikely` ask: the message is a fragment, so ask what they mean. */
+  unclear?: true;
 }
 
 interface KbArticle {
@@ -95,10 +97,30 @@ const answerSchema = z.object({
   // that asks nothing. none: a question the articles do not cover.
   kind: z.enum(["answer", "chat", "none"]),
 });
+// For an accountLikely ask. "needs" comes first so it is decided before the answer.
+const guardedAnswerSchema = z.object({
+  needs: z.enum(["account", "articles", "unclear"]),
+  ...answerSchema.shape,
+});
 
 const LATEST_SUBJECT = `The input may carry a labelled LATEST CUSTOMER MESSAGE followed by EARLIER TURNS. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
 
-const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
+const kbPrompt = (ownAccountRule: string) =>
+  `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. ${ownAccountRule} You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
+
+// Jev cannot tell these apart: "Google says the app is blocked when I connect
+// Email and Calendar" scored investigate 0.84 on a fresh thread, the same as real
+// account questions, was investigated and answered "your account state looks
+// normal"; "and my dashboard totals" was investigated and shown live totals. This
+// model reads the words, so it makes the call the scores could not.
+const MY_IS_HOW_TO = `A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see.`;
+// Appended to the usual prompt this lost to the sentence above: measured on the
+// real model, "why is my campaign not sending" and "why was I charged twice" were
+// answered with general causes. It replaces that sentence, and "needs" is decided
+// before any answer is written.
+const ACCOUNT_LIKELY = `This message may need the customer's own account data, which you cannot see; a lookup of their account runs if you step aside. Decide "needs" FIRST. "account": the customer asks about the state of their own things: their numbers, totals, balance, credits or charges, a status (such as "is my inbox still warming up"), or why something of theirs stopped, failed, was charged or is not working (such as "why is my campaign not sending" or "my AI SDR stopped replying"), where the true cause can only be found by looking at their account. Articles that list possible causes do not change this: never offer general causes or steps for these, and never ask them which case applies. "articles": the message names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). "unclear": the latest message is an incomplete fragment that does not yet say what they want to know or what went wrong, such as "and my dashboard totals". Unless needs is "articles", leave answer empty and set kind to "none".`;
+const KB_PROMPT = kbPrompt(MY_IS_HOW_TO);
+const ACCOUNT_LIKELY_KB_PROMPT = kbPrompt(ACCOUNT_LIKELY);
 
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
@@ -168,6 +190,8 @@ export async function replyToChat(
 
 export interface KbDeps {
   generate: (input: {
+    /** See {@link WidgetAsk.accountLikely}. */
+    accountLikely?: boolean;
     articles: KbArticle[];
     question: string;
     signal: AbortSignal;
@@ -190,7 +214,7 @@ export interface KbDeps {
 let indexCache: { at: number; value: KbIndex } | null = null;
 
 export const defaultKbDeps: KbDeps = {
-  async generate({ articles, question, signal }) {
+  async generate({ accountLikely, articles, question, signal }) {
     const model = await resolveModel("kb");
     const { object } = await generateObject({
       abortSignal: signal,
@@ -204,8 +228,8 @@ export const defaultKbDeps: KbDeps = {
         question,
       }),
       ...fastCallOptions(model),
-      schema: answerSchema,
-      system: KB_PROMPT,
+      schema: accountLikely ? guardedAnswerSchema : answerSchema,
+      system: accountLikely ? ACCOUNT_LIKELY_KB_PROMPT : KB_PROMPT,
     });
     return object;
   },
@@ -515,10 +539,24 @@ export async function answerFromHelpCenter(
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
     mark("read");
-    const raw = answerSchema.parse(
-      await deps.generate({ articles, question, signal })
-    );
+    const generated = await deps.generate({
+      accountLikely: ask.accountLikely,
+      articles,
+      question,
+      signal,
+    });
     mark("generate");
+    const guarded = ask.accountLikely
+      ? guardedAnswerSchema.parse(generated)
+      : null;
+    if (guarded?.needs === "unclear") {
+      return { citations: [], message: "", unclear: true };
+    }
+    // Stepping aside for the account lookup is an ordinary miss.
+    const raw =
+      guarded?.needs === "account"
+        ? { answer: "", kind: "none" as const }
+        : answerSchema.parse(generated);
     if (raw.kind === "chat" && raw.answer.trim()) {
       // Conversation, not information: nothing to ground, so nothing to cite.
       return {
@@ -561,7 +599,8 @@ export async function answerFromHelpCenter(
       return null;
     }
     finish(
-      result.citations.length > 0 ? "ok" : "chat",
+      // biome-ignore lint/style/noNestedTernary: three outcomes of one log field.
+      result.unclear ? "unclear" : result.citations.length > 0 ? "ok" : "chat",
       `citations=${result.citations.length} ${marks.join(" ")}`
     );
     return result;

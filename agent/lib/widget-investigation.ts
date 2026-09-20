@@ -323,20 +323,16 @@ const KB_SCORE = 0.5;
  */
 const STRONG_KB_CONFIDENCE = 0.6;
 /**
- * An `investigate` pick this unsure, with the help center this close behind,
- * gives the help center the first try. "Google says the app is blocked when I
- * connect Email and Calendar" routed investigate 0.61 / kb 0.29 and "and my
- * dashboard totals" 0.51 / 0.33; both were investigated, blocked at the gate
- * and handed to a person. Real account questions in the same run scored
- * investigate >= 0.96 with kb <= 0.03.
+ * Below this, an `investigate` pick gives the help center a guarded first try
+ * (`WidgetAsk.accountLikely`): it answers only what an article fully resolves,
+ * asks what a fragment means, and otherwise steps aside for the investigation.
+ * Scores alone cannot make this call. Documented how-tos were picked
+ * `investigate` anywhere from 0.51 to 0.84 ("Google says the app is blocked when
+ * I connect Email and Calendar": 0.61 in one thread, 0.84 on a fresh one), and
+ * real account questions from 0.72 up. The try costs a few seconds, so only the
+ * picks the router is sure of (0.91 to 1.00 in the same runs) skip it.
  */
-const UNSURE_INVESTIGATE_CONFIDENCE = 0.65;
-const UNSURE_KB_SCORE = 0.25;
-/**
- * On such an unsure pick, a help-center miss on a message this likely to be
- * incomplete gets a clarifying question rather than an investigation.
- */
-const FRAGMENT_UNCLEAR_SCORE = 0.5;
+const SURE_INVESTIGATE_CONFIDENCE = 0.9;
 /** How sure the router must be that the message only continues the previous reply. */
 const FOLLOW_UP_SCORE = 0.6;
 /**
@@ -670,15 +666,15 @@ async function answerGeneralQuestion(
   deps: WidgetDependencies
 ): Promise<WidgetRun | null> {
   // An explicit ask for a person is never overridden by a help-center guess.
-  const unsureInvestigate =
+  const closeSecond = route.lane !== "human" && route.kbScore >= KB_SCORE;
+  // A ticket can only be filed from an investigation, so it never detours here.
+  const guardedTry =
     route.lane === "investigate" &&
     route.source === "jev" &&
-    route.confidence < UNSURE_INVESTIGATE_CONFIDENCE &&
-    route.kbScore >= UNSURE_KB_SCORE;
-  const generalQuestion =
-    route.lane === "kb" ||
-    (route.lane !== "human" && route.kbScore >= KB_SCORE) ||
-    unsureInvestigate;
+    !route.ticket &&
+    !closeSecond &&
+    route.confidence < SURE_INVESTIGATE_CONFIDENCE;
+  const generalQuestion = route.lane === "kb" || closeSecond || guardedTry;
   // A request to act never needs an investigation: the fast lane apologises and
   // gives the steps. An explicit ask for a person is left alone.
   const actionRequest =
@@ -687,21 +683,24 @@ async function answerGeneralQuestion(
     return null;
   }
   const answer = await deps.answerKb(
-    { ...ask, followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE },
+    {
+      ...ask,
+      accountLikely: guardedTry,
+      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
+  if (answer?.unclear) {
+    // If the question cannot be written, the investigation runs as it always did.
+    return clarifyReply(run, ask, deps);
+  }
   if (answer) {
     return finish(answer);
   }
   const strongKb =
     actionRequest ||
     (route.lane === "kb" && route.confidence >= STRONG_KB_CONFIDENCE);
-  if (strongKb) {
-    return kbMissReply(run, ask, deps);
-  }
-  return unsureInvestigate && (route.unclear ?? 0) >= FRAGMENT_UNCLEAR_SCORE
-    ? clarifyReply(run, ask, deps)
-    : null;
+  return strongKb ? kbMissReply(run, ask, deps) : null;
 }
 
 /**

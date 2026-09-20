@@ -34,6 +34,12 @@ export type WidgetLane = (typeof WIDGET_LANES)[number];
  * such as "that" or "what next?". A bare string is a message with no context.
  */
 export interface WidgetAsk {
+  /**
+   * The router leaned towards an account lookup. The help-center lane then
+   * answers only what an article fully resolves, and says so when the message
+   * is an incomplete fragment, instead of answering an account question generically.
+   */
+  accountLikely?: boolean;
   /** Help-center articles the previous reply cited: hints, validated before use. */
   activeArticles?: { title: string; url: string }[];
   /** The router judged `latest` a continuation of the previous reply. */
@@ -161,6 +167,8 @@ export interface WidgetRoute {
   kbScore: number;
   lane: WidgetLane;
   source: "jev" | "fallback";
+  /** The customer asked for a ticket, which only an investigation can file. */
+  ticket?: boolean;
   /** How likely the message cannot be helped without first asking what it means. */
   unclear?: number;
 }
@@ -234,6 +242,7 @@ export async function routeWidgetMessage(
         kbScore: 0,
         lane: "investigate",
         source: "jev",
+        ticket: true,
         unclear: 0,
       };
     }

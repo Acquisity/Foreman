@@ -13,6 +13,7 @@ import {
   waitForWidgetInvestigation,
   withHistory,
 } from "./widget-investigation.js";
+import type { KbAnswer } from "./widget-kb.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
 
@@ -446,16 +447,18 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
   assert.deepEqual(failing.gated, [findings]);
 });
 
-const routeWith = (lane: "investigate", kbScore: number) => () =>
-  Promise.resolve({
-    asksForAction: 0,
-    asksForHuman: 0,
-    asksOwnData: 0.8,
-    confidence: 0.55,
-    kbScore,
-    lane,
-    source: "jev" as const,
-  });
+const routeWith =
+  (lane: "investigate", kbScore: number, confidence = 0.55) =>
+  () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0.8,
+      confidence,
+      kbScore,
+      lane,
+      source: "jev" as const,
+    });
 
 test("the help center gets the first try when it is the router's pick however unsure, or a close second", async (t) => {
   enabled(t);
@@ -487,7 +490,8 @@ test("an unsure help-center miss or a distant second is investigated instead", a
   enabled(t);
   for (const [route, answer] of [
     [kbRoute(0.4), null],
-    [routeWith("investigate", 0.1), kbAnswer],
+    // An investigate pick the router is sure of never detours through the help center.
+    [routeWith("investigate", 0.1, 0.96), kbAnswer],
   ] as const) {
     const { deps, gated } = dependencies();
     deps.route = route;
@@ -1204,6 +1208,9 @@ const DASHBOARD_TOTALS =
 const SDR_KB =
   "ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app";
 
+/** What the lane reports for a message that does not yet say what is wanted. */
+const FRAGMENT = "fragment";
+
 /** Replay one persistent conversation through the front door, turn by turn. */
 async function replayThread(
   turns: string[],
@@ -1221,6 +1228,9 @@ async function replayThread(
       Promise.resolve(loggedRoute(typeof ask === "string" ? ask : ask.latest));
     deps.answerKb = (ask) => {
       const slug = article(typeof ask === "string" ? ask : ask.latest);
+      if (slug === FRAGMENT) {
+        return Promise.resolve({ citations: [], message: "", unclear: true });
+      }
       return Promise.resolve(
         slug
           ? {
@@ -1304,7 +1314,7 @@ test("thread: an incomplete fragment gets a clarifying question, its completion 
     ],
     (latest) => {
       if (latest === "and my dashboard totals") {
-        return null;
+        return FRAGMENT;
       }
       if (latest.startsWith("do not match")) {
         return DASHBOARD_TOTALS;
@@ -1318,4 +1328,108 @@ test("thread: an incomplete fragment gets a clarifying question, its completion 
   assert.deepEqual(seen[3].cited, [docs(DASHBOARD_TOTALS)]);
   assert.deepEqual(seen[5].cited, [docs(SDR_KB)]);
   assert.ok(seen.every((turn) => typeof turn.message === "string"));
+});
+
+// Scores production logged on FRESH threads (2026-09-20, build fc818fd), where
+// no earlier turn lifts the help-center score: both were investigated.
+const freshRoute =
+  (confidence: number, kbScore: number, unclear: number) => () =>
+    Promise.resolve({
+      asksForAction: 0.17,
+      asksForHuman: 0.04,
+      asksOwnData: 0.74,
+      confidence,
+      kbScore,
+      lane: "investigate" as const,
+      source: "jev" as const,
+      unclear,
+    });
+
+test("fresh thread: a documented how-to picked investigate at 0.84 is answered from its article, and a bare fragment is asked what it means, neither touching the account", async (t) => {
+  enabled(t);
+  const google = {
+    citations: [{ n: 1, title: "Google", url: docs(GOOGLE_BLOCKED) }],
+    message: "Choose Advanced, then continue.",
+  };
+  for (const [asked, route, lane, reason, message] of [
+    [
+      "Now Google says the app is blocked when I connect Email and Calendar.",
+      freshRoute(0.84, 0.12, 0.34),
+      google,
+      "kb",
+      google.message,
+    ],
+    [
+      "and my dashboard totals",
+      freshRoute(0.64, 0.09, 0.71),
+      { citations: [], message: "", unclear: true as const },
+      "clarify",
+      "Which totals do you mean?",
+    ],
+  ] as const) {
+    const { deps, gated, run } = dependencies();
+    deps.route = route;
+    let got: { accountLikely?: boolean } | undefined;
+    deps.answerKb = (ask) => {
+      got = typeof ask === "string" ? {} : ask;
+      return Promise.resolve<KbAnswer>({
+        ...lane,
+        citations: [...lane.citations],
+      });
+    };
+    deps.answerChat = () =>
+      Promise.resolve({ citations: [], message: "Which totals do you mean?" });
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: crypto.randomUUID(), question: asked }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(got?.accountLikely, true);
+    assert.equal(body.message, message);
+    assert.equal(run.outcome?.reason, reason);
+    assert.deepEqual(gated, []);
+  }
+});
+
+test("a genuine account question in the same score range still investigates: the guarded try steps aside, and a sure pick or a ticket request never takes it", async (t) => {
+  enabled(t);
+  for (const [route, tried] of [
+    // "why is my campaign not sending" scores like the Google how-to; the lane says none.
+    [freshRoute(0.83, 0.12, 0.57), true],
+    [freshRoute(0.96, 0.03, 0.32), false],
+    [
+      () => freshRoute(0.6, 0, 0)().then((r) => ({ ...r, ticket: true })),
+      false,
+    ],
+  ] as const) {
+    const { deps, gated } = dependencies();
+    deps.route = route;
+    let asked = false;
+    deps.answerKb = () => {
+      asked = true;
+      return Promise.resolve(null);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: crypto.randomUUID() }),
+      {
+        from: () =>
+          ({
+            send: () => Promise.resolve(completedSession()),
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(asked, tried);
+    assert.equal(body.message, allowed.message);
+    assert.deepEqual(gated, [findings]);
+  }
 });

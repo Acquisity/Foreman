@@ -321,3 +321,37 @@ test("a timeout or error in the lane is a miss, never a blank or partial reply",
   );
   assert.equal(result, null);
 });
+
+test("an account-likely ask decides what the message needs first: a fragment is unclear, an account question steps aside, a documented fix is answered", async () => {
+  const told: (boolean | undefined)[] = [];
+  const lane = (needs: string | undefined): KbDeps => ({
+    ...deps(null),
+    generate: ({ accountLikely }) => {
+      told.push(accountLikely);
+      // A model that answers anyway must not get past "needs".
+      return Promise.resolve({ answer: "Do this [1].", kind: "answer", needs });
+    },
+  });
+  const guarded = (latest: string, needs: string) =>
+    answerFromHelpCenter({ accountLikely: true, latest }, log, lane(needs));
+  assert.deepEqual(await guarded("and my dashboard totals", "unclear"), {
+    citations: [],
+    message: "",
+    unclear: true,
+  });
+  assert.equal(
+    await guarded("why is my campaign not sending?", "account"),
+    null
+  );
+  assert.deepEqual(
+    (
+      await guarded("Google says the app is blocked", "articles")
+    )?.citations.map((c) => c.url),
+    [articles[0].url]
+  );
+  // An ordinary ask has no such field and is answered as before.
+  assert.ok(
+    await answerFromHelpCenter("how do i connect?", log, lane(undefined))
+  );
+  assert.deepEqual(told, [true, true, true, undefined]);
+});
