@@ -289,6 +289,98 @@ test("a system-provisioned active connection runs a live check and flags the sta
   );
 });
 
+test("the live check follows Instantly's cursor, so counts cover every account, not the first page", async (t) => {
+  const row = baseRow({
+    accountType: "system_provisioned",
+    connectionUpdatedAt: observedAt,
+    hasConnectionError: false,
+    isActive: true,
+    workspaceId: WORKSPACE_ID,
+  });
+  // Page one alone is 2 healthy accounts: read by itself it said "all healthy"
+  // while the broken inbox sat on the next page.
+  const pages = [
+    {
+      items: [
+        { email: "a@example.test", status: 1 },
+        { email: "b@example.test", status: 1 },
+      ],
+      next_starting_after: "cursor-1",
+    },
+    {
+      items: [{ email: "c@example.test", status: -1 }],
+      next_starting_after: null,
+    },
+  ];
+  let reads = 0;
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => {
+        const data = pages[reads];
+        reads += 1;
+        return { data, ok: true };
+      },
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    return assert.fail("live check did not run");
+  }
+  assert.equal(reads, 2);
+  assert.deepEqual(
+    [result.accounts.total, result.accounts.error, result.accounts.truncated],
+    [3, 1, false]
+  );
+});
+
+test("a workspace larger than the page bound is reported as a sample, never as complete", async (t) => {
+  const row = baseRow({
+    accountType: "system_provisioned",
+    connectionUpdatedAt: observedAt,
+    hasConnectionError: false,
+    isActive: true,
+    workspaceId: WORKSPACE_ID,
+  });
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [{ email: "a@example.test", status: 1 }],
+          next_starting_after: "more",
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    return assert.fail("live check did not run");
+  }
+  assert.equal(result.accounts.truncated, true);
+  assert.equal(result.accounts.total, 10);
+});
+
 test("an Instantly failure leaves the live check unavailable without failing the whole read", async (t) => {
   const warning = t.mock.method(console, "warn", () => undefined);
   const row = baseRow({

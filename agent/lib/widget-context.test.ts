@@ -50,8 +50,10 @@ test("verifies the organization with the app and returns only the widget scope",
   const headers = new Headers(requests[0].init?.headers);
   assert.equal(headers.get("authorization"), `Bearer ${userToken}`);
   assert.equal(headers.get("x-partner-id"), verifiedWidgetContext.partnerId);
+  // The exact chat is named, so the app never resolves scope from another one.
   assert.deepEqual(JSON.parse(String(requests[0].init?.body)), {
     organizationId,
+    widgetConversationId: conversationId,
   });
   assert.deepEqual(result, verifiedWidgetContext);
   assert.ok(Object.isFrozen(result));

@@ -478,9 +478,10 @@ async function readAxiomSignals(
   scope: WidgetContext,
   window: WindowKey
 ): Promise<SourceSignals> {
-  // ponytail: the app-log dataset name is deployment config; unset means the
-  // wiring is absent (unavailable, not empty). Confirm dataset fields against
-  // the live catalog before relying on prod rows.
+  // The app-log dataset name is deployment config; unset means unavailable, not
+  // empty. Leave it unset until the app stamps the workspace on its logs: checked
+  // 2026-09-20, none of 1.8M daily rows carried fields.organizationId, so a
+  // scoped read would report "no errors" for every workspace.
   const dataset = process.env.WIDGET_AXIOM_APP_DATASET;
   if (!(dataset && DATASET_NAME.test(dataset))) {
     return { items: [], status: "unavailable" };
@@ -489,9 +490,10 @@ async function readAxiomSignals(
     const apl = [
       `['${dataset}']`,
       `| where _time > ago(${WINDOWS[window].apl})`,
-      `| where organizationId == '${scope.organizationId}'`,
-      "| where level == 'error' or isnotnull(errorClass)",
-      "| summarize count = count(), lastSeen = max(_time) by errorClass",
+      `| where ['fields.organizationId'] == '${scope.organizationId}'`,
+      "| where level == 'error'",
+      // The workspace stays in each row: toSignals drops any row that lacks it.
+      "| summarize count = count(), lastSeen = max(_time) by organizationId = ['fields.organizationId'], errorClass = coalesce(tostring(['fields.event']), message)",
       "| sort by count desc",
       `| limit ${SIGNAL_LIMIT}`,
     ].join("\n");

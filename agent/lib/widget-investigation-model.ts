@@ -65,18 +65,30 @@ function assertAllowedStreamPart(
  * tool calls the next request advertises no tools so the model must produce its
  * findings instead of investigating forever.
  *
- * ponytail: the budget counts calls seen by this middleware instance. Eve
- * resolves the wrapped model at step start, so the count is per turn, not per
- * whole task; the hard investigation deadline in widget-investigation.ts is the
- * real ceiling. Move the counter to session-keyed state if per-task bounding is
- * ever required.
+ * The budget is counted from the prompt, not held in memory: Eve resolves a new
+ * wrapped model at every step, so an in-memory counter reset each step and never
+ * stopped anything (one investigation made 37 calls to a single tool).
  */
+type Prompt = Parameters<
+  NonNullable<LanguageModelMiddleware["transformParams"]>
+>[0]["params"]["prompt"];
+const toolCallsThisTurn = (prompt: Prompt) =>
+  prompt
+    .slice(prompt.map((message) => message.role).lastIndexOf("user") + 1)
+    .reduce(
+      (total, message) =>
+        message.role === "assistant"
+          ? total +
+            message.content.filter((part) => part.type === "tool-call").length
+          : total,
+      0
+    );
+
 export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
-  let toolCalls = 0;
   return {
     specificationVersion: "v4",
     transformParams({ params }) {
-      const spent = toolCalls >= MAX_WIDGET_TOOL_CALLS;
+      const spent = toolCallsThisTurn(params.prompt) >= MAX_WIDGET_TOOL_CALLS;
       const { toolChoice: requestedToolChoice } = params;
       const tools = spent
         ? []
@@ -101,7 +113,6 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
             throw new Error(BLOCKED);
           }
           sawAllowedCall = true;
-          toolCalls += 1;
         } else if (part.type.startsWith("tool-")) {
           throw new Error(BLOCKED);
         }
@@ -120,9 +131,6 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
           new TransformStream({
             transform: (part, controller) => {
               assertAllowedStreamPart(part, allowedCalls);
-              if (part.type === "tool-call") {
-                toolCalls += 1;
-              }
               if (
                 part.type === "finish" &&
                 part.finishReason.unified === "tool-calls" &&

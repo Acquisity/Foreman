@@ -22,6 +22,12 @@ import {
 
 /** Sending accounts fetched from Instantly for a stale-sync scan (Instantly's own page cap). */
 const ACCOUNTS_LIMIT = 100;
+/**
+ * Pages followed before the counts are reported as a sample. Instantly hands back
+ * a cursor well short of the page size, so a single page covered 12 and 15 accounts
+ * of larger workspaces and was reported as "all healthy".
+ */
+const MAX_ACCOUNT_PAGES = 10;
 /** Stale-sync accounts (recent activity, error status) surfaced in the result. */
 const MISMATCH_LIMIT = 25;
 const RECENT_WEBHOOK_WINDOW_DAYS = 7;
@@ -151,6 +157,7 @@ const instantlyAccount = z.object({
 const CAVEATS = [
   "Connection and webhook facts are saved product state, not a live provider check.",
   "A saved connection error does not establish a current failure by itself.",
+  "accounts.total, healthy, error and warming count the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
   "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization.",
 ];
 
@@ -220,20 +227,31 @@ async function readAccountsEvidence(
     };
   }
   try {
-    const page = await readInstantlySubworkspace(
-      { id: row.workspaceId },
-      "accounts",
-      { limit: ACCOUNTS_LIMIT },
-      { client: executorClient(ctx), signal: ctx.abortSignal }
-    );
-    const { buckets, staleSyncAccounts } = bucketAccounts(page.items);
+    const items: unknown[] = [];
+    let startingAfter: string | undefined;
+    for (let page = 0; page < MAX_ACCOUNT_PAGES; page += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: each page needs the previous cursor.
+      const read = await readInstantlySubworkspace(
+        { id: row.workspaceId },
+        "accounts",
+        { limit: ACCOUNTS_LIMIT, startingAfter },
+        { client: executorClient(ctx), signal: ctx.abortSignal }
+      );
+      items.push(...read.items);
+      startingAfter = read.nextStartingAfter ?? undefined;
+      if (!(startingAfter && read.items.length)) {
+        startingAfter = undefined;
+        break;
+      }
+    }
+    const { buckets, staleSyncAccounts } = bucketAccounts(items);
     return {
       available: true,
       error: buckets.error,
       healthy: buckets.healthy,
       staleSyncAccounts,
-      total: page.items.length,
-      truncated: page.nextStartingAfter !== null,
+      total: items.length,
+      truncated: startingAfter !== undefined,
       warming: buckets.warming,
     };
   } catch (error) {
@@ -357,7 +375,7 @@ export async function readWidgetInboxHealth(
 }
 
 const tool = defineTool({
-  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check: total, healthy, error and warming counts, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): total, healthy, error and warming counts, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,

@@ -5,6 +5,7 @@ import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import { gate as egressGate, logGateDecision } from "./widget-egress.js";
+import { resolveOwnedIdentifiers } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
@@ -261,6 +262,9 @@ export const defaultWidgetDependencies = {
   latestScope: latestWidgetScope,
   read: readWidgetRun,
   route: routeWidgetMessage,
+  /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
+  verifyAccess: (scope: WidgetContext) =>
+    resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
 };
 export type WidgetDependencies = typeof defaultWidgetDependencies;
 
@@ -296,11 +300,11 @@ const blockedOutcome = (
 
 /**
  * A run with no answer after this long is force-finished so the customer never waits forever.
- * ponytail: temporarily raised to just under the Acquisity 4-min poll cap while the findings
- * extractor is being tuned (don't cut real investigations off early). Tune back down (~90s)
- * once extraction latency is understood. The session-failure / no-prose fallback is unaffected.
+ * The Acquisity app stops polling 285s after it sends (its route lives 300s), and finishing a
+ * settled investigation (extract, gate, compose) has taken up to ~100s. Deadline plus finish
+ * must land inside that window, or the answer completes after the last poll and is never delivered.
  */
-export const WIDGET_DEADLINE_MS = 280_000;
+export const WIDGET_DEADLINE_MS = 170_000;
 /** How sure the router must be that a message is small talk before it gets a one-line reply. */
 const CHAT_ROUTE_CONFIDENCE = 0.6;
 /**
@@ -835,11 +839,14 @@ export async function receiveWidgetMessage(
     if (previous && !sameWidgetOwner(previous, scope)) {
       return json({ error: "Conversation scope changed." }, 403);
     }
-    const { fresh, run } = await deps.claim(
+    const { busy, fresh, run } = await deps.claim(
       scope,
       requestKey(input),
       input.question
     );
+    if (busy) {
+      return json({ run_id: run.id, status: "busy" });
+    }
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
@@ -856,6 +863,22 @@ export async function receiveWidgetMessage(
         );
     if (answered) {
       return json(widgetRunResponse(answered));
+    }
+    // The app vouches for the scope, but a preview admin override names a user
+    // the app cannot check. Re-check membership where the tools read, so a
+    // mismatched pair is refused here, not one denied tool call at a time.
+    try {
+      await deps.verifyAccess(scope);
+    } catch {
+      await deps
+        .complete(
+          run.id,
+          blockedOutcome("workspace_access_denied", "failed"),
+          null,
+          run.id
+        )
+        .catch(() => undefined);
+      return json({ error: "Workspace could not be verified." }, 403);
     }
     return json(
       widgetRunResponse(

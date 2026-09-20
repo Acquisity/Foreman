@@ -113,26 +113,35 @@ describe("widget support investigation model boundary", () => {
     });
   }
 
-  it("stops advertising tools once the tool-call budget is spent", async () => {
-    const middleware = widgetInvestigationMiddleware();
-    const doGenerate = () => Promise.resolve(result("widget_outreach_health"));
-    for (let i = 0; i < 14; i += 1) {
-      // biome-ignore lint/performance/noAwaitInLoops: sequential budget accrual.
-      await middleware.wrapGenerate?.({ doGenerate } as never);
-    }
-    const transformed = await middleware.transformParams?.({
-      params: {
-        toolChoice: { type: "auto" },
-        tools: [
-          {
-            inputSchema: { type: "object" },
-            name: "widget_outreach_health",
-            type: "function",
+  it("stops advertising tools once this turn's tool calls, counted across steps, spend the budget", async () => {
+    const call = { toolName: "widget_sdr_thread_status", type: "tool-call" };
+    const calls = (count: number) => ({
+      content: Array.from({ length: count }, () => call),
+      role: "assistant",
+    });
+    // Eve builds a new middleware for every step, so nothing may live in memory.
+    const advertised = async (prompt: unknown[]) => {
+      const transformed =
+        await widgetInvestigationMiddleware().transformParams?.({
+          params: {
+            prompt,
+            toolChoice: { type: "auto" },
+            tools: [
+              {
+                inputSchema: { type: "object" },
+                name: "widget_outreach_health",
+                type: "function",
+              },
+            ],
           },
-        ],
-      },
-      type: "generate",
-    } as never);
-    assert.deepEqual((transformed as { tools?: unknown[] }).tools, []);
+          type: "generate",
+        } as never);
+      return (transformed as { tools?: unknown[] }).tools?.length;
+    };
+    const user = { content: [], role: "user" };
+    assert.equal(await advertised([user, calls(7), calls(7)]), 0);
+    assert.equal(await advertised([user, calls(13)]), 1);
+    // An earlier turn's calls do not starve the follow-up.
+    assert.equal(await advertised([user, calls(14), user, calls(2)]), 1);
   });
 });

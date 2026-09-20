@@ -45,7 +45,11 @@ export async function verifyWidgetContext(
   const response = await request(`${origin}/api/internal/foreman/context`, {
     body: JSON.stringify({
       organizationId: parsed.organizationId,
-      ...(input.staff ? { conversationId: parsed.conversationId } : {}),
+      // The customer lane names its conversation too, so a preview admin
+      // override resolves from this exact chat, never the admin's newest one.
+      ...(input.staff
+        ? { conversationId: parsed.conversationId }
+        : { widgetConversationId: parsed.conversationId }),
     }),
     headers: {
       authorization: `Bearer ${parsed.userToken}`,

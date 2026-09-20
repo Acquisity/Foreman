@@ -104,6 +104,13 @@ function dependencies(gateResult: GateResult = allowed) {
         lane: "investigate",
         source: "fallback",
       }),
+    verifyAccess: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
   };
   return { deps, gated, run };
 }
@@ -253,6 +260,42 @@ test("a changed identity on an existing conversation is refused, not continued",
     deps
   );
   assert.equal(response.status, 403);
+});
+
+test("a scope whose user is not a member of the workspace is refused before any investigation starts", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.verifyAccess = () => Promise.reject(new Error("not a member"));
+  const response = await receiveWidgetMessage(
+    request(start),
+    {
+      from: () => assert.fail("a mismatched owner must not reach a session"),
+      waitUntil: () => undefined,
+    } as never,
+    1,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 403);
+  // Terminal, so the conversation's next message is not handed this run.
+  assert.equal(run.outcome?.reason, "workspace_access_denied");
+});
+
+test("a follow-up sent while an earlier message is still running is told to wait, never handed that run's answer", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.claim = () => Promise.resolve({ busy: true, fresh: false, run });
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "Check inbox health too." }),
+    {
+      from: () => assert.fail("a waiting message must not start a session"),
+      waitUntil: () => undefined,
+    } as never,
+    1,
+    verify,
+    deps
+  );
+  assert.deepEqual(await response.json(), { run_id: run.id, status: "busy" });
 });
 
 test("a completed investigation is gated, answered with the composed reply, and returns its findings for the inbox note", async (t) => {

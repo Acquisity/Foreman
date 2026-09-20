@@ -48,6 +48,7 @@ const workspace = {
     calendarAccounts: [{ failureCount: 0, invalid: false, type: "google" }],
     conferencingAccounts: [{ invalid: true, type: "zoom_video" }],
     conferencingLinkType: "dynamic",
+    hasStaticMeetingLink: false,
     timezone: "America/Chicago",
     workHoursDays: ["monday", "tuesday"],
   },
@@ -152,11 +153,28 @@ test("inputs accept only an owned thread id or cursor", () => {
     { query: "select * from member" },
     { threadId: "x' or true --" },
     { after: "x' or true --" },
-    { after: threadId, threadId },
     { read: "threads" },
   ]) {
     assert.equal(widgetSdrInput.safeParse(input).success, false);
     assert.throws(() => buildWidgetSdrQuery(scope, input as never));
+  }
+  // A model that cannot omit an optional field fills it with the nil UUID. Read
+  // literally, those calls never reached the first page in a real investigation.
+  const nil = "00000000-0000-0000-0000-000000000000";
+  const firstPage = buildWidgetSdrQuery(scope, {});
+  for (const input of [
+    { after: nil },
+    { threadId: nil },
+    { after: nil, threadId: nil },
+  ]) {
+    assert.equal(buildWidgetSdrQuery(scope, input), firstPage);
+  }
+  // A thread read has no pages: a cursor beside a real thread id is ignored.
+  for (const cursor of [nil, threadId]) {
+    assert.equal(
+      buildWidgetSdrQuery(scope, { after: cursor, threadId }),
+      buildWidgetSdrQuery(scope, { threadId })
+    );
   }
   assert.ok(widgetSdrInput.safeParse({}).success);
   assert.ok(widgetSdrInput.safeParse({ threadId }).success);

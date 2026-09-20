@@ -21,20 +21,30 @@ const APPOINTMENT_LIMIT = 5;
 const ACCOUNT_LIMIT = 6;
 const REPLY_WINDOW_DAYS = 30;
 
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+const selector = z
+  .uuid()
+  .optional()
+  // A model that cannot omit an optional field fills it with the nil UUID. That
+  // is "not provided", never a selector: read literally it made 44 of 63 calls
+  // in one audit fail and the first page was never read.
+  .transform((value) => (value === NIL_UUID ? undefined : value));
+
 export const widgetSdrInput = z
   .strictObject({
-    after: z
-      .uuid()
-      .optional()
-      .describe(
-        "Omit for the first page. For later pages pass only the nextAfter returned by a previous ok call. Never invent a cursor."
-      ),
-    threadId: z.uuid().optional(),
+    after: selector.describe(
+      "Omit for the first page. For later pages pass only the nextAfter returned by a previous ok call. Never invent a cursor."
+    ),
+    threadId: selector.describe(
+      "Omit to list threads. Only a thread id returned by a previous ok call."
+    ),
   })
-  .refine((value) => !(value.after && value.threadId), {
-    message: "after only pages the thread summary.",
-  });
-export type WidgetSdrInput = z.infer<typeof widgetSdrInput>;
+  // A thread read has no pages, so a cursor sent alongside it is ignored.
+  .transform(({ after, threadId }) => ({
+    after: threadId ? undefined : after,
+    threadId,
+  }));
+export type WidgetSdrInput = z.input<typeof widgetSdrInput>;
 
 const count = z.number().int().nonnegative();
 const timestamp = z
@@ -119,6 +129,7 @@ const workspace = z.object({
       calendarAccounts: z.array(calendarAccount).max(ACCOUNT_LIMIT),
       conferencingAccounts: z.array(conferencingAccount).max(ACCOUNT_LIMIT),
       conferencingLinkType: z.enum(["dynamic", "static"]),
+      hasStaticMeetingLink: z.boolean(),
       timezone: zone,
       workHoursDays: z.array(z.string().max(16)).max(7),
     })
@@ -183,6 +194,7 @@ export function buildWidgetSdrQuery(
       s.ai_sdr_v2_enabled as "aiSdrV2Enabled",
       (select to_jsonb(h) from (
         select u.timezone, u.conferencing_link_type as "conferencingLinkType",
+          (nullif(u.conferencing_static_link, '') is not null) as "hasStaticMeetingLink",
           coalesce((select jsonb_agg(to_jsonb(c)) from (
             select ca.type, ca.invalid, ca.failure_count as "failureCount"
             from integration_email_calendar_account ca
@@ -284,15 +296,17 @@ export function buildWidgetSdrQuery(
 const CAVEATS = [
   "Saved product state is not a live calendar, Zoom or outreach provider check.",
   "Times are UTC instants; compare against prospectTimezone and the host timezone before calling a slot wrong.",
-  "An invalid or missing calendar or conferencing account explains missing meeting links and unbookable slots.",
+  "Meeting links: with conferencingLinkType static the link is the saved static link (hasStaticMeetingLink), and empty conferencingAccounts is normal, not a fault. Only with dynamic does a missing or invalid conferencing account explain missing links. An invalid or missing calendar account explains unbookable slots either way.",
+  "aiSdrEnabled is the workspace's AI SDR switch. aiSdrV2Enabled false only means the workspace runs the earlier AI SDR workflow; it never means AI SDR is off.",
 ];
 
 /** Parse only the provider envelope and declared fields; never forward raw failure bodies. */
 export function parseWidgetSdrEvidence(
   data: unknown,
   context: WidgetContext,
-  input: WidgetSdrInput
+  raw: WidgetSdrInput
 ): WidgetSdrOutput {
+  const input = widgetSdrInput.parse(raw);
   const envelope = z
     .object({
       rows: z

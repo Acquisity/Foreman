@@ -104,7 +104,7 @@ export async function claimWidgetRun(
   requestKey: string,
   question: string,
   retry = true
-): Promise<{ fresh: boolean; run: WidgetRun }> {
+): Promise<{ busy?: boolean; fresh: boolean; run: WidgetRun }> {
   const db = privateDatabase();
   const inserted = await db.query(
     `INSERT INTO widget_support_runs (id, organization_id, conversation_id, request_key, question, scope)
@@ -135,7 +135,9 @@ export async function claimWidgetRun(
   }
   const run = runSchema.parse(rows[0]);
   assertWidgetRunOwner(run, scope);
-  return { fresh: false, run };
+  // Another message's run is still open. Its answer belongs to that message, so
+  // this caller is told to wait and claim again, never handed the same reply.
+  return { busy: rows[0].request_key !== requestKey, fresh: false, run };
 }
 
 export async function readWidgetRun(id: string): Promise<WidgetRun> {

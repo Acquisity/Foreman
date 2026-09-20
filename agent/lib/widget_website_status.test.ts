@@ -9,6 +9,8 @@ import definition, {
 } from "../tools/widget_website_status.js";
 
 const CANCELLED_RE = /cancelled/;
+const STATUS_COALESCE_RE =
+  /coalesce\(\(select ([\w.:]+) from website_deployment[^)]*\), 'no_deployment'\)/;
 
 const scope = verifiedWidgetContext;
 const observedAt = "2026-09-16T18:00:00.000Z";
@@ -101,6 +103,14 @@ test("every read re-checks membership and scopes each product join to the worksp
   for (const forbidden of ["credentials", "password", "generation_error"]) {
     assert.equal(query.includes(forbidden), false, forbidden);
   }
+});
+
+test("the deployment status enum is cast to text before it meets the no_deployment literal", () => {
+  // Postgres resolves coalesce(enum, 'no_deployment') to the enum type and
+  // rejects the literal, which made every read return unavailable.
+  const query = buildWidgetWebsiteStatusQuery(scope);
+  const coalesced = STATUS_COALESCE_RE.exec(query);
+  assert.equal(coalesced?.[1], "wd.status::text");
 });
 
 test("output matches the schema and distinguishes never-published from published-then-broke", () => {

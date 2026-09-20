@@ -126,7 +126,7 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
       p.updated_at as "updatedAt",
       exists(select 1 from website_deployment wd where wd.project_id = p.id
         and wd.organization_id = a.id and wd.deleted_at is null and wd.status = 'deployed') as "everPublished",
-      coalesce((select wd.status from website_deployment wd
+      coalesce((select wd.status::text from website_deployment wd
         where wd.project_id = p.id and wd.organization_id = a.id and wd.deleted_at is null
         order by wd.created_at desc, wd.id desc limit 1), 'no_deployment') as "currentStatus",
       left(coalesce(
