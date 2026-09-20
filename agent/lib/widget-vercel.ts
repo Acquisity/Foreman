@@ -14,7 +14,13 @@ import { logOpsEvent } from "./ops-log.js";
 const API = "https://api.vercel.com";
 const TIMEOUT_MS = 8000;
 const ERROR_LIMIT = 300;
+// Enough build output to name the file and the error, not the whole log.
+const BUILD_ERROR_LIMIT = 1500;
+const BUILD_ERROR_START = /\b(?:error|failed)\b/iu;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: strips terminal colour codes from build output.
+const ANSI = /\u001b\[[0-9;]*m/gu;
 const PROJECT_ID = /^prj_[A-Za-z0-9]{8,64}$/;
+const DEPLOYMENT_ID = /^dpl_[A-Za-z0-9]{8,64}$/;
 const TEAM_ID = /^team_[A-Za-z0-9]{8,64}$/;
 const DOMAIN = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
 export const LIVE_DOMAIN_LIMIT = 3;
@@ -24,6 +30,9 @@ export type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 export type VercelLive =
   | {
       deployment: {
+        // The failing part of the build output, when the latest build failed. The
+        // customer cannot see build logs, so this is what a fix is written from.
+        buildError: string | null;
         createdAt: string | null;
         errorCode: string | null;
         errorMessage: string | null;
@@ -53,6 +62,7 @@ const deploymentsSchema = z.object({
         readyState: z.string().nullish(),
         state: z.string().nullish(),
         target: z.string().nullish(),
+        uid: z.string().nullish(),
       })
     )
     .max(1),
@@ -60,7 +70,21 @@ const deploymentsSchema = z.object({
 const projectDomainsSchema = z.object({
   domains: z.array(z.object({ name: z.string(), verified: z.boolean() })),
 });
+const eventsSchema = z.array(z.object({ text: z.string().nullish() }));
 const domainConfigSchema = z.object({ misconfigured: z.boolean() });
+
+/** From the first line that reports a failure to the end of the build, capped. */
+export function buildErrorExcerpt(
+  events: { text?: string | null }[]
+): string | null {
+  const lines = events
+    .map((event) => (event.text ?? "").replace(ANSI, "").trimEnd())
+    .filter(Boolean);
+  const start = lines.findIndex((line) => BUILD_ERROR_START.test(line));
+  return start < 0
+    ? null
+    : lines.slice(start).join("\n").slice(0, BUILD_ERROR_LIMIT);
+}
 
 class Inaccessible extends Error {}
 
@@ -89,6 +113,75 @@ const report = (
   );
   return status;
 };
+
+type Get = <T>(path: string, schema: z.ZodType<T>) => Promise<T>;
+
+/** The failing build's output, or null when the latest build did not fail or cannot be read. */
+function readBuildError(
+  latest:
+    | { readyState?: string | null; state?: string | null; uid?: string | null }
+    | undefined,
+  get: Get
+): Promise<string | null> {
+  const failed = (latest?.readyState ?? latest?.state) === "ERROR";
+  if (!(failed && latest?.uid && DEPLOYMENT_ID.test(latest.uid))) {
+    return Promise.resolve(null);
+  }
+  return get(
+    `/v3/deployments/${latest.uid}/events?builds=1&limit=-1`,
+    eventsSchema
+  )
+    .then(buildErrorExcerpt)
+    .catch(() => null);
+}
+
+/** Evidence for a project that already passed the team check. */
+async function readProject(
+  projectId: string,
+  savedDomains: string[],
+  get: Get
+): Promise<VercelLive> {
+  const domains = savedDomains
+    .filter((name) => DOMAIN.test(name))
+    .slice(0, LIVE_DOMAIN_LIMIT);
+  const [deployments, assigned, configs] = await Promise.all([
+    get(`/v6/deployments?projectId=${projectId}&limit=1`, deploymentsSchema),
+    get(`/v9/projects/${projectId}/domains`, projectDomainsSchema),
+    Promise.all(
+      domains.map((name) =>
+        get(`/v6/domains/${name}/config`, domainConfigSchema).catch(() => null)
+      )
+    ),
+  ]);
+  const [latest] = deployments.deployments;
+  const buildError = await readBuildError(latest, get);
+  return {
+    deployment: latest
+      ? {
+          buildError,
+          createdAt: latest.created
+            ? new Date(latest.created).toISOString()
+            : null,
+          errorCode: latest.errorCode ?? null,
+          errorMessage: latest.errorMessage?.slice(0, ERROR_LIMIT) ?? null,
+          state: latest.readyState ?? latest.state ?? "unknown",
+          target: latest.target ?? null,
+        }
+      : null,
+    domains: domains.map((name, index) => {
+      const match = assigned.domains.find(
+        (entry) => entry.name.toLowerCase() === name.toLowerCase()
+      );
+      return {
+        assignedToProject: Boolean(match),
+        domain: name,
+        misconfigured: configs[index]?.misconfigured ?? null,
+        verified: match?.verified ?? null,
+      };
+    }),
+    status: report("live", latest ? "deployment_read" : "no_deployments"),
+  } as VercelLive;
+}
 
 export async function readVercelLive(
   projectId: string | null,
@@ -135,46 +228,7 @@ export async function readVercelLive(
     if (project.accountId !== teamId || project.id !== projectId) {
       return { status: report("inaccessible", "other_team") } as VercelLive;
     }
-    const domains = savedDomains
-      .filter((name) => DOMAIN.test(name))
-      .slice(0, LIVE_DOMAIN_LIMIT);
-    const [deployments, assigned, configs] = await Promise.all([
-      get(`/v6/deployments?projectId=${projectId}&limit=1`, deploymentsSchema),
-      get(`/v9/projects/${projectId}/domains`, projectDomainsSchema),
-      Promise.all(
-        domains.map((name) =>
-          get(`/v6/domains/${name}/config`, domainConfigSchema).catch(
-            () => null
-          )
-        )
-      ),
-    ]);
-    const [latest] = deployments.deployments;
-    return {
-      deployment: latest
-        ? {
-            createdAt: latest.created
-              ? new Date(latest.created).toISOString()
-              : null,
-            errorCode: latest.errorCode ?? null,
-            errorMessage: latest.errorMessage?.slice(0, ERROR_LIMIT) ?? null,
-            state: latest.readyState ?? latest.state ?? "unknown",
-            target: latest.target ?? null,
-          }
-        : null,
-      domains: domains.map((name, index) => {
-        const match = assigned.domains.find(
-          (entry) => entry.name.toLowerCase() === name.toLowerCase()
-        );
-        return {
-          assignedToProject: Boolean(match),
-          domain: name,
-          misconfigured: configs[index]?.misconfigured ?? null,
-          verified: match?.verified ?? null,
-        };
-      }),
-      status: report("live", latest ? "deployment_read" : "no_deployments"),
-    } as VercelLive;
+    return await readProject(projectId, savedDomains, get);
   } catch (error) {
     if (signal.aborted) {
       throw error;

@@ -210,3 +210,10 @@ test("a legacy website's hosting id is read from the builder project that links 
     query.includes("from website_project lp where lp.organization_id = a.id")
   );
 });
+
+test("a builder project that links to a website is listed once, as that website", () => {
+  const query = buildWidgetWebsiteStatusQuery(scope);
+  assert.ok(
+    query.includes("and not exists (select 1 from website lw where lw.id =")
+  );
+});

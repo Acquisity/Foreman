@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type Fetch, readVercelLive } from "./widget-vercel.js";
+import {
+  buildErrorExcerpt,
+  type Fetch,
+  readVercelLive,
+} from "./widget-vercel.js";
 
 const env = {
   ACQUISITY_SUPPORT_VERCEL_TEAM_ID: "team_customersites1",
@@ -106,4 +110,23 @@ test("a project outside the configured team, an unlinked project, a missing cred
   assert.deepEqual(await readVercelLive(projectId, [], signal, down, env), {
     status: "unavailable",
   });
+});
+
+test("the build excerpt starts at the failure, drops colour codes, and is capped", () => {
+  const excerpt = buildErrorExcerpt([
+    { text: "Installing dependencies" },
+    { text: "\u001b[31mFailed to type check.\u001b[0m" },
+    { text: "./components/ui/calendar.tsx:87:9" },
+    {
+      text: "Type error: 'table' does not exist in type 'Partial<ClassNames>'.",
+    },
+    { text: "x".repeat(5000) },
+  ]);
+  assert.ok(
+    excerpt?.startsWith(
+      "Failed to type check.\n./components/ui/calendar.tsx:87:9"
+    )
+  );
+  assert.equal(excerpt?.length, 1500);
+  assert.equal(buildErrorExcerpt([{ text: "Build completed" }]), null);
 });

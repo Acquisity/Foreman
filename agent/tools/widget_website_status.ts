@@ -58,6 +58,7 @@ const live = z.union([
   z.object({
     deployment: z
       .object({
+        buildError: z.string().max(1500).nullable(),
         createdAt: timestamp.nullable(),
         errorCode: z.string().max(128).nullable(),
         errorMessage: z.string().max(300).nullable(),
@@ -113,7 +114,7 @@ const savedProject = project
 
 export const widgetWebsiteStatusOutput = z.union([
   z.object({
-    caveats: z.array(z.string()).max(6),
+    caveats: z.array(z.string()).max(7),
     observedAt: timestamp,
     projects: z.array(project).max(PROJECT_PAGE_SIZE),
     source: z.literal(
@@ -169,6 +170,9 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
   // guard the cast so malformed JSON resolves to no linked domains, not an error.
   const legacyWebsiteId = `(case when p.metadata->>'legacyWebsiteId' ~ '^[0-9a-fA-F-]{36}$'
     then (p.metadata->>'legacyWebsiteId')::uuid else null end)`;
+  // A builder project that links to a website IS that website: listing both made
+  // one site look like two projects sharing a domain. The website row is kept,
+  // since its name is the one the customer sees in their grid.
   const projectRows = `select 'website_project' as source, p.id, left(p.name, ${NAME_SQL_LIMIT}) as name,
       p.updated_at as "updatedAt",
       nullif(p.vercel_project_id, '') as "vercelProjectId",
@@ -194,7 +198,9 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
         order by wd.created_at desc, wd.id desc limit 1) x) as "lastDeployment",
       ${domainsFor(legacyWebsiteId)}
     from website_project p join authorized a on a.id = p.organization_id
-    where p.deleted_at is null`;
+    where p.deleted_at is null
+      and not exists (select 1 from website lw where lw.id = ${legacyWebsiteId}
+        and lw.organization_id = a.id and lw.deleted_at is null)`;
   // A legacy website almost never holds its hosting id itself (5 of 775 published
   // sites): the app finds it on the builder project that links back to it, so
   // this does the same, inside the verified workspace.
@@ -278,6 +284,7 @@ function parseSaved(
   const output = widgetWebsiteStatusOutput.parse({
     caveats: [
       "Each project's live field is a hosting read made just now; every other field is saved builder state. live.status not_checked, not_linked, inaccessible or unavailable means there is no live result: say the live check was not possible, and answer from saved state.",
+      "The customer cannot see build logs or build errors anywhere in the product: never tell them to open, check or paste a build log. When live.deployment.buildError is present, read it, say in one plain sentence what broke, and give the exact message to paste into the website builder's chat to fix it, naming the file and the error. When a build failed and buildError is absent, give a message to paste that asks the builder to find and fix the build error without changing the design.",
       "A READY live deployment does not prove the page renders correctly or that public DNS resolves; misconfigured true means the domain's DNS does not point at hosting.",
       "everPublished false with a connected custom domain is the usual 404 cause: the project never published.",
       "everPublished true with a failed current build means it published before, then broke.",
