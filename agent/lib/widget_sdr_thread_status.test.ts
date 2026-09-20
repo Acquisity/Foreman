@@ -97,7 +97,11 @@ const detail = {
 };
 const envelope = (
   records: unknown[],
-  options: { authorized?: boolean; workspace?: unknown } = {}
+  options: {
+    authorized?: boolean;
+    cursorValid?: boolean;
+    workspace?: unknown;
+  } = {}
 ) => ({
   content: [
     {
@@ -105,6 +109,7 @@ const envelope = (
         rows: [
           {
             authorized: options.authorized ?? true,
+            cursorValid: options.cursorValid ?? true,
             observedAt,
             records,
             workspace:
@@ -196,7 +201,54 @@ test("every statement checks membership and scopes every product join to the org
   assert.ok(query.includes("w.organization_id = t.organization_id"));
   assert.ok(query.includes(`t.id = '${threadId}'::uuid`));
   const paged = buildWidgetSdrQuery(scope, { after: threadId });
-  assert.ok(paged.includes("join authorized a2 on a2.id = c.organization_id"));
+  const cursorCheck = paged.slice(paged.indexOf('as "cursorValid"') - 400);
+  for (const required of [
+    "join authorized a on a.id = t.organization_id",
+    "t.deleted_at is null",
+    "t.control_level is not null",
+    `t.id = '${threadId}'::uuid`,
+  ]) {
+    assert.ok(cursorCheck.includes(required), required);
+  }
+  assert.ok(buildWidgetSdrQuery(scope, {}).includes('true as "cursorValid"'));
+});
+
+test("an unknown or foreign cursor is invalid_cursor, never a successful empty page", () => {
+  const summary = {
+    ...thread,
+    hasActiveAppointment: false,
+    hasPendingFollowup: false,
+  };
+  // The scoped exists() is false for nonexistent and foreign cursors alike, so both arrive here identically.
+  for (const cursor of ["00000000-0000-0000-0000-000000000000", threadId]) {
+    const rejected = parseWidgetSdrEvidence(
+      envelope([], { cursorValid: false }),
+      scope,
+      { after: cursor }
+    );
+    assert.ok(widgetSdrOutput.safeParse(rejected).success);
+    assert.equal(rejected.status, "invalid_cursor");
+    assert.equal(JSON.stringify(rejected).includes(cursor), false);
+    assert.equal("evidence" in rejected, false);
+  }
+  const next = parseWidgetSdrEvidence(envelope([summary]), scope, {
+    after: threadId,
+  });
+  const exhausted = parseWidgetSdrEvidence(envelope([]), scope, {
+    after: threadId,
+  });
+  const emptyWorkspace = parseWidgetSdrEvidence(envelope([]), scope, {});
+  for (const [result, length] of [
+    [next, 1],
+    [exhausted, 0],
+    [emptyWorkspace, 0],
+  ] as const) {
+    if (result.status !== "ok" || result.evidence.read !== "threads") {
+      assert.fail("Expected thread summary");
+    }
+    assert.equal(result.evidence.threads.length, length);
+    assert.equal(result.evidence.nextAfter, null);
+  }
 });
 
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {

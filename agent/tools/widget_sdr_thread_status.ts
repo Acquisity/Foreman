@@ -23,7 +23,12 @@ const REPLY_WINDOW_DAYS = 30;
 
 export const widgetSdrInput = z
   .strictObject({
-    after: z.uuid().optional(),
+    after: z
+      .uuid()
+      .optional()
+      .describe(
+        "Omit for the first page. For later pages pass only the nextAfter returned by a previous ok call. Never invent a cursor."
+      ),
     threadId: z.uuid().optional(),
   })
   .refine((value) => !(value.after && value.threadId), {
@@ -149,7 +154,12 @@ export const widgetSdrOutput = z.union([
   }),
   z.object({
     message: z.string(),
-    status: z.enum(["unavailable", "not_available", "denied"]),
+    status: z.enum([
+      "unavailable",
+      "not_available",
+      "denied",
+      "invalid_cursor",
+    ]),
   }),
 ]);
 export type WidgetSdrOutput = z.infer<typeof widgetSdrOutput>;
@@ -196,6 +206,10 @@ export function buildWidgetSdrQuery(
     t.prospect_timezone as "prospectTimezone"`;
   const threadFrom = `from crm_message_thread t join authorized a on a.id = t.organization_id
     where t.deleted_at is null`;
+  const eligible =
+    "(t.control_level is not null or t.lifecycle is not null or t.interest_level is not null)";
+  const cursorRow = `from crm_message_thread t join authorized a on a.id = t.organization_id
+    where t.deleted_at is null and ${eligible} and t.id = '${input.after}'::uuid`;
   let selection: string;
   if (input.threadId) {
     selection = `select ${threadColumns},
@@ -243,8 +257,7 @@ export function buildWidgetSdrQuery(
   } else {
     const cursor = input.after
       ? `and (coalesce(t.last_message_at, t.created_at), t.id) < (
-          select coalesce(c.last_message_at, c.created_at), c.id from crm_message_thread c
-          join authorized a2 on a2.id = c.organization_id where c.id = '${input.after}'::uuid)`
+          select coalesce(t.last_message_at, t.created_at), t.id ${cursorRow})`
       : "";
     selection = `select ${threadColumns},
       exists(select 1 from scheduled_followup sf
@@ -255,7 +268,7 @@ export function buildWidgetSdrQuery(
           and ap.deleted_at is null and ap.status = 'scheduled'
           and ap.date >= current_timestamp) as "hasActiveAppointment"
       ${threadFrom}
-      and (t.control_level is not null or t.lifecycle is not null or t.interest_level is not null)
+      and ${eligible}
       ${cursor}
       order by coalesce(t.last_message_at, t.created_at) desc, t.id desc
       limit ${THREAD_PAGE_SIZE + 1}`;
@@ -263,6 +276,7 @@ export function buildWidgetSdrQuery(
   return `${authorization}
     select (select count(*) = 1 from authorized) as authorized,
       current_timestamp as "observedAt",
+      ${input.after ? `exists(select 1 ${cursorRow})` : "true"} as "cursorValid",
       ${workspaceJson} as workspace,
       coalesce((select jsonb_agg(to_jsonb(r)) from (${selection}) r), '[]'::jsonb) as records`;
 }
@@ -285,6 +299,7 @@ export function parseWidgetSdrEvidence(
         .array(
           z.object({
             authorized: z.boolean(),
+            cursorValid: z.boolean(),
             observedAt: timestamp,
             records: z.array(z.unknown()).max(THREAD_PAGE_SIZE + 1),
             workspace: workspace.nullable(),
@@ -300,6 +315,13 @@ export function parseWidgetSdrEvidence(
     return {
       message: "Current workspace access could not be verified.",
       status: "denied",
+    };
+  }
+  if (!result.cursorValid) {
+    return {
+      message:
+        "That cursor is not a nextAfter from this workspace's thread list. This is not an empty result. Retry without after to read the first page, then page only with the nextAfter it returns.",
+      status: "invalid_cursor",
     };
   }
   let parsed: z.infer<typeof evidence>;
@@ -425,7 +447,7 @@ export async function readWidgetSdrThreadStatus(
 
 const tool = defineTool({
   description:
-    "Diagnose AI SDR scheduling, booking and reply-sync issues only in this chat's verified workspace. Without threadId: up to 25 recent AI SDR v2 threads (control level, lifecycle, interest, out-of-office, pending follow-up, active appointment) with nextAfter for the next page, plus the workspace's AI SDR settings and host calendar/Zoom/timezone/work-hours configuration. With threadId (a thread UUID from this workspace): that thread's status, last 10 scheduled follow-ups, linked appointments (status, start, timezone, meeting link present, reschedules), the prospect timezone, and a reply-sync comparison of provider reply events versus stored inbound messages. Saved state, not a live calendar or provider check. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose AI SDR scheduling, booking and reply-sync issues only in this chat's verified workspace. Without threadId: up to 25 recent AI SDR v2 threads (control level, lifecycle, interest, out-of-office, pending follow-up, active appointment) plus the workspace's AI SDR settings and host calendar/Zoom/timezone/work-hours configuration. With threadId (a thread UUID from this workspace): that thread's status, last 10 scheduled follow-ups, linked appointments (status, start, timezone, meeting link present, reschedules), the prospect timezone, and a reply-sync comparison of provider reply events versus stored inbound messages. Paging: omit after on the first call; pass after only with a nextAfter returned by a previous ok call, never an invented or placeholder UUID. invalid_cursor means retry without after. Saved state, not a live calendar or provider check. Unavailable and invalid_cursor are not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetSdrThreadStatus(ctx, input),
   inputSchema: widgetSdrInput,
