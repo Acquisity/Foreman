@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logOpsEvent } from "./ops-log.js";
 
 /**
  * Read-only live checks against the Vercel team that hosts customer websites.
@@ -63,6 +64,32 @@ const domainConfigSchema = z.object({ misconfigured: z.boolean() });
 
 class Inaccessible extends Error {}
 
+const HTTP_CODE = /^vercel_\d{3}$/u;
+// Only an authored code is logged: vercel_<status>, a parse failure, or a timeout.
+const failureCode = (error: unknown): string => {
+  if (error instanceof z.ZodError) {
+    return "unexpected_shape";
+  }
+  return error instanceof Error && HTTP_CODE.test(error.message)
+    ? error.message
+    : "timeout_or_network";
+};
+
+// Why a live read produced no live result, without any identifier: the model
+// sees only the status, so this line is the only way to tell a missing or
+// under-permissioned credential from a project that is simply not in the team.
+const report = (
+  status: VercelLive["status"],
+  code: string
+): VercelLive["status"] => {
+  logOpsEvent(
+    "widget.support.vercel_live",
+    { code, outcome: status, tool: "widget_website_status" },
+    console.warn
+  );
+  return status;
+};
+
 export async function readVercelLive(
   projectId: string | null,
   savedDomains: string[],
@@ -71,14 +98,19 @@ export async function readVercelLive(
   env: Record<string, string | undefined> = process.env
 ): Promise<VercelLive> {
   if (!projectId) {
-    return { status: "not_linked" };
+    return { status: report("not_linked", "no_saved_project") } as VercelLive;
   }
   const token = env.ACQUISITY_SUPPORT_VERCEL_TOKEN;
   const teamId = env.ACQUISITY_SUPPORT_VERCEL_TEAM_ID;
   if (
     !(token && teamId && TEAM_ID.test(teamId) && PROJECT_ID.test(projectId))
   ) {
-    return { status: "unavailable" };
+    return {
+      status: report(
+        "unavailable",
+        token && teamId ? "invalid_reference" : "not_configured"
+      ),
+    } as VercelLive;
   }
   // GET is the only verb this module can send.
   const get = async <T>(path: string, schema: z.ZodType<T>): Promise<T> => {
@@ -91,7 +123,7 @@ export async function readVercelLive(
       }
     );
     if (response.status === 403 || response.status === 404) {
-      throw new Inaccessible();
+      throw new Inaccessible(`vercel_${response.status}`);
     }
     if (!response.ok) {
       throw new Error(`vercel_${response.status}`);
@@ -101,7 +133,7 @@ export async function readVercelLive(
   try {
     const project = await get(`/v9/projects/${projectId}`, projectSchema);
     if (project.accountId !== teamId || project.id !== projectId) {
-      return { status: "inaccessible" };
+      return { status: report("inaccessible", "other_team") } as VercelLive;
     }
     const domains = savedDomains
       .filter((name) => DOMAIN.test(name))
@@ -148,7 +180,10 @@ export async function readVercelLive(
       throw error;
     }
     return {
-      status: error instanceof Inaccessible ? "inaccessible" : "unavailable",
-    };
+      status: report(
+        error instanceof Inaccessible ? "inaccessible" : "unavailable",
+        failureCode(error)
+      ),
+    } as VercelLive;
   }
 }
