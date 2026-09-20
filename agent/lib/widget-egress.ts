@@ -72,6 +72,9 @@ const PUBLIC_HOSTS = new Set([
   "help.acquisity.ai",
   "docs.acquisity.ai",
 ]);
+const FOREIGN_PREFIX = "foreign_identifier:";
+/** How many foreign identifiers the gate deletes items for before it gives up and blocks. */
+const MAX_FOREIGN_PASSES = 5;
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -247,7 +250,7 @@ async function deterministicTextReason(
     candidates.slugs.find((slug) => !owned.slugs.has(slug)) ??
     candidates.emails.find((email) => !owned.emails.has(email)) ??
     domains.find((domain) => !owned.domains.has(domain));
-  return foreign ? `foreign_identifier:${foreign}` : null;
+  return foreign ? `${FOREIGN_PREFIX}${foreign}` : null;
 }
 
 function deterministicReason(
@@ -269,7 +272,9 @@ export interface RedactableItem {
   text: string;
 }
 
-const SENTENCE = /[^.!?\n]+[.!?]*\s*/gu;
+// A full stop ends a sentence only before whitespace, so a domain, an email or a
+// version number stays inside one item and can be removed with it.
+const SENTENCE = /(?:[^.!?\n]|[.!?](?=\S))+[.!?]*\s*/gu;
 const sentences = (text: string): string[] =>
   (text.match(SENTENCE) ?? []).filter((part) => part.trim());
 
@@ -436,7 +441,7 @@ export async function gate(
   /** The question within its conversation, for the composer only. */
   conversation: string = question
 ): Promise<GateResult> {
-  const findings = withoutTicketRefs(investigated) ?? investigated;
+  let findings = withoutTicketRefs(investigated) ?? investigated;
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     const startedAt = Date.now();
@@ -448,9 +453,37 @@ export async function gate(
   };
   const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
-    const reason = await timed("scan", () =>
+    let reason = await timed("scan", () =>
       deterministicReason(scope, findings, deps.resolve)
     );
+    // A how-to answer was blocked whole, and the thread handed to a person,
+    // because one item named "accounts.google.com". An identifier the workspace
+    // does not own never reaches the customer, but the item carrying it is
+    // deleted rather than the whole reply: nothing is reworded, and the scan runs
+    // again on what is left. It still blocks when nothing would be left or the
+    // identifier sits outside the removable items.
+    for (
+      let pass = 0;
+      reason?.startsWith(FOREIGN_PREFIX) && pass < MAX_FOREIGN_PASSES;
+      pass++
+    ) {
+      const foreign = reason.slice(FOREIGN_PREFIX.length);
+      const trimmed = removeItems(
+        findings,
+        redactableItems(findings)
+          .filter((item) => item.text.toLowerCase().includes(foreign))
+          .map((item) => item.n)
+      );
+      if (!trimmed) {
+        break;
+      }
+      findings = trimmed;
+      const current = findings;
+      // biome-ignore lint/performance/noAwaitInLoops: each pass scans what the last one left.
+      reason = await timed("scan", () =>
+        deterministicReason(scope, current, deps.resolve)
+      );
+    }
     if (reason) {
       return done(blocked(findings, reason));
     }

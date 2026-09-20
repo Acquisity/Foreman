@@ -85,21 +85,46 @@ test("own-workspace identifiers pass and the composer sees no evidence reference
   assert.equal(JSON.stringify(composed).includes("row-1"), false);
 });
 
-test("a foreign identifier blocks before any model call", async () => {
-  const { calls, deps: d } = deps();
-  const result = await gate(
-    scope,
-    question,
-    findings({
+test("an item carrying a foreign identifier is deleted and the rest is answered; it never reaches a model", async () => {
+  for (const foreign of [foreignId, "accounts.google.com"]) {
+    const { calls, deps: d } = deps();
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own gate run.
+    const result = await gate(
+      scope,
+      question,
+      findings({
+        recommendation: `Reconnect the inbox. Another customer ${foreign} fixed this the same way.`,
+      }),
+      d
+    );
+    assert.equal(result.decision, "allow");
+    assert.equal(result.findings.recommendation, "Reconnect the inbox.");
+    assert.equal(
+      JSON.stringify([calls.judge, calls.compose]).includes(foreign),
+      false
+    );
+  }
+});
+
+test("a foreign identifier in every item, or in an entity id, still blocks before any model call", async () => {
+  for (const overrides of [
+    {
+      facts: [],
       recommendation: `Another customer ${foreignId} fixed this by reconnecting.`,
-    }),
-    d
-  );
-  assert.equal(result.decision, "block");
-  assert.equal(result.reason, `foreign_identifier:${foreignId}`);
-  assert.equal(result.message, null);
-  assert.equal(calls.judge.length, 0);
-  assert.equal(calls.compose.length, 0);
+    },
+    {
+      facts: [{ ...findings().facts[0], entityIds: [foreignId] }],
+    },
+  ]) {
+    const { calls, deps: d } = deps();
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own gate run.
+    const result = await gate(scope, question, findings(overrides), d);
+    assert.equal(result.decision, "block");
+    assert.equal(result.reason, `foreign_identifier:${foreignId}`);
+    assert.equal(result.message, null);
+    assert.equal(calls.judge.length, 0);
+    assert.equal(calls.compose.length, 0);
+  }
 });
 
 for (const [label, text] of [
@@ -157,7 +182,8 @@ test("the customer's own lead, inbox and sending domain pass; ones the workspace
     const result = await gate(
       scope,
       question,
-      findings({ recommendation: text }),
+      // Nothing else to say, so deleting the item leaves no reply: it blocks.
+      findings({ facts: [], recommendation: text }),
       d
     );
     assert.equal(result.reason, `foreign_identifier:${foreign}`);
