@@ -229,6 +229,9 @@ test("a system-provisioned active connection runs a live check and flags the sta
     workspaceId: WORKSPACE_ID,
   });
   const now = new Date(observedAt).getTime();
+  // The tool measures "recently used" against the real clock, so the clock is
+  // held at the fixture's moment; otherwise this fails three days after observedAt.
+  t.mock.timers.enable({ apis: ["Date"], now });
   const recent = new Date(now - 60 * 60 * 1000).toISOString();
   const stale = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
   const accountItems = [
