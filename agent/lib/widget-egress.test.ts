@@ -588,3 +588,25 @@ test("a website's custom domain and the workspace's billing account are owned; t
   assert.equal(foreign.decision, "block");
   assert.equal(foreign.reason, "foreign_identifier:other-tenant-site.com");
 });
+
+test("a source file named in a website fix is not a domain; a real unowned domain beside it still blocks", async () => {
+  const fix = (text: string) =>
+    gate(
+      scope,
+      "Why won't my site publish?",
+      findings({ recommendation: text }),
+      deps().deps
+    );
+  const allowed = await fix(
+    'Paste this into the builder chat: "Fix the type error in components/ui/calendar.tsx and next.config.js without changing the design."'
+  );
+  assert.equal(allowed.decision, "allow");
+  assert.equal(
+    extractIdentifiers(
+      findings({
+        recommendation: "See calendar.tsx and other-tenant-site.com.",
+      })
+    ).candidates.domains?.join(),
+    "other-tenant-site.com"
+  );
+});
