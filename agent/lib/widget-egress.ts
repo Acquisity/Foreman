@@ -465,7 +465,7 @@ export async function gate(
     for (
       let pass = 0;
       reason?.startsWith(FOREIGN_PREFIX) && pass < MAX_FOREIGN_PASSES;
-      pass++
+      pass += 1
     ) {
       const foreign = reason.slice(FOREIGN_PREFIX.length);
       const trimmed = removeItems(
