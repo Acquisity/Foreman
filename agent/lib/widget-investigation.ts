@@ -113,6 +113,8 @@ export type WaitOutcome =
       findings: WidgetFindings | null;
       status: "completed";
       text: string | null;
+      /** What widget_file_ticket itself returned during this turn, if it ran. */
+      ticket?: NonNullable<WidgetFindings["ticket"]> | null;
     };
 
 const TEXT_MAX = 4000;
@@ -121,6 +123,47 @@ const messageText = (data: unknown): string | null => {
   const trimmed = typeof value === "string" ? value.trim() : "";
   return trimmed ? trimmed.slice(0, TEXT_MAX) : null;
 };
+
+type FiledTicket = NonNullable<WidgetFindings["ticket"]>;
+const TICKET_URL =
+  /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
+const ticketOutput = z.object({ identifier: z.string(), url: z.string() });
+
+/**
+ * The ticket widget_file_ticket returned, read from the tool's own result. A
+ * filed ticket is never left to the write-up: ENG-14067 was filed, the prose said
+ * only "ticket filed", and the customer was told it could not be opened.
+ */
+export function filedTicketResult(result: unknown): FiledTicket | null {
+  const action = result as {
+    isError?: boolean;
+    kind?: string;
+    output?: unknown;
+    toolName?: string;
+  } | null;
+  if (
+    action?.kind !== "tool-result" ||
+    action.isError ||
+    action.toolName !== "widget_file_ticket"
+  ) {
+    return null;
+  }
+  const parsed = ticketOutput.safeParse(action.output);
+  if (!parsed.success) {
+    return null;
+  }
+  const { identifier, url } = parsed.data;
+  return TICKET_URL.exec(url)?.[1] === identifier
+    ? { id: identifier, url: url.slice(0, 500) }
+    : null;
+}
+
+/** The tool's own result outranks whatever the write-up or the model pass said about a ticket. */
+const withFiledTicket = (
+  ticket: FiledTicket | null | undefined,
+  findings: WidgetFindings | null
+): WidgetFindings | null =>
+  findings && ticket ? { ...findings, ticket } : findings;
 
 /**
  * Task completion owns the answer. The structured result is the findings
@@ -139,6 +182,7 @@ export async function waitForWidgetInvestigation(
   );
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
+  let ticket: FiledTicket | null = null;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -149,12 +193,15 @@ export async function waitForWidgetInvestigation(
       if (event.type === "turn.started") {
         findings = null;
         text = null;
+        ticket = null;
+      } else if (event.type === "action.result") {
+        ticket = filedTicketResult(event.data.result) ?? ticket;
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return { findings, status: "completed", text };
+        return { findings, status: "completed", text, ticket };
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -327,15 +374,17 @@ export async function finishWidgetRun(
       await deps.history(run).catch(() => [])
     );
     const extractStartedAt = Date.now();
-    const structured =
+    const structured = withFiledTicket(
+      outcome.ticket,
       outcome.findings ??
-      (outcome.text
-        ? await deps.extract({
-            investigatorText: outcome.text,
-            question: conversation,
-            scope: run.scope,
-          })
-        : null);
+        (outcome.text
+          ? await deps.extract({
+              investigatorText: outcome.text,
+              question: conversation,
+              scope: run.scope,
+            })
+          : null)
+    );
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
       ? null

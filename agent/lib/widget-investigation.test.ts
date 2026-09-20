@@ -731,6 +731,45 @@ test("a failed session blocks its run once", async () => {
   await failWidgetRun(runId, "widget-session-3", deps);
 });
 
+test("a filed ticket is taken from the tool's own result, whatever the write-up says", async () => {
+  const ticketResult = (output: unknown, extra: object = {}) =>
+    event("action.result", {
+      result: {
+        callId: "call-1",
+        kind: "tool-result",
+        output,
+        toolName: "widget_file_ticket",
+        ...extra,
+      },
+    });
+  const url = "https://linear.app/acquisity/issue/ENG-14067/pre-warmed";
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      ticketResult({ existing: false, identifier: "ENG-14067", url }),
+      event("message.completed", { message: "Engineering ticket filed." }),
+      event("session.completed"),
+    ])
+  );
+  assert.deepEqual(outcome.status === "completed" && outcome.ticket, {
+    id: "ENG-14067",
+    url,
+  });
+  // A failed call, a mismatched link and another tool's output are never a ticket.
+  const refused = await Promise.all(
+    [
+      ticketResult({ error: "Linear did not accept the ticket." }),
+      ticketResult({ identifier: "ENG-1", url }),
+      ticketResult({ identifier: "ENG-14067", url }, { isError: true }),
+      ticketResult({ identifier: "ENG-14067", url }, { toolName: "other" }),
+    ].map((result) =>
+      waitForWidgetInvestigation(session([result, event("session.completed")]))
+    )
+  );
+  for (const none of refused) {
+    assert.equal(none.status === "completed" && none.ticket, null);
+  }
+});
+
 test("stream observation starts at the turn's index, resets on a new turn, and reports a timeout as pending", async () => {
   const indexes: number[] = [];
   const stream = (events: StreamEvent[]) =>
@@ -753,6 +792,7 @@ test("stream observation starts at the turn's index, resets on a new turn, and r
     findings: null,
     status: "completed",
     text: null,
+    ticket: null,
   });
   assert.deepEqual(indexes, [7]);
   const open = {

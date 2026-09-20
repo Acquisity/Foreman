@@ -16,7 +16,7 @@ const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "File one internal Engineering ticket for this verified support conversation, into Triage. Use only after you have investigated and found a platform fault that Engineering must fix, or when the customer or a support teammate explicitly asks you to file one; investigate first so the ticket carries what you found. Never file a ticket for a how-to question, a customer-side setup problem, or something a known issue already covers. The team, state, workspace and conversation are taken from the verified session, never from this input. A conversation gets one ticket: if one already exists it is returned instead of a second being created. When a ticket comes back, end your write-up with this exact line on its own, filled from the result: Ticket filed: <identifier> <url>. That line is how the ticket is linked to the conversation; without it the customer is told no ticket was opened. It is the only place a ticket number may appear.",
+    "File one internal Engineering ticket for this verified support conversation, into Triage. A request for a ticket earns an investigation, never a ticket by itself. File only when your investigation gives Engineering something to act on: evidence of a platform fault, or a customer who has already done the right steps and it still fails. When the evidence points to something on the customer's side that they have not tried yet, or you do not yet know what is actually going wrong, do not file: give the fix or ask for what you need, and the ticket can be filed on a later message once that is known. Never file for a how-to question or something a known issue already covers. A support teammate who asks for a ticket gets one. The team, state, workspace and conversation are taken from the verified session, never from this input. A conversation gets one open ticket: if one already exists it is returned instead of a second being created.",
   async execute(input, ctx) {
     const scope = requireWidgetContext(ctx.session.auth.initiator);
     try {
@@ -30,7 +30,10 @@ const tool = defineTool({
         },
         { client: executorClient(ctx), signal: ctx.abortSignal }
       );
-      const [existing] = earlier.issues;
+      // A ticket someone cancelled no longer covers this conversation.
+      const [existing] = earlier.issues.filter(
+        (issue) => issue.stateType !== "canceled"
+      );
       if (existing) {
         return {
           existing: true,
