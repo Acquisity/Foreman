@@ -283,13 +283,13 @@ function parseSaved(
     .slice(0, PROJECT_PAGE_SIZE);
   const output = widgetWebsiteStatusOutput.parse({
     caveats: [
-      "Each project's live field is a hosting read made just now; every other field is saved builder state. live.status not_checked, not_linked, inaccessible or unavailable means there is no live result: say the live check was not possible, and answer from saved state.",
+      "Each project's live field is a hosting read made just now; every other field is saved builder state. live.status not_checked, not_linked, inaccessible or unavailable means there is no live result: say 'I could not check the live site' and answer from saved state. Never repeat these internal status names to the customer.",
       "The customer cannot see build logs or build errors anywhere in the product: never tell them to open, check or paste a build log. When live.deployment.buildError is present, read it, say in one plain sentence what broke, and give the exact message to paste into the website builder's chat to fix it, naming the file and the error. When a build failed and buildError is absent, give a message to paste that asks the builder to find and fix the build error without changing the design.",
       "A READY live deployment does not prove the page renders correctly or that public DNS resolves; misconfigured true means the domain's DNS does not point at hosting.",
       "everPublished false with a connected custom domain is the usual 404 cause: the project never published.",
-      "everPublished true with a failed current build means it published before, then broke.",
+      "everPublished true with a failed current build means it published before, then broke. lastBuildFailure is historical saved evidence, not proof the current build is failing. A deployed saved status or READY live deployment can coexist with an old failure. Do not prescribe fixing that old error as the cause of the current symptom unless current evidence confirms failure.",
       "Missing deployment or version rows do not prove a project never built; unavailable is not empty.",
-      "Domain verified and state are the last saved record, not a live DNS lookup.",
+      "The project's domains[].verified and domains[].state are saved records. live.domains[] contains fresh hosting-provider domain checks, including verified and misconfigured. Neither is an independent public DNS lookup. Do not describe live domain checks as saved verification records.",
     ],
     observedAt: result.observedAt,
     projects: rows.map(({ vercelProjectId: _id, ...row }) => ({

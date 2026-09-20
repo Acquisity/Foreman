@@ -11,6 +11,7 @@ import {
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
   waitForWidgetInvestigation,
+  widgetRunResponse,
   withHistory,
 } from "./widget-investigation.js";
 import type { KbAnswer } from "./widget-kb.js";
@@ -842,6 +843,29 @@ test("a blocked investigation returns the raw findings and no customer message",
     run_id: runId,
     status: "completed",
   });
+});
+
+test("internal-artifact blocks request a retry without disclosing the artifact", () => {
+  for (const reason of [
+    "internal_artifact:dpl_private",
+    "composed:internal_artifact:dpl_private",
+  ]) {
+    const { run } = dependencies();
+    run.outcome = {
+      decision: "block",
+      message: null,
+      reason,
+      status: "completed",
+    };
+    assert.deepEqual(widgetRunResponse(run), {
+      decision: "block",
+      findings: null,
+      message: null,
+      retry: true,
+      run_id: runId,
+      status: "completed",
+    });
+  }
 });
 
 test("a finished investigation is finished by one caller: the other reports pending, and an unreadable claim still finishes", async (t) => {

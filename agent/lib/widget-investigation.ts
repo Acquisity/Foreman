@@ -282,7 +282,7 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
 // send the message again instead of promising a teammate. The reason itself can
 // name an identifier, so only this flag crosses to the app.
 const RETRYABLE_BLOCK =
-  /^(?:deadline$|gate_unavailable$|(?:composed:)?foreign_identifier:)/u;
+  /^(?:deadline$|gate_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
