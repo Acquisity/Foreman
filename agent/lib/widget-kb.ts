@@ -1,8 +1,13 @@
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
-import { getHelpArticleContent, HELP_CENTER_BASE_URL } from "./help-center.js";
+import {
+  getHelpArticleContent,
+  HELP_CENTER_BASE_URL,
+  helpArticleSlug,
+} from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
 
 /**
  * The fast lane for general product questions: search the public help center,
@@ -14,9 +19,9 @@ import { logOpsEvent } from "./ops-log.js";
  * articles, so there is nothing cross-tenant for the egress gate to guard. Keep
  * it that way. Giving this lane any account lookup brings the gate back.
  *
- * It returns null whenever it cannot answer from the articles, and the caller
- * falls through to the investigation lane, so a miss costs latency, never a
- * wrong or empty reply.
+ * It returns null whenever it cannot answer from the articles. The caller
+ * decides what a miss means: a confident help-center question gets a
+ * clarifying reply, never an account investigation it did not ask for.
  */
 
 const MAX_ARTICLES = 4;
@@ -30,6 +35,8 @@ const SEARCH_TIMEOUT_MS = 5000;
 // answer with sources still beats falling through to a multi-minute investigation.
 const KB_TIMEOUT_MS = 25_000;
 const MAX_ANSWER_CHARS = 4000;
+const MAX_DESCRIPTION_CHARS = 160;
+const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
@@ -61,8 +68,14 @@ const hitSchema = z.looseObject({
   url: z.string(),
 });
 
+// description and keywords are optional so an older web deploy still parses.
 const indexSchema = z.array(
-  z.object({ id: z.string().min(1).max(300), title: z.string().min(1) })
+  z.object({
+    description: z.string().optional(),
+    id: z.string().min(1).max(300),
+    keywords: z.array(z.string()).optional(),
+    title: z.string().min(1),
+  })
 );
 type KbIndex = z.infer<typeof indexSchema>;
 
@@ -81,20 +94,27 @@ const answerSchema = z.object({
   kind: z.enum(["answer", "chat", "none"]),
 });
 
-const LATEST_SUBJECT = `The message may include earlier turns. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
+const LATEST_SUBJECT = `The input may carry a labelled LATEST CUSTOMER MESSAGE followed by EARLIER TURNS. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
 
 const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
 
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
 // inboxes" lexically, but a model reading both sees they are the same thing.
-const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path)". Return the numbers of up to ${MAX_ARTICLES} articles most likely to contain the answer, best first. Prefer a specific how-to guide over an index, overview or FAQ listing page. Return an empty list if nothing fits.`;
+const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path): description [keywords]". Many articles share a title such as Overview or Frequently Asked Questions: tell them apart by path and description. Return the numbers of up to ${MAX_ARTICLES} articles most likely to contain the answer, best first. Prefer a specific how-to guide over an index, overview or FAQ listing page. Return an empty list if nothing fits.`;
 
 // The help-center search is lexical and matches short keyword queries against
 // article titles. A whole conversational sentence ranks on its filler words
 // ("workspace", "new", "add" matching "ad") and misses the right article, so the
 // message is turned into keyword queries first.
 const REWRITE_PROMPT = `You turn a customer's support message into search queries for a help-center search engine that matches short keywords against article titles. ${LATEST_SUBJECT} Return 1 to ${MAX_QUERIES} queries of 1 to 3 words each, most specific first. Use the product nouns the customer means, and include the likely title wording as well as their wording, for example "buy inboxes" and "email accounts" for someone asking how to add inboxes. No filler words, no punctuation, no questions.`;
+
+// A confident how-to question the help center could not answer. No retrieval
+// result and no account data reach this prompt, so nothing to gate.
+export const KB_MISS_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer asked a general product question and you could not find a help-center article that answers it. Say so in one short, honest sentence, then ask ONE short question that would let you find the right guide: which feature or page it is about, or which of two things they mean when their message could mean either. State no product facts, no steps, and nothing about their account, workspace, campaigns or billing, none of which you can see. Make no promises and do not offer a person. Plain text, no sign-off, no em dashes. ${TEXT_ONLY}`;
+/** Sent when even that reply cannot be written, so a miss is never blank. */
+export const KB_MISS_FALLBACK =
+  "I could not find a help-center guide that answers that. Which feature or page is this about, and what are you trying to do there?";
 
 // No retrieval and no account data, like CHAT_PROMPT, so nothing to gate.
 export const CLARIFY_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message does not say clearly what they need help with. Ask ONE short, friendly question that gets what you need: which part of the product it is about, and what they expected versus what happened. If they sound frustrated, acknowledge it in a few words first. If the message could mean a few specific things, such as which limit or which charge, offer those as options. State no product facts, guess nothing about their account, and make no promises. Plain text, no sign-off, no em dashes. ${TEXT_ONLY}`;
@@ -258,9 +278,7 @@ export const defaultKbDeps: KbDeps = {
       abortSignal: signal,
       model: gateway(model),
       // The listing comes first so the long, stable prefix can be cached.
-      prompt: `${index
-        .map((article, n) => `${n + 1}. ${article.title} (${article.id})`)
-        .join("\n")}\n\nCustomer question: ${question}`,
+      prompt: `${index.map(indexLine).join("\n")}\n\nCustomer question: ${question}`,
       ...fastCallOptions(model),
       schema: selectSchema,
       system: SELECT_PROMPT,
@@ -268,6 +286,45 @@ export const defaultKbDeps: KbDeps = {
     return object;
   },
 };
+
+/** One article as the selector reads it; the web app's metadata is the retrieval language. */
+export function indexLine(article: KbIndex[number], n: number): string {
+  const description = article.description
+    ?.trim()
+    .slice(0, MAX_DESCRIPTION_CHARS);
+  const keywords = article.keywords?.slice(0, MAX_KEYWORDS).join(", ");
+  return `${n + 1}. ${article.title} (${article.id})${description ? `: ${description}` : ""}${keywords ? ` [${keywords}]` : ""}`;
+}
+
+/**
+ * The articles the previous reply cited, as a place to look first. They are
+ * hints from outside this process, so only a same-origin docs slug survives,
+ * the url is rebuilt from that slug alone, and a slug the index does not list
+ * is dropped.
+ */
+export async function activeArticleHits(
+  ask: WidgetAsk,
+  signal: AbortSignal,
+  deps: Pick<KbDeps, "index">
+): Promise<{ title: string; url: string }[]> {
+  const slugs = [
+    ...new Set(
+      (ask.activeArticles ?? [])
+        .map((article) => helpArticleSlug(article.url))
+        .filter((slug): slug is string => slug !== null)
+    ),
+  ].slice(0, MAX_ARTICLES);
+  if (slugs.length === 0) {
+    return [];
+  }
+  const index = await deps.index(signal).catch(() => null);
+  return slugs
+    .filter((slug) => !index || index.some((article) => article.id === slug))
+    .map((slug) => ({
+      title: index?.find((article) => article.id === slug)?.title ?? slug,
+      url: new URL(`/docs/${slug}`, HELP_CENTER_BASE_URL).toString(),
+    }));
+}
 
 /**
  * Merge the hits of several queries into one ranked list. Each query votes for
@@ -428,10 +485,12 @@ export function resolveCitations(
 }
 
 export async function answerFromHelpCenter(
-  question: string,
+  input: string | WidgetAsk,
   log: { conversationId: string; runId: string },
   deps: KbDeps = defaultKbDeps
 ): Promise<KbAnswer | null> {
+  const ask = toAsk(input);
+  const question = renderAsk(ask);
   const startedAt = Date.now();
   const signal = AbortSignal.timeout(KB_TIMEOUT_MS);
   const finish = (outcome: string, detail: string) =>
@@ -446,9 +505,10 @@ export async function answerFromHelpCenter(
     marks.push(`${step}=${Date.now() - lap}`);
     lap = Date.now();
   };
-  try {
-    const { hits, via } = await findArticles(question, signal, deps);
-    mark(`find:${via}`);
+  /** Read the hits and answer from them; null when the answer is not grounded in them. */
+  const attempt = async (
+    hits: { title: string; url: string }[]
+  ): Promise<KbAnswer | { kind: string; read: number }> => {
     const articles = (
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
@@ -459,7 +519,6 @@ export async function answerFromHelpCenter(
     mark("generate");
     if (raw.kind === "chat" && raw.answer.trim()) {
       // Conversation, not information: nothing to ground, so nothing to cite.
-      finish("chat", marks.join(" "));
       return {
         citations: [],
         message: raw.answer
@@ -470,19 +529,36 @@ export async function answerFromHelpCenter(
     }
     const answer =
       raw.kind === "answer" ? resolveCitations(raw.answer, articles) : null;
-    // An answer that cites nothing is not grounded in the articles; investigate instead.
-    if (!answer?.message || answer.citations.length === 0) {
+    // An answer that cites nothing is not grounded in the articles it was given.
+    return answer?.message && answer.citations.length > 0
+      ? answer
+      : { kind: raw.kind, read: articles.length };
+  };
+  try {
+    // A dependent follow-up tries the article the previous reply cited first;
+    // if that does not ground an answer, one fresh retrieval follows.
+    const active = ask.followUp
+      ? await activeArticleHits(ask, signal, deps)
+      : [];
+    mark(`find:active=${active.length}`);
+    let result = active.length > 0 ? await attempt(active) : null;
+    if (!(result && "message" in result)) {
+      const { hits, via } = await findArticles(question, signal, deps);
+      mark(`find:${via}`);
+      result = await attempt(hits);
+    }
+    if (!("message" in result)) {
       finish(
         "miss",
-        `articles=${articles.length} kind=${raw.kind} ${marks.join(" ")}`
+        `articles=${result.read} kind=${result.kind} ${marks.join(" ")}`
       );
       return null;
     }
     finish(
-      "ok",
-      `articles=${articles.length} citations=${answer.citations.length} ${marks.join(" ")}`
+      result.citations.length > 0 ? "ok" : "chat",
+      `citations=${result.citations.length} ${marks.join(" ")}`
     );
-    return answer;
+    return result;
   } catch (error) {
     mark("failed");
     finish(

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { routeWidgetMessage } from "./widget-router.js";
+import { renderAsk, routeWidgetMessage } from "./widget-router.js";
 
 const jevReply = (lane: string, confidence: number) => ({
   json: () =>
@@ -32,6 +32,7 @@ describe("routeWidgetMessage", () => {
       asksForHuman: 0.04,
       asksOwnData: 0.91,
       confidence: 0.87,
+      followUp: 0,
       kbScore: 0,
       lane: "investigate",
       source: "jev",
@@ -45,6 +46,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_human",
       "asks_for_ticket",
       "asks_own_data",
+      "depends_on_previous",
       "is_unclear",
       "lane",
     ]);
@@ -182,5 +184,47 @@ describe("routeWidgetMessage", () => {
       assert.equal(route.lane, "investigate");
       assert.equal(route.source, "fallback");
     }
+  });
+
+  it("puts the latest message first and apart from a few bounded earlier turns", async () => {
+    const turns = Array.from({ length: 10 }, (_, n) => ({
+      role: n % 2 ? ("assistant" as const) : ("customer" as const),
+      text: `turn ${n} ${"x".repeat(2000)}`,
+    }));
+    const state = renderAsk({ latest: "okay, what next?", turns });
+    assert.ok(state.startsWith("LATEST CUSTOMER MESSAGE"));
+    assert.ok(state.indexOf("okay, what next?") < state.indexOf("turn 6"));
+    assert.ok(
+      !state.includes("turn 5"),
+      "only the most recent turns ride along"
+    );
+    assert.ok(state.length < 2500);
+    assert.equal(renderAsk("hello"), "hello");
+
+    let sent = "";
+    const route = await routeWidgetMessage(
+      { latest: "okay, what next?", turns },
+      {
+        apiKey: "test-key",
+        fetch: (_url, init) => {
+          sent = JSON.parse(init.body).state;
+          return Promise.resolve({
+            json: () =>
+              Promise.resolve({
+                answers: {
+                  asks_for_human: { noul: 0 },
+                  asks_own_data: { noul: 0.1 },
+                  depends_on_previous: { noul: 0.93 },
+                  lane: { choice: "kb", confidence: 0.8 },
+                },
+              }),
+            ok: true,
+            status: 200,
+          });
+        },
+      }
+    );
+    assert.equal(sent, state);
+    assert.equal(route.followUp, 0.93);
   });
 });

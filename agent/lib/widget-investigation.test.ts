@@ -483,10 +483,10 @@ test("the help center gets the first try when it is the router's pick however un
   }
 });
 
-test("a help-center miss or a distant second is investigated instead", async (t) => {
+test("an unsure help-center miss or a distant second is investigated instead", async (t) => {
   enabled(t);
   for (const [route, answer] of [
-    [kbRoute(0.98), null],
+    [kbRoute(0.4), null],
     [routeWith("investigate", 0.4), kbAnswer],
   ] as const) {
     const { deps, gated } = dependencies();
@@ -520,14 +520,14 @@ test('a follow-up reaches the router and the fast lane with the earlier turns, s
     { role: "assistant" as const, text: "Open Email Accounts [1]." },
   ];
   assert.equal(withHistory("where is that?", []), "where is that?");
-  const seen: string[] = [];
   const { deps } = dependencies();
-  deps.route = (message) => {
-    seen.push(message);
+  const seen: unknown[] = [];
+  deps.route = (ask) => {
+    seen.push(ask);
     return kbRoute(0.98)();
   };
-  deps.answerKb = (message) => {
-    seen.push(message);
+  deps.answerKb = (ask) => {
+    seen.push(ask);
     return Promise.resolve(kbAnswer);
   };
   const response = await receiveWidgetMessage(
@@ -544,10 +544,171 @@ test('a follow-up reaches the router and the fast lane with the earlier turns, s
   );
   assert.equal(response.status, 200);
   assert.equal(seen.length, 2);
-  for (const message of seen) {
-    assert.ok(message.includes("Customer: how do i add new inboxes?"));
-    assert.ok(message.includes("Support: Open Email Accounts [1]."));
-    assert.ok(message.endsWith("where is that?"));
+  for (const ask of seen as { latest: string; turns: unknown[] }[]) {
+    // The latest message stands apart from the turns that only give it context.
+    assert.equal(ask.latest, "where is that?");
+    assert.deepEqual(ask.turns, history);
+  }
+});
+
+const followUpRoute =
+  (followUp: number, confidence = 0.9) =>
+  () =>
+    Promise.resolve({
+      ...followUpBase,
+      confidence,
+      followUp,
+      kbScore: confidence,
+    });
+const followUpBase = {
+  asksForAction: 0,
+  asksForHuman: 0,
+  asksOwnData: 0,
+  lane: "kb" as const,
+  source: "jev" as const,
+};
+const cited = [
+  { title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
+];
+
+test("the previous reply's citations reach the fast lane, flagged as a follow-up only when the router says so", async (t) => {
+  enabled(t);
+  const history = [
+    { role: "customer" as const, text: "how do i set up ai sdr?" },
+    {
+      citations: cited,
+      role: "assistant" as const,
+      text: "Connect a calendar.",
+    },
+  ];
+  for (const [asked, score, expected] of [
+    ["okay, what next?", 0.95, true],
+    ["how do i buy a domain?", 0.05, false],
+  ] as const) {
+    const { deps } = dependencies();
+    deps.route = followUpRoute(score);
+    let got: unknown;
+    deps.answerKb = (ask) => {
+      got = ask;
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history,
+        message_id: crypto.randomUUID(),
+        question: asked,
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    const sent = got as { activeArticles: unknown; followUp: boolean };
+    assert.deepEqual(sent.activeArticles, cited);
+    assert.equal(sent.followUp, expected);
+  }
+});
+
+test("malformed citation history is dropped, not a reason to refuse the message", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = followUpRoute(0.95);
+  let got: unknown;
+  deps.answerKb = (ask) => {
+    got = ask;
+    return Promise.resolve(kbAnswer);
+  };
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      history: [
+        {
+          citations: [{ url: 7 }],
+          role: "assistant",
+          text: "Connect a calendar.",
+        },
+      ],
+      message_id: crypto.randomUUID(),
+      question: "and then?",
+    }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((got as { activeArticles: unknown }).activeArticles, []);
+});
+
+test("a confident help-center question that misses gets a clarifying reply: no investigation, no handoff, never blank", async (t) => {
+  enabled(t);
+  for (const clarify of [
+    () =>
+      Promise.resolve({
+        citations: [],
+        message: "Which feature is this about?",
+      }),
+    () => Promise.resolve(null),
+    () => Promise.reject(new Error("timeout")),
+  ]) {
+    const { deps, gated, run } = dependencies();
+    deps.route = followUpRoute(0, 0.9);
+    deps.answerKb = () => Promise.resolve(null);
+    deps.answerChat = clarify;
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: crypto.randomUUID() }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.decision, "allow");
+    assert.equal(body.status, "completed");
+    assert.ok(typeof body.message === "string" && body.message.length > 0);
+    assert.equal(body.citations, undefined);
+    assert.equal(body.findings, undefined);
+    assert.equal(run.outcome?.reason, "kb_miss");
+    assert.equal(run.session_id, null);
+    assert.deepEqual(gated, []);
+  }
+});
+
+test("a miss the router was unsure about, or an account question, still investigates", async (t) => {
+  enabled(t);
+  for (const route of [
+    followUpRoute(0, 0.4),
+    () =>
+      Promise.resolve({
+        ...followUpBase,
+        asksOwnData: 0.95,
+        confidence: 0.9,
+        kbScore: 0.55,
+        lane: "investigate" as const,
+      }),
+  ]) {
+    const { deps, gated } = dependencies();
+    deps.route = route;
+    deps.answerKb = () => Promise.resolve(null);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: crypto.randomUUID() }),
+      {
+        from: () =>
+          ({
+            send: () => Promise.resolve(completedSession()),
+          }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+        waitUntil: () => undefined,
+      },
+      200,
+      verify,
+      deps
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(gated, [findings]);
   }
 });
 

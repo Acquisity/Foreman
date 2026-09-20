@@ -10,10 +10,17 @@ import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   answerFromHelpCenter,
   CLARIFY_PROMPT,
+  KB_MISS_FALLBACK,
+  KB_MISS_PROMPT,
   type KbAnswer,
   replyToChat,
 } from "./widget-kb.js";
-import { logRouteDecision, routeWidgetMessage } from "./widget-router.js";
+import {
+  logRouteDecision,
+  routeWidgetMessage,
+  type WidgetAsk,
+  type WidgetRoute,
+} from "./widget-router.js";
 import {
   assertWidgetRunOwner,
   attachWidgetRun,
@@ -49,6 +56,15 @@ const scopeFields = {
 const historySchema = z
   .array(
     z.strictObject({
+      // Help-center articles a reply cited, as the web app stored them. Hints
+      // only: a malformed list is dropped, never a reason to refuse the message.
+      citations: z
+        .array(
+          z.object({ title: z.string().max(300), url: z.string().max(500) })
+        )
+        .max(4)
+        .optional()
+        .catch(undefined),
       role: z.enum(["customer", "assistant"]),
       text: z.string().max(4000),
     })
@@ -74,6 +90,23 @@ export const withHistory = (
     )
     .join("\n");
   return `Earlier in this conversation:\n${transcript}\n\nThe customer's latest message, which is the one to answer:\n${question}`;
+};
+
+/**
+ * The message as the front door reads it: the latest message on its own, the
+ * earlier turns beside it, and the articles the most recent reply cited.
+ */
+export const toWidgetAsk = (
+  question: string,
+  history: WidgetHistory | undefined
+): WidgetAsk => {
+  const turns = (history ?? []).filter((turn) => turn.text.trim());
+  return {
+    activeArticles:
+      turns.filter((turn) => turn.role === "assistant").at(-1)?.citations ?? [],
+    latest: question,
+    turns: turns.map(({ role, text }) => ({ role, text })),
+  };
 };
 
 const inputSchema = z.discriminatedUnion("action", [
@@ -283,6 +316,14 @@ const CHAT_ROUTE_CONFIDENCE = 0.6;
  */
 const KB_SCORE = 0.5;
 /**
+ * How sure the router must be of `kb` before a help-center miss is answered
+ * with a clarifying question instead of an investigation. Below it the router
+ * was unsure the message is general, so an account lookup stays possible.
+ */
+const STRONG_KB_CONFIDENCE = 0.6;
+/** How sure the router must be that the message only continues the previous reply. */
+const FOLLOW_UP_SCORE = 0.6;
+/**
  * How sure the router must be that the customer wants something done for them.
  * High on purpose: a lookup wrongly read as a request to act would get general
  * steps instead of a look at the account.
@@ -482,21 +523,51 @@ async function settleResultRun(
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
 }
 
+/** The reply to a confident help-center question nothing answered: a question back, never blank. */
+async function kbMissReply(
+  run: WidgetRun,
+  question: string,
+  deps: Pick<WidgetDependencies, "answerChat" | "complete">
+): Promise<WidgetRun | null> {
+  const reply = await deps
+    .answerChat(
+      question,
+      { conversationId: run.scope.conversationId, runId: run.id },
+      KB_MISS_PROMPT
+    )
+    .catch(() => null);
+  return deps.complete(
+    run.id,
+    {
+      citations: [],
+      decision: "allow",
+      message: reply?.message || KB_MISS_FALLBACK,
+      reason: "kb_miss",
+      status: "completed",
+    },
+    null,
+    run.id
+  );
+}
+
 /**
  * Front door: an ask for a person hands off at once, and a general product
  * question is answered from the help center, both without starting an
- * investigation. Returns null for every other route,
- * a router failure (which falls open to `investigate`), and any knowledge-base
- * miss, so those take the investigation lane exactly as before.
+ * investigation. Returns null for every other route, a router failure (which
+ * falls open to `investigate`), and a miss on a message the router was not sure
+ * is general, so those take the investigation lane. A miss on a confident
+ * help-center question is answered with a clarifying question instead: it never
+ * needed account data, so it never gets an investigation or a handoff.
  */
 async function answerFromKnowledgeBase(
   run: WidgetRun,
   scope: WidgetContext,
+  ask: WidgetAsk,
   question: string,
   signal: AbortSignal,
   deps: WidgetDependencies
 ): Promise<WidgetRun | null> {
-  const route = await deps.route(question, { signal });
+  const route = await deps.route(ask, { signal });
   logRouteDecision(
     { conversationId: scope.conversationId, runId: run.id },
     route
@@ -551,6 +622,18 @@ async function answerFromKnowledgeBase(
       );
     }
   }
+  return answerGeneralQuestion(run, route, ask, question, finish, deps);
+}
+
+/** The help-center try, for a general question or a request to act; null sends the message on to an investigation. */
+async function answerGeneralQuestion(
+  run: WidgetRun,
+  route: WidgetRoute,
+  ask: WidgetAsk,
+  question: string,
+  finish: (written: KbAnswer) => Promise<WidgetRun | null>,
+  deps: WidgetDependencies
+): Promise<WidgetRun | null> {
   // An explicit ask for a person is never overridden by a help-center guess.
   const generalQuestion =
     route.lane === "kb" ||
@@ -562,8 +645,17 @@ async function answerFromKnowledgeBase(
   if (!(generalQuestion || actionRequest)) {
     return null;
   }
-  const answer = await deps.answerKb(question, ids);
-  return answer ? finish(answer) : null;
+  const answer = await deps.answerKb(
+    { ...ask, followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE },
+    { conversationId: run.scope.conversationId, runId: run.id }
+  );
+  if (answer) {
+    return finish(answer);
+  }
+  const strongKb =
+    actionRequest ||
+    (route.lane === "kb" && route.confidence >= STRONG_KB_CONFIDENCE);
+  return strongKb ? kbMissReply(run, question, deps) : null;
 }
 
 /**
@@ -713,6 +805,7 @@ export async function receiveWidgetMessage(
       : await answerFromKnowledgeBase(
           run,
           scope,
+          toWidgetAsk(input.question, input.history),
           message,
           request.signal,
           deps

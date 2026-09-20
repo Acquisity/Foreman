@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  activeArticleHits,
   answerFromHelpCenter,
+  indexLine,
   type KbDeps,
   mergeHits,
   resolveCitations,
@@ -209,4 +211,120 @@ test("a reaction gets a short conversational reply with no citations, not an inv
     citations: [],
     message: "Glad that helps! Anything else you want to set up?",
   });
+});
+
+const grounded = { answer: "Next, set your hours [1].", kind: "answer" };
+
+test("a dependent follow-up reads the article the previous reply cited, without a fresh retrieval", async () => {
+  const read: string[] = [];
+  const result = await answerFromHelpCenter(
+    {
+      activeArticles: [articles[0]],
+      followUp: true,
+      latest: "okay, what next?",
+    },
+    log,
+    {
+      ...deps(grounded),
+      read: (url) => {
+        read.push(url);
+        return Promise.resolve({ content: "body", title: "Setup", url });
+      },
+      rewrite: () => assert.fail("the active article answered"),
+      search: () => assert.fail("the active article answered"),
+    }
+  );
+  assert.deepEqual(read, [articles[0].url]);
+  assert.deepEqual(
+    result?.citations.map((c) => c.url),
+    [articles[0].url]
+  );
+});
+
+test("a new subject ignores the active article, and an active article that cannot answer falls back to one fresh retrieval", async () => {
+  const fresh = [articles[2]];
+  const read: string[] = [];
+  const reading = (answer: (urls: string[]) => unknown): KbDeps => ({
+    ...deps(null, fresh),
+    generate: ({ articles: given }) =>
+      Promise.resolve(answer(given.map((a) => a.url))),
+    read: (url) => {
+      read.push(url);
+      return Promise.resolve({ content: "body", title: "t", url });
+    },
+  });
+  await answerFromHelpCenter(
+    {
+      activeArticles: [articles[0]],
+      followUp: false,
+      latest: "how do i set my hours?",
+    },
+    log,
+    reading(() => grounded)
+  );
+  assert.deepEqual(read, [fresh[0].url]);
+
+  read.length = 0;
+  const result = await answerFromHelpCenter(
+    { activeArticles: [articles[0]], followUp: true, latest: "and my hours?" },
+    log,
+    reading((urls) =>
+      urls[0] === articles[0].url ? { answer: "", kind: "none" } : grounded
+    )
+  );
+  assert.deepEqual(read, [articles[0].url, fresh[0].url]);
+  // The citation supports this answer: it is the article read for it, not the earlier one.
+  assert.deepEqual(
+    result?.citations.map((c) => c.url),
+    [fresh[0].url]
+  );
+});
+
+test("prior citations are hints only: foreign, malformed and unlisted urls never become something to read", async () => {
+  const index = [{ id: "ai-sdr/setup", title: "Setup" }];
+  const hits = await activeArticleHits(
+    {
+      activeArticles: [
+        { title: "x", url: "https://evil.example/docs/ai-sdr/setup" },
+        { title: "x", url: "https://app.acquisity.ai/api/docs-content?id=x" },
+        { title: "x", url: "not a url" },
+        { title: "x", url: "https://app.acquisity.ai/docs/not-in-index" },
+        {
+          title: "x",
+          url: "https://app.acquisity.ai/docs/ai-sdr/setup?next=//evil#x",
+        },
+      ],
+      latest: "and then?",
+    },
+    AbortSignal.timeout(1000),
+    { index: () => Promise.resolve(index) }
+  );
+  assert.deepEqual(hits, [
+    { title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
+  ]);
+});
+
+test("the selector sees path, description and keywords, bounded, and an older index still renders", () => {
+  assert.equal(
+    indexLine(
+      {
+        description: "d".repeat(500),
+        id: "ai-sdr/faq",
+        keywords: ["pause", "stop"],
+        title: "Frequently Asked Questions",
+      },
+      0
+    ),
+    `1. Frequently Asked Questions (ai-sdr/faq): ${"d".repeat(160)} [pause, stop]`
+  );
+  assert.equal(indexLine({ id: "a", title: "Overview" }, 1), "2. Overview (a)");
+});
+
+test("a timeout or error in the lane is a miss, never a blank or partial reply", async () => {
+  const result = await answerFromHelpCenter(
+    { followUp: true, latest: "what next?" },
+    log,
+    { ...deps(grounded), generate: () => Promise.reject(new Error("timeout")) }
+  );
+  assert.equal(result, null);
 });

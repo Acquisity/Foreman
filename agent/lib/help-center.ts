@@ -94,6 +94,21 @@ const CONTENT_TIMEOUT_MS = 10_000;
 const MAX_CONTENT_CHARS = 60_000;
 const DOCS_SLUG = /^\/docs\/([A-Za-z0-9][A-Za-z0-9/_-]*)$/u;
 
+/** The docs slug of a same-origin `/docs/<slug>` url, or null for anything else. */
+export function helpArticleSlug(
+  articleUrl: string,
+  base: string = HELP_CENTER_BASE_URL
+): string | null {
+  try {
+    const target = new URL(articleUrl, base);
+    return target.host === new URL(base).host
+      ? (DOCS_SLUG.exec(target.pathname)?.[1] ?? null)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export const helpArticleContentSchema = z.object({
   content: z.string(),
   title: z.string().optional(),
@@ -122,15 +137,7 @@ export async function getHelpArticleContent(
 ): Promise<HelpArticleContent> {
   const base = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
   const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
-  let slug: string | null = null;
-  try {
-    const target = new URL(articleUrl, base);
-    if (target.host === new URL(base).host) {
-      slug = DOCS_SLUG.exec(target.pathname)?.[1] ?? null;
-    }
-  } catch {
-    slug = null;
-  }
+  const slug = helpArticleSlug(articleUrl, base);
   if (!slug) {
     return {
       error: "Not an Acquisity help-center article url.",
