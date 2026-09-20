@@ -104,8 +104,21 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
           : requestedToolChoice;
       return Promise.resolve({ ...params, toolChoice, tools });
     },
-    async wrapGenerate({ doGenerate }) {
-      const result = await doGenerate();
+    // One step can ask for several calls at once: at 12 spent, a batch of four
+    // made 16. Calls past the budget are dropped before the SDK dispatches them.
+    async wrapGenerate({ doGenerate, params }) {
+      const generated = await doGenerate();
+      let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+      const result = {
+        ...generated,
+        content: generated.content.filter((part) => {
+          if (part.type !== "tool-call" || !namedTool(part)) {
+            return true;
+          }
+          left -= 1;
+          return left >= 0;
+        }),
+      };
       let sawAllowedCall = false;
       for (const part of result.content) {
         if (part.type === "tool-call") {
@@ -122,9 +135,14 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
       }
       return result;
     },
-    async wrapStream({ doStream }) {
+    async wrapStream({ doStream, params }) {
       const result = await doStream();
       const allowedCalls = new Set<string>();
+      const left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+      const callId = (part: object) => {
+        const { id, toolCallId } = part as { id?: string; toolCallId?: string };
+        return toolCallId ?? id;
+      };
       return {
         ...result,
         stream: result.stream.pipeThrough(
@@ -137,6 +155,15 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
                 allowedCalls.size === 0
               ) {
                 throw new Error(BLOCKED);
+              }
+              const id = part.type.startsWith("tool-")
+                ? callId(part)
+                : undefined;
+              if (
+                id !== undefined &&
+                [...allowedCalls].indexOf(String(id)) >= left
+              ) {
+                return;
               }
               controller.enqueue(part);
             },

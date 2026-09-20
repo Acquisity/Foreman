@@ -277,12 +277,23 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
  * never shown to the customer; only the gated, composed `message` is. The
  * help-center and small-talk lanes have no findings to return.
  */
+// A block from our own controls (the deadline, the ownership guard, a gate
+// outage) is not a finding that needs a person: the app tells the customer to
+// send the message again instead of promising a teammate. The reason itself can
+// name an identifier, so only this flag crosses to the app.
+const RETRYABLE_BLOCK =
+  /^(?:deadline$|gate_unavailable$|(?:composed:)?foreign_identifier:)/u;
+
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
     return { run_id: run.id, status: "pending" as const };
   }
   return {
     decision: run.outcome.decision,
+    ...(run.outcome.decision === "block" &&
+    RETRYABLE_BLOCK.test(run.outcome.reason ?? "")
+      ? { retry: true as const }
+      : {}),
     message: run.outcome.message,
     run_id: run.id,
     status: run.outcome.status,

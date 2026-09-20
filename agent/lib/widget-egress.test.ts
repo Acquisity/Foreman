@@ -480,6 +480,9 @@ test("every table the ownership query reads is reached only through the verified
     "lead_scrape_run sr",
     "agent_executions ae",
     "domain_purchase_order dpo",
+    "website w",
+    "website_project wp",
+    "website_domain wdm",
   ]) {
     const [, alias] = table.split(" ");
     assert.ok(
@@ -540,4 +543,48 @@ test("the same provider id inside a claim still blocks", async () => {
   );
   assert.equal(result.decision, "block");
   assert.match(result.reason, INTERNAL);
+});
+
+test("a website's custom domain and the workspace's billing account are owned; the same shapes elsewhere stay foreign", async () => {
+  const query = buildOwnershipQuery(scope, {
+    domains: ["shop.customer-site.com"],
+    emails: [],
+    slugs: [],
+    uuids: [campaignId],
+  });
+  // The billing account is reached only through the authorized organization row.
+  assert.ok(
+    query.includes(
+      "select o.billing_account_id from organization o join authorized a on a.id = o.id"
+    )
+  );
+  assert.ok(
+    query.includes("lower(w.custom_domain) from website w join authorized")
+  );
+  assert.ok(
+    query.includes("lower(wdm.domain) from website_domain wdm join authorized")
+  );
+
+  const ownedDomain = "shop.customer-site.com";
+  const answer = (domain: string) =>
+    gate(
+      scope,
+      "Why does my site 404?",
+      findings({
+        facts: [{ ...findings().facts[0], entityIds: [campaignId, domain] }],
+      }),
+      deps({
+        resolve: () =>
+          Promise.resolve({
+            domains: new Set([ownedDomain]),
+            emails: new Set<string>(),
+            slugs: new Set<string>(),
+            uuids: new Set([campaignId]),
+          }),
+      }).deps
+    );
+  assert.equal((await answer(ownedDomain)).decision, "allow");
+  const foreign = await answer("other-tenant-site.com");
+  assert.equal(foreign.decision, "block");
+  assert.equal(foreign.reason, "foreign_identifier:other-tenant-site.com");
 });

@@ -837,6 +837,8 @@ test("a blocked investigation returns the raw findings and no customer message",
     decision: "block",
     findings,
     message: null,
+    // Our own guard blocked it: the app asks for a resend, not a teammate.
+    retry: true,
     run_id: runId,
     status: "completed",
   });

@@ -57,6 +57,24 @@ const notSendingReason = z
     "provider_error",
   ])
   .nullable();
+// Saved keys are day indexes, 0 = Sunday .. 6 = Saturday (Acquisity's
+// campaign-schedule.ts). A reply read "5": false as a weekend and told the
+// customer Friday sending was on, so the model only ever sees day names.
+const DAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+export const namedDays = (days: Record<string, boolean> | null) =>
+  days &&
+  Object.fromEntries(
+    Object.entries(days).map(([key, on]) => [DAY_NAMES[Number(key)] ?? key, on])
+  );
+
 const schedule = z.object({
   days: z.record(z.string(), z.boolean()).nullable(),
   fromTime: z.string().max(16).nullable(),
@@ -236,7 +254,7 @@ export function parseWidgetOutreachHealthEvidence(
       recentSends: row.recentSends,
       schedule: hasSchedule
         ? {
-            days: row.days,
+            days: namedDays(row.days),
             fromTime: row.fromTime,
             invertedWindow: Boolean(
               row.fromTime && row.toTime && row.toTime < row.fromTime

@@ -50,6 +50,9 @@ const literalArray = (values: string[], pattern: RegExp, cast: string) => {
  * A domain is the customer's own when it is a sending domain they bought, the
  * domain their members sign in with, or the domain of one of their inboxes: a
  * reply naming the customer's own company domain was being blocked as foreign.
+ * A website's custom domain and the workspace's own billing account are here
+ * because `widget_website_status` and `widget_billing_summary` return them: both
+ * were blocking an owned answer as foreign.
  * These are small per-workspace tables; prospect and contact domains are left
  * out on purpose, since vouching for them means scanning every lead.
  */
@@ -81,6 +84,10 @@ export function buildOwnershipQuery(
       union select sr.id from lead_scrape_run sr join authorized a on a.id = sr.organization_id
       union select ae.id from agent_executions ae join authorized a on a.id = ae.organization_id
       union select dpo.id from domain_purchase_order dpo join authorized a on a.id = dpo.organization_id
+      union select o.billing_account_id from organization o join authorized a on a.id = o.id where o.billing_account_id is not null
+      union select w.id from website w join authorized a on a.id = w.organization_id where w.deleted_at is null
+      union select wp.id from website_project wp join authorized a on a.id = wp.organization_id where wp.deleted_at is null
+      union select wdm.id from website_domain wdm join authorized a on a.id = wdm.organization_id
     ) x where x.id = any(${uuids})), '[]'::jsonb) as uuids,
     coalesce((select jsonb_agg(lower(a.slug)) from authorized a where lower(a.slug) = any(${slugs})), '[]'::jsonb) as slugs,
     coalesce((select jsonb_agg(distinct e.email) from (
@@ -100,6 +107,9 @@ export function buildOwnershipQuery(
         join member m on m.user_id = u.id and m.deleted_at is null
         join authorized a on a.id = m.organization_id
       union select split_part(lower(i.email), '@', 2) from mail_inbox i join authorized a on a.id = i.organization_id
+      union select lower(w.custom_domain) from website w join authorized a on a.id = w.organization_id
+        where w.deleted_at is null and nullif(w.custom_domain, '') is not null
+      union select lower(wdm.domain) from website_domain wdm join authorized a on a.id = wdm.organization_id
     ) x where x.domain = any(${domains})), '[]'::jsonb) as domains`;
 }
 

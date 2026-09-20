@@ -144,4 +144,28 @@ describe("widget support investigation model boundary", () => {
     // An earlier turn's calls do not starve the follow-up.
     assert.equal(await advertised([user, calls(14), user, calls(2)]), 1);
   });
+
+  it("drops the calls of a parallel batch that would pass the budget, before the SDK runs them", async () => {
+    const batch = Array.from({ length: 4 }, (_, n) => ({
+      ...toolCall("widget_outreach_health"),
+      toolCallId: `call-${n}`,
+    }));
+    const generated = await widgetInvestigationMiddleware().wrapGenerate?.({
+      doGenerate: () => Promise.resolve({ ...result("x"), content: batch }),
+      params: {
+        prompt: [
+          { content: [], role: "user" },
+          {
+            content: Array.from({ length: 12 }, () => batch[0]),
+            role: "assistant",
+          },
+        ],
+      },
+    } as never);
+    // 12 spent of 14: only two of the four may run.
+    assert.deepEqual(
+      generated?.content.map((part) => "toolCallId" in part && part.toolCallId),
+      ["call-0", "call-1"]
+    );
+  });
 });
