@@ -202,3 +202,11 @@ test("a non-widget initiator is refused before any dispatch, and aborts stay abo
     CANCELLED_RE
   );
 });
+
+test("a legacy website's hosting id is read from the builder project that links to it, inside the workspace", () => {
+  const query = buildWidgetWebsiteStatusQuery(scope);
+  assert.ok(query.includes("lp.metadata->>'legacyWebsiteId' = w.id::text"));
+  assert.ok(
+    query.includes("from website_project lp where lp.organization_id = a.id")
+  );
+});

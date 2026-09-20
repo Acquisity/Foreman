@@ -169,12 +169,9 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
   // guard the cast so malformed JSON resolves to no linked domains, not an error.
   const legacyWebsiteId = `(case when p.metadata->>'legacyWebsiteId' ~ '^[0-9a-fA-F-]{36}$'
     then (p.metadata->>'legacyWebsiteId')::uuid else null end)`;
-  // The hosting id resolves in the app's own order, minus its v0 lookup (no v0
-  // access here): the project's column, then its linked legacy website's.
   const projectRows = `select 'website_project' as source, p.id, left(p.name, ${NAME_SQL_LIMIT}) as name,
       p.updated_at as "updatedAt",
-      coalesce(nullif(p.vercel_project_id, ''), (select nullif(lw.vercel_project_id, '') from website lw
-        where lw.id = ${legacyWebsiteId} and lw.organization_id = a.id and lw.deleted_at is null)) as "vercelProjectId",
+      nullif(p.vercel_project_id, '') as "vercelProjectId",
       exists(select 1 from website_deployment wd where wd.project_id = p.id
         and wd.organization_id = a.id and wd.deleted_at is null and wd.status = 'deployed') as "everPublished",
       coalesce((select wd.status::text from website_deployment wd
@@ -198,8 +195,15 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
       ${domainsFor(legacyWebsiteId)}
     from website_project p join authorized a on a.id = p.organization_id
     where p.deleted_at is null`;
+  // A legacy website almost never holds its hosting id itself (5 of 775 published
+  // sites): the app finds it on the builder project that links back to it, so
+  // this does the same, inside the verified workspace.
   const websiteRows = `select 'website' as source, w.id, left(w.name, ${NAME_SQL_LIMIT}) as name,
-      w.updated_at as "updatedAt", nullif(w.vercel_project_id, '') as "vercelProjectId",
+      w.updated_at as "updatedAt",
+      coalesce(nullif(w.vercel_project_id, ''), (select nullif(lp.vercel_project_id, '')
+        from website_project lp where lp.organization_id = a.id and lp.deleted_at is null
+          and lp.metadata->>'legacyWebsiteId' = w.id::text and nullif(lp.vercel_project_id, '') is not null
+        order by lp.updated_at desc limit 1)) as "vercelProjectId",
       (w.deployment_url is not null or w.deployment_status = 'deployed') as "everPublished",
       w.deployment_status::text as "currentStatus",
       left(nullif(w.deployment_error, ''), ${FAILURE_REASON_LIMIT}) as "lastBuildFailureReason",
