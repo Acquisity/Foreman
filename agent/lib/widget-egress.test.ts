@@ -15,6 +15,8 @@ import type { WidgetFindings } from "./widget-findings.js";
 
 const RECONNECT = /Reconnect/;
 const INTERNAL = /^internal_artifact:/;
+const COMPOSED_FOREIGN = /^composed:foreign_identifier:/;
+const COMPOSED_INTERNAL = /^composed:internal_artifact:/;
 const STRIPE_CUSTOMER_ID = /cus_/;
 const EMAIL_LITERAL = /'\{someone@example\.com\}'::text\[\]/;
 
@@ -312,7 +314,7 @@ test("a composed message that leaks a foreign identifier is blocked after compos
   });
   const result = await gate(scope, question, findings(), d);
   assert.equal(result.decision, "block");
-  assert.match(result.reason, /^composed:foreign_identifier:/);
+  assert.match(result.reason, COMPOSED_FOREIGN);
   assert.equal(result.message, null);
 });
 
@@ -325,7 +327,7 @@ test("a composed message that leaks an internal host is blocked after compositio
   });
   const result = await gate(scope, question, findings(), d);
   assert.equal(result.decision, "block");
-  assert.match(result.reason, /^composed:internal_artifact:/);
+  assert.match(result.reason, COMPOSED_INTERNAL);
   assert.equal(result.message, null);
 });
 
@@ -479,7 +481,7 @@ test("every table the ownership query reads is reached only through the verified
     "agent_executions ae",
     "domain_purchase_order dpo",
   ]) {
-    const alias = table.split(" ")[1];
+    const [, alias] = table.split(" ");
     assert.ok(
       query.includes(
         `${table} join authorized a on a.id = ${alias}.organization_id`

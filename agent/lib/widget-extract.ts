@@ -5,6 +5,8 @@ import { logOpsEvent } from "./ops-log.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
+const TICKET_ID = /^ENG-\d+$/;
+
 /**
  * A deliberately lenient shape for the extraction model. The strict
  * findingsSchema (nested strictObjects, every field required) is hard for a
@@ -99,7 +101,7 @@ function normalize(
       ? { needsWrite: str(raw.needsWrite, 2000) }
       : {}),
     ...(typeof raw.ticketId === "string" &&
-    /^ENG-\d+$/.test(raw.ticketId) &&
+    TICKET_ID.test(raw.ticketId) &&
     typeof raw.ticketUrl === "string"
       ? { ticket: { id: raw.ticketId, url: raw.ticketUrl.slice(0, 500) } }
       : {}),

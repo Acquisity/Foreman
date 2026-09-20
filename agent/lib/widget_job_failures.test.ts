@@ -196,9 +196,9 @@ test("empty, denied and unavailable stay distinct", async (t) => {
   assert.equal((await readWidgetJobFailures(ctx, {})).status, "denied");
 
   // unavailable: transport throws
-  t.mock.method(executorTransport, "call", async () => {
-    throw new Error("boom");
-  });
+  t.mock.method(executorTransport, "call", () =>
+    Promise.reject(new Error("boom"))
+  );
   assert.equal((await readWidgetJobFailures(ctx, {})).status, "unavailable");
   assert.ok(warn.mock.callCount() >= 1);
 });
