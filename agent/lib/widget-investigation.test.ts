@@ -487,7 +487,7 @@ test("an unsure help-center miss or a distant second is investigated instead", a
   enabled(t);
   for (const [route, answer] of [
     [kbRoute(0.4), null],
-    [routeWith("investigate", 0.4), kbAnswer],
+    [routeWith("investigate", 0.1), kbAnswer],
   ] as const) {
     const { deps, gated } = dependencies();
     deps.route = route;
@@ -1156,4 +1156,166 @@ test("a teammate's inbox run skips the front door, verifies as staff, and keeps 
     deps
   );
   assert.equal(read.status, 503);
+});
+
+// Router scores are the ones production logged for these turns (2026-09-20,
+// conversations a78ebd97 and 869b6831); both turns were investigated, blocked
+// at the gate and left the thread in human takeover.
+const loggedRoute = (latest: string) => {
+  const base = {
+    asksForAction: 0.1,
+    asksForHuman: 0.02,
+    asksOwnData: 0.3,
+    source: "jev" as const,
+  };
+  if (latest.startsWith("Now Google says")) {
+    return {
+      ...base,
+      asksOwnData: 0.9,
+      confidence: 0.61,
+      followUp: 0.04,
+      kbScore: 0.29,
+      lane: "investigate" as const,
+      unclear: 0.46,
+    };
+  }
+  if (latest === "and my dashboard totals") {
+    return {
+      ...base,
+      asksOwnData: 0.77,
+      confidence: 0.51,
+      followUp: 0.12,
+      kbScore: 0.33,
+      lane: "investigate" as const,
+      unclear: 0.66,
+    };
+  }
+  if (latest === "okay thanks") {
+    return { ...base, confidence: 0.95, kbScore: 0, lane: "chat" as const };
+  }
+  return { ...base, confidence: 0.95, kbScore: 0.95, lane: "kb" as const };
+};
+
+const docs = (slug: string) => `https://app.acquisity.ai/docs/${slug}`;
+const GOOGLE_BLOCKED =
+  "account-settings/faq/google-is-blocking-sign-in-when-connecting-my-email-and-calendar";
+const DASHBOARD_TOTALS =
+  "dashboard/faq/why-dont-dashboard-and-per-campaign-totals-match";
+const SDR_KB =
+  "ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app";
+
+/** Replay one persistent conversation through the front door, turn by turn. */
+async function replayThread(
+  turns: string[],
+  article: (latest: string) => string | null
+) {
+  const history: {
+    citations?: { title: string; url: string }[];
+    role: "assistant" | "customer";
+    text: string;
+  }[] = [];
+  const seen: { cited: string[]; message: unknown; reason?: string }[] = [];
+  for (const latest of turns) {
+    const { deps, gated, run } = dependencies();
+    deps.route = (ask) =>
+      Promise.resolve(loggedRoute(typeof ask === "string" ? ask : ask.latest));
+    deps.answerKb = (ask) => {
+      const slug = article(typeof ask === "string" ? ask : ask.latest);
+      return Promise.resolve(
+        slug
+          ? {
+              citations: [{ n: 1, title: slug, url: docs(slug) }],
+              message: `From ${slug}.`,
+            }
+          : null
+      );
+    };
+    deps.answerChat = () =>
+      Promise.resolve({ citations: [], message: "Which totals do you mean?" });
+    // biome-ignore lint/performance/noAwaitInLoops: turns of one thread run in order.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        history,
+        message_id: crypto.randomUUID(),
+        question: latest,
+      }),
+      // No session may start: an investigation is what ended in the takeover.
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    const body = (await response.json()) as {
+      citations?: { url: string }[];
+      message: unknown;
+    };
+    assert.deepEqual(gated, []);
+    assert.equal(run.outcome?.decision, "allow", latest);
+    assert.equal(
+      (run.findings as WidgetFindings | null)?.needsHuman,
+      undefined
+    );
+    const urls = (body.citations ?? []).map((c) => c.url);
+    seen.push({
+      cited: urls,
+      message: body.message,
+      reason: run.outcome?.reason,
+    });
+    history.push(
+      { role: "customer", text: latest },
+      {
+        citations: urls.map((url) => ({ title: url, url })),
+        role: "assistant",
+        text: String(body.message),
+      }
+    );
+  }
+  return seen;
+}
+
+test("thread: a Google blocked-app question after a password-reset thread is answered from its own article, and the thread keeps getting replies", async (t) => {
+  enabled(t);
+  const seen = await replayThread(
+    [
+      "My password reset email never showed up. What should I check first?",
+      "Spam is empty too. What next?",
+      "Now Google says the app is blocked when I connect Email and Calendar.",
+      "It is the Google blocked-app warning. What do I click next?",
+      "okay thanks",
+    ],
+    (latest) => (latest.includes("Google") ? GOOGLE_BLOCKED : "auth/reset")
+  );
+  assert.deepEqual(seen[2].cited, [docs(GOOGLE_BLOCKED)]);
+  assert.deepEqual(seen[3].cited, [docs(GOOGLE_BLOCKED)]);
+  assert.ok(seen.every((turn) => typeof turn.message === "string"));
+});
+
+test("thread: an incomplete fragment gets a clarifying question, its completion the dashboard article, and a jump to the AI SDR knowledge base a fresh one", async (t) => {
+  enabled(t);
+  const seen = await replayThread(
+    [
+      "the forgot-password email",
+      "never arrived... what should I check first?",
+      "and my dashboard totals",
+      "do not match the campaign numbers... why can that happen?",
+      "also the AI SDR knowledge base",
+      "where do I find it in the app?",
+    ],
+    (latest) => {
+      if (latest === "and my dashboard totals") {
+        return null;
+      }
+      if (latest.startsWith("do not match")) {
+        return DASHBOARD_TOTALS;
+      }
+      return latest.includes("AI SDR") || latest.startsWith("where do I")
+        ? SDR_KB
+        : "auth/reset";
+    }
+  );
+  assert.equal(seen[2].reason, "clarify");
+  assert.deepEqual(seen[3].cited, [docs(DASHBOARD_TOTALS)]);
+  assert.deepEqual(seen[5].cited, [docs(SDR_KB)]);
+  assert.ok(seen.every((turn) => typeof turn.message === "string"));
 });

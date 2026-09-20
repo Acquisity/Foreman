@@ -25,6 +25,8 @@ import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
  */
 
 const MAX_ARTICLES = 4;
+/** How many previously cited articles ride along with a follow-up's fresh retrieval. */
+const MAX_ACTIVE_ARTICLES = 2;
 const INDEX_TIMEOUT_MS = 5000;
 const CHAT_TIMEOUT_MS = 12_000;
 const INDEX_CACHE_MS = 10 * 60_000;
@@ -96,7 +98,7 @@ const answerSchema = z.object({
 
 const LATEST_SUBJECT = `The input may carry a labelled LATEST CUSTOMER MESSAGE followed by EARLIER TURNS. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
 
-const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
+const KB_PROMPT = `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a short, plain, warm reply in the second person with concrete steps where the articles give them. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see. You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. No sign-off, no em dashes.`;
 
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
@@ -535,18 +537,22 @@ export async function answerFromHelpCenter(
       : { kind: raw.kind, read: articles.length };
   };
   try {
-    // A dependent follow-up tries the article the previous reply cited first;
-    // if that does not ground an answer, one fresh retrieval follows.
-    const active = ask.followUp
-      ? await activeArticleHits(ask, signal, deps)
-      : [];
-    mark(`find:active=${active.length}`);
-    let result = active.length > 0 ? await attempt(active) : null;
-    if (!(result && "message" in result)) {
-      const { hits, via } = await findArticles(question, signal, deps);
-      mark(`find:${via}`);
-      result = await attempt(hits);
-    }
+    // A dependent follow-up also reads what the previous reply cited, but never
+    // instead of a fresh retrieval: "and if the chat bubble is missing?" scored as
+    // a follow-up, was answered from the ticket-status article alone and cited it.
+    // Fresh hits lead, so the latest message outweighs the earlier citation.
+    const [active, { hits: fresh, via }] = await Promise.all([
+      ask.followUp ? activeArticleHits(ask, signal, deps) : [],
+      findArticles(question, signal, deps),
+    ]);
+    const kept = active
+      .filter((hit) => !fresh.some((found) => found.url === hit.url))
+      .slice(0, MAX_ACTIVE_ARTICLES);
+    mark(`active=${kept.length} find:${via}`);
+    const result = await attempt([
+      ...fresh.slice(0, MAX_ARTICLES - kept.length),
+      ...kept,
+    ]);
     if (!("message" in result)) {
       finish(
         "miss",

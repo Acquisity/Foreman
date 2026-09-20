@@ -322,6 +322,21 @@ const KB_SCORE = 0.5;
  * was unsure the message is general, so an account lookup stays possible.
  */
 const STRONG_KB_CONFIDENCE = 0.6;
+/**
+ * An `investigate` pick this unsure, with the help center this close behind,
+ * gives the help center the first try. "Google says the app is blocked when I
+ * connect Email and Calendar" routed investigate 0.61 / kb 0.29 and "and my
+ * dashboard totals" 0.51 / 0.33; both were investigated, blocked at the gate
+ * and handed to a person. Real account questions in the same run scored
+ * investigate >= 0.96 with kb <= 0.03.
+ */
+const UNSURE_INVESTIGATE_CONFIDENCE = 0.65;
+const UNSURE_KB_SCORE = 0.25;
+/**
+ * On such an unsure pick, a help-center miss on a message this likely to be
+ * incomplete gets a clarifying question rather than an investigation.
+ */
+const FRAGMENT_UNCLEAR_SCORE = 0.5;
 /** How sure the router must be that the message only continues the previous reply. */
 const FOLLOW_UP_SCORE = 0.6;
 /**
@@ -551,6 +566,35 @@ async function kbMissReply(
   );
 }
 
+/** One clarifying question; null when it cannot be written, so the caller falls through. */
+async function clarifyReply(
+  run: WidgetRun,
+  ask: WidgetAsk,
+  deps: Pick<WidgetDependencies, "answerChat" | "complete">
+): Promise<WidgetRun | null> {
+  const reply = await deps
+    .answerChat(
+      renderAsk(ask),
+      { conversationId: run.scope.conversationId, runId: run.id },
+      CLARIFY_PROMPT
+    )
+    .catch(() => null);
+  return reply
+    ? deps.complete(
+        run.id,
+        {
+          citations: [],
+          decision: "allow",
+          message: reply.message,
+          reason: "clarify",
+          status: "completed",
+        },
+        null,
+        run.id
+      )
+    : null;
+}
+
 /**
  * Front door: an ask for a person hands off at once, and a general product
  * question is answered from the help center, both without starting an
@@ -609,20 +653,9 @@ async function answerFromKnowledgeBase(
   // Nothing to look up yet: ask what they mean instead of spending minutes on
   // a broad account investigation. If that reply cannot be written, fall through.
   if (route.lane !== "human" && (route.unclear ?? 0) >= UNCLEAR_SCORE) {
-    const reply = await deps.answerChat(question, ids, CLARIFY_PROMPT);
+    const reply = await clarifyReply(run, ask, deps);
     if (reply) {
-      return deps.complete(
-        run.id,
-        {
-          citations: [],
-          decision: "allow",
-          message: reply.message,
-          reason: "clarify",
-          status: "completed",
-        },
-        null,
-        run.id
-      );
+      return reply;
     }
   }
   return answerGeneralQuestion(run, route, ask, finish, deps);
@@ -637,9 +670,15 @@ async function answerGeneralQuestion(
   deps: WidgetDependencies
 ): Promise<WidgetRun | null> {
   // An explicit ask for a person is never overridden by a help-center guess.
+  const unsureInvestigate =
+    route.lane === "investigate" &&
+    route.source === "jev" &&
+    route.confidence < UNSURE_INVESTIGATE_CONFIDENCE &&
+    route.kbScore >= UNSURE_KB_SCORE;
   const generalQuestion =
     route.lane === "kb" ||
-    (route.lane !== "human" && route.kbScore >= KB_SCORE);
+    (route.lane !== "human" && route.kbScore >= KB_SCORE) ||
+    unsureInvestigate;
   // A request to act never needs an investigation: the fast lane apologises and
   // gives the steps. An explicit ask for a person is left alone.
   const actionRequest =
@@ -657,7 +696,12 @@ async function answerGeneralQuestion(
   const strongKb =
     actionRequest ||
     (route.lane === "kb" && route.confidence >= STRONG_KB_CONFIDENCE);
-  return strongKb ? kbMissReply(run, ask, deps) : null;
+  if (strongKb) {
+    return kbMissReply(run, ask, deps);
+  }
+  return unsureInvestigate && (route.unclear ?? 0) >= FRAGMENT_UNCLEAR_SCORE
+    ? clarifyReply(run, ask, deps)
+    : null;
 }
 
 /**

@@ -215,8 +215,8 @@ test("a reaction gets a short conversational reply with no citations, not an inv
 
 const grounded = { answer: "Next, set your hours [1].", kind: "answer" };
 
-test("a dependent follow-up reads the article the previous reply cited, without a fresh retrieval", async () => {
-  const read: string[] = [];
+test("a dependent follow-up reads the article the previous reply cited alongside a fresh retrieval, fresh first", async () => {
+  const given: string[][] = [];
   const result = await answerFromHelpCenter(
     {
       activeArticles: [articles[0]],
@@ -225,59 +225,52 @@ test("a dependent follow-up reads the article the previous reply cited, without 
     },
     log,
     {
-      ...deps(grounded),
-      read: (url) => {
-        read.push(url);
-        return Promise.resolve({ content: "body", title: "Setup", url });
+      ...deps(null, [articles[2]]),
+      generate: ({ articles: read }) => {
+        given.push(read.map((a) => a.url));
+        return Promise.resolve({
+          answer: "Set your hours [2].",
+          kind: "answer",
+        });
       },
-      rewrite: () => assert.fail("the active article answered"),
-      search: () => assert.fail("the active article answered"),
     }
   );
-  assert.deepEqual(read, [articles[0].url]);
+  assert.deepEqual(given, [[articles[2].url, articles[0].url]]);
   assert.deepEqual(
     result?.citations.map((c) => c.url),
     [articles[0].url]
   );
 });
 
-test("a new subject ignores the active article, and an active article that cannot answer falls back to one fresh retrieval", async () => {
-  const fresh = [articles[2]];
-  const read: string[] = [];
-  const reading = (answer: (urls: string[]) => unknown): KbDeps => ({
-    ...deps(null, fresh),
-    generate: ({ articles: given }) =>
-      Promise.resolve(answer(given.map((a) => a.url))),
-    read: (url) => {
-      read.push(url);
-      return Promise.resolve({ content: "body", title: "t", url });
-    },
-  });
-  await answerFromHelpCenter(
-    {
-      activeArticles: [articles[0]],
-      followUp: false,
-      latest: "how do i set my hours?",
-    },
-    log,
-    reading(() => grounded)
-  );
-  assert.deepEqual(read, [fresh[0].url]);
-
-  read.length = 0;
-  const result = await answerFromHelpCenter(
-    { activeArticles: [articles[0]], followUp: true, latest: "and my hours?" },
-    log,
-    reading((urls) =>
-      urls[0] === articles[0].url ? { answer: "", kind: "none" } : grounded
-    )
-  );
-  assert.deepEqual(read, [articles[0].url, fresh[0].url]);
-  // The citation supports this answer: it is the article read for it, not the earlier one.
-  assert.deepEqual(
-    result?.citations.map((c) => c.url),
-    [fresh[0].url]
-  );
+test("a new subject outweighs the previous citation: scored a follow-up or not, the fresh article is read and cited", async () => {
+  const [ticketStatus, , widgetMissing] = articles;
+  for (const followUp of [true, false]) {
+    // biome-ignore lint/performance/noAwaitInLoops: two independent cases.
+    const result = await answerFromHelpCenter(
+      {
+        activeArticles: [ticketStatus],
+        followUp,
+        latest:
+          "And if the support chat bubble itself is missing, what should I try first?",
+      },
+      log,
+      {
+        ...deps(null, [widgetMissing]),
+        generate: ({ articles: read }) => {
+          // The fresh hit always leads, so the model is never left with only the old article.
+          assert.equal(read[0].url, widgetMissing.url);
+          return Promise.resolve({
+            answer: "Check your ad blocker [1].",
+            kind: "answer",
+          });
+        },
+      }
+    );
+    assert.deepEqual(
+      result?.citations.map((c) => c.url),
+      [widgetMissing.url]
+    );
+  }
 });
 
 test("prior citations are hints only: foreign, malformed and unlisted urls never become something to read", async () => {
