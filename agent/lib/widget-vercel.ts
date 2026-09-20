@@ -173,8 +173,8 @@ export async function readVercelLive(
           verified: match?.verified ?? null,
         };
       }),
-      status: "live",
-    };
+      status: report("live", latest ? "deployment_read" : "no_deployments"),
+    } as VercelLive;
   } catch (error) {
     if (signal.aborted) {
       throw error;
