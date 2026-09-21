@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { after, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
@@ -331,4 +332,71 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
       {}
     )
   );
+});
+
+test("the generated verification subquery counts Instantly and verified imports within the same organization", () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    db.exec(`create table lead_scrape_run (id text, organization_id text, source text);
+      create table lead_scrape_lead (scrape_run_id text, organization_id text, is_email_verified boolean);
+      insert into lead_scrape_run values ('instant', 'ours', 'instantly'), ('import', 'ours', 'manual');
+      insert into lead_scrape_lead values ('instant', 'ours', false), ('instant', 'ours', true),
+        ('instant', 'foreign', true), ('import', 'ours', false), ('import', 'ours', true), ('import', 'foreign', true);`);
+    const query = buildWidgetLeadPipelineQuery(scope, {});
+    const subquery = query.slice(
+      query.indexOf(
+        "(select count(*) from lead_scrape_lead",
+        query.indexOf('as "storedLeadCount"')
+      ),
+      query.indexOf('as "verifiedLeadCount"')
+    );
+    const rows = db
+      .prepare(
+        `select lsr.id, ${subquery} as verified from lead_scrape_run lsr order by lsr.id`
+      )
+      .all();
+    assert.deepEqual(
+      rows.map((row) => ({ ...row })),
+      [
+        { id: "import", verified: 1 },
+        { id: "instant", verified: 2 },
+      ]
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("count differences in either direction do not diagnose failed processing", () => {
+  for (const stored of [800, 1000]) {
+    const result = parseWidgetLeadPipelineEvidence(
+      envelope({
+        reconciliation: {
+          ...reconciliationTotals,
+          scrapeLeadStoredTotal: stored,
+        },
+        scrapeRuns: [
+          {
+            ...scrapeRun,
+            finishedAt: observedAt,
+            status: "completed",
+            stuck: false,
+          },
+        ],
+      }),
+      scope,
+      {}
+    );
+    assert.equal(result.status, "ok");
+    if (result.status !== "ok") {
+      assert.fail("Expected evidence");
+    }
+    assert.equal(result.reconciliation.discrepancy, true);
+    assert.equal(result.scrapeRuns[0].status, "completed");
+    assert.ok(
+      result.reconciliation.note.includes(
+        "does not establish a processing failure"
+      )
+    );
+  }
 });

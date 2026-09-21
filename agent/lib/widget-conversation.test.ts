@@ -248,5 +248,6 @@ test("an identifier from another workspace in the conversation widens nothing: t
   // The selector is given the customer's words only; the verified scope is not
   // in its input to be argued with, and stays with the session and the tools.
   assert.equal(conversation.includes(foreign), true);
-  assert.equal(sent.prompt.length, 3);
+  assert.equal(sent.prompt.length, 4);
+  assert.equal(sent.prompt.at(-1)?.role, "system");
 });

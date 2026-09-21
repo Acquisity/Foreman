@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { generateText, tool, wrapLanguageModel } from "ai";
+import {
+  generateText,
+  simulateStreamingMiddleware,
+  tool,
+  wrapLanguageModel,
+} from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
@@ -140,7 +145,8 @@ describe("widget support investigation model boundary", () => {
     };
     const user = { content: [], role: "user" };
     assert.equal(await advertised([user, calls(7), calls(7)]), 0);
-    assert.equal(await advertised([user, calls(13)]), 1);
+    assert.equal(await advertised([user, calls(11)]), 1);
+    assert.equal(await advertised([user, calls(12)]), 0);
     // An earlier turn's calls do not starve the follow-up.
     assert.equal(await advertised([user, calls(14), user, calls(2)]), 1);
   });
@@ -156,16 +162,90 @@ describe("widget support investigation model boundary", () => {
         prompt: [
           { content: [], role: "user" },
           {
-            content: Array.from({ length: 12 }, () => batch[0]),
+            content: Array.from({ length: 10 }, () => batch[0]),
             role: "assistant",
           },
         ],
       },
     } as never);
-    // 12 spent of 14: only two of the four may run.
+    // Two workspace calls remain; the last two slots are for articles.
     assert.deepEqual(
       generated?.content.map((part) => "toolCallId" in part && part.toolCallId),
       ["call-0", "call-1"]
     );
   });
 });
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: reserves the final two calls for article search and reading`, async () => {
+    const names = [
+      "widget_outreach_health",
+      "widget_help_article",
+      "widget_read_help_article",
+      "widget_help_article",
+    ];
+    const base = new MockLanguageModelV4({
+      doGenerate: {
+        ...result("x"),
+        content: names.map((name, n) => ({
+          ...toolCall(name),
+          toolCallId: `c${n}`,
+        })),
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = {
+      prompt: [
+        {
+          content: [{ text: "Check this", type: "text" as const }],
+          role: "user" as const,
+        },
+        {
+          content: Array.from({ length: 12 }, (_, n) => ({
+            ...toolCall("widget_outreach_health"),
+            input: {},
+            toolCallId: `old${n}`,
+          })),
+          role: "assistant" as const,
+        },
+      ],
+      toolChoice: { toolName: "widget_outreach_health", type: "tool" as const },
+      tools: names.slice(0, 3).map((name) => ({
+        inputSchema: { type: "object" },
+        name,
+        type: "function" as const,
+      })),
+    };
+    const received: string[] = [];
+    if (mode === "generate") {
+      const output = await model.doGenerate(params);
+      for (const part of output.content) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    } else {
+      const { stream } = await model.doStream(params);
+      for await (const part of stream) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    }
+    assert.deepEqual(received, [
+      "widget_help_article",
+      "widget_read_help_article",
+    ]);
+    assert.deepEqual(
+      base.doGenerateCalls[0].tools?.map((t) => t.name),
+      received
+    );
+    assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+  });
+}

@@ -3,10 +3,10 @@ import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 
 /**
- * Preview pilot: after each batch of tool results, TypeSafe's Jev picks the
+ * Preview pilot: at the first investigation step and after results, Jev picks the
  * investigator's next action, and the pick is enforced on the model request.
  * A read advertises and forces exactly that tool, so the investigator only
- * writes its arguments, which the tool's own schema validates. Every other
+ * writes one call's arguments, which the tool's own schema validates. Every other
  * pick removes the evidence tools, so the investigator has to write findings.
  *
  * This sits inside the widget tool allowlist and tool budget and changes
@@ -242,7 +242,7 @@ const responseSchema = z.object({
       choice: z.string(),
       confidence: z.number().min(0).max(1).optional(),
     }),
-    handoff_eligible: z.object({ noul: z.number().min(0).max(1) }),
+    handoff_eligible: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
 
@@ -336,6 +336,7 @@ export async function handoffEligible(
 /** One Jev request. Throws on a missing key, a timeout, a bad status or an answer that is not on the menu. */
 export async function selectNextAction(
   input: {
+    initial?: boolean;
     question: string;
     reads: Read[];
     tools: { description: string; name: string }[];
@@ -379,17 +380,24 @@ export async function selectNextAction(
         }: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
       ])
     ),
-    ...FIXED_CRITERIA,
+    ...(input.initial ? { finish: FIXED_CRITERIA.finish } : FIXED_CRITERIA),
   };
   const { answers } = responseSchema.parse(
     await askJev(
       {
         action: {
           criteria,
-          instructions: `${POLICY} Select the one next step.`,
+          instructions: `${POLICY} ${input.initial ? "The front door has already selected investigation and handled intent and ambiguity. Select the first useful read, or finish if none can help. Do not classify intent again." : "Select the one next step."}`,
           type: "choice",
         },
-        handoff_eligible: { instructions: ELIGIBLE_INSTRUCTIONS, type: "noul" },
+        ...(input.initial
+          ? {}
+          : {
+              handoff_eligible: {
+                instructions: ELIGIBLE_INSTRUCTIONS,
+                type: "noul",
+              },
+            }),
       },
       state,
       apiKey,
@@ -397,10 +405,15 @@ export async function selectNextAction(
     )
   );
   const { choice, confidence = 0 } = answers.action;
+  if (!(choice in criteria && (input.initial || answers.handoff_eligible))) {
+    throw new Error("invalid_choice");
+  }
   if (choice === "human") {
     return {
       action:
-        answers.handoff_eligible.noul >= HANDOFF_ELIGIBLE ? "human" : "finish",
+        (answers.handoff_eligible?.noul ?? 0) >= HANDOFF_ELIGIBLE
+          ? "human"
+          : "finish",
       confidence,
     };
   }
@@ -452,6 +465,14 @@ function forcedParams(
     return {
       params: {
         ...params,
+        prompt: [
+          ...params.prompt,
+          {
+            content:
+              "Perform the selected read once with the arguments most useful to the customer. Wait for its result before choosing another read or page. Do not emit a batch of parameter variations.",
+            role: "system",
+          },
+        ],
         toolChoice: { toolName: next.tool, type: "tool" },
         tools: params.tools?.filter((tool) => tool.name === next.tool),
       },
@@ -486,7 +507,7 @@ export function widgetNextActionMiddleware(
     detail: string
   ) =>
     logOpsEvent("widget.selector.decision", {
-      code: "tool_result",
+      code: fields.step === 0 ? "initial" : "tool_result",
       decision,
       message: `ms=${fields.ms} ${detail}`,
       outcome: outcomeOf(decision, detail),
@@ -594,7 +615,9 @@ export function widgetNextActionMiddleware(
         question,
         reads,
       } = turnEvidence(params.prompt);
-      if (!atToolResult || tools.length === 0) {
+      const initial =
+        reads.length === 0 && params.prompt.at(-1)?.role === "user";
+      if (!(atToolResult || initial) || tools.length === 0) {
         return params;
       }
       const settled = alreadySettled(params, askTool, {
@@ -614,7 +637,7 @@ export function widgetNextActionMiddleware(
       });
       try {
         const next = await selectNextAction(
-          { question, reads, tools },
+          { initial, question, reads, tools },
           { ...opts, signal: params.abortSignal }
         );
         const confidence = `confidence=${next.confidence.toFixed(2)}`;
@@ -659,17 +682,18 @@ export function widgetNextActionMiddleware(
         log("fallback", step, "reason=forced_read_failed");
         return model.doGenerate(plan.original);
       }
-      const repeated = generated.content.some(
+      const selected = generated.content.find(
         (part) =>
           part.type === "tool-call" &&
-          plan.reads.some(
+          part.toolName === plan.tool &&
+          !plan.reads.some(
             (read) =>
               read.tool === part.toolName &&
               read.input === canon(parsed(part.input))
           )
       );
-      if (!repeated) {
-        return generated;
+      if (selected) {
+        return { ...generated, content: [selected] };
       }
       // The same read with the same arguments returns what is already known.
       log("fallback", step, "reason=repeated_read");

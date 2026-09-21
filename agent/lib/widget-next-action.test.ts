@@ -176,19 +176,66 @@ describe("widget next-action selector", () => {
     );
   });
 
-  it("leaves the first step to the investigator: no selector call before any tool result", async () => {
-    let called = false;
-    const { model, sent } = harness(() => {
-      called = true;
-      throw new Error("unused");
-    });
+  it("selects the first useful read without reclassifying intent or ambiguity", async () => {
+    const seen: {
+      state?: string;
+      questions?: { action: { criteria: object }; handoff_eligible?: unknown };
+    }[] = [];
+    const { model, sent } = harness(
+      jev("widget_billing_summary", 0, seen),
+      call("widget_billing_summary", {})
+    );
     await model.doGenerate({
       prompt: prompt("Why was I charged?", []),
       tools: TOOLS,
     });
-    assert.equal(called, false);
-    assert.equal(sent().tools.includes("widget_billing_summary"), true);
-    assert.equal(sent().tools.includes("web_fetch"), false);
+    assert.deepEqual(sent().tools, ["widget_billing_summary"]);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].questions?.handoff_eligible, undefined);
+    assert.equal(
+      "clarify" in (seen[0].questions?.action.criteria ?? {}),
+      false
+    );
+    assert.equal("human" in (seen[0].questions?.action.criteria ?? {}), false);
+    assert.deepEqual(JSON.parse(seen[0].state ?? "{}").completedReads, []);
+  });
+
+  it("one selected read cannot dispatch twelve parameter variants or duplicates", async () => {
+    const batch = call("widget_outreach_health", {});
+    batch.content = Array.from({ length: 12 }, (_, n) => ({
+      ...batch.content[0],
+      input: JSON.stringify(n < 2 ? {} : { after: `page-${n}` }),
+      toolCallId: `batch-${n}`,
+    }));
+    const { model, base } = harness(jev("widget_outreach_health"), batch);
+    const out = await model.doGenerate({
+      prompt: prompt("Check campaign A", []),
+      tools: TOOLS,
+    });
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.deepEqual(out.content, [batch.content[0]]);
+  });
+
+  it("a repeated call in a batch cannot discard a distinct useful page", async () => {
+    const batch = call("widget_outreach_health", {});
+    batch.content.push({
+      ...batch.content[0],
+      input: JSON.stringify({ after: "page2" }),
+      toolCallId: "page2",
+    });
+    const { model, base } = harness(jev("widget_outreach_health"), batch);
+    const out = await model.doGenerate({
+      prompt: prompt("Check the next campaign", [
+        {
+          input: {},
+          output: { nextAfter: "page2" },
+          tool: "widget_outreach_health",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.deepEqual(out.content, [batch.content[1]]);
   });
 
   // One available read per investigation area: the pick is the only tool the

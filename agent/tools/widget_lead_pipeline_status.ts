@@ -118,7 +118,7 @@ export function buildWidgetLeadPipelineQuery(
         where lsl.organization_id = lsr.organization_id and lsl.scrape_run_id = lsr.id) as "storedLeadCount",
       (select count(*) from lead_scrape_lead lsl
         where lsl.organization_id = lsr.organization_id and lsl.scrape_run_id = lsr.id
-          and lsl.is_email_verified = true) as "verifiedLeadCount",
+          and (lsr.source = 'instantly' or lsl.is_email_verified = true)) as "verifiedLeadCount",
       (lsr.status in ('pending', 'running')
         and lsr.started_at < current_timestamp - interval '${STUCK_MINUTES} minutes') as stuck,
       lsr.started_at as "startedAt", lsr.finished_at as "finishedAt", lsr.updated_at as "updatedAt"
@@ -160,7 +160,7 @@ export function buildWidgetLeadPipelineQuery(
 
 const CAVEATS = [
   "Saved product state is not a live scraper, verification or Inngest run check.",
-  "declaredLeadCount is the run's own tally; storedLeadCount counts leads that actually persisted, so a gap points to a scrape or verification that did not finish.",
+  "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
   "A stuck run is inferred from status and age, not confirmed: the live run cannot be read here, so say it looks stuck and what was not checked. widget_job_failures lists recorded scrape failures.",
   "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
   "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
@@ -215,7 +215,7 @@ export function parseWidgetLeadPipelineEvidence(
       ...totals,
       discrepancy,
       note: discrepancy
-        ? "Runs declared more or fewer leads than were persisted; treat the difference as a scrape or verification that did not finish, and check stuck or failed runs and ingestion credits."
+        ? "Declared totals and persisted rows differ. This does not establish a processing failure or its cause; assess recorded run status and failures separately."
         : "Declared run totals reconcile with persisted scrape leads; a low dashboard 'Leads Uploaded' figure is an accounting metric, not a missing-leads fact.",
     },
     scrapeRuns: runs,

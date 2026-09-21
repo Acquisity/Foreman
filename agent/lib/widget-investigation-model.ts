@@ -37,6 +37,11 @@ const ALLOWED_TOOLS = new Set([
 ]);
 /** Past this many tool calls the model is told to stop gathering and answer. */
 const MAX_WIDGET_TOOL_CALLS = 14;
+const ARTICLE_TOOLS = new Set([
+  "widget_help_article",
+  "widget_read_help_article",
+]);
+const MAX_WORKSPACE_CALLS = MAX_WIDGET_TOOL_CALLS - 2;
 const BLOCKED = "Support investigation capability is unavailable.";
 
 const namedTool = (part: { toolName?: unknown }) =>
@@ -98,21 +103,40 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
   return {
     specificationVersion: "v4",
     transformParams({ params }) {
-      const spent = toolCallsThisTurn(params.prompt) >= MAX_WIDGET_TOOL_CALLS;
+      const used = toolCallsThisTurn(params.prompt);
+      const spent = used >= MAX_WIDGET_TOOL_CALLS;
       const { toolChoice: requestedToolChoice } = params;
       const tools = spent
         ? []
         : params.tools?.filter(
             (tool) =>
-              typeof tool.name === "string" && ALLOWED_TOOLS.has(tool.name)
+              typeof tool.name === "string" &&
+              ALLOWED_TOOLS.has(tool.name) &&
+              (used < MAX_WORKSPACE_CALLS || ARTICLE_TOOLS.has(tool.name))
           );
       const toolChoice =
         spent ||
         (requestedToolChoice?.type === "tool" &&
-          !ALLOWED_TOOLS.has(requestedToolChoice.toolName))
+          !tools?.some((tool) => tool.name === requestedToolChoice.toolName))
           ? undefined
           : requestedToolChoice;
-      return Promise.resolve({ ...params, toolChoice, tools });
+      return Promise.resolve({
+        ...params,
+        prompt:
+          used < MAX_WORKSPACE_CALLS
+            ? params.prompt
+            : [
+                ...params.prompt,
+                {
+                  content: spent
+                    ? "The investigation tool budget is exhausted. State the verified findings and limitations. Do not give product steps unless an applicable article was actually read. If no article supports a step, acknowledge that documentation could not be confirmed."
+                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions. Product steps require an article actually read; otherwise report findings and the documentation gap.",
+                  role: "system",
+                },
+              ],
+        toolChoice,
+        tools,
+      });
     },
     // One step can ask for several calls at once: at 12 spent, a batch of four
     // made 16. Calls past the budget are dropped before the SDK dispatches them.
@@ -124,6 +148,9 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
         content: generated.content.filter((part) => {
           if (part.type !== "tool-call" || !namedTool(part)) {
             return true;
+          }
+          if (left <= 2 && !ARTICLE_TOOLS.has(part.toolName)) {
+            return false;
           }
           left -= 1;
           return left >= 0;
@@ -148,7 +175,18 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
     async wrapStream({ doStream, params }) {
       const result = await doStream();
       const allowedCalls = new Set<string>();
-      const left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+      let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+      const admittedCalls = new Map<string, boolean>();
+      const admit = (id: string, toolName: string) => {
+        if (admittedCalls.has(id)) {
+          return;
+        }
+        const keep = left > 0 && (left > 2 || ARTICLE_TOOLS.has(toolName));
+        admittedCalls.set(id, keep);
+        if (keep) {
+          left -= 1;
+        }
+      };
       const callId = (part: object) => {
         const { id, toolCallId } = part as { id?: string; toolCallId?: string };
         return toolCallId ?? id;
@@ -160,19 +198,22 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
             transform: (part, controller) => {
               assertAllowedStreamPart(part, allowedCalls);
               if (
+                part.type === "tool-input-start" ||
+                part.type === "tool-call"
+              ) {
+                admit(String(callId(part)), part.toolName);
+              }
+              if (
                 part.type === "finish" &&
                 part.finishReason.unified === "tool-calls" &&
-                allowedCalls.size === 0
+                ![...admittedCalls.values()].includes(true)
               ) {
                 throw new Error(BLOCKED);
               }
               const id = part.type.startsWith("tool-")
                 ? callId(part)
                 : undefined;
-              if (
-                id !== undefined &&
-                [...allowedCalls].indexOf(String(id)) >= left
-              ) {
+              if (id !== undefined && admittedCalls.get(String(id)) === false) {
                 return;
               }
               controller.enqueue(part);

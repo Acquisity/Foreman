@@ -174,7 +174,7 @@ export async function readWidgetJobFailures(
     const covered = input.area ? [input.area] : [...AREAS];
     const caveats = [
       "Campaign sending problems are covered by widget_outreach_health.",
-      "Run and CSV-import step detail cannot be read here; say the failing step could not be checked, and hand off to a person only when that detail is what the answer needs.",
+      "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
       "inngestRunId is a saved reference only: on lead_scrape rows it is the stored run id, on ai_sdr rows it is an internal run record id and not a provider run id. Provisioning rows have none.",
     ];
     return {
