@@ -3,7 +3,11 @@ import { type TestContext, test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { type GateDeps, gate } from "./widget-egress.js";
 import { extractWidgetFindings } from "./widget-extract.js";
-import { finishWidgetRun, widgetRunResponse } from "./widget-investigation.js";
+import {
+  finishWidgetRun,
+  waitForWidgetInvestigation,
+  widgetRunResponse,
+} from "./widget-investigation.js";
 import { handoffEligible } from "./widget-next-action.js";
 import type { WidgetRun } from "./widget-run-store.js";
 
@@ -275,42 +279,75 @@ test("a post-tool clarify question is delivered without structuring or composing
     stream_index: 0,
   };
   const reviewed: string[] = [];
-  const finishWith = (text: string, judge: GateDeps["judge"]) =>
-    finishWidgetRun(
-      run,
-      "s",
-      { findings: null, status: "completed", text },
+  // The shape the run actually has: the question as the ask tool's own result in
+  // the event stream, then whatever prose the investigator closed with. Run
+  // 367e7ca2 showed that prose cannot be relied on, so it is deliberately not a
+  // tidy marker line here, and it must not matter.
+  const finishWith = async (question: string, judge: GateDeps["judge"]) => {
+    const events = [
+      { data: {}, type: "turn.started" },
       {
-        claimFinish: () => Promise.resolve(true),
-        complete: (_id, outcome, stored) => {
-          run.outcome = outcome;
-          run.findings = stored;
-          return Promise.resolve(run);
+        data: {
+          result: {
+            callId: "c",
+            kind: "tool-result",
+            output: { asked: question },
+            toolName: "widget_ask_customer",
+          },
         },
-        extract: () => assert.fail("a question is not structured by a model"),
-        gate: (gateScope, question, findings, deps, conversation) =>
-          gate(
-            gateScope,
-            question,
-            findings,
-            {
-              compose: deps?.compose ?? gateDeps.compose,
-              judge,
-              resolve: gateDeps.resolve,
+        type: "action.result",
+      },
+      {
+        data: {
+          message:
+            "I looked at the campaigns and several are paused.\n\nI have asked the customer which one they mean. Buy another domain.",
+        },
+        type: "message.completed",
+      },
+      { data: {}, type: "session.completed" },
+    ];
+    const waited = await waitForWidgetInvestigation({
+      getEventStream: () =>
+        Promise.resolve(
+          new ReadableStream({
+            start(controller) {
+              for (const item of events) {
+                controller.enqueue(item);
+              }
+              controller.close();
             },
-            conversation
-          ),
-        history: () => Promise.resolve([]),
-      }
-    );
+          })
+        ),
+    } as never);
+    assert.equal(waited.status === "completed" && waited.asked, question);
+    return finishWidgetRun(run, "s", waited, {
+      claimFinish: () => Promise.resolve(true),
+      complete: (_id, outcome, stored) => {
+        run.outcome = outcome;
+        run.findings = stored;
+        return Promise.resolve(run);
+      },
+      extract: () => assert.fail("a question is not structured by a model"),
+      gate: (gateScope, customerQuestion, findings, deps, conversation) =>
+        gate(
+          gateScope,
+          customerQuestion,
+          findings,
+          {
+            compose: deps?.compose ?? gateDeps.compose,
+            judge,
+            resolve: gateDeps.resolve,
+          },
+          conversation
+        ),
+      history: () => Promise.resolve([]),
+    });
+  };
   const asked = "Which campaign do you mean, Spring Promo or Autumn Promo?";
-  const finished = await finishWith(
-    `QUESTION FOR CUSTOMER: ${asked}`,
-    (input) => {
-      reviewed.push(input.items.map((item) => item.text).join("|"));
-      return Promise.resolve({ decision: "allow", reason: "in scope" });
-    }
-  );
+  const finished = await finishWith(asked, (input) => {
+    reviewed.push(input.items.map((item) => item.text).join("|"));
+    return Promise.resolve({ decision: "allow", reason: "in scope" });
+  });
   assert.ok(finished);
   const response = widgetRunResponse(finished);
   assert.equal(acquisityHandsOff(response), false);
@@ -321,7 +358,7 @@ test("a post-tool clarify question is delivered without structuring or composing
   // 8788da8 re-emitted the text as written: the reviewer deleted the first
   // sentence and the customer still got both.
   const partly = await finishWith(
-    "QUESTION FOR CUSTOMER: Buy another domain. Which campaign do you mean?",
+    "Buy another domain. Which campaign do you mean?",
     (input) =>
       Promise.resolve({
         decision: "rewrite",
@@ -338,7 +375,7 @@ test("a post-tool clarify question is delivered without structuring or composing
 
   // If the reviewer deletes the question itself, the leftover statement is not sent.
   const noQuestion = await finishWith(
-    "QUESTION FOR CUSTOMER: Buy another domain. Which campaign do you mean?",
+    "Buy another domain. Which campaign do you mean?",
     (input) =>
       Promise.resolve({
         decision: "rewrite",
@@ -354,7 +391,7 @@ test("a post-tool clarify question is delivered without structuring or composing
   assert.equal(dropped.message, null);
 
   // The reviewer can still stop it, and then nothing reaches the customer.
-  const blocked = await finishWith(`QUESTION FOR CUSTOMER: ${asked}`, () =>
+  const blocked = await finishWith(asked, () =>
     Promise.resolve({ decision: "block", reason: "foreign data" })
   );
   assert.ok(blocked);
@@ -374,6 +411,28 @@ test("a write-up that is more than the one question takes the ordinary path", as
     },
     question: "Why did my campaign stop?",
   });
+  assert.ok("message" in response);
+  assert.equal(
+    (response.message ?? "").includes("Two campaigns are paused."),
+    true
+  );
+});
+
+test("with the pilot flag off a recorded question is ignored and the write-up takes the ordinary path", async (t) => {
+  const { response } = await finish(
+    t,
+    {
+      eligible: 0,
+      extracted: {
+        facts: [{ claim: "Two campaigns are paused." }],
+        needsHuman: false,
+        recommendation: "Which campaign do you mean?",
+        report: "Asked which campaign.",
+      },
+      question: "Why did my campaign stop?",
+    },
+    ""
+  );
   assert.ok("message" in response);
   assert.equal(
     (response.message ?? "").includes("Two campaigns are paused."),

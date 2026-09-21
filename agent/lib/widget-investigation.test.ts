@@ -1621,3 +1621,51 @@ test("with no previous reply in the supplied history there is nothing to explain
   );
   assert.equal(sends.length, 1);
 });
+
+// Run 02be7213: the explain writer timed out at 12s, the null was read as "needs
+// a lookup", and a 135s investigation answered a question that needed none.
+test("an explain writer that fails technically is retried once and then asks for a resend: never an investigation, never a handoff", async (t) => {
+  enabled(t);
+  const ask = (failures: number) => {
+    const { deps, run } = dependencies();
+    deps.route = explainRoute(0.92);
+    let calls = 0;
+    deps.answerChat = (_message, _log, _system, strict) => {
+      calls += 1;
+      assert.equal(strict, true);
+      return calls <= failures
+        ? Promise.reject(new DOMException("aborted", "TimeoutError"))
+        : Promise.resolve({
+            citations: [],
+            message: "Only none were recorded.",
+          });
+    };
+    return receiveWidgetMessage(
+      request({
+        ...start,
+        history: generationHistory,
+        message_id: `8888888${failures}-8888-4888-8888-888888888888`,
+        question: "Does that mean none happened, or just none were recorded?",
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    ).then(async (response) => ({
+      body: await response.json(),
+      calls: () => calls,
+      run,
+    }));
+  };
+  const recovered = await ask(1);
+  assert.equal(recovered.calls(), 2);
+  assert.equal(recovered.run.outcome?.reason, "explain");
+  assert.equal(recovered.body.message, "Only none were recorded.");
+
+  const down = await ask(2);
+  assert.equal(down.calls(), 2);
+  assert.equal(down.run.outcome?.reason, "explain_unavailable");
+  // The app asks the customer to send it again instead of handing the thread over.
+  assert.equal(down.body.retry, true);
+  assert.equal(down.body.findings ?? null, null);
+});

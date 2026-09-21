@@ -31,14 +31,38 @@ const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",
 ]);
-const CLARIFY_LINE = "QUESTION FOR CUSTOMER:";
-const CLARIFY_REPLY = /^QUESTION FOR CUSTOMER:[ \t]*([^\n]{8,400}\?)\s*$/u;
+export const ASK_TOOL = "widget_ask_customer";
+export const ASK_TOOL_QUESTION = z
+  .string()
+  .trim()
+  .min(8)
+  .max(400)
+  .refine((text) => text.endsWith("?"), "Must be a question.");
+const askOutput = z.object({ asked: ASK_TOOL_QUESTION });
+
 /**
- * The whole write-up was the one question a clarify decision asked for, so there
- * is no report to structure or compose. Anything else is an ordinary write-up.
+ * The question a clarify decision recorded, read from the tool's own result the
+ * way a filed ticket is. A marked line in the closing prose was tried first and
+ * missed live (run 367e7ca2: the slow path ran after a clarify), because it
+ * depended on how the investigator formatted its last message.
  */
-export const clarifyQuestion = (text: string | null | undefined) =>
-  CLARIFY_REPLY.exec(text?.trim() ?? "")?.[1] ?? null;
+export function askedResult(result: unknown): string | null {
+  const action = result as {
+    isError?: boolean;
+    kind?: string;
+    output?: unknown;
+    toolName?: string;
+  } | null;
+  if (
+    action?.kind !== "tool-result" ||
+    action.isError ||
+    action.toolName !== ASK_TOOL
+  ) {
+    return null;
+  }
+  const parsed = askOutput.safeParse(action.output);
+  return parsed.success ? parsed.data.asked : null;
+}
 
 const ELIGIBLE_INSTRUCTIONS =
   "The customer explicitly asked to talk to a person, or the state shows a concrete billing dispute that a person must reconcile, such as a suspected duplicate charge, a charge that may belong to another workspace, or a charged order whose payment or delivery the customer is disputing. Missing data, a failed read, an ambiguous record, conflicting or old records, or a billing difference the customer did not raise is NOT this.";
@@ -64,7 +88,9 @@ const DISCIPLINE =
 const ARTICLES =
   "Only the help-center tools remain. If the recommendation will tell the customer to take a step in the product and no article read in this conversation covers that step, search and read the article first and base the step on it; if none covers it, give no step. A plain account check needs no article.";
 const NOTES = {
-  clarify: `Stop. One detail from the customer is needed before anything more can be checked. Reply with exactly one line and nothing else: "${CLARIFY_LINE} " followed by the one short, friendly question that gets the single detail identifying what they mean. State no facts and make no promises in it, name no tool or system, and ask for no file or screenshot.`,
+  asked:
+    "The question for the customer is recorded and will be sent. Reply with the single word: asked.",
+  clarify: `Stop. One detail from the customer is needed before anything more can be checked. Call ${ASK_TOOL} with the one short, friendly question that gets the single detail identifying what they mean.`,
   finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
   human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
@@ -146,8 +172,9 @@ export function turnEvidence(prompt: Params["prompt"]) {
         )
       : [];
   const gathering = (tool: string) =>
-    tool !== TICKET_TOOL && !ARTICLE_TOOLS.has(tool);
+    tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
   return {
+    asked: lastCalls.includes(ASK_TOOL),
     atToolResult: start >= 0 && prompt.at(-1)?.role === "tool",
     // Jev never picks an article or the ticket tool, so once workspace reads
     // exist, a batch made only of those can only have come from a finish. The
@@ -352,13 +379,48 @@ const outcomeOf = (decision: string, detail: string) => {
   if (decision === "fallback") {
     return "fallback";
   }
-  return detail === "reason=already_finished" ? "rule" : "jev";
+  return detail === "reason=already_finished" ||
+    detail === "reason=question_recorded"
+    ? "rule"
+    : "jev";
 };
 
 interface Plan {
   original: Params;
   reads: Read[];
   tool: string;
+}
+
+type FunctionTool = NonNullable<Params["tools"]>[number];
+
+/** A read forces its tool; a clarify forces the ask tool. Anything else forces nothing. */
+function forcedParams(
+  params: Params,
+  next: NextAction,
+  askTool: FunctionTool | undefined
+): { params: Params; tool: string } | null {
+  if (next.action === "read") {
+    return {
+      params: {
+        ...params,
+        toolChoice: { toolName: next.tool, type: "tool" },
+        tools: params.tools?.filter((tool) => tool.name === next.tool),
+      },
+      tool: next.tool,
+    };
+  }
+  if (next.action !== "clarify" || !askTool) {
+    return null;
+  }
+  return {
+    params: {
+      ...params,
+      prompt: [...params.prompt, note(NOTES.clarify)],
+      toolChoice: { toolName: ASK_TOOL, type: "tool" },
+      tools: [askTool],
+    },
+    tool: ASK_TOOL,
+  };
 }
 
 /**
@@ -396,26 +458,43 @@ export function widgetNextActionMiddleware(
     // center stays readable unless the run is going to a person.
     tools: params.tools?.filter((tool) =>
       tool.name === TICKET_TOOL
-        ? action !== "clarify" &&
+        ? (action === "finish" || action === "human") &&
           !reads.some((read) => read.tool === TICKET_TOOL)
         : action === "finish" && ARTICLE_TOOLS.has(tool.name)
     ),
   });
   return {
     specificationVersion: "v4",
-    async transformParams({ params }) {
+    async transformParams({ params: incoming }) {
+      // The ask tool is the selector's alone: the investigator is only ever
+      // offered it, forced, on a clarify decision.
+      const askTool = incoming.tools?.find((tool) => tool.name === ASK_TOOL);
+      const params: Params = {
+        ...incoming,
+        tools: incoming.tools?.filter((tool) => tool.name !== ASK_TOOL),
+      };
       const tools = (params.tools ?? []).flatMap((tool) =>
         tool.type === "function" &&
         tool.name !== TICKET_TOOL &&
+        tool.name !== ASK_TOOL &&
         !ARTICLE_TOOLS.has(tool.name)
           ? [{ description: tool.description ?? "", name: tool.name }]
           : []
       );
-      const { atToolResult, finishing, question, reads } = turnEvidence(
+      const { asked, atToolResult, finishing, question, reads } = turnEvidence(
         params.prompt
       );
       if (!atToolResult || tools.length === 0) {
         return params;
+      }
+      if (asked) {
+        // The question is already recorded as data; nothing is left to write.
+        log(
+          "clarify",
+          { ms: 0, step: reads.length },
+          "reason=question_recorded"
+        );
+        return finishParams(params, reads, "asked");
       }
       if (finishing) {
         // Grounding a step in an article must not reopen the workspace investigation.
@@ -433,18 +512,21 @@ export function widgetNextActionMiddleware(
           { ...opts, signal: params.abortSignal }
         );
         const confidence = `confidence=${next.confidence.toFixed(2)}`;
-        if (next.action !== "read") {
-          log(next.action, fields(), confidence);
-          return finishParams(params, reads, next.action);
+        const forced = forcedParams(params, next, askTool);
+        log(next.action, { ...fields(), tool: forced?.tool }, confidence);
+        if (!forced) {
+          return finishParams(
+            params,
+            reads,
+            next.action === "read" ? "finish" : next.action
+          );
         }
-        log("read", { ...fields(), tool: next.tool }, confidence);
-        const forced: Params = {
-          ...params,
-          toolChoice: { toolName: next.tool, type: "tool" },
-          tools: params.tools?.filter((tool) => tool.name === next.tool),
-        };
-        plans.set(forced, { original: params, reads, tool: next.tool });
-        return forced;
+        plans.set(forced.params, {
+          original: params,
+          reads,
+          tool: forced.tool,
+        });
+        return forced.params;
       } catch (error) {
         if (params.abortSignal?.aborted) {
           throw error;

@@ -23,7 +23,7 @@ import {
   replyToChat,
 } from "./widget-kb.js";
 import {
-  clarifyQuestion,
+  askedResult,
   handoffEligible,
   nextActionEnabled,
 } from "./widget-next-action.js";
@@ -144,6 +144,8 @@ export type WaitOutcome =
   | { status: "pending" }
   | { status: "failed" }
   | {
+      /** The question widget_ask_customer recorded during this turn, if a clarify decision ran. */
+      asked?: string;
       findings: WidgetFindings | null;
       status: "completed";
       text: string | null;
@@ -199,6 +201,20 @@ const withFiledTicket = (
 ): WidgetFindings | null =>
   findings && ticket ? { ...findings, ticket } : findings;
 
+interface Recorded {
+  asked: string | null;
+  ticket: FiledTicket | null;
+}
+/** What the turn's own tool results recorded: a filed ticket, a question for the customer. */
+const recorded = (result: unknown, so: Recorded): Recorded => ({
+  asked: askedResult(result) ?? so.asked,
+  ticket: filedTicketResult(result) ?? so.ticket,
+});
+const completed = (
+  asked: string | null,
+  outcome: Extract<WaitOutcome, { status: "completed" }>
+): WaitOutcome => (asked ? { ...outcome, asked } : outcome);
+
 /**
  * Task completion owns the answer. The structured result is the findings
  * channel; the last assistant message is kept as a fallback so a finish that
@@ -217,6 +233,7 @@ export async function waitForWidgetInvestigation(
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
   let ticket: FiledTicket | null = null;
+  let asked: string | null = null;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -228,14 +245,20 @@ export async function waitForWidgetInvestigation(
         findings = null;
         text = null;
         ticket = null;
+        asked = null;
       } else if (event.type === "action.result") {
-        ticket = filedTicketResult(event.data.result) ?? ticket;
+        ({ asked, ticket } = recorded(event.data.result, { asked, ticket }));
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return { findings, status: "completed", text, ticket };
+        return completed(asked, {
+          findings,
+          status: "completed",
+          text,
+          ticket,
+        });
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -282,7 +305,7 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
 // send the message again instead of promising a teammate. The reason itself can
 // name an identifier, so only this flag crosses to the app.
 const RETRYABLE_BLOCK =
-  /^(?:deadline$|gate_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
+  /^(?:deadline$|gate_unavailable$|explain_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
@@ -471,7 +494,7 @@ async function structureWriteUp(
   deps: Pick<WidgetDependencies, "extract"> &
     Partial<Pick<WidgetDependencies, "handoffEligible">>
 ) {
-  const asked = nextActionEnabled() ? clarifyQuestion(outcome.text) : null;
+  const asked = nextActionEnabled() ? outcome.asked : null;
   if (asked) {
     return {
       // What is delivered is what the reviewer left, never the text as written:
@@ -704,6 +727,66 @@ async function clarifyReply(
     : null;
 }
 
+const EXPLAIN_ATTEMPTS = 2;
+
+/**
+ * Explain the previous reply from its own words. Three outcomes, kept apart:
+ * answered; the writer returned nothing because the message needs something the
+ * earlier turns do not hold, which is the only one that goes on to an
+ * investigation (null); and the writer failing technically. Run 02be7213 timed
+ * out at 12s, fell through, and cost the customer a 135s investigation of a
+ * question that needed none. A timeout says nothing about the question, so it is
+ * tried once more and then the customer is asked to send the message again.
+ */
+async function explainPrevious(
+  run: WidgetRun,
+  ask: WidgetAsk,
+  ids: { conversationId: string; runId: string },
+  deps: Pick<WidgetDependencies, "answerChat" | "complete">
+): Promise<WidgetRun | null> {
+  const log = (decision: string, attempts: number) =>
+    logOpsEvent("widget.explain", {
+      ...ids,
+      decision,
+      message: `attempts=${attempts}`,
+    });
+  for (let attempt = 1; attempt <= EXPLAIN_ATTEMPTS; attempt += 1) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: the second try only follows a failed first.
+      const reply = await deps.answerChat(
+        renderAsk(ask, DECISION_CONTEXT),
+        ids,
+        EXPLAIN_PROMPT,
+        true
+      );
+      log(reply ? "answered" : "needs_lookup", attempt);
+      return reply
+        ? deps.complete(
+            run.id,
+            {
+              citations: [],
+              decision: "allow",
+              message: reply.message,
+              reason: "explain",
+              status: "completed",
+            },
+            null,
+            run.id
+          )
+        : null;
+    } catch {
+      // Tried again below, or reported once the attempts run out.
+    }
+  }
+  log("unavailable", EXPLAIN_ATTEMPTS);
+  return deps.complete(
+    run.id,
+    blockedOutcome("explain_unavailable", "completed"),
+    null,
+    run.id
+  );
+}
+
 /**
  * Front door: an ask for a person hands off at once, and a general product
  * question is answered from the help center, both without starting an
@@ -768,22 +851,9 @@ async function answerFromKnowledgeBase(
     (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
     ask.turns?.some((turn) => turn.role === "assistant")
   ) {
-    const reply = await deps
-      .answerChat(renderAsk(ask, DECISION_CONTEXT), ids, EXPLAIN_PROMPT)
-      .catch(() => null);
-    if (reply) {
-      return deps.complete(
-        run.id,
-        {
-          citations: [],
-          decision: "allow",
-          message: reply.message,
-          reason: "explain",
-          status: "completed",
-        },
-        null,
-        run.id
-      );
+    const explained = await explainPrevious(run, ask, ids, deps);
+    if (explained) {
+      return explained;
     }
   }
   // Nothing to look up yet: ask what they mean instead of spending minutes on

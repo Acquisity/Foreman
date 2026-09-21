@@ -378,17 +378,54 @@ describe("widget next-action selector", () => {
     );
   });
 
-  it("clarify removes every tool and asks for the one question as a single marked line", async () => {
-    const { model, sent } = harness(jev("clarify"));
+  it("clarify forces the ask tool, which the investigator is never offered otherwise, and the recorded question ends the turn without Jev", async () => {
+    const ASK = {
+      description: "Record the question",
+      inputSchema: { type: "object" as const },
+      name: "widget_ask_customer",
+      type: "function" as const,
+    };
+    const seen: { state?: string }[] = [];
+    const { model, sent } = harness(
+      jev("clarify", 0, seen),
+      call("widget_ask_customer", { question: "Which campaign do you mean?" })
+    );
+    const reads = [
+      { input: {}, output: campaigns, tool: "widget_outreach_health" },
+    ];
+    await model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", reads),
+      tools: [...TOOLS, ASK],
+    });
+    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().toolChoice, {
+      toolName: "widget_ask_customer",
+      type: "tool",
+    });
+    assert.equal(
+      JSON.stringify(seen[0]).includes("widget_ask_customer"),
+      false
+    );
     await model.doGenerate({
       prompt: prompt("Why did my campaign stop?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        ...reads,
+        {
+          input: { question: "Which campaign do you mean?" },
+          output: { asked: "Which campaign do you mean?" },
+          tool: "widget_ask_customer",
+        },
       ]),
-      tools: TOOLS,
+      tools: [...TOOLS, ASK],
     });
-    // A question needs no article and no ticket, and is asked as one marked line.
-    assert.deepEqual(sent().tools, []);
-    assert.equal(sent().note.includes("QUESTION FOR CUSTOMER:"), true);
+    assert.equal(seen.length, 1);
+    assert.deepEqual(sent(1).tools, []);
+    // A read or a fallback step never exposes it.
+    const other = harness(() => Promise.reject(new Error("down")));
+    await other.model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", reads),
+      tools: [...TOOLS, ASK],
+    });
+    assert.equal(other.sent().tools.includes("widget_ask_customer"), false);
   });
 
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {

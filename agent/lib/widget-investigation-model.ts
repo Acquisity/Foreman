@@ -19,6 +19,8 @@ import {
  */
 const ALLOWED_TOOLS = new Set([
   "widget_account_access",
+  // Registered only while the next-action pilot is on, and offered only by its selector.
+  "widget_ask_customer",
   "widget_billing_summary",
   "widget_file_ticket",
   "widget_generation_diagnostics",

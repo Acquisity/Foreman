@@ -159,7 +159,9 @@ const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-ap
 export async function replyToChat(
   message: string,
   log: { conversationId: string; runId: string },
-  system: string = CHAT_PROMPT
+  system: string = CHAT_PROMPT,
+  /** Throw on a technical failure, so the caller can tell it from a reply the writer chose not to give. */
+  strict = false
 ): Promise<KbAnswer | null> {
   const startedAt = Date.now();
   try {
@@ -186,6 +188,9 @@ export async function replyToChat(
       message: `${error instanceof Error ? error.message.slice(0, 120) : "unknown"} direct ms=${Date.now() - startedAt}`,
       outcome: "error",
     });
+    if (strict) {
+      throw error;
+    }
     return null;
   }
 }
