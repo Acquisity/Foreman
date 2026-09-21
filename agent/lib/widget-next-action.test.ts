@@ -17,13 +17,16 @@ const TOOLS = [
   "widget_billing_summary",
   "widget_file_ticket",
   "widget_generation_diagnostics",
+  "widget_help_article",
   "widget_inbox_health",
   "widget_outreach_health",
   "widget_provisioning_status",
+  "widget_read_help_article",
   "widget_website_status",
   "web_fetch",
 ].map((name) => ({
-  description: `Reads ${name}`,
+  // Longer than the old 300-character cut, with the caveat at the very end.
+  description: `Reads ${name}. ${"x".repeat(400)} CANNOT_TIE_ORDER_TO_CHARGE`,
   inputSchema: { type: "object" as const },
   name,
   type: "function" as const,
@@ -149,6 +152,12 @@ const RE_8 = /not a reason for a person/;
 const RE_9 = /A person should take over/;
 const RE_10 = /Stop gathering/;
 
+const WRITE_UP_TOOLS = [
+  "widget_file_ticket",
+  "widget_help_article",
+  "widget_read_help_article",
+];
+
 const campaigns = {
   campaigns: [
     { name: "A", status: "paused" },
@@ -265,6 +274,51 @@ describe("widget next-action selector", () => {
     assert.doesNotMatch(body, RE_4);
   });
 
+  it("finish keeps the help center readable so a product step can rest on an article, and an article read is a normal next checkpoint", async () => {
+    const seen: { state?: string }[] = [];
+    const { model, sent } = harness(
+      jev("finish", 0, seen),
+      call("widget_read_help_article", { url: "https://help.example/launch" })
+    );
+    const first = await model.doGenerate({
+      prompt: prompt("How do I get campaign A sending again?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.deepEqual(sent().tools, WRITE_UP_TOOLS);
+    assert.equal(sent().toolChoice, undefined);
+    assert.equal(first.content[0]?.type, "tool-call");
+    await model.doGenerate({
+      prompt: prompt("How do I get campaign A sending again?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        {
+          input: { url: "https://help.example/launch" },
+          output: { text: "Open the campaign and choose Resume." },
+          tool: "widget_read_help_article",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(seen.length, 2);
+    assert.equal(JSON.stringify(seen[1]).includes("choose Resume"), true);
+  });
+
+  it("the selector reads each tool's whole description, caveats included", async () => {
+    const seen: { state?: string }[] = [];
+    const { model } = harness(jev("finish", 0, seen));
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", [
+        { input: {}, output: {}, tool: "widget_account_access" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(
+      JSON.stringify(seen[0]).includes("CANNOT_TIE_ORDER_TO_CHARGE"),
+      true
+    );
+  });
+
   it("clarify removes the evidence tools and asks for one detail without a handoff", async () => {
     const { model, sent } = harness(jev("clarify"));
     await model.doGenerate({
@@ -273,7 +327,7 @@ describe("widget next-action selector", () => {
       ]),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, ["widget_file_ticket"]);
+    assert.deepEqual(sent().tools, WRITE_UP_TOOLS);
     assert.match(sent().note, RE_5);
     assert.match(sent().note, RE_6);
   });
@@ -347,7 +401,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(base.doGenerateCalls.length, 2);
-    assert.deepEqual(sent(1).tools, ["widget_file_ticket"]);
+    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
     assert.match(sent(1).note, RE_10);
     assert.deepEqual(out.content, [{ text: "findings", type: "text" }]);
   });

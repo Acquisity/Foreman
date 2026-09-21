@@ -19,10 +19,18 @@ const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const SELECTOR_TIMEOUT_MS = 3000;
 const STATE_RESULT_CHARS = 48_000;
 const RESULT_CHARS = 3000;
-const DESCRIPTION_CHARS = 300;
+// The tools describe what they read, and what they cannot show, in 700 to 1,400
+// characters. A 300-character cut left Jev choosing reads from a first sentence.
+const DESCRIPTION_CHARS = 1500;
 /** Below this, a `human` pick was not an explicit ask or a billing dispute, and becomes `finish`. */
 const HANDOFF_ELIGIBLE = 0.5;
 const TICKET_TOOL = "widget_file_ticket";
+const ARTICLE_TOOLS = new Set([
+  "widget_help_article",
+  "widget_read_help_article",
+]);
+const ELIGIBLE_INSTRUCTIONS =
+  "The customer explicitly asked to talk to a person, or the state shows a concrete billing dispute that a person must reconcile, such as a suspected duplicate charge, a charge that may belong to another workspace, or a charged order whose payment or delivery the customer is disputing. Missing data, a failed read, an ambiguous record, conflicting or old records, or a billing difference the customer did not raise is NOT this.";
 
 /** Opt-in, and never on Production whatever the variable says. */
 export const nextActionEnabled = (env: NodeJS.ProcessEnv = process.env) =>
@@ -40,13 +48,14 @@ const FIXED_CRITERIA = {
     "Only when the customer explicitly asked for a person, or there is a concrete billing dispute that needs reconciling by a person, such as a suspected duplicate charge or a charge that may belong to another workspace.",
 } as const;
 
+const DISCIPLINE =
+  "Keep every claim, in the facts and the teammate report as much as the recommendation, to what a result recorded: an empty record means nothing was recorded there, not that nothing happened, and a charge belongs to an order only when a result ties them together. Never put a shell or build command in the findings.";
+const ARTICLES =
+  "Only the help-center tools remain. If the recommendation will tell the customer to take a step in the product and no article read in this conversation covers that step, search and read the article first and base the step on it; if none covers it, give no step. A plain account check needs no article.";
 const NOTES = {
-  clarify:
-    "Stop gathering evidence. Write your findings now with the facts verified so far. The recommendation asks the customer the single detail that identifies what they mean. A person does not need to take over.",
-  finish:
-    "Stop gathering evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. A source that was unavailable is a limitation to state, not a reason for a person to take over.",
-  human:
-    "Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this.",
+  clarify: `Stop gathering workspace evidence. Write your findings now with the facts verified so far. The recommendation asks the customer the single detail that identifies what they mean. A person does not need to take over. ${DISCIPLINE} ${ARTICLES}`,
+  finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
+  human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
 const note = (text: string) => ({
   content: [
@@ -154,6 +163,73 @@ export interface SelectorOptions {
   sessionId?: string;
 }
 
+async function askJev(
+  questions: object,
+  state: string,
+  apiKey: string,
+  opts: SelectorOptions & { signal?: AbortSignal }
+): Promise<unknown> {
+  const timeout = AbortSignal.timeout(SELECTOR_TIMEOUT_MS);
+  const response = await ((opts.fetch ?? fetch) as unknown as FetchLike)(
+    TYPESAFE_URL,
+    {
+      body: JSON.stringify({ model: "jev-latest", questions, state }),
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+      signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`http_${response.status}`);
+  }
+  return response.json();
+}
+
+const eligibleSchema = z.object({
+  answers: z.object({
+    handoff_eligible: z.object({ noul: z.number().min(0).max(1) }),
+  }),
+});
+
+/**
+ * The selector's finish is only a note to the investigator, and Acquisity hands
+ * the thread to a person whenever the final findings say a person is needed. So
+ * the same eligibility question is asked of the finished findings. Throws on any
+ * failure; the caller then leaves the findings as they are.
+ */
+export async function handoffEligible(
+  input: {
+    conversation: string;
+    findings: { facts: { claim: string }[]; recommendation: string };
+  },
+  opts: SelectorOptions = {}
+): Promise<boolean> {
+  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  if (!apiKey) {
+    throw new Error("no_key");
+  }
+  const { answers } = eligibleSchema.parse(
+    await askJev(
+      {
+        handoff_eligible: { instructions: ELIGIBLE_INSTRUCTIONS, type: "noul" },
+      },
+      JSON.stringify({
+        conversation: input.conversation.slice(0, 8000),
+        findings: {
+          facts: input.findings.facts.map((fact) => fact.claim),
+          recommendation: input.findings.recommendation,
+        },
+      }).slice(0, STATE_RESULT_CHARS),
+      apiKey,
+      opts
+    )
+  );
+  return answers.handoff_eligible.noul >= HANDOFF_ELIGIBLE;
+}
+
 /** One Jev request. Throws on a missing key, a timeout, a bad status or an answer that is not on the menu. */
 export async function selectNextAction(
   input: {
@@ -196,38 +272,21 @@ export async function selectNextAction(
     ),
     ...FIXED_CRITERIA,
   };
-  const timeout = AbortSignal.timeout(SELECTOR_TIMEOUT_MS);
-  const response = await ((opts.fetch ?? fetch) as unknown as FetchLike)(
-    TYPESAFE_URL,
-    {
-      body: JSON.stringify({
-        model: "jev-latest",
-        questions: {
-          action: {
-            criteria,
-            instructions: `${POLICY} Select the one next step.`,
-            type: "choice",
-          },
-          handoff_eligible: {
-            instructions:
-              "The customer explicitly asked to talk to a person, or the state shows a concrete billing dispute that a person must reconcile, such as a suspected duplicate charge or a charge that may belong to another workspace. Missing data, a failed read, an ambiguous record or an old billing difference the customer did not raise is NOT this.",
-            type: "noul",
-          },
+  const { answers } = responseSchema.parse(
+    await askJev(
+      {
+        action: {
+          criteria,
+          instructions: `${POLICY} Select the one next step.`,
+          type: "choice",
         },
-        state,
-      }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
+        handoff_eligible: { instructions: ELIGIBLE_INSTRUCTIONS, type: "noul" },
       },
-      method: "POST",
-      signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
-    }
+      state,
+      apiKey,
+      opts
+    )
   );
-  if (!response.ok) {
-    throw new Error(`http_${response.status}`);
-  }
-  const { answers } = responseSchema.parse(await response.json());
   const { choice, confidence = 0 } = answers.action;
   if (choice === "human") {
     return {
@@ -286,16 +345,18 @@ export function widgetNextActionMiddleware(
   const finishParams = (
     params: Params,
     reads: Read[],
-    text: string
+    action: keyof typeof NOTES
   ): Params => ({
     ...params,
-    prompt: [...params.prompt, note(text)],
+    prompt: [...params.prompt, note(NOTES[action])],
     toolChoice: undefined,
-    // A ticket is the investigator's call, not the selector's, and stays possible once.
-    tools: params.tools?.filter(
-      (tool) =>
-        tool.name === TICKET_TOOL &&
-        !reads.some((read) => read.tool === TICKET_TOOL)
+    // A ticket is the investigator's call, not the selector's, and stays possible
+    // once. Advice to act in the product has to rest on an article, so the help
+    // center stays readable unless the run is going to a person.
+    tools: params.tools?.filter((tool) =>
+      tool.name === TICKET_TOOL
+        ? !reads.some((read) => read.tool === TICKET_TOOL)
+        : action !== "human" && ARTICLE_TOOLS.has(tool.name)
     ),
   });
   return {
@@ -323,7 +384,7 @@ export function widgetNextActionMiddleware(
         const confidence = `confidence=${next.confidence.toFixed(2)}`;
         if (next.action !== "read") {
           log(next.action, fields(), confidence);
-          return finishParams(params, reads, NOTES[next.action]);
+          return finishParams(params, reads, next.action);
         }
         log("read", { ...fields(), tool: next.tool }, confidence);
         const forced: Params = {
@@ -374,7 +435,7 @@ export function widgetNextActionMiddleware(
       // The same read with the same arguments returns what is already known.
       log("fallback", step, "reason=repeated_read");
       return model.doGenerate(
-        finishParams(plan.original, plan.reads, NOTES.finish)
+        finishParams(plan.original, plan.reads, "finish")
       );
     },
   };

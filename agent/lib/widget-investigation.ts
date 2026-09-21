@@ -16,6 +16,7 @@ import {
   type KbAnswer,
   replyToChat,
 } from "./widget-kb.js";
+import { handoffEligible, nextActionEnabled } from "./widget-next-action.js";
 import {
   logRouteDecision,
   renderAsk,
@@ -258,6 +259,7 @@ export const defaultWidgetDependencies = {
   complete: completeWidgetRun,
   extract: extractWidgetFindings,
   gate: egressGate,
+  handoffEligible,
   history: recentWidgetTurns,
   latestScope: latestWidgetScope,
   read: readWidgetRun,
@@ -403,6 +405,40 @@ function humanHandoff(
     : null;
 }
 
+/**
+ * Preview pilot: a person is asked for only when the customer asked for one or
+ * billing needs reconciling. Acquisity hands off on needsHuman alone, so findings
+ * that ask for a person on other grounds (an unavailable source, conflicting or
+ * old records) keep every fact and caveat and go to the customer as an answer.
+ * Only this flag changes: the ownership scan, the reviewer and every block still
+ * run on what is left. If eligibility cannot be checked the findings stand.
+ */
+async function withEligibleHandoff(
+  findings: WidgetFindings | null,
+  conversation: string,
+  ids: { conversationId: string; runId: string; sessionId: string },
+  check: WidgetDependencies["handoffEligible"] | undefined
+): Promise<WidgetFindings | null> {
+  if (!(findings?.needsHuman && check && nextActionEnabled())) {
+    return findings;
+  }
+  const startedAt = Date.now();
+  const log = (decision: string) =>
+    logOpsEvent("widget.handoff.eligibility", {
+      ...ids,
+      decision,
+      message: `ms=${Date.now() - startedAt}`,
+    });
+  try {
+    const eligible = await check({ conversation, findings });
+    log(eligible ? "kept" : "cleared");
+    return eligible ? findings : { ...findings, needsHuman: false };
+  } catch {
+    log("fallback");
+    return findings;
+  }
+}
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<WidgetRun, "created_at" | "id" | "question" | "scope">,
@@ -411,7 +447,8 @@ export async function finishWidgetRun(
   deps: Pick<
     WidgetDependencies,
     "claimFinish" | "complete" | "extract" | "gate" | "history"
-  >
+  > &
+    Partial<Pick<WidgetDependencies, "handoffEligible">>
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
@@ -442,16 +479,21 @@ export async function finishWidgetRun(
       await deps.history(run).catch(() => [])
     );
     const extractStartedAt = Date.now();
-    const structured = withFiledTicket(
-      outcome.ticket,
-      outcome.findings ??
-        (outcome.text
-          ? await deps.extract({
-              investigatorText: outcome.text,
-              question: conversation,
-              scope: run.scope,
-            })
-          : null)
+    const structured = await withEligibleHandoff(
+      withFiledTicket(
+        outcome.ticket,
+        outcome.findings ??
+          (outcome.text
+            ? await deps.extract({
+                investigatorText: outcome.text,
+                question: conversation,
+                scope: run.scope,
+              })
+            : null)
+      ),
+      conversation,
+      { conversationId: run.scope.conversationId, runId: run.id, sessionId },
+      deps.handoffEligible
     );
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured

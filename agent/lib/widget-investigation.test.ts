@@ -92,6 +92,8 @@ function dependencies(gateResult: GateResult = allowed) {
       gated.push(raw);
       return Promise.resolve(gateResult);
     },
+    handoffEligible: () =>
+      assert.fail("eligibility is never checked with the pilot flag off"),
     history: () => Promise.resolve([]),
     latestScope: () => Promise.resolve(null),
     read: () => Promise.resolve(run),
