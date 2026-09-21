@@ -397,3 +397,128 @@ test("a succeeded charge with no active subscription status is flagged for recon
   assert.equal(result.reconciliation.chargedButNoActiveSubscription, true);
   assert.ok(result.reconciliation.notes.length > 0);
 });
+
+const ORDER_ID = "0b0e7c1a-1111-4222-8333-444455556666";
+const invoiceEvidenceDeps = () =>
+  fakeDeps({
+    getAutumnCustomer: () =>
+      Promise.resolve({
+        stripe_id: "cus_abc",
+        subscriptions: [
+          { id: "pro", status: "active" },
+          { id: `${ORDER_ID}-Acme-Mail.com`, status: "active" },
+          { id: `${ORDER_ID}-acme-mail.com-inboxes`, status: "active" },
+        ],
+      }),
+    getStripeCustomerBilling: () =>
+      Promise.resolve({
+        ...stripeFixture,
+        invoices: {
+          data: {
+            data: [
+              {
+                amount_due: 0,
+                amount_paid: 0,
+                created: 1_741_000_000,
+                ending_balance: 0,
+                id: "in_march",
+                lines: {
+                  data: [{ amount: 0, description: "1 × Pro", quantity: 1 }],
+                  has_more: false,
+                },
+                starting_balance: 0,
+                status: "paid",
+                total: 0,
+              },
+              {
+                amount_due: 3316,
+                amount_paid: 3316,
+                charge: "ch_june",
+                created: 1_749_000_000,
+                id: "in_june",
+                lines: {
+                  data: [
+                    { amount: 1516, description: "1 × Domain", quantity: 1 },
+                    { amount: 1800, description: "3 × DFY Inbox", quantity: 3 },
+                  ],
+                  has_more: true,
+                },
+                status: "paid",
+                status_transitions: { paid_at: 1_749_000_100 },
+                total: 3316,
+              },
+              { created: 1_749_100_000, id: "in_bare", status: "open" },
+            ],
+            has_more: true,
+            object: "list",
+          },
+        },
+      }),
+  });
+
+test("a paid invoice that collected nothing is never reported as money collected", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    invoiceEvidenceDeps()
+  );
+  widgetBillingSummaryOutputSchema.parse(result);
+  const [march, june, bare] = result.recentInvoices;
+  assert.equal(march?.settlement, "paid_without_money");
+  assert.deepEqual(
+    march?.lines?.map((line) => line.description),
+    ["1 × Pro"]
+  );
+  assert.equal(march?.customerBalanceAppliedCents, 0);
+  assert.equal(june?.settlement, "money_collected");
+  assert.equal(june?.chargeId, "ch_june");
+  assert.deepEqual(
+    june?.lines?.map((line) => [line.description, line.quantity]),
+    [
+      ["1 × Domain", 1],
+      ["3 × DFY Inbox", 3],
+    ]
+  );
+  assert.equal(june?.linesTruncated, true);
+  // Missing line items stay unknown instead of reading as an empty invoice.
+  assert.equal(bare?.lines, null);
+  assert.equal(bare?.settlement, "not_paid");
+  assert.equal(bare?.customerBalanceAppliedCents, null);
+  assert.deepEqual(result.truncated, [
+    "stripe.invoices: older rows exist beyond the ones shown",
+  ]);
+});
+
+test("order links come only from Acquisity's order-scoped subscription ids", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    invoiceEvidenceDeps()
+  );
+  assert.deepEqual(result.orderSubscriptions, {
+    available: true,
+    items: [
+      {
+        domain: "acme-mail.com",
+        kind: "domain",
+        orderId: ORDER_ID,
+        status: "active",
+      },
+      {
+        domain: "acme-mail.com",
+        kind: "inboxes",
+        orderId: ORDER_ID,
+        status: "active",
+      },
+    ],
+    truncated: false,
+  });
+  // No invoice carries an order id: attribution is never inferred.
+  assert.ok(!JSON.stringify(result.recentInvoices).includes(ORDER_ID));
+});
+
+test("order links are unavailable, not empty, when Autumn cannot be read", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({ getAutumnCustomer: () => Promise.reject(new Error("down")) })
+  );
+  assert.equal(result.orderSubscriptions.available, false);
+});

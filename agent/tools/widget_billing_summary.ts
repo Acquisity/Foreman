@@ -54,12 +54,62 @@ const chargeSummarySchema = z.object({
 });
 type ChargeSummary = z.infer<typeof chargeSummarySchema>;
 
+const MAX_INVOICE_LINES = 10;
+const MAX_DESCRIPTION_LENGTH = 200;
+const MAX_ORDER_SUBSCRIPTIONS = 50;
+
+const invoiceLineSchema = z.object({
+  amountCents: z.number().nullable(),
+  description: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  periodStart: z.string().nullable(),
+  proration: z.boolean().nullable(),
+  quantity: z.number().nullable(),
+});
+
 const invoiceSummarySchema = z.object({
   amountDueCents: z.number().nullable(),
   amountPaidCents: z.number().nullable(),
+  amountRemainingCents: z.number().nullable(),
+  billingReason: z.string().nullable(),
+  chargeId: z
+    .string()
+    .nullable()
+    .describe(
+      "Stripe charge this invoice names as its payment; matches an id in recentCharges. null means Stripe named none here, not that none exists"
+    ),
   createdAt: z.string().nullable(),
   currency: z.string().nullable(),
+  customerBalanceAppliedCents: z
+    .number()
+    .nullable()
+    .describe(
+      "Stripe customer credit balance this invoice consumed (ending minus starting balance); null when Stripe did not report both"
+    ),
+  discountCents: z.number().nullable(),
   id: z.string(),
+  lines: z
+    .array(invoiceLineSchema)
+    .max(MAX_INVOICE_LINES)
+    .nullable()
+    .describe(
+      "What the invoice billed for. null means Stripe returned no line items, never that the invoice was empty"
+    ),
+  linesTruncated: z.boolean(),
+  paidAt: z.string().nullable(),
+  settlement: z
+    .enum(["money_collected", "paid_without_money", "not_paid", "unknown"])
+    .describe(
+      "money_collected: paid and amountPaidCents is above zero. paid_without_money: Stripe marks it paid but collected nothing (zero total, discount, or credit). Neither proves which order an invoice paid for"
+    ),
+  status: z.string().nullable(),
+  totalCents: z.number().nullable(),
+});
+
+const orderSubscriptionSchema = z.object({
+  domain: z.string(),
+  kind: z.enum(["domain", "inboxes"]),
+  orderId: z.string(),
   status: z.string().nullable(),
 });
 
@@ -101,6 +151,15 @@ export const widgetBillingSummaryOutputSchema = z.object({
   credits: walletSchema.extend({ renewsAt: z.string().nullable() }).nullable(),
   discount: discountSummarySchema.nullable(),
   failedPayments: z.array(chargeSummarySchema),
+  orderSubscriptions: z
+    .object({
+      available: z.boolean(),
+      items: z.array(orderSubscriptionSchema).max(MAX_ORDER_SUBSCRIPTIONS),
+      truncated: z.boolean(),
+    })
+    .describe(
+      "Autumn subscriptions whose id Acquisity built as <orderId>-<domain> or <orderId>-<domain>-inboxes at checkout. Proves a billing subscription was created for that order and domain. It does not say which invoice or charge paid it, and orders from before this id format, partner orders, and orders covered by an existing entitlement never appear"
+    ),
   organization: z
     .object({
       id: z.string(),
@@ -123,6 +182,8 @@ export const widgetBillingSummaryOutputSchema = z.object({
     notes: z.array(z.string()),
   }),
   stripeSubscriptions: z.array(subscriptionSummarySchema),
+  /** Stripe lists that hit their page limit: older rows exist that are not shown. */
+  truncated: z.array(z.string()),
   /** Sections that could not be verified. Never read a matching empty array as zero. */
   unavailable: z.array(z.string()),
 });
@@ -149,14 +210,128 @@ const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => ({
   status: asText(row.status),
 });
 
-const toInvoiceSummary = (row: Record<string, unknown>) => ({
-  amountDueCents: asNumber(row.amount_due),
-  amountPaidCents: asNumber(row.amount_paid),
-  createdAt: asUnixIso(row.created),
-  currency: asText(row.currency),
-  id: asText(row.id) ?? "",
-  status: asText(row.status),
-});
+const stripeListHasMore = (section: StripeSection): boolean =>
+  asRow(section?.data).has_more === true;
+
+/** A Stripe reference is either the bare id or the expanded object. */
+const asStripeId = (value: unknown): string | null =>
+  asText(value) ?? asText(asRow(value).id);
+
+const toInvoiceLine = (
+  row: Record<string, unknown>
+): z.infer<typeof invoiceLineSchema> => {
+  const period = asRow(row.period);
+  return {
+    amountCents: asNumber(row.amount),
+    description:
+      asText(row.description)?.slice(0, MAX_DESCRIPTION_LENGTH) ?? null,
+    periodEnd: asUnixIso(period.end),
+    periodStart: asUnixIso(period.start),
+    proration: typeof row.proration === "boolean" ? row.proration : null,
+    quantity: asNumber(row.quantity),
+  };
+};
+
+const invoiceSettlement = (
+  status: string | null,
+  amountPaid: number | null
+): z.infer<typeof invoiceSummarySchema>["settlement"] => {
+  if (status === "paid") {
+    if (amountPaid === null) {
+      return "unknown";
+    }
+    return amountPaid > 0 ? "money_collected" : "paid_without_money";
+  }
+  return status === null ? "unknown" : "not_paid";
+};
+
+const toInvoiceSummary = (
+  row: Record<string, unknown>
+): z.infer<typeof invoiceSummarySchema> => {
+  const lineList = asRow(row.lines);
+  const lineRows = Array.isArray(lineList.data)
+    ? lineList.data.map(asRow)
+    : null;
+  const starting = asNumber(row.starting_balance);
+  const ending = asNumber(row.ending_balance);
+  const discounts = Array.isArray(row.total_discount_amounts)
+    ? row.total_discount_amounts
+    : null;
+  const status = asText(row.status);
+  const amountPaidCents = asNumber(row.amount_paid);
+  return {
+    amountDueCents: asNumber(row.amount_due),
+    amountPaidCents,
+    amountRemainingCents: asNumber(row.amount_remaining),
+    billingReason: asText(row.billing_reason),
+    chargeId: asStripeId(row.charge),
+    createdAt: asUnixIso(row.created),
+    currency: asText(row.currency),
+    customerBalanceAppliedCents:
+      starting !== null && ending !== null ? ending - starting : null,
+    discountCents:
+      discounts?.reduce(
+        (sum: number, entry) => sum + (asNumber(asRow(entry).amount) ?? 0),
+        0
+      ) ?? null,
+    id: asText(row.id) ?? "",
+    lines: lineRows?.slice(0, MAX_INVOICE_LINES).map(toInvoiceLine) ?? null,
+    linesTruncated:
+      lineList.has_more === true || (lineRows?.length ?? 0) > MAX_INVOICE_LINES,
+    paidAt: asUnixIso(asRow(row.status_transitions).paid_at),
+    settlement: invoiceSettlement(status, amountPaidCents),
+    status,
+    totalCents: asNumber(row.total),
+  };
+};
+
+// Acquisity's checkout names each DFY and pre-warmed subscription
+// `${orderId}-${domain}` plus an `-inboxes` twin (buildAutumnDomainSubscriptionId
+// in apps/web/lib/billing/providers/autumn/subscription-ids.ts). The order row
+// stores no invoice, charge or payment id, so this id is the only verifiable
+// order link. Dates, amounts and paidAt are never used to attribute a payment.
+const ORDER_SUBSCRIPTION_ID =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-(.{1,253}?)(-inboxes)?$/u;
+
+/** Autumn reports subscription ids under several keys depending on API version; read the ones Acquisity itself reads. */
+const toOrderSubscriptions = (
+  data: unknown
+): z.infer<typeof orderSubscriptionSchema>[] => {
+  const found = new Map<string, z.infer<typeof orderSubscriptionSchema>>();
+  const visit = (value: unknown, inheritedStatus: string | null) => {
+    const row = asRow(value);
+    const status = asText(row.status) ?? inheritedStatus;
+    const ids = [row.id, row.subscription_id]
+      .concat(Array.isArray(row.subscription_ids) ? row.subscription_ids : [])
+      .filter((id): id is string => typeof id === "string" && id.length <= 400);
+    for (const id of ids) {
+      const match = ORDER_SUBSCRIPTION_ID.exec(id.trim().toLowerCase());
+      if (match?.[1] && match[2] && !found.has(match[0])) {
+        found.set(match[0], {
+          domain: match[2],
+          kind: match[3] ? "inboxes" : "domain",
+          orderId: match[1],
+          status,
+        });
+      }
+    }
+    if (Array.isArray(row.subscriptions)) {
+      for (const nested of row.subscriptions) {
+        visit(nested, status);
+      }
+    }
+  };
+  const root = asRow(data);
+  for (const key of ["subscriptions", "products", "purchases"] as const) {
+    const list = root[key];
+    if (Array.isArray(list)) {
+      for (const entry of list) {
+        visit(entry, null);
+      }
+    }
+  }
+  return [...found.values()];
+};
 
 const toSubscriptionSummary = (row: Record<string, unknown>) => ({
   cancelAtPeriodEnd:
@@ -212,6 +387,7 @@ const EMPTY_SUMMARY: Omit<WidgetBillingSummary, "available" | "unavailable"> = {
   credits: null,
   discount: null,
   failedPayments: [],
+  orderSubscriptions: { available: false, items: [], truncated: false },
   organization: null,
   plan: null,
   recentCharges: [],
@@ -219,6 +395,7 @@ const EMPTY_SUMMARY: Omit<WidgetBillingSummary, "available" | "unavailable"> = {
   recentRefunds: [],
   reconciliation: { chargedButNoActiveSubscription: false, notes: [] },
   stripeSubscriptions: [],
+  truncated: [],
 };
 
 interface AutumnResolution {
@@ -375,6 +552,12 @@ export async function composeWidgetBillingSummary(
   const recentRefunds = charges.filter(
     (charge) => charge.refunded || (charge.amountRefundedCents ?? 0) > 0
   );
+  const truncated = (["charges", "invoices", "subscriptions"] as const)
+    .filter((name) => stripeListHasMore(stripe?.[name]))
+    .map((name) => `stripe.${name}: older rows exist beyond the ones shown`);
+  const orderSubscriptions = autumn.available
+    ? toOrderSubscriptions(autumn.data)
+    : [];
   const discount = toDiscountSummary(asRow(stripe?.customer?.data).discount);
 
   const dbWallet = account.billingAccount;
@@ -412,6 +595,11 @@ export async function composeWidgetBillingSummary(
     credits,
     discount,
     failedPayments,
+    orderSubscriptions: {
+      available: autumn.available,
+      items: orderSubscriptions.slice(0, MAX_ORDER_SUBSCRIPTIONS),
+      truncated: orderSubscriptions.length > MAX_ORDER_SUBSCRIPTIONS,
+    },
     organization: {
       id: account.organization.id,
       name: account.organization.name,
@@ -423,6 +611,7 @@ export async function composeWidgetBillingSummary(
     recentRefunds,
     reconciliation: { chargedButNoActiveSubscription, notes },
     stripeSubscriptions: subscriptions,
+    truncated,
     unavailable,
   };
 }
@@ -445,7 +634,7 @@ const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices, failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. Always reads the verified widget organization; it never accepts a customer id or organization id as input. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(_input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {
