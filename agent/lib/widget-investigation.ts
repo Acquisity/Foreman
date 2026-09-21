@@ -7,6 +7,7 @@ import { verifyWidgetContext } from "./widget-context.js";
 import {
   defaultGateDeps,
   gate as egressGate,
+  type GateDeps,
   logGateDecision,
 } from "./widget-egress.js";
 import { resolveOwnedIdentifiers } from "./widget-evidence.js";
@@ -456,6 +457,11 @@ const askedFindings = (asked: string) =>
     report: `Asked the customer: ${asked}`.slice(0, 1000),
   });
 
+const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
+  const left = findings.recommendation.trim();
+  return Promise.resolve(left.endsWith("?") ? left : "");
+};
+
 /** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
 async function structureWriteUp(
   run: Pick<WidgetRun, "id" | "scope">,
@@ -468,7 +474,13 @@ async function structureWriteUp(
   const asked = nextActionEnabled() ? clarifyQuestion(outcome.text) : null;
   if (asked) {
     return {
-      gateDeps: { ...defaultGateDeps, compose: () => Promise.resolve(asked) },
+      // What is delivered is what the reviewer left, never the text as written:
+      // "Buy another domain. Which campaign do you mean?" with the first sentence
+      // deleted must not come back whole. If no question survives, nothing is sent.
+      gateDeps: {
+        ...defaultGateDeps,
+        compose: survivingQuestion,
+      },
       structured: askedFindings(asked),
     };
   }

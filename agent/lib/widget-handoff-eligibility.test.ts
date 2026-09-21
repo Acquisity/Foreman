@@ -318,6 +318,41 @@ test("a post-tool clarify question is delivered without structuring or composing
   assert.equal(response.message, asked);
   assert.equal(reviewed[0].includes(asked), true);
 
+  // 8788da8 re-emitted the text as written: the reviewer deleted the first
+  // sentence and the customer still got both.
+  const partly = await finishWith(
+    "QUESTION FOR CUSTOMER: Buy another domain. Which campaign do you mean?",
+    (input) =>
+      Promise.resolve({
+        decision: "rewrite",
+        reason: "unsupported step",
+        remove: input.items
+          .filter((item) => item.text.includes("Buy another domain"))
+          .map((item) => item.n),
+      })
+  );
+  assert.ok(partly);
+  const trimmed = widgetRunResponse(partly);
+  assert.ok("message" in trimmed);
+  assert.equal(trimmed.message, "Which campaign do you mean?");
+
+  // If the reviewer deletes the question itself, the leftover statement is not sent.
+  const noQuestion = await finishWith(
+    "QUESTION FOR CUSTOMER: Buy another domain. Which campaign do you mean?",
+    (input) =>
+      Promise.resolve({
+        decision: "rewrite",
+        reason: "x",
+        remove: input.items
+          .filter((item) => item.text.includes("Which campaign"))
+          .map((item) => item.n),
+      })
+  );
+  assert.ok(noQuestion);
+  const dropped = widgetRunResponse(noQuestion);
+  assert.ok("message" in dropped);
+  assert.equal(dropped.message, null);
+
   // The reviewer can still stop it, and then nothing reaches the customer.
   const blocked = await finishWith(`QUESTION FOR CUSTOMER: ${asked}`, () =>
     Promise.resolve({ decision: "block", reason: "foreign data" })

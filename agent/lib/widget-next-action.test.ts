@@ -324,6 +324,26 @@ describe("widget next-action selector", () => {
     assert.deepEqual(sent().tools, ["widget_outreach_health"]);
   });
 
+  it("a tool that has already run is offered to Jev as a re-read with its own bar, for every tool alike", async () => {
+    const seen: {
+      questions?: { action?: { criteria?: Record<string, string> } };
+    }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    const criteria = seen[0].questions?.action?.criteria ?? {};
+    const lead = (tool: string) => criteria[tool].split(":")[0];
+    assert.notEqual(
+      lead("widget_outreach_health"),
+      lead("widget_inbox_health")
+    );
+    assert.equal(lead("widget_inbox_health"), lead("widget_billing_summary"));
+  });
+
   it("Jev is never offered an article or the ticket tool as a read", async () => {
     const seen: { questions?: { action?: { criteria?: object } } }[] = [];
     const { model } = harness(jev("finish", 0, seen as never));

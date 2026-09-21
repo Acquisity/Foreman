@@ -60,7 +60,7 @@ const FIXED_CRITERIA = {
 } as const;
 
 const DISCIPLINE =
-  "Keep every claim, in the facts and the teammate report as much as the recommendation, to what a result recorded: an empty record means nothing was recorded there, not that nothing happened, and a charge belongs to an order only when a result ties them together. No recorded problem is not the same as nothing being wrong: never write that nothing needs changing, that no action is needed or that everything is fine unless a live check in a result shows it, and say instead that no problem was recorded and what could not be checked. Never put a shell or build command in the findings.";
+  "Keep every claim, in the facts and the teammate report as much as the recommendation, to what a result recorded: an empty record means nothing was recorded there, not that nothing happened, and a charge belongs to an order only when a result ties them together. A result whose own status is ok or normal means the read worked, not that what it read is healthy. No recorded problem is not the same as nothing being wrong: never write that nothing needs changing, that no action is needed or that everything is fine unless a live check in a result shows it, and say instead that no problem was recorded and what could not be checked. Never put a shell or build command in the findings.";
 const ARTICLES =
   "Only the help-center tools remain. If the recommendation will tell the customer to take a step in the product and no article read in this conversation covers that step, search and read the article first and base the step on it; if none covers it, give no step. A plain account check needs no article.";
 const NOTES = {
@@ -295,7 +295,13 @@ export async function selectNextAction(
     ...Object.fromEntries(
       input.tools.map((tool) => [
         tool.name,
-        `Run this read next, with arguments it has not already been called with, because it can advance the customer's question: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
+        // Live 8788da8: three outreach reads at confidence 0.89, 0.38 and 0.28
+        // before a clarify. Counts read again cannot say which record is meant.
+        `${
+          input.reads.some((read) => read.tool === tool.name)
+            ? "This read has already run. Run it again only when different arguments would return something its earlier results did not, such as the next page or the one record the customer named. Running it again cannot settle which record the customer means when its results already listed several that fit"
+            : "Run this read next because it can advance the customer's question"
+        }: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
       ])
     ),
     ...FIXED_CRITERIA,
