@@ -6,9 +6,35 @@ The widget's logged `judge` time is the model review inside the egress gate. It 
 
 Set `WIDGET_REVIEWER=jev` in an isolated Preview to select JEV for every widget investigation that reaches model review. It uses the existing `TYPESAFE_API_KEY`. Unset preserves the current gate model. Direct Help Center answers use a separate path.
 
-One request classifies numbered claims and recommendations as keep, remove or block. Code derives the verdict and uses the existing deletion-only rewrite. Ownership scans before review and after composition, human-review flags, and the composer are unchanged.
+One request asks three separate questions about each numbered claim and recommendation sentence. Code derives the verdict and uses the existing deletion-only rewrite. Ownership scans before review and after composition, human-review flags, and the composer are unchanged.
 
-Missing credentials, request failures, malformed/missing answers and oversized input fail closed. An ownership-block answer or confidence below 0.8 blocks. That threshold is an experimental conservative setting, not a validated safety guarantee. JEV cannot verify facts against raw provider data it never receives.
+## Decision policy
+
+| Question | Choices |
+| --- | --- |
+| `own_N`: whose data is it | owned, foreign, unsure |
+| `item_N`: may the wording be shown | keep, remove |
+| `need_N`: what deleting it would do | material, dispensable |
+
+An answer counts only at 0.8 confidence or above. Per item, in order:
+
+1. Ownership is not confidently owned or confidently foreign: block (`ownership_uncertain`). Nothing else can override this.
+2. Confidently owned and confidently keep: shown unchanged.
+3. Otherwise the item cannot be shown as is: it is confidently foreign, a confident violation, or the wording verdict is uncertain. It is deleted only when it is confidently dispensable. If not, the whole answer blocks (`violation_not_removable` or `uncertain_not_removable`), so a caveat, an unresolved payment or delivery concern, or a handoff statement is never stripped to get an answer out.
+
+Uncertain wording therefore no longer counts as an ownership failure, but it is never shown and never deleted on doubt alone. The threshold was not lowered. After any rewrite, by either reviewer, a handoff whose facts were all deleted blocks as `needs_human` rather than answering from the recommendation alone; `needsHuman` itself always survives a rewrite.
+
+Missing credentials, request failures, oversized input, a missing or extra answer, and a choice that does not belong to its question all fail closed.
+
+Each review logs one `widget.review.items` line: the decision, the reason category in `code`, and for every item that was not a clean keep its number with the three choices and confidences (`14:owned.97/keep.62/dispensable.91`), deciding item first. It never contains item text or identifiers, and the ops log bounds its length.
+
+## Limitations
+
+- The 0.8 threshold is an experimental conservative setting, not a validated safety guarantee.
+- Materiality is JEV's own judgment. Deletion never rewords retained text, but whether the remaining items still read the same without the deleted one is not independently checked.
+- JEV cannot verify facts against raw provider data it never receives.
+- Three questions per item triples the request. Latency and agreement for this shape have not been measured live; the figures below are for the earlier one-question policy.
+- The provisioning false block (item 14, blanket uncertainty rule) motivated this policy. Whether the new policy delivers that answer is unverified until it is replayed live.
 
 ## Live evaluation, 2026-09-21
 

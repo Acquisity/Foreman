@@ -417,6 +417,25 @@ export const defaultGateDeps: GateDeps = {
   resolve: resolveOwnedIdentifiers,
 };
 
+const handoffOnly = (findings: WidgetFindings) =>
+  findings.needsHuman && findings.facts.length === 0;
+
+/**
+ * Apply the judge's deletions; a string is the reason they cannot be used. The
+ * same rule as before the review applies after it: a handoff with no facts left
+ * is not answered from the recommendation alone.
+ */
+function applyRewrite(
+  findings: WidgetFindings,
+  remove: number[]
+): WidgetFindings | string {
+  const rewritten = removeItems(findings, remove);
+  if (!rewritten) {
+    return "model_gate:invalid_rewrite";
+  }
+  return handoffOnly(rewritten) ? "needs_human" : rewritten;
+}
+
 const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
   decision: "block",
   findings,
@@ -501,7 +520,7 @@ export async function gate(
     // customer. When Foreman found concrete facts, it answers autonomously and
     // routes any teammate follow-up through needsWrite/the note. Only hand off
     // fully when there is nothing concrete to say (no facts at all).
-    if (findings.needsHuman && findings.facts.length === 0) {
+    if (handoffOnly(findings)) {
       return done(blocked(findings, "needs_human"));
     }
     const verdict = await timed("judge", () =>
@@ -517,9 +536,9 @@ export async function gate(
     }
     let gated = findings;
     if (verdict.decision === "rewrite") {
-      const rewritten = removeItems(findings, verdict.remove ?? []);
-      if (!rewritten) {
-        return done(blocked(findings, "model_gate:invalid_rewrite"));
+      const rewritten = applyRewrite(findings, verdict.remove ?? []);
+      if (typeof rewritten === "string") {
+        return done(blocked(findings, rewritten));
       }
       gated = rewritten;
       const again = await timed("scan", () =>
