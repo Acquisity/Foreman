@@ -33,6 +33,11 @@ const mock =
     assert.ok(init?.signal);
     return Promise.resolve(Response.json({ answers: reply }));
   };
+const FALLBACK_LOG = /^reviewer=fallback jev_ms=\d+ fallback_ms=\d+ 1:/u;
+const SOFT_CODE = /^(?:uncertain_not_removable|ownership_low_confidence):1$/u;
+const FAILED_LOG = / fallback_failed /u;
+const JEV_LOG =
+  /^reviewer=jev jev_ms=\d+ 2:owned\.99\/keep\.62\/dispensable\.91$/u;
 const answer = (choice: string, confidence = 0.99) => ({ choice, confidence });
 /** Every item owned, kept and material unless a test overrides one answer. */
 const answers = (overrides: Record<string, unknown> = {}, count = 2) => ({
@@ -126,7 +131,7 @@ test("decision policy separates wording doubt from ownership doubt", async () =>
     [
       { need_1: answer("dispensable"), own_1: answer("owned", 0.79) },
       "block",
-      "jev:ownership_uncertain:1",
+      "jev:ownership_low_confidence:1",
     ],
     [
       { need_1: answer("dispensable"), own_1: answer("foreign", 0.79) },
@@ -139,7 +144,13 @@ test("decision policy separates wording doubt from ownership doubt", async () =>
       "rewrite",
       "jev:remove_items:2",
     ],
-    [{ own_2: answer("foreign") }, "block", "jev:violation_not_removable:2"],
+    [{ own_2: answer("foreign") }, "block", "jev:foreign_not_removable:2"],
+    // An explicit ownership signal outranks an earlier item JEV is merely unsure of.
+    [
+      { item_1: answer("keep", 0.5), own_2: answer("unsure") },
+      "block",
+      "jev:ownership_uncertain:2",
+    ],
   ];
   for (const [overrides, decision, reason] of cases) {
     // biome-ignore lint/performance/noAwaitInLoops: a failure names its case.
@@ -215,6 +226,176 @@ test("an unreadable internal source is deleted only when the caveats stand witho
   }
 });
 
+// The live failures: valid answers JEV was unsure about (telemetry caveat at
+// remove 0.36, "no failed runs" at keep 0.75, a known-issue caveat at owned 0.71,
+// the unreadable run trace at remove 0.76 / dispensable 0.64), and unsafe advice
+// JEV was sure about but would not call dispensable.
+const withFallback = (
+  overrides: Record<string, unknown>,
+  fallback: NonNullable<Parameters<typeof reviewWidgetFindings>[1]>["fallback"],
+  lines: string[] = []
+) =>
+  reviewWidgetFindings(input, {
+    apiKey: "test",
+    fallback,
+    fetch: mock(answers(overrides)),
+    log: (line) => lines.push(line),
+  });
+const allow = () =>
+  Promise.resolve({ decision: "allow" as const, reason: "ok" });
+
+test("JEV doubt goes to the existing reviewer once; confident and explicit verdicts never do", async () => {
+  const soft = [
+    { item_1: answer("remove", 0.36), need_1: answer("material", 0.06) },
+    { item_1: answer("keep", 0.75), need_1: answer("material", 0.56) },
+    { own_1: answer("owned", 0.71) },
+    { item_1: answer("remove", 0.76), need_1: answer("dispensable", 0.64) },
+  ];
+  for (const overrides of soft) {
+    let calls = 0;
+    const lines: string[] = [];
+    // biome-ignore lint/performance/noAwaitInLoops: a failure names its case.
+    const result = await withFallback(
+      overrides,
+      (data, signal) => {
+        calls += 1;
+        assert.equal(data, input);
+        assert.equal(signal.aborted, false);
+        return allow();
+      },
+      lines
+    );
+    assert.equal(calls, 1);
+    assert.equal(result.decision, "allow");
+    const record = JSON.parse(lines[0] ?? "");
+    assert.match(record.message, FALLBACK_LOG);
+    assert.match(record.code, SOFT_CODE);
+    assert.equal(lines[0]?.includes("Payment"), false);
+  }
+  const never = () => assert.fail("fallback must not run");
+  for (const [overrides, reason] of [
+    [{}, "jev:all_items_kept"],
+    [
+      { item_2: answer("remove"), need_2: answer("dispensable") },
+      "jev:remove_items:2",
+    ],
+    [{ own_1: answer("unsure") }, "jev:ownership_uncertain:1"],
+    [{ own_1: answer("foreign", 0.45) }, "jev:ownership_uncertain:1"],
+    [{ own_1: answer("foreign") }, "jev:foreign_not_removable:1"],
+    // One explicit ownership signal stops the fallback for the whole answer.
+    [
+      { item_1: answer("keep", 0.5), own_2: answer("unsure") },
+      "jev:ownership_uncertain:2",
+    ],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: a failure names its case.
+    const result = await withFallback(overrides, never);
+    assert.equal(result.reason, reason);
+  }
+});
+
+test("the fallback can only add deletions, cannot keep a confident violation, and fails closed", async () => {
+  // JEV confidently deleted item 2 and was unsure of item 1; the fallback allows.
+  const merged = await withFallback(
+    {
+      item_1: answer("keep", 0.5),
+      item_2: answer("remove"),
+      need_2: answer("dispensable"),
+    },
+    allow
+  );
+  assert.deepEqual([merged.decision, merged.remove], ["rewrite", [2]]);
+  // Unsafe advice JEV is sure of but will not call dispensable ("Place a fresh order").
+  const violation = {
+    item_2: answer("remove", 1),
+    need_2: answer("dispensable", 0.5),
+  };
+  const removed = await withFallback(violation, () =>
+    Promise.resolve({ decision: "rewrite", reason: "repurchase", remove: [2] })
+  );
+  assert.deepEqual([removed.decision, removed.remove], ["rewrite", [2]]);
+  const kept = await withFallback(violation, allow);
+  assert.deepEqual(
+    [kept.decision, kept.reason],
+    ["block", "jev:fallback_kept_violation:2"]
+  );
+  const blocks = await withFallback({ item_1: answer("keep", 0.5) }, () =>
+    Promise.resolve({ decision: "block", reason: "foreign data" })
+  );
+  assert.equal(blocks.decision, "block");
+  const lines: string[] = [];
+  await assert.rejects(
+    withFallback(
+      { item_1: answer("keep", 0.5) },
+      () => Promise.reject(new Error("timeout")),
+      lines
+    )
+  );
+  assert.match(JSON.parse(lines[0] ?? "").message, FAILED_LOG);
+});
+
+test("a fallback failure blocks at the gate, and a fallback answer keeps caveats and the handoff", async () => {
+  const run = (fallback: Parameters<typeof withFallback>[1]) => {
+    let shown: string[] | undefined;
+    return gate(scope, input.question, overlap, {
+      compose: ({ findings: retained }) => {
+        shown = retained.facts.map((fact) => fact.claim);
+        assert.equal(retained.needsHuman, true);
+        return Promise.resolve("ok");
+      },
+      judge: (data) =>
+        reviewWidgetFindings(data, {
+          apiKey: "test",
+          fallback,
+          fetch: mock(
+            answers(
+              {
+                item_3: answer("remove", 0.76),
+                need_3: answer("dispensable", 0.64),
+              },
+              3
+            )
+          ),
+          log: () => undefined,
+        }),
+      resolve: async () => owned,
+    }).then((result) => ({ result, shown }));
+  };
+  const failed = await run(() => Promise.reject(new Error("down")));
+  assert.deepEqual(
+    [failed.result.decision, failed.result.reason, failed.shown],
+    ["block", "gate_unavailable", undefined]
+  );
+  assert.equal(failed.result.findings.needsHuman, true);
+  const answered = await run(() =>
+    Promise.resolve({ decision: "rewrite", reason: "internal", remove: [3] })
+  );
+  assert.equal(answered.result.decision, "rewrite");
+  assert.deepEqual(
+    answered.shown,
+    overlap.facts.slice(0, 2).map((fact) => fact.claim)
+  );
+});
+
+test("a list marker stays with its step instead of becoming a claim of its own", () => {
+  const items = redactableItems({
+    ...findings,
+    recommendation:
+      "Check your inboxes: 1. Open Email Accounts. 2. Filter by 'Has Errors'. 3) Click Reconnect. You have 5 accounts. Paid in 2026. Done.",
+  }).filter((item) => item.kind === "recommendation");
+  assert.deepEqual(
+    items.map((item) => item.text),
+    [
+      "Check your inboxes: 1. Open Email Accounts.",
+      "2. Filter by 'Has Errors'.",
+      "3) Click Reconnect.",
+      "You have 5 accounts.",
+      "Paid in 2026.",
+      "Done.",
+    ]
+  );
+});
+
 test("the review log carries verdicts and confidence, never customer text", async () => {
   const lines: string[] = [];
   await review(
@@ -224,9 +405,9 @@ test("the review log carries verdicts and confidence, never customer text", asyn
   assert.equal(lines.length, 1);
   const record = JSON.parse(lines[0] ?? "");
   assert.equal(record.event, "widget.review.items");
-  assert.equal(record.code, "remove_items");
+  assert.equal(record.code, "remove_items:2");
   assert.equal(record.decision, "rewrite");
-  assert.equal(record.message, "2:owned.99/keep.62/dispensable.91");
+  assert.match(record.message, JEV_LOG);
   for (const secret of ["Payment", "fresh order", scope.organizationId]) {
     assert.equal(lines[0]?.includes(secret), false);
   }

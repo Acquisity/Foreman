@@ -280,7 +280,10 @@ export interface RedactableItem {
 
 // A full stop ends a sentence only before whitespace, so a domain, an email or a
 // version number stays inside one item and can be removed with it.
-const SENTENCE = /(?:[^.!?\n]|[.!?](?=\S))+[.!?]*\s*/gu;
+// The same goes for the full stop of a list marker ("2. Filter by..."): a bare
+// "2." became its own item, was reviewed as a claim, and was deleted on its own.
+const SENTENCE =
+  /(?:[^.!?\n]|[.!?](?=\S)|(?<=(?:^|\s)\d{1,2})\.(?=\s+\S))+[.!?]*\s*/gu;
 const sentences = (text: string): string[] =>
   (text.match(SENTENCE) ?? []).filter((part) => part.trim());
 
@@ -375,6 +378,35 @@ const verdictSchema = z.object({
   remove: z.array(z.number().int()).max(60).optional(),
 });
 
+type JudgeInput = Parameters<GateDeps["judge"]>[0];
+
+/** The existing model reviewer; also the fallback for cases JEV is unsure about. */
+async function modelJudge(
+  { findings, items, question, scope }: JudgeInput,
+  abortSignal?: AbortSignal
+): ReturnType<GateDeps["judge"]> {
+  const model = await resolveModel("gate");
+  const { object } = await generateObject({
+    abortSignal,
+    model: gateway(model),
+    ...gatewayRouting(model),
+    prompt: JSON.stringify({
+      findings,
+      items,
+      question,
+      scope: {
+        organizationId: scope.organizationId,
+        organizationName: scope.organizationName,
+        organizationSlug: scope.organizationSlug,
+        userId: scope.userId,
+      },
+    }),
+    schema: verdictSchema,
+    system: JUDGE_PROMPT,
+  });
+  return object;
+}
+
 export const defaultGateDeps: GateDeps = {
   async compose({ findings, organizationName, question }) {
     const model = await resolveModel("gate");
@@ -390,30 +422,10 @@ export const defaultGateDeps: GateDeps = {
     });
     return text.trim();
   },
-  async judge({ findings, items, question, scope }) {
-    if (process.env.WIDGET_REVIEWER === "jev") {
-      return reviewWidgetFindings({ findings, items, question, scope });
-    }
-    const model = await resolveModel("gate");
-    const { object } = await generateObject({
-      model: gateway(model),
-      ...gatewayRouting(model),
-      prompt: JSON.stringify({
-        findings,
-        items,
-        question,
-        scope: {
-          organizationId: scope.organizationId,
-          organizationName: scope.organizationName,
-          organizationSlug: scope.organizationSlug,
-          userId: scope.userId,
-        },
-      }),
-      schema: verdictSchema,
-      system: JUDGE_PROMPT,
-    });
-    return object;
-  },
+  judge: (input) =>
+    process.env.WIDGET_REVIEWER === "jev"
+      ? reviewWidgetFindings(input, { fallback: modelJudge })
+      : modelJudge(input),
   resolve: resolveOwnedIdentifiers,
 };
 

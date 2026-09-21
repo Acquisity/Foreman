@@ -20,13 +20,36 @@ An answer counts only at 0.8 confidence or above. Per item, in order:
 
 1. Ownership is not confidently owned or confidently foreign: block (`ownership_uncertain`). Nothing else can override this.
 2. Confidently owned and confidently keep: shown unchanged.
-3. Otherwise the item cannot be shown as is: it is confidently foreign, a confident violation, or the wording verdict is uncertain. It is deleted only when it is confidently dispensable. If not, the whole answer blocks (`violation_not_removable` or `uncertain_not_removable`), so a caveat, an unresolved payment or delivery concern, or a handoff statement is never stripped to get an answer out.
+3. Otherwise the item cannot be shown as is: it is confidently foreign, a confident violation, or the wording verdict is uncertain. It is deleted only when it is confidently dispensable. If not, JEV does not decide it (`violation_not_removable` or `uncertain_not_removable`; see the fallback below), so a caveat, an unresolved payment or delivery concern, or a handoff statement is never stripped to get an answer out.
 
 Uncertain wording therefore no longer counts as an ownership failure, but it is never shown and never deleted on doubt alone. The threshold was not lowered. After any rewrite, by either reviewer, a handoff whose facts were all deleted blocks as `needs_human` rather than answering from the recommendation alone; `needsHuman` itself always survives a rewrite.
 
 Missing credentials, request failures, oversized input, a missing or extra answer, and a choice that does not belong to its question all fail closed.
 
 Each review logs one `widget.review.items` line: the decision, the reason category in `code`, and for every item that was not a clean keep its number with the three choices and confidences (`14:owned.97/keep.62/dispensable.91`), deciding item first. It never contains item text or identifiers, and the ops log bounds its length.
+
+## Fallback to the existing reviewer
+
+Live replays of `1a2e044` showed the remaining false blocks share one cause: a single item JEV is unsure about blocks a whole useful answer. The materiality question in particular is noisy (it gave "Place a fresh domain order" dispensable at 0.50 and a telemetry caveat material at 0.06), so four of five unsafe items blocked instead of being removed, and three valid answers blocked.
+
+JEV's `confidence` is not a probability. For a choice it is documented as `(n × top probability − 1) / (n − 1)`: 0.8 means a top probability of 0.90 on a two-option question and 0.87 on the three-option ownership question. The threshold is unchanged and still read from `confidence`.
+
+With `WIDGET_REVIEWER=jev`, JEV's blocks now fall in two groups:
+
+| JEV outcome | Handling |
+| --- | --- |
+| `ownership_uncertain` (chose unsure, or foreign below 0.8) | block, no fallback |
+| `foreign_not_removable` (confidently foreign, not confidently dispensable) | block, no fallback |
+| `ownership_low_confidence` (chose owned below 0.8) | fallback |
+| `uncertain_not_removable`, `violation_not_removable` | fallback |
+
+One hard block anywhere stops the fallback for the whole answer. Allow and rewrite verdicts keep JEV's fast path and never call the fallback.
+
+The fallback is the existing model reviewer, unchanged, called at most once with a 90 second abort deadline. It is today's production reviewer, so a fallback answer is never reviewed less strictly than without JEV. Its removals are added to the items JEV confidently deleted; it cannot restore one. If it keeps an item JEV confidently called a violation, the answer blocks (`fallback_kept_violation`). A failure or timeout throws into the gate's fail-closed path (`gate_unavailable`). Everything after the verdict is the same gate as before: deletion-only rewrite, the handoff rule, the rescan and the composed-text scan.
+
+The `widget.review.items` line now carries JEV's own outcome in `code`, the final decision in `decision`, and in `message` the reviewer that decided (`reviewer=jev` or `reviewer=fallback`), `jev_ms`, `fallback_ms`, `fallback_failed` when it threw, then the per-item choices and confidences.
+
+Numbered steps: the sentence splitter ended a sentence at a list marker, so "2." became its own item, was reviewed as a claim, and was deleted on its own in the inbox replay. A marker of one or two digits now stays with the step that follows it. This applies to both reviewers.
 
 ## Limitations that name an internal source
 
@@ -36,7 +59,7 @@ The rule now, at each stage: a limitation is kept for what it leaves unconfirmed
 
 - The investigator and the extractor word a limitation as what remains unknown about the workspace, never as the internal source that could not be read. The extractor is the existing rewording stage, so the caveat's meaning is preserved there and the reviewer stays deletion-only.
 - The reviewer policy treats an item that only reports an unreadable internal source as internal detail, and as dispensable only when other items already state what remains unconfirmed. A limitation that says what is unconfirmed stays even when it mentions the source.
-- The decision code and the 0.8 threshold are unchanged. If JEV is still unsure whether such an item is a needed caveat, the answer blocks and hands off with every fact. That block is intended: the code cannot tell a stripped caveat from a stripped aside.
+- The decision code and the 0.8 threshold are unchanged. If JEV is still unsure whether such an item is a needed caveat, the existing reviewer decides (see above); JEV alone never deletes it.
 
 ## Limitations
 

@@ -3,6 +3,8 @@ import { logOpsEvent, type OpsLogger } from "./ops-log.js";
 import type { GateDeps } from "./widget-egress.js";
 
 const REVIEW_TIMEOUT_MS = 10_000;
+// The existing reviewer has taken up to 90 seconds; the widget's own deadline is 170.
+const FALLBACK_TIMEOUT_MS = 90_000;
 const MAX_ITEMS = 60;
 const MAX_STATE_CHARS = 60_000;
 const MIN_CONFIDENCE = 0.8;
@@ -39,28 +41,40 @@ const CHOICES: Record<string, string[]> = {
 type Answer = z.infer<typeof answerSchema>;
 type ReviewInput = Parameters<GateDeps["judge"]>[0];
 type Verdict = Awaited<ReturnType<GateDeps["judge"]>>;
+type Fallback = (input: ReviewInput, signal: AbortSignal) => Promise<Verdict>;
 
 const sure = (answer: Answer, choice: string) =>
   answer.choice === choice && answer.confidence >= MIN_CONFIDENCE;
 
+// A hard block is JEV's explicit signal about whose data this is, and stays a
+// block. The rest are JEV being unsure, and may go to the fallback reviewer once.
+const HARD = new Set(["ownership_uncertain", "foreign_not_removable"]);
+
 /** Why one item cannot simply be shown or deleted, or undefined when it can. */
 function blockCategory(own: Answer, wording: Answer, need: Answer) {
-  if (!(sure(own, "owned") || sure(own, "foreign"))) {
+  if (own.choice !== "owned" && !sure(own, "foreign")) {
     return "ownership_uncertain";
+  }
+  if (!sure(own, own.choice)) {
+    return "ownership_low_confidence";
   }
   if (sure(need, "dispensable")) {
     return;
   }
   // Deleting it could strip a caveat or change what the rest claims.
-  return sure(wording, "remove") || sure(own, "foreign")
+  if (sure(own, "foreign")) {
+    return "foreign_not_removable";
+  }
+  return sure(wording, "remove")
     ? "violation_not_removable"
     : "uncertain_not_removable";
 }
 
 function decide(items: ReviewInput["items"], answers: Record<string, Answer>) {
   const remove: number[] = [];
+  const violations: number[] = [];
   const trace: string[] = [];
-  let block: { category: string; n: number } | undefined;
+  const blocks: { category: string; n: number }[] = [];
   for (const item of items) {
     const [own, wording, need] = ["own", "item", "need"].map(
       (key) => answers[`${key}_${item.n}`] as Answer
@@ -69,19 +83,26 @@ function decide(items: ReviewInput["items"], answers: Record<string, Answer>) {
       continue;
     }
     // Choices and confidences only: never the item's text or an identifier.
-    const entry = `${item.n}:${[own, wording, need]
-      .map((a) => `${a.choice}.${Math.round(a.confidence * 100)}`)
-      .join("/")}`;
+    trace.push(
+      `${item.n}:${[own, wording, need]
+        .map((a) => `${a.choice}.${Math.round(a.confidence * 100)}`)
+        .join("/")}`
+    );
     const category = blockCategory(own, wording, need);
-    if (category && !block) {
-      block = { category, n: item.n };
-      trace.unshift(entry);
+    if (category) {
+      blocks.push({ category, n: item.n });
     } else {
-      trace.push(entry);
-    }
-    if (!category) {
       remove.push(item.n);
     }
+    if (category === "violation_not_removable") {
+      violations.push(item.n);
+    }
+  }
+  const block = blocks.find(({ category }) => HARD.has(category)) ?? blocks[0];
+  // The deciding item goes first, so the log's length bound cannot cut it off.
+  const deciding = trace.findIndex((entry) => entry.startsWith(`${block?.n}:`));
+  if (deciding > 0) {
+    trace.unshift(...trace.splice(deciding, 1));
   }
   let verdict: Verdict;
   if (block) {
@@ -95,18 +116,53 @@ function decide(items: ReviewInput["items"], answers: Record<string, Answer>) {
   } else {
     verdict = { decision: "allow", reason: "jev:all_items_kept" };
   }
-  return { block, remove, trace, verdict };
+  return { block, remove, trace, verdict, violations };
+}
+
+/**
+ * JEV was unsure, so the existing reviewer decides, once and within a deadline;
+ * a failure or timeout throws into the gate's fail-closed path. It can only add
+ * to what JEV confidently deleted, and keeping an item JEV confidently called a
+ * violation blocks rather than letting either reviewer overrule the other.
+ */
+async function reviewByFallback(
+  fallback: Fallback,
+  input: ReviewInput,
+  jev: ReturnType<typeof decide>
+): Promise<Verdict> {
+  const verdict = await fallback(
+    input,
+    AbortSignal.timeout(FALLBACK_TIMEOUT_MS)
+  );
+  if (verdict.decision === "block") {
+    return verdict;
+  }
+  const remove = [...new Set([...jev.remove, ...(verdict.remove ?? [])])];
+  const kept = jev.violations.find((n) => !remove.includes(n));
+  if (kept) {
+    return { decision: "block", reason: `jev:fallback_kept_violation:${kept}` };
+  }
+  return remove.length
+    ? { decision: "rewrite", reason: verdict.reason, remove }
+    : verdict;
 }
 
 /** One bounded classification request; errors propagate to the gate's fail-closed path. */
 export async function reviewWidgetFindings(
   input: ReviewInput,
-  options: { apiKey?: string; fetch?: typeof fetch; log?: OpsLogger } = {}
+  options: {
+    apiKey?: string;
+    /** The existing reviewer, for cases JEV is unsure about. */
+    fallback?: Fallback;
+    fetch?: typeof fetch;
+    log?: OpsLogger;
+  } = {}
 ): Promise<Verdict> {
   const apiKey = options.apiKey ?? process.env.TYPESAFE_API_KEY;
   if (!apiKey) {
     throw new Error("Widget review requires TYPESAFE_API_KEY.");
   }
+  const startedAt = Date.now();
   const { items, question, scope } = input;
   if (
     items.length === 0 ||
@@ -203,18 +259,41 @@ export async function reviewWidgetFindings(
       "Widget review did not classify exactly the supplied items."
     );
   }
-  const { block, remove, trace, verdict } = decide(items, answers);
-  // The deciding item comes first, so the log's length bound cannot cut it off.
-  logOpsEvent(
-    "widget.review.items",
-    {
-      code:
-        block?.category ?? (remove.length ? "remove_items" : "all_items_kept"),
-      conversationId: scope.conversationId,
-      decision: verdict.decision,
-      message: trace.join(" "),
-    },
-    options.log
-  );
-  return verdict;
+  const jev = decide(items, answers);
+  const jevMs = Date.now() - startedAt;
+  const useFallback =
+    options.fallback && jev.block && !HARD.has(jev.block.category);
+  const log = (final: Verdict, outcome?: string) =>
+    logOpsEvent(
+      "widget.review.items",
+      {
+        // JEV's own decision; `decision` is the final one.
+        code: jev.verdict.reason.split(":").slice(1).join(":"),
+        conversationId: scope.conversationId,
+        decision: final.decision,
+        // Reviewer, timings, then choices and confidences. Never item text.
+        message: [
+          `reviewer=${useFallback ? "fallback" : "jev"}`,
+          `jev_ms=${jevMs}`,
+          ...(useFallback
+            ? [`fallback_ms=${Date.now() - startedAt - jevMs}`]
+            : []),
+          ...(outcome ? [outcome] : []),
+          ...jev.trace,
+        ].join(" "),
+      },
+      options.log
+    );
+  if (!(useFallback && options.fallback)) {
+    log(jev.verdict);
+    return jev.verdict;
+  }
+  try {
+    const final = await reviewByFallback(options.fallback, input, jev);
+    log(final);
+    return final;
+  } catch (error) {
+    log({ decision: "block", reason: "" }, "fallback_failed");
+    throw error;
+  }
 }
