@@ -36,6 +36,7 @@ describe("routeWidgetMessage", () => {
       asksForHuman: 0.04,
       asksOwnData: 0.91,
       confidence: 0.87,
+      explainsPrevious: 0,
       followUp: 0,
       kbScore: 0,
       lane: "investigate",
@@ -51,6 +52,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_ticket",
       "asks_own_data",
       "depends_on_previous",
+      "explains_previous",
       "is_unclear",
       "lane",
     ]);

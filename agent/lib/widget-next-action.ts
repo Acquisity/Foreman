@@ -31,6 +31,15 @@ const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",
 ]);
+const CLARIFY_LINE = "QUESTION FOR CUSTOMER:";
+const CLARIFY_REPLY = /^QUESTION FOR CUSTOMER:[ \t]*([^\n]{8,400}\?)\s*$/u;
+/**
+ * The whole write-up was the one question a clarify decision asked for, so there
+ * is no report to structure or compose. Anything else is an ordinary write-up.
+ */
+export const clarifyQuestion = (text: string | null | undefined) =>
+  CLARIFY_REPLY.exec(text?.trim() ?? "")?.[1] ?? null;
+
 const ELIGIBLE_INSTRUCTIONS =
   "The customer explicitly asked to talk to a person, or the state shows a concrete billing dispute that a person must reconcile, such as a suspected duplicate charge, a charge that may belong to another workspace, or a charged order whose payment or delivery the customer is disputing. Missing data, a failed read, an ambiguous record, conflicting or old records, or a billing difference the customer did not raise is NOT this.";
 
@@ -51,11 +60,11 @@ const FIXED_CRITERIA = {
 } as const;
 
 const DISCIPLINE =
-  "Keep every claim, in the facts and the teammate report as much as the recommendation, to what a result recorded: an empty record means nothing was recorded there, not that nothing happened, and a charge belongs to an order only when a result ties them together. Never put a shell or build command in the findings.";
+  "Keep every claim, in the facts and the teammate report as much as the recommendation, to what a result recorded: an empty record means nothing was recorded there, not that nothing happened, and a charge belongs to an order only when a result ties them together. No recorded problem is not the same as nothing being wrong: never write that nothing needs changing, that no action is needed or that everything is fine unless a live check in a result shows it, and say instead that no problem was recorded and what could not be checked. Never put a shell or build command in the findings.";
 const ARTICLES =
   "Only the help-center tools remain. If the recommendation will tell the customer to take a step in the product and no article read in this conversation covers that step, search and read the article first and base the step on it; if none covers it, give no step. A plain account check needs no article.";
 const NOTES = {
-  clarify: `Stop gathering workspace evidence. Write your findings now with the facts verified so far. The recommendation asks the customer the single detail that identifies what they mean. A person does not need to take over. ${DISCIPLINE} ${ARTICLES}`,
+  clarify: `Stop. One detail from the customer is needed before anything more can be checked. Reply with exactly one line and nothing else: "${CLARIFY_LINE} " followed by the one short, friendly question that gets the single detail identifying what they mean. State no facts and make no promises in it, name no tool or system, and ask for no file or screenshot.`,
   finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
   human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
@@ -128,8 +137,25 @@ export function turnEvidence(prompt: Params["prompt"]) {
       }
     }
   }
+  // The batch whose results just arrived sits right before them.
+  const batch = prompt.at(-2);
+  const lastCalls =
+    batch?.role === "assistant"
+      ? batch.content.flatMap((part) =>
+          part.type === "tool-call" ? [part.toolName] : []
+        )
+      : [];
+  const gathering = (tool: string) =>
+    tool !== TICKET_TOOL && !ARTICLE_TOOLS.has(tool);
   return {
     atToolResult: start >= 0 && prompt.at(-1)?.role === "tool",
+    // Jev never picks an article or the ticket tool, so once workspace reads
+    // exist, a batch made only of those can only have come from a finish. The
+    // prompt is the per-turn state; Eve rebuilds this middleware every step.
+    finishing:
+      lastCalls.length > 0 &&
+      !lastCalls.some(gathering) &&
+      [...reads.values()].some((read) => gathering(read.tool)),
     question,
     reads: [...reads.values()],
   };
@@ -316,6 +342,13 @@ const fallbackReason = (error: unknown) => {
   return error.name === "TimeoutError" ? "timeout" : error.message.slice(0, 40);
 };
 
+const outcomeOf = (decision: string, detail: string) => {
+  if (decision === "fallback") {
+    return "fallback";
+  }
+  return detail === "reason=already_finished" ? "rule" : "jev";
+};
+
 interface Plan {
   original: Params;
   reads: Read[];
@@ -339,7 +372,7 @@ export function widgetNextActionMiddleware(
       code: "tool_result",
       decision,
       message: `ms=${fields.ms} ${detail}`,
-      outcome: decision === "fallback" ? "fallback" : "jev",
+      outcome: outcomeOf(decision, detail),
       sessionId: opts.sessionId,
       stepIndex: fields.step,
       tool: fields.tool,
@@ -357,21 +390,31 @@ export function widgetNextActionMiddleware(
     // center stays readable unless the run is going to a person.
     tools: params.tools?.filter((tool) =>
       tool.name === TICKET_TOOL
-        ? !reads.some((read) => read.tool === TICKET_TOOL)
-        : action !== "human" && ARTICLE_TOOLS.has(tool.name)
+        ? action !== "clarify" &&
+          !reads.some((read) => read.tool === TICKET_TOOL)
+        : action === "finish" && ARTICLE_TOOLS.has(tool.name)
     ),
   });
   return {
     specificationVersion: "v4",
     async transformParams({ params }) {
       const tools = (params.tools ?? []).flatMap((tool) =>
-        tool.type === "function" && tool.name !== TICKET_TOOL
+        tool.type === "function" &&
+        tool.name !== TICKET_TOOL &&
+        !ARTICLE_TOOLS.has(tool.name)
           ? [{ description: tool.description ?? "", name: tool.name }]
           : []
       );
-      const { atToolResult, question, reads } = turnEvidence(params.prompt);
+      const { atToolResult, finishing, question, reads } = turnEvidence(
+        params.prompt
+      );
       if (!atToolResult || tools.length === 0) {
         return params;
+      }
+      if (finishing) {
+        // Grounding a step in an article must not reopen the workspace investigation.
+        log("finish", { ms: 0, step: reads.length }, "reason=already_finished");
+        return finishParams(params, reads, "finish");
       }
       const startedAt = Date.now();
       const fields = () => ({

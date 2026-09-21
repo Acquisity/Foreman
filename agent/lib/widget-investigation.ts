@@ -4,20 +4,30 @@ import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
-import { gate as egressGate, logGateDecision } from "./widget-egress.js";
+import {
+  defaultGateDeps,
+  gate as egressGate,
+  logGateDecision,
+} from "./widget-egress.js";
 import { resolveOwnedIdentifiers } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   answerFromHelpCenter,
   CLARIFY_PROMPT,
+  EXPLAIN_PROMPT,
   KB_MISS_FALLBACK,
   KB_MISS_PROMPT,
   type KbAnswer,
   replyToChat,
 } from "./widget-kb.js";
-import { handoffEligible, nextActionEnabled } from "./widget-next-action.js";
 import {
+  clarifyQuestion,
+  handoffEligible,
+  nextActionEnabled,
+} from "./widget-next-action.js";
+import {
+  DECISION_CONTEXT,
   logRouteDecision,
   renderAsk,
   renderConversation,
@@ -357,6 +367,11 @@ const UNCLEAR_SCORE = 0.8;
  * teammate's time on something Foreman could have answered.
  */
 const HUMAN_REQUEST_SCORE = 0.8;
+/**
+ * How sure the router must be that the customer only asks what the previous
+ * reply meant. High on purpose: a request for fresh evidence must still be investigated.
+ */
+const EXPLAIN_SCORE = 0.8;
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
 const DEADLINE_FALLBACK =
@@ -426,6 +441,57 @@ async function withEligibleHandoff(
   }
 }
 
+/**
+ * A post-tool clarify decision is answered with one question. That question is
+ * the whole reply, so it skips the two slow model passes that only exist to turn
+ * a report into a reply (structuring it, then composing from it). It still goes
+ * through the ownership scan, the reviewer and the final text scan.
+ */
+const askedFindings = (asked: string) =>
+  parseFindings({
+    confidence: "low",
+    facts: [],
+    needsHuman: false,
+    recommendation: asked,
+    report: `Asked the customer: ${asked}`.slice(0, 1000),
+  });
+
+/** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
+async function structureWriteUp(
+  run: Pick<WidgetRun, "id" | "scope">,
+  sessionId: string,
+  outcome: Extract<WaitOutcome, { status: "completed" }>,
+  conversation: string,
+  deps: Pick<WidgetDependencies, "extract"> &
+    Partial<Pick<WidgetDependencies, "handoffEligible">>
+) {
+  const asked = nextActionEnabled() ? clarifyQuestion(outcome.text) : null;
+  if (asked) {
+    return {
+      gateDeps: { ...defaultGateDeps, compose: () => Promise.resolve(asked) },
+      structured: askedFindings(asked),
+    };
+  }
+  const extracted =
+    outcome.findings ??
+    (outcome.text
+      ? await deps.extract({
+          investigatorText: outcome.text,
+          question: conversation,
+          scope: run.scope,
+        })
+      : null);
+  return {
+    gateDeps: undefined,
+    structured: await withEligibleHandoff(
+      withFiledTicket(outcome.ticket, extracted),
+      conversation,
+      { conversationId: run.scope.conversationId, runId: run.id, sessionId },
+      deps.handoffEligible
+    ),
+  };
+}
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<WidgetRun, "created_at" | "id" | "question" | "scope">,
@@ -466,21 +532,12 @@ export async function finishWidgetRun(
       await deps.history(run).catch(() => [])
     );
     const extractStartedAt = Date.now();
-    const structured = await withEligibleHandoff(
-      withFiledTicket(
-        outcome.ticket,
-        outcome.findings ??
-          (outcome.text
-            ? await deps.extract({
-                investigatorText: outcome.text,
-                question: conversation,
-                scope: run.scope,
-              })
-            : null)
-      ),
+    const { gateDeps, structured } = await structureWriteUp(
+      run,
+      sessionId,
+      outcome,
       conversation,
-      { conversationId: run.scope.conversationId, runId: run.id, sessionId },
-      deps.handoffEligible
+      deps
     );
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
@@ -494,7 +551,7 @@ export async function finishWidgetRun(
         run.scope,
         run.question,
         structured,
-        undefined,
+        gateDeps,
         conversation
       );
       // Where the wait after an investigation goes: three model calls in a row.
@@ -688,6 +745,33 @@ async function answerFromKnowledgeBase(
     const reply = await deps.answerChat(question, ids);
     if (reply) {
       return finish(reply);
+    }
+  }
+  // "Does that mean none happened, or none were recorded?" is answered by the
+  // reply it asks about. It took a 22s help-center miss and then a second full
+  // investigation. The writer sees the whole previous reply, may add nothing to
+  // it, and returns nothing when the message needs a look, which falls through.
+  if (
+    route.lane !== "human" &&
+    (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
+    ask.turns?.some((turn) => turn.role === "assistant")
+  ) {
+    const reply = await deps
+      .answerChat(renderAsk(ask, DECISION_CONTEXT), ids, EXPLAIN_PROMPT)
+      .catch(() => null);
+    if (reply) {
+      return deps.complete(
+        run.id,
+        {
+          citations: [],
+          decision: "allow",
+          message: reply.message,
+          reason: "explain",
+          status: "completed",
+        },
+        null,
+        run.id
+      );
     }
   }
   // Nothing to look up yet: ask what they mean instead of spending minutes on

@@ -254,3 +254,94 @@ test("a necessary clarification with no facts is a reply, not a handoff", async 
   assert.equal(asked.length, 0);
   assert.equal(acquisityHandsOff(response), false);
 });
+
+// Run d5822f74: Jev chose clarify in 359ms, then structuring and composing a
+// report around one question took 25 of the 34 finishing seconds.
+test("a post-tool clarify question is delivered without structuring or composing a report, and still passes the scan and the reviewer", async (t) => {
+  process.env.WIDGET_NEXT_ACTION = "jev";
+  t.after(() => {
+    delete process.env.WIDGET_NEXT_ACTION;
+  });
+  const run: WidgetRun = {
+    completed_at: null,
+    created_at: new Date(),
+    decision: null,
+    findings: null,
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    outcome: null,
+    question: "Why did my campaign stop?",
+    scope,
+    session_id: "s",
+    stream_index: 0,
+  };
+  const reviewed: string[] = [];
+  const finishWith = (text: string, judge: GateDeps["judge"]) =>
+    finishWidgetRun(
+      run,
+      "s",
+      { findings: null, status: "completed", text },
+      {
+        claimFinish: () => Promise.resolve(true),
+        complete: (_id, outcome, stored) => {
+          run.outcome = outcome;
+          run.findings = stored;
+          return Promise.resolve(run);
+        },
+        extract: () => assert.fail("a question is not structured by a model"),
+        gate: (gateScope, question, findings, deps, conversation) =>
+          gate(
+            gateScope,
+            question,
+            findings,
+            {
+              compose: deps?.compose ?? gateDeps.compose,
+              judge,
+              resolve: gateDeps.resolve,
+            },
+            conversation
+          ),
+        history: () => Promise.resolve([]),
+      }
+    );
+  const asked = "Which campaign do you mean, Spring Promo or Autumn Promo?";
+  const finished = await finishWith(
+    `QUESTION FOR CUSTOMER: ${asked}`,
+    (input) => {
+      reviewed.push(input.items.map((item) => item.text).join("|"));
+      return Promise.resolve({ decision: "allow", reason: "in scope" });
+    }
+  );
+  assert.ok(finished);
+  const response = widgetRunResponse(finished);
+  assert.equal(acquisityHandsOff(response), false);
+  assert.ok("message" in response);
+  assert.equal(response.message, asked);
+  assert.equal(reviewed[0].includes(asked), true);
+
+  // The reviewer can still stop it, and then nothing reaches the customer.
+  const blocked = await finishWith(`QUESTION FOR CUSTOMER: ${asked}`, () =>
+    Promise.resolve({ decision: "block", reason: "foreign data" })
+  );
+  assert.ok(blocked);
+  const stopped = widgetRunResponse(blocked);
+  assert.ok("message" in stopped);
+  assert.equal(stopped.message, null);
+});
+
+test("a write-up that is more than the one question takes the ordinary path", async (t) => {
+  const { response } = await finish(t, {
+    eligible: 0,
+    extracted: {
+      facts: [{ claim: "Two campaigns are paused." }],
+      needsHuman: false,
+      recommendation: "Which campaign do you mean?",
+      report: "Asked which campaign.",
+    },
+    question: "Why did my campaign stop?",
+  });
+  assert.ok("message" in response);
+  assert.equal(
+    (response.message ?? "").includes("Two campaigns are paused."),
+    true
+  );
+});

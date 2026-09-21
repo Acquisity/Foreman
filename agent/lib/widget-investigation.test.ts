@@ -1504,3 +1504,120 @@ test("a genuine account question in the same score range still investigates: the
     assert.deepEqual(gated, [findings]);
   }
 });
+
+const explainRoute = (explainsPrevious: number) => () =>
+  Promise.resolve({
+    asksForAction: 0,
+    asksForHuman: 0,
+    asksOwnData: 0.9,
+    confidence: 0.95,
+    explainsPrevious,
+    followUp: 0.84,
+    kbScore: 0,
+    lane: "investigate" as const,
+    source: "jev" as const,
+  });
+const generationHistory = [
+  { role: "customer" as const, text: "any generation errors lately?" },
+  {
+    role: "assistant" as const,
+    text: "No blocked decisions were recorded in the last 7 days. Live error monitoring could not be checked.",
+  },
+];
+const startedSessions = () => {
+  const sends: string[] = [];
+  const args = {
+    from: () =>
+      ({
+        send: (message: string) => {
+          sends.push(message);
+          return Promise.resolve(completedSession());
+        },
+      }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+    waitUntil: () => undefined,
+  };
+  return { args, sends };
+};
+
+// Live c2a648c: "Does that mean none happened, or just none were recorded?" took
+// a 22s help-center miss and then a second generation investigation.
+test("a question about what the previous reply meant is answered from that reply, with no help-center detour and no new investigation", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.route = explainRoute(0.92);
+  const prompts: (string | undefined)[] = [];
+  let read = "";
+  deps.answerChat = (message, _log, system) => {
+    read = message;
+    prompts.push(system);
+    return Promise.resolve({
+      citations: [],
+      message:
+        "Only that none were recorded; live errors could not be checked.",
+    });
+  };
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      history: generationHistory,
+      question: "Does that mean none happened, or just none were recorded?",
+    }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = await response.json();
+  assert.equal(body.message.startsWith("Only that none were recorded"), true);
+  assert.equal(run.outcome?.reason, "explain");
+  assert.equal(prompts.length, 1);
+  // The writer is shown the whole previous reply, not a 400-character cut of it.
+  assert.equal(
+    read.includes("Live error monitoring could not be checked."),
+    true
+  );
+});
+
+test("a follow-up that wants fresh evidence, or that the writer cannot answer from the previous reply, is still investigated", async (t) => {
+  enabled(t);
+  for (const [score, reply] of [
+    [0.3, "unused"],
+    [0.92, null],
+  ] as const) {
+    const { deps } = dependencies();
+    deps.route = explainRoute(score);
+    deps.answerChat = () =>
+      Promise.resolve(reply ? { citations: [], message: reply } : null);
+    const { args, sends } = startedSessions();
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run, in order.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history: generationHistory,
+        message_id: `9999999${score === 0.3 ? 1 : 2}-9999-4999-8999-999999999999`,
+        question: "can you check again for today?",
+      }),
+      args,
+      200,
+      verify,
+      deps
+    );
+    assert.equal(sends.length, 1);
+  }
+});
+
+test("with no previous reply in the supplied history there is nothing to explain, so it is investigated", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = explainRoute(0.95);
+  deps.answerChat = () => assert.fail("nothing to explain from");
+  const { args, sends } = startedSessions();
+  await receiveWidgetMessage(
+    request({ ...start, question: "what does that mean?" }),
+    args,
+    200,
+    verify,
+    deps
+  );
+  assert.equal(sends.length, 1);
+});

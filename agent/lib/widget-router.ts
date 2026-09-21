@@ -160,6 +160,14 @@ const QUESTIONS = {
       "The customer's latest message only makes sense as a continuation of Support's previous answer: it asks for the next step, more detail, a part, a repeat or a clarification of what was just explained, and names no product, feature or subject of its own. A message that names a new product, feature, page or subject is NOT this, however short it is.",
     type: "noul",
   },
+  // Asked in the same request as the rest, so it costs no extra call. It is not
+  // depends_on_previous: "and what about campaign B?" continues the conversation
+  // and still needs a look.
+  explains_previous: {
+    instructions:
+      "The customer's latest message only asks what Support's previous answer means: to explain, confirm, reword or spell out the implication of something that answer already said. It can be answered from that answer's own words with nothing looked up. A request to check again, to check something else, for the current status, or about anything the previous answer did not cover is NOT this.",
+    type: "noul",
+  },
   is_unclear: {
     instructions:
       "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
@@ -195,6 +203,7 @@ const responseSchema = z.object({
     depends_on_previous: z
       .object({ noul: z.number().min(0).max(1) })
       .optional(),
+    explains_previous: z.object({ noul: z.number().min(0).max(1) }).optional(),
     is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     lane: z.object({
       choice: z.enum(WIDGET_LANES),
@@ -209,6 +218,8 @@ export interface WidgetRoute {
   asksForHuman: number;
   asksOwnData: number;
   confidence: number;
+  /** How likely the latest message only asks what the previous reply meant. */
+  explainsPrevious?: number;
   /** How likely the latest message only continues the previous reply. */
   followUp?: number;
   /** How likely the help center is the right lane, even when another lane won. */
@@ -299,6 +310,7 @@ export async function routeWidgetMessage(
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
       confidence,
+      explainsPrevious: answers.explains_previous?.noul ?? 0,
       followUp: answers.depends_on_previous?.noul ?? 0,
       // Jev may omit the per-lane probabilities; the winner's confidence stands in.
       kbScore:

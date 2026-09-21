@@ -145,8 +145,6 @@ const RE_1 = /unavailable/;
 const RE_2 = /savedBuild/;
 const RE_3 = /private reasoning/;
 const RE_4 = /widget_file_ticket|web_fetch/;
-const RE_5 = /single detail/;
-const RE_6 = /does not need to take over/;
 const RE_7 = /could not be checked/;
 const RE_8 = /not a reason for a person/;
 const RE_9 = /A person should take over/;
@@ -274,7 +272,7 @@ describe("widget next-action selector", () => {
     assert.doesNotMatch(body, RE_4);
   });
 
-  it("finish keeps the help center readable so a product step can rest on an article, and an article read is a normal next checkpoint", async () => {
+  it("finish is terminal: an article read to ground a step does not reopen workspace reads or ask Jev again", async () => {
     const seen: { state?: string }[] = [];
     const { model, sent } = harness(
       jev("finish", 0, seen),
@@ -300,8 +298,49 @@ describe("widget next-action selector", () => {
       ]),
       tools: TOOLS,
     });
-    assert.equal(seen.length, 2);
-    assert.equal(JSON.stringify(seen[1]).includes("choose Resume"), true);
+    // wrun_41M32MCAVG0GN0CZ5AYEW3AYV8: finish, finish, then a forced outreach read.
+    assert.equal(seen.length, 1);
+    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
+    assert.equal(sent(1).toolChoice, undefined);
+  });
+
+  it("legitimate reads before finishing are kept: articles the investigator read first do not end the gathering", async () => {
+    const seen: { state?: string }[] = [];
+    const { model, sent } = harness(
+      jev("widget_outreach_health", 0, seen),
+      call("widget_outreach_health", {})
+    );
+    await model.doGenerate({
+      prompt: prompt("How do I get campaign A sending again?", [
+        {
+          input: { query: "resume campaign" },
+          output: { articles: [] },
+          tool: "widget_help_article",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(seen.length, 1);
+    assert.deepEqual(sent().tools, ["widget_outreach_health"]);
+  });
+
+  it("Jev is never offered an article or the ticket tool as a read", async () => {
+    const seen: { questions?: { action?: { criteria?: object } } }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("Why did campaign A stop?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    const menu = Object.keys(seen[0].questions?.action?.criteria ?? {});
+    assert.equal(menu.includes("widget_outreach_health"), true);
+    assert.equal(
+      menu.some(
+        (key) => key.includes("help_article") || key.includes("ticket")
+      ),
+      false
+    );
   });
 
   it("the selector reads each tool's whole description, caveats included", async () => {
@@ -319,7 +358,7 @@ describe("widget next-action selector", () => {
     );
   });
 
-  it("clarify removes the evidence tools and asks for one detail without a handoff", async () => {
+  it("clarify removes every tool and asks for the one question as a single marked line", async () => {
     const { model, sent } = harness(jev("clarify"));
     await model.doGenerate({
       prompt: prompt("Why did my campaign stop?", [
@@ -327,9 +366,9 @@ describe("widget next-action selector", () => {
       ]),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, WRITE_UP_TOOLS);
-    assert.match(sent().note, RE_5);
-    assert.match(sent().note, RE_6);
+    // A question needs no article and no ticket, and is asked as one marked line.
+    assert.deepEqual(sent().tools, []);
+    assert.equal(sent().note.includes("QUESTION FOR CUSTOMER:"), true);
   });
 
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
