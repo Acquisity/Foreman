@@ -8,6 +8,7 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
+import { reviewWidgetFindings } from "./widget-review.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
@@ -390,6 +391,9 @@ export const defaultGateDeps: GateDeps = {
     return text.trim();
   },
   async judge({ findings, items, question, scope }) {
+    if (process.env.WIDGET_REVIEWER === "jev") {
+      return reviewWidgetFindings({ findings, items, question, scope });
+    }
     const model = await resolveModel("gate");
     const { object } = await generateObject({
       model: gateway(model),
