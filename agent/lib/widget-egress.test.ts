@@ -288,12 +288,31 @@ test("a claim with no evidence reference is judged by the model gate, not blocke
   assert.equal(calls.judge.length, 1);
 });
 
-test("needsHuman with concrete facts still answers the customer and flags CS separately", async () => {
+test("a reviewed handoff with useful findings skips the composer and keeps them; a normal answer still composes", async () => {
   const { calls, deps: d } = deps();
-  const result = await gate(scope, question, findings({ needsHuman: true }), d);
-  assert.equal(result.decision, "allow");
-  assert.match(result.message ?? "", RECONNECT);
+  const raw = findings({ needsHuman: true });
+  const result = await gate(scope, question, raw, d);
+  assert.deepEqual(
+    [result.decision, result.reason, result.message],
+    ["block", "needs_human", null]
+  );
+  assert.deepEqual(result.findings, raw);
+  // The safety review still ran; only the discarded reply was skipped.
+  assert.equal(calls.judge.length, 1);
+  assert.equal(calls.compose.length, 0);
+  const answered = await gate(scope, question, findings(), d);
+  assert.equal(answered.decision, "allow");
+  assert.match(answered.message ?? "", RECONNECT);
   assert.equal(calls.compose.length, 1);
+});
+
+test("a handoff the reviewer blocks keeps the reviewer's reason", async () => {
+  const { calls, deps: d } = deps({
+    judge: () => Promise.resolve({ decision: "block", reason: "foreign data" }),
+  });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.equal(result.reason, "model_gate:foreign data");
+  assert.equal(calls.compose.length, 0);
 });
 
 test("needsHuman with no concrete facts hands off with no reply", async () => {
@@ -628,11 +647,8 @@ test("a billing review keeps its verified facts and open questions for the teamm
       }),
   });
   const result = await gate(scope, question, raw, d);
-  assert.equal(result.findings.needsHuman, true);
-  assert.deepEqual(result.findings.facts, raw.facts);
-  assert.equal(
-    result.findings.recommendation,
-    "Billing needs to confirm whether the March charge was for this order."
-  );
+  assert.equal(result.reason, "needs_human");
+  assert.deepEqual(result.findings, raw);
+  assert.equal(calls.compose.length, 0);
   assert.equal(JSON.stringify(calls.compose).includes("fresh domain"), false);
 });

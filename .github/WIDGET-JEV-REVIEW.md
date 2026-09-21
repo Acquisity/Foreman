@@ -22,7 +22,7 @@ An answer counts only at 0.8 confidence or above. Per item, in order:
 2. Confidently owned and confidently keep: shown unchanged.
 3. Otherwise the item cannot be shown as is: it is confidently foreign, a confident violation, or the wording verdict is uncertain. It is deleted only when it is confidently dispensable. If not, JEV does not decide it (`violation_not_removable` or `uncertain_not_removable`; see the fallback below), so a caveat, an unresolved payment or delivery concern, or a handoff statement is never stripped to get an answer out.
 
-Uncertain wording therefore no longer counts as an ownership failure, but it is never shown and never deleted on doubt alone. The threshold was not lowered. After any rewrite, by either reviewer, a handoff whose facts were all deleted blocks as `needs_human` rather than answering from the recommendation alone; `needsHuman` itself always survives a rewrite.
+Uncertain wording therefore no longer counts as an ownership failure, but it is never shown and never deleted on doubt alone. The threshold was not lowered. After the review, by either reviewer, findings with `needsHuman` set stop as `needs_human` with every finding intact and no reply is composed: Acquisity discards the reply for a handoff, posts the findings as a team-only note and shows its own handoff message.
 
 Missing credentials, request failures, oversized input, a missing or extra answer, and a choice that does not belong to its question all fail closed.
 

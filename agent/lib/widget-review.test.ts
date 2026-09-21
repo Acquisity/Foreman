@@ -19,7 +19,7 @@ const findings: WidgetFindings = {
       evidence: { ref: "", tool: "widget_billing_summary" },
     },
   ],
-  needsHuman: true,
+  needsHuman: false,
   recommendation: "Place a fresh order.",
   report: "Private team-only report",
 };
@@ -75,7 +75,6 @@ test("JEV removal uses existing gate plumbing and preserves billing handoff fact
   const result = await gate(scope, input.question, findings, {
     compose: ({ findings: retained }) => {
       assert.equal(retained.recommendation, "");
-      assert.equal(retained.needsHuman, true);
       assert.equal(retained.facts[0]?.claim, findings.facts[0]?.claim);
       return Promise.resolve("Payment for this order is unconfirmed.");
     },
@@ -90,23 +89,27 @@ test("JEV removal uses existing gate plumbing and preserves billing handoff fact
     resolve: async () => owned,
   });
   assert.equal(result.decision, "rewrite");
-  assert.equal(result.findings.needsHuman, true);
   assert.equal(result.message, "Payment for this order is unconfirmed.");
 });
 
-test("a rewrite that deletes every fact of a handoff hands off instead of answering", async () => {
-  const plain = {
-    ...findings,
-    facts: [{ ...findings.facts[0], claim: "Three inboxes are live." }],
-  } as WidgetFindings;
-  const result = await gate(scope, input.question, plain, {
+test("a JEV-reviewed handoff returns its findings untouched and never composes", async () => {
+  const handoff = { ...findings, needsHuman: true };
+  const result = await gate(scope, input.question, handoff, {
     compose: () => assert.fail("must not compose"),
-    judge: () =>
-      Promise.resolve({ decision: "rewrite", reason: "x", remove: [1] }),
+    judge: (data) =>
+      reviewWidgetFindings(data, {
+        apiKey: "test",
+        fetch: mock(
+          answers({ item_2: answer("remove"), need_2: answer("dispensable") })
+        ),
+        log: () => undefined,
+      }),
     resolve: async () => owned,
   });
-  assert.equal(result.decision, "block");
-  assert.equal(result.reason, "needs_human");
+  assert.deepEqual(
+    [result.decision, result.reason, result.findings],
+    ["block", "needs_human", handoff]
+  );
 });
 
 test("decision policy separates wording doubt from ownership doubt", async () => {
@@ -193,7 +196,6 @@ const gateOverlap = (overrides: Record<string, unknown>) => {
   return gate(scope, input.question, overlap, {
     compose: ({ findings: retained }) => {
       shown = retained.facts.map((fact) => fact.claim);
-      assert.equal(retained.needsHuman, true);
       return Promise.resolve("ok");
     },
     judge: (data) =>
@@ -231,7 +233,6 @@ test("an unreadable internal source is deleted only when the caveats stand witho
     assert.equal(result.decision, "block");
     assert.equal(shown, undefined);
     assert.equal(result.findings.facts.length, 3);
-    assert.equal(result.findings.needsHuman, true);
   }
 });
 
@@ -349,7 +350,6 @@ test("a fallback failure blocks at the gate, and a fallback answer keeps caveats
     return gate(scope, input.question, overlap, {
       compose: ({ findings: retained }) => {
         shown = retained.facts.map((fact) => fact.claim);
-        assert.equal(retained.needsHuman, true);
         return Promise.resolve("ok");
       },
       judge: (data) =>
@@ -375,7 +375,6 @@ test("a fallback failure blocks at the gate, and a fallback answer keeps caveats
     [failed.result.decision, failed.result.reason, failed.shown],
     ["block", "gate_unavailable", undefined]
   );
-  assert.equal(failed.result.findings.needsHuman, true);
   const answered = await run(() =>
     Promise.resolve({ decision: "rewrite", reason: "internal", remove: [3] })
   );
@@ -392,7 +391,6 @@ test("a fallback failure blocks at the gate, and a fallback answer keeps caveats
 const twoItems = (claim: string, recommendation: string): WidgetFindings => ({
   ...findings,
   facts: [{ ...findings.facts[0], claim }] as WidgetFindings["facts"],
-  needsHuman: false,
   recommendation,
 });
 const gateWith = (subject: WidgetFindings, judge: GateDeps["judge"]) => {
@@ -496,13 +494,11 @@ test("deletions spread across reviewers are judged by the answer that remains", 
     );
   const both = await run([3]);
   assert.equal(both.result.reason, "model_gate:removed_last_caveat");
-  assert.equal(both.result.findings.needsHuman, true);
   assert.equal(both.result.findings.facts.length, 3);
   // One statement of the uncertainty surviving is enough to answer.
   const one = await run([1]);
   assert.equal(one.result.decision, "rewrite");
   assert.deepEqual(one.shown, [payment.facts[2]?.claim, ""]);
-  assert.equal(one.result.findings.needsHuman, true);
 });
 
 test("the caveat check leaves ordinary rewrites alone", () => {

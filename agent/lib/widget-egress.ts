@@ -455,27 +455,23 @@ export const defaultGateDeps: GateDeps = {
 const handoffOnly = (findings: WidgetFindings) =>
   findings.needsHuman && findings.facts.length === 0;
 
-/**
- * Apply the judge's deletions; a string is the reason they cannot be used. The
- * same rule as before the review applies after it: a handoff with no facts left
- * is not answered from the recommendation alone.
- */
+/** Apply the judge's deletions; a string is the reason they cannot be used. */
 function applyRewrite(
   findings: WidgetFindings,
   remove: number[]
 ): WidgetFindings | string {
   const rewritten = removeItems(findings, remove);
-  if (!rewritten) {
-    const items = redactableItems(findings);
-    const drop = new Set(remove);
-    return removesLastCaveat(
-      items,
-      items.filter((item) => !drop.has(item.n))
-    )
-      ? "model_gate:removed_last_caveat"
-      : "model_gate:invalid_rewrite";
+  if (rewritten) {
+    return rewritten;
   }
-  return handoffOnly(rewritten) ? "needs_human" : rewritten;
+  const items = redactableItems(findings);
+  const drop = new Set(remove);
+  return removesLastCaveat(
+    items,
+    items.filter((item) => !drop.has(item.n))
+  )
+    ? "model_gate:removed_last_caveat"
+    : "model_gate:invalid_rewrite";
 }
 
 const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
@@ -558,10 +554,8 @@ export async function gate(
     if (reason) {
       return done(blocked(findings, reason));
     }
-    // needsHuman flags the CS inbox; it does not by itself wall off the
-    // customer. When Foreman found concrete facts, it answers autonomously and
-    // routes any teammate follow-up through needsWrite/the note. Only hand off
-    // fully when there is nothing concrete to say (no facts at all).
+    // A handoff with nothing concrete to say needs no review: there is nothing
+    // to show anyone.
     if (handoffOnly(findings)) {
       return done(blocked(findings, "needs_human"));
     }
@@ -575,6 +569,12 @@ export async function gate(
     );
     if (verdict.decision === "block") {
       return done(blocked(findings, `model_gate:${verdict.reason}`));
+    }
+    // Acquisity discards the reply whenever needsHuman is set: it posts the
+    // findings as a team-only note and shows its own handoff message. Composing
+    // one cost 58 seconds for nothing, so the reviewed handoff stops here.
+    if (findings.needsHuman) {
+      return done(blocked(findings, "needs_human"));
     }
     let gated = findings;
     if (verdict.decision === "rewrite") {
