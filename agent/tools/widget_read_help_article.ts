@@ -11,7 +11,7 @@ const tool = defineTool({
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
     "Read the full text of one help-center article by its url (from a " +
-    "find_help_article result), so you can answer from its content and cite it. " +
+    "widget_help_article result), so you can answer from its content and cite it. " +
     "Returns the article markdown, or error set when it could not be read.",
   execute({ url }, ctx) {
     if (!isWidgetSupport(ctx.session.auth.initiator)) {
@@ -25,7 +25,7 @@ const tool = defineTool({
       .trim()
       .min(1)
       .max(500)
-      .describe("The article url returned by find_help_article."),
+      .describe("The article url returned by widget_help_article."),
   }),
   outputSchema: z.union([
     z.object({

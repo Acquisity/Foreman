@@ -259,7 +259,7 @@ function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
 
 const CAVEATS = [
   "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost.",
-  "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; confirm the real charge and entitlement with read_autumn_billing and read_stripe_billing before promising a refund.",
+  "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
   "runState 'stalled' only means the order has not advanced in over 30 minutes; it is a heuristic, not a confirmed hung job.",
   "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
   "submissionId and provisioningFunctionId identify the background run; inspect that Inngest function for step-level failures. No cross-workspace run list is returned here.",

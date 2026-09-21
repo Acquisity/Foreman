@@ -14,7 +14,8 @@ import {
   widgetContext,
 } from "./widget-scope.js";
 
-const PROVIDER_TOOL = /widget_provider/;
+const EXCLUDED_TOOLS =
+  /widget_provider|find_function_runs|find_help_article|read_(autumn|stripe)_billing|planetscale_execute_read_query/;
 const NO_CUSTOMER_TEXT = /never address the customer/;
 const NO_SCOPE = /no valid verified scope/;
 
@@ -39,7 +40,7 @@ test("the widget lane keeps Executor helpers and strips repository and sandbox n
   assert.equal(lane.broadExecutor, false);
   assert.equal(lane.customer, true);
   assert.equal(lane.repository, false);
-  assert.match(lane.discovery, PROVIDER_TOOL);
+  assert.doesNotMatch(lane.discovery, EXCLUDED_TOOLS);
   assert.match(lane.instructions, NO_CUSTOMER_TEXT);
   assert.deepEqual(sandboxSessionOptions(auth), { networkPolicy: "deny-all" });
 });

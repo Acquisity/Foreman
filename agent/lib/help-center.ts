@@ -125,7 +125,7 @@ type FetchLike = (
 ) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
 /**
- * Fetch one help-center article's full markdown by the url `find_help_article`
+ * Fetch one help-center article's full markdown by the url the help search
  * returned, for a search -> read -> answer chat flow. The help center is public,
  * so this goes straight to the docs app rather than through the per-tenant
  * executor. Same-origin `/docs/<slug>` urls only; a failure returns `{ error }`

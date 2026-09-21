@@ -14,7 +14,7 @@ const tool = defineTool({
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
     "Search the public help center for articles relevant to the customer's inquiry. " +
-    "Returns up to 5 articles with title, url, and a brief snippet. " +
+    "Returns up to 5 articles with title and url only, no excerpt; read one with widget_read_help_article before answering from it. " +
     "An empty result is valid; error set means the search could not run.",
   execute({ query }, ctx) {
     if (!isWidgetSupport(ctx.session.auth.initiator)) {

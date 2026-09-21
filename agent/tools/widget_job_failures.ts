@@ -38,8 +38,9 @@ const timestamp = z
   .refine((value) => Number.isFinite(Date.parse(value)));
 
 // entityId is one of the org's OWN record ids (safe to surface). inngestRunId is
-// present only where the product row stores it (scrape), so a teammate can pull
-// the raw run via find_function_runs. Error TEXT is never returned — only hasError.
+// the scrape row's stored run id; for ai_sdr it is the internal execution_runs.id,
+// not a verified provider run id. No run reader exists in the widget lane. Error
+// TEXT is never returned — only hasError.
 const failure = z.object({
   area: z.enum(AREAS),
   entityId: z.string().max(128),
@@ -173,8 +174,8 @@ export async function readWidgetJobFailures(
     const covered = input.area ? [input.area] : [...AREAS];
     const caveats = [
       "Campaign sending problems are covered by widget_outreach_health.",
-      "CSV-import step detail is only in the Inngest run; use find_function_runs.",
-      "inngestRunId is present only for scrape runs; drill in with find_function_runs.",
+      "Run and CSV-import step detail cannot be read here; say the failing step could not be checked, and hand off to a person only when that detail is what the answer needs.",
+      "inngestRunId is a saved reference only: on lead_scrape rows it is the stored run id, on ai_sdr rows it is an internal run record id and not a provider run id. Provisioning rows have none.",
     ];
     return {
       caveats,
@@ -218,8 +219,8 @@ const tool = defineTool({
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
     "This workspace's recent FAILED background jobs, org-scoped: AI SDR agent runs, domain/inbox provisioning orders, and lead-scrape runs. " +
-    "Each failure carries the org's own entity id, a failed/requires_attention status, whether it recorded an error, and (scrape only) the Inngest run id to drill in with find_function_runs. " +
-    "Campaign-send problems use widget_outreach_health; import step detail is Inngest-only. unavailable means the records could not be read, distinct from an empty (no failures) result.",
+    "Each failure carries the org's own entity id, a failed/requires_attention status, whether it recorded an error, and a saved run reference (the stored run id for scrape; an internal run record id, not a provider run id, for AI SDR; none for provisioning). " +
+    "The run itself and import step detail cannot be inspected here: report what the saved row shows and what could not be checked. Campaign-send problems use widget_outreach_health. unavailable means the records could not be read, distinct from an empty (no failures) result.",
   execute: (input, ctx) => readWidgetJobFailures(ctx, input),
   inputSchema: widgetJobFailuresInput,
   outputSchema: widgetJobFailuresOutput,

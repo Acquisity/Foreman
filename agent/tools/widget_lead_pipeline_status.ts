@@ -19,7 +19,7 @@ const SCRAPE_RUN_LIMIT = 20;
 const DEFAULT_WINDOW_DAYS = 30;
 const MAX_WINDOW_DAYS = 90;
 // ponytail: a run older than this in a non-terminal status is called stuck; a
-// fixed threshold, not per-source SLAs. Confirm the live run with find_function_runs.
+// fixed threshold, not per-source SLAs. The live run cannot be read in the widget lane.
 const STUCK_MINUTES = 30;
 
 export const widgetLeadPipelineInput = z.strictObject({
@@ -51,7 +51,7 @@ const scrapeRun = z.object({
   declaredLeadCount: count.nullable(),
   finishedAt: timestamp.nullable(),
   id: z.uuid(),
-  // The Inngest/Apify run id; pivot to find_function_runs for the live trace.
+  // The Inngest/Apify run id as saved on the row; a reference only, no live trace here.
   runId: z.string().max(200).nullable(),
   source: scrapeSource,
   startedAt: timestamp.nullable(),
@@ -161,7 +161,7 @@ export function buildWidgetLeadPipelineQuery(
 const CAVEATS = [
   "Saved product state is not a live scraper, verification or Inngest run check.",
   "declaredLeadCount is the run's own tally; storedLeadCount counts leads that actually persisted, so a gap points to a scrape or verification that did not finish.",
-  "A stuck run is inferred from status and age; confirm the live run with find_function_runs using its runId before acting.",
+  "A stuck run is inferred from status and age, not confirmed: the live run cannot be read here, so say it looks stuck and what was not checked. widget_job_failures lists recorded scrape failures.",
   "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
   "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
   "Per-import step detail (rows expected versus processed, where an import stopped, integer overflow) lives in the process-campaign-add-leads Inngest run, not this saved state.",
@@ -281,7 +281,7 @@ export async function readWidgetLeadPipelineStatus(
 
 const tool = defineTool({
   description:
-    "Diagnose lead scraping and CSV import problems only in this chat's verified workspace. Returns the last 20 lead-scrape runs (status, source, action, Inngest/Apify runId, the run's declared lead count versus leads actually stored, verified leads, a stuck flag, and start/finish times), an import-activity summary (campaigns with leads, total campaign leads, and lead-ingestion credit transactions and credits used in the window), and a lead-count reconciliation (declared scrape totals versus persisted scrape leads versus campaign leads, with a discrepancy flag) so a low dashboard 'Leads Uploaded' figure or vanished leads can be explained. Optional sinceDays (1-90, default 30) bounds the scrape-run and credit window; reconciliation totals span all time. Saved state, not a live scraper check; use find_function_runs with a runId for the live Inngest trace. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose lead scraping and CSV import problems only in this chat's verified workspace. Returns the last 20 lead-scrape runs (status, source, action, Inngest/Apify runId, the run's declared lead count versus leads actually stored, verified leads, a stuck flag, and start/finish times), an import-activity summary (campaigns with leads, total campaign leads, and lead-ingestion credit transactions and credits used in the window), and a lead-count reconciliation (declared scrape totals versus persisted scrape leads versus campaign leads, with a discrepancy flag) so a low dashboard 'Leads Uploaded' figure or vanished leads can be explained. Optional sinceDays (1-90, default 30) bounds the scrape-run and credit window; reconciliation totals span all time. Saved state, not a live scraper check; the live run trace and CSV import step detail cannot be read here, and runId is a reference only. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetLeadPipelineStatus(ctx, input),
   inputSchema: widgetLeadPipelineInput,
