@@ -1,5 +1,13 @@
-import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+import {
+  type LanguageModelMiddleware,
+  simulateStreamingMiddleware,
+  wrapLanguageModel,
+} from "ai";
 import { ticketLinkedModel } from "./ticket-link-model.js";
+import {
+  nextActionEnabled,
+  widgetNextActionMiddleware,
+} from "./widget-next-action.js";
 
 /**
  * Read-only, org-scoped evidence for the in-app support lane: only the curated
@@ -174,8 +182,20 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
   };
 }
 
-export const widgetInvestigationModel = (id: string) =>
+/**
+ * With the Preview next-action pilot on, the selector sits inside the guard, so
+ * it only ever chooses among allowlisted tools the budget still permits. A step
+ * is generated whole and replayed as a stream, because a repeated read can only
+ * be caught, and the step redone, once the full call is known.
+ */
+export const widgetInvestigationModel = (id: string, sessionId?: string) =>
   wrapLanguageModel({
-    middleware: widgetInvestigationMiddleware(),
+    middleware: nextActionEnabled()
+      ? [
+          widgetInvestigationMiddleware(),
+          simulateStreamingMiddleware(),
+          widgetNextActionMiddleware({ sessionId }),
+        ]
+      : widgetInvestigationMiddleware(),
     model: ticketLinkedModel(id),
   });

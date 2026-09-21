@@ -8,10 +8,11 @@ import { isWidgetSupport } from "./lib/widget-scope.js";
 
 function investigationModel(
   auth: Parameters<typeof isWidgetSupport>[0],
-  id: string
+  id: string,
+  sessionId?: string
 ) {
   if (isWidgetSupport(auth)) {
-    return widgetInvestigationModel(id);
+    return widgetInvestigationModel(id, sessionId);
   }
   if (isFinInvestigation(auth)) {
     return finInvestigationModel(id);
@@ -42,7 +43,11 @@ export default defineAgent({
       "step.started": async (_event, ctx) => {
         const id = await resolveModel("orchestrator");
         return {
-          model: investigationModel(ctx.session.auth.initiator, id),
+          model: investigationModel(
+            ctx.session.auth.initiator,
+            id,
+            ctx.session.id
+          ),
           modelOptions: gatewayRouting(id),
         };
       },
