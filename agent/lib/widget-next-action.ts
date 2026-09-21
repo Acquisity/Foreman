@@ -32,13 +32,31 @@ const ARTICLE_TOOLS = new Set([
   "widget_read_help_article",
 ]);
 export const ASK_TOOL = "widget_ask_customer";
-export const ASK_TOOL_QUESTION = z
-  .string()
-  .trim()
-  .min(8)
-  .max(400)
-  .refine((text) => text.endsWith("?"), "Must be a question.");
-const askOutput = z.object({ asked: ASK_TOOL_QUESTION });
+/**
+ * The one contract for a recorded clarification, used by the tool when it runs,
+ * by the selector before it ends the turn, by the finish when it reads the
+ * result back, and by what may be delivered after review: 8 to 400 characters
+ * that contain a question. It may carry a short sentence after the question
+ * ("Which campaign is this about? Sharing its name will let me look at the right
+ * one." is the live case): that text is not trusted here, it goes through the
+ * ownership scan and the reviewer like any other reply.
+ *
+ * Eve hands the model the input schema as JSON schema, which cannot carry a
+ * refinement, and run 07133479 showed the deployed tool executing input the
+ * refinement rejects. So the schema below is only a shape; the tool's execute
+ * applies {@link validAsk} itself and returns an error the model can correct.
+ */
+export const ASK_MIN = 8;
+export const ASK_MAX = 400;
+export const validAsk = (value: unknown): string | null => {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text.length >= ASK_MIN && text.length <= ASK_MAX && text.includes("?")
+    ? text
+    : null;
+};
+export const ASK_ERROR = `Not recorded. Send one question for the customer, ${ASK_MIN} to ${ASK_MAX} characters, containing a question mark.`;
+/** How many times a turn may try to record its question before it writes findings the ordinary way. */
+const ASK_ATTEMPTS = 2;
 
 /**
  * The question a clarify decision recorded, read from the tool's own result the
@@ -60,8 +78,7 @@ export function askedResult(result: unknown): string | null {
   ) {
     return null;
   }
-  const parsed = askOutput.safeParse(action.output);
-  return parsed.success ? parsed.data.asked : null;
+  return validAsk((action.output as { asked?: unknown } | null)?.asked);
 }
 
 const ELIGIBLE_INSTRUCTIONS =
@@ -133,18 +150,10 @@ const parsed = (input: unknown) => {
   }
 };
 
-/** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
-export function turnEvidence(prompt: Params["prompt"]) {
-  const start = prompt.map((message) => message.role).lastIndexOf("user");
-  const user = prompt[start];
-  const question =
-    user?.role === "user"
-      ? user.content
-          .map((part) => (part.type === "text" ? part.text : ""))
-          .join("\n")
-      : "";
+/** Each tool call of the turn paired with its result. */
+function turnReads(messages: Params["prompt"]): Read[] {
   const reads = new Map<string, Read>();
-  for (const message of prompt.slice(start + 1)) {
+  for (const message of messages) {
     if (message.role === "system" || message.role === "user") {
       continue;
     }
@@ -163,6 +172,42 @@ export function turnEvidence(prompt: Params["prompt"]) {
       }
     }
   }
+  return [...reads.values()];
+}
+
+/** Every ask result this turn, and the question the latest one recorded, if it did. */
+function askState(messages: Params["prompt"]) {
+  const outputs = messages.flatMap((message) =>
+    message.role === "tool"
+      ? message.content.flatMap((part) =>
+          part.type === "tool-result" && part.toolName === ASK_TOOL
+            ? [part.output]
+            : []
+        )
+      : []
+  );
+  const last = outputs.at(-1);
+  return {
+    askAttempts: outputs.length,
+    asked:
+      last?.type === "json"
+        ? validAsk((last.value as { asked?: unknown } | null)?.asked)
+        : null,
+  };
+}
+
+/** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
+export function turnEvidence(prompt: Params["prompt"]) {
+  const start = prompt.map((message) => message.role).lastIndexOf("user");
+  const user = prompt[start];
+  const question =
+    user?.role === "user"
+      ? user.content
+          .map((part) => (part.type === "text" ? part.text : ""))
+          .join("\n")
+      : "";
+  const { askAttempts, asked } = askState(prompt.slice(start + 1));
+  const reads = turnReads(prompt.slice(start + 1));
   // The batch whose results just arrived sits right before them.
   const batch = prompt.at(-2);
   const lastCalls =
@@ -174,7 +219,10 @@ export function turnEvidence(prompt: Params["prompt"]) {
   const gathering = (tool: string) =>
     tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
   return {
-    asked: lastCalls.includes(ASK_TOOL),
+    // A call is not a recorded question: only a successful, valid result is.
+    askAttempts,
+    asked,
+    askFailed: lastCalls.includes(ASK_TOOL) && !asked,
     atToolResult: start >= 0 && prompt.at(-1)?.role === "tool",
     // Jev never picks an article or the ticket tool, so once workspace reads
     // exist, a batch made only of those can only have come from a finish. The
@@ -182,9 +230,9 @@ export function turnEvidence(prompt: Params["prompt"]) {
     finishing:
       lastCalls.length > 0 &&
       !lastCalls.some(gathering) &&
-      [...reads.values()].some((read) => gathering(read.tool)),
+      reads.some((read) => gathering(read.tool)),
     question,
-    reads: [...reads.values()],
+    reads,
   };
 }
 
@@ -380,7 +428,8 @@ const outcomeOf = (decision: string, detail: string) => {
     return "fallback";
   }
   return detail === "reason=already_finished" ||
-    detail === "reason=question_recorded"
+    detail === "reason=question_recorded" ||
+    detail === "reason=question_retry"
     ? "rule"
     : "jev";
 };
@@ -463,6 +512,61 @@ export function widgetNextActionMiddleware(
         : action === "finish" && ARTICLE_TOOLS.has(tool.name)
     ),
   });
+  // The tool said why the question was not recorded. One more try, then the
+  // ordinary write-up: never an "asked" with no question behind it.
+  const retryAsk = (
+    params: Params,
+    reads: Read[],
+    again: FunctionTool | false | undefined
+  ): Params => {
+    const retry =
+      again &&
+      forcedParams(params, { action: "clarify", confidence: 0 }, again);
+    if (!retry) {
+      log(
+        "fallback",
+        { ms: 0, step: reads.length },
+        "reason=question_not_recorded"
+      );
+      return finishParams(params, reads, "finish");
+    }
+    log(
+      "clarify",
+      { ms: 0, step: reads.length, tool: ASK_TOOL },
+      "reason=question_retry"
+    );
+    plans.set(retry.params, { original: params, reads, tool: ASK_TOOL });
+    return retry.params;
+  };
+  /** What the turn's own tool results already decided, so Jev is not asked again. */
+  const alreadySettled = (
+    params: Params,
+    askTool: FunctionTool | undefined,
+    turn: Pick<
+      ReturnType<typeof turnEvidence>,
+      "askAttempts" | "asked" | "askFailed" | "finishing" | "reads"
+    >
+  ): Params | null => {
+    const step = { ms: 0, step: turn.reads.length };
+    if (turn.asked) {
+      // The question is recorded as data; nothing is left to write.
+      log("clarify", step, "reason=question_recorded");
+      return finishParams(params, turn.reads, "asked");
+    }
+    if (turn.askFailed) {
+      return retryAsk(
+        params,
+        turn.reads,
+        turn.askAttempts < ASK_ATTEMPTS && askTool
+      );
+    }
+    if (turn.finishing) {
+      // Grounding a step in an article must not reopen the workspace investigation.
+      log("finish", step, "reason=already_finished");
+      return finishParams(params, turn.reads, "finish");
+    }
+    return null;
+  };
   return {
     specificationVersion: "v4",
     async transformParams({ params: incoming }) {
@@ -481,25 +585,27 @@ export function widgetNextActionMiddleware(
           ? [{ description: tool.description ?? "", name: tool.name }]
           : []
       );
-      const { asked, atToolResult, finishing, question, reads } = turnEvidence(
-        params.prompt
-      );
+      const {
+        askAttempts,
+        asked,
+        askFailed,
+        atToolResult,
+        finishing,
+        question,
+        reads,
+      } = turnEvidence(params.prompt);
       if (!atToolResult || tools.length === 0) {
         return params;
       }
-      if (asked) {
-        // The question is already recorded as data; nothing is left to write.
-        log(
-          "clarify",
-          { ms: 0, step: reads.length },
-          "reason=question_recorded"
-        );
-        return finishParams(params, reads, "asked");
-      }
-      if (finishing) {
-        // Grounding a step in an article must not reopen the workspace investigation.
-        log("finish", { ms: 0, step: reads.length }, "reason=already_finished");
-        return finishParams(params, reads, "finish");
+      const settled = alreadySettled(params, askTool, {
+        askAttempts,
+        asked,
+        askFailed,
+        finishing,
+        reads,
+      });
+      if (settled) {
+        return settled;
       }
       const startedAt = Date.now();
       const fields = () => ({

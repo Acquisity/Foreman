@@ -26,6 +26,7 @@ import {
   askedResult,
   handoffEligible,
   nextActionEnabled,
+  validAsk,
 } from "./widget-next-action.js";
 import {
   DECISION_CONTEXT,
@@ -481,8 +482,8 @@ const askedFindings = (asked: string) =>
   });
 
 const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
-  const left = findings.recommendation.trim();
-  return Promise.resolve(left.endsWith("?") ? left : "");
+  // The same contract the question was recorded under, applied to what is left.
+  return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
 /** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
