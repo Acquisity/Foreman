@@ -123,13 +123,13 @@ const sentryPayload = {
       tags: { organizationId: scope.organizationId },
       title: "Empty model response for Ask AI",
     },
-    {
-      count: 40,
-      lastSeen: t3,
-      tags: { organizationId: foreignOrg },
-      title: "OtherWorkspaceError: leaked detail",
-    },
   ],
+};
+const foreignSentryIssue = {
+  count: 40,
+  lastSeen: t3,
+  tags: { organizationId: foreignOrg },
+  title: `OtherWorkspaceError: leaked detail for ${scope.organizationId}`,
 };
 const axiomPayload = {
   rows: [
@@ -138,12 +138,6 @@ const axiomPayload = {
       count: "4",
       errorClass: "GenerationTimeoutError",
       organizationId: scope.organizationId,
-    },
-    {
-      _time: t3,
-      count: 9,
-      errorClass: "ForeignOrgError",
-      organizationId: foreignOrg,
     },
   ],
 };
@@ -290,13 +284,14 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
     (entry) => (entry.arguments as unknown[])[1] === SENTRY_PATH
   );
   assert.ok(sentryCall);
-  assert.equal(
-    (sentryCall.arguments as unknown[]).length &&
-      (
-        sentryCall.arguments as [unknown, unknown, { query: string }]
-      )[2].query.includes(scope.organizationId),
-    true
-  );
+  // The live search_issues contract: required slug, separate period, explicit syntax only.
+  assert.deepEqual((sentryCall.arguments as unknown[])[2], {
+    limit: 20,
+    organizationSlug: "acquisity-monitoring",
+    period: "7d",
+    query: `is:unresolved organizationId:${scope.organizationId}`,
+    sort: "freq",
+  });
 });
 
 test("output matches the schema, aggregates copy-review, and sanitizes org-gated signals", async (t) => {
@@ -336,12 +331,9 @@ test("output matches the schema, aggregates copy-review, and sanitizes org-gated
   assert.ok(
     result.signals.sentry.items.some((item) => item.kind === "empty_response")
   );
-  // Foreign workspace rows and every raw message are dropped.
+  // Every raw message is dropped.
   const serialized = JSON.stringify(result);
-  assert.equal(serialized.includes(foreignOrg), false);
-  assert.equal(serialized.includes("leaked detail"), false);
   assert.equal(serialized.includes("undefined signOffName"), false);
-  assert.equal(serialized.includes("ForeignOrgError"), false);
   for (const item of [
     ...result.signals.sentry.items,
     ...result.signals.axiom.items,
@@ -422,28 +414,114 @@ test("a signal source is unavailable, never empty, when it errors or is unconfig
   process.env.WIDGET_AXIOM_APP_DATASET = "acquisity-app-logs";
 });
 
-test("toSignals drops foreign rows and sanitizeErrorClass strips messages", () => {
+test("sanitizeErrorClass strips messages", () => {
   assert.equal(
     sanitizeErrorClass("TypeError: bad thing at file.ts:12"),
     "TypeError"
   );
   assert.equal(sanitizeErrorClass("  "), "UnknownError");
   assert.equal(sanitizeErrorClass({ not: "a string" }), "UnknownError");
-  const signals = toSignals(
+});
+
+const mine = {
+  count: 2,
+  errorClass: "MineError",
+  lastSeen: t1,
+  organizationId: scope.organizationId,
+};
+const unavailable = { items: [], status: "unavailable" };
+
+test("toSignals accepts only exact structured ownership", () => {
+  const owned = toSignals(
     [
+      mine,
+      { count: 1, tags: { organizationId: scope.organizationId }, title: "A" },
       {
-        count: 2,
-        errorClass: "MineError",
-        lastSeen: t1,
-        organizationId: scope.organizationId,
+        count: 1,
+        tags: [{ key: "organizationId", value: scope.organizationId }],
+        title: "B",
       },
-      { count: 9, errorClass: "TheirError", organizationId: foreignOrg },
-      "not an object",
     ],
     scope
   );
-  assert.equal(signals.length, 1);
-  assert.equal(signals[0].errorClass, "MineError");
+  assert.equal(owned.status, "ok");
+  assert.deepEqual(owned.items.map((item) => item.errorClass).sort(), [
+    "A",
+    "B",
+    "MineError",
+  ]);
+  // A genuinely scoped empty result is a real zero.
+  assert.deepEqual(toSignals([], scope), { items: [], status: "ok" });
+});
+
+test("toSignals refuses foreign, unowned and malformed rows instead of reporting a count", () => {
+  const cases: Record<string, unknown[] | null> = {
+    "conflicting owners": [{ ...mine, tags: { organizationId: foreignOrg } }],
+    "foreign row whose text mentions this workspace": [
+      mine,
+      {
+        count: 9,
+        errorClass: "TheirError",
+        message: `failure while reading ${scope.organizationId}`,
+        organizationId: foreignOrg,
+      },
+    ],
+    "foreign tag with this workspace only in the title": [foreignSentryIssue],
+    "missing ownership": [
+      { count: 3, message: scope.organizationId, title: "NoOwnerError" },
+    ],
+    "non-object row": [mine, "not an object"],
+    "non-string owner": [{ ...mine, organizationId: [scope.organizationId] }],
+    "unrecognized shape": null,
+  };
+  for (const [name, rows] of Object.entries(cases)) {
+    assert.deepEqual(toSignals(rows, scope), unavailable, name);
+  }
+});
+
+test("signal sources stay inconclusive end to end unless ownership is verified", async (t) => {
+  const sentryMarkdown = {
+    content: [
+      {
+        text: `# Search Results for "is:unresolved organizationId:${scope.organizationId}"\n\nFound **1** issues:\n\n## 1. [ACQUISITY-1](https://x.sentry.io/issues/ACQUISITY-1)\n\n**OtherWorkspaceError: leaked detail**\n\n- **Events**: 40`,
+        type: "text",
+      },
+    ],
+  };
+  const cases: { axiom: unknown; sentry: unknown; want: string }[] = [
+    // The live Sentry MCP answers in markdown with no per-issue owner.
+    {
+      axiom: mcp({ unexpected: true }),
+      sentry: sentryMarkdown,
+      want: "unavailable",
+    },
+    {
+      axiom: mcp({ rows: [{ count: 1, errorClass: "NoOwnerError" }] }),
+      sentry: mcp({ issues: [...sentryPayload.issues, foreignSentryIssue] }),
+      want: "unavailable",
+    },
+    { axiom: mcp({ rows: [] }), sentry: mcp({ issues: [] }), want: "ok" },
+  ];
+  for (const { axiom, sentry, want } of cases) {
+    const transport = mockTransport(t, {
+      axiom,
+      db: dbEnvelope(dbRows),
+      sentry,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each case swaps the one shared transport mock.
+    const result = await readWidgetGenerationDiagnostics(ctx, {});
+    transport.mock.restore();
+    if (result.status !== "ok") {
+      assert.fail("expected ok");
+    }
+    assert.equal(result.signals.sentry.status, want);
+    assert.equal(result.signals.axiom.status, want);
+    assert.deepEqual(result.signals.sentry.items, []);
+    assert.deepEqual(result.signals.axiom.items, []);
+    const serialized = JSON.stringify(result);
+    assert.equal(serialized.includes("leaked detail"), false);
+    assert.equal(serialized.includes(foreignOrg), false);
+  }
 });
 
 test("non-widget sessions are refused before any dispatch", async (t) => {

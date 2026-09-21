@@ -221,8 +221,10 @@ const toTimestamp = (raw: unknown): string | null =>
     ? raw
     : null;
 
-/** Pull the row array out of whatever envelope the signal provider returned. */
-function collectRows(parsed: unknown): unknown[] {
+const ROW_KEYS = ["issues", "events", "data", "results", "rows", "matches"];
+
+/** The row array from a recognized envelope, or null when the shape is not one we know. */
+function collectRows(parsed: unknown): unknown[] | null {
   const flatten = (rows: unknown[]): unknown[] =>
     rows
       .slice(0, CANDIDATE_LIMIT)
@@ -239,31 +241,83 @@ function collectRows(parsed: unknown): unknown[] {
     return flatten(parsed);
   }
   if (parsed && typeof parsed === "object") {
-    for (const key of [
-      "issues",
-      "events",
-      "data",
-      "results",
-      "rows",
-      "matches",
-    ]) {
+    for (const key of ROW_KEYS) {
       const value = (parsed as Record<string, unknown>)[key];
       if (Array.isArray(value)) {
         return flatten(value);
       }
     }
   }
-  return [];
+  return null;
+}
+
+const OWNER_KEY = "organizationId";
+
+/**
+ * Every workspace id a row structurally claims. Only the exact fields the app
+ * stamps count: the `organizationId` Sentry tag (apps/web/trpc/init.ts), as a
+ * tag object or Sentry's `[{ key, value }]` tag list, and the top-level
+ * `organizationId` column our Axiom summarize projects. Free text never counts.
+ */
+function rowOwners(record: Record<string, unknown>): string[] {
+  const owners: unknown[] = [];
+  if (OWNER_KEY in record) {
+    owners.push(record[OWNER_KEY]);
+  }
+  const { tags } = record;
+  if (Array.isArray(tags)) {
+    for (const tag of tags) {
+      if (
+        tag &&
+        typeof tag === "object" &&
+        (tag as { key?: unknown }).key === OWNER_KEY
+      ) {
+        owners.push((tag as { value?: unknown }).value);
+      }
+    }
+  } else if (tags && typeof tags === "object" && OWNER_KEY in tags) {
+    owners.push((tags as Record<string, unknown>)[OWNER_KEY]);
+  }
+  return owners.map((owner) =>
+    typeof owner === "string" ? owner.toLowerCase() : ""
+  );
+}
+
+function readSignal(record: Record<string, unknown>) {
+  const source =
+    record.errorClass ??
+    record.error ??
+    record.title ??
+    record.culprit ??
+    record.msg ??
+    record.message ??
+    record.type;
+  const errorClass = sanitizeErrorClass(source);
+  const kind = classifyKind(typeof source === "string" ? source : "");
+  const rowCount = toCount(
+    record.count ?? record.events ?? record.total ?? record.userCount ?? 1
+  );
+  const lastSeen = toTimestamp(
+    record.lastSeen ?? record.last_seen ?? record._time ?? record.timestamp
+  );
+  return { errorClass, kind, lastSeen, rowCount };
 }
 
 /**
- * Sanitize signal candidates and DROP anything not carrying this workspace's id.
- * Sentry and Axiom hold every customer's telemetry, so the org gate is the wall.
+ * Sanitize signal candidates. Sentry and Axiom hold every customer's telemetry,
+ * so the read was scoped to this workspace and every row must prove it with an
+ * exact structured owner. A row that is foreign, unowned or malformed means the
+ * scope did not hold, so the whole source is unavailable: a partial list could
+ * hide this workspace's own rows behind the limit and must not read as a count.
  */
 export function toSignals(
-  rows: unknown[],
+  rows: unknown[] | null,
   scope: WidgetContext
-): z.infer<typeof signal>[] {
+): SourceSignals {
+  const unavailable: SourceSignals = { items: [], status: "unavailable" };
+  if (!rows) {
+    return unavailable;
+  }
   const orgId = scope.organizationId.toLowerCase();
   const merged = new Map<
     string,
@@ -275,32 +329,16 @@ export function toSignals(
     }
   >();
   for (const row of rows) {
-    if (!row || typeof row !== "object") {
-      continue;
-    }
-    // The org id is stamped as a Sentry tag and an Axiom top-level field; if it
-    // is absent from the record, the record is another workspace's and is dropped.
-    if (!JSON.stringify(row).toLowerCase().includes(orgId)) {
-      continue;
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      return unavailable;
     }
     const record = row as Record<string, unknown>;
-    const source =
-      record.errorClass ??
-      record.error ??
-      record.title ??
-      record.culprit ??
-      record.msg ??
-      record.message ??
-      record.type;
-    const errorClass = sanitizeErrorClass(source);
-    const kind = classifyKind(typeof source === "string" ? source : "");
-    const rowCount = toCount(
-      record.count ?? record.events ?? record.total ?? record.userCount ?? 1
-    );
-    const lastSeen = toTimestamp(
-      record.lastSeen ?? record.last_seen ?? record._time ?? record.timestamp
-    );
-    const key = `${kind} ${errorClass}`;
+    const owners = rowOwners(record);
+    if (!(owners.length > 0 && owners.every((owner) => owner === orgId))) {
+      return unavailable;
+    }
+    const { errorClass, kind, lastSeen, rowCount } = readSignal(record);
+    const key = `${kind} ${errorClass}`;
     const prev = merged.get(key);
     if (prev) {
       prev.count += rowCount;
@@ -311,9 +349,12 @@ export function toSignals(
       merged.set(key, { count: rowCount, errorClass, kind, lastSeen });
     }
   }
-  return [...merged.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, SIGNAL_LIMIT);
+  return {
+    items: [...merged.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, SIGNAL_LIMIT),
+    status: "ok",
+  };
 }
 
 const dbRow = z.object({
@@ -451,22 +492,26 @@ async function readSentrySignals(
   scope: WidgetContext,
   window: WindowKey
 ): Promise<SourceSignals> {
-  // ponytail: Foreman's Sentry org slug is deployment config; unset means the
-  // wiring is absent, which is unavailable, not an empty result. Confirm the
-  // search_issues arg shape against the live catalog before relying on prod rows.
+  // The org slug is deployment config; unset means unavailable, not empty.
+  // Checked live 2026-09-21 (Sentry MCP 0.39.0): search_issues requires
+  // organizationSlug, takes period (24h|7d|14d|30d|90d) and limit, and answers
+  // in markdown with no per-issue tags. Its embedded agent also dropped an
+  // explicit organizationId: filter and returned other workspaces' issues. So
+  // ownership cannot be verified from this operation today and the source
+  // reports unavailable until the provider returns structured, tagged rows.
   const organizationSlug = process.env.WIDGET_SENTRY_ORG_SLUG;
   if (!organizationSlug) {
     return { items: [], status: "unavailable" };
   }
   try {
     const data = await dispatchWidget(ctx, SENTRY_ISSUES_PATH, {
+      limit: SIGNAL_LIMIT,
       organizationSlug,
-      query: `is:unresolved organizationId:${scope.organizationId} AI SDR generation, copy or model-call errors in the last ${WINDOWS[window].apl}`,
+      period: window,
+      query: `is:unresolved organizationId:${scope.organizationId}`,
+      sort: "freq",
     });
-    return {
-      items: toSignals(collectRows(providerData(data)), scope),
-      status: "ok",
-    };
+    return toSignals(collectRows(providerData(data)), scope);
   } catch {
     return { items: [], status: "unavailable" };
   }
@@ -492,16 +537,13 @@ async function readAxiomSignals(
       `| where _time > ago(${WINDOWS[window].apl})`,
       `| where ['fields.organizationId'] == '${scope.organizationId}'`,
       "| where level == 'error'",
-      // The workspace stays in each row: toSignals drops any row that lacks it.
+      // The workspace stays in each row: toSignals refuses the source if any row lacks it.
       "| summarize count = count(), lastSeen = max(_time) by organizationId = ['fields.organizationId'], errorClass = coalesce(tostring(['fields.event']), message)",
       "| sort by count desc",
       `| limit ${SIGNAL_LIMIT}`,
     ].join("\n");
     const data = await dispatchWidget(ctx, AXIOM_QUERY_PATH, { apl });
-    return {
-      items: toSignals(collectRows(providerData(data)), scope),
-      status: "ok",
-    };
+    return toSignals(collectRows(providerData(data)), scope);
   } catch {
     return { items: [], status: "unavailable" };
   }
@@ -510,7 +552,7 @@ async function readAxiomSignals(
 const CAVEATS = [
   "Decisions are recorded AI SDR agent runs; a blocked copy-review means the gate held before send, not that a customer received the email.",
   "Error and empty signals are reduced to a class, kind and count; the underlying logs, prompts, messages and model names are never included.",
-  "A source marked unavailable was unreachable or unconfigured; it is not a zero. Unavailable is not empty.",
+  "A source marked unavailable was unreachable, unconfigured, or returned rows whose workspace could not be verified; it is not a zero. Unavailable is not empty.",
   "All counts cover the selected window only, and saved state is not a live model check.",
 ];
 
