@@ -51,6 +51,14 @@ The `widget.review.items` line now carries JEV's own outcome in `code`, the fina
 
 Numbered steps: the sentence splitter ended a sentence at a list marker, so "2." became its own item, was reviewed as a claim, and was deleted on its own in the inbox replay. A marker of one or two digits now stays with the step that follows it. This applies to both reviewers.
 
+## Keeping what is unconfirmed
+
+Live fallback replays of `9151613` showed the existing reviewer deleting an answer's only caveat as "internal telemetry" and blocking a plain "no failed runs" answer as internal job detail. The limitation rules had been given to JEV only, and nothing looked at the answer left after deletions.
+
+- One shared `LIMITATION_POLICY` text is now part of both reviewers' prompts: the outcomes and counts of the workspace's own jobs and runs are product facts; a limitation is kept for what it leaves unconfirmed, as is a statement of what a finding does not establish; never remove the only item that says what could not be checked; an item that only reports an unreadable internal source is still internal detail. This changes the existing reviewer's prompt for every widget answer, not only under the JEV flag.
+- The deletion-only rewrite now refuses any deletion set after which findings that stated something unconfirmed no longer state anything unconfirmed (`model_gate:removed_last_caveat`). It checks the remaining answer as a whole, so it covers either reviewer, the JEV plus fallback union, and the deterministic identifier deletions. It blocks; it never restores an item a reviewer wanted gone. The check is a word list (`CAVEAT` in `widget-egress.ts`): it can miss a caveat worded another way, which is why the prompt rule comes first, and a false match only costs a block.
+- Teammate summaries: the investigator and extractor are told the report keeps the certainty of the facts (no matching payment record is "not confirmed", never "unpaid"). The provisioning tool's caveats now say `paidAt` is the order's own saved date, not a link to a charge, so an order is called paid only when a billing record ties a payment to it.
+
 ## Limitations that name an internal source
 
 The live replay of `d2b286d` still blocked the provisioning answer on one item: a statement that a run trace and per-step detail were "not readable" (wording keep at 0.18, material at 0.55, `uncertain_not_removable`). Three instructions collided on it: the investigator is told to say when something sits outside its tools, the extractor is told to make every such statement its own fact, and the reviewer is told both to remove internal operations detail and to keep honest limitations. Limitations that were kept cleanly in the same replays state what is unconfirmed for the customer (sending-account health, model-call errors); this one named only the internal source.

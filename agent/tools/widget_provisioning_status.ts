@@ -289,7 +289,7 @@ function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
 }
 
 const CAVEATS = [
-  "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost.",
+  "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost. paidAt is the order's own saved paid date, not a link to an invoice or charge: say the order records a paid date, call an order paid only when a billing record ties a payment to that order, and otherwise say payment for it could not be confirmed.",
   "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
   "runState 'stalled' only means the order has not advanced in over 30 minutes; it is a heuristic, not a confirmed hung job.",
   "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",

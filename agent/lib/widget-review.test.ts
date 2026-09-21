@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { gate, redactableItems } from "./widget-egress.js";
+import {
+  type GateDeps,
+  gate,
+  redactableItems,
+  removesLastCaveat,
+} from "./widget-egress.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import { reviewWidgetFindings } from "./widget-review.js";
 
@@ -90,7 +95,11 @@ test("JEV removal uses existing gate plumbing and preserves billing handoff fact
 });
 
 test("a rewrite that deletes every fact of a handoff hands off instead of answering", async () => {
-  const result = await gate(scope, input.question, findings, {
+  const plain = {
+    ...findings,
+    facts: [{ ...findings.facts[0], claim: "Three inboxes are live." }],
+  } as WidgetFindings;
+  const result = await gate(scope, input.question, plain, {
     compose: () => assert.fail("must not compose"),
     judge: () =>
       Promise.resolve({ decision: "rewrite", reason: "x", remove: [1] }),
@@ -374,6 +383,151 @@ test("a fallback failure blocks at the gate, and a fallback answer keeps caveats
   assert.deepEqual(
     answered.shown,
     overlap.facts.slice(0, 2).map((fact) => fact.claim)
+  );
+});
+
+// The live fallback failures. The generation answer's only caveat was deleted as
+// "internal telemetry"; whoever asks for that deletion, the remaining answer would
+// claim a clean bill of health that was never verified, so the gate refuses it.
+const twoItems = (claim: string, recommendation: string): WidgetFindings => ({
+  ...findings,
+  facts: [{ ...findings.facts[0], claim }] as WidgetFindings["facts"],
+  needsHuman: false,
+  recommendation,
+});
+const gateWith = (subject: WidgetFindings, judge: GateDeps["judge"]) => {
+  let shown: string[] | undefined;
+  return gate(scope, input.question, subject, {
+    compose: ({ findings: retained }) => {
+      shown = [
+        ...retained.facts.map((fact) => fact.claim),
+        retained.recommendation,
+      ];
+      return Promise.resolve("ok");
+    },
+    judge,
+    resolve: async () => owned,
+  }).then((result) => ({ result, shown }));
+};
+
+test("no reviewer, alone or combined, can delete the last statement of what is unconfirmed", async () => {
+  const generation = twoItems(
+    "No saved copy-review blocks were found in the last seven days.",
+    "Model-call error telemetry was unavailable, so that part remains unknown."
+  );
+  const job = twoItems(
+    "No failed runs were recorded in the last seven days.",
+    "This does not establish that every job completed."
+  );
+  for (const subject of [generation, job]) {
+    // The existing reviewer on its own.
+    // biome-ignore lint/performance/noAwaitInLoops: a failure names its case.
+    const direct = await gateWith(subject, () =>
+      Promise.resolve({ decision: "rewrite", reason: "internal", remove: [2] })
+    );
+    assert.deepEqual(
+      [direct.result.decision, direct.result.reason, direct.shown],
+      ["block", "model_gate:removed_last_caveat", undefined]
+    );
+    // JEV unsure, the fallback deletes it: the combined set is refused too.
+    const viaFallback = await gateWith(subject, (data) =>
+      reviewWidgetFindings(data, {
+        apiKey: "test",
+        fallback: () =>
+          Promise.resolve({
+            decision: "rewrite",
+            reason: "internal",
+            remove: [2],
+          }),
+        fetch: mock(answers({ item_2: answer("remove", 0.36) })),
+        log: () => undefined,
+      })
+    );
+    assert.equal(viaFallback.result.reason, "model_gate:removed_last_caveat");
+    // Kept, the product-job fact and its limit reach the customer word for word.
+    const kept = await gateWith(subject, () =>
+      Promise.resolve({ decision: "allow", reason: "ok" })
+    );
+    assert.deepEqual(kept.shown, [
+      subject.facts[0]?.claim,
+      subject.recommendation,
+    ]);
+  }
+});
+
+test("deletions spread across reviewers are judged by the answer that remains", async () => {
+  // Payment uncertainty stated twice plus an aside. JEV confidently deletes one
+  // statement, the fallback the other: each is fine alone, together they leave
+  // only "the order is completed".
+  const payment: WidgetFindings = {
+    ...findings,
+    facts: [
+      "The order is completed.",
+      "Payment for this order could not be confirmed.",
+      "No record links the order to a charge, so attribution is unknown.",
+    ].map((claim) => ({
+      ...findings.facts[0],
+      claim,
+    })) as WidgetFindings["facts"],
+    recommendation: "",
+  };
+  const run = (fallbackRemove: number[]) =>
+    gateWith(payment, (data) =>
+      reviewWidgetFindings(data, {
+        apiKey: "test",
+        fallback: () =>
+          Promise.resolve({
+            decision: "rewrite",
+            reason: "x",
+            remove: fallbackRemove,
+          }),
+        fetch: mock(
+          answers(
+            {
+              item_1: answer("keep", 0.5),
+              item_2: answer("remove"),
+              need_2: answer("dispensable"),
+            },
+            3
+          )
+        ),
+        log: () => undefined,
+      })
+    );
+  const both = await run([3]);
+  assert.equal(both.result.reason, "model_gate:removed_last_caveat");
+  assert.equal(both.result.findings.needsHuman, true);
+  assert.equal(both.result.findings.facts.length, 3);
+  // One statement of the uncertainty surviving is enough to answer.
+  const one = await run([1]);
+  assert.equal(one.result.decision, "rewrite");
+  assert.deepEqual(one.shown, [payment.facts[2]?.claim, ""]);
+  assert.equal(one.result.findings.needsHuman, true);
+});
+
+test("the caveat check leaves ordinary rewrites alone", () => {
+  const text = (...texts: string[]) => texts.map((t) => ({ text: t }));
+  const caveat = "Whether it was charged cannot be settled.";
+  assert.equal(
+    removesLastCaveat(
+      text("Three inboxes are live.", "Buy again."),
+      text("Three inboxes are live.")
+    ),
+    false
+  );
+  assert.equal(
+    removesLastCaveat(
+      text("Three inboxes are live.", caveat),
+      text("Three inboxes are live.")
+    ),
+    true
+  );
+  assert.equal(
+    removesLastCaveat(
+      text(caveat, "The run trace is not readable."),
+      text(caveat)
+    ),
+    false
   );
 });
 

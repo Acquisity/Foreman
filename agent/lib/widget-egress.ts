@@ -8,7 +8,7 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { reviewWidgetFindings } from "./widget-review.js";
+import { LIMITATION_POLICY, reviewWidgetFindings } from "./widget-review.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
@@ -309,6 +309,25 @@ export function redactableItems(findings: WidgetFindings): RedactableItem[] {
   return items.map((item, index) => ({ ...item, n: index + 1 }));
 }
 
+// ponytail: a word list, not understanding. It misses a caveat phrased another
+// way (the reviewers' policy is the first defence) and can count a non-caveat,
+// which only costs an extra block. Upgrade path: a structured caveat flag on facts.
+const CAVEAT =
+  /\b(?:cannot|can(?:'|’)t|could(?: not|n(?:'|’)t)|unable|unknown|uncertain|unconfirmed|unverified|unavailable|not (?:be |been |yet )?(?:confirmed|verified|checked|established|settled|known|readable|available)|does not (?:establish|show|prove|mean))\b/iu;
+
+/**
+ * Looks at the answer that would remain, not at each deletion: findings that
+ * said something was unconfirmed must still say so afterwards. Whoever asked
+ * for the deletions, an answer stripped of its last caveat claims more than was
+ * verified, so it is refused and the caller blocks.
+ */
+export const removesLastCaveat = (
+  before: { text: string }[],
+  kept: { text: string }[]
+): boolean =>
+  before.some((item) => CAVEAT.test(item.text)) &&
+  !kept.some((item) => CAVEAT.test(item.text));
+
 /**
  * Apply a rewrite by deletion only. The judge names item numbers and this
  * removes them, so a rewrite can drop content but can never add or reword any:
@@ -339,7 +358,10 @@ export function removeItems(
   const facts = findings.facts.filter((_fact, index) =>
     keptFacts.has(index + 1)
   );
-  if (facts.length === 0 && !recommendation) {
+  if (
+    (facts.length === 0 && !recommendation) ||
+    removesLastCaveat(items, kept)
+  ) {
     return null;
   }
   const { needsWrite, ...rest } = findings;
@@ -362,6 +384,7 @@ export function removeItems(
 const JUDGE_PROMPT = `You are the egress gate between an internal investigator and a customer of Acquisity. You receive the verified customer scope, the customer's question, and the investigator's findings. Decide whether the findings can be shown to this customer.
 Block when any fact or the recommendation discloses data belonging to a different workspace or customer, personal details of an individual who is not part of the verified workspace (another customer, another user's account, an Acquisity employee), or internal operations detail (systems, dashboards, logs, employees, deployments, error traces, tickets other than findings.ticket).
 Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block. Naming Stripe for the customer's own billing, or Instantly for their own sending accounts, is not internal operations detail. Remove an item whose point is what another outside service (such as Autumn, Sentry, Axiom, Inngest, Vercel) shows or did; an item that merely names one while stating a fact about the customer's workspace can stay, because the reply writer drops the name.
+${LIMITATION_POLICY}
 Also remove an item that tells the customer to buy again, place a new order or pay again while the findings leave the original payment or delivery unresolved, and an item that promises sending or other activity will resume.
 Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
 
@@ -443,7 +466,14 @@ function applyRewrite(
 ): WidgetFindings | string {
   const rewritten = removeItems(findings, remove);
   if (!rewritten) {
-    return "model_gate:invalid_rewrite";
+    const items = redactableItems(findings);
+    const drop = new Set(remove);
+    return removesLastCaveat(
+      items,
+      items.filter((item) => !drop.has(item.n))
+    )
+      ? "model_gate:removed_last_caveat"
+      : "model_gate:invalid_rewrite";
   }
   return handoffOnly(rewritten) ? "needs_human" : rewritten;
 }
