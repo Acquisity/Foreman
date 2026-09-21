@@ -27,6 +27,17 @@ const DFY_ORDER_FUNCTION_ID = "ai-clients.campaigns.create-dfy-order";
 // provisioning poll interval changes and false-stalls show up.
 const STALL_MS = 30 * 60_000;
 
+// DFY orders carry their inbox quantity in dfy_config.mailboxes (domain ->
+// mailbox list), not inbox_count_per_domain; Acquisity's domain purchase
+// processor sums those lists. Only the aggregate leaves the database, and any
+// missing, empty or non-array entry yields null rather than a partial count.
+const DFY_INBOX_COUNT = `(select case when count(*) > 0 and bool_and(
+        case when jsonb_typeof(mb.value) = 'array' then jsonb_array_length(mb.value) > 0 else false end)
+      then sum(case when jsonb_typeof(mb.value) = 'array' then jsonb_array_length(mb.value) end)::int end
+      from jsonb_each(case when dpo.order_type = 'dfy'
+        and jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'
+        then dpo.dfy_config -> 'mailboxes' else '{}'::jsonb end) mb)`;
+
 export const widgetProvisioningInput = z.strictObject({});
 export type WidgetProvisioningInput = z.infer<typeof widgetProvisioningInput>;
 
@@ -63,11 +74,20 @@ const reconciliation = z.object({
   domainsFailed: count,
   domainsMissing: count,
   domainsProvisionedCounter: count,
-  fullyProvisioned: z.boolean(),
+  fullyProvisioned: z
+    .boolean()
+    .nullable()
+    .describe("null when the ordered inbox quantity is unknown"),
   inboxesActive: count,
-  inboxesCharged: count,
+  inboxesCharged: count
+    .nullable()
+    .describe(
+      "Ordered inbox quantity from the saved order, not proof of a charge; null when a DFY order's mailbox configuration is missing or malformed"
+    ),
   inboxesConnected: count,
-  inboxesMissing: count,
+  inboxesMissing: count
+    .nullable()
+    .describe("null when the ordered inbox quantity is unknown"),
   inboxesProvisionedCounter: count,
   invisibleInboxes: z.boolean(),
 });
@@ -137,6 +157,7 @@ export function buildWidgetProvisioningQuery(
       dpo.billing_account_id as "billingAccountId", dpo.submission_id as "submissionId",
       dpo.domain_count as "domainCount", dpo.inbox_count_per_domain as "inboxCountPerDomain",
       dpo.domains_provisioned as "domainsProvisioned", dpo.inboxes_provisioned as "inboxesProvisioned",
+      ${DFY_INBOX_COUNT} as "dfyInboxCount",
       dpo.dismissed, (dpo.error is not null and dpo.error <> '') as "hasError",
       coalesce((dpo.provisioning_log ->> 'totalAttempts')::int, 0) as "provisioningAttempts",
       (dpo.provisioning_log ->> 'lastUpdated') as "provisioningLastUpdated",
@@ -164,6 +185,7 @@ const rawOrder = z.object({
   completedAt: timestamp.nullable(),
   connectedInboxRows: count,
   createdAt: timestamp,
+  dfyInboxCount: count.nullable(),
   dismissed: z.boolean(),
   domainCount: count,
   domainRows: count,
@@ -214,9 +236,15 @@ function deriveRunState(
 }
 
 function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
-  const inboxesCharged = row.domainCount * row.inboxCountPerDomain;
+  const inboxesCharged =
+    row.orderType === "dfy"
+      ? row.dfyInboxCount
+      : row.domainCount * row.inboxCountPerDomain;
   const domainsMissing = Math.max(0, row.domainCount - row.activeDomainRows);
-  const inboxesMissing = Math.max(0, inboxesCharged - row.activeInboxRows);
+  const inboxesMissing =
+    inboxesCharged === null
+      ? null
+      : Math.max(0, inboxesCharged - row.activeInboxRows);
   return {
     billingAccountId: row.billingAccountId,
     completedAt: row.completedAt,
@@ -241,13 +269,16 @@ function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
       domainsFailed: row.failedDomainRows,
       domainsMissing,
       domainsProvisionedCounter: row.domainsProvisioned,
-      fullyProvisioned: domainsMissing === 0 && inboxesMissing === 0,
+      fullyProvisioned:
+        inboxesMissing === null
+          ? null
+          : domainsMissing === 0 && inboxesMissing === 0,
       inboxesActive: row.activeInboxRows,
       inboxesCharged,
       inboxesConnected: row.connectedInboxRows,
       inboxesMissing,
       inboxesProvisionedCounter: row.inboxesProvisioned,
-      invisibleInboxes: inboxesCharged > 0 && row.inboxRows === 0,
+      invisibleInboxes: (inboxesCharged ?? 0) > 0 && row.inboxRows === 0,
     },
     runState: deriveRunState(row, observedAtMs),
     status: row.status,

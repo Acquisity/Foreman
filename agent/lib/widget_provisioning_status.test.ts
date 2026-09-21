@@ -51,6 +51,7 @@ const rawOrder = {
   completedAt: null,
   connectedInboxRows: 0,
   createdAt: staleAt,
+  dfyInboxCount: null,
   dismissed: false,
   domainCount: 6,
   domainRows: 6,
@@ -145,6 +146,9 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "md.organization_id = dpo.organization_id and md.order_id = dpo.id",
     "mi.organization_id = dpo.organization_id and mi.order_id = dpo.id",
     `limit ${25}`,
+    "dpo.order_type = 'dfy'",
+    "jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'",
+    "jsonb_array_length(mb.value)",
   ]) {
     assert.ok(query.includes(required), required);
   }
@@ -153,7 +157,9 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "buyer_email",
     "domain_search",
     "selected_domains",
-    "dfy_config",
+    "dfy_config as",
+    "dfy_config -> 'domains'",
+    "jsonb_object_keys",
     "checkout_lease",
     "md.domain",
     "mi.email",
@@ -254,6 +260,88 @@ test("run state and reconciliation follow status, staleness and live rows", () =
       `fullyProvisioned ${expectedRunState}`
     );
   }
+});
+
+test("DFY inbox quantity comes from the mailbox aggregate, never the multiplier", () => {
+  const dfy = {
+    ...rawOrder,
+    activeDomainRows: 1,
+    domainCount: 1,
+    domainsProvisioned: 1,
+    inboxCountPerDomain: 0,
+    orderType: "dfy",
+    status: "completed",
+  };
+  const cases: [
+    Record<string, unknown>,
+    number | null,
+    number | null,
+    boolean | null,
+  ][] = [
+    // Verified case: zero multiplier, three configured mailboxes, three active inboxes.
+    [{ activeInboxRows: 3, dfyInboxCount: 3, inboxRows: 3 }, 3, 0, true],
+    // Unequal mailbox counts across domains (2 + 5) arrive as one aggregate.
+    [
+      {
+        activeDomainRows: 2,
+        activeInboxRows: 4,
+        dfyInboxCount: 7,
+        domainCount: 2,
+        inboxCountPerDomain: 3,
+        inboxRows: 4,
+      },
+      7,
+      3,
+      false,
+    ],
+    // Missing or malformed configuration: unknown, not zero and not complete.
+    [
+      { activeInboxRows: 3, dfyInboxCount: null, inboxRows: 3 },
+      null,
+      null,
+      null,
+    ],
+    // A non-DFY order ignores any aggregate and keeps the multiplier.
+    [
+      {
+        activeDomainRows: 6,
+        activeInboxRows: 18,
+        dfyInboxCount: 99,
+        domainCount: 6,
+        inboxCountPerDomain: 3,
+        inboxRows: 18,
+        orderType: "pre_warmed",
+      },
+      18,
+      0,
+      true,
+    ],
+  ];
+  for (const [patch, charged, missing, full] of cases) {
+    const result = parseWidgetProvisioningEvidence(
+      envelope([{ ...dfy, ...patch }]),
+      scope
+    );
+    assert.ok(widgetProvisioningOutput.safeParse(result).success);
+    if (result.status !== "ok") {
+      assert.fail("Expected provisioning evidence");
+    }
+    const { reconciliation } = result.orders[0];
+    assert.equal(reconciliation.inboxesCharged, charged);
+    assert.equal(reconciliation.inboxesMissing, missing);
+    assert.equal(reconciliation.fullyProvisioned, full);
+    assert.equal(reconciliation.invisibleInboxes, false);
+  }
+  // Configured DFY inboxes with no inbox rows at all are still flagged invisible.
+  const invisible = parseWidgetProvisioningEvidence(
+    envelope([{ ...dfy, dfyInboxCount: 3 }]),
+    scope
+  );
+  assert.equal(
+    invisible.status === "ok" &&
+      invisible.orders[0].reconciliation.invisibleInboxes,
+    true
+  );
 });
 
 test("empty, denied and unavailable stay distinct; unavailable never leaks values", async (t) => {
