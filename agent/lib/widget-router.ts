@@ -18,7 +18,9 @@ import { logOpsEvent } from "./ops-log.js";
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
-const MAX_STATE_CHARS = 8000;
+// The accepted question (4,000) plus the full history budget and its labels fit
+// inside this, so the cap never cuts anything; the latest message leads regardless.
+const MAX_STATE_CHARS = 12_000;
 
 /** Below this, an explicit ask for a person was not what the customer wrote. */
 const HUMAN_AGREEMENT = 0.5;
@@ -48,32 +50,78 @@ export interface WidgetAsk {
   turns?: { role: "customer" | "assistant"; text: string }[];
 }
 
-const CONTEXT_TURNS = 4;
-const CONTEXT_TURN_CHARS = 400;
+export interface ContextBudget {
+  /** All earlier turns together. The latest message is never counted against this. */
+  chars: number;
+  turnChars: number;
+  turns: number;
+}
+/** A one-line front-door reply needs only what "it" or "that" points at. */
+const REPLY_CONTEXT: ContextBudget = { chars: 1600, turnChars: 400, turns: 4 };
+/**
+ * What the router, the investigator and the selector all read. Acquisity sends
+ * at most the last 8 customer-visible messages at 2,000 characters each, so this
+ * keeps a whole turn and as many recent ones as fit.
+ */
+export const DECISION_CONTEXT: ContextBudget = {
+  chars: 7000,
+  turnChars: 2000,
+  turns: 12,
+};
 
 export const toAsk = (ask: string | WidgetAsk): WidgetAsk =>
   typeof ask === "string" ? { latest: ask } : ask;
 
 /**
- * The ask as a model reads it: the latest message first and labelled, so a
- * length cap can never cut it, then a few bounded earlier turns.
+ * One conversation format for every reader: the latest message first, labelled
+ * and whole, then the earlier turns, newest kept first within their own budget,
+ * with every cut and omission marked. History can never crowd out the question.
  */
-export function renderAsk(input: string | WidgetAsk): string {
-  const ask = toAsk(input);
-  const turns = (ask.turns ?? [])
-    .filter((turn) => turn.text.trim())
-    .slice(-CONTEXT_TURNS);
+export function renderConversation(
+  latest: string,
+  history: WidgetAsk["turns"] = [],
+  budget: ContextBudget = DECISION_CONTEXT
+): string {
+  const turns = history.filter((turn) => turn.text.trim());
   if (turns.length === 0) {
-    return ask.latest;
+    return latest;
   }
-  const context = turns
-    .map(
-      (turn) =>
-        `${turn.role === "customer" ? "Customer" : "Support"}: ${turn.text.trim().slice(0, CONTEXT_TURN_CHARS)}`
-    )
-    .join("\n");
-  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${ask.latest}\n\nEARLIER TURNS (context only, to resolve what a word like "it" or "that" refers to):\n${context}`;
+  const kept: string[] = [];
+  let left = budget.chars;
+  for (const turn of turns.slice(-budget.turns).reverse()) {
+    const text = turn.text.trim();
+    const shown =
+      text.length > budget.turnChars
+        ? `${text.slice(0, budget.turnChars)} [message cut here]`
+        : text;
+    // The marker is ours, so it is not charged to the customer's budget.
+    const cost = Math.min(text.length, budget.turnChars);
+    if (cost > left) {
+      break;
+    }
+    left -= cost;
+    kept.unshift(
+      `${turn.role === "customer" ? "Customer" : "Support"}: ${shown}`
+    );
+  }
+  const omitted = turns.length - kept.length;
+  const context = [
+    ...(omitted
+      ? [`[${omitted} older message${omitted === 1 ? "" : "s"} not shown]`]
+      : []),
+    ...kept,
+  ].join("\n");
+  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context}`;
 }
+
+/** The ask as a front-door reply reads it; the router passes the full decision budget. */
+export const renderAsk = (
+  input: string | WidgetAsk,
+  budget: ContextBudget = REPLY_CONTEXT
+): string => {
+  const ask = toAsk(input);
+  return renderConversation(ask.latest, ask.turns, budget);
+};
 
 const QUESTIONS = {
   // Foreman can never act on an account, and the reply to a request to act is
@@ -114,7 +162,7 @@ const QUESTIONS = {
   },
   is_unclear: {
     instructions:
-      "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could help. A short follow-up whose subject is clear from the earlier turns is NOT this.",
+      "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
     type: "noul",
   },
   lane: {
@@ -214,7 +262,7 @@ export async function routeWidgetMessage(
       body: JSON.stringify({
         model: TYPESAFE_MODEL,
         questions: QUESTIONS,
-        state: renderAsk(ask).slice(0, MAX_STATE_CHARS),
+        state: renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
       }),
       headers: {
         authorization: `Bearer ${apiKey}`,

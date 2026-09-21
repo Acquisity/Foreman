@@ -20,6 +20,7 @@ import { handoffEligible, nextActionEnabled } from "./widget-next-action.js";
 import {
   logRouteDecision,
   renderAsk,
+  renderConversation,
   routeWidgetMessage,
   type WidgetAsk,
   type WidgetRoute,
@@ -75,25 +76,11 @@ const historySchema = z
   .max(12);
 export type WidgetHistory = z.infer<typeof historySchema>;
 
-const HISTORY_TURN_CHARS = 1200;
-
-/** The message as each lane should read it: the earlier turns as context, then the question. */
+/** The message as the investigator, extractor, composer and selector read it: the router's own format. */
 export const withHistory = (
   question: string,
   history: WidgetHistory | undefined
-): string => {
-  const turns = (history ?? []).filter((turn) => turn.text.trim());
-  if (turns.length === 0) {
-    return question;
-  }
-  const transcript = turns
-    .map(
-      (turn) =>
-        `${turn.role === "customer" ? "Customer" : "Support"}: ${turn.text.trim().slice(0, HISTORY_TURN_CHARS)}`
-    )
-    .join("\n");
-  return `Earlier in this conversation:\n${transcript}\n\nThe customer's latest message, which is the one to answer:\n${question}`;
-};
+): string => renderConversation(question, history);
 
 /**
  * The message as the front door reads it: the latest message on its own, the

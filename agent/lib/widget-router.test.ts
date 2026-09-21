@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { renderAsk, routeWidgetMessage } from "./widget-router.js";
+import {
+  DECISION_CONTEXT,
+  renderAsk,
+  routeWidgetMessage,
+} from "./widget-router.js";
 
 const jevReply = (lane: string, confidence: number) => ({
   json: () =>
@@ -224,7 +228,11 @@ describe("routeWidgetMessage", () => {
         },
       }
     );
-    assert.equal(sent, state);
+    // The router decides on the full shared context, not the short reply one.
+    assert.equal(
+      sent,
+      renderAsk({ latest: "okay, what next?", turns }, DECISION_CONTEXT)
+    );
     assert.equal(route.followUp, 0.93);
   });
 });
