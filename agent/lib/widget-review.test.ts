@@ -148,6 +148,73 @@ test("decision policy separates wording doubt from ownership doubt", async () =>
   }
 });
 
+// Shaped like the captured provisioning case: caveats the customer needs, plus
+// one report that an internal source was unreadable. JEV's judgment is mocked,
+// so this proves what the code does with each judgment, not which one JEV gives.
+const overlap: WidgetFindings = {
+  ...findings,
+  facts: [
+    ...findings.facts,
+    {
+      claim: "Whether the cancelled orders were charged cannot be settled.",
+      entityIds: [],
+      evidence: { ref: "", tool: "widget_provisioning_status" },
+    },
+    {
+      claim: "The run trace behind each order is not readable.",
+      entityIds: [],
+      evidence: { ref: "", tool: "widget_provisioning_status" },
+    },
+  ],
+  recommendation: "",
+};
+const gateOverlap = (overrides: Record<string, unknown>) => {
+  let shown: string[] | undefined;
+  return gate(scope, input.question, overlap, {
+    compose: ({ findings: retained }) => {
+      shown = retained.facts.map((fact) => fact.claim);
+      assert.equal(retained.needsHuman, true);
+      return Promise.resolve("ok");
+    },
+    judge: (data) =>
+      reviewWidgetFindings(data, {
+        apiKey: "test",
+        fetch: mock(answers(overrides, 3)),
+        log: () => undefined,
+      }),
+    resolve: async () => owned,
+  }).then((result) => ({ result, shown }));
+};
+
+test("an unreadable internal source is deleted only when the caveats stand without it", async () => {
+  const caveats = overlap.facts.slice(0, 2).map((fact) => fact.claim);
+  // Internal detail, other items carry the uncertainty: deleted, caveats shown.
+  const removed = await gateOverlap({
+    item_3: answer("remove"),
+    need_3: answer("dispensable"),
+  });
+  assert.equal(removed.result.decision, "rewrite");
+  assert.deepEqual(removed.shown, caveats);
+  // A necessary limitation is kept word for word.
+  const kept = await gateOverlap({});
+  assert.equal(kept.result.decision, "allow");
+  assert.equal(kept.shown?.length, 3);
+  // The overlap: read as internal detail and as a needed caveat, or with doubt
+  // on either question. Never shown, never stripped; the handoff keeps every fact.
+  for (const overrides of [
+    { item_3: answer("remove"), need_3: answer("material") },
+    { item_3: answer("keep", 0.18), need_3: answer("material", 0.55) },
+    { item_3: answer("remove"), need_3: answer("dispensable", 0.55) },
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: a failure names its case.
+    const { result, shown } = await gateOverlap(overrides);
+    assert.equal(result.decision, "block");
+    assert.equal(shown, undefined);
+    assert.equal(result.findings.facts.length, 3);
+    assert.equal(result.findings.needsHuman, true);
+  }
+});
+
 test("the review log carries verdicts and confidence, never customer text", async () => {
   const lines: string[] = [];
   await review(

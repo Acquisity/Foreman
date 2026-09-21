@@ -28,13 +28,23 @@ Missing credentials, request failures, oversized input, a missing or extra answe
 
 Each review logs one `widget.review.items` line: the decision, the reason category in `code`, and for every item that was not a clean keep its number with the three choices and confidences (`14:owned.97/keep.62/dispensable.91`), deciding item first. It never contains item text or identifiers, and the ops log bounds its length.
 
+## Limitations that name an internal source
+
+The live replay of `d2b286d` still blocked the provisioning answer on one item: a statement that a run trace and per-step detail were "not readable" (wording keep at 0.18, material at 0.55, `uncertain_not_removable`). Three instructions collided on it: the investigator is told to say when something sits outside its tools, the extractor is told to make every such statement its own fact, and the reviewer is told both to remove internal operations detail and to keep honest limitations. Limitations that were kept cleanly in the same replays state what is unconfirmed for the customer (sending-account health, model-call errors); this one named only the internal source.
+
+The rule now, at each stage: a limitation is kept for what it leaves unconfirmed about the customer's workspace, not for the source it names.
+
+- The investigator and the extractor word a limitation as what remains unknown about the workspace, never as the internal source that could not be read. The extractor is the existing rewording stage, so the caveat's meaning is preserved there and the reviewer stays deletion-only.
+- The reviewer policy treats an item that only reports an unreadable internal source as internal detail, and as dispensable only when other items already state what remains unconfirmed. A limitation that says what is unconfirmed stays even when it mentions the source.
+- The decision code and the 0.8 threshold are unchanged. If JEV is still unsure whether such an item is a needed caveat, the answer blocks and hands off with every fact. That block is intended: the code cannot tell a stripped caveat from a stripped aside.
+
 ## Limitations
 
 - The 0.8 threshold is an experimental conservative setting, not a validated safety guarantee.
 - Materiality is JEV's own judgment. Deletion never rewords retained text, but whether the remaining items still read the same without the deleted one is not independently checked.
 - JEV cannot verify facts against raw provider data it never receives.
 - Three questions per item triples the request. Latency and agreement for this shape have not been measured live; the figures below are for the earlier one-question policy.
-- The provisioning false block (item 14, blanket uncertainty rule) motivated this policy. Whether the new policy delivers that answer is unverified until it is replayed live.
+- Replaying the captured provisioning items exercises only the reviewer wording; the investigator and extractor changes take effect only on a fresh investigation. None of the three prompt changes is verified by the mocked tests.
 
 ## Live evaluation, 2026-09-21
 
