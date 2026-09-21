@@ -18,6 +18,8 @@ import {
 const INVITATION_LIMIT = 25;
 const ROLE_LIMIT = 4;
 const AUTH_ERROR_CLASS_LIMIT = 10;
+const SENTRY_WINDOW_DAYS = 14;
+const sentryOrgSlug = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,99}$/);
 
 const role = z.enum(["owner", "admin", "member", "client"]);
 const timestamp = z
@@ -74,15 +76,27 @@ const invitation = z.object({
   role,
   status: z.enum(["pending", "accepted", "expired", "revoked"]),
 });
-const authErrors = z.union([
+/**
+ * Acquisity sends no tagged sign-in failures to Sentry, so these are every
+ * unresolved error recorded against the user, never proven auth failures.
+ */
+const userErrorSignals = z.union([
   z.object({
     classes: z.array(z.string().max(200)).max(AUTH_ERROR_CLASS_LIMIT),
     lastSeenAt: timestamp.nullable(),
+    scope: z.literal(
+      "all unresolved errors recorded for this user; not filtered to sign-in"
+    ),
     status: z.literal("ok"),
     total: count,
+    windowDays: z.literal(SENTRY_WINDOW_DAYS),
   }),
   z.object({
-    reason: z.enum(["sentry_unconfigured", "sentry_unreachable"]),
+    reason: z.enum([
+      "sentry_unconfigured",
+      "sentry_unreachable",
+      "sentry_malformed",
+    ]),
     status: z.literal("unavailable"),
   }),
 ]);
@@ -93,7 +107,6 @@ export type WidgetAccountAccessInput = z.infer<typeof widgetAccountAccessInput>;
 export const widgetAccountAccessOutput = z.union([
   z.object({
     account,
-    authErrors,
     caveats: z.array(z.string()).max(6),
     membership,
     observedAt: timestamp,
@@ -109,6 +122,7 @@ export const widgetAccountAccessOutput = z.union([
       "Acquisity product database; saved account and onboarding state, not a live auth or billing check"
     ),
     status: z.literal("ok"),
+    userErrorSignals,
     workspace: z.string().max(500),
   }),
   z.object({
@@ -193,14 +207,14 @@ const CAVEATS = [
   "Saved product state, not a live authentication or billing check.",
   "Seat counts are active members of this workspace; the plan's seat limit comes from billing and is not read here.",
   "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
-  "Login error signals, when present, are aggregated Sentry counts, not proof that any one sign-in failed.",
+  "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in.",
 ];
 
 /** Parse only the provider envelope and declared fields; never forward raw failure bodies. */
 export function parseAccountAccess(
   data: unknown,
   context: WidgetContext,
-  errors: z.infer<typeof authErrors>
+  errors: z.infer<typeof userErrorSignals>
 ): WidgetAccountAccessOutput {
   const envelope = z
     .object({
@@ -231,7 +245,6 @@ export function parseAccountAccess(
   }
   return widgetAccountAccessOutput.parse({
     account: row.account,
-    authErrors: errors,
     caveats: CAVEATS,
     membership: row.membership,
     observedAt: row.observedAt,
@@ -246,6 +259,7 @@ export function parseAccountAccess(
     source:
       "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
     status: "ok",
+    userErrorSignals: errors,
     workspace: context.organizationName,
   });
 }
@@ -263,12 +277,13 @@ const sentryIssue = z
 /**
  * Aggregate Sentry issues into sanitized counts only: total, last-seen and a
  * bounded set of error classes. Never emit titles verbatim beyond a short class
- * label, message bodies, or event traces. Any unexpected shape reads unavailable.
+ * label, message bodies, or event traces. Any unexpected shape reads malformed,
+ * which stays distinct from a confirmed empty list.
  * ponytail: tolerant parse; pin the search_issues response schema if it drifts.
  */
-export function parseSentryAuthErrors(
+export function parseSentryUserErrors(
   data: unknown
-): z.infer<typeof authErrors> {
+): z.infer<typeof userErrorSignals> {
   try {
     const parsed = providerData(data);
     const list = Array.isArray(parsed)
@@ -293,45 +308,60 @@ export function parseSentryAuthErrors(
       const label = (
         issue.metadata?.type ??
         issue.type ??
-        issue.title ??
+        issue.title?.split(":")[0] ??
         "error"
       ).slice(0, 200);
       if (!classes.includes(label) && classes.length < AUTH_ERROR_CLASS_LIMIT) {
         classes.push(label);
       }
     }
-    return authErrors.parse({
+    return userErrorSignals.parse({
       classes,
       lastSeenAt,
+      scope:
+        "all unresolved errors recorded for this user; not filtered to sign-in",
       status: "ok",
       total: Math.trunc(total),
+      windowDays: SENTRY_WINDOW_DAYS,
     });
   } catch {
-    return { reason: "sentry_unreachable", status: "unavailable" };
+    return { reason: "sentry_malformed", status: "unavailable" };
   }
 }
 
-/** Best-effort user-scoped auth error signals; unavailable whenever Sentry is not wired or reachable. */
-async function readAuthErrors(
+/** Best-effort user-scoped error signals; no request is made unless the org slug and binding are configured. */
+async function readUserErrors(
   ctx: ProviderContext,
   scope: WidgetContext
-): Promise<z.infer<typeof authErrors>> {
+): Promise<z.infer<typeof userErrorSignals>> {
+  const slug = sentryOrgSlug.safeParse(process.env.WIDGET_SENTRY_ORG_SLUG);
+  let path: string;
   try {
-    const path = operationPath("sentry.searchIssues");
+    path = operationPath("sentry.searchIssues");
+  } catch {
+    return { reason: "sentry_unconfigured", status: "unavailable" };
+  }
+  if (!slug.success) {
+    return { reason: "sentry_unconfigured", status: "unavailable" };
+  }
+  try {
     const outcome = await invokeProvider(
       ctx,
       path,
       // A validated UUID cannot break the Sentry query DSL. Bounded to this user's errors.
-      { query: `is:unresolved level:error user.id:"${scope.userId}"` },
+      {
+        organizationSlug: slug.data,
+        query: `is:unresolved level:error user.id:"${scope.userId}" lastSeen:-${SENTRY_WINDOW_DAYS}d`,
+      },
       undefined,
       { maxBytes: 64 * 1024, timeoutMs: 20_000 }
     );
     if (!outcome.ok || (outcome.http && outcome.http.status !== 200)) {
       return { reason: "sentry_unreachable", status: "unavailable" };
     }
-    return parseSentryAuthErrors(outcome.data);
+    return parseSentryUserErrors(outcome.data);
   } catch {
-    return { reason: "sentry_unconfigured", status: "unavailable" };
+    return { reason: "sentry_unreachable", status: "unavailable" };
   }
 }
 
@@ -363,9 +393,15 @@ export async function readWidgetAccountAccess(
       throw new Error("Evidence provider unavailable.");
     }
     stage = "response";
-    // Sentry is additive; its own failure degrades to unavailable inside authErrors.
-    const errors = await readAuthErrors(ctx, scope);
-    return parseAccountAccess(result.data, scope, errors);
+    const parsed = parseAccountAccess(result.data, scope, {
+      reason: "sentry_unconfigured",
+      status: "unavailable",
+    });
+    // Sentry is additive and only read once membership is authorized; its own failure degrades inside userErrorSignals.
+    if (parsed.status === "ok") {
+      parsed.userErrorSignals = await readUserErrors(ctx, scope);
+    }
+    return parsed;
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;
@@ -390,7 +426,7 @@ export async function readWidgetAccountAccess(
 
 const tool = defineTool({
   description:
-    "Diagnose login, access and onboarding problems only for the verified user in this chat's workspace. Returns that user's membership and role, whether their seat is active, the workspace's status, partner and used seat count by role, the plan seat limit (from billing, not read here), the onboarding steps done versus pending, this workspace's pending invitations (with the invited email so an invite-login report can be matched), and sanitized recent auth error signals from Sentry when reachable. Support-safe status and dates only, never a password hash, session or token, and never another member's email. Saved state, not a live auth or billing check. Unavailable is not empty. No SQL, workspace, user or field selector is accepted.",
+    "Diagnose login, access and onboarding problems only for the verified user in this chat's workspace. Returns that user's membership and role, whether their seat is active, the workspace's status, partner and used seat count by role, the plan seat limit (from billing, not read here), the onboarding steps done versus pending, this workspace's pending invitations (with the invited email so an invite-login report can be matched), and, when Sentry is configured and reachable, sanitized counts of all unresolved errors recorded for that user in the last 14 days (any product area; not proof of a sign-in failure). Support-safe status and dates only, never a password hash, session or token, and never another member's email. Saved state, not a live auth or billing check. Unavailable is not empty. No SQL, workspace, user or field selector is accepted.",
   execute: async (_input, ctx: ToolContext) => readWidgetAccountAccess(ctx),
   inputSchema: widgetAccountAccessInput,
   outputSchema: widgetAccountAccessOutput,

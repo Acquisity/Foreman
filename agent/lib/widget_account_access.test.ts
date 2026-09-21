@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after, type TestContext, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
@@ -10,7 +10,7 @@ import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildAccountAccessQuery,
   parseAccountAccess,
-  parseSentryAuthErrors,
+  parseSentryUserErrors,
   readWidgetAccountAccess,
   widgetAccountAccessInput,
   widgetAccountAccessOutput,
@@ -195,7 +195,7 @@ test("account access output matches the schema and carries no sensitive field", 
   assert.equal(result.seats.used, 6);
   assert.equal(result.seats.planLimit, null);
   assert.equal(result.pendingInvitations[0].email, "invitee@example.com");
-  assert.equal(result.authErrors.status, "unavailable");
+  assert.equal(result.userErrorSignals.status, "unavailable");
   assert.equal(result.workspace, scope.organizationName);
   const serialized = JSON.stringify(result).toLowerCase();
   for (const forbidden of [
@@ -272,7 +272,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
   assert.ok(input.query.includes(scope.userId));
   assert.equal(input.use_replica, false);
   if (result.status === "ok") {
-    assert.equal(result.authErrors.status, "unavailable");
+    assert.equal(result.userErrorSignals.status, "unavailable");
   }
 });
 
@@ -306,8 +306,8 @@ test("malformed rows become unavailable without leaking values", async (t) => {
   assert.equal(JSON.stringify(result).includes("not-an-array"), false);
 });
 
-test("Sentry signals aggregate to sanitized counts, and any unexpected shape reads unavailable", () => {
-  const ok = parseSentryAuthErrors(
+test("Sentry signals aggregate to sanitized counts, and any unexpected shape reads malformed", () => {
+  const ok = parseSentryUserErrors(
     sentryEnvelope([
       {
         count: "4",
@@ -331,16 +331,148 @@ test("Sentry signals aggregate to sanitized counts, and any unexpected shape rea
     assert.equal(JSON.stringify(ok).includes("leaked value"), false);
     assert.equal(JSON.stringify(ok).includes("token expired"), false);
   }
-  const empty = parseSentryAuthErrors(sentryEnvelope([]));
+  const empty = parseSentryUserErrors(sentryEnvelope([]));
   assert.equal(empty.status, "ok");
   if (empty.status === "ok") {
     assert.equal(empty.total, 0);
     assert.deepEqual(empty.classes, []);
     assert.equal(empty.lastSeenAt, null);
   }
-  assert.equal(parseSentryAuthErrors({ isError: true }).status, "unavailable");
-  assert.equal(
-    parseSentryAuthErrors(sentryEnvelope([{ count: {} }])).status,
-    "unavailable"
+  // A title-only issue contributes its class prefix, never the message.
+  const titled = parseSentryUserErrors(
+    sentryEnvelope([{ title: "TypeError: secret message" }])
   );
+  assert.equal(JSON.stringify(titled).includes("secret"), false);
+  assert.deepEqual(parseSentryUserErrors({ isError: true }), {
+    reason: "sentry_malformed",
+    status: "unavailable",
+  });
+  assert.deepEqual(parseSentryUserErrors(sentryEnvelope([{ count: {} }])), {
+    reason: "sentry_malformed",
+    status: "unavailable",
+  });
+});
+
+const SENTRY_PATH = "sentry.user.personalSentry.search_issues";
+const PLANETSCALE_PATH =
+  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
+/** Bind Sentry and set the org slug for one test, then restore both. */
+function withSentry(t: TestContext, slug: string | null = "acquisity") {
+  const bindings = process.env.EXECUTOR_OPERATION_BINDINGS;
+  const saved = process.env.WIDGET_SENTRY_ORG_SLUG;
+  process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
+    "planetscale.readQuery": { path: PLANETSCALE_PATH },
+    "sentry.searchIssues": { path: SENTRY_PATH },
+  });
+  if (slug === null) {
+    delete process.env.WIDGET_SENTRY_ORG_SLUG;
+  } else {
+    process.env.WIDGET_SENTRY_ORG_SLUG = slug;
+  }
+  t.after(() => {
+    process.env.EXECUTOR_OPERATION_BINDINGS = bindings;
+    if (saved === undefined) {
+      delete process.env.WIDGET_SENTRY_ORG_SLUG;
+    } else {
+      process.env.WIDGET_SENTRY_ORG_SLUG = saved;
+    }
+  });
+}
+function mockReads(t: TestContext, sentry: unknown, record = row) {
+  return t.mock.method(
+    executorTransport,
+    "call",
+    async (_wire: unknown, path: string) =>
+      path === SENTRY_PATH ? sentry : { data: envelope(record), ok: true }
+  );
+}
+const signals = async () => {
+  const result = await readWidgetAccountAccess(ctx);
+  assert.equal(result.status, "ok");
+  return result.status === "ok" ? result.userErrorSignals : null;
+};
+
+test("Sentry read carries the org slug, the verified user and a bounded window", async (t) => {
+  withSentry(t);
+  const call = mockReads(t, {
+    data: sentryEnvelope([{ count: 3, metadata: { type: "TypeError" } }]),
+    ok: true,
+  });
+  const result = await signals();
+  assert.equal(call.mock.callCount(), 2);
+  const [, path, input] = call.mock.calls[1].arguments as unknown as [
+    unknown,
+    string,
+    Record<string, string>,
+  ];
+  assert.equal(path, SENTRY_PATH);
+  assert.deepEqual(input, {
+    organizationSlug: "acquisity",
+    query: `is:unresolved level:error user.id:"${scope.userId}" lastSeen:-14d`,
+  });
+  // An unrelated error is reported as a user error, never as a sign-in failure.
+  assert.equal(result?.status, "ok");
+  if (result?.status === "ok") {
+    assert.deepEqual(result.classes, ["TypeError"]);
+    assert.ok(result.scope.includes("not filtered to sign-in"));
+    assert.equal(result.windowDays, 14);
+  }
+});
+
+for (const slug of [null, "", "bad slug/../x"]) {
+  test(`org slug ${JSON.stringify(slug)} makes no Sentry request`, async (t) => {
+    withSentry(t, slug);
+    const call = mockReads(t, { data: sentryEnvelope([]), ok: true });
+    assert.deepEqual(await signals(), {
+      reason: "sentry_unconfigured",
+      status: "unavailable",
+    });
+    assert.equal(call.mock.callCount(), 1);
+  });
+}
+
+test("Sentry failure, malformed and empty stay distinct and keep saved evidence", async (t) => {
+  withSentry(t);
+  const failed = mockReads(t, { error: { code: "upstream" }, ok: false });
+  assert.deepEqual(await signals(), {
+    reason: "sentry_unreachable",
+    status: "unavailable",
+  });
+  failed.mock.restore();
+  const thrown = t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string) =>
+      path === SENTRY_PATH
+        ? Promise.reject(new Error("secret transport detail"))
+        : Promise.resolve({ data: envelope(), ok: true })
+  );
+  assert.deepEqual(await signals(), {
+    reason: "sentry_unreachable",
+    status: "unavailable",
+  });
+  thrown.mock.restore();
+  const malformed = mockReads(t, { data: { content: "nope" }, ok: true });
+  assert.deepEqual(await signals(), {
+    reason: "sentry_malformed",
+    status: "unavailable",
+  });
+  malformed.mock.restore();
+  mockReads(t, { data: sentryEnvelope([]), ok: true });
+  const empty = await signals();
+  assert.equal(empty?.status, "ok");
+  if (empty?.status === "ok") {
+    assert.equal(empty.total, 0);
+  }
+});
+
+test("denied membership never reaches Sentry", async (t) => {
+  withSentry(t);
+  const call = mockReads(t, { data: sentryEnvelope([]), ok: true }, {
+    ...row,
+    authorized: false,
+  } as typeof row);
+  const result = await readWidgetAccountAccess(ctx);
+  assert.equal(result.status, "denied");
+  assert.equal(call.mock.callCount(), 1);
 });
