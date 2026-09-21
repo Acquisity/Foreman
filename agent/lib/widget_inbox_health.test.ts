@@ -52,6 +52,7 @@ const baseRow = (overrides: Record<string, unknown> = {}) => ({
   authorized: true,
   connectionUpdatedAt: null,
   hasConnectionError: null,
+  initialWarmupEmails: [],
   isActive: null,
   lastWebhookEventAt: null,
   observedAt,
@@ -221,6 +222,7 @@ test("a system-provisioned active connection runs a live check and flags the sta
     accountType: "system_provisioned",
     connectionUpdatedAt: observedAt,
     hasConnectionError: false,
+    initialWarmupEmails: ["warmup@example.test"],
     isActive: true,
     lastWebhookEventAt: observedAt,
     recentWebhookErrorCount: 1,
@@ -242,12 +244,16 @@ test("a system-provisioned active connection runs a live check and flags the sta
       timestamp_last_used: stale,
     },
     { email: "mismatch@example.test", status: -1, timestamp_last_used: recent },
+    { email: "paused@example.test", status: 2, timestamp_last_used: recent },
+    { email: "setup@example.test", setup_pending: true, status: 1 },
+    { email: "Warmup@example.test", status: 1 },
     {
-      email: "warming@example.test",
-      setup_pending: true,
-      status: 2,
-      timestamp_last_used: recent,
+      email: "coded@example.test",
+      status: 1,
+      status_message: { code: "EAUTH", response: "535 secret smtp text" },
     },
+    { email: "odd@example.test", status: 3 },
+    { email: "nostatus@example.test" },
   ];
   t.mock.method(
     executorTransport,
@@ -278,10 +284,15 @@ test("a system-provisioned active connection runs a live check and flags the sta
   if (result.accounts.available !== true) {
     return;
   }
-  assert.equal(result.accounts.total, 4);
-  assert.equal(result.accounts.healthy, 2);
-  assert.equal(result.accounts.error, 2);
-  assert.equal(result.accounts.warming, 1);
+  assert.equal(result.accounts.total, 9);
+  assert.equal(result.accounts.ready, 1);
+  assert.equal(result.accounts.paused, 1);
+  assert.equal(result.accounts.setupPending, 1);
+  assert.equal(result.accounts.initialWarmup, 1);
+  // Two negative statuses plus a positive status carrying an error code.
+  assert.equal(result.accounts.error, 3);
+  assert.equal(result.accounts.unknown, 2);
+  assert.ok(!JSON.stringify(result).includes("secret smtp"));
   assert.equal(result.accounts.staleSyncAccounts.length, 1);
   assert.equal(
     result.accounts.staleSyncAccounts[0].email,
@@ -460,4 +471,47 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
       },
     } as unknown as ProviderContext)
   );
+});
+
+test("a cut-off warmup list leaves active accounts unknown instead of ready", async (t) => {
+  const row = baseRow({
+    accountType: "system_provisioned",
+    initialWarmupEmails: Array.from(
+      { length: 1001 },
+      (_, index) => `w${index}@example.test`
+    ),
+    isActive: true,
+    workspaceId: WORKSPACE_ID,
+  });
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [
+            { email: "w0@example.test", status: 1 },
+            { email: "other@example.test", status: 1 },
+          ],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    assert.fail("expected a live account read");
+  }
+  assert.equal(result.accounts.initialWarmup, 1);
+  assert.equal(result.accounts.ready, 0);
+  assert.equal(result.accounts.unknown, 1);
 });

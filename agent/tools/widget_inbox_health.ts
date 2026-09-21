@@ -37,6 +37,10 @@ const RECENT_WEBHOOK_WINDOW_DAYS = 7;
  * configurable if a shorter/longer campaign cadence produces false positives or negatives.
  */
 const RECENT_ACTIVITY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+/** Acquisity's INITIAL_DFY_WARMUP_WINDOW_MS: a done-for-you inbox cannot send for its first 14 days. */
+const INITIAL_WARMUP_DAYS = 14;
+/** Done-for-you inboxes in initial warmup read from the product database. */
+const INITIAL_WARMUP_LIMIT = 1000;
 
 export const widgetInboxHealthInput = z.strictObject({});
 export type WidgetInboxHealthInput = z.infer<typeof widgetInboxHealthInput>;
@@ -67,11 +71,14 @@ const accounts = z.discriminatedUnion("available", [
   z.object({
     available: z.literal(true),
     error: z.number().int().nonnegative(),
-    healthy: z.number().int().nonnegative(),
+    initialWarmup: z.number().int().nonnegative(),
+    paused: z.number().int().nonnegative(),
+    ready: z.number().int().nonnegative(),
+    setupPending: z.number().int().nonnegative(),
     staleSyncAccounts: z.array(staleSyncAccount).max(MISMATCH_LIMIT),
     total: z.number().int().nonnegative(),
     truncated: z.boolean(),
-    warming: z.number().int().nonnegative(),
+    unknown: z.number().int().nonnegative(),
   }),
   z.object({ available: z.literal(false), reason: z.string() }),
 ]);
@@ -129,7 +136,12 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
     (select count(*)::int from outreach_webhook_event e
       where e.provider_id = (select id from provider)
         and e.created_at > current_timestamp - interval '${RECENT_WEBHOOK_WINDOW_DAYS} days'
-        and e.outcome = 'error') as "recentWebhookErrorCount"`;
+        and e.outcome = 'error') as "recentWebhookErrorCount",
+    (select coalesce(jsonb_agg(w.email), '[]'::jsonb) from (
+      select lower(mi.email) as email from mail_inbox mi join authorized a on a.id = mi.organization_id
+      where mi.mailbox_type = 'dfy'
+        and mi.created_at > current_timestamp - interval '${INITIAL_WARMUP_DAYS} days'
+      order by mi.created_at desc limit ${INITIAL_WARMUP_LIMIT + 1}) w) as "initialWarmupEmails"`;
 }
 
 const dbRow = z.object({
@@ -137,6 +149,9 @@ const dbRow = z.object({
   authorized: z.boolean(),
   connectionUpdatedAt: timestamp.nullable(),
   hasConnectionError: z.boolean().nullable(),
+  initialWarmupEmails: z
+    .array(z.string().max(320))
+    .max(INITIAL_WARMUP_LIMIT + 1),
   isActive: z.boolean().nullable(),
   lastWebhookEventAt: timestamp.nullable(),
   observedAt: timestamp,
@@ -151,35 +166,81 @@ const instantlyAccount = z.object({
   email: z.string().max(320).optional(),
   setup_pending: z.boolean().nullish(),
   status: z.number().optional(),
+  status_message_code: z.string().optional(),
   timestamp_last_used: z.string().nullish(),
 });
 
 const CAVEATS = [
   "Connection and webhook facts are saved product state, not a live provider check.",
   "A saved connection error does not establish a current failure by itself.",
-  "accounts.total, healthy, error and warming count the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+  "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+  "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
   "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization.",
 ];
 
-function bucketAccounts(items: unknown[]): {
-  buckets: { error: number; healthy: number; warming: number };
+type Bucket =
+  | "error"
+  | "initialWarmup"
+  | "paused"
+  | "ready"
+  | "setupPending"
+  | "unknown";
+
+/**
+ * Acquisity's rules, in its order: hasEmailAccountError, then setup_pending
+ * (provider-inbox-readiness), then initial DFY warmup, then status 1 active / 2 paused.
+ * warmupComplete false means the warmup list was cut off, so an active account that is
+ * not on it cannot be confirmed ready.
+ */
+function classify(
+  account: z.infer<typeof instantlyAccount>,
+  warmupEmails: ReadonlySet<string>,
+  warmupComplete: boolean
+): Bucket {
+  if (
+    account.status_message_code ||
+    (typeof account.status === "number" && account.status < 0)
+  ) {
+    return "error";
+  }
+  if (account.setup_pending === true) {
+    return "setupPending";
+  }
+  const email = account.email?.trim().toLowerCase();
+  if (email && warmupEmails.has(email)) {
+    return "initialWarmup";
+  }
+  if (account.status === 2) {
+    return "paused";
+  }
+  if (account.status === 1 && email && warmupComplete) {
+    return "ready";
+  }
+  return "unknown";
+}
+
+function bucketAccounts(
+  items: unknown[],
+  initialWarmupEmails: string[]
+): {
+  buckets: Record<Bucket, number>;
   staleSyncAccounts: z.infer<typeof staleSyncAccount>[];
 } {
-  const buckets = { error: 0, healthy: 0, warming: 0 };
+  const buckets: Record<Bucket, number> = {
+    error: 0,
+    initialWarmup: 0,
+    paused: 0,
+    ready: 0,
+    setupPending: 0,
+    unknown: 0,
+  };
+  const warmupEmails = new Set(initialWarmupEmails);
+  const warmupComplete = initialWarmupEmails.length <= INITIAL_WARMUP_LIMIT;
   const staleSyncAccounts: z.infer<typeof staleSyncAccount>[] = [];
   const now = Date.now();
   for (const raw of items) {
     const account = instantlyAccount.parse(raw);
-    if (typeof account.status === "number") {
-      if (account.status > 0) {
-        buckets.healthy += 1;
-      } else if (account.status < 0) {
-        buckets.error += 1;
-      }
-    }
-    if (account.setup_pending === true) {
-      buckets.warming += 1;
-    }
+    buckets[classify(account, warmupEmails, warmupComplete)] += 1;
     const lastUsedAt = account.timestamp_last_used
       ? Date.parse(account.timestamp_last_used)
       : Number.NaN;
@@ -244,15 +305,16 @@ async function readAccountsEvidence(
         break;
       }
     }
-    const { buckets, staleSyncAccounts } = bucketAccounts(items);
+    const { buckets, staleSyncAccounts } = bucketAccounts(
+      items,
+      row.initialWarmupEmails
+    );
     return {
       available: true,
-      error: buckets.error,
-      healthy: buckets.healthy,
+      ...buckets,
       staleSyncAccounts,
       total: items.length,
       truncated: startingAfter !== undefined,
-      warming: buckets.warming,
     };
   } catch (error) {
     if (ctx.abortSignal.aborted) {
@@ -375,7 +437,7 @@ export async function readWidgetInboxHealth(
 }
 
 const tool = defineTool({
-  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): total, healthy, error and warming counts, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,

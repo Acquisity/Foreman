@@ -648,6 +648,14 @@ const sanitizeItems = (
         safe[field] = value;
       }
     }
+    // Acquisity treats a status_message code as an account error even when status is
+    // positive. Only the short code leaves here: the rest of the object is raw SMTP output.
+    if (resource === "accounts") {
+      const code = (record.status_message as { code?: unknown } | null)?.code;
+      if (typeof code === "string" && code) {
+        safe.status_message_code = code.slice(0, 64);
+      }
+    }
     return safe;
   });
 
