@@ -610,3 +610,29 @@ test("a source file named in a website fix is not a domain; a real unowned domai
     "other-tenant-site.com"
   );
 });
+
+test("a billing review keeps its verified facts and open questions for the teammate, and repurchase advice never reaches the composer", async () => {
+  const raw = findings({
+    needsHuman: true,
+    recommendation:
+      "Place a fresh domain order to get the domain back. Billing needs to confirm whether the March charge was for this order.",
+  });
+  const { calls, deps: d } = deps({
+    judge: (input) =>
+      Promise.resolve({
+        decision: "rewrite",
+        reason: "repurchase advice while the original order is unresolved",
+        remove: input.items
+          .filter((item) => item.text.startsWith("Place a fresh"))
+          .map((item) => item.n),
+      }),
+  });
+  const result = await gate(scope, question, raw, d);
+  assert.equal(result.findings.needsHuman, true);
+  assert.deepEqual(result.findings.facts, raw.facts);
+  assert.equal(
+    result.findings.recommendation,
+    "Billing needs to confirm whether the March charge was for this order."
+  );
+  assert.equal(JSON.stringify(calls.compose).includes("fresh domain"), false);
+});

@@ -130,3 +130,18 @@ test("a filed ticket is read from the closing line; a ticket merely mentioned is
     null
   );
 });
+
+test("a billing review hands off with its facts and unresolved questions intact", async () => {
+  const out = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        ...lenient,
+        needsHuman: true,
+        recommendation:
+          "Unresolved: whether the second charge belongs to this workspace.",
+      }),
+  });
+  assert.equal(out?.needsHuman, true);
+  assert.deepEqual(out?.facts, expected.facts);
+  assert.equal(out?.recommendation.includes("second charge"), true);
+});
