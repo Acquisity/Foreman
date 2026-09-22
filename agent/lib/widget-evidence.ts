@@ -128,6 +128,13 @@ const resultSchema = z.object({
   success: z.literal(true),
 });
 
+/** The live database says the scoped user is not a current owner or admin of the workspace. */
+export class WorkspaceAccessDenied extends Error {
+  constructor() {
+    super("Current workspace access could not be verified.");
+  }
+}
+
 /** Any unresolved candidate is foreign; the caller blocks on it. */
 export async function resolveOwnedIdentifiers(
   scope: WidgetContext,
@@ -138,7 +145,7 @@ export async function resolveOwnedIdentifiers(
   const data = await readWidgetOwnership(query, signal);
   const [row] = resultSchema.parse(providerData(data)).rows;
   if (!row.authorized) {
-    throw new Error("Current workspace access could not be verified.");
+    throw new WorkspaceAccessDenied();
   }
   return {
     domains: new Set(row.domains),

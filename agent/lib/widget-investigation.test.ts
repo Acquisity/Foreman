@@ -4,6 +4,7 @@ import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import type { GateResult } from "./widget-egress.js";
+import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
@@ -283,6 +284,24 @@ test("a scope whose user is not a member of the workspace is refused before any 
   assert.equal(response.status, 403);
   // Terminal, so the conversation's next message is not handed this run.
   assert.equal(run.outcome?.reason, "workspace_access_denied");
+});
+
+test("an owner or admin scope the live database no longer backs gets the help-center reply, not a refusal", async (t) => {
+  enabled(t);
+  const { deps, gated, run } = dependencies();
+  deps.verifyAccess = () => Promise.reject(new WorkspaceAccessDenied());
+  const response = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    1,
+    verify,
+    deps
+  );
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(response.status, 200);
+  assert.equal(body.message, ROLE_LIMITED_REPLY);
+  assert.deepEqual(gated, []);
+  assert.equal(run.outcome?.reason, "role_limited");
 });
 
 test("a follow-up sent while an earlier message is still running is told to wait, never handed that run's answer", async (t) => {

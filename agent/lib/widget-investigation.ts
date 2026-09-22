@@ -10,7 +10,10 @@ import {
   type GateDeps,
   logGateDecision,
 } from "./widget-egress.js";
-import { resolveOwnedIdentifiers } from "./widget-evidence.js";
+import {
+  resolveOwnedIdentifiers,
+  WorkspaceAccessDenied,
+} from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
@@ -1084,6 +1087,37 @@ async function roleLimitedReply(
   return done ?? run;
 }
 
+/**
+ * The app vouches for the scope, but a preview admin override names a user the
+ * app cannot check, and the app's database can lag the one the tools read.
+ * Re-check membership where the tools read. Someone the live database says is
+ * not an owner or admin hears what they can ask instead; a check that could not
+ * run is refused, not one denied tool call at a time.
+ */
+async function investigationDenied(
+  run: WidgetRun,
+  scope: WidgetContext,
+  deps: WidgetDependencies
+): Promise<Response | null> {
+  try {
+    await deps.verifyAccess(scope);
+    return null;
+  } catch (error) {
+    if (error instanceof WorkspaceAccessDenied) {
+      return json(widgetRunResponse(await roleLimitedReply(run, deps)));
+    }
+    await deps
+      .complete(
+        run.id,
+        blockedOutcome("workspace_access_denied", "failed"),
+        null,
+        run.id
+      )
+      .catch(() => undefined);
+    return json({ error: "Workspace could not be verified." }, 403);
+  }
+}
+
 export async function receiveWidgetMessage(
   request: Request,
   {
@@ -1178,21 +1212,9 @@ export async function receiveWidgetMessage(
     if (answered) {
       return json(widgetRunResponse(answered));
     }
-    // The app vouches for the scope, but a preview admin override names a user
-    // the app cannot check. Re-check membership where the tools read, so a
-    // mismatched pair is refused here, not one denied tool call at a time.
-    try {
-      await deps.verifyAccess(scope);
-    } catch {
-      await deps
-        .complete(
-          run.id,
-          blockedOutcome("workspace_access_denied", "failed"),
-          null,
-          run.id
-        )
-        .catch(() => undefined);
-      return json({ error: "Workspace could not be verified." }, 403);
+    const denied = await investigationDenied(run, scope, deps);
+    if (denied) {
+      return denied;
     }
     return json(
       widgetRunResponse(
