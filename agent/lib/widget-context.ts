@@ -9,7 +9,7 @@ const appContextSchema = z.looseObject({
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
-  role: z.enum(["owner", "admin"]),
+  role: z.enum(["owner", "admin", "member", "client"]),
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
 });

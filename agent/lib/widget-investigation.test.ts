@@ -7,6 +7,7 @@ import type { GateResult } from "./widget-egress.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
+  ROLE_LIMITED_REPLY,
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
@@ -442,6 +443,72 @@ test("a request to act skips the investigation, and an ask for a person hands of
   assert.equal(handedBody.message, null);
   assert.equal(handedBody.findings.needsHuman, true);
   assert.deepEqual(human.gated, []);
+  assert.equal(human.run.outcome?.reason, "asked_for_human");
+});
+
+test("a member or client gets the help center and a handoff, never an investigation", async (t) => {
+  enabled(t);
+  for (const role of ["member", "client"] as const) {
+    const { deps, gated, run } = dependencies();
+    deps.verifyAccess = () =>
+      assert.fail("must not check investigation access");
+    // biome-ignore lint/performance/noAwaitInLoops: one role at a time keeps failures readable.
+    const response = await receiveWidgetMessage(
+      request(start),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, role }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.decision, "allow");
+    assert.equal(body.message, ROLE_LIMITED_REPLY);
+    assert.deepEqual(gated, []);
+    assert.equal(run.outcome?.reason, "role_limited");
+  }
+
+  const kb = dependencies();
+  kb.deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0,
+      confidence: 0.95,
+      kbScore: 0.95,
+      lane: "kb",
+      source: "jev",
+    });
+  kb.deps.answerKb = () => Promise.resolve(kbAnswer);
+  const answered = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" }),
+    kb.deps
+  );
+  assert.equal(
+    ((await answered.json()) as Record<string, unknown>).message,
+    kbAnswer.message
+  );
+
+  const human = dependencies();
+  human.deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0.95,
+      asksOwnData: 0,
+      confidence: 0.9,
+      kbScore: 0,
+      lane: "human",
+      source: "jev",
+    });
+  await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "client" }),
+    human.deps
+  );
   assert.equal(human.run.outcome?.reason, "asked_for_human");
 });
 

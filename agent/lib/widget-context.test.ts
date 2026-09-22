@@ -65,7 +65,7 @@ test("rejects a denied, mismatched, or malformed verification", async (context) 
   for (const response of [
     Response.json({ error: "denied" }, { status: 403 }),
     Response.json({ ...appContext, organizationId: conversationId }),
-    Response.json({ ...appContext, role: "member" }),
+    Response.json({ ...appContext, role: "guest" }),
     new Response("not json"),
   ]) {
     // biome-ignore lint/performance/noAwaitInLoops: each response is one rejection case.

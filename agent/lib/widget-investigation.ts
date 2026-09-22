@@ -412,6 +412,9 @@ const UNCLEAR_SCORE = 0.8;
 const EXPLAIN_SCORE = 0.8;
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
+const INVESTIGATOR_ROLES = new Set<WidgetContext["role"]>(["owner", "admin"]);
+export const ROLE_LIMITED_REPLY =
+  "Looking into your workspace's account details is something only workspace owners and admins can ask me to do, so I can't check that for you. I can still help with how anything in Acquisity works: ask me a how-to question, like how to set something up or what a setting does, and I'll answer from the Help Center. For account-specific issues, your workspace owner or admin can ask me here.";
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -903,7 +906,12 @@ async function answerFromKnowledgeBase(
       return reply;
     }
   }
-  return answerGeneralQuestion(run, route, ask, finish, deps);
+  const general = await answerGeneralQuestion(run, route, ask, finish, deps);
+  // Members and clients get everything above; only owners and admins go on to an investigation.
+  return (
+    general ??
+    (INVESTIGATOR_ROLES.has(scope.role) ? null : roleLimitedReply(run, deps))
+  );
 }
 
 /** The help-center try, for a general question or a request to act; null sends the message on to an investigation. */
@@ -1056,6 +1064,26 @@ async function pollWidgetRun(
     clearTimeout(timer);
   }
 }
+/** Investigations are for workspace owners and admins; everyone else hears what they can ask instead. */
+async function roleLimitedReply(
+  run: WidgetRun,
+  deps: Pick<WidgetDependencies, "complete">
+): Promise<WidgetRun> {
+  const done = await deps.complete(
+    run.id,
+    {
+      citations: [],
+      decision: "allow",
+      message: ROLE_LIMITED_REPLY,
+      reason: "role_limited",
+      status: "completed",
+    },
+    null,
+    run.id
+  );
+  return done ?? run;
+}
+
 export async function receiveWidgetMessage(
   request: Request,
   {
