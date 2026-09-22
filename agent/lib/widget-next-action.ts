@@ -17,6 +17,9 @@ import { logOpsEvent } from "./ops-log.js";
 
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const SELECTOR_TIMEOUT_MS = 3000;
+// A selected read only needs tool arguments. A stalled request previously waited
+// ~300s before falling back, after the widget's 170s investigation deadline.
+const FORCED_CALL_TIMEOUT_MS = 30_000;
 const STATE_RESULT_CHARS = 48_000;
 const RESULT_CHARS = 3000;
 // renderConversation already budgets this below 12,000 with the latest message first.
@@ -501,6 +504,18 @@ export function widgetNextActionMiddleware(
   opts: SelectorOptions = {}
 ): LanguageModelMiddleware {
   const plans = new WeakMap<object, Plan>();
+  const remember = (
+    forced: { params: Params; tool: string },
+    original: Params,
+    reads: Read[]
+  ) => {
+    const timeout = AbortSignal.timeout(FORCED_CALL_TIMEOUT_MS);
+    forced.params.abortSignal = original.abortSignal
+      ? AbortSignal.any([original.abortSignal, timeout])
+      : timeout;
+    plans.set(forced.params, { original, reads, tool: forced.tool });
+    return forced.params;
+  };
   const log = (
     decision: string,
     fields: { ms: number; step: number; tool?: string },
@@ -556,8 +571,7 @@ export function widgetNextActionMiddleware(
       { ms: 0, step: reads.length, tool: ASK_TOOL },
       "reason=question_retry"
     );
-    plans.set(retry.params, { original: params, reads, tool: ASK_TOOL });
-    return retry.params;
+    return remember(retry, params, reads);
   };
   /** What the turn's own tool results already decided, so Jev is not asked again. */
   const alreadySettled = (
@@ -650,12 +664,7 @@ export function widgetNextActionMiddleware(
             next.action === "read" ? "finish" : next.action
           );
         }
-        plans.set(forced.params, {
-          original: params,
-          reads,
-          tool: forced.tool,
-        });
-        return forced.params;
+        return remember(forced, params, reads);
       } catch (error) {
         if (params.abortSignal?.aborted) {
           throw error;
@@ -670,16 +679,26 @@ export function widgetNextActionMiddleware(
       if (!plan) {
         return doGenerate();
       }
-      const step = { ms: 0, step: plan.reads.length, tool: plan.tool };
+      const startedAt = Date.now();
+      const step = () => ({
+        ms: Date.now() - startedAt,
+        step: plan.reads.length,
+        tool: plan.tool,
+      });
       let generated: Awaited<ReturnType<typeof doGenerate>>;
       try {
         generated = await doGenerate();
       } catch (error) {
-        if (params.abortSignal?.aborted) {
+        // A local request timeout can use the existing fallback. A cancelled
+        // investigation must never restart work with another model request.
+        if (plan.original.abortSignal?.aborted) {
           throw error;
         }
-        // A provider that refuses a forced tool must not cost the customer the run.
-        log("fallback", step, "reason=forced_read_failed");
+        log(
+          "fallback",
+          step(),
+          `reason=forced_read_failed error=${fallbackReason(error)}`
+        );
         return model.doGenerate(plan.original);
       }
       const selected = generated.content.find(
@@ -696,7 +715,7 @@ export function widgetNextActionMiddleware(
         return { ...generated, content: [selected] };
       }
       // The same read with the same arguments returns what is already known.
-      log("fallback", step, "reason=repeated_read");
+      log("fallback", step(), "reason=repeated_read");
       return model.doGenerate(
         finishParams(plan.original, plan.reads, "finish")
       );

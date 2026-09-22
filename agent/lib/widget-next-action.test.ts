@@ -654,6 +654,84 @@ describe("widget next-action selector", () => {
     );
   });
 
+  it("a stalled forced request aborts and the streaming path falls back with the original signal", async (t) => {
+    const parent = new AbortController();
+    const local = new AbortController();
+    t.mock.method(AbortSignal, "timeout", (ms: number) => {
+      assert.ok(ms === 3000 || ms === 30_000);
+      return ms === 30_000 ? local.signal : new AbortController().signal;
+    });
+    let calls = 0;
+    const base = new MockLanguageModelV4({
+      doGenerate: (params) => {
+        calls += 1;
+        if (calls === 1) {
+          assert.notEqual(params.abortSignal, parent.signal);
+          local.abort(new DOMException("timed out", "TimeoutError"));
+          assert.equal(params.abortSignal?.aborted, true);
+          return Promise.reject(params.abortSignal?.reason);
+        }
+        assert.equal(params.abortSignal, parent.signal);
+        assert.equal(params.abortSignal.aborted, false);
+        assert.equal(params.toolChoice, undefined);
+        return Promise.resolve(text("recovered findings"));
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+        widgetNextActionMiddleware({
+          apiKey: "k",
+          fetch: jev("widget_website_status"),
+        }),
+      ],
+      model: base,
+    });
+    const { stream } = await model.doStream({
+      abortSignal: parent.signal,
+      prompt: prompt("Check my website", []),
+      tools: TOOLS,
+    });
+    let recovered = false;
+    for await (const part of stream) {
+      if (part.type === "text-delta" && part.delta === "recovered findings") {
+        recovered = true;
+      }
+    }
+    assert.equal(calls, 2);
+    assert.ok(recovered);
+  });
+
+  it("cancelling the investigation aborts the forced request without starting its fallback", async () => {
+    const parent = new AbortController();
+    const cancelled = new DOMException("cancelled", "AbortError");
+    const base = new MockLanguageModelV4({
+      doGenerate: (params) => {
+        parent.abort(cancelled);
+        assert.equal(params.abortSignal?.aborted, true);
+        return Promise.reject(params.abortSignal?.reason);
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: widgetNextActionMiddleware({
+        apiKey: "k",
+        fetch: jev("widget_website_status"),
+      }),
+      model: base,
+    });
+    await assert.rejects(
+      async () =>
+        await model.doGenerate({
+          abortSignal: parent.signal,
+          prompt: prompt("Check my website", []),
+          tools: TOOLS,
+        }),
+      (error) => error === cancelled
+    );
+    assert.equal(base.doGenerateCalls.length, 1);
+  });
+
   it("the tool budget still wins: once spent there is nothing to select and no selector call", async () => {
     let called = false;
     const { model, sent } = harness(() => {
