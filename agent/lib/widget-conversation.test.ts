@@ -242,8 +242,7 @@ test("an identifier from another workspace in the conversation widens nothing: t
     ["widget_inbox_health"]
   );
   assert.deepEqual(sent.toolChoice, {
-    toolName: "widget_inbox_health",
-    type: "tool",
+    type: "required",
   });
   // The selector is given the customer's words only; the verified scope is not
   // in its input to be argued with, and stays with the session and the tools.
