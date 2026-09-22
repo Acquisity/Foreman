@@ -419,7 +419,7 @@ export function parseWidgetOutreachHealthEvidence(
     caveats: [
       "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap. Acquisity manages Instantly limits; do not ask the customer to change them in Instantly.",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
-      "Missing metric rows do not mean zero activity.",
+      "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
       "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes.",
     ],
