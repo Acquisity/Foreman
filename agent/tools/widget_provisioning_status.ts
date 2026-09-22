@@ -42,9 +42,9 @@ const DFY_INBOX_COUNT = `(select case when count(*) > 0 and bool_and(
 export const widgetProvisioningInput = z.strictObject({
   orderId: z
     .uuid()
-    .optional()
+    .nullish()
     .describe(
-      "Read bounded domain and inbox diagnostics for this owned order."
+      "Use null to list this workspace's orders first. To read domain and inbox diagnostics, use only an orderId returned by this tool; never invent an id."
     ),
 });
 export type WidgetProvisioningInput = z.infer<typeof widgetProvisioningInput>;

@@ -37,12 +37,12 @@ const DOMAIN_LIMIT = 20;
 const LIVE_PROJECT_LIMIT = 3;
 
 // Optional selection is restricted to the current workspace listing.
-const inputSchema = z.strictObject({
+export const widgetWebsiteInput = z.strictObject({
   inspectWebsiteId: z
     .uuid()
-    .optional()
+    .nullish()
     .describe(
-      "An id returned by this tool for the current workspace. Adds a public DNS/HTTPS check of the first hosting-assigned custom domain; no arbitrary URL is accepted."
+      "Use null to list this workspace's websites first. To inspect one, use only an id returned by this tool; never invent an id. Adds public DNS/HTTPS checks of its first hosting-assigned custom domain."
     ),
 });
 
@@ -414,8 +414,13 @@ const tool = defineTool({
   description:
     "Read the verified workspace's Website and Funnel Builder projects to explain publish or build failures. Returns up to 30 recent projects with current build status, whether each has EVER successfully published (a connected custom domain plus never-published is the usual cause of a 404), the last build failure reason, connected custom domains with their saved verification/DNS state, the last deployment id and state, and purchased domains not connected to any website (listed apart: bought is not connected). The three most recent projects also carry a read-only live hosting check (latest deployment state and error, whether each saved domain is attached, verified and correctly pointed); everything else is saved product state. Never present saved state as live, and when live is not_checked, inaccessible or unavailable say so. Unavailable is not empty. To investigate a particular returned website, pass its id as inspectWebsiteId. This checks that website instead of the three recent projects, and adds independent public DNS answers and an HTTPS root-page status for its first hosting-assigned custom domain. Recommended DNS records come from live domain configuration. HTTP status does not verify browser rendering. No arbitrary URL, SQL or workspace override is accepted.",
   execute: (input, ctx) =>
-    readWidgetWebsiteStatus(ctx, undefined, undefined, input.inspectWebsiteId),
-  inputSchema,
+    readWidgetWebsiteStatus(
+      ctx,
+      undefined,
+      undefined,
+      input.inspectWebsiteId ?? undefined
+    ),
+  inputSchema: widgetWebsiteInput,
   outputSchema: widgetWebsiteStatusOutput,
 });
 

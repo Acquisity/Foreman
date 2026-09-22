@@ -131,6 +131,11 @@ test("input accepts only an optional owned order selector", () => {
     assert.throws(() => buildWidgetProvisioningQuery(scope, input as never));
   }
   assert.ok(widgetProvisioningInput.safeParse({}).success);
+  assert.ok(widgetProvisioningInput.safeParse({ orderId: null }).success);
+  assert.equal(
+    buildWidgetProvisioningQuery(scope, { orderId: null }),
+    buildWidgetProvisioningQuery(scope, {})
+  );
   const selected = buildWidgetProvisioningQuery(scope, { orderId });
   assert.ok(selected.includes(`where dpo.id = '${orderId}'::uuid`));
   assert.ok(

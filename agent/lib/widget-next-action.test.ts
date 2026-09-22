@@ -293,21 +293,8 @@ describe("widget next-action selector", () => {
         tools: TOOLS,
       });
       assert.deepEqual(sent().tools, [pick]);
-      assert.deepEqual(sent().toolChoice, { type: "required" });
+      assert.deepEqual(sent().toolChoice, { toolName: pick, type: "tool" });
       assert.equal(out.content[0]?.type, "tool-call");
-    });
-  }
-
-  for (const name of ["widget_website_status", "widget_provisioning_status"]) {
-    it(`${name}: the selected read preserves an empty list call`, async () => {
-      const { model, sent } = harness(jev(name), call(name, {}));
-      const out = await model.doGenerate({
-        prompt: prompt("Inspect my records", []),
-        tools: TOOLS,
-      });
-      assert.deepEqual(sent().tools, [name]);
-      assert.deepEqual(sent().toolChoice, { type: "required" });
-      assert.deepEqual(out.content, call(name, {}).content);
     });
   }
 
@@ -458,7 +445,10 @@ describe("widget next-action selector", () => {
       tools: [...TOOLS, ASK],
     });
     assert.deepEqual(sent().tools, ["widget_ask_customer"]);
-    assert.deepEqual(sent().toolChoice, { type: "required" });
+    assert.deepEqual(sent().toolChoice, {
+      toolName: "widget_ask_customer",
+      type: "tool",
+    });
     assert.equal(
       JSON.stringify(seen[0]).includes("widget_ask_customer"),
       false

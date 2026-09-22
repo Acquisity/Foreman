@@ -6,6 +6,7 @@ import definition, {
   buildWidgetWebsiteStatusQuery,
   parseWidgetWebsiteStatus,
   readWidgetWebsiteStatus,
+  widgetWebsiteInput,
 } from "../tools/widget_website_status.js";
 
 const CANCELLED_RE = /cancelled/;
@@ -293,4 +294,29 @@ test("targeted public diagnostics require both current workspace membership and 
   if (checked.status === "ok") {
     assert.equal(checked.projects[0].publicCheck?.domain, "shop.example.com");
   }
+});
+
+test("website selector accepts explicit list mode without accepting invalid IDs", () => {
+  assert.deepEqual(widgetWebsiteInput.parse({ inspectWebsiteId: null }), {
+    inspectWebsiteId: null,
+  });
+  assert.deepEqual(widgetWebsiteInput.parse({}), {});
+  assert.equal(
+    widgetWebsiteInput.safeParse({ inspectWebsiteId: "" }).success,
+    false
+  );
+  assert.equal(
+    widgetWebsiteInput.safeParse({ inspectWebsiteId: "not-a-uuid" }).success,
+    false
+  );
+  assert.equal(
+    widgetWebsiteInput.safeParse({ organizationId: scope.organizationId })
+      .success,
+    false
+  );
+  assert.equal(
+    widgetWebsiteInput.parse({ inspectWebsiteId: neverPublished.id })
+      .inspectWebsiteId,
+    neverPublished.id
+  );
 });

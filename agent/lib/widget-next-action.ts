@@ -473,10 +473,7 @@ function forcedParams(
             role: "system",
           },
         ],
-        // The current model fills optional selectors with placeholder UUIDs when
-        // forced by name. Requiring a call with only this tool advertised keeps
-        // the same selection while allowing an empty list input ({}).
-        toolChoice: { type: "required" },
+        toolChoice: { toolName: next.tool, type: "tool" },
         tools: params.tools?.filter((tool) => tool.name === next.tool),
       },
       tool: next.tool,
@@ -489,7 +486,7 @@ function forcedParams(
     params: {
       ...params,
       prompt: [...params.prompt, note(NOTES.clarify)],
-      toolChoice: { type: "required" },
+      toolChoice: { toolName: ASK_TOOL, type: "tool" },
       tools: [askTool],
     },
     tool: ASK_TOOL,

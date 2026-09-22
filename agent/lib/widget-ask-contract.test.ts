@@ -223,7 +223,8 @@ test("a question the tool does not record comes back as an error, is retried onc
   const retry = await nextStep([rejected]);
   assert.deepEqual(retry.tools, ["widget_ask_customer"]);
   assert.deepEqual(retry.toolChoice, {
-    type: "required",
+    toolName: "widget_ask_customer",
+    type: "tool",
   });
 
   // Second failure: the ordinary write-up, with its note, and no "asked" step.
