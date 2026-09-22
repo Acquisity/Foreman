@@ -998,7 +998,9 @@ async function startInvestigation(
   try {
     const address = widgetAddress(scope);
     // Guessed while the session starts, so it costs the customer no wait.
-    const planning = (deps.plan ?? (() => Promise.resolve([])))(question);
+    const planning = (deps.plan ?? (() => Promise.resolve([])))(question, {
+      runId: run.id,
+    });
     const existing = resolveSession ? await resolveSession(address) : null;
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
     const session = await from(address).send(question, {

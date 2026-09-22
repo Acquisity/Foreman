@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logOpsEvent } from "./ops-log.js";
 import { askJev, type SelectorOptions } from "./widget-next-action.js";
 
 export const widgetProgressSchema = z.object({
@@ -66,9 +67,14 @@ const eventSchema = z.object({
 
 type Check = WidgetProgress["checks"][number];
 const priority = { completed: 0, planned: -1, running: 2, unavailable: 1 };
+/** Checks that ran lead in the order they started; guesses still waiting follow. */
 function groupedChecks(calls: Map<string, Check>): Check[] {
+  const all = [...calls.values()];
   const grouped = new Map<CheckId, Check["status"]>();
-  for (const call of calls.values()) {
+  for (const call of [
+    ...all.filter((check) => check.status !== "planned"),
+    ...all.filter((check) => check.status === "planned"),
+  ]) {
     const current = grouped.get(call.id);
     grouped.set(
       call.id,
@@ -164,7 +170,7 @@ const PLAN_MAX = 4;
  */
 export async function planWidgetChecks(
   question: string,
-  opts: SelectorOptions & { signal?: AbortSignal } = {}
+  opts: SelectorOptions & { runId?: string; signal?: AbortSignal } = {}
 ): Promise<CheckId[]> {
   const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
   if (!apiKey) {
@@ -192,13 +198,21 @@ export async function planWidgetChecks(
           opts
         )
       );
-    return entries
+    const scored = entries
       .map(([id]) => ({ id, score: response.answers[id]?.noul ?? 0 }))
+      .sort((a, b) => b.score - a.score);
+    logOpsEvent("widget.plan", {
+      message: scored
+        .map(({ id, score }) => `${id}=${score.toFixed(2)}`)
+        .join(" "),
+      runId: opts.runId,
+    });
+    return scored
       .filter(({ score }) => score >= PLAN_SCORE)
-      .sort((a, b) => b.score - a.score)
       .slice(0, PLAN_MAX)
       .map(({ id }) => id);
   } catch {
+    logOpsEvent("widget.plan", { outcome: "fallback", runId: opts.runId });
     return [];
   }
 }

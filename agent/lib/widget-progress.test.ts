@@ -39,11 +39,11 @@ test("unknown tools and arbitrary output never become customer-facing labels or 
   ]);
   assert.equal(reduce(result(3, "unknown", {})), null);
 });
-test("planned checks lead in order until a real call replaces them; unplanned calls follow", () => {
+test("checks that ran lead in start order; guesses still waiting follow in their order", () => {
   const reduce = progressFromEvents(["inboxes", "campaigns"]);
   assert.deepEqual(reduce(start(1, ["a"]))?.checks, [
-    { id: "inboxes", status: "planned" },
     { id: "campaigns", status: "running" },
+    { id: "inboxes", status: "planned" },
   ]);
   assert.deepEqual(
     reduce({
@@ -54,9 +54,9 @@ test("planned checks lead in order until a real call replaces them; unplanned ca
       type: "actions.requested",
     })?.checks,
     [
-      { id: "inboxes", status: "planned" },
       { id: "campaigns", status: "running" },
       { id: "billing", status: "running" },
+      { id: "inboxes", status: "planned" },
     ]
   );
 });
