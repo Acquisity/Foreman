@@ -15,7 +15,7 @@ export const MODELS = {
   gate: "deepseek/deepseek-v4-pro-0813",
   // Support widget knowledge-base lane: one grounded answer over a few public
   // help articles, where time to reply matters more than reasoning depth.
-  kb: "google/gemini-3.5-flash",
+  kb: "deepseek/deepseek-v4.1-flash",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
