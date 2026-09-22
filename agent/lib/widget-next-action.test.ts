@@ -659,7 +659,9 @@ describe("widget next-action selector", () => {
     const local = new AbortController();
     t.mock.method(AbortSignal, "timeout", (ms: number) => {
       assert.ok(ms === 3000 || ms === 30_000);
-      return ms === 30_000 ? local.signal : new AbortController().signal;
+      return ms === 30_000 && !local.signal.aborted
+        ? local.signal
+        : new AbortController().signal;
     });
     let calls = 0;
     const base = new MockLanguageModelV4({
@@ -671,8 +673,8 @@ describe("widget next-action selector", () => {
           assert.equal(params.abortSignal?.aborted, true);
           return Promise.reject(params.abortSignal?.reason);
         }
-        assert.equal(params.abortSignal, parent.signal);
-        assert.equal(params.abortSignal.aborted, false);
+        assert.notEqual(params.abortSignal, parent.signal);
+        assert.equal(params.abortSignal?.aborted, false);
         assert.equal(params.toolChoice, undefined);
         return Promise.resolve(text("recovered findings"));
       },
@@ -701,6 +703,85 @@ describe("widget next-action selector", () => {
     }
     assert.equal(calls, 2);
     assert.ok(recovered);
+  });
+
+  it("a stalled write-up retries once with a fresh signal, including after a repeated read", async (t) => {
+    const timers: AbortController[] = [];
+    t.mock.method(AbortSignal, "timeout", () => {
+      const timer = new AbortController();
+      timers.push(timer);
+      return timer.signal;
+    });
+    const base = new MockLanguageModelV4({
+      doGenerate: (params) => {
+        const n = base.doGenerateCalls.length;
+        if (n === 1) {
+          return Promise.resolve(call("widget_website_status", {}));
+        }
+        if (n === 2) {
+          timers.at(-1)?.abort(new DOMException("timed out", "TimeoutError"));
+          return Promise.reject(params.abortSignal?.reason);
+        }
+        assert.equal(params.abortSignal?.aborted, false);
+        assert.equal(params.toolChoice, undefined);
+        return Promise.resolve(text("DNS mismatch and HTTP 403"));
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: widgetNextActionMiddleware({
+        apiKey: "k",
+        fetch: jev("widget_website_status"),
+      }),
+      model: base,
+    });
+    const result = await model.doGenerate({
+      prompt: prompt("Check my website", [
+        {
+          input: {},
+          output: { status: "misconfigured" },
+          tool: "widget_website_status",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(base.doGenerateCalls.length, 3);
+    assert.deepEqual(result.content, text("DNS mismatch and HTTP 403").content);
+  });
+
+  it("an unforced request stops after one timeout retry and never retries parent cancellation", async (t) => {
+    const timers: AbortController[] = [];
+    t.mock.method(AbortSignal, "timeout", () => {
+      const timer = new AbortController();
+      timers.push(timer);
+      return timer.signal;
+    });
+    for (const cancelParent of [false, true]) {
+      const parent = new AbortController();
+      const base = new MockLanguageModelV4({
+        doGenerate: (params) => {
+          if (cancelParent) {
+            parent.abort(new DOMException("cancelled", "AbortError"));
+          } else {
+            timers.at(-1)?.abort(new DOMException("timed out", "TimeoutError"));
+          }
+          return Promise.reject(params.abortSignal?.reason);
+        },
+      });
+      const model = wrapLanguageModel({
+        middleware: widgetNextActionMiddleware(),
+        model: base,
+      });
+      // biome-ignore lint/performance/noAwaitInLoops: independent cancellation cases.
+      await assert.rejects(
+        async () =>
+          await model.doGenerate({
+            abortSignal: parent.signal,
+            prompt: prompt("Write the findings", []),
+            tools: [],
+          })
+      );
+      assert.equal(base.doGenerateCalls.length, cancelParent ? 1 : 2);
+    }
   });
 
   it("cancelling the investigation aborts the forced request without starting its fallback", async () => {

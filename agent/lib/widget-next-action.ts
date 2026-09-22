@@ -17,9 +17,9 @@ import { logOpsEvent } from "./ops-log.js";
 
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const SELECTOR_TIMEOUT_MS = 3000;
-// A selected read only needs tool arguments. A stalled request previously waited
-// ~300s before falling back, after the widget's 170s investigation deadline.
-const FORCED_CALL_TIMEOUT_MS = 30_000;
+// A stalled model request previously waited ~300s, beyond the widget's
+// 170s investigation deadline. Leave time for a fresh request to recover.
+const MODEL_CALL_TIMEOUT_MS = 30_000;
 const STATE_RESULT_CHARS = 48_000;
 const RESULT_CHARS = 3000;
 // renderConversation already budgets this below 12,000 with the latest message first.
@@ -509,7 +509,7 @@ export function widgetNextActionMiddleware(
     original: Params,
     reads: Read[]
   ) => {
-    const timeout = AbortSignal.timeout(FORCED_CALL_TIMEOUT_MS);
+    const timeout = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
     forced.params.abortSignal = original.abortSignal
       ? AbortSignal.any([original.abortSignal, timeout])
       : timeout;
@@ -676,8 +676,32 @@ export function widgetNextActionMiddleware(
     },
     async wrapGenerate({ doGenerate, model, params }) {
       const plan = plans.get(params);
+      // The unforced write-up can stall too. Bound each attempt and retry a
+      // timed-out model request once. This never replays a tool execution.
+      const unforced = async (input: Params) => {
+        for (let attempt = 0; ; attempt += 1) {
+          const timeout = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
+          const abortSignal = input.abortSignal
+            ? AbortSignal.any([input.abortSignal, timeout])
+            : timeout;
+          const started = Date.now();
+          try {
+            // biome-ignore lint/performance/noAwaitInLoops: one retry only after the previous model request aborts.
+            return await model.doGenerate({ ...input, abortSignal });
+          } catch (error) {
+            if (input.abortSignal?.aborted || !timeout.aborted || attempt > 0) {
+              throw error;
+            }
+            log(
+              "fallback",
+              { ms: Date.now() - started, step: plan?.reads.length ?? 0 },
+              "reason=unforced_request_timeout"
+            );
+          }
+        }
+      };
       if (!plan) {
-        return doGenerate();
+        return unforced(params);
       }
       const startedAt = Date.now();
       const step = () => ({
@@ -699,7 +723,7 @@ export function widgetNextActionMiddleware(
           step(),
           `reason=forced_read_failed error=${fallbackReason(error)}`
         );
-        return model.doGenerate(plan.original);
+        return unforced(plan.original);
       }
       const selected = generated.content.find(
         (part) =>
@@ -716,9 +740,7 @@ export function widgetNextActionMiddleware(
       }
       // The same read with the same arguments returns what is already known.
       log("fallback", step(), "reason=repeated_read");
-      return model.doGenerate(
-        finishParams(plan.original, plan.reads, "finish")
-      );
+      return unforced(finishParams(plan.original, plan.reads, "finish"));
     },
   };
 }
