@@ -93,15 +93,11 @@ test("a grounded answer is returned with the urls of the searched articles only"
   });
 });
 
-test("no hits, an unanswerable question, an uncited answer, and a failure all fall back to null", async () => {
+test("no hits, an unanswerable question, and an uncited answer fall back to null", async () => {
   const cases: KbDeps[] = [
     deps({ answer: "x [1]", kind: "answer" }, []),
     deps({ answer: "", kind: "none" }),
     deps({ answer: "Just trust me.", kind: "answer" }),
-    {
-      ...deps(null),
-      generate: () => Promise.reject(new Error("gateway down")),
-    },
   ];
   for (const kbDeps of cases) {
     // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
@@ -313,13 +309,17 @@ test("the selector sees path, description and keywords, bounded, and an older in
   assert.equal(indexLine({ id: "a", title: "Overview" }, 1), "2. Overview (a)");
 });
 
-test("a timeout or error in the lane is a miss, never a blank or partial reply", async () => {
+test("a timeout or error reports a technical failure instead of a missing guide", async () => {
   const result = await answerFromHelpCenter(
     { followUp: true, latest: "what next?" },
     log,
     { ...deps(grounded), generate: () => Promise.reject(new Error("timeout")) }
   );
-  assert.equal(result, null);
+  assert.deepEqual(result, {
+    citations: [],
+    message:
+      "Sorry, the help-center answer could not be loaded just now. Please try your message again.",
+  });
 });
 
 test("an account-likely ask decides what the message needs first: a fragment is unclear, an account question steps aside, a documented fix is answered", async () => {

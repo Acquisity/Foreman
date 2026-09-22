@@ -538,7 +538,12 @@ export async function gate(
       const trimmed = removeItems(
         findings,
         redactableItems(findings)
-          .filter((item) => item.text.toLowerCase().includes(foreign))
+          .filter((item) => {
+            const { candidates } = scanIdentifiers(item.text);
+            return Object.values(candidates).some((ids) =>
+              ids.includes(foreign)
+            );
+          })
           .map((item) => item.n)
       );
       if (!trimmed) {

@@ -652,3 +652,38 @@ test("a billing review keeps its verified facts and open questions for the teamm
   assert.equal(calls.compose.length, 0);
   assert.equal(JSON.stringify(calls.compose).includes("fresh domain"), false);
 });
+
+test("removing a foreign parent domain keeps facts about an owned subdomain", async () => {
+  const owned = "shop.customer-site.com";
+  const claim = `Public DNS for ${owned} returned no A records.`;
+  const { calls, deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set([owned]),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set([campaignId]),
+      }),
+  });
+  const result = await gate(
+    scope,
+    "Why is my website down?",
+    findings({
+      facts: [
+        { ...findings().facts[0], claim },
+        {
+          ...findings().facts[0],
+          claim: "Who manages customer-site.com is unknown.",
+        },
+        { ...findings().facts[0], claim: "Browser rendering is unavailable." },
+      ],
+    }),
+    d
+  );
+  assert.equal(result.decision, "allow");
+  assert.deepEqual(
+    result.findings.facts.map((fact) => fact.claim),
+    [claim, "Browser rendering is unavailable."]
+  );
+  assert.equal(calls.compose.length, 1);
+});

@@ -3,7 +3,7 @@ import { type ProviderClient, requiredClient } from "./executor/operations.js";
 
 /** Base for relative article links. The search backend is selected by the Executor binding. */
 export const HELP_CENTER_BASE_URL =
-  process.env.ACQUISITY_WEB_BASE_URL ?? "https://app.acquisity.ai";
+  process.env.ACQUISITY_WEB_BASE_URL?.trim() || "https://app.acquisity.ai";
 
 const MAX_ARTICLES = 5;
 const REQUEST_TIMEOUT_MS = 10_000;

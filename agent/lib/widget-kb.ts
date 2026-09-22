@@ -33,9 +33,9 @@ const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
 const SEARCH_TIMEOUT_MS = 5000;
-// The whole lane measures about 4 to 5s. The cap is generous on purpose: a slow
-// answer with sources still beats falling through to a multi-minute investigation.
-const KB_TIMEOUT_MS = 25_000;
+// Article selection and answer generation are sequential model calls. Live
+// selection alone can take 15s; leave time for the grounded answer as well.
+const KB_TIMEOUT_MS = 45_000;
 const MAX_ANSWER_CHARS = 4000;
 const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
@@ -617,6 +617,10 @@ export async function answerFromHelpCenter(
       "error",
       `${error instanceof Error ? error.message.slice(0, 100) : "unknown"} ${marks.join(" ")}`
     );
-    return null;
+    return {
+      citations: [],
+      message:
+        "Sorry, the help-center answer could not be loaded just now. Please try your message again.",
+    };
   }
 }
