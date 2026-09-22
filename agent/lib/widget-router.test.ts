@@ -238,3 +238,31 @@ describe("routeWidgetMessage", () => {
     assert.equal(route.followUp, 0.93);
   });
 });
+
+describe("low-confidence human routing regression", () => {
+  it("keeps a feature-navigation question in the help-center lane", async () => {
+    const route = await routeWidgetMessage(
+      "canh you tell me where to find the niche researcher?",
+      {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve({
+            json: async () => ({
+              answers: {
+                asks_for_human: { noul: 0.55 },
+                asks_own_data: { noul: 0.19 },
+                lane: {
+                  choice: "human",
+                  confidence: 0.37,
+                  probabilities: { human: 0.37, investigate: 0.19, kb: 0.43 },
+                },
+              },
+            }),
+            ok: true,
+            status: 200,
+          }),
+      }
+    );
+    assert.equal(route.lane, "kb");
+  });
+});

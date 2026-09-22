@@ -23,7 +23,7 @@ const ROUTER_TIMEOUT_MS = 5000;
 const MAX_STATE_CHARS = 12_000;
 
 /** Below this, an explicit ask for a person was not what the customer wrote. */
-const HUMAN_AGREEMENT = 0.5;
+export const HUMAN_REQUEST_SCORE = 0.8;
 /** At or above this, the customer asked for a ticket. */
 const TICKET_REQUEST = 0.5;
 
@@ -134,7 +134,7 @@ const QUESTIONS = {
   },
   asks_for_human: {
     instructions:
-      "The customer explicitly asks to talk to a person, a human, an agent, or the support team.",
+      "The customer explicitly requests a conversation with a human support representative. Asking where to find or how to use a named product feature (such as Niche Researcher or AI SDR) is not a request for a person.",
     type: "noul",
   },
   // Filing a ticket is the one thing Foreman can do for a customer. "can you open
@@ -213,6 +213,20 @@ const responseSchema = z.object({
   }),
 });
 
+function supportedLane(
+  answers: z.infer<typeof responseSchema>["answers"]
+): WidgetLane {
+  if (
+    answers.lane.choice !== "human" ||
+    answers.asks_for_human.noul >= HUMAN_REQUEST_SCORE
+  ) {
+    return answers.lane.choice;
+  }
+  return (answers.lane.probabilities?.kb ?? 0) >
+    (answers.lane.probabilities?.investigate ?? 0)
+    ? "kb"
+    : "investigate";
+}
 export interface WidgetRoute {
   asksForAction: number;
   asksForHuman: number;
@@ -291,7 +305,7 @@ export async function routeWidgetMessage(
     // never a change to apologise for, a help-center question or a handoff.
     const wantsTicket =
       (answers.asks_for_ticket?.noul ?? 0) >= TICKET_REQUEST &&
-      answers.asks_for_human.noul < HUMAN_AGREEMENT;
+      answers.asks_for_human.noul < HUMAN_REQUEST_SCORE;
     if (wantsTicket) {
       return {
         asksForAction: 0,
@@ -318,11 +332,7 @@ export async function routeWidgetMessage(
         (answers.lane.choice === "kb" ? confidence : 0),
       // The lane choice and the direct question must agree before a handoff: the
       // human lane skips the investigation, so a wrong guess costs the customer an answer.
-      lane:
-        answers.lane.choice === "human" &&
-        answers.asks_for_human.noul < HUMAN_AGREEMENT
-          ? "investigate"
-          : answers.lane.choice,
+      lane: supportedLane(answers),
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };

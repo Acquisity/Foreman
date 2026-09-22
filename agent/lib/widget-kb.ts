@@ -5,8 +5,9 @@ import {
   HELP_CENTER_BASE_URL,
   helpArticleSlug,
 } from "./help-center.js";
-import { fastCallOptions, resolveModel } from "./models.js";
+import { resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { withKbModel } from "./widget-kb-model.js";
 import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
 
 /**
@@ -223,21 +224,27 @@ let indexCache: { at: number; value: KbIndex } | null = null;
 export const defaultKbDeps: KbDeps = {
   async generate({ accountLikely, articles, question, signal }) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      model: gateway(model),
-      prompt: JSON.stringify({
-        articles: articles.map((article, index) => ({
-          content: article.content,
-          number: index + 1,
-          title: article.title,
-        })),
-        question,
-      }),
-      ...fastCallOptions(model),
-      schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: accountLikely ? ACCOUNT_LIKELY_KB_PROMPT : KB_PROMPT,
-    });
+    const { object } = await withKbModel(
+      model,
+      signal,
+      (attemptSignal, options) =>
+        generateObject({
+          abortSignal: attemptSignal,
+          maxRetries: 0,
+          model: gateway(model),
+          prompt: JSON.stringify({
+            articles: articles.map((article, index) => ({
+              content: article.content,
+              number: index + 1,
+              title: article.title,
+            })),
+            question,
+          }),
+          ...options,
+          schema: accountLikely ? guardedAnswerSchema : answerSchema,
+          system: accountLikely ? ACCOUNT_LIKELY_KB_PROMPT : KB_PROMPT,
+        })
+    );
     return object;
   },
   // The list changes only when docs ship, so one warm instance fetches it rarely.
@@ -269,14 +276,20 @@ export const defaultKbDeps: KbDeps = {
   },
   async rewrite(question, signal) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      model: gateway(model),
-      prompt: question,
-      ...fastCallOptions(model),
-      schema: rewriteSchema,
-      system: REWRITE_PROMPT,
-    });
+    const { object } = await withKbModel(
+      model,
+      signal,
+      (attemptSignal, options) =>
+        generateObject({
+          abortSignal: attemptSignal,
+          maxRetries: 0,
+          model: gateway(model),
+          prompt: question,
+          ...options,
+          schema: rewriteSchema,
+          system: REWRITE_PROMPT,
+        })
+    );
     return object;
   },
   // The help-center search is a public route, so this lane calls it directly
@@ -307,15 +320,21 @@ export const defaultKbDeps: KbDeps = {
   },
   async select({ index, question, signal }) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      model: gateway(model),
-      // The listing comes first so the long, stable prefix can be cached.
-      prompt: `${index.map(indexLine).join("\n")}\n\nCustomer question: ${question}`,
-      ...fastCallOptions(model),
-      schema: selectSchema,
-      system: SELECT_PROMPT,
-    });
+    const { object } = await withKbModel(
+      model,
+      signal,
+      (attemptSignal, options) =>
+        generateObject({
+          abortSignal: attemptSignal,
+          maxRetries: 0,
+          model: gateway(model),
+          // The listing comes first so the long, stable prefix can be cached.
+          prompt: `${index.map(indexLine).join("\n")}\n\nCustomer question: ${question}`,
+          ...options,
+          schema: selectSchema,
+          system: SELECT_PROMPT,
+        })
+    );
     return object;
   },
 };

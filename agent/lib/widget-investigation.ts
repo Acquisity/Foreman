@@ -30,6 +30,7 @@ import {
 } from "./widget-next-action.js";
 import {
   DECISION_CONTEXT,
+  HUMAN_REQUEST_SCORE,
   logRouteDecision,
   renderAsk,
   renderConversation,
@@ -386,12 +387,6 @@ const ACTION_REQUEST_SCORE = 0.8;
  * but it must not get in the way of a real, answerable account question.
  */
 const UNCLEAR_SCORE = 0.8;
-/**
- * How sure the router must be that the customer asked for a person before the
- * run hands off without investigating. High on purpose: a wrong handoff costs a
- * teammate's time on something Foreman could have answered.
- */
-const HUMAN_REQUEST_SCORE = 0.8;
 /**
  * How sure the router must be that the customer only asks what the previous
  * reply meant. High on purpose: a request for fresh evidence must still be investigated.
@@ -829,7 +824,7 @@ async function answerFromKnowledgeBase(
     );
   // An explicit ask for a person is honoured at once: no investigation stands
   // between the customer and the handoff. The note tells the teammate why.
-  if (route.lane === "human" || route.asksForHuman >= HUMAN_REQUEST_SCORE) {
+  if (route.asksForHuman >= HUMAN_REQUEST_SCORE) {
     const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
     if (handoff) {
       return deps.complete(run.id, handoff.result, handoff.findings, run.id);
