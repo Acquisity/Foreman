@@ -192,14 +192,34 @@ describe("widget next-action selector", () => {
     assert.deepEqual(sent().tools, ["widget_billing_summary"]);
     assert.equal(seen.length, 1);
     assert.equal(seen[0].questions?.handoff_eligible, undefined);
-    assert.equal(
-      "clarify" in (seen[0].questions?.action.criteria ?? {}),
-      false
-    );
+    assert.equal("clarify" in (seen[0].questions?.action.criteria ?? {}), true);
     assert.equal("human" in (seen[0].questions?.action.criteria ?? {}), false);
     assert.deepEqual(JSON.parse(seen[0].state ?? "{}").completedReads, []);
   });
 
+  it("can request customer-only evidence before any workspace read", async () => {
+    const ask = {
+      description: "Record the question",
+      inputSchema: { type: "object" as const },
+      name: "widget_ask_customer",
+      type: "function" as const,
+    };
+    const { model, sent } = harness(
+      jev("clarify"),
+      call("widget_ask_customer", {
+        question: "What busy times does your calendar show in that window?",
+      })
+    );
+    await model.doGenerate({
+      prompt: prompt("Is my calendar free tomorrow from 9 to 5 Eastern?", []),
+      tools: [...TOOLS, ask],
+    });
+    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().toolChoice, {
+      toolName: "widget_ask_customer",
+      type: "tool",
+    });
+  });
   it("one selected read cannot dispatch twelve parameter variants or duplicates", async () => {
     const batch = call("widget_outreach_health", {});
     batch.content = Array.from({ length: 12 }, (_, n) => ({

@@ -95,7 +95,7 @@ const POLICY =
 
 const FIXED_CRITERIA = {
   clarify:
-    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it.",
+    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it. Live personal-calendar availability is not available from these tools: ask the customer what busy times their calendar shows in the requested window; do not read unrelated SDR host settings.",
   finish:
     "The completed reads support an answer, or no listed read could add anything useful. Findings may state plainly what could not be checked. Also choose this when the customer asks about another workspace or person. An unavailable source, a failed read, an ambiguous record or an old billing difference the customer did not raise is a limitation to state here, never a reason for a person.",
   human:
@@ -109,7 +109,7 @@ const ARTICLES =
 const NOTES = {
   asked:
     "The question for the customer is recorded and will be sent. Reply with the single word: asked.",
-  clarify: `Stop. One detail from the customer is needed before anything more can be checked. Call ${ASK_TOOL} with the one short, friendly question that gets the single detail identifying what they mean.`,
+  clarify: `Stop. One detail from the customer is needed before anything more can be checked. Call ${ASK_TOOL} with the one short, friendly question that gets the single detail or observation that is missing. Use the person, date and timezone already supplied; for calendar availability ask what busy times their connected calendar shows, without requesting event titles or attendees.`,
   finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
   human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
@@ -381,14 +381,16 @@ export async function selectNextAction(
         }: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
       ])
     ),
-    ...(input.initial ? { finish: FIXED_CRITERIA.finish } : FIXED_CRITERIA),
+    ...(input.initial
+      ? { clarify: FIXED_CRITERIA.clarify, finish: FIXED_CRITERIA.finish }
+      : FIXED_CRITERIA),
   };
   const { answers } = responseSchema.parse(
     await askJev(
       {
         action: {
           criteria,
-          instructions: `${POLICY} ${input.initial ? "The front door has already selected investigation and handled intent and ambiguity. Select the first useful read, or finish if none can help. Do not classify intent again." : "Select the one next step."}`,
+          instructions: `${POLICY} ${input.initial ? "The front door has already selected investigation and handled intent and ambiguity. Select the first useful read, clarify if only the customer can supply the missing evidence, or finish if neither can help. Do not classify intent again." : "Select the one next step."}`,
           type: "choice",
         },
         ...(input.initial
