@@ -331,6 +331,7 @@ export function widgetRunResponse(run: WidgetRun) {
     };
   }
   return {
+    ...(run.progress ? { progress: run.progress } : {}),
     decision: run.outcome.decision,
     ...(run.outcome.decision === "block" &&
     RETRYABLE_BLOCK.test(run.outcome.reason ?? "")
