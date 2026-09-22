@@ -596,3 +596,56 @@ test("calendar diagnostics refuse unexpected returned members and bound the rang
     false
   );
 });
+
+test("personal calendar target uses verified requester instead of the workspace host", async () => {
+  const calendar = {
+    end: "2026-09-23T00:00:00Z",
+    start: "2026-09-22T00:00:00Z",
+    target: "requester" as const,
+  };
+  const calls: unknown[] = [];
+  await readWidgetCalendar(ctx, { calendar }, threadId, (_ctx, kind, input) => {
+    calls.push({ input, kind });
+    return Promise.resolve({ members: [], status: "ok" });
+  });
+  assert.deepEqual(calls, [
+    {
+      input: {
+        end: calendar.end,
+        memberIds: [scope.userId],
+        start: calendar.start,
+      },
+      kind: "calendar",
+    },
+  ]);
+  assert.equal(
+    widgetSdrInput.safeParse({
+      calendar: { ...calendar, memberIds: [threadId] },
+    }).success,
+    false
+  );
+  assert.equal(
+    widgetSdrInput.safeParse({ calendar: { ...calendar, target: threadId } })
+      .success,
+    false
+  );
+});
+
+test("omitted personal target preserves scheduling host selection", async () => {
+  const calendar = {
+    end: "2026-09-23T00:00:00Z",
+    start: "2026-09-22T00:00:00Z",
+    target: null,
+  };
+  const calls: unknown[] = [];
+  await readWidgetCalendar(
+    ctx,
+    { calendar },
+    threadId,
+    (_ctx, _kind, input) => {
+      calls.push(input.memberIds);
+      return Promise.resolve({ members: [], status: "ok" });
+    }
+  );
+  assert.deepEqual(calls, [[threadId]]);
+});

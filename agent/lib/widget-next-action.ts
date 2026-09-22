@@ -21,7 +21,6 @@ const SELECTOR_TIMEOUT_MS = 3000;
 // 170s investigation deadline. Leave time for a fresh request to recover.
 const MODEL_CALL_TIMEOUT_MS = 30_000;
 const STATE_RESULT_CHARS = 48_000;
-const RESULT_CHARS = 3000;
 // renderConversation already budgets this below 12,000 with the latest message first.
 const CONVERSATION_CHARS = 12_000;
 // The tools describe what they read, and what they cannot show, in 700 to 1,400
@@ -350,10 +349,9 @@ export async function selectNextAction(
   if (!apiKey) {
     throw new Error("no_key");
   }
-  const cap = Math.min(
-    RESULT_CHARS,
-    Math.floor(STATE_RESULT_CHARS / Math.max(1, input.reads.length))
-  );
+  // Share the existing total budget: a 3k per-read cut hid website diagnostics
+  // behind their caveats and made the selector ask for an already supplied domain.
+  const cap = Math.floor(STATE_RESULT_CHARS / Math.max(1, input.reads.length));
   const state = JSON.stringify({
     availableReads: input.tools.map((tool) => ({
       alreadyCalledWith: input.reads

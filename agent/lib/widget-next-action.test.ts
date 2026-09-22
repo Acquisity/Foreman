@@ -319,6 +319,41 @@ describe("widget next-action selector", () => {
     assert.doesNotMatch(body, RE_4);
   });
 
+  it("keeps diagnostic evidence beyond 3k while sharing the total evidence budget", async () => {
+    const seen: { state?: string }[] = [];
+    const { model } = harness(jev("finish", 0, seen));
+    await model.doGenerate({
+      prompt: prompt("Inspect the named website", [
+        {
+          input: {},
+          output: {
+            caveats: "x".repeat(4000),
+            publicCheck: { dns: "no_records" },
+          },
+          tool: "widget_website_status",
+        },
+        {
+          input: { inspectWebsiteId: "selected" },
+          output: {
+            caveats: "x".repeat(4000),
+            publicCheck: { dns: "no_records" },
+            trailing: "x".repeat(50_000),
+          },
+          tool: "widget_website_status",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    const reads = JSON.parse(seen[0].state ?? "{}").completedReads;
+    assert.ok(
+      reads.every((read: { result: string }) =>
+        read.result.includes('"dns":"no_records"')
+      )
+    );
+    assert.ok(reads[1].result.includes("[cut here for length"));
+    assert.ok(reads[1].result.length < 24_100);
+  });
+
   it("finish is terminal: an article read to ground a step does not reopen workspace reads or ask Jev again", async () => {
     const seen: { state?: string }[] = [];
     const { model, sent } = harness(
