@@ -1669,3 +1669,48 @@ test("an explain writer that fails technically is retried once and then asks for
   assert.equal(down.body.retry, true);
   assert.equal(down.body.findings ?? null, null);
 });
+
+test("polls return persisted progress while answer preparation continues in the background", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  run.session_id = "widget-session-1";
+  deps.progress = (_id, _session, progress) => {
+    run.progress = progress;
+    return Promise.resolve();
+  };
+  const { extract } = deps;
+  let release: (() => void) | undefined;
+  const paused = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  deps.extract = async (...args) => {
+    await paused;
+    return extract(...args);
+  };
+  const background: Promise<unknown>[] = [];
+  const response = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      attachSession: () => completedSession(),
+      from: noWork().from,
+      waitUntil: (work) => {
+        background.push(work);
+      },
+    },
+    1,
+    verify,
+    deps
+  );
+  const body = await response.json();
+  assert.equal(body.status, "pending");
+  assert.equal(body.progress.stage, "preparing");
+  assert.equal(background.length, 1);
+  release?.();
+  await Promise.all(background);
+  assert.equal(run.outcome?.status, "completed");
+});

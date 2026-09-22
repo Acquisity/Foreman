@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { privateDatabase } from "./private-postgres.js";
 import {
+  type WidgetProgress,
+  widgetProgressSchema,
+} from "./widget-progress.js";
+import {
   sameWidgetOwner,
   type WidgetContext,
   widgetContextSchema,
@@ -36,6 +40,7 @@ const runSchema = z.object({
   findings: z.unknown().nullable(),
   id: z.uuid(),
   outcome: widgetOutcomeSchema.nullable(),
+  progress: widgetProgressSchema.nullish(),
   question: z.string(),
   scope: widgetContextSchema,
   session_id: z.string().nullable(),
@@ -212,4 +217,26 @@ export async function completeWidgetRun(
     throw new Error("Investigation session ownership mismatch.");
   }
   return run;
+}
+
+/** Replayed readers cannot move progress backwards or change a settled run. */
+export async function saveWidgetProgress(
+  id: string,
+  sessionId: string,
+  progress: WidgetProgress
+) {
+  await privateDatabase(1500).query(
+    `UPDATE widget_support_runs SET progress = CASE WHEN $5 = 'preparing' AND progress IS NOT NULL
+       THEN jsonb_set(progress, '{stage}', '"preparing"'::jsonb) ELSE $3::jsonb END
+     WHERE id = $1 AND session_id = $2 AND completed_at IS NULL
+       AND (progress IS NULL OR (progress->>'stage' <> 'preparing'
+         AND ((progress->>'sequence')::bigint < $4 OR $5 = 'preparing')))`,
+    [
+      id,
+      sessionId,
+      JSON.stringify(widgetProgressSchema.parse(progress)),
+      progress.sequence,
+      progress.stage,
+    ]
+  );
 }

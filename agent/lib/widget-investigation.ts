@@ -28,6 +28,7 @@ import {
   nextActionEnabled,
   validAsk,
 } from "./widget-next-action.js";
+import { progressFromEvents, type WidgetProgress } from "./widget-progress.js";
 import {
   DECISION_CONTEXT,
   HUMAN_REQUEST_SCORE,
@@ -47,6 +48,7 @@ import {
   latestWidgetScope,
   readWidgetRun,
   recentWidgetTurns,
+  saveWidgetProgress,
   type WidgetOutcome,
   type WidgetRun,
 } from "./widget-run-store.js";
@@ -225,13 +227,15 @@ const completed = (
 export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
   startIndex = 0,
-  timeoutMs = 120_000
+  timeoutMs = 120_000,
+  onProgress?: (progress: WidgetProgress) => Promise<void>
 ): Promise<WaitOutcome> {
   const reader = (await session.getEventStream({ startIndex })).getReader();
   const timeout = setTimeout(
     () => reader.cancel().catch(() => undefined),
     timeoutMs
   );
+  const progress = progressFromEvents();
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
   let ticket: FiledTicket | null = null;
@@ -242,6 +246,10 @@ export async function waitForWidgetInvestigation(
       const { done, value: event } = await reader.read();
       if (done) {
         return { status: "pending" };
+      }
+      const update = progress(event);
+      if (update) {
+        await onProgress?.(update).catch(() => undefined);
       }
       if (event.type === "turn.started") {
         findings = null;
@@ -285,13 +293,18 @@ export const defaultWidgetDependencies = {
   handoffEligible,
   history: recentWidgetTurns,
   latestScope: latestWidgetScope,
+  progress: saveWidgetProgress,
   read: readWidgetRun,
   route: routeWidgetMessage,
   /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
   verifyAccess: (scope: WidgetContext) =>
     resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
 };
-export type WidgetDependencies = typeof defaultWidgetDependencies;
+export type WidgetDependencies = Omit<
+  typeof defaultWidgetDependencies,
+  "progress"
+> &
+  Partial<Pick<typeof defaultWidgetDependencies, "progress">>;
 
 const disclose = (outcome: WidgetOutcome, findings: unknown) =>
   outcome.decision === "block" || Boolean(findings);
@@ -311,7 +324,11 @@ const RETRYABLE_BLOCK =
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
-    return { run_id: run.id, status: "pending" as const };
+    return {
+      run_id: run.id,
+      status: "pending" as const,
+      ...(run.progress ? { progress: run.progress } : {}),
+    };
   }
   return {
     decision: run.outcome.decision,
@@ -532,7 +549,7 @@ export async function finishWidgetRun(
     WidgetDependencies,
     "claimFinish" | "complete" | "extract" | "gate" | "history"
   > &
-    Partial<Pick<WidgetDependencies, "handoffEligible">>
+    Partial<Pick<WidgetDependencies, "handoffEligible" | "progress">>
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
@@ -546,6 +563,15 @@ export async function finishWidgetRun(
     !(await deps.claimFinish(run.id).catch(() => true))
   ) {
     return null;
+  }
+  if (outcome.status === "completed") {
+    await deps
+      .progress?.(run.id, sessionId, {
+        checks: [],
+        sequence: 0,
+        stage: "preparing",
+      })
+      .catch(() => undefined);
   }
   let result: WidgetOutcome;
   let findings: unknown = null;
@@ -643,7 +669,11 @@ async function settleResultRun(
   const outcome = await waitForWidgetInvestigation(
     attach(sessionId),
     run.stream_index,
-    responseWaitMs
+    responseWaitMs,
+    deps.progress
+      ? (progress) =>
+          deps.progress?.(run.id, sessionId, progress) ?? Promise.resolve()
+      : undefined
   );
   const overdue = Date.now() - run.created_at.getTime() > WIDGET_DEADLINE_MS;
   const handoff =
@@ -943,19 +973,35 @@ async function startInvestigation(
     });
     sessionId = session.id;
     await deps.attach(run.id, session.id, startIndex);
-    const settled = waitForWidgetInvestigation(session, startIndex).then(
-      (outcome) => finishWidgetRun(run, session.id, outcome, deps)
-    );
+    await deps
+      .progress?.(run.id, session.id, {
+        checks: [],
+        sequence: 0,
+        stage: "investigating",
+      })
+      .catch(() => undefined);
+    const settled = waitForWidgetInvestigation(
+      session,
+      startIndex,
+      120_000,
+      deps.progress
+        ? (progress) =>
+            deps.progress?.(run.id, session.id, progress) ?? Promise.resolve()
+        : undefined
+    ).then((outcome) => finishWidgetRun(run, session.id, outcome, deps));
     waitUntil(settled.catch(() => null));
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const finished = await Promise.race([
         settled,
         new Promise<null>((resolve) => {
-          timeout = setTimeout(() => resolve(null), responseWaitMs);
+          timeout = setTimeout(
+            () => resolve(null),
+            Math.min(responseWaitMs, 1000)
+          );
         }),
       ]);
-      return finished ?? run;
+      return finished ?? (await deps.read(run.id));
     } finally {
       clearTimeout(timeout);
     }
@@ -972,6 +1018,34 @@ async function startInvestigation(
   }
 }
 
+async function pollWidgetRun(
+  run: WidgetRun,
+  attach: NonNullable<RouteHandlerArgs["attachSession"]>,
+  waitMs: number,
+  deps: WidgetDependencies,
+  waitUntil: RouteHandlerArgs["waitUntil"]
+): Promise<WidgetRun> {
+  if (!run.session_id) {
+    return run;
+  }
+  const settling = settleResultRun(run, run.session_id, attach, waitMs, deps);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const finished = await Promise.race([
+      settling,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), waitMs + 25);
+      }),
+    ]);
+    if (!finished) {
+      waitUntil(settling.catch(() => run));
+    }
+    return finished ?? (await deps.read(run.id));
+  } finally {
+    clearTimeout(timer);
+  }
+}
 export async function receiveWidgetMessage(
   request: Request,
   {
@@ -1026,12 +1100,12 @@ export async function receiveWidgetMessage(
         throw new Error("Investigation unavailable for this conversation.");
       }
       if (!run.outcome && run.session_id && attachSession) {
-        run = await settleResultRun(
+        run = await pollWidgetRun(
           run,
-          run.session_id,
           attachSession,
-          responseWaitMs,
-          deps
+          Math.min(responseWaitMs, 1000),
+          deps,
+          waitUntil
         );
       }
       return json(widgetRunResponse(run));
