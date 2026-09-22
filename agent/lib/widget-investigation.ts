@@ -31,7 +31,12 @@ import {
   nextActionEnabled,
   validAsk,
 } from "./widget-next-action.js";
-import { progressFromEvents, type WidgetProgress } from "./widget-progress.js";
+import {
+  type CheckId,
+  planWidgetChecks,
+  progressFromEvents,
+  type WidgetProgress,
+} from "./widget-progress.js";
 import {
   DECISION_CONTEXT,
   HUMAN_REQUEST_SCORE,
@@ -231,14 +236,15 @@ export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
   startIndex = 0,
   timeoutMs = 120_000,
-  onProgress?: (progress: WidgetProgress) => Promise<void>
+  onProgress?: (progress: WidgetProgress) => Promise<void>,
+  planned: readonly CheckId[] = []
 ): Promise<WaitOutcome> {
   const reader = (await session.getEventStream({ startIndex })).getReader();
   const timeout = setTimeout(
     () => reader.cancel().catch(() => undefined),
     timeoutMs
   );
-  const progress = progressFromEvents();
+  const progress = progressFromEvents(planned);
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
   let ticket: FiledTicket | null = null;
@@ -296,6 +302,7 @@ export const defaultWidgetDependencies = {
   handoffEligible,
   history: recentWidgetTurns,
   latestScope: latestWidgetScope,
+  plan: planWidgetChecks,
   progress: saveWidgetProgress,
   read: readWidgetRun,
   route: routeWidgetMessage,
@@ -305,9 +312,9 @@ export const defaultWidgetDependencies = {
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
-  "progress"
+  "plan" | "progress"
 > &
-  Partial<Pick<typeof defaultWidgetDependencies, "progress">>;
+  Partial<Pick<typeof defaultWidgetDependencies, "plan" | "progress">>;
 
 const disclose = (outcome: WidgetOutcome, findings: unknown) =>
   outcome.decision === "block" || Boolean(findings);
@@ -692,7 +699,9 @@ async function settleResultRun(
     attach(sessionId),
     run.stream_index,
     responseWaitMs,
-    recordRunProgress(run, sessionId, deps)
+    recordRunProgress(run, sessionId, deps),
+    // The saved list keeps its order when the stream is replayed on each poll.
+    run.progress?.checks.map((check) => check.id)
   );
   const overdue = Date.now() - run.created_at.getTime() > WIDGET_DEADLINE_MS;
   const handoff =
@@ -988,6 +997,8 @@ async function startInvestigation(
   let sessionId: string | undefined;
   try {
     const address = widgetAddress(scope);
+    // Guessed while the session starts, so it costs the customer no wait.
+    const planning = (deps.plan ?? (() => Promise.resolve([])))(question);
     const existing = resolveSession ? await resolveSession(address) : null;
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
     const session = await from(address).send(question, {
@@ -997,9 +1008,10 @@ async function startInvestigation(
     });
     sessionId = session.id;
     await deps.attach(run.id, session.id, startIndex);
+    const planned = await planning;
     await deps
       .progress?.(run.id, session.id, {
-        checks: [],
+        checks: planned.map((id) => ({ id, status: "planned" as const })),
         sequence: 0,
         stage: "investigating",
       })
@@ -1008,7 +1020,8 @@ async function startInvestigation(
       session,
       startIndex,
       120_000,
-      recordRunProgress(run, session.id, deps)
+      recordRunProgress(run, session.id, deps),
+      planned
     ).then((outcome) => finishWidgetRun(run, session.id, outcome, deps));
     waitUntil(settled.catch(() => null));
     let timeout: ReturnType<typeof setTimeout> | undefined;

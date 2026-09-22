@@ -17,6 +17,7 @@ import {
   withHistory,
 } from "./widget-investigation.js";
 import type { KbAnswer } from "./widget-kb.js";
+import type { WidgetProgress } from "./widget-progress.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
 
@@ -577,6 +578,38 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
     failing.deps
   );
   assert.deepEqual(failing.gated, [findings]);
+});
+
+test("the guessed checks are saved as planned before the first real check runs", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  const saved: WidgetProgress[] = [];
+  deps.plan = () => Promise.resolve(["inboxes", "campaigns"]);
+  deps.progress = (_id, _session, progress) => {
+    saved.push(progress);
+    return Promise.resolve();
+  };
+  await receiveWidgetMessage(
+    request(start),
+    {
+      from: () =>
+        ({
+          send: () => Promise.resolve(completedSession()),
+        }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
+      waitUntil: () => undefined,
+    },
+    200,
+    verify,
+    deps
+  );
+  assert.deepEqual(saved[0], {
+    checks: [
+      { id: "inboxes", status: "planned" },
+      { id: "campaigns", status: "planned" },
+    ],
+    sequence: 0,
+    stage: "investigating",
+  });
 });
 
 const routeWith =

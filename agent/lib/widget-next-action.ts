@@ -268,7 +268,7 @@ export interface SelectorOptions {
   sessionId?: string;
 }
 
-async function askJev(
+export async function askJev(
   questions: object,
   state: string,
   apiKey: string,
