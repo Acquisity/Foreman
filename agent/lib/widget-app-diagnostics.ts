@@ -8,7 +8,7 @@ export async function readWidgetAppDiagnostics(
     abortSignal: AbortSignal;
     session?: { auth: { initiator: SessionAuthContext | null } };
   },
-  kind: "calendar" | "website",
+  kind: "website",
   input: Record<string, unknown>,
   request: typeof fetch = fetch
 ): Promise<unknown> {

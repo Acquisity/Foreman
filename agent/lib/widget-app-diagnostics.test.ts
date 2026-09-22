@@ -32,7 +32,7 @@ test("app diagnostics send trusted scope to a fixed origin and refuse redirects/
     }
   });
   const request = ((url, init) => {
-    assert.equal(url, "https://app.test/api/internal/foreman/calendar");
+    assert.equal(url, "https://app.test/api/internal/foreman/website");
     assert.equal(init?.redirect, "error");
     assert.equal(
       JSON.parse(String(init?.body)).userId,
@@ -48,27 +48,27 @@ test("app diagnostics send trusted scope to a fixed origin and refuse redirects/
   assert.deepEqual(
     await readWidgetAppDiagnostics(
       ctx,
-      "calendar",
+      "website",
       { organizationId: "other", userId: "other" },
       request
     ),
     { status: "ok" }
   );
   await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "calendar", {}, (() =>
+    readWidgetAppDiagnostics(ctx, "website", {}, (() =>
       Promise.resolve(
         new Response("not authorized", { status: 403 })
       )) as typeof fetch),
     forbidden
   );
   await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "calendar", {}, (() =>
+    readWidgetAppDiagnostics(ctx, "website", {}, (() =>
       Promise.resolve(new Response("x".repeat(65_537)))) as typeof fetch),
     oversized
   );
   delete process.env.FOREMAN_DIAGNOSTICS_SECRET;
   await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "calendar", {}, request),
+    readWidgetAppDiagnostics(ctx, "website", {}, request),
     unconfigured
   );
 });
