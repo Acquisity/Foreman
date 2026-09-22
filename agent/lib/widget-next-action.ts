@@ -95,9 +95,9 @@ const POLICY =
 
 const FIXED_CRITERIA = {
   clarify:
-    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it. Live personal-calendar availability is not available from these tools: ask the customer what busy times their calendar shows in the requested window; do not read unrelated SDR host settings.",
+    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it. Live personal-calendar availability is not available from these tools. Only if busy times are missing, ask what busy times their calendar shows in the requested window; do not read unrelated SDR host settings. If the customer already supplied busy times, including explicit hypothetical/test assumptions, finish using them as given: do not ask for confirmation.",
   finish:
-    "The completed reads support an answer, or no listed read could add anything useful. Findings may state plainly what could not be checked. Also choose this when the customer asks about another workspace or person. An unavailable source, a failed read, an ambiguous record or an old billing difference the customer did not raise is a limitation to state here, never a reason for a person.",
+    "The completed reads support an answer, or no listed read could add anything useful. Findings may state plainly what could not be checked. Supplied calendar busy times are sufficient to calculate free intervals in the requested window; accept explicit assumptions as assumptions and attribute the answer to the supplied times without claiming a live check. Also choose this when the customer asks about another workspace or person. An unavailable source, a failed read, an ambiguous record or an old billing difference the customer did not raise is a limitation to state here, never a reason for a person.",
   human:
     "Only when the customer explicitly asked for a person, or there is a concrete billing dispute that needs reconciling by a person, such as a suspected duplicate charge or a charge that may belong to another workspace.",
 } as const;
