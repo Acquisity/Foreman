@@ -659,6 +659,21 @@ const requestKey = (input: Extract<WidgetInput, { action: "start" }>) =>
     )
     .digest("hex");
 
+/** Polls replay the turn; skip already persisted events before making a database call. */
+function recordRunProgress(
+  run: WidgetRun,
+  sessionId: string,
+  deps: WidgetDependencies
+) {
+  let sequence = run.progress?.sequence ?? -1;
+  return async (progress: WidgetProgress) => {
+    if (run.progress?.stage === "preparing" || progress.sequence <= sequence) {
+      return;
+    }
+    await deps.progress?.(run.id, sessionId, progress);
+    ({ sequence } = progress);
+  };
+}
 /** Advance a still-open run: finish it if it settled, or force a human handoff once overdue. */
 async function settleResultRun(
   run: WidgetRun,
@@ -671,10 +686,7 @@ async function settleResultRun(
     attach(sessionId),
     run.stream_index,
     responseWaitMs,
-    deps.progress
-      ? (progress) =>
-          deps.progress?.(run.id, sessionId, progress) ?? Promise.resolve()
-      : undefined
+    recordRunProgress(run, sessionId, deps)
   );
   const overdue = Date.now() - run.created_at.getTime() > WIDGET_DEADLINE_MS;
   const handoff =
@@ -985,10 +997,7 @@ async function startInvestigation(
       session,
       startIndex,
       120_000,
-      deps.progress
-        ? (progress) =>
-            deps.progress?.(run.id, session.id, progress) ?? Promise.resolve()
-        : undefined
+      recordRunProgress(run, session.id, deps)
     ).then((outcome) => finishWidgetRun(run, session.id, outcome, deps));
     waitUntil(settled.catch(() => null));
     let timeout: ReturnType<typeof setTimeout> | undefined;

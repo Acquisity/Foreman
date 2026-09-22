@@ -1714,3 +1714,46 @@ test("polls return persisted progress while answer preparation continues in the 
   await Promise.all(background);
   assert.equal(run.outcome?.status, "completed");
 });
+
+test("result polls do not rewrite progress already saved by the background watcher", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  run.session_id = "widget-session-1";
+  run.progress = {
+    checks: [{ id: "campaigns", status: "completed" }],
+    sequence: 2,
+    stage: "investigating",
+  };
+  let writes = 0;
+  deps.progress = () => {
+    writes += 1;
+    return Promise.resolve();
+  };
+  const replay = session([
+    event("actions.requested", {
+      actions: [{ callId: "one", toolName: "widget_outreach_health" }],
+      sequence: 0,
+    }),
+    event("action.result", {
+      result: { callId: "one", kind: "tool-result", output: {} },
+      sequence: 0,
+    }),
+  ]);
+  const response = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      ...noWork(),
+      attachSession: () => replay,
+    },
+    100,
+    verify,
+    deps
+  );
+  assert.equal((await response.json()).status, "pending");
+  assert.equal(writes, 0);
+});
