@@ -10,6 +10,7 @@ import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetSdrQuery,
   parseWidgetSdrEvidence,
+  readWidgetCalendar,
   readWidgetSdrThreadStatus,
   widgetSdrInput,
   widgetSdrOutput,
@@ -543,5 +544,55 @@ test("actual thread messages are bounded and arbitrary fields are stripped", () 
       scope,
       { threadId }
     )
+  );
+});
+
+test("calendar diagnostics use resolved host and preserve unavailable results", async () => {
+  const calendar = {
+    end: "2026-09-23T00:00:00Z",
+    start: "2026-09-22T00:00:00Z",
+  };
+  const calls: unknown[] = [];
+  const result = await readWidgetCalendar(
+    ctx,
+    { calendar },
+    scope.userId,
+    (_ctx, kind, input) => {
+      calls.push({ input, kind });
+      return Promise.resolve({ message: "Read failed", status: "unavailable" });
+    }
+  );
+  assert.equal(result.status, "unavailable");
+  assert.deepEqual(calls, [
+    { input: { ...calendar, memberIds: [scope.userId] }, kind: "calendar" },
+  ]);
+  assert.equal(
+    (await readWidgetCalendar(ctx, { calendar })).status,
+    "unavailable"
+  );
+});
+
+test("calendar diagnostics refuse unexpected returned members and bound the range", async () => {
+  const calendar = {
+    end: "2026-09-23T00:00:00Z",
+    start: "2026-09-22T00:00:00Z",
+  };
+  const result = await readWidgetCalendar(
+    ctx,
+    { calendar },
+    scope.userId,
+    async () => ({
+      members: [
+        { accounts: [], status: "ok", truncated: false, userId: threadId },
+      ],
+      status: "ok",
+    })
+  );
+  assert.equal(result.status, "unavailable");
+  assert.equal(
+    widgetSdrInput.safeParse({
+      calendar: { ...calendar, end: "2026-10-23T00:00:00Z" },
+    }).success,
+    false
   );
 });

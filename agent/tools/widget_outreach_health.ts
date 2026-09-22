@@ -20,10 +20,29 @@ import {
 const CAMPAIGN_PAGE_SIZE = 20;
 const RECENT_SEND_DAYS = 7;
 
-export const widgetOutreachHealthInput = z.strictObject({
-  after: z.uuid().optional(),
-  campaignId: z.uuid().optional(),
-});
+const metricDate = z.iso.date();
+export const widgetOutreachHealthInput = z
+  .strictObject({
+    after: z.uuid().nullish(),
+    afterInboxId: z.uuid().nullish(),
+    campaignId: z.uuid().nullish(),
+    endDate: metricDate.nullish(),
+    startDate: metricDate.nullish(),
+  })
+  .refine((input) => {
+    if (input.afterInboxId && !input.campaignId) {
+      return false;
+    }
+    if (!(input.startDate || input.endDate)) {
+      return true;
+    }
+    if (!(input.campaignId && input.startDate && input.endDate)) {
+      return false;
+    }
+    const days =
+      (Date.parse(input.endDate) - Date.parse(input.startDate)) / 86_400_000;
+    return days >= 0 && days < 31;
+  }, "Select a campaign for inbox pagination or a complete date range of at most 31 days.");
 export type WidgetOutreachHealthInput = z.infer<
   typeof widgetOutreachHealthInput
 >;
@@ -97,7 +116,49 @@ const liveCampaign = z.union([
   }),
   z.object({ available: z.literal(false), reason: z.string() }),
 ]);
+const dailyMetrics = z.object({
+  date: dateStr,
+  emailsBounced: count,
+  emailsDelivered: count,
+  emailsOpened: count,
+  emailsSent: count,
+  meetingsScheduled: count,
+  repliesReceived: count,
+  updatedAt: timestamp,
+});
+const assignedInbox = z.object({
+  connected: z.boolean(),
+  email: z.email(),
+  id: z.uuid(),
+  status: z.string().max(100),
+});
+const campaignDiagnostics = z
+  .object({
+    assignedInboxes: z.object({
+      accounts: z.array(assignedInbox).max(101),
+      configuredCount: count.nullable(),
+      healthyCount: count,
+      matchedCount: count,
+      nextAfterInboxId: z.uuid().nullable(),
+    }),
+    dailyMetrics: z.array(dailyMetrics).max(31),
+    endDate: dateStr,
+    overview: z
+      .object({
+        bounces: count,
+        emailsSent: count,
+        meetingsBooked: count,
+        opens: count,
+        replies: count,
+        snapshotAt: timestamp.nullable(),
+        unsubscribes: count,
+      })
+      .nullable(),
+    startDate: dateStr,
+  })
+  .nullable();
 const campaignHealth = z.object({
+  diagnostics: campaignDiagnostics,
   id: z.uuid(),
   leadsNotPushedCount: count,
   live: liveCampaign,
@@ -159,7 +220,54 @@ export function buildWidgetOutreachHealthQuery(
   const target = input.campaignId
     ? `and c.id = '${input.campaignId}'::uuid`
     : "";
-  const selection = `select c.id, left(c.name, 300) as name, c.status,
+  const startDate = input.startDate
+    ? `'${input.startDate}'::date`
+    : "current_date - 6";
+  const endDate = input.endDate ? `'${input.endDate}'::date` : "current_date";
+  const inboxCursor = input.afterInboxId
+    ? `and mi.id > '${input.afterInboxId}'::uuid`
+    : "";
+  // The public metrics API reads this same overview. Date-window rows and saved
+  // account selections are product data not exposed by that public endpoint.
+  const diagnostics = input.campaignId
+    ? `jsonb_build_object(
+    'startDate', (${startDate})::text, 'endDate', (${endDate})::text,
+    'dailyMetrics', coalesce((select jsonb_agg(to_jsonb(d) order by d.date) from (
+      select cm.date, cm.emails_sent as "emailsSent", cm.emails_delivered as "emailsDelivered",
+        cm.emails_opened as "emailsOpened", cm.emails_bounced as "emailsBounced",
+        cm.replies_received as "repliesReceived", cm.meetings_scheduled as "meetingsScheduled",
+        cm.updated_at as "updatedAt"
+      from outreach_campaign_metrics cm
+      where cm.organization_id = c.organization_id and cm.campaign_id = c.id
+        and cm.date >= (${startDate})::text and cm.date <= (${endDate})::text
+      order by cm.date limit 31
+    ) d), '[]'::jsonb),
+    'overview', (select jsonb_build_object(
+      'emailsSent', co.emails_sent_count, 'opens', co.open_count,
+      'replies', co.reply_count, 'bounces', co.bounced_count,
+      'unsubscribes', co.unsubscribed_count, 'meetingsBooked', co.total_meeting_booked,
+      'snapshotAt', co.snapshot_at)
+      from outreach_campaign_overview co
+      where co.organization_id = c.organization_id and co.campaign_id = c.id),
+    'assignedInboxes', (select jsonb_build_object(
+      'configuredCount', case when jsonb_typeof(c.settings->'emailAccounts') = 'array'
+        then jsonb_array_length(c.settings->'emailAccounts') else null end,
+      'matchedCount', count(*),
+      'healthyCount', count(*) filter (where mi.status = 'active' and mi.connected),
+      'nextAfterInboxId', null,
+      'accounts', coalesce((select jsonb_agg(to_jsonb(ai)) from (
+        select mi.id, mi.email, mi.status, mi.connected
+        from mail_inbox mi where mi.organization_id = c.organization_id
+          and jsonb_typeof(c.settings->'emailAccounts') = 'array'
+          and c.settings->'emailAccounts' ? mi.email ${inboxCursor}
+        order by mi.id limit 101
+      ) ai), '[]'::jsonb))
+      from mail_inbox mi where mi.organization_id = c.organization_id
+        and jsonb_typeof(c.settings->'emailAccounts') = 'array'
+        and c.settings->'emailAccounts' ? mi.email)
+  )`
+    : "null::jsonb";
+  const selection = `select ${diagnostics} as diagnostics, c.id, left(c.name, 300) as name, c.status,
       c.provider_campaign_id as "providerCampaignId", p.provider,
       p.account_type as "accountType", p.workspace_id as "providerWorkspaceId",
       c.total_leads as "totalLeads", c.updated_at as "updatedAt",
@@ -214,6 +322,7 @@ const campaignRow = z.object({
   accountType: z.enum(["system_provisioned", "user_owned"]).nullable(),
   dailyLimit: count.nullable(),
   days: z.record(z.string(), z.boolean()).nullable(),
+  diagnostics: campaignDiagnostics,
   fromTime: z.string().max(16).nullable(),
   id: z.uuid(),
   leadsNotPushedCount: count,
@@ -269,7 +378,15 @@ export function parseWidgetOutreachHealthEvidence(
       row.toTime !== null ||
       row.timezone !== null ||
       row.days !== null;
+    const { diagnostics } = row;
+    if (diagnostics) {
+      const { accounts } = diagnostics.assignedInboxes;
+      diagnostics.assignedInboxes.nextAfterInboxId =
+        accounts.length > 100 ? accounts[99].id : null;
+      diagnostics.assignedInboxes.accounts = accounts.slice(0, 100);
+    }
     return campaignHealth.parse({
+      diagnostics,
       id: row.id,
       leadsNotPushedCount: row.leadsNotPushedCount,
       live: {
@@ -303,8 +420,8 @@ export function parseWidgetOutreachHealthEvidence(
       "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap. Acquisity manages Instantly limits; do not ask the customer to change them in Instantly.",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity.",
-      "recentSends covers only the last saved days, not the campaign's full history.",
-      "Inbox health is the saved status and connection flag, not a live send test.",
+      "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+      "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes.",
     ],
     inboxes: result.inboxes,
     nextAfter:
@@ -479,7 +596,7 @@ export async function readWidgetOutreachHealth(
 
 const tool = defineTool({
   description:
-    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 recent active campaigns (name, status, total leads) with nextAfter for the next page, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Pass campaignId from this tool to fetch live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 recent active campaigns (name, status, total leads) with nextAfter for the next page, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), and campaign-specific inbox assignments. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. This also fetches live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetOutreachHealth(ctx, input),
   inputSchema: widgetOutreachHealthInput,

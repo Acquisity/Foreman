@@ -4,6 +4,7 @@ import { z } from "zod";
 import { readWidgetOwnership } from "#lib/executor/dispatch.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { readWidgetAppDiagnostics } from "#lib/widget-app-diagnostics.js";
 import {
   isWidgetSupport,
   requireWidgetContext,
@@ -102,6 +103,18 @@ const live = z.union([
   }),
 ]);
 
+const renderSchema = z.union([
+  z.object({
+    bodyText: z.string().max(4000),
+    domain: z.string().max(256),
+    limitation: z.string().max(1000),
+    observedAt: timestamp,
+    status: z.literal("observed"),
+    title: z.string().max(300),
+  }),
+  z.object({ status: z.enum(["unavailable", "denied", "not_linked"]) }),
+]);
+
 const project = z.object({
   // Whether the project has EVER reached a live deployment. false + a connected
   // domain is the usual 404 cause: never published. false is distinct from a
@@ -117,6 +130,7 @@ const project = z.object({
   // PostgreSQL left(..., 300) counts code points; Zod counts UTF-16 units.
   name: z.string().max(NAME_SQL_LIMIT * 2),
   publicCheck: websiteNetworkSchema.optional(),
+  render: renderSchema.optional(),
   source: z.enum(["website", "website_project"]),
   updatedAt: timestamp,
 });
@@ -124,7 +138,7 @@ const project = z.object({
 // The saved row also carries the hosting project id. It selects the live read
 // and is dropped before anything reaches the model.
 const savedProject = project
-  .omit({ live: true, publicCheck: true })
+  .omit({ live: true, publicCheck: true, render: true })
   .extend({ vercelProjectId: z.string().max(128).nullable().default(null) });
 
 export const widgetWebsiteStatusOutput = z.union([
@@ -300,7 +314,7 @@ function parseSaved(
     caveats: [
       "Each project's live field is a hosting read made just now, and publicCheck is a separate public network read when requested; remaining fields are saved builder state. live.status not_checked, not_linked, inaccessible or unavailable means there is no hosting result. Explain a missing check only when it affects the answer, and never repeat internal status names to the customer.",
       "The customer cannot see build logs or build errors anywhere in the product: never tell them to open, check or paste a build log. When live.deployment.buildError is present, read it, say in one plain sentence what broke, and give the exact message to paste into the website builder's chat to fix it, naming the file and the error. When a build failed and buildError is absent, give a message to paste that asks the builder to find and fix the build error without changing the design.",
-      "A READY deployment does not prove the page renders. publicCheck is a separate public DNS and HTTPS root-page check of one assigned domain, when requested. HTTP status is not a browser render test. Redirects are reported but not followed; browser is not checked. misconfigured true means hosting configuration or automatic TLS issuance is not satisfied; use configuration's recommended records and configuredBy to diagnose it.",
+      "A READY deployment does not prove the page renders. publicCheck is a separate public DNS and HTTPS root-page check of one assigned domain, when requested. HTTP status is not a browser render test. HTTP redirects are reported but not followed. render, when present, is a separate browser DOM observation with its own limitations; it is not a visual or console-error check. misconfigured true means hosting configuration or automatic TLS issuance is not satisfied; use configuration's recommended records and configuredBy to diagnose it.",
       "everPublished false with a connected custom domain is the usual 404 cause: the project never published.",
       "everPublished true with a failed current build means it published before, then broke. lastBuildFailure is historical saved evidence, not proof the current build is failing. A deployed saved status or READY live deployment can coexist with an old failure. Do not prescribe fixing that old error as the cause of the current symptom unless current evidence confirms failure.",
       "Missing deployment or version rows do not prove a project never built; unavailable is not empty.",
@@ -334,7 +348,11 @@ export async function readWidgetWebsiteStatus(
   dispatch: Dispatch = readWidgetOwnership,
   fetcher?: Fetch,
   inspectWebsiteId?: string,
-  networkRead = readWebsiteNetwork
+  networkRead = readWebsiteNetwork,
+  renderRead: (ctx: StatusContext, websiteId: string) => Promise<unknown> = (
+    context,
+    websiteId
+  ) => readWidgetAppDiagnostics(context, "website", { websiteId })
 ): Promise<WidgetWebsiteStatusOutput> {
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   const query = buildWidgetWebsiteStatusQuery(scope);
@@ -384,12 +402,27 @@ export async function readWidgetWebsiteStatus(
     const publicCheck = assignedDomain
       ? await networkRead(assignedDomain, ctx.abortSignal)
       : undefined;
+    let render: z.infer<typeof renderSchema> | undefined;
+    if (assignedDomain && inspectWebsiteId) {
+      try {
+        const result = renderSchema.safeParse(
+          await renderRead(ctx, inspectWebsiteId)
+        );
+        render = result.success ? result.data : { status: "unavailable" };
+      } catch (error) {
+        if (ctx.abortSignal.aborted) {
+          throw error;
+        }
+        render = { status: "unavailable" };
+      }
+    }
     return {
       ...output,
       projects: output.projects.map((row) => ({
         ...row,
         live: results.get(row.id) ?? row.live,
         ...(row.id === inspectWebsiteId && publicCheck ? { publicCheck } : {}),
+        ...(row.id === inspectWebsiteId && render ? { render } : {}),
       })),
     };
   } catch (error) {
@@ -412,7 +445,7 @@ export async function readWidgetWebsiteStatus(
 
 const tool = defineTool({
   description:
-    "Read the verified workspace's Website and Funnel Builder projects to explain publish or build failures. Returns up to 30 recent projects with current build status, whether each has EVER successfully published (a connected custom domain plus never-published is the usual cause of a 404), the last build failure reason, connected custom domains with their saved verification/DNS state, the last deployment id and state, and purchased domains not connected to any website (listed apart: bought is not connected). The three most recent projects also carry a read-only live hosting check (latest deployment state and error, whether each saved domain is attached, verified and correctly pointed); everything else is saved product state. Never present saved state as live, and when live is not_checked, inaccessible or unavailable say so. Unavailable is not empty. To investigate a particular returned website, pass its id as inspectWebsiteId. This checks that website instead of the three recent projects, and adds independent public DNS answers and an HTTPS root-page status for its first hosting-assigned custom domain. Recommended DNS records come from live domain configuration. HTTP status does not verify browser rendering. No arbitrary URL, SQL or workspace override is accepted.",
+    "Read the verified workspace's Website and Funnel Builder projects to explain publish or build failures. Returns up to 30 recent projects with current build status, whether each has EVER successfully published (a connected custom domain plus never-published is the usual cause of a 404), the last build failure reason, connected custom domains with their saved verification/DNS state, the last deployment id and state, and purchased domains not connected to any website (listed apart: bought is not connected). The three most recent projects also carry a read-only live hosting check (latest deployment state and error, whether each saved domain is attached, verified and correctly pointed); everything else is saved product state. Never present saved state as live, and when live is not_checked, inaccessible or unavailable say so. Unavailable is not empty. To investigate a particular returned website, pass its id as inspectWebsiteId. This checks that website instead of the three recent projects, and adds independent public DNS answers and an HTTPS root-page status for its first hosting-assigned custom domain. Recommended DNS records come from live domain configuration. Selected websites also request an independent, credential-free browser DOM read through Acquisity; render contains current title/body text or an explicit unavailable/not-linked result. Its cross-origin restrictions can affect the result. HTTP status does not verify browser rendering. No arbitrary URL, SQL or workspace override is accepted.",
   execute: (input, ctx) =>
     readWidgetWebsiteStatus(
       ctx,

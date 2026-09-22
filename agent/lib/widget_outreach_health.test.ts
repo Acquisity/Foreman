@@ -59,6 +59,7 @@ const row = {
     "5": true,
     "6": false,
   },
+  diagnostics: null,
   fromTime: "09:00",
   id: campaignId,
   leadsNotPushedCount: 12,
@@ -422,4 +423,82 @@ test("a denied or absent target cannot trigger a provider read", async (t) => {
     "denied"
   );
   assert.equal(call.mock.callCount(), 1);
+});
+
+test("date windows require a selected campaign, real dates and no more than 31 inclusive days", () => {
+  assert.ok(
+    widgetOutreachHealthInput.safeParse({ after: null, campaignId: null })
+      .success
+  );
+  const valid = { campaignId, endDate: "2026-09-30", startDate: "2026-09-01" };
+  assert.ok(widgetOutreachHealthInput.safeParse(valid).success);
+  for (const input of [
+    { ...valid, campaignId: null },
+    { ...valid, startDate: "2026-09-31" },
+    { ...valid, endDate: null },
+    { ...valid, endDate: "2026-08-31" },
+    { ...valid, endDate: "2026-10-02" },
+    { afterInboxId: campaignId },
+  ]) {
+    assert.equal(widgetOutreachHealthInput.safeParse(input).success, false);
+  }
+  const query = buildWidgetOutreachHealthQuery(scope, {
+    ...valid,
+    afterInboxId: campaignId,
+  });
+  assert.ok(query.includes("cm.date >= ('2026-09-01'::date)::text"));
+  assert.ok(query.includes("cm.date <= ('2026-09-30'::date)::text"));
+  assert.ok(
+    query.includes(
+      "co.organization_id = c.organization_id and co.campaign_id = c.id"
+    )
+  );
+  assert.ok(query.includes("mi.organization_id = c.organization_id"));
+  assert.ok(query.includes(`mi.id > '${campaignId}'::uuid`));
+  assert.ok(query.includes("c.settings->'emailAccounts' ? mi.email"));
+});
+
+test("saved diagnostics preserve missing metrics and page assignments without truncating totals", () => {
+  const accounts = Array.from({ length: 101 }, (_, index) => ({
+    connected: true,
+    email: `inbox${index}@example.com`,
+    id: `${String(index + 1).padStart(8, "0")}-0000-4000-8000-000000000000`,
+    status: "active",
+  }));
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts,
+            configuredCount: 200,
+            healthyCount: 180,
+            matchedCount: 199,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          endDate: "2026-09-30",
+          overview: null,
+          startDate: "2026-09-01",
+        },
+      },
+    ]),
+    scope
+  );
+  if (result.status !== "ok") {
+    assert.fail("Expected saved diagnostics");
+  }
+  const details = result.campaigns[0].diagnostics;
+  assert.ok(details);
+  assert.equal(details.overview, null);
+  assert.deepEqual(details.dailyMetrics, []);
+  assert.equal(details.assignedInboxes.accounts.length, 100);
+  assert.equal(details.assignedInboxes.nextAfterInboxId, accounts[99].id);
+  assert.equal(details.assignedInboxes.configuredCount, 200);
+  assert.equal(details.assignedInboxes.matchedCount, 199);
+  assert.equal(details.assignedInboxes.healthyCount, 180);
+  assert.ok(
+    result.caveats.some((text) => text.includes("Neither is dispatch history"))
+  );
 });

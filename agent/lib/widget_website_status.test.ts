@@ -266,12 +266,25 @@ test("targeted public diagnostics require both current workspace membership and 
     }
     return Promise.resolve(Response.json(data));
   };
+  const renderCalls: string[] = [];
+  const renderRead = (_ctx: unknown, websiteId: string) => {
+    renderCalls.push(websiteId);
+    return Promise.resolve({
+      bodyText: "Welcome",
+      domain: "shop.example.com",
+      limitation: "Cross-origin assets blocked; cannot establish page health.",
+      observedAt: new Date().toISOString(),
+      status: "observed",
+      title: "Shop",
+    });
+  };
   const denied = await readWidgetWebsiteStatus(
     context(),
     dispatch,
     fetcher(false),
     publishedThenBroke.id,
-    networkRead
+    networkRead,
+    renderRead
   );
   assert.equal(denied.status, "denied");
   await readWidgetWebsiteStatus(
@@ -279,20 +292,38 @@ test("targeted public diagnostics require both current workspace membership and 
     dispatch,
     fetcher(false),
     neverPublished.id,
-    networkRead
+    networkRead,
+    renderRead
   );
   assert.deepEqual(calls, []);
+  assert.deepEqual(renderCalls, []);
   const checked = await readWidgetWebsiteStatus(
     context(),
     dispatch,
     fetcher(true),
     neverPublished.id,
-    networkRead
+    networkRead,
+    renderRead
   );
   assert.deepEqual(calls, ["shop.example.com"]);
+  assert.deepEqual(renderCalls, [neverPublished.id]);
   assert.equal(checked.status, "ok");
   if (checked.status === "ok") {
     assert.equal(checked.projects[0].publicCheck?.domain, "shop.example.com");
+    assert.equal(checked.projects[0].render?.status, "observed");
+  }
+  const failed = await readWidgetWebsiteStatus(
+    context(),
+    dispatch,
+    fetcher(true),
+    neverPublished.id,
+    networkRead,
+    () => Promise.reject(new Error("private provider failure"))
+  );
+  assert.equal(failed.status, "ok");
+  if (failed.status === "ok") {
+    assert.equal(failed.projects[0].render?.status, "unavailable");
+    assert.equal(failed.projects[0].publicCheck?.domain, "shop.example.com");
   }
 });
 
