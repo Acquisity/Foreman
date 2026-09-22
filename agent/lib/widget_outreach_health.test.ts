@@ -5,6 +5,7 @@ import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
+import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
@@ -20,6 +21,12 @@ const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
+  "instantly.campaigns": {
+    path: "foreman_instantly_api.org.foremanInstantlyApi.campaigns.listCampaigns",
+  },
+  "instantly.workspace-group-members": {
+    path: "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers",
+  },
   "planetscale.readQuery": {
     path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
   },
@@ -41,6 +48,7 @@ const campaignId = "44444444-4444-4444-8444-444444444444";
 const observedAt = "2026-09-17T10:00:00.000Z";
 const inboxes = { healthyAccounts: 3, totalSendingAccounts: 5 };
 const row = {
+  accountType: "system_provisioned",
   dailyLimit: 35,
   days: {
     "0": false,
@@ -56,6 +64,9 @@ const row = {
   leadsNotPushedCount: 12,
   name: "Customer campaign",
   notSendingStatusRaw: "1",
+  provider: "instantly",
+  providerCampaignId: campaignId,
+  providerWorkspaceId: "e05cbe7b-67db-4b07-b712-46b9365dc83f",
   recentSends: [{ date: "2026-09-16", emailsSent: 0 }],
   status: "active",
   timezone: "Etc/GMT+12",
@@ -108,12 +119,12 @@ test("tool is exposed only for the widget support initiator", async () => {
   assert.deepEqual(results, [null, null, null]);
 });
 
-test("inputs accept only a page cursor, never SQL, org id or a field selector", () => {
+test("inputs accept an owned campaign ID or page cursor, never SQL or workspace selectors", () => {
   for (const input of [
     { organizationId: scope.organizationId },
     { query: "select * from member" },
     { after: "x' or true --" },
-    { campaignId },
+    { campaignId: "invalid" },
     { read: "campaigns" },
   ]) {
     assert.equal(widgetOutreachHealthInput.safeParse(input).success, false);
@@ -147,7 +158,6 @@ test("every statement checks membership and scopes every product join to the org
       "select *",
       "credentials",
       "connection_error",
-      "workspace_id",
       "l.email",
     ]) {
       assert.equal(query.includes(forbidden), false, forbidden);
@@ -193,7 +203,7 @@ test("campaign output matches the schema, maps the not-sending code and flags an
   assert.equal(campaign.notSendingReason, "outside_schedule_window");
   assert.equal(campaign.schedule?.invertedWindow, false);
   assert.equal(campaign.leadsNotPushedCount, 12);
-  assert.equal(campaign.dailyLimit, 35);
+  assert.equal(campaign.savedDailyLimitPerInbox, 35);
 
   const inverted = parseWidgetOutreachHealthEvidence(
     envelope([{ ...row, fromTime: "17:00", toTime: "09:00" }]),
@@ -319,4 +329,97 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
       {}
     )
   );
+});
+
+test("targeted live read matches owned provider ID and keeps saved limits distinct", async (t) => {
+  const call = t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string, input: Record<string, unknown>) => {
+      if (path.includes("planetscale")) {
+        assert.ok(String(input.query).includes(`c.id = '${campaignId}'::uuid`));
+        return { data: envelope([row]), ok: true };
+      }
+      if (path.includes("workspaceGroupMembers")) {
+        return { data: { items: [member()] }, ok: true };
+      }
+      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
+      return {
+        data: {
+          items: [
+            { daily_limit: 999, id: "other-campaign", status: 2 },
+            {
+              daily_limit: 150,
+              id: campaignId,
+              not_sending_status: 3,
+              status: 1,
+            },
+          ],
+        },
+        ok: true,
+      };
+    }
+  );
+  const result = await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(call.mock.callCount(), 3);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  const [campaign] = result.campaigns;
+  assert.equal(campaign.savedDailyLimitPerInbox, 35);
+  assert.equal(campaign.notSendingReasonCode, 1);
+  assert.equal(campaign.live.available, true);
+  if (!campaign.live.available) {
+    assert.fail("Expected live evidence");
+  }
+  assert.equal(campaign.live.campaignDailyLimit, 150);
+  assert.equal(campaign.live.notSendingReasonCode, 3);
+  assert.equal(campaign.live.statusCode, 1);
+});
+
+test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {
+  const state = { accountType: "system_provisioned" };
+  const call = t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string) => {
+      if (path.includes("planetscale")) {
+        return {
+          data: envelope([
+            {
+              ...row,
+              accountType: state.accountType,
+            },
+          ]),
+          ok: true,
+        };
+      }
+      throw new Error("secret provider response");
+    }
+  );
+  const failed = await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(failed.status, "ok");
+  if (failed.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.equal(failed.campaigns[0].live.available, false);
+  assert.equal(failed.campaigns[0].savedDailyLimitPerInbox, 35);
+  assert.equal(JSON.stringify(failed).includes("secret"), false);
+  state.accountType = "user_owned";
+  const before = call.mock.callCount();
+  await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(call.mock.callCount() - before, 1);
+});
+
+test("a denied or absent target cannot trigger a provider read", async (t) => {
+  const call = t.mock.method(executorTransport, "call", async () => ({
+    data: envelope([], { authorized: false }),
+    ok: true,
+  }));
+  assert.equal(
+    (await readWidgetOutreachHealth(ctx, { campaignId })).status,
+    "denied"
+  );
+  assert.equal(call.mock.callCount(), 1);
 });

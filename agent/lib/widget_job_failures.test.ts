@@ -69,9 +69,10 @@ const failureRow = {
   area: "scrape",
   entity_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   entity_type: "lead_scrape_run",
+  error_message: null,
   has_error: false,
-  inngest_run_id: "run_123",
   observed_at: "2026-09-17T00:00:00.000Z",
+  saved_run_id: "run_123",
   status: "failed",
 };
 
@@ -148,7 +149,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
   assert.equal(result.status, "ok");
 });
 
-test("output matches schema, surfaces the org's own id + inngest run id, no error text", async (t) => {
+test("output labels stored references without claiming Inngest ownership", async (t) => {
   t.mock.method(executorTransport, "call", async () => ({
     data: envelope([
       failureRow,
@@ -157,7 +158,7 @@ test("output matches schema, surfaces the org's own id + inngest run id, no erro
         area: "provisioning",
         entity_type: "domain_purchase_order",
         has_error: true,
-        inngest_run_id: null,
+        saved_run_id: null,
         secretLeak: "should be dropped",
         status: "requires_attention",
       },
@@ -170,7 +171,12 @@ test("output matches schema, surfaces the org's own id + inngest run id, no erro
     return;
   }
   assert.equal(result.failures.length, 2);
-  assert.equal(result.failures[0].inngestRunId, "run_123");
+  assert.deepEqual(result.failures[0].runReference, {
+    id: "run_123",
+    kind: "scrape_provider_run_or_submission",
+  });
+  assert.equal(result.failures[1].runReference, null);
+  assert.equal("inngestRunId" in result.failures[0], false);
   assert.equal(result.failures[1].status, "requires_attention");
   assert.equal(result.failures[1].hasError, true);
   // no raw error text field leaked
@@ -219,4 +225,45 @@ test("non-widget session is refused before dispatch", async (t) => {
   } as unknown as ProviderContext;
   await assert.rejects(() => readWidgetJobFailures(finCtx, {}));
   assert.equal(call.mock.callCount(), 0);
+});
+
+test("failure messages are bounded, sanitized and unavailable scrape detail remains null", async (t) => {
+  t.mock.method(executorTransport, "call", async () => ({
+    data: envelope([
+      {
+        ...failureRow,
+        area: "ai_sdr",
+        entity_type: "agent_execution",
+        error_details: { secret: "private-details" },
+        error_message:
+          'Authentication failed password=privatepassword123 at https://provider.test/?signature=private-signature for owner@example.com; {"token":"private-token"}',
+        has_error: true,
+      },
+      failureRow,
+    ]),
+    ok: true,
+  }));
+  const result = await readWidgetJobFailures(ctx, { since: "24h" });
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected failures");
+  }
+  assert.equal(result.failures[0].runReference?.kind, "internal_execution_run");
+  assert.ok(result.failures[0].error?.startsWith("Authentication failed"));
+  assert.equal(result.failures[1].error, null);
+  for (const secret of [
+    "privatepassword123",
+    "private-signature",
+    "owner@example.com",
+    "private-token",
+    "private-details",
+  ]) {
+    assert.equal(JSON.stringify(result).includes(secret), false);
+  }
+  assert.deepEqual(result.coveredAreas, ["ai_sdr", "provisioning", "scrape"]);
+  const query = buildQuery(scope, { area: "ai_sdr", since: "24h" });
+  assert.ok(query.includes("interval '1 days'"));
+  assert.ok(query.includes("e.error ->> 'message'"));
+  assert.equal(query.includes("e.input"), false);
+  assert.equal(query.includes("inngest_run_id"), false);
 });

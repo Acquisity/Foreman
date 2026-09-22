@@ -429,7 +429,11 @@ const mine = {
   lastSeen: t1,
   organizationId: scope.organizationId,
 };
-const unavailable = { items: [], status: "unavailable" };
+const unavailable = {
+  items: [],
+  reason: "ownership_unverified",
+  status: "unavailable",
+};
 
 test("toSignals accepts only exact structured ownership", () => {
   const owned = toSignals(
@@ -475,7 +479,15 @@ test("toSignals refuses foreign, unowned and malformed rows instead of reporting
     "unrecognized shape": null,
   };
   for (const [name, rows] of Object.entries(cases)) {
-    assert.deepEqual(toSignals(rows, scope), unavailable, name);
+    assert.deepEqual(
+      toSignals(rows, scope),
+      {
+        ...unavailable,
+        reason:
+          rows === null ? "unrecognized_response" : "ownership_unverified",
+      },
+      name
+    );
   }
 });
 
@@ -515,7 +527,10 @@ test("signal sources stay inconclusive end to end unless ownership is verified",
       assert.fail("expected ok");
     }
     assert.equal(result.signals.sentry.status, want);
-    assert.equal(result.signals.axiom.status, want);
+    assert.equal(result.signals.axiom.status, "unavailable");
+    if (want === "ok") {
+      assert.equal(result.signals.axiom.reason, "no_owned_error_rows");
+    }
     assert.deepEqual(result.signals.sentry.items, []);
     assert.deepEqual(result.signals.axiom.items, []);
     const serialized = JSON.stringify(result);
@@ -542,4 +557,89 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
       {}
     )
   );
+});
+
+test("targeted evidence selects final outputs and knowledge rules but never reasoning or raw input", () => {
+  const query = buildGenerationDiagnosticsQuery(scope, {
+    executionId: threadId,
+  });
+  const threadQuery = buildGenerationDiagnosticsQuery(scope, { threadId });
+  assert.equal(threadQuery.includes("a.output->>'body'"), false);
+  assert.ok(threadQuery.includes("'generatedBody', null"));
+  for (const field of [
+    "a.output->>'body'",
+    "a.output->>'category'",
+    "a.error->>'code'",
+    "s.knowledge_base",
+    "s.knowledge_base_rules",
+    "au.id = s.organization_id",
+    `a.id = '${threadId}'::uuid`,
+  ]) {
+    assert.ok(query.includes(field), field);
+  }
+  for (const forbidden of [
+    "a.reasoning",
+    "a.input",
+    "a.error->>'message'",
+    "a.output as",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  assert.equal(
+    widgetGenerationDiagnosticsInput.safeParse({ executionId: "not-a-uuid" })
+      .success,
+    false
+  );
+});
+
+test("owned final draft and settings are bounded, redacted, and kept separate from hidden reasoning", () => {
+  const record = {
+    ...dbRows[2],
+    details: {
+      bodyTruncated: false,
+      decisionCode: "RESPONSE_GENERATED",
+      errorCode: null,
+      escalationCategory: null,
+      generatedBody: "Contact person@example.com token=supersecret123",
+      reasoning: "hidden thoughts",
+    },
+    id: threadId,
+    input: { token: "raw-secret" },
+    reasoning: "hidden thoughts",
+    threadId,
+  };
+  const parsed = parseExecutions({
+    rows: [
+      {
+        authorized: true,
+        observedAt,
+        records: [record],
+        settings: {
+          knowledgeBase: "password=supersecret456 Our service is support.",
+          knowledgeBaseTruncated: false,
+          rules: [{ answer: "person@example.com", question: "Who?" }],
+          rulesTruncated: false,
+        },
+      },
+    ],
+    success: true,
+  });
+  assert.ok("executions" in parsed);
+  if (!("executions" in parsed)) {
+    assert.fail("Expected evidence");
+  }
+  assert.equal(
+    parsed.executions.decisions[0].details?.decisionCode,
+    "RESPONSE_GENERATED"
+  );
+  const text = JSON.stringify(parsed);
+  for (const forbidden of [
+    "supersecret",
+    "person@example.com",
+    "hidden thoughts",
+    "raw-secret",
+  ]) {
+    assert.equal(text.includes(forbidden), false);
+  }
+  assert.ok(text.includes("[redacted]"));
 });

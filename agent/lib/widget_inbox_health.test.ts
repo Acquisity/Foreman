@@ -246,7 +246,16 @@ test("a system-provisioned active connection runs a live check and flags the sta
     { email: "mismatch@example.test", status: -1, timestamp_last_used: recent },
     { email: "paused@example.test", status: 2, timestamp_last_used: recent },
     { email: "setup@example.test", setup_pending: true, status: 1 },
-    { email: "Warmup@example.test", status: 1 },
+    {
+      daily_limit: 5,
+      email: "Warmup@example.test",
+      enable_slow_ramp: true,
+      password: "secret-account-password",
+      stat_warmup_score: 98,
+      status: 1,
+      timestamp_warmup_start: observedAt,
+      warmup_status: 1,
+    },
     {
       email: "coded@example.test",
       status: 1,
@@ -285,6 +294,33 @@ test("a system-provisioned active connection runs a live check and flags the sta
     return;
   }
   assert.equal(result.accounts.total, 9);
+  assert.equal(result.accounts.detailsTruncated, false);
+  assert.equal(result.accounts.details.length, 9);
+  assert.deepEqual(
+    result.accounts.details.find(
+      (item) => item.email === "Warmup@example.test"
+    ),
+    {
+      bucket: "initialWarmup",
+      dailyLimit: 5,
+      email: "Warmup@example.test",
+      errorCode: null,
+      lastUsedAt: null,
+      setupPending: null,
+      slowRampEnabled: true,
+      status: 1,
+      warmupScore: 98,
+      warmupStartedAt: observedAt,
+      warmupStatus: 1,
+    }
+  );
+  assert.equal(
+    result.accounts.details.find((item) => item.email === "coded@example.test")
+      ?.errorCode,
+    "EAUTH"
+  );
+  assert.equal(result.accounts.details.at(-1)?.bucket, "ready");
+  assert.ok(!JSON.stringify(result).includes("secret-account-password"));
   assert.equal(result.accounts.ready, 1);
   assert.equal(result.accounts.paused, 1);
   assert.equal(result.accounts.setupPending, 1);
@@ -308,15 +344,24 @@ test("the live check follows Instantly's cursor, so counts cover every account, 
     isActive: true,
     workspaceId: WORKSPACE_ID,
   });
-  // Page one alone is 2 healthy accounts: read by itself it said "all healthy"
-  // while the broken inbox sat on the next page.
+  // Two pages contain 200 ready accounts; the error on the third page must
+  // remain visible even when the per-account detail limit is reached.
   const pages = [
     {
       items: [
-        { email: "a@example.test", status: 1 },
-        { email: "b@example.test", status: 1 },
+        ...Array.from({ length: 100 }, (_, index) => ({
+          email: `a${index}@example.test`,
+          status: 1,
+        })),
       ],
       next_starting_after: "cursor-1",
+    },
+    {
+      items: Array.from({ length: 100 }, (_, index) => ({
+        email: `b${index}@example.test`,
+        status: 1,
+      })),
+      next_starting_after: "cursor-2",
     },
     {
       items: [{ email: "c@example.test", status: -1 }],
@@ -348,10 +393,13 @@ test("the live check follows Instantly's cursor, so counts cover every account, 
   if (result.status !== "ok" || result.accounts.available !== true) {
     return assert.fail("live check did not run");
   }
-  assert.equal(reads, 2);
+  assert.equal(reads, 3);
+  assert.equal(result.accounts.details.length, 200);
+  assert.equal(result.accounts.detailsTruncated, true);
+  assert.equal(result.accounts.details[0].email, "c@example.test");
   assert.deepEqual(
     [result.accounts.total, result.accounts.error, result.accounts.truncated],
-    [3, 1, false]
+    [201, 1, false]
   );
 });
 

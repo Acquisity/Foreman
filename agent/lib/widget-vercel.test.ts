@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildErrorExcerpt,
+  domainConfigSchema,
   type Fetch,
   readVercelLive,
 } from "./widget-vercel.js";
@@ -12,6 +13,20 @@ const env = {
 };
 const projectId = "prj_customerproject1";
 const { signal } = new AbortController();
+
+test("domain diagnostics retain documented recommendations without raw provider fields", () => {
+  const config = domainConfigSchema.parse({
+    acceptedChallenges: ["dns-01"],
+    configuredBy: null,
+    misconfigured: true,
+    recommendedCNAME: [{ rank: 1, value: "cname.vercel-dns.com" }],
+    recommendedIPv4: [{ rank: 1, value: ["76.76.21.21"] }],
+    secret: "not returned",
+  });
+  assert.equal(config.recommendedIPv4?.[0].value[0], "76.76.21.21");
+  assert.equal(config.recommendedCNAME?.[0].value, "cname.vercel-dns.com");
+  assert.equal("secret" in config, false);
+});
 
 const api =
   (accountId: string, seen: { init: RequestInit; url: string }[]): Fetch =>

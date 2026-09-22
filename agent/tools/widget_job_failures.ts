@@ -5,6 +5,7 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
+import { redact } from "#lib/investigation-memory/case.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
@@ -37,17 +38,23 @@ const timestamp = z
   .max(64)
   .refine((value) => Number.isFinite(Date.parse(value)));
 
-// entityId is one of the org's OWN record ids (safe to surface). inngestRunId is
-// the scrape row's stored run id; for ai_sdr it is the internal execution_runs.id,
-// not a verified provider run id. No run reader exists in the widget lane. Error
-// TEXT is never returned — only hasError.
+// Stored application references are not verified Inngest execution IDs.
 const failure = z.object({
   area: z.enum(AREAS),
   entityId: z.string().max(128),
   entityType: z.string().max(64),
+  error: z.string().max(500).nullable(),
   hasError: z.boolean(),
-  inngestRunId: z.string().max(191).nullable(),
   observedAt: timestamp,
+  runReference: z
+    .object({
+      id: z.string().max(191),
+      kind: z.enum([
+        "internal_execution_run",
+        "scrape_provider_run_or_submission",
+      ]),
+    })
+    .nullable(),
   status: z.enum(["failed", "requires_attention"]),
 });
 
@@ -72,8 +79,9 @@ export type WidgetJobFailuresOutput = z.infer<typeof widgetJobFailuresOutput>;
 /** Fixed statements only; every area subquery hangs off the authorized workspace. */
 export function buildQuery(
   context: WidgetContext,
-  input: WidgetJobFailuresInput
+  raw: WidgetJobFailuresInput
 ) {
+  const input = widgetJobFailuresInput.parse(raw);
   const scope = widgetContextSchema.parse(context);
   const days = SINCE[input.since ?? "7d"];
   const areas = input.area ? [input.area] : [...AREAS];
@@ -86,25 +94,27 @@ export function buildQuery(
       and o.deleted_at is null and m.deleted_at is null
     limit 1)`;
 
-  // Each subquery is org-scoped through `authorized`; errors are reduced to a
-  // boolean so no raw provider/customer text leaves SQL.
+  // Each subquery is org-scoped. Project only bounded error messages; never
+  // return raw error objects, stack traces, inputs or provider responses.
   const parts: Record<Area, string> = {
     ai_sdr: `select 'ai_sdr' as area, 'agent_execution' as entity_type,
-        e.id::text as entity_id, e.execution_run_id::text as inngest_run_id,
+        e.id::text as entity_id, e.execution_run_id::text as saved_run_id,
         'failed' as status, (e.error is not null) as has_error,
+        left(case when jsonb_typeof(e.error -> 'message') = 'string' then e.error ->> 'message' end, 2000) as error_message,
         e.started_at as observed_at
       from agent_executions e join authorized a on a.id = e.organization_id
       where e.success = false and e.started_at > now() - interval '${days} days'`,
     provisioning: `select 'provisioning' as area, 'domain_purchase_order' as entity_type,
-        o.id::text as entity_id, null::text as inngest_run_id,
+        o.id::text as entity_id, null::text as saved_run_id,
         o.status as status, (o.error is not null or o.error_details is not null) as has_error,
+        left(o.error, 2000) as error_message,
         o.updated_at as observed_at
       from domain_purchase_order o join authorized a on a.id = o.organization_id
       where o.status in ('failed','requires_attention')
         and o.updated_at > now() - interval '${days} days'`,
     scrape: `select 'scrape' as area, 'lead_scrape_run' as entity_type,
-        r.id::text as entity_id, r.run_id as inngest_run_id,
-        'failed' as status, false as has_error,
+        r.id::text as entity_id, r.run_id as saved_run_id,
+        'failed' as status, false as has_error, null::text as error_message,
         r.created_at as observed_at
       from lead_scrape_run r join authorized a on a.id = r.organization_id
       where r.status = 'failed' and r.created_at > now() - interval '${days} days'`,
@@ -129,9 +139,10 @@ const rowSchema = z.object({
         area: z.enum(AREAS),
         entity_id: z.string(),
         entity_type: z.string(),
+        error_message: z.string().max(2000).nullable(),
         has_error: z.boolean(),
-        inngest_run_id: z.string().nullable(),
         observed_at: z.string(),
+        saved_run_id: z.string().max(191).nullable(),
         status: z.string(),
       })
     )
@@ -175,7 +186,7 @@ export async function readWidgetJobFailures(
     const caveats = [
       "Campaign sending problems are covered by widget_outreach_health.",
       "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
-      "inngestRunId is a saved reference only: on lead_scrape rows it is the stored run id, on ai_sdr rows it is an internal run record id and not a provider run id. Provisioning rows have none.",
+      "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred.",
     ];
     return {
       caveats,
@@ -184,9 +195,28 @@ export async function readWidgetJobFailures(
         area: r.area,
         entityId: r.entity_id.slice(0, 128),
         entityType: r.entity_type.slice(0, 64),
+        error:
+          r.error_message === null
+            ? null
+            : redact(r.error_message)
+                .replace(/https?:\/\/[^\s"'<>]+/gi, "[redacted URL]")
+                .replace(
+                  /"(?:api[_-]?key|secret|password|token)"\s*:\s*"[^"\n]*"/gi,
+                  '"credential":"[redacted]"'
+                )
+                .slice(0, 500),
         hasError: r.has_error,
-        inngestRunId: r.inngest_run_id,
         observedAt: r.observed_at,
+        runReference:
+          r.saved_run_id && r.area !== "provisioning"
+            ? {
+                id: r.saved_run_id,
+                kind:
+                  r.area === "ai_sdr"
+                    ? ("internal_execution_run" as const)
+                    : ("scrape_provider_run_or_submission" as const),
+              }
+            : null,
         status: mapStatus(r.status),
       })),
       observedAt: new Date().toISOString(),
@@ -219,7 +249,7 @@ const tool = defineTool({
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
     "This workspace's recent FAILED background jobs, org-scoped: AI SDR agent runs, domain/inbox provisioning orders, and lead-scrape runs. " +
-    "Each failure carries the org's own entity id, a failed/requires_attention status, whether it recorded an error, and a saved run reference (the stored run id for scrape; an internal run record id, not a provider run id, for AI SDR; none for provisioning). " +
+    "Each failure carries the org's own entity id, a failed/requires_attention status, whether it recorded an error, its bounded sanitized error message when saved, and a typed application run reference (scrape-provider ID or submission ID for scrape; internal execution_runs ID for AI SDR; none for provisioning). These references are not Inngest run IDs. " +
     "The run itself and import step detail cannot be inspected here: report what the saved row shows and what could not be checked. Campaign-send problems use widget_outreach_health. unavailable means the records could not be read, distinct from an empty (no failures) result.",
   execute: (input, ctx) => readWidgetJobFailures(ctx, input),
   inputSchema: widgetJobFailuresInput,

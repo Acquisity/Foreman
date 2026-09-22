@@ -2,7 +2,12 @@ import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
 import {
   type BillingAccountResult,
+  type CreditHistoryResult,
+  type CreditHistoryWindow,
+  creditHistoryResultSchema,
+  creditHistoryWindowSchema,
   readBillingAccount,
+  readBillingCreditHistory,
 } from "#lib/billing-account.js";
 import {
   readAutumnCustomer,
@@ -136,7 +141,13 @@ const walletSchema = z.object({
   lifetimeUsed: z.number(),
 });
 
-export const widgetBillingSummaryInputSchema = z.strictObject({});
+export const widgetBillingSummaryInputSchema = z.strictObject({
+  creditWindow: creditHistoryWindowSchema
+    .optional()
+    .describe(
+      "Optional credit ledger window, from inclusive and to exclusive, at most 93 days. Does not filter Stripe lists or current/lifetime balances."
+    ),
+});
 export type WidgetBillingSummaryInput = z.infer<
   typeof widgetBillingSummaryInputSchema
 >;
@@ -148,6 +159,11 @@ export const widgetBillingSummaryOutputSchema = z.object({
     reason: z.string().optional(),
   }),
   available: z.boolean(),
+  creditHistory: creditHistoryResultSchema
+    .nullable()
+    .describe(
+      "Requested workspace-only database ledger aggregates; null means not requested. Transaction amounts retain their signed values, grouped by type and resource. Completed manual grants use completed_at; transactions use created_at. These sources can overlap: never add manual grants to transaction totals. Does not prove complete Autumn usage or include other workspaces sharing the billing account."
+    ),
   credits: walletSchema.extend({ renewsAt: z.string().nullable() }).nullable(),
   discount: discountSummarySchema.nullable(),
   failedPayments: z.array(chargeSummarySchema),
@@ -373,6 +389,10 @@ const readAutumnStripeId = (data: unknown): string | null => {
 export interface WidgetBillingSummaryDeps {
   getAutumnCustomer: (customerId: string) => Promise<unknown>;
   getBillingAccount: (organizationId: string) => Promise<BillingAccountResult>;
+  getCreditHistory?: (
+    organizationId: string,
+    window: CreditHistoryWindow
+  ) => Promise<CreditHistoryResult>;
   getStripeCustomerBilling: (customerId: string) => Promise<StripeBilling>;
   /**
    * Whether the asking user is a live owner or admin of this organization, read
@@ -384,6 +404,7 @@ export interface WidgetBillingSummaryDeps {
 
 const EMPTY_SUMMARY: Omit<WidgetBillingSummary, "available" | "unavailable"> = {
   autumn: { available: false },
+  creditHistory: null,
   credits: null,
   discount: null,
   failedPayments: [],
@@ -510,8 +531,10 @@ function chargedWithoutActiveSubscription(
  */
 export async function composeWidgetBillingSummary(
   organizationId: string,
-  deps: WidgetBillingSummaryDeps
+  deps: WidgetBillingSummaryDeps,
+  input: WidgetBillingSummaryInput = {}
 ): Promise<WidgetBillingSummary> {
+  const { creditWindow } = widgetBillingSummaryInputSchema.parse(input);
   const unavailable: string[] = [];
   // Every other widget tool hangs its reads off a live membership check. The
   // billing reads are keyed by organization id alone, so the check runs first,
@@ -532,6 +555,24 @@ export async function composeWidgetBillingSummary(
   }
 
   const notes: string[] = [];
+  let creditHistory: CreditHistoryResult | null = null;
+  if (creditWindow) {
+    creditHistory = (await deps
+      .getCreditHistory?.(organizationId, creditWindow)
+      .catch(() => undefined)) ?? {
+      available: false,
+      completedManualGrants: [],
+      transactionTotals: [],
+      truncated: false,
+      window: creditWindow,
+    };
+    if (!creditHistory.available) {
+      unavailable.push("productDb.creditHistory read unavailable");
+    }
+    notes.push(
+      "Credit-window totals cover this workspace's stored ledger only, not lifetime balances or all provider activity. Transaction amounts are signed. Manual grants may also appear in transactions; do not add the two sources. Manual grants without a completed_at timestamp are not included."
+    );
+  }
   const autumn = await resolveAutumn(account, deps);
   if (autumn.reason) {
     notes.push(...(autumn.skipped ? [autumn.reason] : []));
@@ -592,6 +633,7 @@ export async function composeWidgetBillingSummary(
       ...(autumn.reason ? { reason: autumn.reason } : {}),
     },
     available: true,
+    creditHistory,
     credits,
     discount,
     failedPayments,
@@ -634,40 +676,54 @@ const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
-  execute(_input: WidgetBillingSummaryInput, ctx: ToolContext) {
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+  execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {
       throw new Error("Support widget identity required.");
     }
-    return composeWidgetBillingSummary(scope.organizationId, {
-      getAutumnCustomer: (customerId) =>
-        readAutumnCustomer(customerId, {
-          client: executorClient(ctx),
-          signal: ctx.abortSignal,
-        }),
-      getBillingAccount: (organizationId) =>
-        readBillingAccount(organizationId, (query) =>
-          callPlanetscaleReadQuery(ctx, {
-            ...PRODUCTION_READ_QUERY_ARGS,
-            query,
-          })
-        ),
-      getStripeCustomerBilling: (customerId) =>
-        readStripeCustomerBilling(customerId, {
-          client: executorClient(ctx),
-          signal: ctx.abortSignal,
-        }),
-      isAuthorized: async (organizationId) => {
-        const [row] = parseReadQueryResult(
-          await callPlanetscaleReadQuery(ctx, {
-            ...PRODUCTION_READ_QUERY_ARGS,
-            query: buildBillingAuthorizationQuery({ ...scope, organizationId }),
-          })
-        ).rows as { authorized?: unknown }[];
-        return row?.authorized === true;
+    return composeWidgetBillingSummary(
+      scope.organizationId,
+      {
+        getAutumnCustomer: (customerId) =>
+          readAutumnCustomer(customerId, {
+            client: executorClient(ctx),
+            signal: ctx.abortSignal,
+          }),
+        getBillingAccount: (organizationId) =>
+          readBillingAccount(organizationId, (query) =>
+            callPlanetscaleReadQuery(ctx, {
+              ...PRODUCTION_READ_QUERY_ARGS,
+              query,
+            })
+          ),
+        getCreditHistory: (organizationId, window) =>
+          readBillingCreditHistory(organizationId, window, (query) =>
+            callPlanetscaleReadQuery(ctx, {
+              ...PRODUCTION_READ_QUERY_ARGS,
+              query,
+            })
+          ),
+        getStripeCustomerBilling: (customerId) =>
+          readStripeCustomerBilling(customerId, {
+            client: executorClient(ctx),
+            signal: ctx.abortSignal,
+          }),
+        isAuthorized: async (organizationId) => {
+          const [row] = parseReadQueryResult(
+            await callPlanetscaleReadQuery(ctx, {
+              ...PRODUCTION_READ_QUERY_ARGS,
+              query: buildBillingAuthorizationQuery({
+                ...scope,
+                organizationId,
+              }),
+            })
+          ).rows as { authorized?: unknown }[];
+          return row?.authorized === true;
+        },
       },
-    });
+      input
+    );
   },
   inputSchema: widgetBillingSummaryInputSchema,
   outputSchema: widgetBillingSummaryOutputSchema,

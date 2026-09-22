@@ -30,6 +30,8 @@ const ACCOUNTS_LIMIT = 100;
 const MAX_ACCOUNT_PAGES = 10;
 /** Stale-sync accounts (recent activity, error status) surfaced in the result. */
 const MISMATCH_LIMIT = 25;
+/** Bounded diagnostic rows, with non-ready accounts first. */
+const ACCOUNT_DETAIL_LIMIT = 200;
 const RECENT_WEBHOOK_WINDOW_DAYS = 7;
 /**
  * A sending account counts as "recently active" when Instantly last used it within this
@@ -67,9 +69,31 @@ const staleSyncAccount = z.object({
   lastUsedAt: timestamp.nullable(),
   status: z.number().nullable(),
 });
+const accountDetail = z.object({
+  bucket: z.enum([
+    "error",
+    "initialWarmup",
+    "paused",
+    "ready",
+    "setupPending",
+    "unknown",
+  ]),
+  dailyLimit: z.number().nullable(),
+  email: z.string().max(320).nullable(),
+  errorCode: z.string().max(64).nullable(),
+  lastUsedAt: timestamp.nullable(),
+  setupPending: z.boolean().nullable(),
+  slowRampEnabled: z.boolean().nullable(),
+  status: z.number().nullable(),
+  warmupScore: z.number().nullable(),
+  warmupStartedAt: timestamp.nullable(),
+  warmupStatus: z.number().nullable(),
+});
 const accounts = z.discriminatedUnion("available", [
   z.object({
     available: z.literal(true),
+    details: z.array(accountDetail).max(ACCOUNT_DETAIL_LIMIT),
+    detailsTruncated: z.boolean(),
     error: z.number().int().nonnegative(),
     initialWarmup: z.number().int().nonnegative(),
     paused: z.number().int().nonnegative(),
@@ -163,11 +187,16 @@ const dbRow = z.object({
 
 /** Instantly's account item after the shared safe-field allowlist strips everything else. */
 const instantlyAccount = z.object({
+  daily_limit: z.number().nullish().catch(null),
   email: z.string().max(320).optional(),
+  enable_slow_ramp: z.boolean().nullish().catch(null),
   setup_pending: z.boolean().nullish(),
+  stat_warmup_score: z.number().nullish().catch(null),
   status: z.number().optional(),
   status_message_code: z.string().optional(),
   timestamp_last_used: z.string().nullish(),
+  timestamp_warmup_start: timestamp.nullish().catch(null),
+  warmup_status: z.number().nullish().catch(null),
 });
 
 const CAVEATS = [
@@ -175,6 +204,7 @@ const CAVEATS = [
   "A saved connection error does not establish a current failure by itself.",
   "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
   "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+  "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
   "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization.",
 ];
 
@@ -224,6 +254,7 @@ function bucketAccounts(
   initialWarmupEmails: string[]
 ): {
   buckets: Record<Bucket, number>;
+  details: z.infer<typeof accountDetail>[];
   staleSyncAccounts: z.infer<typeof staleSyncAccount>[];
 } {
   const buckets: Record<Bucket, number> = {
@@ -237,10 +268,28 @@ function bucketAccounts(
   const warmupEmails = new Set(initialWarmupEmails);
   const warmupComplete = initialWarmupEmails.length <= INITIAL_WARMUP_LIMIT;
   const staleSyncAccounts: z.infer<typeof staleSyncAccount>[] = [];
+  const details: z.infer<typeof accountDetail>[] = [];
   const now = Date.now();
   for (const raw of items) {
     const account = instantlyAccount.parse(raw);
-    buckets[classify(account, warmupEmails, warmupComplete)] += 1;
+    const bucket = classify(account, warmupEmails, warmupComplete);
+    buckets[bucket] += 1;
+    details.push({
+      bucket,
+      dailyLimit: account.daily_limit ?? null,
+      email: account.email ?? null,
+      errorCode: account.status_message_code ?? null,
+      lastUsedAt: timestamp
+        .nullable()
+        .catch(null)
+        .parse(account.timestamp_last_used),
+      setupPending: account.setup_pending ?? null,
+      slowRampEnabled: account.enable_slow_ramp ?? null,
+      status: account.status ?? null,
+      warmupScore: account.stat_warmup_score ?? null,
+      warmupStartedAt: account.timestamp_warmup_start ?? null,
+      warmupStatus: account.warmup_status ?? null,
+    });
     const lastUsedAt = account.timestamp_last_used
       ? Date.parse(account.timestamp_last_used)
       : Number.NaN;
@@ -260,7 +309,14 @@ function bucketAccounts(
       });
     }
   }
-  return { buckets, staleSyncAccounts };
+  details.sort(
+    (a, b) => Number(a.bucket === "ready") - Number(b.bucket === "ready")
+  );
+  return {
+    buckets,
+    details: details.slice(0, ACCOUNT_DETAIL_LIMIT),
+    staleSyncAccounts,
+  };
 }
 
 /** Live Instantly account check, only for a workspace Acquisity itself provisioned. */
@@ -305,13 +361,15 @@ async function readAccountsEvidence(
         break;
       }
     }
-    const { buckets, staleSyncAccounts } = bucketAccounts(
+    const { buckets, details, staleSyncAccounts } = bucketAccounts(
       items,
       row.initialWarmupEmails
     );
     return {
       available: true,
       ...buckets,
+      details,
+      detailsTruncated: items.length > details.length,
       staleSyncAccounts,
       total: items.length,
       truncated: startingAfter !== undefined,
@@ -437,7 +495,7 @@ export async function readWidgetInboxHealth(
 }
 
 const tool = defineTool({
-  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,

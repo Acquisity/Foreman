@@ -3,13 +3,56 @@ import { describe, it } from "node:test";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import {
   billingAccountQueries,
+  billingCreditHistoryQuery,
   HISTORY_LIMIT,
   organizationIdSchema,
   readBillingAccount,
+  readBillingCreditHistory,
 } from "./billing-account.js";
 
 const ORG = "4939211d-158a-48ae-8f9a-4b94a48ca221";
 const SENSITIVE_COLUMN = /card|token|secret|key\b|password/iu;
+
+describe("dated credit aggregates", () => {
+  const window = { from: "2026-08-22T00:00:00Z", to: "2026-09-22T00:00:00Z" };
+  it("scopes both ledgers and applies the right timestamp before aggregation", () => {
+    const query = billingCreditHistoryQuery(ORG, window);
+    assert.equal(query.split(`organization_id = '${ORG}'::uuid`).length - 1, 2);
+    assert.ok(query.includes("created_at >= '2026-08-22T00:00:00.000Z'"));
+    assert.ok(query.includes("completed_at < '2026-09-22T00:00:00.000Z'"));
+    assert.ok(query.includes("status = 'completed'"));
+    assert.ok(query.includes("group by resource, type"));
+    assert.equal(query.includes("billing_account_id"), false);
+    assert.throws(() => billingCreditHistoryQuery("' OR true --", window));
+  });
+  it("keeps signed sums and reports truncated groups and read warnings", async () => {
+    const totals = Array.from({ length: 51 }, (_, index) => ({
+      amount: "-10",
+      entries: "2",
+      resource: "credits",
+      type: `type${index}`,
+    }));
+    const result = await readBillingCreditHistory(ORG, window, () =>
+      Promise.resolve(
+        JSON.stringify({
+          rows: [{ completedManualGrants: [], transactionTotals: totals }],
+        })
+      )
+    );
+    assert.equal(result.transactionTotals.length, 50);
+    assert.equal(result.transactionTotals[0].amount, -10);
+    assert.equal(result.truncated, true);
+    const unavailable = await readBillingCreditHistory(ORG, window, () =>
+      Promise.resolve(
+        JSON.stringify({
+          rows: [{ completedManualGrants: [], transactionTotals: [] }],
+          warnings: ["RLS filtered rows"],
+        })
+      )
+    );
+    assert.equal(unavailable.available, false);
+  });
+});
 
 const orgRow = {
   billing_account_id: "ba-1",

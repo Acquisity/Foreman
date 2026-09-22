@@ -40,6 +40,7 @@ export type VercelLive =
         target: string | null;
       } | null;
       domains: {
+        configuration: z.infer<typeof domainConfigSchema> | null;
         assignedToProject: boolean;
         domain: string;
         misconfigured: boolean | null;
@@ -71,7 +72,23 @@ const projectDomainsSchema = z.object({
   domains: z.array(z.object({ name: z.string(), verified: z.boolean() })),
 });
 const eventsSchema = z.array(z.object({ text: z.string().nullish() }));
-const domainConfigSchema = z.object({ misconfigured: z.boolean() });
+// Vercel's getDomainConfig contract; retain the actual recommended records.
+export const domainConfigSchema = z.object({
+  acceptedChallenges: z
+    .array(z.enum(["dns-01", "http-01"]))
+    .max(2)
+    .optional(),
+  configuredBy: z.enum(["A", "CNAME", "dns-01", "http"]).nullable().optional(),
+  misconfigured: z.boolean(),
+  recommendedCNAME: z
+    .array(z.object({ rank: z.number(), value: z.string().max(256) }))
+    .max(10)
+    .optional(),
+  recommendedIPv4: z
+    .array(z.object({ rank: z.number(), value: z.array(z.ipv4()).max(10) }))
+    .max(10)
+    .optional(),
+});
 
 /** From the first line that reports a failure to the end of the build, capped. */
 export function buildErrorExcerpt(
@@ -174,6 +191,7 @@ async function readProject(
       );
       return {
         assignedToProject: Boolean(match),
+        configuration: configs[index] ?? null,
         domain: name,
         misconfigured: configs[index]?.misconfigured ?? null,
         verified: match?.verified ?? null,

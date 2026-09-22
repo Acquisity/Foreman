@@ -368,6 +368,8 @@ const SAFE_ITEM_FIELDS: Record<InstantlyResource, readonly string[]> = {
     "warmup_status",
   ],
   campaigns: [
+    "daily_limit",
+    "not_sending_status",
     "id",
     "is_evergreen",
     "name",

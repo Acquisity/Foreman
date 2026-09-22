@@ -5,6 +5,7 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
+import { redact } from "#lib/investigation-memory/case.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
@@ -38,7 +39,14 @@ const DFY_INBOX_COUNT = `(select case when count(*) > 0 and bool_and(
         and jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'
         then dpo.dfy_config -> 'mailboxes' else '{}'::jsonb end) mb)`;
 
-export const widgetProvisioningInput = z.strictObject({});
+export const widgetProvisioningInput = z.strictObject({
+  orderId: z
+    .uuid()
+    .optional()
+    .describe(
+      "Read bounded domain and inbox diagnostics for this owned order."
+    ),
+});
 export type WidgetProvisioningInput = z.infer<typeof widgetProvisioningInput>;
 
 const count = z.number().int().nonnegative();
@@ -92,11 +100,45 @@ const reconciliation = z.object({
   invisibleInboxes: z.boolean(),
 });
 
+function diagnosticText(value: string | null): string | null {
+  return value === null
+    ? null
+    : redact(value)
+        .replace(/https?:\/\/[^\s"'<>]+/gi, "[redacted URL]")
+        .replace(
+          /"(?:api[_-]?key|secret|password|token)"\s*:\s*"[^"\n]*"/gi,
+          '"credential":"[redacted]"'
+        )
+        .slice(0, 500);
+}
+const inboxDiagnostic = z.object({
+  connected: z.boolean().nullable(),
+  connectionError: z.string().max(500).nullable(),
+  lastRetryAt: timestamp.nullable(),
+  retryCount: count.nullable(),
+});
+const domainDiagnostic = z.object({
+  domain: z.string().max(253),
+  error: z.string().max(500).nullable(),
+  expectedInboxes: count.nullable(),
+  inboxCount: count.nullable(),
+  inboxes: z.array(inboxDiagnostic).max(5),
+  inboxesTruncated: z.boolean(),
+  provisionedAt: timestamp.nullable(),
+  status: z.enum(["pending", "success", "partial", "failed"]),
+});
+const diagnostics = z.object({
+  domains: z.array(domainDiagnostic).max(10),
+  domainsTruncated: z.boolean(),
+});
+
 const order = z.object({
   billingAccountId: z.uuid().nullable(),
   completedAt: timestamp.nullable(),
   createdAt: timestamp,
+  diagnostics: diagnostics.nullable(),
   dismissed: z.boolean(),
+  error: z.string().max(500).nullable(),
   hasError: z.boolean(),
   id: z.uuid(),
   mailProvider: z.string().max(64),
@@ -139,7 +181,7 @@ export function buildWidgetProvisioningQuery(
   raw: WidgetProvisioningInput
 ): string {
   const scope = widgetContextSchema.parse(context);
-  widgetProvisioningInput.parse(raw);
+  const input = widgetProvisioningInput.parse(raw);
   const authorization = `with authorized as (
     select o.id from organization o join member m on m.organization_id = o.id
     where o.id = '${scope.organizationId}'::uuid and m.user_id = '${scope.userId}'::uuid
@@ -152,12 +194,32 @@ export function buildWidgetProvisioningQuery(
   const inboxCounts = (predicate: string) =>
     `(select count(*) from mail_inbox mi
       where mi.organization_id = dpo.organization_id and mi.order_id = dpo.id${predicate})`;
+  // Project only the known diagnostic fields. Mailbox credentials, identities,
+  // error_details and other arbitrary provider blobs never leave the database.
+  const detail = input.orderId
+    ? `case when jsonb_typeof(dpo.provisioning_log -> 'domains') = 'array' then jsonb_build_object(
+      'domainsTruncated', jsonb_array_length(case when jsonb_typeof(dpo.provisioning_log -> 'domains') = 'array' then dpo.provisioning_log -> 'domains' else '[]'::jsonb end) > 10,
+      'domains', coalesce((select jsonb_agg(jsonb_build_object(
+        'domain', d.value ->> 'domain', 'status', d.value ->> 'status',
+        'error', left(d.value ->> 'error', 2000),
+        'expectedInboxes', d.value -> 'expectedInboxes', 'inboxCount', d.value -> 'inboxCount',
+        'provisionedAt', d.value ->> 'provisionedAt',
+        'inboxesTruncated', jsonb_array_length(case when jsonb_typeof(d.value -> 'inboxes') = 'array' then d.value -> 'inboxes' else '[]'::jsonb end) > 5,
+        'inboxes', coalesce((select jsonb_agg(jsonb_build_object(
+          'connected', i.value -> 'connected',
+          'connectionError', left(i.value ->> 'connectionError', 2000),
+          'retryCount', i.value -> 'retryCount', 'lastRetryAt', i.value ->> 'lastRetryAt'))
+          from (select value from jsonb_array_elements(case when jsonb_typeof(d.value -> 'inboxes') = 'array' then d.value -> 'inboxes' else '[]'::jsonb end) limit 5) i), '[]'::jsonb)
+      )) from (select value from jsonb_array_elements(case when jsonb_typeof(dpo.provisioning_log -> 'domains') = 'array' then dpo.provisioning_log -> 'domains' else '[]'::jsonb end) limit 10) d), '[]'::jsonb)
+    ) else null end`
+    : "null::jsonb";
   const selection = `select dpo.id, dpo.order_type as "orderType", dpo.status,
       dpo.provider as "mailProvider", dpo.provider_order_id as "providerOrderId",
       dpo.billing_account_id as "billingAccountId", dpo.submission_id as "submissionId",
       dpo.domain_count as "domainCount", dpo.inbox_count_per_domain as "inboxCountPerDomain",
       dpo.domains_provisioned as "domainsProvisioned", dpo.inboxes_provisioned as "inboxesProvisioned",
       ${DFY_INBOX_COUNT} as "dfyInboxCount",
+      ${detail} as diagnostics, left(dpo.error, 2000) as error,
       dpo.dismissed, (dpo.error is not null and dpo.error <> '') as "hasError",
       coalesce((dpo.provisioning_log ->> 'totalAttempts')::int, 0) as "provisioningAttempts",
       (dpo.provisioning_log ->> 'lastUpdated') as "provisioningLastUpdated",
@@ -170,6 +232,7 @@ export function buildWidgetProvisioningQuery(
       ${inboxCounts(" and mi.status = 'active'")} as "activeInboxRows",
       ${inboxCounts(" and mi.connected = true")} as "connectedInboxRows"
     from domain_purchase_order dpo join authorized a on a.id = dpo.organization_id
+    ${input.orderId ? `where dpo.id = '${input.orderId}'::uuid` : ""}
     order by dpo.created_at desc, dpo.id desc limit ${ORDER_LIMIT}`;
   // One statement checks current permissions and reads orders in the same snapshot.
   return `${authorization}
@@ -186,10 +249,30 @@ const rawOrder = z.object({
   connectedInboxRows: count,
   createdAt: timestamp,
   dfyInboxCount: count.nullable(),
+  diagnostics: diagnostics
+    .extend({
+      domains: z
+        .array(
+          domainDiagnostic.extend({
+            error: z.string().max(2000).nullable(),
+            inboxes: z
+              .array(
+                inboxDiagnostic.extend({
+                  connectionError: z.string().max(2000).nullable(),
+                })
+              )
+              .max(5),
+          })
+        )
+        .max(10),
+    })
+    .nullable()
+    .default(null),
   dismissed: z.boolean(),
   domainCount: count,
   domainRows: count,
   domainsProvisioned: count,
+  error: z.string().max(2000).nullable().default(null),
   failedDomainRows: count,
   hasError: z.boolean(),
   id: z.uuid(),
@@ -249,7 +332,21 @@ function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
     billingAccountId: row.billingAccountId,
     completedAt: row.completedAt,
     createdAt: row.createdAt,
+    diagnostics: row.diagnostics
+      ? {
+          ...row.diagnostics,
+          domains: row.diagnostics.domains.map((domain) => ({
+            ...domain,
+            error: diagnosticText(domain.error),
+            inboxes: domain.inboxes.map((inbox) => ({
+              ...inbox,
+              connectionError: diagnosticText(inbox.connectionError),
+            })),
+          })),
+        }
+      : null,
     dismissed: row.dismissed,
+    error: diagnosticText(row.error),
     hasError: row.hasError,
     id: row.id,
     mailProvider: row.mailProvider,
@@ -293,8 +390,8 @@ const CAVEATS = [
   "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
   "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
   "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
-  "submissionId and provisioningFunctionId are saved references only. This tool cannot inspect live run steps or determine why provisioning stopped. No cross-workspace run list is returned here.",
-  "An empty orders list means no provisioning orders in this workspace, not that a purchase failed silently.",
+  "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+  "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders.",
 ];
 
 /** Parse only the provider envelope and declared fields; never forward raw failure bodies. */
@@ -337,7 +434,7 @@ export function parseWidgetProvisioningEvidence(
   });
 }
 
-/** Widget reads accept no selector: every order is scoped to the verified workspace. */
+/** An optional order selector is still constrained to the verified workspace. */
 export async function readWidgetProvisioningStatus(
   ctx: ProviderContext,
   input: WidgetProvisioningInput
@@ -391,7 +488,7 @@ export async function readWidgetProvisioningStatus(
 
 const tool = defineTool({
   description:
-    "Diagnose stuck domain and inbox provisioning only in this chat's verified workspace, for the 'I paid but my domains/inboxes are still provisioning' problem. Lists up to 25 recent domain-purchase orders (pre-warmed and DFY) newest first, each with: order type, status and a derived run state (awaiting_payment, queued, running, stalled, completed, failed, cancelled), the current step such as 3/6, created/paid/started/completed timestamps, the order id plus its billing-account (Autumn customer) and provider-order links and background submission id, and a reconciliation of what was charged versus what is actually provisioned (domains and inboxes charged, provisioned counters, live active rows, connected inboxes, missing counts, and an invisibleInboxes flag for charged-but-absent inboxes). Saved order state, not a live provisioning or billing check. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose stuck domain and inbox provisioning only in this chat's verified workspace, for the 'I paid but my domains/inboxes are still provisioning' problem. Lists up to 25 recent domain-purchase orders (pre-warmed and DFY) newest first, each with: order type, status and a derived run state (awaiting_payment, queued, running, stalled, completed, failed, cancelled), the current step such as 3/6, created/paid/started/completed timestamps, the order id plus its billing-account (Autumn customer) and provider-order links and background submission id, and a reconciliation of what was charged versus what is actually provisioned (domains and inboxes charged, provisioned counters, live active rows, connected inboxes, missing counts, and an invisibleInboxes flag for charged-but-absent inboxes). Saved order state, not a live provisioning or billing check. Unavailable is not empty. Pass an orderId from these results to inspect up to 10 saved domain log entries and 5 inbox connection/retry entries per domain, with sanitized errors and explicit truncation. These are saved diagnostic observations, not live Inngest traces. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetProvisioningStatus(ctx, input),
   inputSchema: widgetProvisioningInput,

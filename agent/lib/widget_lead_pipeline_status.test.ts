@@ -42,16 +42,20 @@ const runId = "44444444-4444-4444-8444-444444444444";
 const observedAt = "2026-09-17T10:00:00.000Z";
 const scrapeRun = {
   action: "upload_to_campaign",
+  campaignId: null,
   declaredLeadCount: 500,
   finishedAt: null,
   id: runId,
+  name: "Selected lead list",
   runId: "apify-run-abc123",
   source: "apollo",
   startedAt: observedAt,
   status: "running",
   storedLeadCount: 0,
   stuck: true,
+  unverifiedLeadCount: 0,
   updatedAt: observedAt,
+  verificationJobs: { completed: 0, failed: 0, pending: 1, unknown: 0 },
   verifiedLeadCount: 0,
 };
 const importActivity = {
@@ -399,4 +403,56 @@ test("count differences in either direction do not diagnose failed processing", 
       )
     );
   }
+});
+
+test("selectors remain tenant scoped and a selected old run bypasses only the time window", () => {
+  const query = buildWidgetLeadPipelineQuery(scope, {
+    campaignId: runId,
+    scrapeRunId: runId,
+  });
+  assert.ok(query.includes(`lsr.id = '${runId}'::uuid`));
+  assert.ok(query.includes(`lsr.campaign_id = '${runId}'::uuid`));
+  assert.ok(query.includes("c.organization_id = lsr.organization_id"));
+  assert.ok(query.includes("join authorized a on a.id = lsr.organization_id"));
+  assert.ok(
+    query.includes(
+      "v.organization_id = lsr.organization_id and v.scrape_run_id = lsr.id"
+    )
+  );
+  assert.equal(query.includes("where lsr.created_at >"), false);
+  for (const input of [
+    { scrapeRunId: "bad" },
+    { campaignId: "bad" },
+    { runId: "provider-run" },
+  ]) {
+    assert.equal(widgetLeadPipelineInput.safeParse(input).success, false);
+  }
+});
+
+test("verification breakdown retains product semantics and provider references never dispatch to Inngest", async (t) => {
+  const call = t.mock.method(executorTransport, "call", async () => ({
+    data: envelope({
+      scrapeRuns: [
+        {
+          ...scrapeRun,
+          storedLeadCount: 10,
+          unverifiedLeadCount: 3,
+          verificationJobs: { completed: 1, failed: 1, pending: 0, unknown: 0 },
+          verifiedLeadCount: 7,
+        },
+      ],
+    }),
+    ok: true,
+  }));
+  const result = await readWidgetLeadPipelineStatus(ctx, {
+    scrapeRunId: runId,
+  });
+  assert.equal(call.mock.callCount(), 1);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.equal(result.scrapeRuns[0].runId, "apify-run-abc123");
+  assert.equal(result.scrapeRuns[0].unverifiedLeadCount, 3);
+  assert.equal(result.scrapeRuns[0].verificationJobs.failed, 1);
 });

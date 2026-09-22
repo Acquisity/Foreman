@@ -1,10 +1,12 @@
 import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
 import { operationPath } from "#lib/executor/bindings.js";
+import { executorClient } from "#lib/executor/client.js";
 import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
+import { readInstantlySubworkspace } from "#lib/instantly-api.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
@@ -20,6 +22,7 @@ const RECENT_SEND_DAYS = 7;
 
 export const widgetOutreachHealthInput = z.strictObject({
   after: z.uuid().optional(),
+  campaignId: z.uuid().optional(),
 });
 export type WidgetOutreachHealthInput = z.infer<
   typeof widgetOutreachHealthInput
@@ -82,14 +85,27 @@ const schedule = z.object({
   timezone: z.string().max(64).nullable(),
   toTime: z.string().max(16).nullable(),
 });
+const liveCampaign = z.union([
+  z.object({
+    available: z.literal(true),
+    campaignDailyLimit: count.nullable(),
+    notSendingReason,
+    notSendingReasonCode: z.number().int().nullable(),
+    observedAt: timestamp,
+    statusCode: z.number().int(),
+    updatedAt: timestamp.nullable(),
+  }),
+  z.object({ available: z.literal(false), reason: z.string() }),
+]);
 const campaignHealth = z.object({
-  dailyLimit: count.nullable(),
   id: z.uuid(),
   leadsNotPushedCount: count,
+  live: liveCampaign,
   name: z.string().max(600),
   notSendingReason,
   notSendingReasonCode: z.number().int().nullable(),
   recentSends: z.array(dailySend).max(RECENT_SEND_DAYS),
+  savedDailyLimitPerInbox: count.nullable(),
   schedule: schedule.nullable(),
   status,
   totalLeads: count.nullable(),
@@ -107,7 +123,7 @@ export const widgetOutreachHealthOutput = z.union([
     nextAfter: z.uuid().nullable(),
     observedAt: timestamp,
     source: z.literal(
-      "Acquisity product database; saved state, not a live provider check"
+      "Acquisity product database; live Instantly evidence only for a selected campaign"
     ),
     status: z.literal("ok"),
     workspace: z.string().max(500),
@@ -140,7 +156,12 @@ export function buildWidgetOutreachHealthQuery(
     from mail_inbox mi join authorized a on a.id = mi.organization_id
   ) i) as inboxes`;
   const cursor = input.after ? `and c.id > '${input.after}'::uuid` : "";
+  const target = input.campaignId
+    ? `and c.id = '${input.campaignId}'::uuid`
+    : "";
   const selection = `select c.id, left(c.name, 300) as name, c.status,
+      c.provider_campaign_id as "providerCampaignId", p.provider,
+      p.account_type as "accountType", p.workspace_id as "providerWorkspaceId",
       c.total_leads as "totalLeads", c.updated_at as "updatedAt",
       c.metadata->'providerData'->>'not_sending_status' as "notSendingStatusRaw",
       sched."fromTime", sched."toTime", sched.timezone, sched.days, sched."dailyLimit",
@@ -166,7 +187,7 @@ export function buildWidgetOutreachHealthQuery(
       limit 1
     ) sched on true
     where c.display_status = 'active'
-    ${cursor}
+    ${cursor} ${target}
     order by c.id limit ${CAMPAIGN_PAGE_SIZE + 1}`;
   return `${authorization}
     select (select count(*) = 1 from authorized) as authorized,
@@ -190,6 +211,7 @@ function toNotSendingReason(raw: string | null): {
 }
 
 const campaignRow = z.object({
+  accountType: z.enum(["system_provisioned", "user_owned"]).nullable(),
   dailyLimit: count.nullable(),
   days: z.record(z.string(), z.boolean()).nullable(),
   fromTime: z.string().max(16).nullable(),
@@ -197,6 +219,9 @@ const campaignRow = z.object({
   leadsNotPushedCount: count,
   name: z.string().max(600),
   notSendingStatusRaw: z.string().nullable(),
+  provider: z.string().max(100),
+  providerCampaignId: z.string().max(200),
+  providerWorkspaceId: z.string().max(200).nullable(),
   recentSends: z.array(dailySend).max(RECENT_SEND_DAYS),
   status,
   timezone: z.string().max(64).nullable(),
@@ -245,13 +270,17 @@ export function parseWidgetOutreachHealthEvidence(
       row.timezone !== null ||
       row.days !== null;
     return campaignHealth.parse({
-      dailyLimit: row.dailyLimit,
       id: row.id,
       leadsNotPushedCount: row.leadsNotPushedCount,
+      live: {
+        available: false,
+        reason: "Select this campaignId to check the provider.",
+      },
       name: row.name,
       notSendingReason: reason,
       notSendingReasonCode: code,
       recentSends: row.recentSends,
+      savedDailyLimitPerInbox: row.dailyLimit,
       schedule: hasSchedule
         ? {
             days: namedDays(row.days),
@@ -271,7 +300,7 @@ export function parseWidgetOutreachHealthEvidence(
   return widgetOutreachHealthOutput.parse({
     campaigns,
     caveats: [
-      "Saved product state is not a live provider check.",
+      "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap. Acquisity manages Instantly limits; do not ask the customer to change them in Instantly.",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity.",
       "recentSends covers only the last saved days, not the campaign's full history.",
@@ -282,13 +311,105 @@ export function parseWidgetOutreachHealthEvidence(
       rows.length > CAMPAIGN_PAGE_SIZE ? rows[CAMPAIGN_PAGE_SIZE - 1].id : null,
     observedAt: result.observedAt,
     source:
-      "Acquisity product database; saved state, not a live provider check",
+      "Acquisity product database; live Instantly evidence only for a selected campaign",
     status: "ok",
     workspace: context.organizationName,
   });
 }
 
-/** Widget reads accept only a page cursor, never a workspace, SQL or field selector. */
+const providerCampaign = z.object({
+  daily_limit: count.nullish(),
+  id: z.string().max(200),
+  not_sending_status: z.number().int().nullish(),
+  status: z.number().int(),
+  timestamp_updated: timestamp.nullish(),
+});
+
+/** Match only the provider identity read from the authorized campaign, never a model-supplied provider ID. */
+async function readLiveCampaign(
+  ctx: ProviderContext,
+  row: z.infer<typeof campaignRow>
+): Promise<z.infer<typeof liveCampaign>> {
+  if (
+    row.provider !== "instantly" ||
+    row.accountType !== "system_provisioned" ||
+    !row.providerWorkspaceId
+  ) {
+    return {
+      available: false,
+      reason:
+        "No ownership-verified Acquisity-provisioned Instantly connection for this campaign.",
+    };
+  }
+  try {
+    const signal = AbortSignal.any([
+      ctx.abortSignal,
+      AbortSignal.timeout(20_000),
+    ]);
+    let startingAfter: string | undefined;
+    const cursors = new Set<string>();
+    for (let page = 0; page < 3; page += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: the provider cursor determines the next page.
+      const result = await readInstantlySubworkspace(
+        { id: row.providerWorkspaceId },
+        "campaigns",
+        { limit: 100, startingAfter },
+        { client: executorClient(ctx), signal }
+      );
+      const match = result.items.find(
+        (item) =>
+          z.object({ id: z.string() }).safeParse(item).data?.id ===
+          row.providerCampaignId
+      );
+      if (match) {
+        const campaign = providerCampaign.parse(match);
+        const reason = toNotSendingReason(
+          campaign.not_sending_status === null ||
+            campaign.not_sending_status === undefined
+            ? null
+            : String(campaign.not_sending_status)
+        );
+        return {
+          available: true,
+          campaignDailyLimit: campaign.daily_limit ?? null,
+          notSendingReason: reason.reason as z.infer<typeof notSendingReason>,
+          notSendingReasonCode: reason.code,
+          observedAt: new Date().toISOString(),
+          statusCode: campaign.status,
+          updatedAt: campaign.timestamp_updated ?? null,
+        };
+      }
+      if (!result.nextStartingAfter) {
+        return {
+          available: false,
+          reason:
+            "The owned campaign was not found in the provider list; this does not establish why it is absent.",
+        };
+      }
+      if (cursors.has(result.nextStartingAfter)) {
+        break;
+      }
+      cursors.add(result.nextStartingAfter);
+      startingAfter = result.nextStartingAfter;
+    }
+    return {
+      available: false,
+      reason:
+        "Provider campaign scan was truncated before finding this campaign.",
+    };
+  } catch (error) {
+    if (ctx.abortSignal.aborted) {
+      throw error;
+    }
+    return {
+      available: false,
+      reason:
+        "The live campaign read failed; saved evidence remains available.",
+    };
+  }
+}
+
+/** Widget reads accept an owned campaign selector or a page cursor, never workspace or SQL. */
 export async function readWidgetOutreachHealth(
   ctx: ProviderContext,
   input: WidgetOutreachHealthInput
@@ -317,7 +438,23 @@ export async function readWidgetOutreachHealth(
       throw new Error("Evidence provider unavailable.");
     }
     stage = "response";
-    return parseWidgetOutreachHealthEvidence(result.data, scope);
+    const evidence = parseWidgetOutreachHealthEvidence(result.data, scope);
+    if (
+      evidence.status === "ok" &&
+      input.campaignId &&
+      evidence.campaigns.length === 1
+    ) {
+      const db = z
+        .object({
+          rows: z.array(z.object({ records: z.array(campaignRow) })).length(1),
+        })
+        .parse(providerData(result.data));
+      evidence.campaigns[0].live = await readLiveCampaign(
+        ctx,
+        db.rows[0].records[0]
+      );
+    }
+    return evidence;
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;
@@ -342,7 +479,7 @@ export async function readWidgetOutreachHealth(
 
 const tool = defineTool({
   description:
-    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 recent active campaigns (name, status, total leads) with nextAfter for the next page, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the daily send-volume allocation, up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Saved state, not a live provider check. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 recent active campaigns (name, status, total leads) with nextAfter for the next page, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Pass campaignId from this tool to fetch live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetOutreachHealth(ctx, input),
   inputSchema: widgetOutreachHealthInput,

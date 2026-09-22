@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { z } from "zod";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
@@ -119,10 +120,10 @@ test("tool is exposed only for the widget support initiator", async () => {
   assert.deepEqual(results, [null, null, null]);
 });
 
-test("input accepts only the empty selector", () => {
+test("input accepts only an optional owned order selector", () => {
   for (const input of [
     { organizationId: scope.organizationId },
-    { orderId },
+    { orderId: "not-a-uuid" },
     { query: "select * from domain_purchase_order" },
     { status: "provisioning" },
   ]) {
@@ -130,6 +131,14 @@ test("input accepts only the empty selector", () => {
     assert.throws(() => buildWidgetProvisioningQuery(scope, input as never));
   }
   assert.ok(widgetProvisioningInput.safeParse({}).success);
+  const selected = buildWidgetProvisioningQuery(scope, { orderId });
+  assert.ok(selected.includes(`where dpo.id = '${orderId}'::uuid`));
+  assert.ok(
+    selected.includes("join authorized a on a.id = dpo.organization_id")
+  );
+  assert.ok(selected.includes("limit 10"));
+  assert.ok(selected.includes("limit 5"));
+  assert.equal(selected.includes("error_details"), false);
 });
 
 test("the statement checks membership and scopes every provisioning join", () => {
@@ -192,6 +201,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
 
 test("output matches the schema and reconciles charged versus provisioned", () => {
   const result = parseWidgetProvisioningEvidence(envelope([rawOrder]), scope);
+  assert.ok(z.toJSONSchema(widgetProvisioningOutput));
   assert.ok(widgetProvisioningOutput.safeParse(result).success);
   assert.equal(result.status, "ok");
   if (result.status !== "ok") {
@@ -414,5 +424,93 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
       } as unknown as ProviderContext,
       {}
     )
+  );
+});
+
+test("owned saved logs expose partial failures and retries without provider blobs", () => {
+  const record = {
+    ...rawOrder,
+    diagnostics: {
+      domains: [
+        {
+          credentials: "discarded-domain-secret",
+          domain: "example.com",
+          error: "Provider rejected token=verysecret123",
+          expectedInboxes: 3,
+          inboxCount: 1,
+          inboxes: [
+            {
+              connected: false,
+              connectionError: "Authentication failed Bearer abcdefghijklmnop",
+              lastRetryAt: staleAt,
+              password: "discarded-provider-password",
+              retryCount: 2,
+            },
+          ],
+          inboxesTruncated: true,
+          provisionedAt: null,
+          status: "partial",
+        },
+      ],
+      domainsTruncated: true,
+    },
+    error:
+      "Connection rejected password=verysecret123 for person@example.com https://provider.test/?signature=private-signature",
+    errorDetails: { password: "discarded-order-secret" },
+  };
+  const result = parseWidgetProvisioningEvidence(envelope([record]), scope);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected evidence");
+  }
+  const [item] = result.orders;
+  assert.equal(item.diagnostics?.domains[0].status, "partial");
+  assert.equal(item.diagnostics?.domains[0].inboxes[0].retryCount, 2);
+  assert.equal(item.diagnostics?.domains[0].expectedInboxes, 3);
+  assert.equal(item.diagnostics?.domainsTruncated, true);
+  assert.equal(item.diagnostics?.domains[0].inboxesTruncated, true);
+  for (const secret of [
+    "verysecret123",
+    "person@example.com",
+    "abcdefghijklmnop",
+    "discarded-",
+    "private-signature",
+  ]) {
+    assert.equal(JSON.stringify(result).includes(secret), false);
+  }
+  assert.equal(
+    parseWidgetProvisioningEvidence(
+      envelope([record], { authorized: false }),
+      scope
+    ).status,
+    "denied"
+  );
+  const missing = parseWidgetProvisioningEvidence(
+    envelope([
+      {
+        ...rawOrder,
+        diagnostics: {
+          domains: [
+            {
+              domain: "example.com",
+              error: null,
+              expectedInboxes: null,
+              inboxCount: null,
+              inboxes: [],
+              inboxesTruncated: false,
+              provisionedAt: null,
+              status: "pending",
+            },
+          ],
+          domainsTruncated: false,
+        },
+      },
+    ]),
+    scope
+  );
+  assert.equal(
+    missing.status === "ok" &&
+      missing.orders[0].diagnostics?.domains[0].expectedInboxes,
+    null
   );
 });

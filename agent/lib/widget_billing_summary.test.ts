@@ -61,7 +61,35 @@ test("execute refuses a non-widget identity before touching any provider", () =>
 });
 
 test("no selector accepts an organization id, customer id or SQL", () => {
-  assert.deepEqual(Object.keys(widgetBillingSummaryInputSchema.shape), []);
+  for (const input of [
+    { organizationId: "x" },
+    { customerId: "cus_x" },
+    { query: "select 1" },
+  ]) {
+    assert.equal(
+      widgetBillingSummaryInputSchema.safeParse(input).success,
+      false
+    );
+  }
+});
+
+const creditWindow = {
+  from: "2026-08-22T00:00:00Z",
+  to: "2026-09-22T00:00:00Z",
+};
+
+test("credit windows reject injection, reversed dates, and unbounded periods", () => {
+  for (const window of [
+    { from: "2026-08-22'", to: creditWindow.to },
+    { from: creditWindow.to, to: creditWindow.from },
+    { from: "2025-01-01T00:00:00Z", to: creditWindow.to },
+  ]) {
+    assert.equal(
+      widgetBillingSummaryInputSchema.safeParse({ creditWindow: window })
+        .success,
+      false
+    );
+  }
 });
 
 const BASE_BILLING_ACCOUNT: NonNullable<
@@ -221,6 +249,73 @@ const fakeDeps = (
     ...overrides,
   };
 };
+
+test("requested history is scoped, separate from lifetime totals, and unavailable is not zero", async () => {
+  const calls: string[] = [];
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: (organizationId, window) => {
+        calls.push(organizationId);
+        assert.deepEqual(window, creditWindow);
+        return Promise.resolve({
+          available: true,
+          completedManualGrants: [
+            { amount: 100, entries: 1, resource: "credits" },
+          ],
+          transactionTotals: [
+            { amount: -50, entries: 2, resource: "credits", type: "usage" },
+          ],
+          truncated: false,
+          window,
+        });
+      },
+    }),
+    { creditWindow }
+  );
+  assert.deepEqual(calls, [verifiedWidgetContext.organizationId]);
+  assert.equal(result.creditHistory?.transactionTotals[0].amount, -50);
+  assert.equal(result.credits?.lifetimeUsed, 500);
+  const unavailable = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: () =>
+        Promise.reject(new Error("private provider details")),
+    }),
+    { creditWindow }
+  );
+  assert.equal(unavailable.creditHistory?.available, false);
+  assert.ok(
+    unavailable.unavailable.includes("productDb.creditHistory read unavailable")
+  );
+  assert.equal(
+    JSON.stringify(unavailable).includes("private provider details"),
+    false
+  );
+  const denied = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: () => assert.fail("must not read another workspace"),
+      isAuthorized: () => Promise.resolve(false),
+    }),
+    { creditWindow }
+  );
+  assert.equal(denied.available, false);
+});
+
+test("missing Autumn Stripe identity does not trigger a guessed customer lookup", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getAutumnCustomer: () => Promise.resolve({ stripe_id: null }),
+      getStripeCustomerBilling: () =>
+        assert.fail("no trusted customer identifier"),
+    })
+  );
+  assert.ok(
+    result.unavailable.includes("stripe: Autumn record has no stripe_id.")
+  );
+});
 
 test("a user who is not a live owner or admin, or whose membership cannot be checked, reads no billing at all", async () => {
   for (const isAuthorized of [

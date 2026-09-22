@@ -217,3 +217,80 @@ test("a builder project that links to a website is listed once, as that website"
     query.includes("and not exists (select 1 from website lw where lw.id =")
   );
 });
+
+test("targeted public diagnostics require both current workspace membership and live hosting assignment", async (t) => {
+  const previousToken = process.env.ACQUISITY_SUPPORT_VERCEL_TOKEN;
+  const previousTeam = process.env.ACQUISITY_SUPPORT_VERCEL_TEAM_ID;
+  process.env.ACQUISITY_SUPPORT_VERCEL_TOKEN = "test-token";
+  process.env.ACQUISITY_SUPPORT_VERCEL_TEAM_ID = "team_customersites1";
+  t.after(() => {
+    if (previousToken === undefined) {
+      delete process.env.ACQUISITY_SUPPORT_VERCEL_TOKEN;
+    } else {
+      process.env.ACQUISITY_SUPPORT_VERCEL_TOKEN = previousToken;
+    }
+    if (previousTeam === undefined) {
+      delete process.env.ACQUISITY_SUPPORT_VERCEL_TEAM_ID;
+    } else {
+      process.env.ACQUISITY_SUPPORT_VERCEL_TEAM_ID = previousTeam;
+    }
+  });
+  const dispatch = () =>
+    Promise.resolve(
+      envelope([{ ...neverPublished, vercelProjectId: "prj_customerproject1" }])
+    );
+  const calls: string[] = [];
+  const networkRead = (domain: string) => {
+    calls.push(domain);
+    const empty = { status: "no_records" as const, values: [] };
+    return Promise.resolve({
+      dns: { A: empty, AAAA: empty, CNAME: empty, NS: empty },
+      domain,
+      http: { status: "no_address" as const },
+    });
+  };
+  const fetcher = (assigned: boolean) => (url: string) => {
+    const path = new URL(url).pathname;
+    let data: unknown = { misconfigured: true };
+    if (path === "/v9/projects/prj_customerproject1") {
+      data = { accountId: "team_customersites1", id: "prj_customerproject1" };
+    }
+    if (path.endsWith("/deployments")) {
+      data = { deployments: [] };
+    }
+    if (path.endsWith("/domains")) {
+      data = {
+        domains: assigned ? [{ name: "shop.example.com", verified: true }] : [],
+      };
+    }
+    return Promise.resolve(Response.json(data));
+  };
+  const denied = await readWidgetWebsiteStatus(
+    context(),
+    dispatch,
+    fetcher(false),
+    publishedThenBroke.id,
+    networkRead
+  );
+  assert.equal(denied.status, "denied");
+  await readWidgetWebsiteStatus(
+    context(),
+    dispatch,
+    fetcher(false),
+    neverPublished.id,
+    networkRead
+  );
+  assert.deepEqual(calls, []);
+  const checked = await readWidgetWebsiteStatus(
+    context(),
+    dispatch,
+    fetcher(true),
+    neverPublished.id,
+    networkRead
+  );
+  assert.deepEqual(calls, ["shop.example.com"]);
+  assert.equal(checked.status, "ok");
+  if (checked.status === "ok") {
+    assert.equal(checked.projects[0].publicCheck?.domain, "shop.example.com");
+  }
+});

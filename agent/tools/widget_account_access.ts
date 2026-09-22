@@ -1,5 +1,6 @@
 import { defineDynamic, defineTool, type ToolContext } from "eve/tools";
 import { z } from "zod";
+import { DEFAULT_PARTNER_ID } from "#lib/acquisity-constants.js";
 import { operationPath } from "#lib/executor/bindings.js";
 import {
   invokeProvider,
@@ -50,6 +51,7 @@ const account = z.object({
   onboardingCallScheduled: z.boolean(),
   onboardingComplete: z.boolean(),
   onboardingCompletedAt: timestamp.nullable(),
+  partnerEligible: z.boolean(),
   twoFactorEnabled: z.boolean(),
 });
 const onboarding = z
@@ -112,6 +114,10 @@ export const widgetAccountAccessOutput = z.union([
     observedAt: timestamp,
     onboarding,
     organization,
+    partnerAccess: z.object({
+      menuVisible: z.boolean(),
+      reason: z.enum(["eligible", "not_eligible", "partner_managed_workspace"]),
+    }),
     pendingInvitations: z.array(invitation).max(INVITATION_LIMIT),
     seats: z.object({
       byRole: z.array(seatCount).max(ROLE_LIMIT),
@@ -154,7 +160,8 @@ export function buildAccountAccessQuery(context: WidgetContext): string {
     (select count(*) = 1 from authorized) as authorized,
     current_timestamp as "observedAt",
     (select to_jsonb(w) from (
-      select a.name, a.slug, (a.partner_id is not null) as "partnerManaged",
+      select a.name, a.slug,
+        (a.partner_id is not null and a.partner_id <> '${DEFAULT_PARTNER_ID}'::uuid) as "partnerManaged",
         a.onboarding_status as "onboardingStatus"
       from authorized a
     ) w) as organization,
@@ -169,6 +176,7 @@ export function buildAccountAccessQuery(context: WidgetContext): string {
         coalesce(u.two_factor_enabled, false) as "twoFactorEnabled",
         u.last_login as "lastLoginAt",
         u.onboarding_complete as "onboardingComplete",
+        (u.partner_eligibility is not null) as "partnerEligible",
         u.onboarding_completed_at as "onboardingCompletedAt",
         coalesce(u.onboarding_call_scheduled, false) as "onboardingCallScheduled"
       from "user" u
@@ -205,7 +213,7 @@ export function buildAccountAccessQuery(context: WidgetContext): string {
 
 const CAVEATS = [
   "Saved product state, not a live authentication or billing check.",
-  "Seat counts are active members of this workspace; the plan's seat limit comes from billing and is not read here.",
+  "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
   "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
   "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in.",
 ];
@@ -243,6 +251,12 @@ export function parseAccountAccess(
       status: "denied",
     };
   }
+  let partnerAccessReason = row.account.partnerEligible
+    ? "eligible"
+    : "not_eligible";
+  if (row.organization.partnerManaged) {
+    partnerAccessReason = "partner_managed_workspace";
+  }
   return widgetAccountAccessOutput.parse({
     account: row.account,
     caveats: CAVEATS,
@@ -250,6 +264,11 @@ export function parseAccountAccess(
     observedAt: row.observedAt,
     onboarding: row.onboarding,
     organization: row.organization,
+    partnerAccess: {
+      menuVisible:
+        row.account.partnerEligible && !row.organization.partnerManaged,
+      reason: partnerAccessReason,
+    },
     pendingInvitations: row.invitations,
     seats: {
       byRole: row.seats,
@@ -426,7 +445,7 @@ export async function readWidgetAccountAccess(
 
 const tool = defineTool({
   description:
-    "Diagnose login, access and onboarding problems only for the verified user in this chat's workspace. Returns that user's membership and role, whether their seat is active, the workspace's status, partner and used seat count by role, the plan seat limit (from billing, not read here), the onboarding steps done versus pending, this workspace's pending invitations (with the invited email so an invite-login report can be matched), and, when Sentry is configured and reachable, sanitized counts of all unresolved errors recorded for that user in the last 14 days (any product area; not proof of a sign-in failure). Support-safe status and dates only, never a password hash, session or token, and never another member's email. Saved state, not a live auth or billing check. Unavailable is not empty. No SQL, workspace, user or field selector is accepted.",
+    "Diagnose login, access and onboarding problems only for the verified user in this chat's workspace. Returns that user's membership and role, whether their seat is active, the workspace's status, partner and used seat count by role, the verified user's partner eligibility and effective Become a Partner menu visibility (including the reason), the onboarding steps done versus pending, this workspace's pending invitations (with the invited email so an invite-login report can be matched), and, when Sentry is configured and reachable, sanitized counts of all unresolved errors recorded for that user in the last 14 days (any product area; not proof of a sign-in failure). Support-safe status and dates only, never a password hash, session or token, and never another member's email. Saved state, not a live auth or billing check. Unavailable is not empty. No SQL, workspace, user or field selector is accepted.",
   execute: async (_input, ctx: ToolContext) => readWidgetAccountAccess(ctx),
   inputSchema: widgetAccountAccessInput,
   outputSchema: widgetAccountAccessOutput,

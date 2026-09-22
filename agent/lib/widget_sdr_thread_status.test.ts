@@ -45,15 +45,29 @@ const workspace = {
   aiSdrV2Enabled: true,
   hasSettings: true,
   host: {
-    calendarAccounts: [{ failureCount: 0, invalid: false, type: "google" }],
+    calendarAccounts: [
+      {
+        activeOn: null,
+        checkFor: [],
+        failureCount: 0,
+        invalid: false,
+        type: "google",
+      },
+    ],
     conferencingAccounts: [{ invalid: true, type: "zoom_video" }],
     conferencingLinkType: "dynamic",
+    email: "host@example.com",
     hasStaticMeetingLink: false,
+    id: threadId,
+    name: "Host",
     timezone: "America/Chicago",
+    workHours: [],
     workHoursDays: ["monday", "tuesday"],
   },
+  hostResolution: "workspace",
 };
 const thread = {
+  campaignId: null,
   controlLevel: "automated",
   id: threadId,
   interestLevel: "high",
@@ -61,9 +75,13 @@ const thread = {
   lastMessageAt: observedAt,
   lifecycle: "slots_sent",
   nextFollowupAt: observedAt,
+  prospectEmail: null,
+  prospectName: null,
   prospectTimezone: "Europe/Lisbon",
 };
 const detail = {
+  messages: [],
+  messagesTruncated: false,
   ...thread,
   appointments: [
     {
@@ -196,19 +214,16 @@ test("every statement checks membership and scopes every product join to the org
       "t.deleted_at is null",
       "sf.organization_id = t.organization_id",
       "ap.organization_id = t.organization_id",
-      "join authorized a2 on a2.handler_id = u.id",
+      "join chosen_host h on h.id = u.id",
     ]) {
       assert.ok(query.includes(required), required);
     }
     for (const forbidden of [
       "select *",
-      "u.email",
-      "u.name",
       "ap.attendees",
       "meeting_url as",
       "ca.key",
       "cf.key",
-      "body_text",
       "payload",
     ]) {
       assert.equal(query.includes(forbidden), false, forbidden);
@@ -411,7 +426,7 @@ test("malformed rows become unavailable without leaking values, and extra fields
             meetingUrl: "secret",
           },
         ],
-        prospectEmail: "secret",
+        rawProviderCredentials: "secret",
       },
     ]),
     scope,
@@ -437,6 +452,96 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
         },
       } as unknown as ProviderContext,
       {}
+    )
+  );
+});
+
+test("targeted search is escaped, tenant scoped and includes legacy threads", () => {
+  const query = buildWidgetSdrQuery(scope, {
+    campaignId: threadId,
+    prospectEmail: "o'brien@example.com",
+  });
+  assert.ok(query.includes("lower('o''brien@example.com')"));
+  assert.ok(query.includes(`t.campaign_id = '${threadId}'::uuid`));
+  assert.ok(query.includes("c.organization_id"));
+  assert.ok(query.includes("and true"));
+  assert.ok(query.includes("join authorized a on a.id = c.organization_id"));
+});
+
+test("host precedence and ambiguous fallback retain configuration without credentials", () => {
+  const query = buildWidgetSdrQuery(scope, { threadId });
+  assert.ok(query.includes("c.sales_person_id"));
+  assert.ok(query.includes("u.id = a.handler_id"));
+  assert.ok(query.includes("min(priority)"));
+  assert.ok(query.includes("priority = 3) = 1"));
+  assert.ok(query.includes("hm.organization_id = a.id"));
+  assert.ok(query.includes("ca.deleted_at is null"));
+  assert.ok(query.includes("ca.check_for[1:20]"));
+  assert.ok(query.includes("scheduling_work_time_slot"));
+  for (const forbidden of [
+    "ca.key",
+    "cf.key",
+    "access_token",
+    "refresh_token",
+  ]) {
+    assert.equal(query.includes(forbidden), false);
+  }
+  const result = parseWidgetSdrEvidence(
+    envelope([detail], {
+      workspace: {
+        ...workspace,
+        host: null,
+        hostResolution: "automatic_ambiguous",
+      },
+    }),
+    scope,
+    { threadId }
+  );
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.equal(
+      result.evidence.workspace.hostResolution,
+      "automatic_ambiguous"
+    );
+  }
+});
+
+test("actual thread messages are bounded and arbitrary fields are stripped", () => {
+  const row = {
+    ...detail,
+    messages: [
+      {
+        at: observedAt,
+        content: "Why was this lead escalated?",
+        contentTruncated: false,
+        direction: "received",
+        hasHtmlOnly: false,
+        headers: "secret",
+        id: threadId,
+      },
+    ],
+  };
+  const result = parseWidgetSdrEvidence(envelope([row]), scope, { threadId });
+  assert.equal(result.status, "ok");
+  assert.ok(JSON.stringify(result).includes("Why was this lead escalated?"));
+  assert.equal(JSON.stringify(result).includes("secret"), false);
+  assert.throws(() =>
+    parseWidgetSdrEvidence(
+      envelope([
+        {
+          ...row,
+          messages: [{ ...row.messages[0], content: "a".repeat(3001) }],
+        },
+      ]),
+      scope,
+      { threadId }
+    )
+  );
+  assert.throws(() =>
+    parseWidgetSdrEvidence(
+      envelope([{ ...row, messages: new Array(21).fill(row.messages[0]) }]),
+      scope,
+      { threadId }
     )
   );
 });

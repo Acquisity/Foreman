@@ -23,6 +23,8 @@ const MAX_WINDOW_DAYS = 90;
 const STUCK_MINUTES = 30;
 
 export const widgetLeadPipelineInput = z.strictObject({
+  campaignId: z.uuid().optional(),
+  scrapeRunId: z.uuid().optional(),
   sinceDays: z.number().int().min(1).max(MAX_WINDOW_DAYS).optional(),
 });
 export type WidgetLeadPipelineInput = z.infer<typeof widgetLeadPipelineInput>;
@@ -45,20 +47,30 @@ const scrapeSource = z.enum([
 ]);
 const scrapeAction = z.enum(["none", "upload_to_campaign", "complete"]);
 
+const verificationJobs = z.object({
+  completed: count,
+  failed: count,
+  pending: count,
+  unknown: count,
+});
 const scrapeRun = z.object({
   action: scrapeAction.nullable(),
+  campaignId: z.uuid().nullable(),
   // Run's own tally; compare with storedLeadCount before trusting it.
   declaredLeadCount: count.nullable(),
   finishedAt: timestamp.nullable(),
   id: z.uuid(),
-  // The Inngest/Apify run id as saved on the row; a reference only, no live trace here.
+  name: z.string().max(300).nullable(),
+  // Source-provider run ID; for manual uploads this is a submission ID, never an established Inngest run ID.
   runId: z.string().max(200).nullable(),
   source: scrapeSource,
   startedAt: timestamp.nullable(),
   status: scrapeStatus,
   storedLeadCount: count,
   stuck: z.boolean(),
+  unverifiedLeadCount: count,
   updatedAt: timestamp,
+  verificationJobs,
   verifiedLeadCount: count,
 });
 const importActivity = z.object({
@@ -112,18 +124,36 @@ export function buildWidgetLeadPipelineQuery(
       and o.deleted_at is null and m.deleted_at is null and m.role in ('owner', 'admin')
       and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
   )`;
-  const scrapeRuns = `select lsr.id, lsr.status, lsr.source, lsr.action,
+  const selectedRun = input.scrapeRunId
+    ? `and lsr.id = '${input.scrapeRunId}'::uuid`
+    : "";
+  const selectedCampaign = input.campaignId
+    ? `and lsr.campaign_id = '${input.campaignId}'::uuid
+    and exists (select 1 from outreach_campaign c where c.id = lsr.campaign_id and c.organization_id = lsr.organization_id)`
+    : "";
+  const scrapeRuns = `select lsr.id, left(lsr.name, 300) as name, lsr.campaign_id as "campaignId", lsr.status, lsr.source, lsr.action,
       lsr.run_id as "runId", lsr.lead_count as "declaredLeadCount",
       (select count(*) from lead_scrape_lead lsl
         where lsl.organization_id = lsr.organization_id and lsl.scrape_run_id = lsr.id) as "storedLeadCount",
       (select count(*) from lead_scrape_lead lsl
         where lsl.organization_id = lsr.organization_id and lsl.scrape_run_id = lsr.id
           and (lsr.source = 'instantly' or lsl.is_email_verified = true)) as "verifiedLeadCount",
+      (select count(*) from lead_scrape_lead lsl
+        where lsl.organization_id = lsr.organization_id and lsl.scrape_run_id = lsr.id
+          and lsr.source is distinct from 'instantly' and lsl.is_email_verified is not true) as "unverifiedLeadCount",
+      (select jsonb_build_object(
+        'pending', count(*) filter (where v.status = 'pending'),
+        'completed', count(*) filter (where v.status = 'completed'),
+        'failed', count(*) filter (where v.status = 'failed'),
+        'unknown', count(*) filter (where v.status is null or v.status not in ('pending', 'completed', 'failed')))
+        from lead_scrape_email_verification v
+        where v.organization_id = lsr.organization_id and v.scrape_run_id = lsr.id) as "verificationJobs",
       (lsr.status in ('pending', 'running')
         and lsr.started_at < current_timestamp - interval '${STUCK_MINUTES} minutes') as stuck,
       lsr.started_at as "startedAt", lsr.finished_at as "finishedAt", lsr.updated_at as "updatedAt"
     from lead_scrape_run lsr join authorized a on a.id = lsr.organization_id
-    where lsr.created_at > current_timestamp - make_interval(days => ${days})
+    where ${input.scrapeRunId ? "true" : `lsr.created_at > current_timestamp - make_interval(days => ${days})`}
+    ${selectedRun} ${selectedCampaign}
     order by lsr.created_at desc, lsr.id desc limit ${SCRAPE_RUN_LIMIT}`;
   const importActivityJson = `(select to_jsonb(i) from (
     select
@@ -161,10 +191,10 @@ export function buildWidgetLeadPipelineQuery(
 const CAVEATS = [
   "Saved product state is not a live scraper, verification or Inngest run check.",
   "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
-  "A stuck run is inferred from status and age, not confirmed: the live run cannot be read here, so say it looks stuck and what was not checked. widget_job_failures lists recorded scrape failures.",
+  "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
   "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
   "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
-  "Per-import step detail (rows expected versus processed, where an import stopped, integer overflow) lives in the process-campaign-add-leads Inngest run, not this saved state.",
+  "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts.",
 ];
 
 /** Parse only the provider envelope and declared fields; never forward raw failure bodies. */
@@ -227,7 +257,7 @@ export function parseWidgetLeadPipelineEvidence(
   });
 }
 
-/** Widget reads accept only a bounded window, never a workspace, SQL or field selector. */
+/** Widget reads accept owned scrape/campaign IDs and a bounded window, never workspace or SQL. */
 export async function readWidgetLeadPipelineStatus(
   ctx: ProviderContext,
   input: WidgetLeadPipelineInput
@@ -281,7 +311,7 @@ export async function readWidgetLeadPipelineStatus(
 
 const tool = defineTool({
   description:
-    "Diagnose lead scraping and CSV import problems only in this chat's verified workspace. Returns the last 20 lead-scrape runs (status, source, action, Inngest/Apify runId, the run's declared lead count versus leads actually stored, verified leads, a stuck flag, and start/finish times), an import-activity summary (campaigns with leads, total campaign leads, and lead-ingestion credit transactions and credits used in the window), and a lead-count reconciliation (declared scrape totals versus persisted scrape leads versus campaign leads, with a discrepancy flag) so a low dashboard 'Leads Uploaded' figure or vanished leads can be explained. Optional sinceDays (1-90, default 30) bounds the scrape-run and credit window; reconciliation totals span all time. Saved state, not a live scraper check; the live run trace and CSV import step detail cannot be read here, and runId is a reference only. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose lead scraping and CSV import problems only in this chat's verified workspace. Returns the last 20 lead-scrape runs (status, source, action, source-provider runId (manual uploads use a submission ID), run name, campaignId, saved verification-job status counts, unverified count, the run's declared lead count versus leads actually stored, verified leads, a stuck flag, and start/finish times), an import-activity summary (campaigns with leads, total campaign leads, and lead-ingestion credit transactions and credits used in the window), and a lead-count reconciliation (declared scrape totals versus persisted scrape leads versus campaign leads, with a discrepancy flag) so a low dashboard 'Leads Uploaded' figure or vanished leads can be explained. Optional scrapeRunId selects one owned run even outside the date window; campaignId narrows the recent runs to an owned campaign. Optional sinceDays (1-90, default 30) bounds the scrape-run and credit window; reconciliation totals span all time. Saved state, not a live scraper check; the live run trace and CSV import step detail cannot be read here, and runId is not a proven Inngest run ID. Import activity and reconciliation remain workspace-wide even when runs are filtered. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetLeadPipelineStatus(ctx, input),
   inputSchema: widgetLeadPipelineInput,

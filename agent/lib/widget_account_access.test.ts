@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, type TestContext, test } from "node:test";
+import { DEFAULT_PARTNER_ID } from "#lib/acquisity-constants.js";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
@@ -53,6 +54,7 @@ const row = {
     onboardingCallScheduled: false,
     onboardingComplete: true,
     onboardingCompletedAt: observedAt,
+    partnerEligible: false,
     twoFactorEnabled: true,
   },
   authorized: true,
@@ -179,6 +181,47 @@ test("the statement selects no password, session, token or other member email", 
   }
   // Only pending invitations expose an invited email; no other member email column is read.
   assert.equal(query.includes("mm.email"), false);
+});
+
+test("partner classification excludes the default partner without expanding authorization", () => {
+  const query = buildAccountAccessQuery(scope);
+  assert.ok(
+    query.includes(
+      `a.partner_id is not null and a.partner_id <> '${DEFAULT_PARTNER_ID}'::uuid`
+    )
+  );
+  assert.ok(
+    query.includes(
+      `o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid`
+    )
+  );
+  assert.ok(
+    query.includes('(u.partner_eligibility is not null) as "partnerEligible"')
+  );
+});
+
+test("Become a Partner visibility follows eligibility and workspace partner classification", () => {
+  for (const [partnerEligible, partnerManaged, menuVisible, reason] of [
+    [false, false, false, "not_eligible"],
+    [true, false, true, "eligible"],
+    [false, true, false, "partner_managed_workspace"],
+    [true, true, false, "partner_managed_workspace"],
+  ] as const) {
+    const result = parseAccountAccess(
+      envelope({
+        ...row,
+        account: { ...row.account, partnerEligible },
+        organization: { ...row.organization, partnerManaged },
+      }),
+      scope,
+      unavailableErrors
+    );
+    assert.equal(result.status, "ok");
+    if (result.status === "ok") {
+      assert.deepEqual(result.partnerAccess, { menuVisible, reason });
+      assert.equal(result.seats.planLimit, null);
+    }
+  }
 });
 
 test("account access output matches the schema and carries no sensitive field", () => {
