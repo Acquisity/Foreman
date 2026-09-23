@@ -376,6 +376,51 @@ export async function routeWidgetMessage(
   }
 }
 
+/** At or above this, the customer asked for a change on their account (the front door's action bar). */
+const CHANGE_REQUEST = 0.8;
+const changeSchema = z.object({
+  answers: z.object({ asks_for_action: z.object({ noul: z.number() }) }),
+});
+
+/**
+ * Jev's one question at the finish of an investigation: did the customer ask
+ * us to change something for them? Only then may the reply say it cannot make
+ * changes. Any failure is "no", so the reply never says it unasked.
+ */
+export async function asksForChange(
+  conversation: string,
+  opts?: { apiKey?: string; fetch?: FetchLike; signal?: AbortSignal }
+): Promise<boolean> {
+  const apiKey = opts?.apiKey ?? process.env.TYPESAFE_API_KEY;
+  if (!apiKey) {
+    return false;
+  }
+  const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
+  const timeout = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
+  try {
+    const response = await doFetch(TYPESAFE_URL, {
+      body: JSON.stringify({
+        model: TYPESAFE_MODEL,
+        questions: { asks_for_action: QUESTIONS.asks_for_action },
+        state: conversation.slice(0, MAX_STATE_CHARS),
+      }),
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+      signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const { answers } = changeSchema.parse(await response.json());
+    return answers.asks_for_action.noul >= CHANGE_REQUEST;
+  } catch {
+    return false;
+  }
+}
+
 export function logRouteDecision(
   fields: { conversationId: string; runId: string },
   route: WidgetRoute

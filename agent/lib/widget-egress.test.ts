@@ -687,3 +687,27 @@ test("removing a foreign parent domain keeps facts about an owned subdomain", as
   );
   assert.equal(calls.compose.length, 1);
 });
+
+test("the reply says it cannot change the account only when Jev read a request for a change", async () => {
+  const reply =
+    "I'm not able to make changes to your account, but here's what I can tell you. Your campaign paused because its inbox disconnected.";
+  const { calls, deps: d } = deps({
+    compose: (input) => {
+      calls.compose.push(input);
+      return Promise.resolve(reply);
+    },
+  });
+  const unasked = await gate(scope, question, findings(), d, question);
+  assert.equal(
+    unasked.message,
+    "Your campaign paused because its inbox disconnected."
+  );
+  const asked = await gate(scope, question, findings(), d, question, true);
+  assert.equal(asked.message, reply);
+  assert.deepEqual(
+    calls.compose.map(
+      (input) => (input as { askedForChange?: boolean }).askedForChange
+    ),
+    [false, true]
+  );
+});

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  asksForChange,
   DECISION_CONTEXT,
   renderAsk,
   routeWidgetMessage,
@@ -298,5 +299,33 @@ describe("low-confidence human routing regression", () => {
       }
     );
     assert.equal(route.lane, "kb");
+  });
+});
+
+describe("asksForChange", () => {
+  const reply = (noul: number) => () =>
+    Promise.resolve({
+      json: () => Promise.resolve({ answers: { asks_for_action: { noul } } }),
+      ok: true,
+      status: 200,
+    });
+  it("is yes only at the front door's action bar, and no on any failure", async () => {
+    const convo = "can you turn my campaign back on?";
+    assert.equal(
+      await asksForChange(convo, { apiKey: "k", fetch: reply(0.92) }),
+      true
+    );
+    assert.equal(
+      await asksForChange(convo, { apiKey: "k", fetch: reply(0.3) }),
+      false
+    );
+    assert.equal(await asksForChange(convo, { apiKey: "" }), false);
+    assert.equal(
+      await asksForChange(convo, {
+        apiKey: "k",
+        fetch: () => Promise.reject(new Error("down")),
+      }),
+      false
+    );
   });
 });

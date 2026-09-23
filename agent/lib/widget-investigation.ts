@@ -38,6 +38,7 @@ import {
   type WidgetProgress,
 } from "./widget-progress.js";
 import {
+  asksForChange,
   DECISION_CONTEXT,
   HUMAN_REQUEST_SCORE,
   logRouteDecision,
@@ -312,6 +313,7 @@ export const defaultWidgetDependencies = {
   answerChat: replyToChat,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
+  changeRequested: (conversation: string) => asksForChange(conversation),
   claim: claimWidgetRun,
   claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
@@ -330,9 +332,14 @@ export const defaultWidgetDependencies = {
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
-  "plan" | "progress"
+  "changeRequested" | "plan" | "progress"
 > &
-  Partial<Pick<typeof defaultWidgetDependencies, "plan" | "progress">>;
+  Partial<
+    Pick<
+      typeof defaultWidgetDependencies,
+      "changeRequested" | "plan" | "progress"
+    >
+  >;
 
 const disclose = (outcome: WidgetOutcome, findings: unknown) =>
   outcome.decision === "block" || Boolean(findings);
@@ -587,7 +594,12 @@ export async function finishWidgetRun(
     WidgetDependencies,
     "claimFinish" | "complete" | "extract" | "gate" | "history"
   > &
-    Partial<Pick<WidgetDependencies, "handoffEligible" | "progress">>
+    Partial<
+      Pick<
+        WidgetDependencies,
+        "changeRequested" | "handoffEligible" | "progress"
+      >
+    >
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
@@ -631,6 +643,10 @@ export async function finishWidgetRun(
       run.question,
       await deps.history(run).catch(() => [])
     );
+    // Asked alongside the write-up passes, so it costs no wait.
+    const changeAsked = (
+      deps.changeRequested?.(conversation) ?? Promise.resolve(false)
+    ).catch(() => false);
     const extractStartedAt = Date.now();
     const { gateDeps, structured } = await structureWriteUp(
       run,
@@ -652,7 +668,8 @@ export async function finishWidgetRun(
         run.question,
         structured,
         gateDeps,
-        conversation
+        conversation,
+        await changeAsked
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
