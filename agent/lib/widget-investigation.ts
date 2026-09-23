@@ -578,7 +578,12 @@ export async function finishWidgetRun(
   ) {
     return null;
   }
-  if (outcome.status === "completed") {
+  // A question for the customer is not an answer being prepared; saying so
+  // would pop the checklist up just before the question arrives.
+  if (
+    outcome.status === "completed" &&
+    !(nextActionEnabled() && outcome.asked)
+  ) {
     await deps
       .progress?.(run.id, sessionId, {
         checks: [],

@@ -164,6 +164,7 @@ async function deliver(output: unknown, closing: string) {
     stream_index: 0,
   };
   let extracted = 0;
+  const stages: string[] = [];
   const finished = await finishWidgetRun(run, "s", outcome, {
     claimFinish: () => Promise.resolve(true),
     complete: (_id, result, stored) => {
@@ -195,9 +196,13 @@ async function deliver(output: unknown, closing: string) {
         conversation
       ),
     history: () => Promise.resolve([]),
+    progress: (_id, _session, progress) => {
+      stages.push(progress.stage);
+      return Promise.resolve();
+    },
   });
   assert.ok(finished);
-  return { extracted, response: widgetRunResponse(finished) };
+  return { extracted, response: widgetRunResponse(finished), stages };
 }
 
 test("the exact live ask payload is recorded by the tool, ends the turn, and reaches the customer with no extraction or composing", async () => {
@@ -208,8 +213,10 @@ test("the exact live ask payload is recorded by the tool, ends the turn, and rea
   assert.deepEqual(step.tools, []);
   assert.equal(step.jevCalls, 0);
 
-  const { extracted, response } = await deliver(output, "asked");
+  const { extracted, response, stages } = await deliver(output, "asked");
   assert.equal(extracted, 0);
+  // A question is not an answer being prepared, so the checklist never pops up for it.
+  assert.deepEqual(stages, []);
   assert.ok("message" in response);
   assert.equal(response.message, LIVE);
   assert.equal(response.decision, "allow");
