@@ -18,10 +18,14 @@ import { logOpsEvent } from "./ops-log.js";
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const SELECTOR_TIMEOUT_MS = 3000;
 // A stalled model request previously waited ~300s, beyond the widget's
-// 170s investigation deadline. Leave time for a fresh request to recover. The
-// widget model answers a step in seconds; at 30s one stalled gateway call and
-// its retry cost a third of the deadline (2026-09-23).
+// 170s investigation deadline. Leave time for a fresh request to recover.
+// Filling in a picked read takes the step model seconds; at 30s one stalled
+// gateway call and its retry cost a third of the deadline (2026-09-23).
 const MODEL_CALL_TIMEOUT_MS = 15_000;
+// Writing (the findings, a question for the customer) runs on the diagnosis
+// model, which took 12 to 20s for a full write-up. Held to the step bar, every
+// write-up timed out and retried until the deadline (2026-09-23).
+const WRITE_CALL_TIMEOUT_MS = 60_000;
 const STATE_RESULT_CHARS = 48_000;
 // renderConversation already budgets this below 12,000 with the latest message first.
 const CONVERSATION_CHARS = 12_000;
@@ -588,7 +592,9 @@ export function widgetNextActionMiddleware(
     original: Params,
     reads: Read[]
   ) => {
-    const timeout = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
+    const timeout = AbortSignal.timeout(
+      forced.tool === ASK_TOOL ? WRITE_CALL_TIMEOUT_MS : MODEL_CALL_TIMEOUT_MS
+    );
     forced.params.abortSignal = original.abortSignal
       ? AbortSignal.any([original.abortSignal, timeout])
       : timeout;
@@ -760,7 +766,7 @@ export function widgetNextActionMiddleware(
       // timed-out model request once. This never replays a tool execution.
       const unforced = async (input: Params) => {
         for (let attempt = 0; ; attempt += 1) {
-          const timeout = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
+          const timeout = AbortSignal.timeout(WRITE_CALL_TIMEOUT_MS);
           const abortSignal = input.abortSignal
             ? AbortSignal.any([input.abortSignal, timeout])
             : timeout;

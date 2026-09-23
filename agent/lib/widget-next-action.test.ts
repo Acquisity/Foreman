@@ -716,7 +716,8 @@ describe("widget next-action selector", () => {
     const parent = new AbortController();
     const local = new AbortController();
     t.mock.method(AbortSignal, "timeout", (ms: number) => {
-      assert.ok(ms === 3000 || ms === 15_000);
+      // 15s for the forced read, 60s for the write-up it falls back to.
+      assert.ok(ms === 3000 || ms === 15_000 || ms === 60_000);
       return ms === 15_000 && !local.signal.aborted
         ? local.signal
         : new AbortController().signal;
