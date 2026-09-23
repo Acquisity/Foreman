@@ -5,7 +5,9 @@ import { MockLanguageModelV4 } from "ai/test";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
   nextActionEnabled,
+  note,
   selectNextAction,
+  turnEvidence,
   widgetNextActionMiddleware,
 } from "./widget-next-action.js";
 
@@ -972,5 +974,21 @@ describe("repeat reads", () => {
       confidence: 0.4,
       tool: inbox.name,
     });
+  });
+});
+
+describe("control notes", () => {
+  it("are never read as the customer's message, so a note cannot restart the turn", () => {
+    const turn = prompt("why did my campaign stop?", [
+      { input: {}, output: { ok: true }, tool: "widget_outreach_health" },
+    ]);
+    const plain = turnEvidence(turn as never);
+    const noted = turnEvidence([
+      ...turn,
+      note("Stop workspace reads."),
+    ] as never);
+    assert.equal(noted.question, plain.question);
+    assert.equal(noted.reads.length, 1);
+    assert.equal(noted.atToolResult, plain.atToolResult);
   });
 });

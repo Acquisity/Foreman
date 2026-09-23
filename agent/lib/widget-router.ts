@@ -187,7 +187,7 @@ const QUESTIONS = {
       // Without this the router had to file a plain "thank you" under one of the
       // other lanes, and with an account conversation as context it chose
       // investigate: minutes of work to answer nothing.
-      chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account.",
+      chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account. A message that answers a question Support just asked, such as confirming a name, a date or a detail ('it is the right name', 'yes, that one'), is NOT this: it continues that request.",
       // "can you open up a ticket for me" was filed here at 0.96 and handed off
       // with nothing looked up and no ticket filed.
       human:

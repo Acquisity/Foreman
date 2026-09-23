@@ -6,7 +6,9 @@ import {
 import { ticketLinkedModel } from "./ticket-link-model.js";
 import {
   nextActionEnabled,
+  note,
   widgetNextActionMiddleware,
+  withoutNotes,
 } from "./widget-next-action.js";
 
 /**
@@ -87,8 +89,9 @@ function assertAllowedStreamPart(
 type Prompt = Parameters<
   NonNullable<LanguageModelMiddleware["transformParams"]>
 >[0]["params"]["prompt"];
-const toolCallsThisTurn = (prompt: Prompt) =>
-  prompt
+const toolCallsThisTurn = (withControl: Prompt) => {
+  const prompt = withoutNotes(withControl);
+  return prompt
     .slice(prompt.map((message) => message.role).lastIndexOf("user") + 1)
     .reduce(
       (total, message) =>
@@ -98,6 +101,7 @@ const toolCallsThisTurn = (prompt: Prompt) =>
           : total,
       0
     );
+};
 
 export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
   return {
@@ -127,12 +131,11 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
             ? params.prompt
             : [
                 ...params.prompt,
-                {
-                  content: spent
+                note(
+                  spent
                     ? "The investigation tool budget is exhausted. State the verified findings and limitations. Do not give product steps unless an applicable article was actually read. If no article supports a step, acknowledge that documentation could not be confirmed."
-                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions. Product steps require an article actually read; otherwise report findings and the documentation gap.",
-                  role: "system",
-                },
+                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions. Product steps require an article actually read; otherwise report findings and the documentation gap."
+                ),
               ],
         toolChoice,
         tools,

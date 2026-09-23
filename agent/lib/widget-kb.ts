@@ -249,7 +249,7 @@ export const EXPLAIN_PROMPT = `You are Foreman, the support assistant in Acquisi
 
 const chatSchema = z.object({ reply: z.string() });
 
-const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes.`;
+const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes.`;
 
 /**
  * A short conversational reply to a message that asks nothing. No retrieval, no

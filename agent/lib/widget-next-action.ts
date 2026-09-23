@@ -123,15 +123,32 @@ const NOTES = {
   finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
   human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
-const note = (text: string) => ({
-  content: [
-    {
-      text: `Investigation control (not from the customer): ${text}`,
-      type: "text" as const,
-    },
-  ],
+const CONTROL = "Investigation control (not from the customer): ";
+/**
+ * Our instructions to the investigator mid-turn. They are user-role because
+ * Gemini rejects a system message anywhere but the start, so every reader of
+ * "this turn" must skip them: a note is never the customer's message.
+ */
+export const note = (text: string) => ({
+  content: [{ text: `${CONTROL}${text}`, type: "text" as const }],
   role: "user" as const,
 });
+export const withoutNotes = <M extends { content: unknown; role: string }>(
+  prompt: M[]
+): M[] =>
+  prompt.filter(
+    (message) =>
+      !(
+        message.role === "user" &&
+        Array.isArray(message.content) &&
+        message.content.some(
+          (part: { text?: unknown; type?: unknown }) =>
+            part.type === "text" &&
+            typeof part.text === "string" &&
+            part.text.startsWith(CONTROL)
+        )
+      )
+  );
 
 type Params = Parameters<
   NonNullable<LanguageModelMiddleware["transformParams"]>
@@ -209,7 +226,8 @@ function askState(messages: Params["prompt"]) {
 }
 
 /** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
-export function turnEvidence(prompt: Params["prompt"]) {
+export function turnEvidence(withControl: Params["prompt"]) {
+  const prompt = withoutNotes(withControl);
   const start = prompt.map((message) => message.role).lastIndexOf("user");
   const user = prompt[start];
   const question =
@@ -526,11 +544,11 @@ function forcedParams(
         ...params,
         prompt: [
           ...params.prompt,
-          {
-            content:
-              "Perform the selected read once with the arguments most useful to the customer. Wait for its result before choosing another read or page. Do not emit a batch of parameter variations.",
-            role: "system",
-          },
+          // A user-role note, like every other control here: Gemini rejects a
+          // system message anywhere but the start of the conversation.
+          note(
+            "Perform the selected read once with the arguments most useful to the customer. Wait for its result before choosing another read or page. Do not emit a batch of parameter variations."
+          ),
         ],
         toolChoice: { toolName: next.tool, type: "tool" },
         tools: params.tools?.filter((tool) => tool.name === next.tool),
@@ -686,7 +704,8 @@ export function widgetNextActionMiddleware(
         reads,
       } = turnEvidence(params.prompt);
       const initial =
-        reads.length === 0 && params.prompt.at(-1)?.role === "user";
+        reads.length === 0 &&
+        withoutNotes(params.prompt).at(-1)?.role === "user";
       if (!(atToolResult || initial) || tools.length === 0) {
         return params;
       }

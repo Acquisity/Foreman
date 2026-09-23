@@ -249,5 +249,12 @@ test("an identifier from another workspace in the conversation widens nothing: t
   // in its input to be argued with, and stays with the session and the tools.
   assert.equal(conversation.includes(foreign), true);
   assert.equal(sent.prompt.length, 4);
-  assert.equal(sent.prompt.at(-1)?.role, "system");
+  // A user-role control note: Gemini rejects a system message mid-conversation.
+  const last = sent.prompt.at(-1);
+  assert.equal(last?.role, "user");
+  assert.ok(
+    JSON.stringify(last?.content).includes(
+      "Investigation control (not from the customer)"
+    )
+  );
 });
