@@ -153,7 +153,7 @@ export type KbDecision = (typeof KB_DECISIONS)[number];
 
 const decisionCriteria = (accountLikely: boolean) => ({
   answer: accountLikely
-    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ)."
+    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). A message that asks Support to check, look at or look into their own account is NOT this, even when it also says what went wrong."
     : "The numbered articles answer the latest message: how to do something, where something is, what something means, or why the product in general behaves some way. It is still this when the message says 'my account' or 'my workspace', because the articles' general steps answer it.",
   not_covered:
     "None of the numbered articles covers what the latest message asks. An article about a nearby topic, or one that only mentions the subject in passing, does not count.",
@@ -162,7 +162,7 @@ const decisionCriteria = (accountLikely: boolean) => ({
   ...(accountLikely
     ? {
         account:
-          "The customer asks about the state of their own things: their numbers, totals, balance, credits or charges, a status (such as whether their inbox is still warming up), or why something of theirs stopped, failed, was charged or is not working (such as why their campaign is not sending or their AI SDR stopped replying), where the true cause can only be found by looking at their account. Articles that list possible causes do not change this.",
+          "The customer asks Support to check, look at or look into their own account, workspace, billing or data, such as 'check my account and see why my campaign isn't sending', 'look at my billing' or 'check whether my inboxes are done warming up'. A question about their own things that does not ask for that look, such as 'why is my campaign not sending?' or 'is my inbox still warming up', is NOT this: the articles' general answer comes first, and the customer can then ask for a look.",
         unclear:
           'The latest message is an incomplete fragment that does not yet say what the customer wants to know or what went wrong, such as "and my dashboard totals".',
       }
@@ -627,6 +627,17 @@ export function resolveCitations(
 
 type Decision = Awaited<ReturnType<typeof decideFromArticles>> | null;
 
+/**
+ * How sure Jev must be that the customer asked for a look at their own account
+ * before the help center steps aside; below it the articles answer. A help-center
+ * answer costs seconds and a follow-up, an unwanted investigation minutes. The
+ * `account` criterion does the sorting: live 2026-09-23, vague questions ("why is
+ * my campaign not sending?") were picked `answer` in every run, while explicit
+ * asks ("can you check how many credits I have left") were picked `account` at
+ * 0.80 to 0.99 over two runs. This only stops a pick Jev is torn on.
+ */
+const SURE_ACCOUNT = 0.4;
+
 const decisionMark = (decided: Decision) =>
   decided
     ? `decide:${decided.choice}@${decided.confidence.toFixed(2)}`
@@ -637,7 +648,11 @@ function settledByDecision(
   decided: Decision,
   read: number
 ): KbAnswer | { kind: string; read: number } | null {
-  if (!decided || decided.choice === "answer") {
+  if (
+    !decided ||
+    decided.choice === "answer" ||
+    (decided.choice === "account" && decided.confidence < SURE_ACCOUNT)
+  ) {
     return null;
   }
   if (decided.choice === "unclear" || decided.choice === "which_product") {

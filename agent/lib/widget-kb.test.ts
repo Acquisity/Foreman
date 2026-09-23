@@ -387,6 +387,23 @@ test("Jev decides what the articles can do and the writer only writes when Jev s
   assert.deepEqual(written, [{ accountLikely: undefined, decided: true }]);
 });
 
+test("an unsure account pick is answered from the articles; only a sure one steps aside", async () => {
+  let writes = 0;
+  const lane = (confidence: number): KbDeps => ({
+    ...deps(null),
+    decide: () => Promise.resolve({ choice: "account", confidence }),
+    generate: () => {
+      writes += 1;
+      return Promise.resolve({ answer: "Do this [1].", kind: "answer" });
+    },
+  });
+  const ask = { accountLikely: true, latest: "why was I charged twice?" };
+  assert.ok(await answerFromHelpCenter(ask, log, lane(0.35)));
+  assert.equal(writes, 1);
+  assert.equal(await answerFromHelpCenter(ask, log, lane(0.9)), null);
+  assert.equal(writes, 1);
+});
+
 test("a failed Jev decision leaves the call to the writer, as before", async () => {
   const written: (boolean | undefined)[] = [];
   const answer = await answerFromHelpCenter(
