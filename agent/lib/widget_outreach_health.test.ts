@@ -168,6 +168,20 @@ test("every statement checks membership and scopes every product join to the org
   assert.ok(paged.includes(`c.id > '${campaignId}'::uuid`));
 });
 
+test("a paused campaign, the one that stopped sending, is listed and readable by id; drafts and archived are not", () => {
+  // Live 2026-09-23: "Construction / Contractors" was Paused, so the old
+  // active-only filter hid it and the customer was asked for its name.
+  for (const input of [{}, { campaignId }]) {
+    const query = buildWidgetOutreachHealthQuery(scope, input);
+    assert.ok(
+      query.includes(
+        "c.display_status in ('active', 'paused', 'attention_needed', 'completed')"
+      )
+    );
+    assert.equal(query.includes("c.display_status = 'active'"), false);
+  }
+});
+
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {
   const call = t.mock.method(executorTransport, "call", async () => ({
     data: envelope([row]),
