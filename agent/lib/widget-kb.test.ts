@@ -3,6 +3,8 @@ import { test } from "node:test";
 import {
   activeArticleHits,
   answerFromHelpCenter,
+  CANNOT_CHECK,
+  CANNOT_CHECK_ALONE,
   decideFromArticles,
   indexLine,
   type KbDeps,
@@ -457,4 +459,37 @@ test("the Jev decision offers account and unclear only on an account-likely ask,
   await assert.rejects(decideFromArticles(input(false), { apiKey: "" }), {
     message: "no_key",
   });
+});
+
+test("help-center mode answers an ask for a look from the articles, saying first that it cannot check", async () => {
+  const lane = (answer: unknown): KbDeps => ({
+    ...deps(null),
+    decide: () => Promise.resolve({ choice: "account", confidence: 0.9 }),
+    generate: () => Promise.resolve(answer),
+  });
+  const ask = { cannotLook: true, latest: "what campaigns do you see?" };
+  const answered = await answerFromHelpCenter(
+    ask,
+    log,
+    lane({ answer: "Open Campaigns [1].", kind: "answer" })
+  );
+  assert.ok(answered?.message.startsWith(CANNOT_CHECK));
+  assert.deepEqual(
+    answered?.citations.map((c) => c.url),
+    [articles[0].url]
+  );
+  // Nothing in the articles: the plain line alone, never a silent miss.
+  assert.deepEqual(
+    await answerFromHelpCenter(ask, log, lane({ answer: "", kind: "none" })),
+    { citations: [], message: CANNOT_CHECK_ALONE }
+  );
+  // Full mode steps aside for the investigation instead, and never says it.
+  assert.equal(
+    await answerFromHelpCenter(
+      { accountLikely: true, latest: "what campaigns do you see?" },
+      log,
+      lane({ answer: "Open Campaigns [1].", kind: "answer" })
+    ),
+    null
+  );
 });

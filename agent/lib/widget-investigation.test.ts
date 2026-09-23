@@ -9,7 +9,7 @@ import type { WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
   finishWidgetRun,
-  ROLE_LIMITED_REPLY,
+  REFUND_REDIRECT,
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
@@ -19,6 +19,7 @@ import {
 } from "./widget-investigation.js";
 import type { KbAnswer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
+import type { WidgetAsk } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
 
@@ -288,10 +289,15 @@ test("a scope whose user is not a member of the workspace is refused before any 
   assert.equal(run.outcome?.reason, "workspace_access_denied");
 });
 
-test("an owner or admin scope the live database no longer backs gets the help-center reply, not a refusal", async (t) => {
+test("an owner or admin scope the live database no longer backs is answered in help-center mode, not refused", async (t) => {
   enabled(t);
   const { deps, gated, run } = dependencies();
   deps.verifyAccess = () => Promise.reject(new WorkspaceAccessDenied());
+  const asks: WidgetAsk[] = [];
+  deps.answerKb = (ask) => {
+    asks.push(ask as WidgetAsk);
+    return Promise.resolve(kbAnswer);
+  };
   const response = await receiveWidgetMessage(
     request(start),
     noWork(),
@@ -301,9 +307,10 @@ test("an owner or admin scope the live database no longer backs gets the help-ce
   );
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(response.status, 200);
-  assert.equal(body.message, ROLE_LIMITED_REPLY);
+  assert.equal(body.message, kbAnswer.message);
   assert.deepEqual(gated, []);
-  assert.equal(run.outcome?.reason, "role_limited");
+  assert.equal(run.outcome?.reason, "kb");
+  assert.equal(asks.at(-1)?.cannotLook, true);
 });
 
 test("a follow-up sent while an earlier message is still running is told to wait, never handed that run's answer", async (t) => {
@@ -467,12 +474,17 @@ test("a request to act skips the investigation, and an ask for a person hands of
   assert.equal(human.run.outcome?.reason, "asked_for_human");
 });
 
-test("a member or client gets the help center and a handoff, never an investigation", async (t) => {
+test("a member or client is answered in help-center mode, never investigated", async (t) => {
   enabled(t);
   for (const role of ["member", "client"] as const) {
     const { deps, gated, run } = dependencies();
     deps.verifyAccess = () =>
       assert.fail("must not check investigation access");
+    const asks: WidgetAsk[] = [];
+    deps.answerKb = (ask) => {
+      asks.push(ask as WidgetAsk);
+      return Promise.resolve(kbAnswer);
+    };
     // biome-ignore lint/performance/noAwaitInLoops: one role at a time keeps failures readable.
     const response = await receiveWidgetMessage(
       request(start),
@@ -483,10 +495,55 @@ test("a member or client gets the help center and a handoff, never an investigat
     );
     const body = (await response.json()) as Record<string, unknown>;
     assert.equal(body.decision, "allow");
-    assert.equal(body.message, ROLE_LIMITED_REPLY);
+    // The default route here is a sure "investigate": help-center mode still answers.
+    assert.equal(body.message, kbAnswer.message);
     assert.deepEqual(gated, []);
-    assert.equal(run.outcome?.reason, "role_limited");
+    assert.equal(run.outcome?.reason, "kb");
+    assert.equal(asks.at(-1)?.cannotLook, true);
   }
+
+  const refund = dependencies();
+  refund.deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0.05,
+      asksOwnData: 0.8,
+      confidence: 0.9,
+      kbScore: 0,
+      lane: "investigate",
+      refund: true,
+      source: "jev",
+      ticket: true,
+    });
+  const redirected = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" }),
+    refund.deps
+  );
+  assert.equal(
+    ((await redirected.json()) as Record<string, unknown>).message,
+    REFUND_REDIRECT
+  );
+  assert.equal(refund.run.outcome?.reason, "refund_redirect");
+
+  const miss = dependencies();
+  miss.deps.answerKb = () => Promise.resolve(null);
+  miss.deps.answerChat = () =>
+    Promise.resolve({ citations: [], message: "Which feature is this about?" });
+  const missed = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "client" }),
+    miss.deps
+  );
+  assert.equal(
+    ((await missed.json()) as Record<string, unknown>).message,
+    "Which feature is this about?"
+  );
+  assert.equal(miss.run.outcome?.reason, "kb_miss");
 
   const kb = dependencies();
   kb.deps.route = () =>

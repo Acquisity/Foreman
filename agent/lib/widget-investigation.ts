@@ -440,9 +440,15 @@ const UNCLEAR_SCORE = 0.8;
 const EXPLAIN_SCORE = 0.8;
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
+/**
+ * The two modes: owners and admins get the help center and investigations;
+ * everyone else gets the help center only. Decided in code from the verified
+ * role before any routing, because it is a permission boundary.
+ */
 const INVESTIGATOR_ROLES = new Set<WidgetContext["role"]>(["owner", "admin"]);
-export const ROLE_LIMITED_REPLY =
-  "Looking into your workspace's account details is something only workspace owners and admins can ask me to do, so I can't check that for you. I can still help with how anything in Acquisity works: ask me a how-to question, like how to set something up or what a setting does, and I'll answer from the Help Center. For account-specific issues, your workspace owner or admin can ask me here.";
+/** Help-center mode: the one place a member or client hears about owners and admins. */
+export const REFUND_REDIRECT =
+  "Refunds aren't something I can help with here. Please reach out to your workspace owner or admin about billing.";
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -878,7 +884,8 @@ async function answerFromKnowledgeBase(
   scope: WidgetContext,
   ask: WidgetAsk,
   signal: AbortSignal,
-  deps: WidgetDependencies
+  deps: WidgetDependencies,
+  helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
   const route = await deps.route(ask, { signal });
   // Every reply written at the front door reads the latest message first with
@@ -941,12 +948,50 @@ async function answerFromKnowledgeBase(
       return reply;
     }
   }
-  const general = await answerGeneralQuestion(run, route, ask, finish, deps);
-  // Members and clients get everything above; only owners and admins go on to an investigation.
-  return (
-    general ??
-    (INVESTIGATOR_ROLES.has(scope.role) ? null : roleLimitedReply(run, deps))
+  return helpCenterOnly
+    ? helpCenterReply(run, route, ask, finish, deps)
+    : answerGeneralQuestion(run, route, ask, finish, deps);
+}
+
+/**
+ * Help-center mode ends every message here with a reply; nothing goes on to an
+ * investigation. Jev still decides what the message is: a refund request is
+ * redirected, an ask for a look is answered from the articles with a plain
+ * "not something I can do" first, and a miss gets a question back.
+ */
+async function helpCenterReply(
+  run: WidgetRun,
+  route: WidgetRoute,
+  ask: WidgetAsk,
+  finish: (written: KbAnswer) => Promise<WidgetRun | null>,
+  deps: WidgetDependencies
+): Promise<WidgetRun | null> {
+  if (route.refund) {
+    return deps.complete(
+      run.id,
+      {
+        citations: [],
+        decision: "allow",
+        message: REFUND_REDIRECT,
+        reason: "refund_redirect",
+        status: "completed",
+      },
+      null,
+      run.id
+    );
+  }
+  const answer = await deps.answerKb(
+    {
+      ...ask,
+      cannotLook: true,
+      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    },
+    { conversationId: run.scope.conversationId, runId: run.id }
   );
+  if (answer?.unclear) {
+    return (await clarifyReply(run, ask, deps)) ?? kbMissReply(run, ask, deps);
+  }
+  return answer ? finish(answer) : kbMissReply(run, ask, deps);
 }
 
 /** The help-center try, for a general question or a request to act; null sends the message on to an investigation. */
@@ -1105,44 +1150,26 @@ async function pollWidgetRun(
     clearTimeout(timer);
   }
 }
-/** Investigations are for workspace owners and admins; everyone else hears what they can ask instead. */
-async function roleLimitedReply(
-  run: WidgetRun,
-  deps: Pick<WidgetDependencies, "complete">
-): Promise<WidgetRun> {
-  const done = await deps.complete(
-    run.id,
-    {
-      citations: [],
-      decision: "allow",
-      message: ROLE_LIMITED_REPLY,
-      reason: "role_limited",
-      status: "completed",
-    },
-    null,
-    run.id
-  );
-  return done ?? run;
-}
-
 /**
  * The app vouches for the scope, but a preview admin override names a user the
  * app cannot check, and the app's database can lag the one the tools read.
  * Re-check membership where the tools read. Someone the live database says is
- * not an owner or admin hears what they can ask instead; a check that could not
- * run is refused, not one denied tool call at a time.
+ * not an owner or admin is answered in help-center mode instead; a check that
+ * could not run is refused, not one denied tool call at a time.
  */
 async function investigationDenied(
   run: WidgetRun,
   scope: WidgetContext,
-  deps: WidgetDependencies
+  deps: WidgetDependencies,
+  helpCenter: () => Promise<WidgetRun | null>
 ): Promise<Response | null> {
   try {
     await deps.verifyAccess(scope);
     return null;
   } catch (error) {
     if (error instanceof WorkspaceAccessDenied) {
-      return json(widgetRunResponse(await roleLimitedReply(run, deps)));
+      const answered = await helpCenter();
+      return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
     }
     await deps
       .complete(
@@ -1154,6 +1181,63 @@ async function investigationDenied(
       .catch(() => undefined);
     return json({ error: "Workspace could not be verified." }, 403);
   }
+}
+
+/** A fresh run: the mode first, then the front door, then an investigation in full mode only. */
+async function answerFreshRun(
+  run: WidgetRun,
+  scope: WidgetContext,
+  input: Extract<WidgetInput, { action: "start" }>,
+  signal: AbortSignal,
+  handlers: Pick<
+    RouteHandlerArgs<{ runId: string | null }>,
+    "from" | "waitUntil"
+  > &
+    Partial<Pick<RouteHandlerArgs, "resolveSession">>,
+  responseWaitMs: number,
+  deps: WidgetDependencies
+): Promise<Response> {
+  const message = withHistory(input.question, input.history);
+  const ask = toWidgetAsk(input.question, input.history);
+  const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
+  const helpCenter = () =>
+    answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
+  // A teammate asked for an investigation: no help-center or handoff front door.
+  const answered = input.staff
+    ? null
+    : await answerFromKnowledgeBase(
+        run,
+        scope,
+        ask,
+        signal,
+        deps,
+        helpCenterOnly
+      );
+  if (answered) {
+    return json(widgetRunResponse(answered));
+  }
+  // Help-center mode never reaches an investigation, whatever the routing did.
+  // A teammate's run skipped the front door above, so it is answered here.
+  if (helpCenterOnly) {
+    const reply = input.staff ? await helpCenter() : null;
+    return json(widgetRunResponse(reply ?? (await deps.read(run.id))));
+  }
+  const denied = await investigationDenied(run, scope, deps, helpCenter);
+  if (denied) {
+    return denied;
+  }
+  return json(
+    widgetRunResponse(
+      await startInvestigation(
+        run,
+        scope,
+        message,
+        handlers,
+        responseWaitMs,
+        deps
+      )
+    )
+  );
 }
 
 export async function receiveWidgetMessage(
@@ -1236,35 +1320,14 @@ export async function receiveWidgetMessage(
     if (!fresh) {
       return json(widgetRunResponse(run));
     }
-    const message = withHistory(input.question, input.history);
-    // A teammate asked for an investigation: no help-center or handoff front door.
-    const answered = input.staff
-      ? null
-      : await answerFromKnowledgeBase(
-          run,
-          scope,
-          toWidgetAsk(input.question, input.history),
-          request.signal,
-          deps
-        );
-    if (answered) {
-      return json(widgetRunResponse(answered));
-    }
-    const denied = await investigationDenied(run, scope, deps);
-    if (denied) {
-      return denied;
-    }
-    return json(
-      widgetRunResponse(
-        await startInvestigation(
-          run,
-          scope,
-          message,
-          { from, resolveSession, waitUntil },
-          responseWaitMs,
-          deps
-        )
-      )
+    return await answerFreshRun(
+      run,
+      scope,
+      input,
+      request.signal,
+      { from, resolveSession, waitUntil },
+      responseWaitMs,
+      deps
     );
   } catch {
     logOpsEvent(

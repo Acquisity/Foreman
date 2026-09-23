@@ -55,6 +55,12 @@ export const kbCitationSchema = z.object({
 });
 export type KbCitation = z.infer<typeof kbCitationSchema>;
 
+/** Help-center mode, when Jev reads the message as an ask to look at the account. */
+export const CANNOT_CHECK =
+  "Checking your account isn't something I can do, but here's what the help center says:";
+export const CANNOT_CHECK_ALONE =
+  "Checking your account isn't something I can do. I can help with how anything in Acquisity works, though: ask me how to set something up or what a setting does.";
+
 export interface KbAnswer {
   citations: KbCitation[];
   message: string;
@@ -627,6 +633,41 @@ export function resolveCitations(
 
 type Decision = Awaited<ReturnType<typeof decideFromArticles>> | null;
 
+/** The written answer with its citations; null when it cites nothing, so is not grounded in the articles. */
+function grounded(
+  raw: { answer: string; kind: string },
+  articles: KbArticle[]
+): KbAnswer | null {
+  const answer =
+    raw.kind === "answer" ? resolveCitations(raw.answer, articles) : null;
+  return answer?.message && answer.citations.length > 0 ? answer : null;
+}
+
+/** In help-center mode an ask for a look is still answered from the articles. */
+function afterDecision(decided: Decision, read: number, cannotLook: boolean) {
+  const cannotCheck =
+    cannotLook &&
+    decided?.choice === "account" &&
+    decided.confidence >= SURE_ACCOUNT;
+  return {
+    cannotCheck,
+    settled: cannotCheck ? null : settledByDecision(decided, read),
+  };
+}
+
+/** Help-center mode after an ask for a look: say it plainly, then whatever the articles give. */
+function withCannotCheck(
+  answer: KbAnswer | null,
+  cannotCheck: boolean
+): KbAnswer | null {
+  if (!cannotCheck) {
+    return answer;
+  }
+  return answer
+    ? { ...answer, message: `${CANNOT_CHECK}\n\n${answer.message}` }
+    : { citations: [], message: CANNOT_CHECK_ALONE };
+}
+
 /**
  * How sure Jev must be that the customer asked for a look at their own account
  * before the help center steps aside; below it the articles answer. A help-center
@@ -694,14 +735,19 @@ export async function answerFromHelpCenter(
     const decided =
       (await deps
         .decide?.({
-          accountLikely: ask.accountLikely,
+          // Help-center mode needs the same "asks for a look" choice.
+          accountLikely: ask.accountLikely || ask.cannotLook,
           articles,
           question,
           signal,
         })
         .catch(() => null)) ?? null;
     mark(decisionMark(decided));
-    const settled = settledByDecision(decided, articles.length);
+    const { cannotCheck, settled } = afterDecision(
+      decided,
+      articles.length,
+      ask.cannotLook === true
+    );
     if (settled) {
       return settled;
     }
@@ -735,12 +781,12 @@ export async function answerFromHelpCenter(
           .slice(0, MAX_ANSWER_CHARS),
       };
     }
-    const answer =
-      raw.kind === "answer" ? resolveCitations(raw.answer, articles) : null;
-    // An answer that cites nothing is not grounded in the articles it was given.
-    return answer?.message && answer.citations.length > 0
-      ? answer
-      : { kind: raw.kind, read: articles.length };
+    return (
+      withCannotCheck(grounded(raw, articles), cannotCheck) ?? {
+        kind: raw.kind,
+        read: articles.length,
+      }
+    );
   };
   try {
     // A dependent follow-up also reads what the previous reply cited, but never

@@ -46,6 +46,12 @@ export interface WidgetAsk {
   accountLikely?: boolean;
   /** Help-center articles the previous reply cited: hints, validated before use. */
   activeArticles?: { title: string; url: string }[];
+  /**
+   * Help-center mode (not an owner or admin): nothing will look at this
+   * account, so an ask for a look is answered from the articles, with a plain
+   * "not something I can do" first, instead of stepping aside.
+   */
+  cannotLook?: boolean;
   /** The router judged `latest` a continuation of the previous reply. */
   followUp?: boolean;
   latest: string;
