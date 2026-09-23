@@ -36,8 +36,6 @@ const HANDOFF_ELIGIBLE = 0.5;
  * 0.71) and ran out the widget deadline still reading.
  */
 const MAX_READS_PER_TOOL = 2;
-/** Below this, Jev choosing a read that already ran is a finish, not another read. */
-const SURE_REREAD = 0.7;
 const TICKET_TOOL = "widget_file_ticket";
 const ARTICLE_TOOLS = new Set([
   "widget_help_article",
@@ -496,9 +494,10 @@ export async function selectNextAction(
     return { action: choice, confidence };
   }
   if (input.tools.some((tool) => tool.name === choice)) {
-    return timesRead(choice) > 0 && confidence < SURE_REREAD
-      ? { action: "finish", confidence }
-      : { action: "read", confidence, tool: choice };
+    // No confidence bar on a re-read: the next page is a re-read, and live
+    // 2026-09-23 the customer's campaign sat on page 2 (22nd of 54) behind a
+    // 0.46 pick. MAX_READS_PER_TOOL alone stops the billing loop.
+    return { action: "read", confidence, tool: choice };
   }
   throw new Error("invalid_choice");
 }

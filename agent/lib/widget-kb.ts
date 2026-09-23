@@ -119,7 +119,7 @@ const kbPrompt = (ownAccountRule: string, whichProduct = WHICH_PRODUCT) =>
 // answered "your account state looks normal"; "and my dashboard totals" was
 // investigated and shown live totals. So the call is made here, with the
 // articles in hand: by Jev (`decideFromArticles`), or by this model when Jev fails.
-const MY_IS_HOW_TO = `A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings, which you cannot see.`;
+const MY_IS_HOW_TO = `A question phrased about "my account" or "my workspace" is still a how-to question: answer it with the general steps from the articles, and never describe or guess the customer's own settings. Never say you cannot see or access their account: the customer can ask for a look at it.`;
 // Appended to the usual prompt this lost to the sentence above: measured on the
 // real model, "why is my campaign not sending" and "why was I charged twice" were
 // answered with general causes. It replaces that sentence, and "needs" is decided
@@ -162,7 +162,7 @@ const decisionCriteria = (accountLikely: boolean) => ({
   ...(accountLikely
     ? {
         account:
-          "The customer asks Support to check, look at or look into their own account, workspace, billing or data, such as 'check my account and see why my campaign isn't sending', 'look at my billing' or 'check whether my inboxes are done warming up'. A question about their own things that does not ask for that look, such as 'why is my campaign not sending?' or 'is my inbox still warming up', is NOT this: the articles' general answer comes first, and the customer can then ask for a look.",
+          "The customer asks Support to check, look at or look into their own account, workspace, billing or data, such as 'check my account and see why my campaign isn't sending', 'look at my billing' or 'check whether my inboxes are done warming up', or asks what Support can see in their account, such as 'what campaigns do you see'. A question about their own things that does not ask for that look, such as 'why is my campaign not sending?' or 'is my inbox still warming up', is NOT this: the articles' general answer comes first, and the customer can then ask for a look.",
         unclear:
           'The latest message is an incomplete fragment that does not yet say what the customer wants to know or what went wrong, such as "and my dashboard totals".',
       }

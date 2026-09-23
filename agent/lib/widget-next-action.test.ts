@@ -959,20 +959,11 @@ describe("repeat reads", () => {
     assert.ok(offered[0]?.includes(inbox.name));
   });
 
-  it("turns an unsure re-read into a finish, and lets a sure one or a first read run", async () => {
-    assert.deepEqual(await select([read(1)], pick(billing.name, 0.62)), {
-      action: "finish",
-      confidence: 0.62,
-    });
-    assert.deepEqual(await select([read(1)], pick(billing.name, 0.9)), {
+  it("lets a re-read run at any confidence, so the next page is never cut off", async () => {
+    assert.deepEqual(await select([read(1)], pick(billing.name, 0.46)), {
       action: "read",
-      confidence: 0.9,
+      confidence: 0.46,
       tool: billing.name,
-    });
-    assert.deepEqual(await select([read(1)], pick(inbox.name, 0.4)), {
-      action: "read",
-      confidence: 0.4,
-      tool: inbox.name,
     });
   });
 });
