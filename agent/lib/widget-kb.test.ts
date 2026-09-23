@@ -478,6 +478,21 @@ test("help-center mode answers an ask for a look from the articles, saying first
     answered?.citations.map((c) => c.url),
     [articles[0].url]
   );
+  // The writer's own "I can't access your account" is not said twice.
+  const told: unknown[] = [];
+  const twice = await answerFromHelpCenter(ask, log, {
+    ...lane(null),
+    generate: (input) => {
+      told.push(input.cannotCheck);
+      return Promise.resolve({
+        answer:
+          "I am not able to access or view your account. Open Campaigns [1].",
+        kind: "answer",
+      });
+    },
+  });
+  assert.equal(twice?.message, `${CANNOT_CHECK}\n\nOpen Campaigns.`);
+  assert.deepEqual(told, [true]);
   // Nothing in the articles: the plain line alone, never a silent miss.
   assert.deepEqual(
     await answerFromHelpCenter(ask, log, lane({ answer: "", kind: "none" })),

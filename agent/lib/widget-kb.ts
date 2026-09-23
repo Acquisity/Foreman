@@ -61,6 +61,11 @@ export const CANNOT_CHECK =
 export const CANNOT_CHECK_ALONE =
   "Checking your account isn't something I can do. I can help with how anything in Acquisity works, though: ask me how to set something up or what a setting does.";
 
+const ALREADY_SAID = ` Support has already told the customer, just before your answer, that checking their account isn't something it can do. Do not say that again or that you cannot see or access their account: start with the answer.`;
+/** The writer's own "I can't access your account" opening, which CANNOT_CHECK already says. */
+const CANNOT_SEE_OPENING =
+  /^\s*I(?:'m| am)? (?:not able to|unable to|can(?:'|no)t) (?:access|view|see|check|look at)\b[^.!?]*[.!?]\s*/iu;
+
 export interface KbAnswer {
   citations: KbCitation[];
   message: string;
@@ -311,6 +316,8 @@ export interface KbDeps {
     /** See {@link WidgetAsk.accountLikely}. */
     accountLikely?: boolean;
     articles: KbArticle[];
+    /** Help-center mode: CANNOT_CHECK is said before this answer, so it must not be said again. */
+    cannotCheck?: boolean;
     /** Jev chose to answer: write, decide nothing. */
     decided?: boolean;
     question: string;
@@ -335,7 +342,14 @@ let indexCache: { at: number; value: KbIndex } | null = null;
 
 export const defaultKbDeps: KbDeps = {
   decide: (input) => decideFromArticles(input),
-  async generate({ accountLikely, articles, decided, question, signal }) {
+  async generate({
+    accountLikely,
+    articles,
+    cannotCheck,
+    decided,
+    question,
+    signal,
+  }) {
     const model = await resolveModel("kb");
     const { object } = await generateObject({
       abortSignal: signal,
@@ -350,7 +364,7 @@ export const defaultKbDeps: KbDeps = {
       }),
       ...fastCallOptions(model),
       schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: writerPrompt(accountLikely, decided),
+      system: `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
     });
     return object;
   },
@@ -663,8 +677,9 @@ function withCannotCheck(
   if (!cannotCheck) {
     return answer;
   }
-  return answer
-    ? { ...answer, message: `${CANNOT_CHECK}\n\n${answer.message}` }
+  const body = answer?.message.replace(CANNOT_SEE_OPENING, "").trim();
+  return answer && body
+    ? { ...answer, message: `${CANNOT_CHECK}\n\n${body}` }
     : { citations: [], message: CANNOT_CHECK_ALONE };
 }
 
@@ -754,6 +769,7 @@ export async function answerFromHelpCenter(
     const generated = await deps.generate({
       accountLikely: decided ? undefined : ask.accountLikely,
       articles,
+      cannotCheck,
       decided: Boolean(decided),
       question,
       signal,
