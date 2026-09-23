@@ -219,6 +219,21 @@ export async function completeWidgetRun(
   return run;
 }
 
+/** Stopped by the customer. A finish that lands later finds the run settled and changes nothing. */
+export async function cancelWidgetRun(id: string) {
+  const outcome: WidgetOutcome = {
+    decision: "block",
+    message: null,
+    reason: "cancelled",
+    status: "failed",
+  };
+  await privateDatabase().query(
+    `UPDATE widget_support_runs SET outcome = $2::jsonb, decision = 'block', completed_at = now()
+     WHERE id = $1 AND completed_at IS NULL`,
+    [id, JSON.stringify(outcome)]
+  );
+}
+
 /** Replayed readers cannot move progress backwards or change a settled run. */
 export async function saveWidgetProgress(
   id: string,

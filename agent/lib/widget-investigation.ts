@@ -51,6 +51,7 @@ import {
 import {
   assertWidgetRunOwner,
   attachWidgetRun,
+  cancelWidgetRun,
   claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
@@ -134,6 +135,11 @@ const inputSchema = z.discriminatedUnion("action", [
   z.strictObject({
     ...scopeFields,
     action: z.literal("result"),
+    run_id: z.uuid(),
+  }),
+  z.strictObject({
+    ...scopeFields,
+    action: z.literal("cancel"),
     run_id: z.uuid(),
   }),
 ]);
@@ -313,6 +319,7 @@ export const defaultWidgetDependencies = {
   answerChat: replyToChat,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
+  cancel: cancelWidgetRun,
   changeRequested: (conversation: string) => asksForChange(conversation),
   claim: claimWidgetRun,
   claimFinish: claimWidgetFinish,
@@ -1257,6 +1264,23 @@ async function answerFreshRun(
   );
 }
 
+/** The customer pressed stop: close the run so their next message starts at once, and stop the investigation spending. */
+async function cancelRun(
+  run: WidgetRun,
+  attachSession: RouteHandlerArgs["attachSession"] | undefined,
+  deps: Pick<WidgetDependencies, "cancel" | "read">
+) {
+  if (!run.outcome) {
+    await deps.cancel(run.id);
+    if (run.session_id && attachSession) {
+      await attachSession(run.session_id)
+        .cancel({ tasks: true })
+        .catch(() => undefined);
+    }
+  }
+  return widgetRunResponse(await deps.read(run.id));
+}
+
 export async function receiveWidgetMessage(
   request: Request,
   {
@@ -1303,12 +1327,15 @@ export async function receiveWidgetMessage(
     return json({ error: "Workspace could not be verified." }, 403);
   }
   try {
-    if (input.action === "result") {
+    if (input.action !== "start") {
       let run = await deps.read(input.run_id);
       assertWidgetRunOwner(run, scope);
       // A teammate's run is read only through the teammate's verified path.
       if (run.scope.source !== scope.source) {
         throw new Error("Investigation unavailable for this conversation.");
+      }
+      if (input.action === "cancel") {
+        return json(await cancelRun(run, attachSession, deps));
       }
       if (!run.outcome && run.session_id && attachSession) {
         run = await pollWidgetRun(

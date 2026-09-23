@@ -84,6 +84,16 @@ function dependencies(gateResult: GateResult = allowed) {
       run.stream_index = streamIndex;
       return Promise.resolve();
     },
+    cancel: () => {
+      run.outcome = {
+        decision: "block",
+        message: null,
+        reason: "cancelled",
+        status: "failed",
+      };
+      run.completed_at = new Date();
+      return Promise.resolve();
+    },
     claim: () => Promise.resolve({ fresh: true, run }),
     claimFinish: () => Promise.resolve(true),
     complete: (_id, outcome, stored) => {
@@ -1122,6 +1132,52 @@ test("a slow investigation answers pending, then the result action recovers the 
   );
   assert.equal((await result.json()).status, "completed");
   assert.equal((run.outcome as { decision: string } | null)?.decision, "allow");
+});
+
+test("cancel closes an open run and stops its session; a settled run is left alone", async (t) => {
+  enabled(t);
+  const cancel = (deps: WidgetDependencies, cancelled: string[]) =>
+    receiveWidgetMessage(
+      request({
+        action: "cancel",
+        conversation_id: scope.conversationId,
+        organization_id: scope.organizationId,
+        run_id: runId,
+      }),
+      {
+        attachSession: (id) =>
+          ({
+            cancel: () => {
+              cancelled.push(id);
+              return Promise.resolve();
+            },
+          }) as unknown as Session,
+        ...noWork(),
+      },
+      100,
+      verify,
+      deps
+    );
+  const open = dependencies();
+  open.run.session_id = "widget-session-1";
+  const stopped: string[] = [];
+  const body = await (await cancel(open.deps, stopped)).json();
+  assert.equal(body.status, "failed");
+  assert.equal(open.run.outcome?.reason, "cancelled");
+  assert.deepEqual(stopped, ["widget-session-1"]);
+
+  const settled = dependencies();
+  settled.run.session_id = "widget-session-1";
+  settled.run.outcome = {
+    decision: "allow",
+    message: allowed.message,
+    reason: allowed.reason,
+    status: "completed",
+  };
+  settled.deps.cancel = () => assert.fail("a settled run is never cancelled");
+  const untouched: string[] = [];
+  await cancel(settled.deps, untouched);
+  assert.deepEqual(untouched, []);
 });
 
 test("a result read from another user or a duplicate start never starts work", async (t) => {
