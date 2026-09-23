@@ -1,7 +1,7 @@
 import { defineAgent, defineDynamic } from "eve";
 import { isFinInvestigation } from "./lib/fin-investigation-auth.js";
 import { finInvestigationModel } from "./lib/fin-investigation-model.js";
-import { gatewayRouting, resolveModel } from "./lib/models.js";
+import { fastCallOptions, gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 import { widgetInvestigationModel } from "./lib/widget-investigation-model.js";
 import { isWidgetSupport } from "./lib/widget-scope.js";
@@ -41,18 +41,17 @@ export default defineAgent({
   model: defineDynamic({
     events: {
       "step.started": async (_event, ctx) => {
-        const id = await resolveModel(
-          isWidgetSupport(ctx.session.auth.initiator)
-            ? "widget"
-            : "orchestrator"
-        );
+        const widget = isWidgetSupport(ctx.session.auth.initiator);
+        const id = await resolveModel(widget ? "widget" : "orchestrator");
         return {
           model: investigationModel(
             ctx.session.auth.initiator,
             id,
             ctx.session.id
           ),
-          modelOptions: gatewayRouting(id),
+          // Jev decides each widget step, so the widget model only acts: on its
+          // default reasoning each step ran past the 15s model-call timeout.
+          modelOptions: widget ? fastCallOptions(id) : gatewayRouting(id),
         };
       },
     },

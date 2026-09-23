@@ -23,8 +23,10 @@ export const MODELS = {
   // model only fills in one read's arguments, writes the findings and writes the
   // reply: acting, not deciding. The orchestrator's reasoning took 10 to 30s a
   // step and ran investigations past the widget deadline (3 of 14 runs,
-  // 2026-09-23); the egress reviewer stays on `gate`.
-  widget: "google/gemini-3.5-flash",
+  // 2026-09-23); the egress reviewer stays on `gate`. Measured through the
+  // gateway the same afternoon: gemini-3.5-flash took ~15s on every call (small
+  // or large), haiku-4.5 ~1s.
+  widget: "anthropic/claude-haiku-4.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;

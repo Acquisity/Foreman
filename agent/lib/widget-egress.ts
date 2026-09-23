@@ -1,6 +1,6 @@
 import { gateway, generateObject, generateText } from "ai";
 import { z } from "zod";
-import { gatewayRouting, resolveModel } from "./models.js";
+import { fastCallOptions, gatewayRouting, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   type IdentifierCandidates,
@@ -435,7 +435,7 @@ export const defaultGateDeps: GateDeps = {
     const model = await resolveModel("widget");
     const { text } = await generateText({
       model: gateway(model),
-      ...gatewayRouting(model),
+      ...fastCallOptions(model),
       prompt: JSON.stringify({
         findings,
         question,
