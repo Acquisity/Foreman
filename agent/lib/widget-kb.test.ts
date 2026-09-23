@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   activeArticleHits,
   answerFromHelpCenter,
+  decideFromArticles,
   indexLine,
   type KbDeps,
   mergeHits,
@@ -354,4 +355,89 @@ test("an account-likely ask decides what the message needs first: a fragment is 
     await answerFromHelpCenter("how do i connect?", log, lane(undefined))
   );
   assert.deepEqual(told, [true, true, true, undefined]);
+});
+
+test("Jev decides what the articles can do and the writer only writes when Jev says answer", async () => {
+  const written: { accountLikely?: boolean; decided?: boolean }[] = [];
+  const lane = (choice: string): KbDeps => ({
+    ...deps(null),
+    decide: () => Promise.resolve({ choice, confidence: 0.9 } as never),
+    generate: ({ accountLikely, decided }) => {
+      written.push({ accountLikely, decided });
+      return Promise.resolve({ answer: "Do this [1].", kind: "answer" });
+    },
+  });
+  const ask = (choice: string) =>
+    answerFromHelpCenter(
+      { accountLikely: true, latest: "why is my campaign not sending?" },
+      log,
+      lane(choice)
+    );
+  const unclear = { citations: [], message: "", unclear: true };
+  assert.deepEqual(await ask("unclear"), unclear);
+  assert.deepEqual(await ask("which_product"), unclear);
+  assert.equal(await ask("account"), null);
+  assert.equal(await ask("not_covered"), null);
+  assert.deepEqual(written, []);
+  assert.deepEqual(
+    (await ask("answer"))?.citations.map((c) => c.url),
+    [articles[0].url]
+  );
+  // Jev already stepped past "needs", so the writer is not asked it again.
+  assert.deepEqual(written, [{ accountLikely: undefined, decided: true }]);
+});
+
+test("a failed Jev decision leaves the call to the writer, as before", async () => {
+  const written: (boolean | undefined)[] = [];
+  const answer = await answerFromHelpCenter(
+    { accountLikely: true, latest: "why is my campaign not sending?" },
+    log,
+    {
+      ...deps(null),
+      decide: () => Promise.reject(new Error("timeout")),
+      generate: ({ accountLikely, decided }) => {
+        written.push(accountLikely, decided);
+        return Promise.resolve({ answer: "", kind: "none", needs: "account" });
+      },
+    }
+  );
+  assert.equal(answer, null);
+  assert.deepEqual(written, [true, false]);
+});
+
+test("the Jev decision offers account and unclear only on an account-likely ask, and refuses anything off the menu", async () => {
+  const offered: string[][] = [];
+  const jev = (choice: string) => (_url: string, init: { body: string }) => {
+    offered.push(Object.keys(JSON.parse(init.body).questions.kb.criteria));
+    return Promise.resolve({
+      json: () =>
+        Promise.resolve({ answers: { kb: { choice, confidence: 0.9 } } }),
+      ok: true,
+      status: 200,
+    });
+  };
+  const input = (accountLikely: boolean) => ({
+    accountLikely,
+    articles: [{ content: "body", title: "Setup", url: articles[0].url }],
+    question: "how do i connect?",
+    signal: AbortSignal.timeout(1000),
+  });
+  assert.deepEqual(
+    await decideFromArticles(input(true), {
+      apiKey: "k",
+      fetch: jev("account"),
+    }),
+    { choice: "account", confidence: 0.9 }
+  );
+  await assert.rejects(
+    decideFromArticles(input(false), { apiKey: "k", fetch: jev("account") }),
+    { message: "invalid_choice" }
+  );
+  assert.deepEqual(offered, [
+    ["answer", "not_covered", "which_product", "account", "unclear"],
+    ["answer", "not_covered", "which_product"],
+  ]);
+  await assert.rejects(decideFromArticles(input(false), { apiKey: "" }), {
+    message: "no_key",
+  });
 });
