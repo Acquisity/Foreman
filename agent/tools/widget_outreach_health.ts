@@ -399,7 +399,9 @@ export function parseWidgetOutreachHealthEvidence(
       notSendingReason: reason,
       notSendingReasonCode: code,
       recentSends: row.recentSends,
-      savedDailyLimitPerInbox: row.dailyLimit,
+      // 0 is the settings column's empty default, not a cap: live 2026-09-23 it
+      // was read as "your limit is 0, which stops all sending".
+      savedDailyLimitPerInbox: row.dailyLimit || null,
       schedule: hasSchedule
         ? {
             days: namedDays(row.days),
@@ -419,7 +421,7 @@ export function parseWidgetOutreachHealthEvidence(
   return widgetOutreachHealthOutput.parse({
     campaigns,
     caveats: [
-      "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap. Acquisity manages Instantly limits; do not ask the customer to change them in Instantly.",
+      "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",

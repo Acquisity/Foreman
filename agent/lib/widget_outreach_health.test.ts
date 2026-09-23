@@ -219,6 +219,15 @@ test("campaign output matches the schema, maps the not-sending code and flags an
   assert.equal(campaign.schedule?.invertedWindow, false);
   assert.equal(campaign.leadsNotPushedCount, 12);
   assert.equal(campaign.savedDailyLimitPerInbox, 35);
+  // The column's empty default is not a limit of zero.
+  const unset = parseWidgetOutreachHealthEvidence(
+    envelope([{ ...row, dailyLimit: 0 }]),
+    scope
+  );
+  if (unset.status !== "ok") {
+    assert.fail("Expected ok evidence");
+  }
+  assert.equal(unset.campaigns[0].savedDailyLimitPerInbox, null);
 
   const inverted = parseWidgetOutreachHealthEvidence(
     envelope([{ ...row, fromTime: "17:00", toTime: "09:00" }]),
