@@ -41,7 +41,11 @@ export default defineAgent({
   model: defineDynamic({
     events: {
       "step.started": async (_event, ctx) => {
-        const id = await resolveModel("orchestrator");
+        const id = await resolveModel(
+          isWidgetSupport(ctx.session.auth.initiator)
+            ? "widget"
+            : "orchestrator"
+        );
         return {
           model: investigationModel(
             ctx.session.auth.initiator,

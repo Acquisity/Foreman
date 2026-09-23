@@ -19,6 +19,12 @@ export const MODELS = {
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
+  // Support widget investigator and reply writer. Jev picks every step, so this
+  // model only fills in one read's arguments, writes the findings and writes the
+  // reply: acting, not deciding. The orchestrator's reasoning took 10 to 30s a
+  // step and ran investigations past the widget deadline (3 of 14 runs,
+  // 2026-09-23); the egress reviewer stays on `gate`.
+  widget: "google/gemini-3.5-flash",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;

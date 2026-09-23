@@ -432,7 +432,7 @@ async function modelJudge(
 
 export const defaultGateDeps: GateDeps = {
   async compose({ findings, organizationName, question }) {
-    const model = await resolveModel("gate");
+    const model = await resolveModel("widget");
     const { text } = await generateText({
       model: gateway(model),
       ...gatewayRouting(model),

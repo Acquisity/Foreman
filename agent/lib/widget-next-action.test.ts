@@ -5,6 +5,7 @@ import { MockLanguageModelV4 } from "ai/test";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
   nextActionEnabled,
+  selectNextAction,
   widgetNextActionMiddleware,
 } from "./widget-next-action.js";
 
@@ -713,8 +714,8 @@ describe("widget next-action selector", () => {
     const parent = new AbortController();
     const local = new AbortController();
     t.mock.method(AbortSignal, "timeout", (ms: number) => {
-      assert.ok(ms === 3000 || ms === 30_000);
-      return ms === 30_000 && !local.signal.aborted
+      assert.ok(ms === 3000 || ms === 15_000);
+      return ms === 15_000 && !local.signal.aborted
         ? local.signal
         : new AbortController().signal;
     });
@@ -908,5 +909,68 @@ describe("widget next-action selector", () => {
     }
     assert.deepEqual(sent().tools, ["widget_website_status"]);
     assert.equal(types.includes("tool-call"), true);
+  });
+});
+
+describe("repeat reads", () => {
+  const billing = {
+    description: "Billing summary",
+    name: "widget_billing_summary",
+  };
+  const inbox = { description: "Inbox health", name: "widget_inbox_health" };
+  const read = (n: number) => ({
+    input: `{"page":${n}}`,
+    result: "{}",
+    tool: billing.name,
+  });
+  const pick =
+    (choice: string, confidence: number, offered: string[][] = []) =>
+    (_url: string, init: { body: string }) => {
+      offered.push(
+        Object.keys(JSON.parse(init.body).questions.action.criteria)
+      );
+      return Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              action: { choice, confidence },
+              handoff_eligible: { noul: 0 },
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    };
+  const select = (
+    reads: ReturnType<typeof read>[],
+    fetch: ReturnType<typeof pick>
+  ) =>
+    selectNextAction(
+      { question: "can I get a refund?", reads, tools: [billing, inbox] },
+      { apiKey: "k", fetch }
+    );
+
+  it("takes a read that ran twice off the menu", async () => {
+    const offered: string[][] = [];
+    await select([read(1), read(2)], pick("finish", 0.9, offered));
+    assert.ok(!offered[0]?.includes(billing.name));
+    assert.ok(offered[0]?.includes(inbox.name));
+  });
+
+  it("turns an unsure re-read into a finish, and lets a sure one or a first read run", async () => {
+    assert.deepEqual(await select([read(1)], pick(billing.name, 0.62)), {
+      action: "finish",
+      confidence: 0.62,
+    });
+    assert.deepEqual(await select([read(1)], pick(billing.name, 0.9)), {
+      action: "read",
+      confidence: 0.9,
+      tool: billing.name,
+    });
+    assert.deepEqual(await select([read(1)], pick(inbox.name, 0.4)), {
+      action: "read",
+      confidence: 0.4,
+      tool: inbox.name,
+    });
   });
 });

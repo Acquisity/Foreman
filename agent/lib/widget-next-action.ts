@@ -18,8 +18,10 @@ import { logOpsEvent } from "./ops-log.js";
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const SELECTOR_TIMEOUT_MS = 3000;
 // A stalled model request previously waited ~300s, beyond the widget's
-// 170s investigation deadline. Leave time for a fresh request to recover.
-const MODEL_CALL_TIMEOUT_MS = 30_000;
+// 170s investigation deadline. Leave time for a fresh request to recover. The
+// widget model answers a step in seconds; at 30s one stalled gateway call and
+// its retry cost a third of the deadline (2026-09-23).
+const MODEL_CALL_TIMEOUT_MS = 15_000;
 const STATE_RESULT_CHARS = 48_000;
 // renderConversation already budgets this below 12,000 with the latest message first.
 const CONVERSATION_CHARS = 12_000;
@@ -28,6 +30,14 @@ const CONVERSATION_CHARS = 12_000;
 const DESCRIPTION_CHARS = 1500;
 /** Below this, a `human` pick was not an explicit ask or a billing dispute, and becomes `finish`. */
 const HANDOFF_ELIGIBLE = 0.5;
+/**
+ * A read that has run this many times is off the menu. Live 2026-09-23: a refund
+ * investigation read billing again at steps 8, 10 and 11 (confidence 0.62 to
+ * 0.71) and ran out the widget deadline still reading.
+ */
+const MAX_READS_PER_TOOL = 2;
+/** Below this, Jev choosing a read that already ran is a finish, not another read. */
+const SURE_REREAD = 0.7;
 const TICKET_TOOL = "widget_file_ticket";
 const ARTICLE_TOOLS = new Set([
   "widget_help_article",
@@ -408,18 +418,22 @@ export async function selectNextAction(
     })),
     conversation: input.question.slice(0, CONVERSATION_CHARS),
   });
+  const timesRead = (name: string) =>
+    input.reads.filter((read) => read.tool === name).length;
   const criteria = {
     ...Object.fromEntries(
-      input.tools.map((tool) => [
-        tool.name,
-        // Live 8788da8: three outreach reads at confidence 0.89, 0.38 and 0.28
-        // before a clarify. Counts read again cannot say which record is meant.
-        `${
-          input.reads.some((read) => read.tool === tool.name)
-            ? "This read has already run. Run it again only when different arguments would return something its earlier results did not, such as the next page or the one record the customer named. Running it again cannot settle which record the customer means when its results already listed several that fit"
-            : "Run this read next because it can advance the customer's question"
-        }: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
-      ])
+      input.tools
+        .filter((tool) => timesRead(tool.name) < MAX_READS_PER_TOOL)
+        .map((tool) => [
+          tool.name,
+          // Live 8788da8: three outreach reads at confidence 0.89, 0.38 and 0.28
+          // before a clarify. Counts read again cannot say which record is meant.
+          `${
+            input.reads.some((read) => read.tool === tool.name)
+              ? "This read has already run. Run it again only when different arguments would return something its earlier results did not, such as the next page or the one record the customer named. Running it again cannot settle which record the customer means when its results already listed several that fit"
+              : "Run this read next because it can advance the customer's question"
+          }: ${tool.description.slice(0, DESCRIPTION_CHARS)}`,
+        ])
     ),
     ...(input.initial
       ? { clarify: FIXED_CRITERIA.clarify, finish: FIXED_CRITERIA.finish }
@@ -464,7 +478,9 @@ export async function selectNextAction(
     return { action: choice, confidence };
   }
   if (input.tools.some((tool) => tool.name === choice)) {
-    return { action: "read", confidence, tool: choice };
+    return timesRead(choice) > 0 && confidence < SURE_REREAD
+      ? { action: "finish", confidence }
+      : { action: "read", confidence, tool: choice };
   }
   throw new Error("invalid_choice");
 }
