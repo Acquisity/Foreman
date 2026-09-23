@@ -58,6 +58,7 @@ import {
   latestWidgetScope,
   readWidgetRun,
   recentWidgetTurns,
+  requestWidgetRecording,
   saveWidgetProgress,
   type WidgetOutcome,
   type WidgetRun,
@@ -332,6 +333,7 @@ export const defaultWidgetDependencies = {
   plan: planWidgetChecks,
   progress: saveWidgetProgress,
   read: readWidgetRun,
+  requestRecording: requestWidgetRecording,
   route: routeWidgetMessage,
   /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
   verifyAccess: (scope: WidgetContext) =>
@@ -339,12 +341,12 @@ export const defaultWidgetDependencies = {
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
-  "changeRequested" | "plan" | "progress"
+  "changeRequested" | "plan" | "progress" | "requestRecording"
 > &
   Partial<
     Pick<
       typeof defaultWidgetDependencies,
-      "changeRequested" | "plan" | "progress"
+      "changeRequested" | "plan" | "progress" | "requestRecording"
     >
   >;
 
@@ -380,6 +382,7 @@ export function widgetRunResponse(run: WidgetRun) {
       ? { retry: true as const }
       : {}),
     message: run.outcome.message,
+    ...(run.recording_requested ? { request_recording: true as const } : {}),
     run_id: run.id,
     status: run.outcome.status,
     ...(run.outcome.citations?.length
@@ -920,6 +923,11 @@ async function answerFromKnowledgeBase(
     route
   );
   const ids = { conversationId: scope.conversationId, runId: run.id };
+  // Before any reply is written, so every lane's result carries the flag. A
+  // failed write only loses the recording offer, never the reply.
+  if (route.bug && deps.requestRecording) {
+    await deps.requestRecording(run.id).catch(() => undefined);
+  }
   const finish = (written: KbAnswer) =>
     deps.complete(
       run.id,

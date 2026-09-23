@@ -57,6 +57,7 @@ describe("routeWidgetMessage", () => {
       "explains_previous",
       "is_unclear",
       "lane",
+      "reports_bug",
     ]);
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
@@ -124,6 +125,41 @@ describe("routeWidgetMessage", () => {
     assert.equal(route.asksForAction, 0);
     assert.equal(route.kbScore, 0);
     assert.equal(route.unclear, 0);
+  });
+
+  it("flags a bug report on any lane, including a ticket request", async () => {
+    const bugReply = (extra: Record<string, unknown>, bug: number) => () =>
+      Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              asks_for_human: { noul: 0.04 },
+              asks_own_data: { noul: 0.9 },
+              lane: { choice: "investigate", confidence: 0.8 },
+              reports_bug: { noul: bug },
+              ...extra,
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    const plain = await routeWidgetMessage("the save button does nothing", {
+      apiKey: "test-key",
+      fetch: bugReply({}, 0.9),
+    });
+    assert.equal(plain.bug, true);
+    assert.equal(plain.lane, "investigate");
+    const ticket = await routeWidgetMessage("report this bug please", {
+      apiKey: "test-key",
+      fetch: bugReply({ asks_for_ticket: { noul: 0.9 } }, 0.9),
+    });
+    assert.equal(ticket.ticket, true);
+    assert.equal(ticket.bug, true);
+    const howTo = await routeWidgetMessage("how do I add an inbox?", {
+      apiKey: "test-key",
+      fetch: bugReply({}, 0.2),
+    });
+    assert.equal(howTo.bug, undefined);
   });
 
   it("investigates a refund request as a ticket, unless the customer asked for a person", async () => {

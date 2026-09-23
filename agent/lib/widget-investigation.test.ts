@@ -648,6 +648,38 @@ test("a thank you gets a sentence back, and is investigated only if that reply c
   assert.deepEqual(failing.gated, [findings]);
 });
 
+test("a bug report asks the app for a screen recording next to the reply", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0.9,
+      bug: true,
+      confidence: 0.97,
+      kbScore: 0,
+      lane: "chat" as const,
+      source: "jev" as const,
+    });
+  deps.answerChat = () =>
+    Promise.resolve({ citations: [], message: "Sorry about that." });
+  deps.requestRecording = () => {
+    run.recording_requested = true;
+    return Promise.resolve();
+  };
+  const response = await receiveWidgetMessage(
+    request({ ...start, message_id: "eeeeeeee-5555-4555-8555-eeeeeeeeeeee" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.message, "Sorry about that.");
+  assert.equal(body.request_recording, true);
+});
+
 test("the guessed checks are saved as planned before the first real check runs", async (t) => {
   enabled(t);
   const { deps } = dependencies();

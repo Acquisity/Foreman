@@ -42,6 +42,7 @@ const runSchema = z.object({
   outcome: widgetOutcomeSchema.nullable(),
   progress: widgetProgressSchema.nullish(),
   question: z.string(),
+  recording_requested: z.boolean().optional(),
   scope: widgetContextSchema,
   session_id: z.string().nullable(),
   stream_index: z.number().int().nonnegative(),
@@ -217,6 +218,14 @@ export async function completeWidgetRun(
     throw new Error("Investigation session ownership mismatch.");
   }
   return run;
+}
+
+/** The customer reported a bug: the app offers a screen recording next to this run's reply. */
+export async function requestWidgetRecording(id: string) {
+  await privateDatabase().query(
+    "UPDATE widget_support_runs SET recording_requested = true WHERE id = $1",
+    [id]
+  );
 }
 
 /** Stopped by the customer. A finish that lands later finds the run settled and changes nothing. */

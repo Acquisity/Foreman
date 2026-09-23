@@ -28,6 +28,8 @@ export const HUMAN_REQUEST_SCORE = 0.8;
 const TICKET_REQUEST = 0.5;
 /** At or above this, the customer asked for a refund. */
 const REFUND_REQUEST = 0.5;
+/** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
+const BUG_REPORT = 0.7;
 
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
@@ -207,6 +209,13 @@ const QUESTIONS = {
     instructions: "Which kind of help does the customer's message need?",
     type: "choice",
   },
+  // Asked in the same request, so it costs nothing. It only decides whether the
+  // app offers a screen recording next to the reply; the lanes ignore it.
+  reports_bug: {
+    instructions:
+      "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
+    type: "noul",
+  },
 } as const;
 
 const responseSchema = z.object({
@@ -226,6 +235,7 @@ const responseSchema = z.object({
       confidence: z.number().min(0).max(1).optional(),
       probabilities: z.record(z.string(), z.number()).optional(),
     }),
+    reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
 
@@ -247,6 +257,8 @@ export interface WidgetRoute {
   asksForAction: number;
   asksForHuman: number;
   asksOwnData: number;
+  /** The customer is reporting a bug, so the app offers a screen recording. */
+  bug?: boolean;
   confidence: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
@@ -350,11 +362,8 @@ export async function routeWidgetMessage(
     }
     const { answers } = responseSchema.parse(await response.json());
     const confidence = answers.lane.confidence ?? 0;
-    const ticket = ticketRoute(answers, confidence);
-    if (ticket) {
-      return ticket;
-    }
-    return {
+    const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
+    const routed: WidgetRoute = ticketRoute(answers, confidence) ?? {
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
@@ -371,6 +380,7 @@ export async function routeWidgetMessage(
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };
+    return bug ? { ...routed, bug } : routed;
   } catch {
     return FALLBACK;
   }
@@ -428,7 +438,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}`,
     runId: fields.runId,
   });
 }
