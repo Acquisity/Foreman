@@ -49,6 +49,7 @@ describe("routeWidgetMessage", () => {
     assert.deepEqual(Object.keys(body.questions).sort(), [
       "asks_for_action",
       "asks_for_human",
+      "asks_for_refund",
       "asks_for_ticket",
       "asks_own_data",
       "depends_on_previous",
@@ -122,6 +123,39 @@ describe("routeWidgetMessage", () => {
     assert.equal(route.asksForAction, 0);
     assert.equal(route.kbScore, 0);
     assert.equal(route.unclear, 0);
+  });
+
+  it("investigates a refund request as a ticket, unless the customer asked for a person", async () => {
+    const refund = (human: number) =>
+      routeWidgetMessage("can I get a refund?", {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve({
+            json: () =>
+              Promise.resolve({
+                answers: {
+                  asks_for_action: { noul: 0.9 },
+                  asks_for_human: { noul: human },
+                  asks_for_refund: { noul: 0.93 },
+                  asks_own_data: { noul: 0.6 },
+                  is_unclear: { noul: 0.85 },
+                  lane: { choice: "kb", confidence: 0.7 },
+                },
+              }),
+            ok: true,
+            status: 200,
+          }),
+      });
+    const route = await refund(0.1);
+    assert.equal(route.lane, "investigate");
+    assert.equal(route.refund, true);
+    assert.equal(route.ticket, true);
+    assert.equal(route.asksForAction, 0);
+    assert.equal(route.kbScore, 0);
+    assert.equal(route.unclear, 0);
+    const person = await refund(0.95);
+    assert.equal(person.refund, undefined);
+    assert.equal(person.ticket, undefined);
   });
 
   it("hands off only when the direct question agrees a person was asked for", async () => {

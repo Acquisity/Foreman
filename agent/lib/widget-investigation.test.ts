@@ -8,6 +8,7 @@ import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
+  finishWidgetRun,
   ROLE_LIMITED_REPLY,
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
@@ -1175,6 +1176,58 @@ test("a filed ticket is taken from the tool's own result, whatever the write-up 
   for (const none of refused) {
     assert.equal(none.status === "completed" && none.ticket, null);
   }
+});
+
+test("a filed refund ticket is the handoff to billing, so the customer gets a reply instead of a person", async () => {
+  const { deps, gated, run } = dependencies();
+  deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
+  const url = "https://linear.app/acquisity/issue/ENG-15000/refund";
+  const finish = (refund: boolean) =>
+    finishWidgetRun(
+      run,
+      "widget-session-refund",
+      {
+        findings: null,
+        status: "completed",
+        text: "Refund request filed.",
+        ticket: { id: "ENG-15000", url, ...(refund ? { refund } : {}) },
+      },
+      deps
+    );
+  await finish(true);
+  await finish(false);
+  const [refunded, other] = gated as WidgetFindings[];
+  assert.equal(refunded?.needsHuman, false);
+  // The findings contract carries only the ticket's id and url.
+  assert.deepEqual(refunded?.ticket, { id: "ENG-15000", url });
+  assert.equal(other?.needsHuman, true);
+});
+
+test("the ticket result carries whether Jev read it as a refund", async () => {
+  const url = "https://linear.app/acquisity/issue/ENG-15000/refund";
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      event("action.result", {
+        result: {
+          callId: "call-1",
+          kind: "tool-result",
+          output: {
+            existing: false,
+            identifier: "ENG-15000",
+            refund: true,
+            url,
+          },
+          toolName: "widget_file_ticket",
+        },
+      }),
+      event("session.completed"),
+    ])
+  );
+  assert.deepEqual(outcome.status === "completed" && outcome.ticket, {
+    id: "ENG-15000",
+    refund: true,
+    url,
+  });
 });
 
 test("stream observation starts at the turn's index, resets on a new turn, and reports a timeout as pending", async () => {

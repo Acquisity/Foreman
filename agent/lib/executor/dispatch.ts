@@ -40,12 +40,31 @@ const finLinearTicketInput = z.strictObject({
   title: z.string().min(1).max(160),
 });
 
-const widgetLinearTicketInput = z.strictObject({
+/**
+ * Where a widget refund request lands: the Support project with the Refund
+ * label, assigned to the billing owner, which is the queue billing triage reads.
+ */
+export const REFUND_TICKET = {
+  assignee: "Aaron Fraga",
+  labels: ["9120e30d-e188-4972-940b-20005b7f6d03"],
+  project: "P-ENG-20",
+} as const;
+
+const widgetTicketShape = {
   description: z.string().min(1).max(16_000),
   state: z.literal("Triage"),
   team: z.literal("Engineering Team"),
   title: z.string().min(1).max(160),
-});
+};
+const widgetLinearTicketInput = z.union([
+  z.strictObject(widgetTicketShape),
+  z.strictObject({
+    ...widgetTicketShape,
+    assignee: z.literal(REFUND_TICKET.assignee),
+    labels: z.tuple([z.literal(REFUND_TICKET.labels[0])]),
+    project: z.literal(REFUND_TICKET.project),
+  }),
+]);
 
 /** Intake has no Eve session. Only these fixed identity reads are available. */
 export async function readFinIntercom(
@@ -270,13 +289,16 @@ export async function createFinInvestigationTicket(
 /** The widget lane's one provider write. Team, state and scope come only from the session initiator. */
 export async function createWidgetTicket(
   ctx: ProviderContext,
-  input: { report: string; title: string }
+  input: { refund?: boolean; report: string; title: string }
 ): Promise<ExecutorOutcome> {
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   return await invokeProvider(
     ctx,
     FIN_LINEAR_TICKET_PATH,
     {
+      ...(input.refund
+        ? { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] }
+        : {}),
       description: `${input.report}\n\n${widgetScopeBlock(scope)}`,
       state: "Triage",
       team: "Engineering Team",

@@ -162,7 +162,7 @@ export type WaitOutcome =
       status: "completed";
       text: string | null;
       /** What widget_file_ticket itself returned during this turn, if it ran. */
-      ticket?: NonNullable<WidgetFindings["ticket"]> | null;
+      ticket?: FiledTicket | null;
     };
 
 const TEXT_MAX = 4000;
@@ -172,10 +172,15 @@ const messageText = (data: unknown): string | null => {
   return trimmed ? trimmed.slice(0, TEXT_MAX) : null;
 };
 
-type FiledTicket = NonNullable<WidgetFindings["ticket"]>;
+/** `refund` is ours alone: the findings contract carries only the id and url. */
+type FiledTicket = NonNullable<WidgetFindings["ticket"]> & { refund?: true };
 const TICKET_URL =
   /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
-const ticketOutput = z.object({ identifier: z.string(), url: z.string() });
+const ticketOutput = z.object({
+  identifier: z.string(),
+  refund: z.boolean().optional(),
+  url: z.string(),
+});
 
 /**
  * The ticket widget_file_ticket returned, read from the tool's own result. A
@@ -200,18 +205,31 @@ export function filedTicketResult(result: unknown): FiledTicket | null {
   if (!parsed.success) {
     return null;
   }
-  const { identifier, url } = parsed.data;
+  const { identifier, refund, url } = parsed.data;
   return TICKET_URL.exec(url)?.[1] === identifier
-    ? { id: identifier, url: url.slice(0, 500) }
+    ? { id: identifier, url: url.slice(0, 500), ...(refund ? { refund } : {}) }
     : null;
 }
 
-/** The tool's own result outranks whatever the write-up or the model pass said about a ticket. */
+/**
+ * The tool's own result outranks whatever the write-up or the model pass said
+ * about a ticket. A filed refund ticket is the handoff to billing, so the
+ * customer gets a reply saying so instead of a handoff to a person.
+ */
 const withFiledTicket = (
   ticket: FiledTicket | null | undefined,
   findings: WidgetFindings | null
-): WidgetFindings | null =>
-  findings && ticket ? { ...findings, ticket } : findings;
+): WidgetFindings | null => {
+  if (!(findings && ticket)) {
+    return findings;
+  }
+  const { refund, ...filed } = ticket;
+  return {
+    ...findings,
+    ...(refund ? { needsHuman: false } : {}),
+    ticket: filed,
+  };
+};
 
 interface Recorded {
   asked: string | null;

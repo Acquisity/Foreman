@@ -26,6 +26,8 @@ const MAX_STATE_CHARS = 12_000;
 export const HUMAN_REQUEST_SCORE = 0.8;
 /** At or above this, the customer asked for a ticket. */
 const TICKET_REQUEST = 0.5;
+/** At or above this, the customer asked for a refund. */
+const REFUND_REQUEST = 0.5;
 
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
@@ -129,12 +131,19 @@ const QUESTIONS = {
   // such a message out of a minutes-long investigation it cannot benefit from.
   asks_for_action: {
     instructions:
-      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect, refund or set something up for them. Asking for a ticket to be opened or a bug to be reported is NOT this. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
+      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect or set something up for them. Asking for a ticket to be opened, a bug to be reported or a refund is NOT this. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
     type: "noul",
   },
   asks_for_human: {
     instructions:
       "The customer explicitly requests a conversation with a human support representative. Asking where to find or how to use a named product feature (such as Niche Researcher or AI SDR) is not a request for a person.",
+    type: "noul",
+  },
+  // A refund is never a help-center answer: which charge and why is asked for,
+  // billing is read, and the request is filed for the billing team.
+  asks_for_refund: {
+    instructions:
+      "The customer asks for a refund, their money back or a charge to be reversed, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a charge was for, without asking for money back is NOT this.",
     type: "noul",
   },
   // Filing a ticket is the one thing Foreman can do for a customer. "can you open
@@ -198,6 +207,7 @@ const responseSchema = z.object({
   answers: z.object({
     asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
+    asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
     depends_on_previous: z
@@ -239,6 +249,8 @@ export interface WidgetRoute {
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
+  /** The customer asked for a refund, which an investigation files as a ticket. */
+  refund?: boolean;
   source: "jev" | "fallback";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
@@ -265,6 +277,37 @@ type FetchLike = (
     signal: AbortSignal;
   }
 ) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+
+/**
+ * A ticket can only be filed from an investigation, so a request for one is
+ * never a change to apologise for, a help-center question or a handoff. A refund
+ * request ends in a ticket, so it takes the same way in. An explicit ask for a
+ * person still wins.
+ */
+function ticketRoute(
+  answers: z.infer<typeof responseSchema>["answers"],
+  confidence: number
+): WidgetRoute | null {
+  if (answers.asks_for_human.noul >= HUMAN_REQUEST_SCORE) {
+    return null;
+  }
+  const refund = (answers.asks_for_refund?.noul ?? 0) >= REFUND_REQUEST;
+  if (!(refund || (answers.asks_for_ticket?.noul ?? 0) >= TICKET_REQUEST)) {
+    return null;
+  }
+  return {
+    asksForAction: 0,
+    asksForHuman: answers.asks_for_human.noul,
+    asksOwnData: answers.asks_own_data.noul,
+    confidence,
+    kbScore: 0,
+    lane: "investigate",
+    ...(refund ? { refund } : {}),
+    source: "jev",
+    ticket: true,
+    unclear: 0,
+  };
+}
 
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
@@ -301,23 +344,9 @@ export async function routeWidgetMessage(
     }
     const { answers } = responseSchema.parse(await response.json());
     const confidence = answers.lane.confidence ?? 0;
-    // A ticket can only be filed from an investigation, so a request for one is
-    // never a change to apologise for, a help-center question or a handoff.
-    const wantsTicket =
-      (answers.asks_for_ticket?.noul ?? 0) >= TICKET_REQUEST &&
-      answers.asks_for_human.noul < HUMAN_REQUEST_SCORE;
-    if (wantsTicket) {
-      return {
-        asksForAction: 0,
-        asksForHuman: answers.asks_for_human.noul,
-        asksOwnData: answers.asks_own_data.noul,
-        confidence,
-        kbScore: 0,
-        lane: "investigate",
-        source: "jev",
-        ticket: true,
-        unclear: 0,
-      };
+    const ticket = ticketRoute(answers, confidence);
+    if (ticket) {
+      return ticket;
     }
     return {
       asksForAction: answers.asks_for_action?.noul ?? 0,
@@ -348,7 +377,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}`,
     runId: fields.runId,
   });
 }

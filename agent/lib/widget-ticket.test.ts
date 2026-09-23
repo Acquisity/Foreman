@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   createWidgetTicket,
   invokeProvider,
+  REFUND_TICKET,
   widgetScopeBlock,
 } from "./executor/dispatch.js";
 import { executorTransport } from "./executor/transport.js";
@@ -51,6 +52,53 @@ test("the widget ticket takes its team, state and scope from the session", async
     team: "Engineering Team",
     title: "Inbox fails",
   });
+});
+
+test("a refund ticket goes to the billing queue, and only in that exact shape", async () => {
+  const scope = widgetScopeBlock(verifiedWidgetContext);
+  const [call] = await withTransport(() =>
+    createWidgetTicket(ctx(), {
+      refund: true,
+      report: "Report",
+      title: "Refund request",
+    })
+  );
+  assert.deepEqual(call?.[2], {
+    assignee: "Aaron Fraga",
+    description: `Report\n\n${scope}`,
+    labels: [...REFUND_TICKET.labels],
+    project: REFUND_TICKET.project,
+    state: "Triage",
+    team: "Engineering Team",
+    title: "Refund request",
+  });
+  const refused = (error: { code?: string }) =>
+    error.code === "customer_scope_required";
+  const calls = await withTransport(async () => {
+    // Half the refund shape, or another label, is not the billing queue.
+    await assert.rejects(
+      invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        description: `x\n\n${scope}`,
+        labels: [...REFUND_TICKET.labels],
+        state: "Triage",
+        team: "Engineering Team",
+        title: "Unsafe",
+      }),
+      refused
+    );
+    await assert.rejects(
+      invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...REFUND_TICKET,
+        description: `x\n\n${scope}`,
+        labels: ["Bug"],
+        state: "Triage",
+        team: "Engineering Team",
+        title: "Unsafe",
+      }),
+      refused
+    );
+  });
+  assert.equal(calls.length, 0);
 });
 
 test("a widget session cannot shape the ticket write itself", async () => {
