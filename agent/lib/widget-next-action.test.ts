@@ -983,3 +983,60 @@ describe("control notes", () => {
     assert.equal(noted.atToolResult, plain.atToolResult);
   });
 });
+
+describe("step model", () => {
+  const build = (choice: string, stepResult: ReturnType<typeof call>) => {
+    const main = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(text("findings")),
+    });
+    const step = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(stepResult),
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+        widgetNextActionMiddleware({
+          apiKey: "k",
+          fetch: jev(choice),
+          sessionId: "s",
+          stepModel: wrapLanguageModel({ middleware: [], model: step }),
+        }),
+      ],
+      model: main,
+    });
+    return { main, model, step };
+  };
+
+  it("fills in a read Jev picked, and never writes the findings", async () => {
+    const { main, model, step } = build(
+      "widget_billing_summary",
+      call("widget_billing_summary", {})
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      tools: TOOLS,
+    });
+    assert.equal(step.doGenerateCalls.length, 1);
+    assert.deepEqual(
+      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
+      ["widget_billing_summary"]
+    );
+    assert.equal(main.doGenerateCalls.length, 0);
+  });
+
+  it("leaves a finish write-up to the main model", async () => {
+    const { main, model, step } = build(
+      "finish",
+      call("widget_billing_summary", {})
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", [
+        { input: {}, output: { ok: true }, tool: "widget_billing_summary" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(step.doGenerateCalls.length, 0);
+    assert.equal(main.doGenerateCalls.length, 1);
+  });
+});

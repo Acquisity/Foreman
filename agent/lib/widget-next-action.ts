@@ -1,4 +1,4 @@
-import type { LanguageModelMiddleware } from "ai";
+import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 
@@ -574,7 +574,13 @@ function forcedParams(
  * already empty once the tool budget is spent, in which case there is nothing to choose.
  */
 export function widgetNextActionMiddleware(
-  opts: SelectorOptions = {}
+  opts: SelectorOptions & {
+    /**
+     * Fills in the arguments of a read Jev picked. The wrapped model keeps the
+     * write-up and the question for the customer, which need judgment.
+     */
+    stepModel?: ReturnType<typeof wrapLanguageModel>;
+  } = {}
 ): LanguageModelMiddleware {
   const plans = new WeakMap<object, Plan>();
   const remember = (
@@ -785,7 +791,10 @@ export function widgetNextActionMiddleware(
       });
       let generated: Awaited<ReturnType<typeof doGenerate>>;
       try {
-        generated = await doGenerate();
+        generated =
+          opts.stepModel && plan.tool !== ASK_TOOL
+            ? await opts.stepModel.doGenerate(params)
+            : await doGenerate();
       } catch (error) {
         // A local request timeout can use the existing fallback. A cancelled
         // investigation must never restart work with another model request.

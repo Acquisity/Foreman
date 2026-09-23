@@ -234,13 +234,20 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
  * is generated whole and replayed as a stream, because a repeated read can only
  * be caught, and the step redone, once the full call is known.
  */
-export const widgetInvestigationModel = (id: string, sessionId?: string) =>
+export const widgetInvestigationModel = (
+  id: string,
+  sessionId?: string,
+  stepsId?: string
+) =>
   wrapLanguageModel({
     middleware: nextActionEnabled()
       ? [
           widgetInvestigationMiddleware(),
           simulateStreamingMiddleware(),
-          widgetNextActionMiddleware({ sessionId }),
+          widgetNextActionMiddleware({
+            sessionId,
+            stepModel: stepsId ? ticketLinkedModel(stepsId) : undefined,
+          }),
         ]
       : widgetInvestigationMiddleware(),
     model: ticketLinkedModel(id),

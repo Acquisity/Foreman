@@ -9,10 +9,11 @@ import { isWidgetSupport } from "./lib/widget-scope.js";
 function investigationModel(
   auth: Parameters<typeof isWidgetSupport>[0],
   id: string,
-  sessionId?: string
+  sessionId?: string,
+  stepsId?: string
 ) {
   if (isWidgetSupport(auth)) {
-    return widgetInvestigationModel(id, sessionId);
+    return widgetInvestigationModel(id, sessionId, stepsId);
   }
   if (isFinInvestigation(auth)) {
     return finInvestigationModel(id);
@@ -47,7 +48,8 @@ export default defineAgent({
           model: investigationModel(
             ctx.session.auth.initiator,
             id,
-            ctx.session.id
+            ctx.session.id,
+            widget ? await resolveModel("widgetSteps") : undefined
           ),
           // Jev decides each widget step, so the widget model only acts: on its
           // default reasoning each step ran past the 15s model-call timeout.

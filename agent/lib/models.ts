@@ -19,14 +19,16 @@ export const MODELS = {
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
-  // Support widget investigator and reply writer. Jev picks every step, so this
-  // model only fills in one read's arguments, writes the findings and writes the
-  // reply: acting, not deciding. The orchestrator's reasoning took 10 to 30s a
-  // step and ran investigations past the widget deadline (3 of 14 runs,
-  // 2026-09-23); the egress reviewer stays on `gate`. Measured through the
-  // gateway the same afternoon: gemini-3.5-flash took ~15s on every call (small
-  // or large), haiku-4.5 ~1s.
-  widget: "anthropic/claude-haiku-4.5",
+  // Support widget diagnosis: the investigator's write-up of what the evidence
+  // shows, a question for the customer, and the reply. It runs once or twice an
+  // investigation. Measured through the gateway 2026-09-23 on a full-size
+  // write-up: sonnet-5 12 to 20s, haiku-4.5 10 to 16s, the orchestrator's
+  // deepseek 39 to 41s, which with a deepseek call on every step ran 3 of 14
+  // investigations past the widget deadline. The egress reviewer stays on `gate`.
+  widget: "anthropic/claude-sonnet-5",
+  // Support widget steps: Jev picks each read, so this only fills in its
+  // arguments. ~1s a call; gemini-3.5-flash took ~15s a call the same afternoon.
+  widgetSteps: "anthropic/claude-haiku-4.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;
