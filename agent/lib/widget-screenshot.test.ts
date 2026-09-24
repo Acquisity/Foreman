@@ -159,3 +159,38 @@ describe("readScreenshot hedging", () => {
     assert.equal(result.screen, "backup");
   });
 });
+
+describe("a teammate's screenshot", () => {
+  it("is verified as staff against its conversation", async () => {
+    let seen: { staff?: boolean; conversationId?: string } = {};
+    const response = await receiveWidgetScreenshot(
+      post({
+        conversation_id: ORG,
+        image: PNG.toString("base64"),
+        organization_id: ORG,
+        staff: true,
+      }),
+      (input) => {
+        seen = input;
+        return Promise.resolve({} as never);
+      },
+      read
+    );
+    assert.equal(response.status, 200);
+    assert.equal(seen.staff, true);
+    assert.equal(seen.conversationId, ORG);
+  });
+
+  it("is refused without a conversation", async () => {
+    const response = await receiveWidgetScreenshot(
+      post({
+        image: PNG.toString("base64"),
+        organization_id: ORG,
+        staff: true,
+      }),
+      verified,
+      read
+    );
+    assert.equal(response.status, 400);
+  });
+});

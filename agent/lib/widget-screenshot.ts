@@ -36,12 +36,19 @@ const HEDGE_AFTER_MS = 4000;
 const BACKUP_MODEL = "google/gemini-3.5-flash-lite";
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 
-const inputSchema = z.strictObject({
-  // Absent for the first message of a new chat: the chat does not exist yet.
-  conversation_id: z.uuid().optional(),
-  image: z.base64().max(MAX_BODY_CHARS),
-  organization_id: z.uuid(),
-});
+const inputSchema = z
+  .strictObject({
+    // Absent for the first message of a new chat: the chat does not exist yet.
+    conversation_id: z.uuid().optional(),
+    image: z.base64().max(MAX_BODY_CHARS),
+    organization_id: z.uuid(),
+    // A support teammate attached it in the inbox. The app then checks the
+    // teammate against the conversation, as it does for an inbox investigation.
+    staff: z.boolean().optional(),
+  })
+  .refine((input) => !input.staff || input.conversation_id, {
+    message: "A teammate's screenshot names its conversation.",
+  });
 
 const readingSchema = z.object({
   error_text: z
@@ -189,6 +196,7 @@ export async function receiveWidgetScreenshot(
       conversationId: input.conversation_id ?? randomUUID(),
       organizationId: input.organization_id,
       signal: request.signal,
+      staff: input.staff,
       userToken,
     });
   } catch {
