@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.SUPPORT_CHAT_ENABLED = "true";
 
-const { receiveWidgetScreenshot, renderReading } = await import(
+const { readScreenshot, receiveWidgetScreenshot, renderReading } = await import(
   "./widget-screenshot.js"
 );
 const { withScreenshots } = await import("./widget-investigation.js");
@@ -98,5 +98,47 @@ describe("withScreenshots", () => {
       input.action === "start" && input.question,
       "why is this failing?\n\n[Screenshot ...] one\n\n[Screenshot ...] two"
     );
+  });
+});
+
+describe("readScreenshot hedging", () => {
+  const later = <T>(ms: number, value: T) =>
+    new Promise<T>((resolve) => setTimeout(resolve, ms, value));
+  const readingOf = (screen: string) => ({
+    error_text: [],
+    notable: "",
+    screen,
+    unreadable: [],
+  });
+
+  it("never starts the backup when the first read is quick", async () => {
+    const models: string[] = [];
+    const result = await readScreenshot(
+      PNG,
+      "image/png",
+      AbortSignal.timeout(10_000),
+      (model) => {
+        models.push(model);
+        return later(10, readingOf(model));
+      }
+    );
+    await later(20, null);
+    assert.deepEqual(models, [result.screen]);
+  });
+
+  it("answers from the backup when the first read fails", async () => {
+    const result = await readScreenshot(
+      PNG,
+      "image/png",
+      AbortSignal.timeout(10_000),
+      (model, _image, _type, signal) =>
+        model.endsWith("lite")
+          ? later(5, readingOf("backup"))
+          : new Promise((_, reject) => {
+              signal.addEventListener("abort", () => reject(new Error("x")));
+              setTimeout(() => reject(new Error("stalled")), 5);
+            })
+    );
+    assert.equal(result.screen, "backup");
   });
 });

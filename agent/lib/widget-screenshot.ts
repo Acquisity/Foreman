@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
@@ -20,12 +21,19 @@ import { verifyWidgetContext } from "./widget-context.js";
  * trips the customer would wait on. Measured through the gateway 2026-09-24 on
  * six real app screenshots: gemini-3.5-flash 1.7 to 6s (about 2.7s average);
  * flash-lite about 1.4s but missed highlighted controls and banner text.
+ *
+ * The same afternoon the first preview read took 18s: gemini-3.5-flash through
+ * the gateway is bimodal, about 1.8s or a 15 to 20s stall, with or without
+ * structured output. So a read still running after {@link HEDGE_AFTER_MS} is
+ * raced by one on {@link BACKUP_MODEL}, and the first to finish wins.
  */
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 // base64 of the largest image plus the scope fields.
 const MAX_BODY_CHARS = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 1024;
 const READ_TIMEOUT_MS = 20_000;
+const HEDGE_AFTER_MS = 4000;
+const BACKUP_MODEL = "google/gemini-3.5-flash-lite";
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 
 const inputSchema = z.strictObject({
@@ -61,14 +69,49 @@ const READ_PROMPT =
 export async function readScreenshot(
   image: Buffer,
   mediaType: string,
+  signal: AbortSignal,
+  readWith = readOnce
+): Promise<ScreenshotReading> {
+  const settled = new AbortController();
+  const scoped = AbortSignal.any([signal, settled.signal]);
+  const primary = readWith(
+    await resolveModel("vision"),
+    image,
+    mediaType,
+    scoped
+  );
+  const backup = (async () => {
+    await Promise.race([
+      sleep(HEDGE_AFTER_MS, undefined, { signal: scoped }),
+      // A failed primary starts the backup at once; a successful one never
+      // does, since the abort below ends the wait first.
+      primary.then(
+        () => new Promise<never>(() => undefined),
+        () => undefined
+      ),
+    ]);
+    return readWith(BACKUP_MODEL, image, mediaType, scoped);
+  })();
+  try {
+    return await Promise.any([primary, backup]);
+  } finally {
+    settled.abort();
+  }
+}
+
+async function readOnce(
+  model: string,
+  image: Buffer,
+  mediaType: string,
   signal: AbortSignal
 ): Promise<ScreenshotReading> {
-  const model = await resolveModel("vision");
   const { object } = await generateObject({
     abortSignal: AbortSignal.any([
       signal,
       AbortSignal.timeout(READ_TIMEOUT_MS),
     ]),
+    // A stalled call is raced by the backup, never retried in place.
+    maxRetries: 0,
     messages: [
       {
         content: [{ data: image, mediaType, type: "file" }],
