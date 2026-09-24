@@ -105,8 +105,10 @@ export type WidgetHistory = z.infer<typeof historySchema>;
 /** The message as the investigator, extractor, composer and selector read it: the router's own format. */
 export const withHistory = (
   question: string,
-  history: WidgetHistory | undefined
-): string => renderConversation(question, history);
+  history: WidgetHistory | undefined,
+  screenshots?: string[]
+): string =>
+  renderConversation(question, history, DECISION_CONTEXT, screenshots);
 
 /**
  * The message as the front door reads it: the latest message on its own, the
@@ -114,13 +116,15 @@ export const withHistory = (
  */
 export const toWidgetAsk = (
   question: string,
-  history: WidgetHistory | undefined
+  history: WidgetHistory | undefined,
+  screenshots?: string[]
 ): WidgetAsk => {
   const turns = (history ?? []).filter((turn) => turn.text.trim());
   return {
     activeArticles:
       turns.filter((turn) => turn.role === "assistant").at(-1)?.citations ?? [],
     latest: question,
+    ...(screenshots?.length ? { screenshots } : {}),
     turns: turns.map(({ role, text }) => ({ role, text })),
   };
 };
@@ -133,7 +137,8 @@ const inputSchema = z.discriminatedUnion("action", [
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
     // What /internal/widget/image read from each screenshot sent with this
-    // message. Joined onto the question at intake, so every stage reads it.
+    // message. The front door and the investigator read them beside the
+    // question; the stored run keeps them joined onto it for later stages.
     screenshots: z.array(z.string().trim().min(1).max(1500)).max(3).optional(),
   }),
   z.strictObject({
@@ -149,14 +154,10 @@ const inputSchema = z.discriminatedUnion("action", [
 ]);
 export type WidgetInput = z.infer<typeof inputSchema>;
 
-export const withScreenshots = (input: WidgetInput): WidgetInput =>
-  input.action === "start" && input.screenshots?.length
-    ? {
-        ...input,
-        question: [input.question, ...input.screenshots].join("\n\n"),
-        screenshots: undefined,
-      }
-    : input;
+/** The question as the run stores it, readings and all, for the stages that read it back. */
+export const withScreenshots = (
+  input: Extract<WidgetInput, { action: "start" }>
+): string => [input.question, ...(input.screenshots ?? [])].join("\n\n");
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -734,7 +735,7 @@ const requestKey = (input: Extract<WidgetInput, { action: "start" }>) =>
     .update(
       JSON.stringify([
         input.conversation_id,
-        input.question,
+        withScreenshots(input),
         ...(input.staff ? ["inbox"] : []),
       ])
     )
@@ -1241,8 +1242,12 @@ async function answerFreshRun(
   responseWaitMs: number,
   deps: WidgetDependencies
 ): Promise<Response> {
-  const message = withHistory(input.question, input.history);
-  const ask = toWidgetAsk(input.question, input.history);
+  const message = withHistory(
+    input.question,
+    input.history,
+    input.screenshots
+  );
+  const ask = toWidgetAsk(input.question, input.history, input.screenshots);
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
@@ -1330,7 +1335,7 @@ export async function receiveWidgetMessage(
       return json({ error: "Request is too large." }, 413);
     }
     const raw = JSON.parse(body);
-    input = withScreenshots(inputSchema.parse({ action: "start", ...raw }));
+    input = inputSchema.parse({ action: "start", ...raw });
   } catch {
     return json({ error: "Invalid support request." }, 400);
   }
@@ -1376,7 +1381,7 @@ export async function receiveWidgetMessage(
     const { busy, fresh, run } = await deps.claim(
       scope,
       requestKey(input),
-      input.question
+      withScreenshots(input)
     );
     if (busy) {
       return json({ run_id: run.id, status: "busy" });

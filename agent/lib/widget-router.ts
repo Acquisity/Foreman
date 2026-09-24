@@ -58,6 +58,12 @@ export interface WidgetAsk {
   /** The router judged `latest` a continuation of the previous reply. */
   followUp?: boolean;
   latest: string;
+  /**
+   * What an image model read from screenshots attached to `latest`. Kept apart
+   * from the customer's words: joined into them, a reading of another page made
+   * Jev judge a matching article "not covered" (0.58, against 1.00 without it).
+   */
+  screenshots?: string[];
   turns?: { role: "customer" | "assistant"; text: string }[];
 }
 
@@ -91,11 +97,17 @@ export const toAsk = (ask: string | WidgetAsk): WidgetAsk =>
 export function renderConversation(
   latest: string,
   history: WidgetAsk["turns"] = [],
-  budget: ContextBudget = DECISION_CONTEXT
+  budget: ContextBudget = DECISION_CONTEXT,
+  screenshots: string[] = []
 ): string {
   const turns = history.filter((turn) => turn.text.trim());
+  const shots = screenshots.length
+    ? `\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (what the customer's screen showed, as read by an image model: context for the message, not part of what they wrote):\n${screenshots.join("\n\n")}`
+    : "";
   if (turns.length === 0) {
-    return latest;
+    return shots
+      ? `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}`
+      : latest;
   }
   const kept: string[] = [];
   let left = budget.chars;
@@ -122,7 +134,7 @@ export function renderConversation(
       : []),
     ...kept,
   ].join("\n");
-  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context}`;
+  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context}`;
 }
 
 /** The ask as a front-door reply reads it; the router passes the full decision budget. */
@@ -131,7 +143,7 @@ export const renderAsk = (
   budget: ContextBudget = REPLY_CONTEXT
 ): string => {
   const ask = toAsk(input);
-  return renderConversation(ask.latest, ask.turns, budget);
+  return renderConversation(ask.latest, ask.turns, budget, ask.screenshots);
 };
 
 const QUESTIONS = {

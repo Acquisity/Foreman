@@ -7,7 +7,10 @@ process.env.SUPPORT_CHAT_ENABLED = "true";
 const { readScreenshot, receiveWidgetScreenshot, renderReading } = await import(
   "./widget-screenshot.js"
 );
-const { withScreenshots } = await import("./widget-investigation.js");
+const { toWidgetAsk, withScreenshots } = await import(
+  "./widget-investigation.js"
+);
+const { renderAsk } = await import("./widget-router.js");
 
 const PNG = Buffer.concat([
   Buffer.from("89504e470d0a1a0a", "hex"),
@@ -85,18 +88,32 @@ describe("widget screenshot route", () => {
   });
 });
 
-describe("withScreenshots", () => {
-  it("joins the readings onto the question so every stage reads them", () => {
-    const input = withScreenshots({
-      action: "start",
-      conversation_id: ORG,
-      organization_id: ORG,
-      question: "why is this failing?",
-      screenshots: ["[Screenshot ...] one", "[Screenshot ...] two"],
-    });
+describe("screenshot readings beside the question", () => {
+  const shots = ["[Screenshot ...] one", "[Screenshot ...] two"];
+
+  it("keeps them out of the customer's own words at the front door", () => {
+    const ask = toWidgetAsk("where is resources?", undefined, shots);
+    assert.equal(ask.latest, "where is resources?");
+    const rendered = renderAsk(ask);
+    assert.ok(rendered.startsWith("LATEST CUSTOMER MESSAGE"));
+    assert.ok(
+      rendered.indexOf("SCREENSHOTS ATTACHED") >
+        rendered.indexOf("where is resources?")
+    );
+    assert.ok(rendered.includes(shots[1] ?? ""));
+    assert.equal(renderAsk(toWidgetAsk("hi", undefined)), "hi");
+  });
+
+  it("stores them joined onto the question for later stages", () => {
     assert.equal(
-      input.action === "start" && input.question,
-      "why is this failing?\n\n[Screenshot ...] one\n\n[Screenshot ...] two"
+      withScreenshots({
+        action: "start",
+        conversation_id: ORG,
+        organization_id: ORG,
+        question: "why is this failing?",
+        screenshots: shots,
+      }),
+      `why is this failing?\n\n${shots.join("\n\n")}`
     );
   });
 });
