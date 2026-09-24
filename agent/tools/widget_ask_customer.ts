@@ -29,7 +29,7 @@ const tool = defineTool({
     "Record the one question to ask the customer when a single detail only they " +
     "can give is needed before anything more can be checked. One short, friendly " +
     "question that states no facts, makes no promises, names no tool or system and " +
-    "asks for no file or screenshot. Returns asked when recorded, or error with " +
+    "asks for no file (a screenshot is fine). Returns asked when recorded, or error with " +
     "what to correct.",
   execute({ question }, ctx) {
     if (!isWidgetSupport(ctx.session.auth.initiator)) {

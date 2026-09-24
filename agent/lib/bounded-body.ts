@@ -1,10 +1,14 @@
 /**
- * Read a request body as text, or null once it exceeds 8 KB. A deadline bounds
+ * Read a request body as text, or null once it exceeds `maxChars` (8 KB by default). A deadline bounds
  * the total read so a client that trickles bytes slowly (staying under the size
  * cap) cannot hold the route open: when it fires, the reader is cancelled, the
  * pending read rejects, and the caller treats the request as unreadable.
  */
-export async function readRequestBody(request: Request, timeoutMs = 10_000) {
+export async function readRequestBody(
+  request: Request,
+  timeoutMs = 10_000,
+  maxChars = 8192
+) {
   if (!request.body) {
     return "";
   }
@@ -22,7 +26,7 @@ export async function readRequestBody(request: Request, timeoutMs = 10_000) {
       if (done) {
         return body;
       }
-      if (body.length + value.length > 8192) {
+      if (body.length + value.length > maxChars) {
         return null;
       }
       body += value;

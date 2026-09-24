@@ -132,6 +132,9 @@ const inputSchema = z.discriminatedUnion("action", [
     history: historySchema.optional(),
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
+    // What /internal/widget/image read from each screenshot sent with this
+    // message. Joined onto the question at intake, so every stage reads it.
+    screenshots: z.array(z.string().trim().min(1).max(1500)).max(3).optional(),
   }),
   z.strictObject({
     ...scopeFields,
@@ -145,6 +148,15 @@ const inputSchema = z.discriminatedUnion("action", [
   }),
 ]);
 export type WidgetInput = z.infer<typeof inputSchema>;
+
+export const withScreenshots = (input: WidgetInput): WidgetInput =>
+  input.action === "start" && input.screenshots?.length
+    ? {
+        ...input,
+        question: [input.question, ...input.screenshots].join("\n\n"),
+        screenshots: undefined,
+      }
+    : input;
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -1318,7 +1330,7 @@ export async function receiveWidgetMessage(
       return json({ error: "Request is too large." }, 413);
     }
     const raw = JSON.parse(body);
-    input = inputSchema.parse({ action: "start", ...raw });
+    input = withScreenshots(inputSchema.parse({ action: "start", ...raw }));
   } catch {
     return json({ error: "Invalid support request." }, 400);
   }

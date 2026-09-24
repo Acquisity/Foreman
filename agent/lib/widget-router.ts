@@ -18,9 +18,10 @@ import { logOpsEvent } from "./ops-log.js";
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
-// The accepted question (4,000) plus the full history budget and its labels fit
-// inside this, so the cap never cuts anything; the latest message leads regardless.
-const MAX_STATE_CHARS = 12_000;
+// The accepted question (4,000) with up to three screenshot readings (1,500
+// each) plus the full history budget and its labels fit inside this, so the cap
+// never cuts anything; the latest message leads regardless.
+const MAX_STATE_CHARS = 16_000;
 
 /** Below this, an explicit ask for a person was not what the customer wrote. */
 export const HUMAN_REQUEST_SCORE = 0.8;

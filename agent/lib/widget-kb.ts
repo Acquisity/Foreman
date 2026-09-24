@@ -46,7 +46,7 @@ const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
 
 const TEXT_ONLY =
-  "This chat is text only: the customer cannot attach, paste or upload a file, image, screenshot or recording here, so never ask for one and never describe an upload or attach control. Ask them to describe what they see or paste the exact error text instead.";
+  "The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. They cannot attach files or recordings of any other kind here.";
 
 export const kbCitationSchema = z.object({
   n: z.number().int().positive(),
