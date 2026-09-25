@@ -1,4 +1,4 @@
-import type { SlackAttachment } from "eve/channels/slack";
+import type { SlackAttachment, SlackAuthor } from "eve/channels/slack";
 import type { SessionAuthContext } from "eve/context";
 import { stampIntakeOnly } from "./trust.js";
 
@@ -42,6 +42,24 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
   C0BMXPV6EGJ: BILLING_TRIAGE_WORKFLOW,
   C0BNCL031AQ: INTERCOM_INTAKE_WORKFLOW,
 };
+
+/**
+ * Intake channels whose asks Foreman investigates in Linear. A person tagging
+ * Foreman here would start a second investigation beside the Linear one, so
+ * only the Asks receiver's own mention (its fallback when Linear rejects the
+ * handoff) is answered; the requester's thread replies wake the Linear session.
+ */
+const LINEAR_INVESTIGATED_CHANNELS: ReadonlySet<string> = new Set([
+  "C0BBPVC3N2X",
+]);
+
+/** Whether a Slack mention in this channel may start a Foreman turn. */
+export function admitsSlackMention(
+  channelId: string,
+  author: SlackAuthor | undefined
+): boolean {
+  return !LINEAR_INVESTIGATED_CHANNELS.has(channelId) || author?.isBot === true;
+}
 
 // The final Slack-post rule, stated once here as the canonical home. The Slack
 // channel injects it into every session, the intake boundary below carries the
