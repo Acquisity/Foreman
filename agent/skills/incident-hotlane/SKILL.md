@@ -39,7 +39,7 @@ Propose `STANDARD_ENGINEERING` for a confirmed defect that meets none of those. 
 
 When evidence points at a high-risk condition but a critical evidence lane was unavailable, so the condition cannot be confirmed, return `NEEDS_HUMAN_URGENT`. Do not downgrade it to routine work. `NEEDS_HUMAN_URGENT` means Foreman stops before any settled classification, priority, label, master, or announcement, keeps the investigation document, and routes the case to a person with a clearly labelled provisional note that a possible high-risk incident is awaiting confirmation. Foreman does that; this skill only returns the route.
 
-A `HOTLANE` proposal maps to the existing `fast-lane` label on the ENG team. Stage 6 applies it after the critic review settles, alongside the numeric priority Stage 5 already decided. This skill does not set priority; Stage 5 owns it.
+A `HOTLANE` proposal maps to the existing `fast-lane` label on the ENG team. `engineering-handoff` applies it to the master only, after the critic review settles, never to the customer ticket. This skill does not set priority; Stage 5 owns it.
 
 ## Separate the four workstreams
 

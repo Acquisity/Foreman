@@ -123,7 +123,7 @@ const intercomIssueTask = (skills: readonly string[]): string =>
 const existingIssueTask = (skills: readonly string[]): string =>
   [
     `Use the existing-issue Linear workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
-    "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures.",
+    "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures. These skills are the entry procedure: when one hands the ask to another skill, such as a money ask to billing-triage, that skill then governs.",
     "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, ask the requester for its Linear link or identifier, then stop.",
     "Answer in the Slack thread, honoring the final-post rule above and the channel scope of any loaded wording skill, then stop.",
   ].join("\n\n");

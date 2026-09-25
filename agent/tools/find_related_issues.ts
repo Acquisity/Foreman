@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { isIntakeOnly } from "#lib/trust.js";
+import { isIntakeOnly, isLinearSession } from "#lib/trust.js";
 
 const relatedIssueSchema = z.object({
   assignee: z.string().nullable(),
@@ -20,14 +20,14 @@ const relatedIssueSchema = z.object({
 export default defineTool({
   description:
     "Search Linear with fixed queries. scope duplicates: every team, closed and archived included, for prior reports and investigations of the same symptom. " +
-    "scope masters: Engineering Team issues eligible to own a root cause; in an intake-only Slack session only issues created in the last 30 days are eligible, elsewhere there is no cutoff, and createdAfter reports which applied. " +
+    "scope masters: Engineering Team issues eligible to own a root cause; in an intake-only Slack session or a Linear session only issues created in the last 30 days are eligible, elsewhere there is no cutoff, and createdAfter reports which applied. " +
     "Pass 2 to 4 phrasings: the customer outcome, the visible error text, the feature or object name, and for masters the root cause and code path. " +
     "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate.",
   async execute(input, ctx) {
     const auth = ctx.session.auth.current;
     try {
       return await findRelatedIssues(
-        { ...input, windowed: isIntakeOnly(auth) },
+        { ...input, windowed: isIntakeOnly(auth) || isLinearSession(auth) },
         { client: executorClient(ctx), signal: ctx.abortSignal }
       );
     } catch (error) {
