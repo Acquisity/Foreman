@@ -93,6 +93,7 @@ export async function askJev(
   const signal = opts.signal
     ? AbortSignal.any([opts.signal, timeout])
     : timeout;
+  signal.throwIfAborted();
   const token = opts.token ?? (await beforeAbort(resolveToken(), signal));
   const response = await (opts.fetch ?? fetch)(JEV_URL, {
     body: JSON.stringify({
