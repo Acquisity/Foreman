@@ -237,7 +237,7 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
   assert.equal(
     (
       await receiveWidgetMessage(
-        request({ ...start, question: "x".repeat(9000) }),
+        request({ ...start, question: "x".repeat(600_000) }),
         noWork(),
         1,
         verified,
@@ -246,6 +246,36 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
     ).status,
     413
   );
+});
+
+test("a valid conversation at every schema limit is read whole, not refused as too large", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  // Control characters are the worst case: JSON writes each one as six.
+  const text = (length: number) => "\u0001".repeat(length);
+  const body = JSON.stringify({
+    ...start,
+    history: Array.from({ length: 12 }, (_, index) => ({
+      citations: Array.from({ length: 4 }, () => ({
+        title: text(300),
+        url: text(500),
+      })),
+      role: index % 2 ? "assistant" : "customer",
+      text: text(4000),
+    })),
+    question: `a${text(3998)}b`,
+    screenshots: Array.from({ length: 3 }, () => `a${text(1498)}b`),
+  });
+  assert.ok(body.length > 8192);
+  const response = await receiveWidgetMessage(
+    request(body),
+    noWork(),
+    1,
+    () => Promise.reject(new Error("denied")),
+    deps
+  );
+  // Past the body read and the schema, it reaches workspace verification.
+  assert.equal(response.status, 403);
 });
 
 test("an unverified workspace starts nothing", async (t) => {

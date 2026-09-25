@@ -154,6 +154,15 @@ const inputSchema = z.discriminatedUnion("action", [
 ]);
 export type WidgetInput = z.infer<typeof inputSchema>;
 
+/**
+ * The largest body a valid start can be: the question, twelve turns with four
+ * citations each, and three screenshot readings at their schema limits, every
+ * character escaped to six in JSON (\u0000), plus room for the ids and keys.
+ * The default 8 KB read cap refused ordinary multi-turn conversations.
+ */
+const MAX_START_BODY_CHARS =
+  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500) * 6 + 4096;
+
 /** The question as the run stores it, readings and all, for the stages that read it back. */
 export const withScreenshots = (
   input: Extract<WidgetInput, { action: "start" }>
@@ -1326,7 +1335,11 @@ export async function receiveWidgetMessage(
   }
   let input: WidgetInput;
   try {
-    const body = await readRequestBody(request);
+    const body = await readRequestBody(
+      request,
+      undefined,
+      MAX_START_BODY_CHARS
+    );
     if (body === null) {
       return json({ error: "Request is too large." }, 413);
     }
