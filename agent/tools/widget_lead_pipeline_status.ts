@@ -148,8 +148,8 @@ export function buildWidgetLeadPipelineQuery(
         'unknown', count(*) filter (where v.status is null or v.status not in ('pending', 'completed', 'failed')))
         from lead_scrape_email_verification v
         where v.organization_id = lsr.organization_id and v.scrape_run_id = lsr.id) as "verificationJobs",
-      (lsr.status in ('pending', 'running')
-        and lsr.started_at < current_timestamp - interval '${STUCK_MINUTES} minutes') as stuck,
+      coalesce(lsr.status in ('pending', 'running')
+        and lsr.started_at < current_timestamp - interval '${STUCK_MINUTES} minutes', false) as stuck,
       lsr.started_at as "startedAt", lsr.finished_at as "finishedAt", lsr.updated_at as "updatedAt"
     from lead_scrape_run lsr join authorized a on a.id = lsr.organization_id
     where ${input.scrapeRunId ? "true" : `lsr.created_at > current_timestamp - make_interval(days => ${days})`}
