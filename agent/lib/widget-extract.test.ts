@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { extractWidgetFindings, filedTicket } from "./widget-extract.js";
+import {
+  defaultExtractDeps,
+  extractWidgetFindings,
+  filedTicket,
+} from "./widget-extract.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
 // What the small model returns: the lenient extraction shape.
@@ -144,4 +148,39 @@ test("a billing review hands off with its facts and unresolved questions intact"
   assert.equal(out?.needsHuman, true);
   assert.deepEqual(out?.facts, expected.facts);
   assert.equal(out?.recommendation.includes("second charge"), true);
+});
+
+test("the default extractor runs under a deadline, so a stalled call hands the write-up to a person", async () => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  globalThis.fetch = ((request: RequestInfo | URL, init?: RequestInit) => {
+    if (
+      String(request instanceof Request ? request.url : request).includes(
+        "ai-gateway"
+      )
+    ) {
+      signals.push(init?.signal);
+    }
+    return Promise.resolve(new Response("{}", { status: 400 }));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      defaultExtractDeps.generate({
+        investigatorText: "The sending inbox is disconnected.",
+        question: "Why did my campaign stop?",
+        scope,
+      })
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = realKey;
+    }
+  }
+  assert.equal(signals.length, 1);
+  assert.ok(signals[0] instanceof AbortSignal);
 });

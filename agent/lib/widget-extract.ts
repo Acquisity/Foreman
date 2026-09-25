@@ -118,12 +118,16 @@ export interface ExtractDeps {
   generate: (input: ExtractInput) => Promise<unknown>;
 }
 
+/** Part of the finish budget in widget-egress: a stall hands the write-up to a person instead of holding the reply. */
+const EXTRACT_TIMEOUT_MS = 25_000;
+
 export const defaultExtractDeps: ExtractDeps = {
   async generate({ investigatorText, question, scope }) {
     // Reformatting the investigator's prose needs no reasoning, and the gate
     // re-validates everything downstream, so this runs on the fast slot.
     const model = await resolveModel("kb");
     const { object } = await generateObject({
+      abortSignal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
       model: gateway(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
