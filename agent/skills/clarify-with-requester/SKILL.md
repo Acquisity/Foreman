@@ -6,7 +6,7 @@ description: "When and how to involve the requester in a triage decision — the
 
 Triage is a dialogue with the requester, not a report written about them. Two decisions bracket every investigation: whether you can start without them, and whether you can decide without them. When either is in doubt, ask.
 
-Both gates use the same ask flow: batch the questions into one message. In a Slack session post it in the thread. In a Linear session it is your one `reply_to_requester` message, never a Linear comment, and it is sent only when Gate 2 holds the verdict; otherwise record the open question in the investigation document and answer. After asking, keep checking the evidence that does not depend on the answer. Withhold only what depends on it: the verdict, routing, and the closing reply. An open question is not a verdict.
+Both gates use the same ask flow: batch the questions into one message. In a Slack session post it in the thread. In a Linear session it is your one `reply_to_requester` message, never a Linear comment, sent at Gate 1 when a customer-specific check cannot run without the missing fact, or at Gate 2 when the verdict needs it; otherwise record the open question in the investigation document and answer. After asking, keep checking the evidence that does not depend on the answer. Withhold only what depends on it: the verdict, routing, and the closing reply. An open question is not a verdict.
 
 ## Gate 1 — before investigating
 
@@ -28,7 +28,7 @@ The requester's concrete evidence beats a working hypothesis. New specifics re-o
 
 ## Severity honesty
 
-Priority belongs to `decide_triage`. A fact that lands before routing means calling it again; after routing, a changed conclusion re-runs it and re-routes.
+Priority and routing belong to the decision tool (`decide_triage`, or `decide_billing` for a money ask). A fact that lands before routing means calling it again; after routing, a changed conclusion re-runs it and re-routes.
 
 ## Every close carries its reopen condition
 

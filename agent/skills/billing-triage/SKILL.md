@@ -13,7 +13,7 @@ Jev decides whether this ticket is a **money** ask or a **product** ask: after r
 - If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. clarify-with-requester and slack-wording still do.
 - If it is a product ask, hand it to triage-investigate instead, which then governs.
 - If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. That line is a sentence inside the reply, never its own post, and a Linear session has no channel to mismatch. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
-- If it answers `unclear`, ask one batched question to place it and keep reading what does not depend on the answer.
+- If it answers `unclear`, ask one batched question to place it and keep reading what does not depend on the answer. When they answer, call `classify_ask` again with the report and their answer, and use its new bucket and source labels.
 
 ## Step 1: Read the Linear issue
 
