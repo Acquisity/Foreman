@@ -25,12 +25,13 @@ type KnownIssue = z.infer<typeof knownIssueSchema>;
  * Open issues sort ahead of closed ones, ties broken by recency, before the
  * result is capped.
  */
-async function searchKnownIssues(
+export async function searchKnownIssues(
   query: string,
-  opts: { client: ReturnType<typeof executorClient>; signal: AbortSignal }
+  opts: { client: ReturnType<typeof executorClient>; signal: AbortSignal },
+  search: typeof findRelatedIssues = findRelatedIssues
 ): Promise<{ error?: string; issues: KnownIssue[] }> {
   try {
-    const result = await findRelatedIssues(
+    const result = await search(
       { phrases: [query], scope: "masters", windowed: false },
       opts
     );

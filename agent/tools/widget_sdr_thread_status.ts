@@ -66,6 +66,15 @@ const timestamp = z
   .max(64)
   .refine((value) => Number.isFinite(Date.parse(value)));
 const zone = z.string().max(64);
+/**
+ * Text the SQL cuts with left(), which counts characters. Zod's max counts
+ * UTF-16 units, so an emoji inside a full-length cut would fail the whole read.
+ */
+const sqlText = (limit: number) =>
+  z
+    .string()
+    .max(limit * 2)
+    .refine((value) => [...value].length <= limit);
 const controlLevel = z.enum([
   "automated",
   "human_takeover",
@@ -93,8 +102,8 @@ const threadStatus = z.object({
   lastMessageAt: timestamp.nullable(),
   lifecycle: lifecycle.nullable(),
   nextFollowupAt: timestamp.nullable(),
-  prospectEmail: z.string().max(320).nullable(),
-  prospectName: z.string().max(200).nullable(),
+  prospectEmail: sqlText(320).nullable(),
+  prospectName: sqlText(200).nullable(),
   prospectTimezone: zone,
 });
 const threadSummary = threadStatus.extend({
@@ -105,7 +114,7 @@ const followup = z.object({
   executedAt: timestamp.nullable(),
   scheduledAt: timestamp,
   sequenceIndex: count,
-  skipReason: z.string().max(200).nullable(),
+  skipReason: sqlText(200).nullable(),
   status: z.enum(["pending", "sent", "cancelled", "skipped"]),
   totalInSequence: count,
 });
@@ -122,8 +131,8 @@ const appointment = z.object({
   supersededByAppointmentId: z.uuid().nullable(),
 });
 const calendarAccount = z.object({
-  activeOn: z.string().max(500).nullable(),
-  checkFor: z.array(z.string().max(500)).max(20),
+  activeOn: sqlText(500).nullable(),
+  checkFor: z.array(sqlText(500)).max(20),
   failureCount: count,
   invalid: z.boolean(),
   type: z.enum(["google", "outlook"]),
@@ -148,10 +157,10 @@ const workspace = z.object({
       calendarAccounts: z.array(calendarAccount).max(ACCOUNT_LIMIT),
       conferencingAccounts: z.array(conferencingAccount).max(ACCOUNT_LIMIT),
       conferencingLinkType: z.enum(["dynamic", "static"]),
-      email: z.string().max(320),
+      email: sqlText(320),
       hasStaticMeetingLink: z.boolean(),
       id: z.uuid(),
-      name: z.string().max(200).nullable(),
+      name: sqlText(200).nullable(),
       timezone: zone,
       workHours: z
         .array(
@@ -175,7 +184,7 @@ const workspace = z.object({
 });
 const message = z.object({
   at: timestamp,
-  content: z.string().max(MESSAGE_CHARS).nullable(),
+  content: sqlText(MESSAGE_CHARS).nullable(),
   contentTruncated: z.boolean(),
   direction: z.enum(["sent", "received", "manual", "draft"]),
   hasHtmlOnly: z.boolean(),
