@@ -167,3 +167,15 @@ export function canUseInvestigationMemory(
     !isUnattended(auth)
   );
 }
+
+/**
+ * Whether this session came from a Linear Agent Session.
+ *
+ * @remarks
+ * eve's default Linear auth stamps `agent_session_id` on every Linear
+ * dispatch. Intake now runs there, so master search applies the same 30-day
+ * window it applies to intake-only Slack sessions.
+ */
+export function isLinearSession(auth: SessionAuthContext | null): boolean {
+  return Boolean(auth?.attributes.agent_session_id);
+}

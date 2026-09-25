@@ -14,7 +14,7 @@ All of these hold before anything is written:
 
 - Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`.
 - The `Triage investigation` document is attached to the customer ticket and current.
-- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket exactly once, so a document changed after its review settled has no review covering it and fails this precondition until Stage 5 re-adjudicates and re-saves it.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket once and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
 - When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
 - The master search below has been run in this pass, not carried over from an earlier one.
 
@@ -37,10 +37,10 @@ Search on four axes: the cause, the Stage 4 code path, the provider failure, and
 
 1. Call `find_related_issues` with `scope: "masters"` and one phrasing per axis. The Engineering Team and full pagination are fixed inside the tool; `truncated` true means candidates were dropped, so narrow the phrasings.
 
-   In an intake-only Slack workflow the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied. Outside an intake-only Slack workflow, including a Linear Agent Session, it preserves the general triage behavior: `createdAfter` is null, no recency filter is applied, and matching masters are considered regardless of creation date.
+   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied. Elsewhere it preserves the general triage behavior: `createdAfter` is null, no recency filter is applied, and matching masters are considered regardless of creation date.
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
-2. In an intake-only Slack workflow, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Outside that Slack workflow, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom.
+2. In an intake-only Slack workflow or a Linear Agent Session, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Elsewhere, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom.
 
 The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. It narrows the candidate set only in that workflow. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
 
@@ -73,7 +73,7 @@ The master carries only sanitized, aggregate engineering context: the cause, the
 
 After the writes, read the master and the report again and confirm: the parent relation, the assignee on both, the master's project, priority, label union including `fast-lane` when approved, and the report link from the master. If any of it disagrees with what was intended, stop and report the mismatch in the investigation document. Never create a second master as a recovery step; a duplicate master is worse than a missing link.
 
-Changing a diagnosis or moving a report between masters needs a new investigation document version whose changed findings Foreman adjudicates once and records on that version's `**Review**` line, a fresh `decide_triage` call whose `route` is applied, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
+Changing a diagnosis or moving a report between masters needs a new investigation document version whose changed findings are recorded on that version's `**Review**` line (no second critic review), a fresh `decide_triage` call whose `route` is applied, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
 
 ## Return to Stage 6
 

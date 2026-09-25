@@ -850,15 +850,18 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   assert.ok(triageHandlingSkill.includes("### Area-routing roster"));
 });
 
-test("shared triage preserves unbounded master lookup outside Slack intake", () => {
+test("master lookup is windowed for Slack intake and Linear sessions, unbounded elsewhere", () => {
   const masterSelection = extractInstruction(
     handoffSkill,
     "## Search for the current master",
     "## Content boundary"
   );
 
-  assert.ok(masterSelection.includes("intake-only Slack workflow"));
-  assert.ok(masterSelection.includes("including a Linear Agent Session"));
+  assert.ok(
+    masterSelection.includes(
+      "intake-only Slack workflow or a Linear Agent Session"
+    )
+  );
   assert.ok(masterSelection.includes("`createdAfter` is null"));
   assert.ok(masterSelection.includes("no recency filter is applied"));
   assert.ok(
@@ -866,7 +869,7 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
       "matching masters are considered regardless of creation date"
     )
   );
-  assert.ok(masterSelection.includes("Outside that Slack workflow"));
+  assert.ok(masterSelection.includes("Elsewhere, do not apply"));
   assert.ok(masterSelection.includes("do not apply the recency cutoff"));
   assert.ok(masterSelection.includes("In other contexts"));
   assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
@@ -1091,7 +1094,11 @@ test("triage reviews a Bug with the critic before routing it", () => {
       "names each blocking finding or the failure reason in the `**Review**` line itself"
     )
   );
-  assert.ok(handoffSkill.includes("The critic reviews a ticket exactly once"));
+  assert.ok(
+    handoffSkill.includes(
+      "The critic reviews a ticket once and Foreman adjudicates once"
+    )
+  );
   assert.ok(
     handoffSkill.includes(
       "the `updatedAt` Stage 5 read back after its settling save"
