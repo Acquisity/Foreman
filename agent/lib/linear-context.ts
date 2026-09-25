@@ -4,7 +4,7 @@ import type { LinearAgentSessionEvent } from "eve/channels/linear";
 // pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
 
 /** Points a customer report at the same procedure the Slack intake channels load. */
-export const LINEAR_TRIAGE_ROUTE = `If this issue is a customer report or support ask (it usually carries an 'Ask from' Slack link or a 'Support conversation' link) rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage. When the issue has a comment starting 'Slack thread connected in', replies to that comment reach the requester in Slack: post your clarifying questions and your one final requester-facing answer there with the Linear connection's save_comment and that comment's id as parentId, and never the investigation itself.`;
+export const LINEAR_TRIAGE_ROUTE = `If this issue is a customer report or support ask (it usually carries an 'Ask from' Slack link or a 'Support conversation' link) rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage. When the issue has a comment starting 'Slack thread connected in', the requester is in that Slack thread: send them exactly one message with reply_to_requester, your answer or your questions when you need more from them, and never the investigation itself.`;
 
 export function buildLinearContext(
   event: LinearAgentSessionEvent
