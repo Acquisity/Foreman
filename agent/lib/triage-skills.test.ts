@@ -88,7 +88,7 @@ test("pre-evidence forward references name the handling skill", () => {
   );
   assert.ok(
     triageSkill.includes(
-      "parent's assignee as `triage-handling` Stage 6 describes"
+      "a duplicate candidate that `decide_triage` settles in Stage 5"
     )
   );
 });
@@ -302,6 +302,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "listFolders",
       "listMembers",
     ],
+    "Jev decisions": ["classify_ask", "decide_triage", "decide_billing"],
     "Linear connection": [
       "list_issues",
       "get_issue",
@@ -442,6 +443,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ["PlanetScale data", "root, bare"],
     ["PlanetScale connection", "Executor: planetscale"],
     ["Instantly", "root, bare"],
+    ["Jev decisions", "root, bare"],
     ["Linear searches and routing writes", "root, bare"],
     ["Linear connection", "Executor: linear"],
     ["Inngest runs", "root, bare"],

@@ -25,7 +25,7 @@ Choose one lane:
 - Money: continue here.
 - Product behavior or feedback: follow `intercom-triage-investigate` in this same channel.
 
-Both lanes are valid here. Never redirect the requester to another Slack channel. If the lane is ambiguous, load `clarify-with-requester`, ask one batched question that distinguishes the asks, and wait.
+Jev picks the lane: call `classify_ask` with the conversation and keep its bucket and `sourceLabels`. Both lanes are valid here. Never redirect the requester to another Slack channel. If it answers `unclear`, load `clarify-with-requester`, ask one batched question that distinguishes the asks, and wait.
 
 Place a money ask in exactly one taxonomy bucket:
 
@@ -97,7 +97,7 @@ Load `clarify-with-requester`. Ask one batched set before the verdict, capped at
 
 ## Step 7: Produce the proposal
 
-Every verdict includes the taxonomy bucket and one discretion note:
+Call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the seven checks; record them as returned, with its notes. Only on `decided: false` settle them yourself, and say so. Every verdict includes the taxonomy bucket and one discretion note:
 
 - `justified`: current evidence supports the refund or credit proposal.
 - `not justified`: current evidence does not support it.
@@ -124,7 +124,7 @@ Use linear `save_issue` to create one Support/Financial ticket with:
 - project Support
 - assignee Aaron Fraga
 - state Todo
-- priority High for an active billing or refund blocker, Medium otherwise
+- the priority and labels from `decide_billing`'s `route` (High for an active billing or refund blocker, Medium otherwise)
 - the Intercom conversation URL and bounded context
 - the taxonomy bucket, current finding, exposure, and proposed human action
 - `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`

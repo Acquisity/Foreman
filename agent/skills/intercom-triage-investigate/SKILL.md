@@ -26,12 +26,12 @@ When the conversation carries screenshots, route each to the `vision` subagent t
 
 ## Step 2: Classify the predominant ask
 
-Choose one lane:
+Lanes:
 
 - Money: refund, charge, coupon, invoice, financial credit, product-credit balance, or a subscription request that asks for a financial remedy. Follow `intercom-billing-triage` in this same channel.
 - Product or feedback: behavior, setup, limitation, feature request, failure, defect claim, or subscription behavior with no financial remedy. Continue here.
 
-Both lanes are valid in this channel. Never redirect between separate Slack channels. If the lane is ambiguous, load `clarify-with-requester`, ask one batched question that distinguishes them, and wait.
+Jev picks the lane: call `classify_ask`. Both lanes are valid in this channel. Never redirect between separate Slack channels. If it answers `unclear`, load `clarify-with-requester`, ask one batched question that distinguishes them, and wait.
 
 ## Step 3: State the claim
 

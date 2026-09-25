@@ -16,6 +16,10 @@ Purpose: either stop with the missing confirmation explicit when the claim remai
 
 Inputs: the completed Stage 4 evidence record. Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius.
 
+### Jev decides, Foreman acts
+
+Call `decide_triage` once with the evidence record, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, and `classify_ask`'s `sourceLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project below; record its notes and never override it. `unproven` takes the unproven branch with its `missing` list. Call it again after adjudication corrects the evidence. Only on `decided: false` apply the rules below, and say so.
+
 ### Rehash the claim against the evidence
 
 The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
@@ -28,7 +32,7 @@ Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the clas
 
 The verdict says what is wrong, not what the customer does tomorrow morning. Answer that separately, even on a `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix. Ask what gets them working today: a setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product, a manual step on our side. The cause found here says which of these would actually work, which is why this follows the verdict.
 
-When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. Naming Support or engineering does not make an unverified action real. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
+When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
 
 The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority.
 
@@ -42,7 +46,7 @@ Set the state that matches the handling path: `Engineering Todo` is `Todo` (the 
 
 ### Set Linear priority
 
-Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. `route_ticket` takes `priority` as a number: 1 Urgent, 2 High, 3 Medium, 4 Low. Weigh in order:
+Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. Weigh in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
 2. Blast radius, quantified from primary data in Stage 4, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
@@ -57,14 +61,14 @@ Bands:
 - `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
 - `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
 
-A workaround does not enter the weighting: it makes the customer's day survivable, not the defect smaller. Between two adjacent bands take the higher one and write the rationale where the verdict lives, flagged for a domain expert to review; the weighting above decides the band, and nothing here overrides it. Duplicates inherit the parent's priority and the parent's assignee.
+A workaround never lowers the band. Between two adjacent bands take the higher one and flag the rationale for a domain expert where the verdict lives. Duplicates inherit the parent's priority and the parent's assignee.
 
 ### Label the ticket
 
-Apply the fewest labels that place the ticket, passing them as `addLabels` to `route_ticket` in Stage 6. It adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
+Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never invent a label:
 
 - One type label from the verdict: `Bug` for a Bug, `Feature Request` for a Platform Limitation the customer wants lifted, and no type label for User Error.
-- The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
+- The source labels (`classify_ask` returns them): `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
 - One `Root Cause` label when the team has one that matches the cause found in Stage 4.
 
 Every decision above is provisional until the review below has settled the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for a settled document version. Outcomes the review does not cover (`User Error`, `Platform Limitation`, a `Duplicate`, the unproven stop) are applied in Stage 6 without one.
@@ -104,13 +108,13 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 ### Area-routing roster
 
-Take the product area from the evidence-backed project selected after the investigation, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
+Take the product area from the evidence-backed project, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
 
 The roster exists on the production ENG team only; SAN sandbox tickets always route to Aaron Fraga. If the area is ambiguous, the project has no lead set, or the roster is unavailable, assign Aaron Fraga and say why in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the Stage 5 state, priority, `addLabels`, and project; a `Duplicate` adds the fields below. The ticket carries the explanation and closes into the Stage 5 state; nothing goes to engineering and no queue should hold a closed report.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged; a `Duplicate` adds the fields below. The ticket carries the explanation and closes into the Stage 5 state; nothing goes to engineering and no queue should hold a closed report.
 
 A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster as the fallback, plus the Stage 5 state, priority, and labels, so whoever owns the root cause owns the reports of it. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket still closes into its Stage 5 state in the same pass.
 
