@@ -744,13 +744,10 @@ export function widgetNextActionMiddleware(
         const forced = forcedParams(params, next, askTool);
         log(next.action, { ...fields(), tool: forced?.tool }, confidence);
         if (!forced) {
-          // No forced call: a read found nothing to read, or a clarify has no ask tool to call.
           return finishParams(
             params,
             reads,
-            next.action === "read" || next.action === "clarify"
-              ? "finish"
-              : next.action
+            next.action === "read" ? "finish" : next.action
           );
         }
         return remember(forced, params, reads);
