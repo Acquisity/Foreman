@@ -113,6 +113,8 @@ export interface ExtractInput {
   investigatorText: string;
   question: string;
   scope: WidgetContext;
+  /** The run's remaining finish deadline, when the caller has one. */
+  signal?: AbortSignal;
 }
 export interface ExtractDeps {
   generate: (input: ExtractInput) => Promise<unknown>;
@@ -122,12 +124,14 @@ export interface ExtractDeps {
 const EXTRACT_TIMEOUT_MS = 25_000;
 
 export const defaultExtractDeps: ExtractDeps = {
-  async generate({ investigatorText, question, scope }) {
+  async generate({ investigatorText, question, scope, signal }) {
     // Reformatting the investigator's prose needs no reasoning, and the gate
     // re-validates everything downstream, so this runs on the fast slot.
     const model = await resolveModel("kb");
     const { object } = await generateObject({
-      abortSignal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
+      abortSignal: signal
+        ? AbortSignal.any([AbortSignal.timeout(EXTRACT_TIMEOUT_MS), signal])
+        : AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
       model: gateway(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({

@@ -175,7 +175,7 @@ export async function attachWidgetRun(
  * 100s of model calls), shorter than the web app's 4-minute poll cap, so a
  * finisher that died is taken over while the customer is still waiting.
  */
-const FINISH_CLAIM_SECONDS = 150;
+export const FINISH_CLAIM_SECONDS = 150;
 
 /**
  * Only one caller finishes a run. The background watcher and the result poll

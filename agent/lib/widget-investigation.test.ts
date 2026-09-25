@@ -2171,3 +2171,35 @@ test("result polls do not rewrite progress already saved by the background watch
   assert.equal((await response.json()).status, "pending");
   assert.equal(writes, 0);
 });
+
+test("one finish deadline, bounded by the app's last poll and the finish claim, reaches extraction and the gate", async () => {
+  const deadlines = async (ageMs: number) => {
+    const { deps, run } = dependencies();
+    run.created_at = new Date(Date.now() - ageMs);
+    const seen: (AbortSignal | undefined)[] = [];
+    deps.extract = (input) => {
+      seen.push(input.signal);
+      return Promise.resolve(findings);
+    };
+    deps.gate = (...args) => {
+      seen.push(args[6]);
+      return Promise.resolve(allowed);
+    };
+    await finishWidgetRun(
+      run,
+      "widget-session-deadline",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return seen;
+  };
+  // Past the app's last poll: the finish runs out at once and fails closed.
+  const late = await deadlines(280_000);
+  assert.equal(late.length, 2);
+  assert.equal(late[0], late[1]);
+  assert.equal(late[0]?.aborted, true);
+  // A fresh run still has most of the finish claim to spend.
+  const fresh = await deadlines(0);
+  assert.equal(fresh[0]?.aborted, false);
+});

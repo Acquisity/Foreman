@@ -56,6 +56,7 @@ import {
   claimWidgetRun,
   completeWidgetRun,
   expireSessionlessWidgetRun,
+  FINISH_CLAIM_SECONDS,
   latestWidgetScope,
   readWidgetRun,
   recentWidgetTurns,
@@ -428,6 +429,27 @@ const blockedOutcome = (
  * must land inside that window, or the answer completes after the last poll and is never delivered.
  */
 export const WIDGET_DEADLINE_MS = 170_000;
+/** The app's last poll, counted from when it sent the message. */
+const APP_POLL_WINDOW_MS = 285_000;
+/** Kept back from the finish budget for saving the outcome. */
+const FINISH_SAVE_MARGIN_MS = 10_000;
+
+/**
+ * One deadline for the whole finish (extract, ownership reads, judge, compose):
+ * whatever is left of the app's poll window, and never longer than the finish
+ * claim, so a slow finish neither lands after the last poll nor lets a second
+ * finisher start. Once it passes, each step takes its existing failure path.
+ */
+const finishDeadline = (run: Pick<WidgetRun, "created_at">) =>
+  AbortSignal.timeout(
+    Math.max(
+      0,
+      Math.min(
+        FINISH_CLAIM_SECONDS * 1000,
+        APP_POLL_WINDOW_MS - (Date.now() - run.created_at.getTime())
+      ) - FINISH_SAVE_MARGIN_MS
+    )
+  );
 /** How sure the router must be that a message is small talk before it gets a one-line reply. */
 const CHAT_ROUTE_CONFIDENCE = 0.6;
 /**
@@ -584,7 +606,8 @@ async function structureWriteUp(
   outcome: Extract<WaitOutcome, { status: "completed" }>,
   conversation: string,
   deps: Pick<WidgetDependencies, "extract"> &
-    Partial<Pick<WidgetDependencies, "handoffEligible">>
+    Partial<Pick<WidgetDependencies, "handoffEligible">>,
+  signal?: AbortSignal
 ) {
   const asked = nextActionEnabled() ? outcome.asked : null;
   if (asked) {
@@ -606,6 +629,7 @@ async function structureWriteUp(
           investigatorText: outcome.text,
           question: conversation,
           scope: run.scope,
+          signal,
         })
       : null);
   return {
@@ -681,13 +705,15 @@ export async function finishWidgetRun(
     const changeAsked = (
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
     ).catch(() => false);
+    const deadline = finishDeadline(run);
     const extractStartedAt = Date.now();
     const { gateDeps, structured } = await structureWriteUp(
       run,
       sessionId,
       outcome,
       conversation,
-      deps
+      deps,
+      deadline
     );
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
@@ -703,7 +729,8 @@ export async function finishWidgetRun(
         structured,
         gateDeps,
         conversation,
-        await changeAsked
+        await changeAsked,
+        deadline
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
