@@ -60,7 +60,11 @@ function setEnv(t: TestContext, key: string, value: string | undefined) {
     }
   });
 }
-const enabled = (t: TestContext) => setEnv(t, "SUPPORT_CHAT_ENABLED", "true");
+const SERVICE_SECRET = "s".repeat(40);
+const enabled = (t: TestContext) => {
+  setEnv(t, "SUPPORT_CHAT_ENABLED", "true");
+  setEnv(t, "FOREMAN_DIAGNOSTICS_SECRET", SERVICE_SECRET);
+};
 
 function dependencies(gateResult: GateResult = allowed) {
   const run: WidgetRun = {
@@ -137,11 +141,18 @@ function dependencies(gateResult: GateResult = allowed) {
 
 const request = (
   body: unknown,
-  authorization = "Bearer signed.user.identity"
+  authorization = "Bearer signed.user.identity",
+  serviceSecret: string | null = SERVICE_SECRET
 ) =>
   new Request("https://foreman.example/internal/widget/message", {
     body: typeof body === "string" ? body : JSON.stringify(body),
-    headers: { authorization, "content-type": "application/json" },
+    headers: {
+      authorization,
+      "content-type": "application/json",
+      ...(serviceSecret === null
+        ? {}
+        : { "x-acquisity-service-secret": serviceSecret }),
+    },
     method: "POST",
   });
 const start = {
@@ -278,6 +289,60 @@ test("a valid conversation at every schema limit is read whole, not refused as t
   );
   // Past the body read and the schema, it reaches workspace verification.
   assert.equal(response.status, 403);
+});
+
+test("a widget request without the Acquisity service secret is refused before the identity is checked", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  const unverified = () => assert.fail("must not verify the identity");
+  const send = (serviceSecret: string | null) =>
+    receiveWidgetMessage(
+      request(start, "Bearer signed.user.identity", serviceSecret),
+      noWork(),
+      1,
+      unverified,
+      deps
+    );
+  // Missing, or the customer's own token in its place: the same 403 as an unverified workspace.
+  for (const serviceSecret of [
+    null,
+    "",
+    "signed.user.identity",
+    `${SERVICE_SECRET}x`,
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each header is its own case.
+    const refused = await send(serviceSecret);
+    assert.equal(refused.status, 403);
+    assert.deepEqual(await refused.json(), {
+      error: "Workspace could not be verified.",
+    });
+  }
+  // Foreman without its own secret refuses every request.
+  setEnv(t, "FOREMAN_DIAGNOSTICS_SECRET", undefined);
+  assert.equal((await send(SERVICE_SECRET)).status, 503);
+});
+
+test("with the service secret, a request still needs a verified identity and then proceeds", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const denied = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    1,
+    () => Promise.reject(new Error("denied")),
+    deps
+  );
+  assert.equal(denied.status, 403);
+  deps.claim = () => Promise.resolve({ busy: true, fresh: false, run });
+  const proceeds = await receiveWidgetMessage(
+    request(start),
+    { from: () => assert.fail("busy"), waitUntil: () => undefined } as never,
+    1,
+    verify,
+    deps
+  );
+  assert.equal(proceeds.status, 200);
+  assert.deepEqual(await proceeds.json(), { run_id: run.id, status: "busy" });
 });
 
 test("an unverified workspace starts nothing", async (t) => {

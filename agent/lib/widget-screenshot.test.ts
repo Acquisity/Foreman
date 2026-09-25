@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 process.env.SUPPORT_CHAT_ENABLED = "true";
+const SERVICE_SECRET = "s".repeat(40);
+process.env.FOREMAN_DIAGNOSTICS_SECRET = SERVICE_SECRET;
 
 const { readScreenshot, receiveWidgetScreenshot, renderReading } = await import(
   "./widget-screenshot.js"
@@ -23,10 +25,19 @@ const reading = {
   screen: "Campaign settings",
   unreadable: [],
 };
-const post = (body: unknown, token = "tok") =>
+const post = (
+  body: unknown,
+  token = "tok",
+  serviceSecret: string | null = SERVICE_SECRET
+) =>
   new Request("https://foreman.test/internal/widget/image", {
     body: JSON.stringify(body),
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(serviceSecret === null
+        ? {}
+        : { "x-acquisity-service-secret": serviceSecret }),
+    },
     method: "POST",
   });
 const verified = () => Promise.resolve({} as never);
@@ -65,6 +76,29 @@ describe("widget screenshot route", () => {
     assert.ok(text.length <= 1500, `${text.length}`);
     assert.equal(text.includes('"3x'), false);
     assert.ok(text.includes('"2x'));
+  });
+
+  it("refuses a request without the Acquisity service secret before reading anything", async () => {
+    const body = { image: PNG.toString("base64"), organization_id: ORG };
+    const never = () => assert.fail("must not verify or read");
+    for (const secret of [null, "tok", "wrong"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: each header is its own case.
+      const response = await receiveWidgetScreenshot(
+        post(body, "tok", secret),
+        never,
+        never
+      );
+      assert.equal(response.status, 403);
+    }
+    process.env.FOREMAN_DIAGNOSTICS_SECRET = "";
+    try {
+      assert.equal(
+        (await receiveWidgetScreenshot(post(body), never, never)).status,
+        503
+      );
+    } finally {
+      process.env.FOREMAN_DIAGNOSTICS_SECRET = SERVICE_SECRET;
+    }
   });
 
   it("refuses a caller without a token or a verified workspace", async () => {

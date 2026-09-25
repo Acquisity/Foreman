@@ -7,6 +7,7 @@ import { readRequestBody } from "./bounded-body.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
+import { serviceSecretRefusal } from "./widget-service-secret.js";
 
 /**
  * Reads a screenshot the customer attached in the support widget, while they
@@ -177,8 +178,9 @@ export async function receiveWidgetScreenshot(
   verifyContext = verifyWidgetContext,
   read = readScreenshot
 ): Promise<Response> {
-  if (process.env.SUPPORT_CHAT_ENABLED !== "true") {
-    return json({ error: "Not found." }, 404);
+  const refused = serviceSecretRefusal(request);
+  if (refused) {
+    return refused;
   }
   const userToken = bearer.exec(
     request.headers.get("authorization") ?? ""

@@ -71,6 +71,7 @@ import {
   type WidgetContext,
   widgetAuth,
 } from "./widget-scope.js";
+import { serviceSecretRefusal } from "./widget-service-secret.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
@@ -1444,8 +1445,9 @@ export async function receiveWidgetMessage(
   verifyContext = verifyWidgetContext,
   deps: WidgetDependencies = defaultWidgetDependencies
 ) {
-  if (process.env.SUPPORT_CHAT_ENABLED !== "true") {
-    return json({ error: "Not found." }, 404);
+  const refused = serviceSecretRefusal(request);
+  if (refused) {
+    return refused;
   }
   const userToken = bearer.exec(
     request.headers.get("authorization") ?? ""
