@@ -53,7 +53,6 @@ test("active instructions route company discovery through the shared Executor co
 test("root prompts keep authored helpers separate from provider discovery", () => {
   assert.ok(GENERAL_PROMPT.includes("bare names without discovery"));
   assert.ok(GENERAL_PROMPT.includes("never search every connection"));
-  assert.ok(GENERAL_PROMPT.includes("Personal Supermemory"));
 });
 
 test("all agent-facing Markdown avoids retired provider connection names", () => {

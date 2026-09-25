@@ -6,7 +6,7 @@ Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). I
 
 ## Surfaces
 
-Foreman runs on four channels, with GitHub and browser extensions, one shared company-service Executor connection, and a personal Supermemory connection:
+Foreman runs on four channels, with GitHub and browser extensions, and one shared company-service Executor connection:
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions. Labels, PR opens, CI changes, reviews, and synchronizations do not launch work or automatic summaries.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues use the same general agent.
@@ -15,7 +15,7 @@ Foreman runs on four channels, with GitHub and browser extensions, one shared co
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Personal Supermemory remains a separate user-scoped connection. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
@@ -29,7 +29,7 @@ The root can use eve's native `agent` tool for independent subtasks. On eve 0.44
 
 ## Trust and safety
 
-`agent/lib/trust.ts` is the single trust authority. Scheduled runs are denied shared-config writes (repository knowledge and model overrides), plus personal Supermemory writes because nobody is watching to answer an approval card. For repository knowledge and model settings, trusted attended callers write directly; other attended callers park on a card. Company services share the Executor catalog across workflows. Merge tools are absent; the delivery boundary is a feature branch and pull request for repository work. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
+`agent/lib/trust.ts` is the single trust authority. Scheduled runs are denied shared-config writes (repository knowledge and model overrides). For repository knowledge and model settings, trusted attended callers write directly; other attended callers park on a card. Company services share the Executor catalog across workflows. Merge tools are absent; the delivery boundary is a feature branch and pull request for repository work. Git commands use the validated literal `https://github.com/<owner>/<repo>.git` URL, never mutable remote configuration, and credentials are injected at the sandbox firewall.
 
 ## Repository targeting
 
@@ -46,7 +46,7 @@ Durable documents live in one Vercel Blob store. Reserved prefixes are registere
 
 - `repository-knowledge/<repository-hash>.md` stores verified repository conventions and recurring build or review facts. Reads fall back to the matching legacy `factory-brain/` document until the next trusted write migrates it.
 - `model-overrides/foreman.json` stores global agent model overrides.
-- `user-preferences/` is principal-scoped. Supermemory supports broader attended-session recall, but neither is repository authority.
+- `user-preferences/` is principal-scoped and never repository authority.
 - `sla-report/` stores the daily SLA report dispatch marker.
 
 Settled investigations, including ticketless Intercom and Slack ones and conclusions a colleague corrected in a thread, are indexed in a private Foreman-owned Postgres database, reached through `FOREMAN_MEMORY_DATABASE_URL` and never through the read-only Neon MCP connection. The schema lives in `migrations/` and applies with `pnpm db:migrate`, a manual release step and never part of agent startup. Run a new migration against production before relying on the code that needs it: until `0002` runs, a ticketless write fails on the `NOT NULL` project column and the tool reports `recorded: false` without touching the verdict. It holds sanitized case patterns, not customer data: PlanetScale remains the only production database and the only source of current blast radius. Access is fail-closed and stamped per channel, so GitHub sessions and unattended runs cannot read or write it.
