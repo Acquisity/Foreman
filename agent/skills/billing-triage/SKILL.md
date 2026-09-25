@@ -8,12 +8,12 @@ How to investigate a money ask and leave a proposal a human can act on. The agen
 
 ## Step 0 — Classify the predominant ask
 
-Decide whether this ticket is a **money** ask or a **product** ask.
+Jev decides whether this ticket is a **money** ask or a **product** ask: call `classify_ask` with the report, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
 
 - If it is a money ask, continue with this skill.
 - If it is a product ask, hand it to the product triage procedure instead.
 - If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
-- If you cannot place the ask, ask one batched question to place it before doing anything else.
+- If it answers `unclear`, ask one batched question to place it before doing anything else.
 
 ## Step 1: Read the Linear issue
 
@@ -27,7 +27,7 @@ No tool can issue, schedule, or promise a refund or credit. Stripe and Autumn lo
 
 ## Taxonomy
 
-Place the ask in exactly one bucket:
+`classify_ask` places the ask in exactly one bucket:
 
 - `refund`
 - `overcharged`
@@ -49,7 +49,7 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 4. Approval trail: read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
 5. Systems of record: read each one named below. Read-only everywhere.
 6. Clarifying questions: batched, before any verdict, capped at three rounds.
-7. Verdict: classification, justification checklist, and discretion note.
+7. Verdict: call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the justification checklist; record them as it returns them, with its notes.
 8. Document: the full investigation, attached to the ticket.
 9. Comment: a short human-readable reply on the ticket.
 
@@ -126,7 +126,7 @@ Before any verdict, confirm each:
 
 ## Discretion note
 
-Every verdict carries one of:
+`decide_billing` returns one of these; only on `decided: false` decide it yourself from these definitions, and say so in the document:
 
 - **justified** — the evidence supports the refund/credit.
 - **not justified** — the evidence does not support it.
@@ -214,7 +214,7 @@ The status line is fixed; do not use a free-form reply on financial tickets. Nev
 
 ## Routing
 
-Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
+Pass `decide_billing`'s `route` to `route_ticket` unchanged with the ticket's `issue`; it already holds these values. Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
 
 Apply the fewest labels that place the ask, the same way `triage-handling` does. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
 

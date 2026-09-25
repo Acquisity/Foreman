@@ -26,6 +26,9 @@ importers:
       '@vercel/connect':
         specifier: 0.8.0
         version: 0.8.0(ai@7.0.97(zod@4.4.3))(eve@0.54.2(ai@7.0.97(zod@4.4.3)))
+      '@vercel/oidc':
+        specifier: 3.8.4
+        version: 3.8.4
       '@vercel/sandbox':
         specifier: ^3.0.0
         version: 3.0.1

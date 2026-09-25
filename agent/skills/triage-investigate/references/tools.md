@@ -13,6 +13,7 @@ The triage-investigate skill mandates loading this catalog at the start of Stage
 | PlanetScale data | root, bare | `planetscale_execute_read_query`, `describe_table` |
 | PlanetScale connection | Executor: planetscale | `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation` |
 | Instantly | root, bare | `list_instantly_subworkspaces`, `read_instantly_subworkspace` |
+| Jev decisions | root, bare | `classify_ask`, `decide_triage`, `decide_billing` |
 | Linear searches and routing writes | root, bare | `find_related_issues`, `route_ticket`, `save_investigation_document` |
 | Linear connection | Executor: linear | `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment` |
 | Inngest runs | root, bare | `find_function_runs` |

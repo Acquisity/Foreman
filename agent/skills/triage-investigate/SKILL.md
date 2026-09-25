@@ -26,7 +26,7 @@ Inputs: the issue and runtime-stamped context. Treat the runtime's `intakeOnly` 
 
 ### Is this a money ask?
 
-Money ask: load the billing-triage skill. Channel mismatched to the ask: say so in one line and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
+Call `classify_ask` with the report and keep its `sourceLabels`. Money ask: load the billing-triage skill. `unclear`: ask one question that places it. Channel mismatched to the ask: say so in one line and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
 
 ### Read the Linear issue
 
@@ -73,12 +73,11 @@ Reuse existing investigations where current evidence supports them. Existing Dup
 
 `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit, then classify by outcome, not keyword overlap:
 
-- `SAME_OUTCOME`: same symptom and cause; a duplicate. Identify the parent, comment, and route in one Linear update, taking the parent's assignee as `triage-handling` Stage 6 describes.
+- `SAME_OUTCOME`: same symptom and cause; a duplicate candidate that `decide_triage` settles in Stage 5.
 - `PARTIAL_OR_ADJACENT`: relate it, do not close it.
 - `STALE_OR_SUPERSEDED`: point at the fix or the decision.
 - `NOT_RELEVANT`: move on.
 
-A shared component or error string is not enough to call two tickets duplicates.
 
 ### Ask or proceed
 
