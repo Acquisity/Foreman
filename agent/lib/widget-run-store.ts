@@ -248,6 +248,37 @@ export async function expireSessionlessWidgetRun(
   return rows.length === 1;
 }
 
+/**
+ * The same settlement for every dead claim of one conversation and source,
+ * before a new message claims its run. It runs ahead of the claim because the
+ * claim refuses a run older than the result window, and a dead claim that old
+ * would otherwise hold the conversation's open run for good.
+ */
+export async function expireSessionlessWidgetRuns(
+  scope: WidgetContext,
+  outcome: WidgetOutcome,
+  findings: unknown,
+  olderThanMs: number
+): Promise<string[]> {
+  const rows = await privateDatabase().query(
+    `UPDATE widget_support_runs SET outcome = $4::jsonb, findings = $5::jsonb, decision = $6,
+       completed_at = now()
+     WHERE organization_id = $1 AND conversation_id = $2 AND scope->>'source' = $3
+       AND session_id IS NULL AND completed_at IS NULL
+       AND created_at < now() - make_interval(secs => $7::double precision / 1000) RETURNING id`,
+    [
+      scope.organizationId,
+      scope.conversationId,
+      scope.source,
+      JSON.stringify(outcome),
+      JSON.stringify(findings),
+      outcome.decision,
+      olderThanMs,
+    ]
+  );
+  return rows.map((row) => String(row.id));
+}
+
 /** The customer reported a bug: the app offers a screen recording next to this run's reply. */
 export async function requestWidgetRecording(id: string) {
   await privateDatabase().query(

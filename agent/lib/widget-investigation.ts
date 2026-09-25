@@ -56,6 +56,7 @@ import {
   claimWidgetRun,
   completeWidgetRun,
   expireSessionlessWidgetRun,
+  expireSessionlessWidgetRuns,
   FINISH_CLAIM_SECONDS,
   latestWidgetScope,
   readWidgetRun,
@@ -350,6 +351,7 @@ export const defaultWidgetDependencies = {
   claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
   expire: expireSessionlessWidgetRun,
+  expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
   gate: egressGate,
   handoffEligible,
@@ -875,21 +877,32 @@ const settledIfStale = async (
   deps: Pick<WidgetDependencies, "expire" | "read">
 ) => ((await expireStaleClaim(run, deps)) ? await deps.read(run.id) : run);
 
-/** Claim this message's run. A dead claim is settled first: this message then gets its own run, or, when it is the same message, the handoff that settled it. */
+/**
+ * Claim this message's run. Dead claims of this conversation are settled first,
+ * however old: this message then gets its own run, or, when it is the same
+ * message, the handoff that settled it.
+ */
 async function claimOpenRun(
   scope: WidgetContext,
   input: Extract<WidgetInput, { action: "start" }>,
-  deps: Pick<WidgetDependencies, "claim" | "expire" | "read">
+  deps: Pick<WidgetDependencies, "claim" | "expireAll">
 ) {
-  const claim = () =>
-    deps.claim(scope, requestKey(input), withScreenshots(input));
-  const claimed = await claim();
-  if (claimed.fresh || !(await expireStaleClaim(claimed.run, deps))) {
-    return claimed;
+  const handoff = humanHandoff(null, "deadline");
+  if (handoff) {
+    const expired = await deps.expireAll(
+      scope,
+      handoff.result,
+      handoff.findings,
+      WIDGET_DEADLINE_MS
+    );
+    for (const runId of expired) {
+      logGateDecision(
+        { conversationId: scope.conversationId, runId },
+        handoff.result
+      );
+    }
   }
-  return claimed.busy
-    ? await claim()
-    : { ...claimed, run: await deps.read(claimed.run.id) };
+  return deps.claim(scope, requestKey(input), withScreenshots(input));
 }
 
 /** The reply to a confident help-center question nothing answered: a question back, never blank. */
@@ -1452,15 +1465,21 @@ export async function receiveWidgetMessage(
   try {
     if (input.action !== "start") {
       let run = await deps.read(input.run_id);
-      assertWidgetRunOwner(run, scope);
       // A teammate's run is read only through the teammate's verified path.
-      if (run.scope.source !== scope.source) {
+      if (
+        !sameWidgetOwner(run.scope, scope) ||
+        run.scope.source !== scope.source
+      ) {
         throw new Error("Investigation unavailable for this conversation.");
       }
       if (input.action === "cancel") {
+        assertWidgetRunOwner(run, scope);
         return json(await cancelRun(run, attachSession, deps));
       }
+      // A dead claim is settled even past the result window, so it stops
+      // holding the conversation; its result is still refused below.
       run = await settledIfStale(run, deps);
+      assertWidgetRunOwner(run, scope);
       if (!run.outcome && run.session_id && attachSession) {
         run = await pollWidgetRun(
           run,
