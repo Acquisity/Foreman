@@ -433,25 +433,38 @@ const blockedOutcome = (
 export const WIDGET_DEADLINE_MS = 170_000;
 /** The app's last poll, counted from when it sent the message. */
 const APP_POLL_WINDOW_MS = 285_000;
-/** Kept back from the finish budget for saving the outcome. */
-const FINISH_SAVE_MARGIN_MS = 10_000;
+/**
+ * Kept back for saving the outcome: the completion write's own 15-second
+ * database deadline (privateDatabase's default) plus a small margin.
+ */
+const FINISH_SAVE_RESERVE_MS = 17_000;
+
+/** The finish's time source, injectable so its budget can be tested. */
+export interface FinishClock {
+  now: () => number;
+  timeout: (ms: number) => AbortSignal;
+}
+const systemClock: FinishClock = {
+  now: () => Date.now(),
+  timeout: (ms) => AbortSignal.timeout(ms),
+};
 
 /**
- * One deadline for the whole finish (extract, ownership reads, judge, compose):
- * whatever is left of the app's poll window, and never longer than the finish
- * claim, so a slow finish neither lands after the last poll nor lets a second
- * finisher start. Once it passes, each step takes its existing failure path.
+ * The moment the model work (extract, ownership reads, judge, compose) must be
+ * done: the earlier of the finish claim running out, counted from when it was
+ * taken, and the app's last poll, counted from when it sent the message, less
+ * the time to save the outcome. So a slow finish neither lets a second finisher
+ * start nor lands after the last poll; once it passes, each step takes its
+ * existing failure path.
  */
-const finishDeadline = (run: Pick<WidgetRun, "created_at">) =>
-  AbortSignal.timeout(
-    Math.max(
-      0,
-      Math.min(
-        FINISH_CLAIM_SECONDS * 1000,
-        APP_POLL_WINDOW_MS - (Date.now() - run.created_at.getTime())
-      ) - FINISH_SAVE_MARGIN_MS
-    )
-  );
+export const finishCutoff = (
+  run: Pick<WidgetRun, "created_at">,
+  claimedAt: number
+) =>
+  Math.min(
+    claimedAt + FINISH_CLAIM_SECONDS * 1000,
+    run.created_at.getTime() + APP_POLL_WINDOW_MS
+  ) - FINISH_SAVE_RESERVE_MS;
 /** How sure the router must be that a message is small talk before it gets a one-line reply. */
 const CHAT_ROUTE_CONFIDENCE = 0.6;
 /**
@@ -659,11 +672,13 @@ export async function finishWidgetRun(
         WidgetDependencies,
         "changeRequested" | "handoffEligible" | "progress"
       >
-    >
+    >,
+  clock: FinishClock = systemClock
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
   }
+  const claimedAt = clock.now();
   // Someone else is already finishing this run: report pending and let the next
   // poll read what they save. Only the model work is worth claiming; a failed
   // session is recorded at once. A claim that cannot be checked never costs the
@@ -707,7 +722,10 @@ export async function finishWidgetRun(
     const changeAsked = (
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
     ).catch(() => false);
-    const deadline = finishDeadline(run);
+    // Everything since the claim, the history read included, came out of it.
+    const deadline = clock.timeout(
+      Math.max(0, finishCutoff(run, claimedAt) - clock.now())
+    );
     const extractStartedAt = Date.now();
     const { gateDeps, structured } = await structureWriteUp(
       run,

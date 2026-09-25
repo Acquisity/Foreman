@@ -2208,3 +2208,48 @@ test("one finish deadline, bounded by the app's last poll and the finish claim, 
   const fresh = await deadlines(0);
   assert.equal(fresh[0]?.aborted, false);
 });
+
+test("the finish budget is counted from the claim, history read included, and leaves the completion write inside the lease and the last poll", async () => {
+  const LEASE_MS = 150_000;
+  const POLL_WINDOW_MS = 285_000;
+  const SAVE_MS = 15_000;
+  const budget = async (claimAgeMs: number) => {
+    const { deps, run } = dependencies();
+    const createdAt = 1_000_000;
+    run.created_at = new Date(createdAt);
+    let now = createdAt + claimAgeMs;
+    let granted: { at: number; ms: number } | undefined;
+    deps.history = () => {
+      now += 14_000;
+      return Promise.resolve([]);
+    };
+    await finishWidgetRun(
+      run,
+      "widget-session-budget",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps,
+      {
+        now: () => now,
+        timeout: (ms) => {
+          granted = { at: now, ms };
+          return new AbortController().signal;
+        },
+      }
+    );
+    assert.ok(granted);
+    // The model work may run to the deadline; the completion write then takes
+    // up to its own database deadline.
+    const savedAt = granted.at + granted.ms + SAVE_MS;
+    const claimedAt = createdAt + claimAgeMs;
+    assert.ok(savedAt - claimedAt <= LEASE_MS, `lease ${savedAt - claimedAt}`);
+    assert.ok(
+      savedAt - createdAt <= POLL_WINDOW_MS,
+      `poll ${savedAt - createdAt}`
+    );
+    return granted.ms;
+  };
+  // An early claim: 14s of history comes out of the 150s lease.
+  assert.equal(await budget(0), 119_000);
+  // A late claim at run age 169s: the app's last poll is the limit.
+  assert.equal(await budget(169_000), 85_000);
+});
