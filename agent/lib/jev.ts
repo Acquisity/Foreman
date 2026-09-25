@@ -67,11 +67,16 @@ const resolveToken = async (): Promise<string> =>
 /** Rejects when `signal` aborts first, so a stalled step still ends in time. */
 const beforeAbort = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
   new Promise((resolve, reject) => {
-    signal.throwIfAborted();
+    // Settle on `work` first: a rejection it produces after the abort must
+    // still be observed, or it surfaces as an unhandled rejection.
+    work.then(resolve, reject);
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
     signal.addEventListener("abort", () => reject(signal.reason), {
       once: true,
     });
-    work.then(resolve, reject);
   });
 
 /**
