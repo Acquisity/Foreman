@@ -352,14 +352,16 @@ test("askJev refuses an answer off the menu, a missing answer, or a bad status",
 
 test("askJev stops before the request when the call is already cancelled", async () => {
   let called = false;
-  await assert.rejects(
+  const cancelled = (token?: string) =>
     askJev({ refund: { instructions: "?", type: "boolean" } }, "s", {
       fetch: () => {
         called = true;
         return reply({ answers: {}, model: "m" });
       },
       signal: AbortSignal.abort(),
-    })
-  );
+      ...(token ? { token } : {}),
+    });
+  await assert.rejects(cancelled());
+  await assert.rejects(cancelled("t"));
   assert.equal(called, false);
 });
