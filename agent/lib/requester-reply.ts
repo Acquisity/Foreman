@@ -32,7 +32,12 @@ export function planReply(
   comments: readonly ThreadComment[],
   foremanUserId: string
 ): ReplyPlan {
-  const anchor = comments.find((c) => ANCHOR_PATTERN.test(c.body.trim()));
+  // The receiver writes the anchor top-level at intake, before anyone else
+  // can comment, so the earliest top-level match is the real one.
+  const anchor = comments
+    .filter((c) => c.parentId === null && ANCHOR_PATTERN.test(c.body.trim()))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .at(0);
   if (!anchor) {
     return {
       error:
@@ -59,6 +64,7 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
   issue(id: $id) {
     id
     comments(first: 100) {
+      pageInfo { hasNextPage }
       nodes { id body createdAt parent { id } user { id } }
     }
   }
@@ -71,6 +77,7 @@ const REPLY_MUTATION = `mutation RequesterReply($input: CommentCreateInput!) {
 interface ThreadResponse {
   issue: {
     comments: {
+      pageInfo: { hasNextPage: boolean };
       nodes: {
         body: string;
         createdAt: string;
@@ -105,6 +112,13 @@ export async function replyToRequester(
   });
   if (!thread.issue) {
     throw new Error(`Issue ${issue} was not found.`);
+  }
+  // One page is the whole history for an intake ticket; past it the latest
+  // reply may be missing, so refuse rather than risk a second message.
+  if (thread.issue.comments.pageInfo.hasNextPage) {
+    throw new Error(
+      `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
+    );
   }
   const plan = planReply(
     thread.issue.comments.nodes.map((c) => ({

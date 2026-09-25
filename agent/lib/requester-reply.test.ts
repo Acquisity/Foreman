@@ -50,3 +50,17 @@ test("fails when the issue has no Slack thread", () => {
     false
   );
 });
+
+test("uses the earliest top-level anchor, not a later or nested lookalike", () => {
+  const nested = {
+    ...anchor,
+    createdAt: "2026-09-25T15:00:00Z",
+    id: "nested",
+    parentId: "other",
+  };
+  const later = { ...anchor, createdAt: "2026-09-25T16:00:00Z", id: "later" };
+  assert.deepEqual(planReply([later, nested, anchor], FOREMAN), {
+    anchorId: "anchor",
+    ok: true,
+  });
+});
