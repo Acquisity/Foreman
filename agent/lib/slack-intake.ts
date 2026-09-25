@@ -1,4 +1,4 @@
-import type { SlackAttachment } from "eve/channels/slack";
+import type { SlackAttachment, SlackAuthor } from "eve/channels/slack";
 import type { SessionAuthContext } from "eve/context";
 import { stampIntakeOnly } from "./trust.js";
 
@@ -43,11 +43,30 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
   C0BNCL031AQ: INTERCOM_INTAKE_WORKFLOW,
 };
 
+/**
+ * Asks-receiver intake channels (feedback, refunds). Foreman starts there only
+ * from the receiver's own mention: its intake handoff, or its fallback when
+ * Linear rejects a delegation. A person tagging Foreman would start a second,
+ * independent investigation, so that mention is ignored.
+ */
+const RECEIVER_ONLY_CHANNELS: ReadonlySet<string> = new Set([
+  "C0BBPVC3N2X",
+  "C0BC011NAQL",
+]);
+
+/** Whether a Slack mention in this channel may start a Foreman turn. */
+export function admitsSlackMention(
+  channelId: string,
+  author: SlackAuthor | undefined
+): boolean {
+  return !RECEIVER_ONLY_CHANNELS.has(channelId) || author?.isBot === true;
+}
+
 // The final Slack-post rule, stated once here as the canonical home. The Slack
 // channel injects it into every session, the intake boundary below carries the
 // same rule, and workflow skills defer instead of restating it.
 export const FINAL_SLACK_POST_RULE =
-  "The final post in the Slack thread must contain only the requester-facing answer, with no internal summary or action log. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Normal conversational progress updates are allowed; this boundary applies to the closing post.";
+  "The final post in the Slack thread must contain only the requester-facing answer, with no internal summary or action log. Never combine an internal investigation summary, Linear update report, or proof of work with that reply. Every message that ends a turn is posted to the thread. While a delegated task is still running, do not send the requester-facing answer: end that turn with one short acknowledgement that carries no findings, ticket details, or review narration, and send the answer in the turn its results trigger. When the answer was already posted and a later background result does not change it, reply with exactly <eve-empty-delivery/> and nothing else; in this thread that overrides the runtime Background task reporting instruction. When it changes the answer, post only the short correction.";
 
 // eve stages each image and file attachment under /workspace/attachments
 // before the first model step, inside a directory named by the content hash,
@@ -104,7 +123,7 @@ const intercomIssueTask = (skills: readonly string[]): string =>
 const existingIssueTask = (skills: readonly string[]): string =>
   [
     `Use the existing-issue Linear workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
-    "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures.",
+    "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures. These skills are the entry procedure: when one hands the ask to another skill, such as a money ask to billing-triage, that skill then governs.",
     "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, ask the requester for its Linear link or identifier, then stop.",
     "Answer in the Slack thread, honoring the final-post rule above and the channel scope of any loaded wording skill, then stop.",
   ].join("\n\n");

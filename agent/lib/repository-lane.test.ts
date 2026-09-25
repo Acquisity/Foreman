@@ -1,5 +1,3 @@
-process.env.SUPERMEMORY_MCP_CONNECTOR ??= "placeholder/foreman-ci";
-
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";

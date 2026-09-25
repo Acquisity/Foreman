@@ -13,6 +13,7 @@ import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import { slackFreshSessionHistory } from "../lib/slack-history.js";
 import {
+  admitsSlackMention,
   FINAL_SLACK_POST_RULE,
   slackAttachmentContext,
   slackIntakeContext,
@@ -50,9 +51,7 @@ import { isIntakeOnly } from "../lib/trust.js";
  *
  * Automatic Slack connection attempts never show a sign-in prompt: user-scoped
  * connections authorize through `userConnect`, which turns a missing grant for
- * any Slack-issued user principal into a terminal, non-retryable failure. The
- * attended root `sign_in` tool is the deliberate exception and may invoke
- * consent after a person explicitly asks to connect one service.
+ * any Slack-issued user principal into a terminal, non-retryable failure.
  *
  * Only a full GitHub URL in the message selects the session repository. A bare
  * `owner/repo` token is not extracted here, because prose cannot be told apart
@@ -118,6 +117,9 @@ export const dispatch = async (
   // author.
   const auth = defaultSlackAuth(message, ctx);
   if (auth === null) {
+    return null;
+  }
+  if (!admitsSlackMention(message.channelId, message.author)) {
     return null;
   }
   // A literal stop/cancel retires the exact session, never reaching the model.
@@ -211,30 +213,6 @@ const truncateTypingStatus = (text: string): string =>
     stripTypingStatusMarkdown(text).trim().replace(/\s+/gu, " "),
     SLACK_TYPING_STATUS_MAX_LENGTH
   );
-
-const ERROR_HINT_MAX_LENGTH = 160;
-
-const truncateForDisplay = (text: string): string =>
-  text.length <= ERROR_HINT_MAX_LENGTH
-    ? text
-    : `${text.slice(0, ERROR_HINT_MAX_LENGTH - 1).trimEnd()}…`;
-
-const formatErrorHint = (data: {
-  readonly message: string;
-  readonly details?: Record<string, unknown> | undefined;
-}): string => {
-  const rawName = data.details?.name;
-  const name =
-    typeof rawName === "string" && rawName.length > 0 ? rawName : undefined;
-  const message = data.message.trim();
-  if (name && message.length > 0) {
-    return ` (${name}: ${truncateForDisplay(message)})`;
-  }
-  if (name) {
-    return ` (${name})`;
-  }
-  return message.length > 0 ? ` (${truncateForDisplay(message)})` : "";
-};
 
 const extractErrorId = (
   details: Record<string, unknown> | undefined
@@ -351,6 +329,11 @@ export const slackChannelEvents: SlackChannelEvents = {
     channel.state.progress = undefined;
     // Blankness decides the typing fallback, but the post itself is verbatim:
     // trimming would destroy leading Markdown indentation in the reply.
+    // A null message is eve's empty delivery: the turn chose to say nothing,
+    // so no typing indicator is left hanging with no turn behind it.
+    if (data.message === null) {
+      return;
+    }
     if (!data.message?.trim()) {
       await channel.thread.startTyping();
       return;
@@ -418,13 +401,14 @@ export const slackChannelEvents: SlackChannelEvents = {
   },
   async "turn.failed"(data, channel) {
     clearReasoning(channel);
-    // A failed turn leaves no progress state behind. Preserve Foreman's
-    // existing error post while clearing its local rendering state.
+    // A failed turn leaves no progress state behind. The thread gets a short
+    // outcome and the error id only; the raw error name and message stay in
+    // operator records, never in a requester-facing post.
     channel.state.progress = undefined;
     const errorId = extractErrorId(data.details);
     await channel.thread.post(
       [
-        `I hit an error while handling your request${formatErrorHint(data)}.`,
+        "I hit an error while handling your request.",
         "",
         "Please try again, rephrase, or reach out if it keeps failing.",
         ...(errorId ? ["", `_Error id: \`${errorId}\`_`] : []),

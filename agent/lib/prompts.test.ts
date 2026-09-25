@@ -35,10 +35,10 @@ describe("composePrompt", () => {
     );
   });
 
-  it("limits the Slack wording skill to the two intended channels", () => {
+  it("limits the Slack wording skill to the two intake channels and requester replies", () => {
     assert.ok(
       GENERAL_PROMPT.includes(
-        "Load `slack-wording` only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request)."
+        "Load `slack-wording` when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request), and for every `reply_to_requester` message."
       )
     );
     assert.ok(

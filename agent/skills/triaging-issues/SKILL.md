@@ -1,5 +1,5 @@
 ---
-description: "Grounding a GitHub work item before acting on it: checking for duplicates, working with the repo's existing labels, deciding whether to ask for clarification or proceed, and asking for reproduction details well. Load whenever a work item arrives from a GitHub issue or mention, and whenever asked to triage, label, dedupe, or close issues. Not needed for work items that arrive as plain requests with no GitHub issue behind them."
+description: "Grounding a GitHub work item before acting on it: checking for duplicates, working with the repo's existing labels, deciding whether to ask for clarification or proceed, and asking for reproduction details well. Load whenever a work item arrives from a GitHub issue or mention, and whenever asked to triage, label, dedupe, or close GitHub issues. Not for Linear tickets or Slack/Intercom customer reports: those use triage-investigate or billing-triage. Not needed for work items that arrive as plain requests with no GitHub issue behind them."
 ---
 # Triaging Issues
 

@@ -4,7 +4,7 @@ Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` exis
 
 ## Linear report template
 
-Prose, not a field list. The classification, priority, and handling path are already set on the ticket as state, priority, and labels; repeating them in the comment is noise.
+Prose, not a field list. The classification, priority, and handling path go on the ticket as state, priority, and labels; repeating them in the comment is noise.
 
 ```markdown
 ## Triage investigation

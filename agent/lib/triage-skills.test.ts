@@ -83,12 +83,12 @@ test("triage intake hands off to the handling skill after Stage 4", () => {
 test("pre-evidence forward references name the handling skill", () => {
   assert.ok(
     triageSkill.includes(
-      "`triage-handling` Stage 6 chooses ownership from completed evidence"
+      "`decide_triage` chooses ownership from completed evidence"
     )
   );
   assert.ok(
     triageSkill.includes(
-      "parent's assignee as `triage-handling` Stage 6 describes"
+      "a duplicate candidate that `decide_triage` settles in Stage 5"
     )
   );
 });
@@ -302,10 +302,12 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "listFolders",
       "listMembers",
     ],
+    "Jev decisions": ["classify_ask", "decide_triage", "decide_billing"],
     "Linear connection": [
       "list_issues",
       "get_issue",
       "list_issue_labels",
+      "list_projects",
       "save_issue",
       "save_document",
       "list_comments",
@@ -442,6 +444,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ["PlanetScale data", "root, bare"],
     ["PlanetScale connection", "Executor: planetscale"],
     ["Instantly", "root, bare"],
+    ["Jev decisions", "root, bare"],
     ["Linear searches and routing writes", "root, bare"],
     ["Linear connection", "Executor: linear"],
     ["Inngest runs", "root, bare"],
@@ -847,15 +850,18 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
   assert.ok(triageHandlingSkill.includes("### Area-routing roster"));
 });
 
-test("shared triage preserves unbounded master lookup outside Slack intake", () => {
+test("master lookup is windowed for Slack intake and Linear sessions, unbounded elsewhere", () => {
   const masterSelection = extractInstruction(
     handoffSkill,
     "## Search for the current master",
     "## Content boundary"
   );
 
-  assert.ok(masterSelection.includes("intake-only Slack workflow"));
-  assert.ok(masterSelection.includes("including a Linear Agent Session"));
+  assert.ok(
+    masterSelection.includes(
+      "intake-only Slack workflow or a Linear Agent Session"
+    )
+  );
   assert.ok(masterSelection.includes("`createdAfter` is null"));
   assert.ok(masterSelection.includes("no recency filter is applied"));
   assert.ok(
@@ -863,7 +869,7 @@ test("shared triage preserves unbounded master lookup outside Slack intake", () 
       "matching masters are considered regardless of creation date"
     )
   );
-  assert.ok(masterSelection.includes("Outside that Slack workflow"));
+  assert.ok(masterSelection.includes("Elsewhere, do not apply"));
   assert.ok(masterSelection.includes("do not apply the recency cutoff"));
   assert.ok(masterSelection.includes("In other contexts"));
   assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
@@ -900,7 +906,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "One master per root cause",
     "`fast-lane`",
     "area-routing roster in `triage-handling` Stage 6",
-    "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
+    "in the product project `route.project` carries (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
   }
@@ -966,7 +972,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
     "a duplicate routes nothing new to engineering",
     "The critic runs exactly once per ticket",
-    "Foreman posts one progress line, delegates once, and adjudicates the result once",
+    "Foreman delegates once and adjudicates the result once",
     "never parks the ticket on a person",
     "Foreman settles the findings against the Stage 4 evidence record and continues routing",
     "[references/critic-review.md](references/critic-review.md)",
@@ -977,7 +983,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "`**Review**: Pending critic`",
     "Load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
-    "Post one progress line to the attended thread",
+    "Post nothing about the review to the attended thread",
     "the next message the thread receives is the final reply",
     "Delegate to the `critic` subagent exactly once",
     "the full 40-character SHA",
@@ -988,7 +994,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "A result with an empty `criteria_results` is a review that could not start",
     "None of these is a reason for a second delegation",
     "On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record",
-    "When the corrected record no longer supports the classification, change the classification and handling path",
+    "take every field it returns, including a changed classification, handling path",
     "read back its adjudicated-evidence `updatedAt`",
     "`**Review**: Adjudicated <that adjudicated-evidence updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`",
     "without adding settlement-summary clauses elsewhere in the document",
@@ -1001,14 +1007,10 @@ test("triage reviews a Bug with the critic before routing it", () => {
   ]) {
     assert.ok(criticReviewReference.includes(rule), rule);
   }
-  assert.ok(
-    criticReviewReference.indexOf(
-      "Post one progress line to the attended thread"
-    ) <
-      criticReviewReference.indexOf(
-        "Delegate to the `critic` subagent exactly once"
-      ),
-    "the progress line precedes the delegation"
+  assert.equal(
+    criticReviewReference.includes("Post one progress line"),
+    false,
+    "the review posts no progress line to the thread"
   );
   const retryWording = [
     "attempt 1",
@@ -1092,7 +1094,11 @@ test("triage reviews a Bug with the critic before routing it", () => {
       "names each blocking finding or the failure reason in the `**Review**` line itself"
     )
   );
-  assert.ok(handoffSkill.includes("The critic reviews a ticket exactly once"));
+  assert.ok(
+    handoffSkill.includes(
+      "The critic reviews a ticket once and Foreman adjudicates once"
+    )
+  );
   assert.ok(
     handoffSkill.includes(
       "the `updatedAt` Stage 5 read back after its settling save"

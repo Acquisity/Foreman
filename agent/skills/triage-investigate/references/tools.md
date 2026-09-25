@@ -13,8 +13,9 @@ The triage-investigate skill mandates loading this catalog at the start of Stage
 | PlanetScale data | root, bare | `planetscale_execute_read_query`, `describe_table` |
 | PlanetScale connection | Executor: planetscale | `planetscale_list_organizations`, `planetscale_get_organization`, `planetscale_list_databases`, `planetscale_get_database`, `planetscale_list_branches`, `planetscale_get_branch`, `planetscale_get_insights`, `planetscale_list_schema_recommendations`, `planetscale_search_documentation` |
 | Instantly | root, bare | `list_instantly_subworkspaces`, `read_instantly_subworkspace` |
+| Jev decisions | root, bare | `classify_ask`, `decide_triage`, `decide_billing` |
 | Linear searches and routing writes | root, bare | `find_related_issues`, `route_ticket`, `save_investigation_document` |
-| Linear connection | Executor: linear | `list_issues`, `get_issue`, `list_issue_labels`, `save_issue`, `save_document`, `list_comments`, `save_comment` |
+| Linear connection | Executor: linear | `list_issues`, `get_issue`, `list_issue_labels`, `list_projects`, `save_issue`, `save_document`, `list_comments`, `save_comment` |
 | Inngest runs | root, bare | `find_function_runs` |
 | Inngest connection | Executor: inngest | `list_function_runs`, `list_runs`, `get_run`, `get_run_trace`, `get_event_runs`, `list_functions`, `get_function`, `list_envs`, `query_insights`, `list_insights_tables`, `list_insights_event_schemas`, `get_app`, `get_apps`, `list_webhooks`, `health` |
 | Sentry | Executor: sentry | `find_organizations`, `find_projects`, `search_issues`, `search_events`, `search_sentry_tools`, `execute_sentry_tool`; discover the nested `get_issue_details` and `search_issue_events` read schemas before invoking them |

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import {
+  isLinearSession,
   isUnattended,
   stampUnattended,
   UNATTENDED_ATTRIBUTE,
@@ -45,4 +46,13 @@ test("isUnattended", async (t) => {
   await t.test("is false with no auth", () => {
     assert.equal(isUnattended(null), false);
   });
+});
+
+test("isLinearSession recognizes a Linear Agent Session dispatch", () => {
+  assert.equal(
+    isLinearSession(auth({ attributes: { agent_session_id: "s1" } })),
+    true
+  );
+  assert.equal(isLinearSession(auth()), false);
+  assert.equal(isLinearSession(null), false);
 });

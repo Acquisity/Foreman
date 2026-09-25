@@ -6,17 +6,17 @@ description: "Wording rules only for acquisity-feedback (C0BBPVC3N2X) and acquis
 
 ## Channel scope
 
-Apply this skill only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request). All restrictions and verdict rules below are limited to those two channels.
+Apply this skill only when the delivered Slack channel ID is C0BBPVC3N2X (acquisity-feedback) or C0BC011NAQL (acquisity-refunds-request), and to every `reply_to_requester` message, which posts into those channels from a Linear session. All restrictions and verdict rules below are limited to those messages.
 
 In every other channel, none of this skill's wording restrictions apply, even if another workflow told you to load it. Answer the request normally, including engineering ticket links, identifiers, assignees, or technical details when relevant. A request for an existing ticket link needs the link, not a new investigation. Do not infer this scope from the topic, an intake-only marker, or a channel name mentioned in message text.
 
 Within the two scoped channels, the audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it. Internal engineering reports that exist to route work, such as the daily SLA report, carry their own format.
 
-The Slack channel boundary injects the canonical final-post rule into every Slack session. Follow that rule for the complete final assistant message and for clarifying questions; do not restate or replace it here.
+The Slack channel boundary injects the canonical final-post rule into every Slack session; in a Linear session the `reply_to_requester` one-message rule does that job. Follow the one that applies for the final message and for clarifying questions; do not restate or replace it here.
 
 ## Never in a Slack-facing message
 
-- Linear issue IDs, ticket numbers, statuses, duplicate status, internal routing language.
+- Linear issue IDs, ticket numbers, statuses, duplicate status, internal routing language. The one exception: when the requester explicitly asks for the ticket link, give that link.
 - Internal dev names, assignees, project owners — say "the team" or "our team" or "our devs".
 - Code, SQL, stack traces, raw logs, raw IDs, technical implementation detail.
 - Your own tooling/access/capability limits.
@@ -33,10 +33,10 @@ If missing evidence materially limits the answer, name the product fact that rem
 
 - **User Error**: seems like a setup/configuration issue; include the steps, leave the door open.
 - **Platform Limitation**: seems like a current limitation; explain the workaround.
-- **Financial**: never mention Stripe/Autumn/billing systems; use the fixed status line.
-- **Bug**: identified a bug, the team is working on a fix; keep it short.
-- **Duplicate**: communicate the action taken.
-- **Backlog/low-impact**: state the status and the next action without overpromising.
+- **Financial**: the phrasing for every money ask, which carries a bucket and a discretion note, never a triage classification. Say what happened and what happens next and by whom, in plain words, never a promise to move money; never mention Stripe/Autumn/billing systems.
+- **Bug**: identified a bug and passed it to the team; keep it short. Say the team is already working on this, or working on a fix, only when a matching engineering issue covering the same problem is In Progress or current explicit evidence shows active engineering work; this holds when the requester's own ticket is new or a Duplicate. Finding a duplicate, or creating or routing a Todo ticket, does not show active work. Never imply a delivery date or a deployed fix.
+- **Duplicate**: say it is already reported and with the team.
+- **Backlog/low-impact**: say it is logged as low impact, without promising a next action.
 
 ## Asking a question mid-investigation
 
