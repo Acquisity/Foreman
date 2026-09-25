@@ -64,6 +64,16 @@ export interface JevOptions {
 const resolveToken = async (): Promise<string> =>
   process.env.AI_GATEWAY_API_KEY || (await getVercelOidcToken());
 
+/** Rejects when `signal` aborts first, so a stalled step still ends in time. */
+const beforeAbort = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
+  new Promise((resolve, reject) => {
+    signal.throwIfAborted();
+    signal.addEventListener("abort", () => reject(signal.reason), {
+      once: true,
+    });
+    work.then(resolve, reject);
+  });
+
 /**
  * Asks Jev every question in one request. Throws on a missing credential, a
  * timeout, a bad status, or an answer missing or off its menu, so a caller
@@ -75,6 +85,10 @@ export async function askJev(
   opts: JevOptions = {}
 ): Promise<Record<string, JevAnswer>> {
   const timeout = AbortSignal.timeout(JEV_TIMEOUT_MS);
+  const signal = opts.signal
+    ? AbortSignal.any([opts.signal, timeout])
+    : timeout;
+  const token = opts.token ?? (await beforeAbort(resolveToken(), signal));
   const response = await (opts.fetch ?? fetch)(JEV_URL, {
     body: JSON.stringify({
       model: JEV_MODEL,
@@ -83,11 +97,11 @@ export async function askJev(
       state,
     }),
     headers: {
-      authorization: `Bearer ${opts.token ?? (await resolveToken())}`,
+      authorization: `Bearer ${token}`,
       "content-type": "application/json",
     },
     method: "POST",
-    signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+    signal,
   });
   if (!response.ok) {
     throw new Error(`Jev request failed with HTTP ${response.status}.`);

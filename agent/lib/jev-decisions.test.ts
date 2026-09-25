@@ -349,3 +349,17 @@ test("askJev refuses an answer off the menu, a missing answer, or a bad status",
     )
   );
 });
+
+test("askJev stops before the request when the call is already cancelled", async () => {
+  let called = false;
+  await assert.rejects(
+    askJev({ refund: { instructions: "?", type: "boolean" } }, "s", {
+      fetch: () => {
+        called = true;
+        return reply({ answers: {}, model: "m" });
+      },
+      signal: AbortSignal.abort(),
+    })
+  );
+  assert.equal(called, false);
+});
