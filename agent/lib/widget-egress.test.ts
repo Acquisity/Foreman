@@ -711,3 +711,41 @@ test("the reply says it cannot change the account only when Jev read a request f
     [false, true]
   );
 });
+
+test("a foreign hostname inside a url is checked for ownership; the customer's own site and our help and app links pass", async () => {
+  const owned = "www.customer-site.com";
+  const reply = (url: string) =>
+    `Your campaign paused because its inbox disconnected. See ${url} for details.`;
+  const ownership = () =>
+    Promise.resolve({
+      domains: new Set([owned]),
+      emails: new Set<string>(),
+      slugs: new Set([scope.organizationSlug.toLowerCase()]),
+      uuids: new Set([campaignId]),
+    });
+  const foreign = deps({
+    compose: () =>
+      Promise.resolve(reply("https://other-tenant-site.com/private-report")),
+    resolve: ownership,
+  });
+  const blockedResult = await gate(scope, question, findings(), foreign.deps);
+  assert.equal(blockedResult.decision, "block");
+  assert.equal(
+    blockedResult.reason,
+    "composed:foreign_identifier:other-tenant-site.com"
+  );
+  for (const url of [
+    `https://${owned}/pricing.`,
+    "https://help.acquisity.ai/campaigns",
+    `https://app.acquisity.ai/dashboard/${scope.organizationSlug}/campaigns`,
+  ]) {
+    const own = deps({
+      compose: () => Promise.resolve(reply(url)),
+      resolve: ownership,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each url is its own gate run.
+    const result = await gate(scope, question, findings(), own.deps);
+    assert.equal(result.decision, "allow", url);
+    assert.equal(result.message, reply(url));
+  }
+});

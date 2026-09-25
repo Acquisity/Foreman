@@ -83,6 +83,9 @@ const UUID =
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const URL_PATTERN = /\bhttps?:\/\/[^\s)>"']+/gi;
 const DOMAIN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
+/** A url's hostname shaped like a registrable domain, as the ownership check accepts it. */
+const TRAILING_DOT = /\.$/u;
+const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 // A website fix names the file that broke ("calendar.tsx", "next.config.js"). These
 // endings are not registrable domains, so such a name is never another tenant's
 // domain; treating it as one deleted the fix from the reply.
@@ -128,15 +131,28 @@ const isInternalHost = (host: string) =>
  * the ownership check must vouch for, such as the customer's own sending domain.
  * One it cannot vouch for is foreign and blocks, as it always did. Domains that
  * are public, part of a url, or the domain of an email already in the text are
- * covered by those checks and skipped here.
+ * covered by those checks and skipped here. A url's own hostname is not covered
+ * by anything else, so one that is neither ours nor public is checked the same
+ * way as a bare domain.
  */
 function classifyDomains(
   text: string,
   urls: string[],
+  urlHosts: string[],
   emailDomains: Set<string>,
   internal: string[]
 ): string[] {
-  const domains: string[] = [];
+  const domains = new Set<string>();
+  for (const host of urlHosts) {
+    if (
+      DOMAIN_HOST.test(host) &&
+      !PUBLIC_HOSTS.has(host) &&
+      !emailDomains.has(host) &&
+      !isInternalHost(host)
+    ) {
+      domains.add(host);
+    }
+  }
   for (const domain of uniqueLower(text.match(DOMAIN))) {
     const covered =
       SOURCE_FILE.test(domain) ||
@@ -149,10 +165,10 @@ function classifyDomains(
     if (isInternalHost(domain)) {
       internal.push(domain);
     } else {
-      domains.push(domain);
+      domains.add(domain);
     }
   }
-  return domains;
+  return Array.from(domains);
 }
 
 /** Everything identifier-shaped in an arbitrary customer-bound string. */
@@ -166,9 +182,11 @@ export function scanIdentifiers(
   const internal: string[] = [];
   const urls = text.match(URL_PATTERN) ?? [];
   const slugs = new Set<string>();
+  const urlHosts: string[] = [];
   for (const value of urls) {
     const url = URL.parse(value);
-    const host = url?.hostname.toLowerCase() ?? "";
+    const host = url?.hostname.toLowerCase().replace(TRAILING_DOT, "") ?? "";
+    urlHosts.push(host);
     if (isInternalHost(host)) {
       internal.push(value);
     }
@@ -178,7 +196,7 @@ export function scanIdentifiers(
   }
   const emails = uniqueLower(text.match(EMAIL));
   const emailDomains = new Set(emails.map((email) => email.split("@")[1]));
-  const domains = classifyDomains(text, urls, emailDomains, internal);
+  const domains = classifyDomains(text, urls, urlHosts, emailDomains, internal);
   if (STACK_TRACE.test(text)) {
     internal.push("stack trace");
   }
