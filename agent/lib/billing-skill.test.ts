@@ -8,7 +8,7 @@ const billingSkill = readFileSync(
 );
 
 test("billing triage reads the complete Linear issue contract", () => {
-  const issueRead = billingSkill.indexOf("2. Step 1 issue read:");
+  const issueRead = billingSkill.indexOf("1. Step 1 issue read:");
   const identityGate = billingSkill.indexOf("3. Identity gate:");
   const stepOne = billingSkill.indexOf("## Step 1: Read the Linear issue");
   const stepTwo = billingSkill.indexOf("## Never move money", stepOne);

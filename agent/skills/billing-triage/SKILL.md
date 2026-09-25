@@ -8,12 +8,12 @@ How to investigate a money ask and leave a proposal a human can act on. The agen
 
 ## Step 0 — Classify the predominant ask
 
-Jev decides whether this ticket is a **money** ask or a **product** ask: call `classify_ask` with the report, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
+Jev decides whether this ticket is a **money** ask or a **product** ask: after reading the issue text and comments (Step 1), call `classify_ask` once, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
 
-- If it is a money ask, continue with this skill.
-- If it is a product ask, hand it to the product triage procedure instead.
-- If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
-- If it answers `unclear`, ask one batched question to place it before doing anything else.
+- If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. clarify-with-requester and slack-wording still do.
+- If it is a product ask, hand it to triage-investigate instead, which then governs.
+- If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. That line is a sentence inside the reply, never its own post, and a Linear session has no channel to mismatch. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
+- If it answers `unclear`, ask one batched question to place it and keep reading what does not depend on the answer.
 
 ## Step 1: Read the Linear issue
 
@@ -35,7 +35,7 @@ No tool can issue, schedule, or promise a refund or credit. Stripe and Autumn lo
 - `credits`
 - `stripe_credit`
 
-`stripe_credit` puts money on the Stripe customer balance so it comes off future invoices. It is the usual remedy when the customer is staying: an existing Acquisity subscription, or domains and inboxes they are keeping, and they want the cost covered rather than money returned. It needs something to apply against, so with no active subscription the credit sits unspent and a refund is the honest remedy instead. Ask which the requester wants when both would work; the money is the same and where it lands is not.
+`stripe_credit` puts money on the Stripe customer balance so it comes off future invoices. It is the usual remedy when the customer is staying: an existing Acquisity subscription, or domains and inboxes they are keeping, and they want the cost covered rather than money returned. It needs something to apply against, so with no active subscription the credit sits unspent and a refund is the honest remedy instead. Ask which the requester wants when both would work; the money is the same and where it lands is not. When their answer changes the outcome they want, call `classify_ask` again with the report plus that answer and use its new bucket and labels.
 
 `stripe_credit` and `credits` share a word and nothing else. `credits` is the product feature balance in Autumn that is spent inside the app. `stripe_credit` is money against an invoice. Never satisfy one by granting the other.
 
@@ -43,15 +43,15 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 ## Investigation order
 
-1. Step 0 classification: money vs product. If the channel mismatches, say so in one line and continue with the procedure for the ask's real kind.
-2. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
-3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. The pin scopes PlanetScale only; Autumn and Stripe are keyed by the billing account, read in step 5. If `ambiguous` is true, stop and ask which workspace. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: say so and stop rather than reading billing for a null organization.
-4. Approval trail: read the ticket comments via the Linear connection and quote any prior approval or promise verbatim. There is no Slack read tool: Slack thread history arrives with the turn as channel-supplied context, so what is not in that context cannot be fetched. When the trail is absent or reaches back no further than the current thread, say so and set the discretion note to `needs-human`. Never assume an approval exists.
+1. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
+2. Step 0 classification: money vs product, from what Step 1 read. If the channel mismatches, say so in one sentence inside the reply and continue with the procedure for the ask's real kind.
+3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. The pin scopes PlanetScale only; Autumn and Stripe are keyed by the billing account, read in step 5. If `ambiguous` is true, pick the workspace the evidence establishes, name the others in the document, and ask only when the choice changes the financial verdict and evidence cannot settle it. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: run no customer-scoped read, do not call `decide_billing`, ask for the workspace or billing email, and end the turn.
+4. Approval trail: every ticket comment, including the requester's replies under "Slack thread connected in", plus the thread history a Slack session supplies. There is no Slack read tool, so what is in neither cannot be fetched. Quote any prior approval or promise verbatim. Pass it to `decide_billing` as `approvalQuote` only when it predates the current thread; an approval found only in the current thread is quoted in the document but passed as null, which makes the discretion `needs-human`. When the trail is absent, say so. Never assume an approval exists.
 5. Systems of record: read each one named below. Read-only everywhere.
-6. Clarifying questions: batched, before any verdict, capped at three rounds.
-7. Verdict: call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the justification checklist; record them as it returns them, with its notes.
+6. Clarifying questions: batched, before any verdict, within clarify-with-requester's two-round cap. This is its Gate 2; Gate 1 is the Step 0 `unclear` question and the identity question. Keep reading what does not depend on the answer.
+7. Verdict: gather evidence for each of the seven checklist items, then call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the justification checklist; record them as it returns them, with its notes and its `unconfirmed` list unchanged.
 8. Document: the full investigation, attached to the ticket.
-9. Comment: a short human-readable reply on the ticket.
+9. Comment: a short human-readable `## Refund investigation` comment on the ticket. In a Linear session the requester also gets one `reply_to_requester` message; the comment is not that message.
 
 ## Systems of record
 
@@ -88,7 +88,7 @@ These are real and recurring. Check each one before concluding the customer is a
 
 **A failed sync can run the other way.** After a failed billing sync the Autumn subscriptions are gone while the customer still has working inboxes and domains and keeps using them, so they are getting them for free. It is rare, and it will not be what the ticket is about, but surface it when you see it. The remedy is reattaching the plans in Autumn, which is a proposal for a human like any other. Never propose recovering past unbilled usage on your own judgment: say what was used, for how long, and let a person decide whether to bill for it.
 
-The first and third run in opposite directions and are separate defects: one is a deletion that fails to propagate out of the workspace, the other is a provisioning record lost while the entitlement survives. They need separate root causes and separate owners. Both are product defects as well as money problems, so record each under Observations for the product triage path.
+The first and third run in opposite directions and are separate defects: one is a deletion that fails to propagate out of the workspace, the other is a provisioning record lost while the entitlement survives. They need separate root causes and separate owners. Both are product defects as well as money problems, so record each under Observations and flag it to Aaron.
 
 ### Reading the code
 
@@ -96,7 +96,7 @@ When the three systems diverge and the readouts do not explain why, read the cod
 
 Do not open the repository when the three systems agree. There the question is discretion, not mechanism, and the code has nothing to add.
 
-This stays an explanation, never a fix. Billing triage proposes money decisions, not patches. When the divergence turns out to be a product defect, record it under Observations and leave it to the product triage path to own: that is where a root cause becomes a master ticket. Say so in the document rather than diagnosing it further here.
+This stays an explanation, never a fix. Billing triage proposes money decisions, not patches. When the divergence turns out to be a product defect, record it under Observations and flag it to Aaron in the document; never run product triage or create engineering tickets from here. Say so in the document rather than diagnosing it further here.
 
 ## Provider governance — Autumn vs Whop
 
@@ -110,11 +110,11 @@ This stays an explanation, never a fix. Billing triage proposes money decisions,
 - **credits**: the balance they expected vs the balance shown, how many they believe were consumed, and the action that should have credited or debited them.
 - **stripe_credit**: which subscription or upcoming charge should be covered, the amount, and whether they would rather have the money back than have it applied.
 
-Each question names the fact it discriminates. Batch them into one message and wait.
+Ask only the facts the systems of record did not already settle, at most three. Each question names the fact it discriminates. Batch them into one message, keep reading what does not depend on the answer, and withhold only `decide_billing`, routing, and the closing reply.
 
 ## Justification checklist (7 items)
 
-Before any verdict, confirm each:
+`decide_billing` judges each item from the evidence you gather for it; judge them yourself only on `decided: false`:
 
 1. The charge matches a real invoice or subscription in the system of record.
 2. The amount in dispute is quantified from primary data, not the reporter's claim.
@@ -202,21 +202,17 @@ Any check that could not run, and what it would have proved.
 Anything worth a separate ticket, kept out of this refund decision.
 ```
 
-## Slack reply
+## Requester reply
 
-At most three things on a financial ticket:
+At most two things reach the requester on a financial ticket, one message each: the batched clarifying questions, if any, and one closing reply. A channel-mismatch note is one sentence inside the first of them. In a Linear session each goes through `reply_to_requester`; in a Slack session it is the thread message.
 
-1. The batched clarifying questions, if any.
-2. The one-line classification note, if the channel mismatched. It says which kind of ask this is and that it is being handled here; the investigation continues either way.
-3. One closing status reply, using the fixed status line.
-
-The status line is fixed; do not use a free-form reply on financial tickets. Never mention Stripe, Autumn, or billing systems by name in a Slack-facing message.
+The closing reply says what happened and what happens next, and by whom, in two or three plain sentences: never a promise to move money, and never Stripe, Autumn, or billing systems by name.
 
 ## Routing
 
 Pass `decide_billing`'s `route` to `route_ticket` unchanged with the ticket's `issue`; it already holds these values. Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
 
-Apply the fewest labels that place the ask, the same way `triage-handling` does. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
+Only on `decided: false`, apply the fewest labels that place the ask yourself, the same way `triage-handling` does; otherwise pass `route.addLabels` unchanged and add nothing. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
 
 - One bucket label from the taxonomy: `Refund` for `refund` or `overcharged`, `Credits` for `credits` or `stripe_credit`, `Discount` for `coupon_code`.
 - The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
