@@ -461,10 +461,20 @@ const CANT_CHANGE =
 const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
   askedForChange ? composed : composed.replace(CANT_CHANGE, "").trim();
 
+/**
+ * A stalled model call must fail closed as gate_unavailable, not hold the reply
+ * past the app's last poll. The app stops polling 285s after it sends and an
+ * investigation may run to its 170s deadline, so the finish (extract, judge,
+ * compose) has about 115s; the extractor gets 25s of it.
+ */
+const JUDGE_TIMEOUT_MS = 60_000;
+const COMPOSE_TIMEOUT_MS = 25_000;
+
 export const defaultGateDeps: GateDeps = {
   async compose({ askedForChange, findings, organizationName, question }) {
     const model = await resolveModel("widget");
     const { text } = await generateText({
+      abortSignal: AbortSignal.timeout(COMPOSE_TIMEOUT_MS),
       model: gateway(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
@@ -480,7 +490,7 @@ export const defaultGateDeps: GateDeps = {
   judge: (input) =>
     process.env.WIDGET_REVIEWER === "jev"
       ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(input),
+      : modelJudge(input, AbortSignal.timeout(JUDGE_TIMEOUT_MS)),
   resolve: resolveOwnedIdentifiers,
 };
 

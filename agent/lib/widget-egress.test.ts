@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
   composerInput,
+  defaultGateDeps,
   extractIdentifiers,
   type GateDeps,
   gate,
@@ -748,4 +749,47 @@ test("a foreign hostname inside a url is checked for ownership; the customer's o
     assert.equal(result.decision, "allow", url);
     assert.equal(result.message, reply(url));
   }
+});
+
+test("the default judge and composer run under a deadline, so a stalled model call fails closed", async () => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (
+      String(input instanceof Request ? input.url : input).includes(
+        "ai-gateway"
+      )
+    ) {
+      signals.push(init?.signal);
+    }
+    return Promise.resolve(new Response("{}", { status: 400 }));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      defaultGateDeps.judge({
+        findings: findings(),
+        items: redactableItems(findings()),
+        question,
+        scope,
+      })
+    );
+    await assert.rejects(
+      defaultGateDeps.compose({
+        findings: composerInput(findings()),
+        organizationName: scope.organizationName,
+        question,
+      })
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = realKey;
+    }
+  }
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every((signal) => signal instanceof AbortSignal));
 });
