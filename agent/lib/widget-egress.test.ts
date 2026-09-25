@@ -821,3 +821,62 @@ test("a domain inside a url is covered only when it is that url's host", async (
     assert.equal(result.reason, `composed:foreign_identifier:${foreign}`);
   }
 });
+
+test("the run's finish deadline reaches ownership reads and the judge, and its expiry fails closed", async () => {
+  const signals: (AbortSignal | undefined)[] = [];
+  const { deps: d } = deps({
+    judge: ({ signal }) =>
+      new Promise((resolve, reject) => {
+        signals.push(signal);
+        const late = setTimeout(
+          () => resolve({ decision: "allow", reason: "too late" }),
+          2000
+        );
+        signal?.addEventListener("abort", () => {
+          clearTimeout(late);
+          reject(signal.reason);
+        });
+      }),
+    resolve: (_scope, _candidates, signal) => {
+      signals.push(signal);
+      return Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set([campaignId]),
+      });
+    },
+  });
+  const deadline = AbortSignal.timeout(50);
+  const startedAt = Date.now();
+  const result = await gate(
+    scope,
+    question,
+    findings(),
+    d,
+    question,
+    false,
+    deadline
+  );
+  assert.equal(result.reason, "gate_unavailable");
+  assert.ok(Date.now() - startedAt < 1000);
+  assert.deepEqual(signals, [deadline, deadline]);
+  const expired = AbortSignal.abort();
+  const none = deps({
+    resolve: () => assert.fail("no read after the deadline"),
+  });
+  assert.equal(
+    (
+      await gate(
+        scope,
+        question,
+        findings(),
+        none.deps,
+        question,
+        false,
+        expired
+      )
+    ).reason,
+    "gate_unavailable"
+  );
+});

@@ -137,11 +137,12 @@ async function reviewByFallback(
   jev: ReturnType<typeof decide>,
   startedAt: number
 ): Promise<Verdict> {
+  const budget = AbortSignal.timeout(
+    Math.max(0, REVIEW_BUDGET_MS - (Date.now() - startedAt))
+  );
   const verdict = await fallback(
     input,
-    AbortSignal.timeout(
-      Math.max(0, REVIEW_BUDGET_MS - (Date.now() - startedAt))
-    )
+    input.signal ? AbortSignal.any([budget, input.signal]) : budget
   );
   if (verdict.decision === "block") {
     return verdict;
@@ -248,7 +249,12 @@ export async function reviewWidgetFindings(
         "content-type": "application/json",
       },
       method: "POST",
-      signal: AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+      signal: input.signal
+        ? AbortSignal.any([
+            AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+            input.signal,
+          ])
+        : AbortSignal.timeout(REVIEW_TIMEOUT_MS),
     }
   );
   if (!response.ok) {

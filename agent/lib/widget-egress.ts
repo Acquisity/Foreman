@@ -27,6 +27,8 @@ export interface GateDeps {
     findings: ComposerInput;
     organizationName: string;
     question: string;
+    /** The run's remaining finish deadline, when the caller has one. */
+    signal?: AbortSignal;
   }) => Promise<string>;
   judge: (input: {
     findings: WidgetFindings;
@@ -34,10 +36,13 @@ export interface GateDeps {
     items: RedactableItem[];
     question: string;
     scope: WidgetContext;
+    /** The run's remaining finish deadline, when the caller has one. */
+    signal?: AbortSignal;
   }) => Promise<{ decision: GateDecision; reason: string; remove?: number[] }>;
   resolve: (
     scope: WidgetContext,
-    candidates: IdentifierCandidates
+    candidates: IdentifierCandidates,
+    signal?: AbortSignal
   ) => Promise<OwnedIdentifiers>;
 }
 
@@ -254,7 +259,8 @@ async function deterministicTextReason(
   scope: WidgetContext,
   text: string,
   resolve: GateDeps["resolve"],
-  exemptTicketId?: string
+  exemptTicketId?: string,
+  signal?: AbortSignal
 ): Promise<string | null> {
   const { candidates, internal } = scanIdentifiers(text, exemptTicketId);
   if (internal.length) {
@@ -270,7 +276,7 @@ async function deterministicTextReason(
   ) {
     return null;
   }
-  const owned = await resolve(scope, candidates);
+  const owned = await resolve(scope, candidates, signal);
   const foreign =
     candidates.uuids.find((id) => !owned.uuids.has(id)) ??
     candidates.slugs.find((slug) => !owned.slugs.has(slug)) ??
@@ -282,13 +288,15 @@ async function deterministicTextReason(
 function deterministicReason(
   scope: WidgetContext,
   findings: WidgetFindings,
-  resolve: GateDeps["resolve"]
+  resolve: GateDeps["resolve"],
+  signal?: AbortSignal
 ): Promise<string | null> {
   return deterministicTextReason(
     scope,
     customerText(findings),
     resolve,
-    findings.ticket?.id
+    findings.ticket?.id,
+    signal
   );
 }
 
@@ -423,6 +431,12 @@ const verdictSchema = z.object({
 
 type JudgeInput = Parameters<GateDeps["judge"]>[0];
 
+/** A call's own deadline, cut short by the run's finish deadline when there is one. */
+const within = (ms: number, signal?: AbortSignal) =>
+  signal
+    ? AbortSignal.any([AbortSignal.timeout(ms), signal])
+    : AbortSignal.timeout(ms);
+
 /** The existing model reviewer; also the fallback for cases JEV is unsure about. */
 async function modelJudge(
   { findings, items, question, scope }: JudgeInput,
@@ -471,10 +485,16 @@ const JUDGE_TIMEOUT_MS = 60_000;
 const COMPOSE_TIMEOUT_MS = 25_000;
 
 export const defaultGateDeps: GateDeps = {
-  async compose({ askedForChange, findings, organizationName, question }) {
+  async compose({
+    askedForChange,
+    findings,
+    organizationName,
+    question,
+    signal,
+  }) {
     const model = await resolveModel("widget");
     const { text } = await generateText({
-      abortSignal: AbortSignal.timeout(COMPOSE_TIMEOUT_MS),
+      abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
       model: gateway(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
@@ -490,8 +510,9 @@ export const defaultGateDeps: GateDeps = {
   judge: (input) =>
     process.env.WIDGET_REVIEWER === "jev"
       ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(input, AbortSignal.timeout(JUDGE_TIMEOUT_MS)),
-  resolve: resolveOwnedIdentifiers,
+      : modelJudge(input, within(JUDGE_TIMEOUT_MS, input.signal)),
+  resolve: (scope, candidates, signal) =>
+    resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
 
 const handoffOnly = (findings: WidgetFindings) =>
@@ -550,11 +571,17 @@ export async function gate(
   /** The question within its conversation, for the composer only. */
   conversation: string = question,
   /** Jev's read of whether the customer asked for a change; see `asksForChange`. */
-  askedForChange = false
+  askedForChange = false,
+  /**
+   * The run's remaining finish deadline. Every ownership read and model call
+   * runs under it, and once it passes the gate fails closed as gate_unavailable.
+   */
+  signal?: AbortSignal
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
+    signal?.throwIfAborted();
     const startedAt = Date.now();
     try {
       return await work();
@@ -565,7 +592,7 @@ export async function gate(
   const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
     let reason = await timed("scan", () =>
-      deterministicReason(scope, findings, deps.resolve)
+      deterministicReason(scope, findings, deps.resolve, signal)
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
@@ -597,7 +624,7 @@ export async function gate(
       const current = findings;
       // biome-ignore lint/performance/noAwaitInLoops: each pass scans what the last one left.
       reason = await timed("scan", () =>
-        deterministicReason(scope, current, deps.resolve)
+        deterministicReason(scope, current, deps.resolve, signal)
       );
     }
     if (reason) {
@@ -614,6 +641,7 @@ export async function gate(
         items: redactableItems(findings),
         question,
         scope,
+        signal,
       })
     );
     if (verdict.decision === "block") {
@@ -633,7 +661,7 @@ export async function gate(
       }
       gated = rewritten;
       const again = await timed("scan", () =>
-        deterministicReason(scope, gated, deps.resolve)
+        deterministicReason(scope, gated, deps.resolve, signal)
       );
       if (again) {
         return done(blocked(findings, again));
@@ -645,6 +673,7 @@ export async function gate(
         findings: composerInput(gated),
         organizationName: scope.organizationName,
         question: conversation,
+        signal,
       })
     );
     const message = unaskedChangeRemoved(composed, askedForChange);
@@ -656,7 +685,7 @@ export async function gate(
     // in the gated findings; the customer message must contain no foreign
     // identifier and no ticket reference at all.
     const egress = await timed("scan", () =>
-      deterministicTextReason(scope, message, deps.resolve)
+      deterministicTextReason(scope, message, deps.resolve, undefined, signal)
     );
     if (egress) {
       return done(blocked(findings, `composed:${egress}`));
