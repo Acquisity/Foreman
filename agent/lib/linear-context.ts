@@ -5,7 +5,7 @@ import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
 /** Points a customer report at the same procedure the Slack intake channels load. */
 export const LINEAR_TRIAGE_ROUTE =
-  "If this issue is a customer report or support ask rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage.";
+  "If this issue is a customer report or support ask (it usually carries an 'Ask from' Slack link or a 'Support conversation' link) rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage.";
 
 export function buildLinearContext(
   event: LinearAgentSessionEvent
