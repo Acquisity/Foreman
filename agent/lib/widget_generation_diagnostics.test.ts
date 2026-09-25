@@ -643,3 +643,12 @@ test("owned final draft and settings are bounded, redacted, and kept separate fr
   }
   assert.ok(text.includes("[redacted]"));
 });
+
+test("an untyped copy-review issue is left out of the type list instead of failing the read", () => {
+  const query = buildGenerationDiagnosticsQuery(verifiedWidgetContext, {});
+  assert.ok(
+    query.includes(
+      "jsonb_agg(distinct e->>'type') filter (where e->>'type' is not null)"
+    )
+  );
+});

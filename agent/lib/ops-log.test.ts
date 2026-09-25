@@ -365,6 +365,19 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes("[redacted]"));
   });
 
+  it("redacts an opaque credential after an authorization scheme", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          "401 with Authorization: Bearer abc123opaque and Basic dXNlcjpwYXNz on the basic plan",
+      })
+    );
+    assert.equal(record.message.includes("abc123opaque"), false);
+    assert.equal(record.message.includes("dXNlcjpwYXNz"), false);
+    assert.ok(record.message.includes("Bearer [redacted]"));
+    assert.ok(record.message.includes("basic plan"));
+  });
+
   it("leaves an ordinary message and non-message fields untouched", () => {
     const record = JSON.parse(
       formatOpsEvent("session.completed", {

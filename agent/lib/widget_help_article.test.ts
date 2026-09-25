@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
+import type { z } from "zod";
 import type { FindHelpArticleResult } from "#lib/help-center.js";
-
-const HTTP_500_RE = /HTTP 500/;
 
 // Mock the help-center module
 // biome-ignore lint/suspicious/useAwait: test mock mirrors the async helper signature.
@@ -78,57 +77,41 @@ describe("widget_help_article tool", () => {
     );
   });
 
-  it("returns structured article list with title and url", async () => {
-    // Test the output schema validation
-    const result = await mockFindHelpArticles("email setup");
-    assert.equal(result.articles.length, 2, "should return 2 articles");
-    assert.ok(result.articles[0].title, "articles should have title");
-    assert.ok(result.articles[0].url, "articles should have url");
-    assert.equal(
-      typeof result.articles[0].title,
-      "string",
-      "title should be a string"
+  it("the tool's schemas trim and bound the query, and drop article paths", async () => {
+    const { default: dynamic } = await import(
+      "../tools/widget_help_article.js"
     );
-    assert.equal(
-      typeof result.articles[0].url,
-      "string",
-      "url should be a string"
-    );
-  });
-
-  it("handles empty results", async () => {
-    const result = await mockFindHelpArticles("empty");
+    const tool = dynamic.events["step.started"]?.({}, {
+      session: {
+        auth: {
+          initiator: {
+            attributes: {},
+            issuer: "foreman:widget-support",
+          } as SessionAuthContext,
+        },
+      },
+    } as never) as
+      | { inputSchema: z.ZodType; outputSchema: z.ZodType }
+      | null
+      | undefined;
+    assert.ok(tool);
+    const parse = (query: string) => tool.inputSchema.safeParse({ query });
+    assert.equal(parse("a").success, false);
+    assert.equal(parse("ab").success, true);
+    assert.equal(parse("a".repeat(120)).success, true);
+    assert.equal(parse("a".repeat(121)).success, false);
+    assert.deepEqual(parse("  email setup  ").data, { query: "email setup" });
+    const found = await mockFindHelpArticles("email setup");
+    const output = tool.outputSchema.parse(found) as {
+      articles: Record<string, unknown>[];
+    };
+    assert.equal(output.articles.length, 2);
+    for (const article of output.articles) {
+      assert.equal("path" in article, false);
+    }
     assert.deepEqual(
-      result.articles,
-      [],
-      "should return empty array when no articles found"
+      tool.outputSchema.parse(await mockFindHelpArticles("error test")),
+      { articles: [], error: "Help-center search failed: HTTP 500." }
     );
-    assert.equal(
-      result.error,
-      undefined,
-      "should not have error when empty is expected"
-    );
-  });
-
-  it("includes error message when search fails", async () => {
-    const result = await mockFindHelpArticles("error test");
-    assert.equal(result.articles.length, 0, "should have no articles on error");
-    assert.ok(result.error, "should include error message");
-    assert.match(result.error, HTTP_500_RE, "error should contain HTTP status");
-  });
-
-  it("input schema validates query length and trimming", () => {
-    // Verify the tool's input constraints
-    const minLength = 2;
-    const maxLength = 120;
-
-    // Valid queries
-    assert.ok("ab".length >= minLength, "2-char query should be valid");
-    assert.ok("a".repeat(120).length <= maxLength, "120-char query valid");
-
-    // Trimming should work
-    const padded = "  query  ";
-    const trimmed = padded.trim();
-    assert.equal(trimmed, "query", "trimming should remove whitespace");
   });
 });
