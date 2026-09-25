@@ -2,8 +2,13 @@ import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
-import { createWidgetTicket } from "#lib/executor/dispatch.js";
-import { findRelatedIssues, type RelatedIssue } from "#lib/linear-api.js";
+import { createWidgetTicket, REFUND_TICKET } from "#lib/executor/dispatch.js";
+import {
+  findRelatedIssues,
+  type LinearGraphqlOptions,
+  linearGraphql,
+  type RelatedIssue,
+} from "#lib/linear-api.js";
 import { isRefundTicket } from "#lib/widget-next-action.js";
 import { isWidgetSupport, requireWidgetContext } from "../lib/widget-scope.js";
 import {
@@ -11,21 +16,55 @@ import {
   formatFinCustomerReport,
 } from "./file_fin_investigation_ticket.js";
 
-/** The name of REFUND_TICKET's label: the queue billing triage reads. */
-const REFUND_LABEL = "Refund";
+/** REFUND_TICKET.project (P-ENG-20, "Support") as the id Linear returns for an issue's project. */
+const SUPPORT_PROJECT_ID = "4534deb2-6bbc-4e30-ad38-48963f414d14";
+
+interface RoutedIssue {
+  issue: {
+    labels: { nodes: { id: string }[] };
+    project: { id: string } | null;
+  } | null;
+}
+
+/**
+ * Whether an existing ticket already sits in the queue billing triage reads:
+ * the Support project with the Refund label, the destination REFUND_TICKET
+ * files to. A ticket that cannot be read counts as not routed.
+ */
+export async function inRefundQueue(
+  identifier: string,
+  opts: LinearGraphqlOptions
+): Promise<boolean> {
+  try {
+    const { issue } = await linearGraphql<RoutedIssue>(
+      "RouteIssue",
+      { id: identifier },
+      opts
+    );
+    return Boolean(
+      issue?.project?.id === SUPPORT_PROJECT_ID &&
+        issue.labels.nodes.some(({ id }) => id === REFUND_TICKET.labels[0])
+    );
+  } catch (error) {
+    if (opts.signal?.aborted) {
+      throw error;
+    }
+    return false;
+  }
+}
 
 /**
  * A conversation's existing ticket is returned instead of a second one. It
- * counts as routed to billing only when it already carries the refund label;
+ * counts as routed to billing only when it is verified in the refund queue;
  * an ordinary ticket reused for a refund leaves the handoff to a person.
  */
 export const existingTicket = (
-  issue: Pick<RelatedIssue, "identifier" | "labels" | "url">,
-  refund: boolean
+  issue: Pick<RelatedIssue, "identifier" | "url">,
+  routedRefund: boolean
 ) => ({
   existing: true,
   identifier: issue.identifier,
-  refund: refund && issue.labels.includes(REFUND_LABEL),
+  refund: routedRefund,
   url: issue.url,
 });
 
@@ -55,7 +94,11 @@ const tool = defineTool({
         (issue) => issue.stateType !== "canceled"
       );
       if (existing) {
-        return existingTicket(existing, refund);
+        const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
+        return existingTicket(
+          existing,
+          refund && (await inRefundQueue(existing.identifier, opts))
+        );
       }
       const result = await createWidgetTicket(ctx, {
         refund,
