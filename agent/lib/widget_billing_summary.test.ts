@@ -617,3 +617,31 @@ test("order links are unavailable, not empty, when Autumn cannot be read", async
   );
   assert.equal(result.orderSubscriptions.available, false);
 });
+
+test("the renewal date comes from a live subscription, never a newer canceled one", async () => {
+  const canceled = {
+    cancel_at_period_end: false,
+    current_period_end: 1_800_000_000,
+    id: "sub_0",
+    status: "canceled",
+    trial_end: null,
+  };
+  const withSubscriptions = (data: unknown[]) =>
+    fakeDeps({
+      getStripeCustomerBilling: () =>
+        Promise.resolve({
+          ...stripeFixture,
+          subscriptions: { data: { data, object: "list" } },
+        }),
+    });
+  const live = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    withSubscriptions([canceled, ...stripeFixture.subscriptions.data.data])
+  );
+  assert.equal(live.credits?.renewsAt, "2024-10-15T13:46:40.000Z");
+  const none = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    withSubscriptions([canceled])
+  );
+  assert.equal(none.credits?.renewsAt, null);
+});
