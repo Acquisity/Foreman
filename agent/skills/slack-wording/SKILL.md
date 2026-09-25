@@ -34,7 +34,7 @@ If missing evidence materially limits the answer, name the product fact that rem
 - **User Error**: seems like a setup/configuration issue; include the steps, leave the door open.
 - **Platform Limitation**: seems like a current limitation; explain the workaround.
 - **Financial**: never mention Stripe/Autumn/billing systems; use the fixed status line.
-- **Bug**: identified a bug, the team is working on a fix; keep it short.
+- **Bug**: identified a bug and passed it to the team; keep it short. Say the team is already working on this, or working on a fix, only when a matching engineering issue covering the same problem is In Progress or current explicit evidence shows active engineering work; this holds when the requester's own ticket is new or a Duplicate. Finding a duplicate, or creating or routing a Todo ticket, does not show active work. Never imply a delivery date or a deployed fix.
 - **Duplicate**: communicate the action taken.
 - **Backlog/low-impact**: state the status and the next action without overpromising.
 
