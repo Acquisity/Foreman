@@ -2,6 +2,11 @@ import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
 // Kept in its own module so linear-context.test.ts can import it without
 // pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
+
+/** Points a customer report at the same procedure the Slack intake channels load. */
+export const LINEAR_TRIAGE_ROUTE =
+  "If this issue is a customer report or support ask rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage.";
+
 export function buildLinearContext(
   event: LinearAgentSessionEvent
 ): string[] | null {
@@ -9,7 +14,7 @@ export function buildLinearContext(
     return null;
   }
   const requester = event.agentActivity?.user ?? event.agentSession.creator;
-  const context: string[] = [];
+  const context: string[] = [LINEAR_TRIAGE_ROUTE];
   const requesterName = requester?.displayName ?? requester?.name;
   if (requesterName) {
     context.push(`The requesting user is ${requesterName}.`);

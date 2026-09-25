@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-const { buildLinearContext } = await import("./linear-context.js");
+const { buildLinearContext, LINEAR_TRIAGE_ROUTE } = await import(
+  "./linear-context.js"
+);
 
 function makeEvent(overrides: {
   action: string;
@@ -32,12 +34,12 @@ function makeEvent(overrides: {
 }
 
 describe("buildLinearContext", () => {
-  it("adds no context for created and prompted dispatches", () => {
+  it("points every created and prompted dispatch at triage for customer reports", () => {
     for (const action of ["created", "prompted"]) {
       const context = buildLinearContext(
         makeEvent({ action, issue: { id: "issue-1" } })
       );
-      assert.deepEqual(context, []);
+      assert.deepEqual(context, [LINEAR_TRIAGE_ROUTE]);
     }
   });
 
