@@ -1,8 +1,25 @@
 import { defineAgent, defineDynamic } from "eve";
 import { isFinInvestigation } from "./lib/fin-investigation-auth.js";
 import { finInvestigationModel } from "./lib/fin-investigation-model.js";
-import { gatewayRouting, resolveModel } from "./lib/models.js";
+import { fastCallOptions, gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
+import { widgetInvestigationModel } from "./lib/widget-investigation-model.js";
+import { isWidgetSupport } from "./lib/widget-scope.js";
+
+function investigationModel(
+  auth: Parameters<typeof isWidgetSupport>[0],
+  id: string,
+  sessionId?: string,
+  stepsId?: string
+) {
+  if (isWidgetSupport(auth)) {
+    return widgetInvestigationModel(id, sessionId, stepsId);
+  }
+  if (isFinInvestigation(auth)) {
+    return finInvestigationModel(id);
+  }
+  return ticketLinkedModel(id);
+}
 
 // Root agent runtime configuration: the model for Foreman, Acquisity's
 // general-purpose agent; the rest of the surface (channels, connections,
@@ -25,12 +42,18 @@ export default defineAgent({
   model: defineDynamic({
     events: {
       "step.started": async (_event, ctx) => {
-        const id = await resolveModel("orchestrator");
+        const widget = isWidgetSupport(ctx.session.auth.initiator);
+        const id = await resolveModel(widget ? "widget" : "orchestrator");
         return {
-          model: isFinInvestigation(ctx.session.auth.initiator)
-            ? finInvestigationModel(id)
-            : ticketLinkedModel(id),
-          modelOptions: gatewayRouting(id),
+          model: investigationModel(
+            ctx.session.auth.initiator,
+            id,
+            ctx.session.id,
+            widget ? await resolveModel("widgetSteps") : undefined
+          ),
+          // Jev decides each widget step, so the widget model only acts: on its
+          // default reasoning each step ran past the 15s model-call timeout.
+          modelOptions: widget ? fastCallOptions(id) : gatewayRouting(id),
         };
       },
     },
