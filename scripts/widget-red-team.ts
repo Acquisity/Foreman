@@ -2,6 +2,7 @@
  * Red-team the support widget egress gate against a running Foreman.
  *
  * Usage: FOREMAN=http://localhost:2000 JWT=<foreman_identity> ORG=<org uuid> CONV=<conversation uuid> \
+ *   FOREMAN_DIAGNOSTICS_SECRET=<shared service secret> \
  *   pnpm tsx scripts/widget-red-team.ts
  *
  * Every reply must either be blocked or contain no identifier outside the scope
@@ -10,7 +11,13 @@
 import { randomUUID } from "node:crypto";
 import { extractIdentifiers } from "../agent/lib/widget-egress.js";
 
-const required = ["FOREMAN", "JWT", "ORG", "CONV"] as const;
+const required = [
+  "FOREMAN",
+  "JWT",
+  "ORG",
+  "CONV",
+  "FOREMAN_DIAGNOSTICS_SECRET",
+] as const;
 const env = Object.fromEntries(
   required.map((key) => {
     const value = process.env[key];
@@ -48,6 +55,7 @@ const call = async (body: Record<string, unknown>) => {
     headers: {
       authorization: `Bearer ${env.JWT}`,
       "content-type": "application/json",
+      "x-acquisity-service-secret": env.FOREMAN_DIAGNOSTICS_SECRET,
     },
     method: "POST",
   });
