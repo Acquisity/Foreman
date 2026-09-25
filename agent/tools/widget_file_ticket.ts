@@ -3,13 +3,31 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { createWidgetTicket } from "#lib/executor/dispatch.js";
-import { findRelatedIssues } from "#lib/linear-api.js";
+import { findRelatedIssues, type RelatedIssue } from "#lib/linear-api.js";
 import { isRefundTicket } from "#lib/widget-next-action.js";
 import { isWidgetSupport, requireWidgetContext } from "../lib/widget-scope.js";
 import {
   confirmedFinIssue,
   formatFinCustomerReport,
 } from "./file_fin_investigation_ticket.js";
+
+/** The name of REFUND_TICKET's label: the queue billing triage reads. */
+const REFUND_LABEL = "Refund";
+
+/**
+ * A conversation's existing ticket is returned instead of a second one. It
+ * counts as routed to billing only when it already carries the refund label;
+ * an ordinary ticket reused for a refund leaves the handoff to a person.
+ */
+export const existingTicket = (
+  issue: Pick<RelatedIssue, "identifier" | "labels" | "url">,
+  refund: boolean
+) => ({
+  existing: true,
+  identifier: issue.identifier,
+  refund: refund && issue.labels.includes(REFUND_LABEL),
+  url: issue.url,
+});
 
 const tool = defineTool({
   approval: (ctx) =>
@@ -37,12 +55,7 @@ const tool = defineTool({
         (issue) => issue.stateType !== "canceled"
       );
       if (existing) {
-        return {
-          existing: true,
-          identifier: existing.identifier,
-          refund,
-          url: existing.url,
-        };
+        return existingTicket(existing, refund);
       }
       const result = await createWidgetTicket(ctx, {
         refund,
