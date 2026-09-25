@@ -130,14 +130,13 @@ const isInternalHost = (host: string) =>
  * A bare domain is either one of ours (internal, always blocked) or something
  * the ownership check must vouch for, such as the customer's own sending domain.
  * One it cannot vouch for is foreign and blocks, as it always did. Domains that
- * are public, part of a url, or the domain of an email already in the text are
+ * are public, a url's own host, or the domain of an email already in the text are
  * covered by those checks and skipped here. A url's own hostname is not covered
  * by anything else, so one that is neither ours nor public is checked the same
  * way as a bare domain.
  */
 function classifyDomains(
   text: string,
-  urls: string[],
   urlHosts: string[],
   emailDomains: Set<string>,
   internal: string[]
@@ -158,7 +157,8 @@ function classifyDomains(
       SOURCE_FILE.test(domain) ||
       PUBLIC_HOSTS.has(domain) ||
       emailDomains.has(domain) ||
-      urls.some((value) => value.toLowerCase().includes(domain));
+      // Only a url's own host is checked there: a domain elsewhere in a url is not.
+      urlHosts.includes(domain);
     if (covered) {
       continue;
     }
@@ -196,7 +196,7 @@ export function scanIdentifiers(
   }
   const emails = uniqueLower(text.match(EMAIL));
   const emailDomains = new Set(emails.map((email) => email.split("@")[1]));
-  const domains = classifyDomains(text, urls, urlHosts, emailDomains, internal);
+  const domains = classifyDomains(text, urlHosts, emailDomains, internal);
   if (STACK_TRACE.test(text)) {
     internal.push("stack trace");
   }
