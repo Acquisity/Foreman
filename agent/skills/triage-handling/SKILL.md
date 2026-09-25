@@ -116,7 +116,7 @@ The roster exists on the production ENG team only; SAN sandbox tickets always ro
 
 `User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged; a `Duplicate` adds the fields below. The ticket carries the explanation and closes into the Stage 5 state; nothing goes to engineering and no queue should hold a closed report.
 
-A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster as the fallback, plus the Stage 5 state, priority, and labels, so whoever owns the root cause owns the reports of it. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket still closes into its Stage 5 state in the same pass.
+A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster as the fallback unless `route` names one, plus the Stage 5 state, priority, and labels, so the root cause's owner owns its reports. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket still closes into its Stage 5 state.
 
 ### When the root cause warrants action
 
