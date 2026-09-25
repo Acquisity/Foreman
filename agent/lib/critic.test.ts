@@ -171,9 +171,6 @@ describe("critic subagent", () => {
       tools: string[];
     };
     assert.ok(info.subagents.includes("critic"));
-    // P2.3's discovery check rides this same compiler run: the sign_in tool
-    // must compile and surface as a root tool.
-    assert.ok(info.tools.includes("sign_in"));
     // P4.2 also rides this run: the compiled manifest must carry the root
     // agent's disabled per-session input budget, proving agent.test.ts's
     // source-level pin survives compilation into what eve actually runs.
@@ -191,9 +188,6 @@ describe("critic subagent", () => {
       tools: { logicalPath: string }[];
     };
     assert.equal(manifest.diagnosticsSummary.errors, 0);
-    assert.ok(
-      manifest.tools.some((tool) => tool.logicalPath === "tools/sign_in.ts")
-    );
     // P7.1 rides this run: the ops hook must be discovered from
     // agent/hooks/ops.ts. The exact ten subscribed events are pinned in
     // ops-log.test.ts.

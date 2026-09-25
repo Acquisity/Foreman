@@ -50,9 +50,7 @@ import { isIntakeOnly } from "../lib/trust.js";
  *
  * Automatic Slack connection attempts never show a sign-in prompt: user-scoped
  * connections authorize through `userConnect`, which turns a missing grant for
- * any Slack-issued user principal into a terminal, non-retryable failure. The
- * attended root `sign_in` tool is the deliberate exception and may invoke
- * consent after a person explicitly asks to connect one service.
+ * any Slack-issued user principal into a terminal, non-retryable failure.
  *
  * Only a full GitHub URL in the message selects the session repository. A bare
  * `owner/repo` token is not extracted here, because prose cannot be told apart

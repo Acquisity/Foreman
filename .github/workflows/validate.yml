@@ -21,7 +21,6 @@ jobs:
     env:
       EXECUTOR_MCP_CONNECTOR: placeholder/foreman-ci
       LINEAR_CONNECTOR: placeholder/foreman-ci
-      SUPERMEMORY_MCP_CONNECTOR: placeholder/foreman-ci
     steps:
       - uses: actions/checkout@v5
         with:
