@@ -55,6 +55,7 @@ import {
   claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
+  expireSessionlessWidgetRun,
   latestWidgetScope,
   readWidgetRun,
   recentWidgetTurns,
@@ -347,6 +348,7 @@ export const defaultWidgetDependencies = {
   claim: claimWidgetRun,
   claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
+  expire: expireSessionlessWidgetRun,
   extract: extractWidgetFindings,
   gate: egressGate,
   handoffEligible,
@@ -801,6 +803,66 @@ async function settleResultRun(
     );
   }
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
+}
+
+/**
+ * A claimed run that never got a session and is past the deadline is handed to
+ * a person, as an overdue investigation is: nothing else will ever finish it,
+ * and it would hold the conversation's one open run for good.
+ */
+async function expireStaleClaim(
+  run: WidgetRun,
+  deps: Pick<WidgetDependencies, "expire">
+): Promise<boolean> {
+  if (
+    run.outcome ||
+    run.session_id ||
+    Date.now() - run.created_at.getTime() <= WIDGET_DEADLINE_MS
+  ) {
+    return false;
+  }
+  const handoff = humanHandoff(null, "deadline");
+  if (
+    !(
+      handoff &&
+      (await deps.expire(
+        run.id,
+        handoff.result,
+        handoff.findings,
+        WIDGET_DEADLINE_MS
+      ))
+    )
+  ) {
+    return false;
+  }
+  logGateDecision(
+    { conversationId: run.scope.conversationId, runId: run.id },
+    handoff.result
+  );
+  return true;
+}
+
+/** The run as it stands once a dead claim, if this is one, is settled. */
+const settledIfStale = async (
+  run: WidgetRun,
+  deps: Pick<WidgetDependencies, "expire" | "read">
+) => ((await expireStaleClaim(run, deps)) ? await deps.read(run.id) : run);
+
+/** Claim this message's run. A dead claim is settled first: this message then gets its own run, or, when it is the same message, the handoff that settled it. */
+async function claimOpenRun(
+  scope: WidgetContext,
+  input: Extract<WidgetInput, { action: "start" }>,
+  deps: Pick<WidgetDependencies, "claim" | "expire" | "read">
+) {
+  const claim = () =>
+    deps.claim(scope, requestKey(input), withScreenshots(input));
+  const claimed = await claim();
+  if (claimed.fresh || !(await expireStaleClaim(claimed.run, deps))) {
+    return claimed;
+  }
+  return claimed.busy
+    ? await claim()
+    : { ...claimed, run: await deps.read(claimed.run.id) };
 }
 
 /** The reply to a confident help-center question nothing answered: a question back, never blank. */
@@ -1371,6 +1433,7 @@ export async function receiveWidgetMessage(
       if (input.action === "cancel") {
         return json(await cancelRun(run, attachSession, deps));
       }
+      run = await settledIfStale(run, deps);
       if (!run.outcome && run.session_id && attachSession) {
         run = await pollWidgetRun(
           run,
@@ -1387,11 +1450,7 @@ export async function receiveWidgetMessage(
     if (previous && !sameWidgetOwner(previous, scope)) {
       return json({ error: "Conversation scope changed." }, 403);
     }
-    const { busy, fresh, run } = await deps.claim(
-      scope,
-      requestKey(input),
-      withScreenshots(input)
-    );
+    const { busy, fresh, run } = await claimOpenRun(scope, input, deps);
     if (busy) {
       return json({ run_id: run.id, status: "busy" });
     }

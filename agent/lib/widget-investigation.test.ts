@@ -102,6 +102,7 @@ function dependencies(gateResult: GateResult = allowed) {
       run.completed_at = new Date();
       return Promise.resolve(run);
     },
+    expire: () => assert.fail("a live run must not be expired"),
     extract: () => Promise.resolve(findings),
     gate: (_scope, _question, raw) => {
       gated.push(raw);
@@ -368,6 +369,72 @@ test("a follow-up sent while an earlier message is still running is told to wait
     deps
   );
   assert.deepEqual(await response.json(), { run_id: run.id, status: "busy" });
+});
+
+test("a claim that never got a session is settled after the deadline, so the conversation is not blocked for good", async (t) => {
+  enabled(t);
+  const stale = () => {
+    const made = dependencies();
+    made.run.created_at = new Date(Date.now() - 200_000);
+    made.deps.expire = (_id, outcome, stored) => {
+      made.run.outcome = outcome;
+      made.run.findings = stored;
+      made.run.completed_at = new Date();
+      return Promise.resolve(true);
+    };
+    return made;
+  };
+  // Polling the dead run settles it as a handoff instead of pending forever.
+  const polled = stale();
+  const result = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    { attachSession: () => assert.fail("no session to attach"), ...noWork() },
+    1,
+    verify,
+    polled.deps
+  );
+  assert.equal(result.status, 200);
+  assert.equal(polled.run.outcome?.reason, "deadline");
+  // A new message is no longer told to wait on it: it claims a run of its own.
+  const next = stale();
+  const claims: boolean[] = [];
+  next.deps.claim = () => {
+    claims.push(true);
+    return Promise.resolve(
+      claims.length === 1
+        ? { busy: true, fresh: false, run: next.run }
+        : {
+            busy: true,
+            fresh: false,
+            run: {
+              ...next.run,
+              created_at: new Date(),
+              id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            },
+          }
+    );
+  };
+  const started = await receiveWidgetMessage(
+    request({ ...start, question: "Is it fixed now?" }),
+    {
+      from: () => assert.fail("still busy"),
+      waitUntil: () => undefined,
+    } as never,
+    1,
+    verify,
+    next.deps
+  );
+  assert.equal(claims.length, 2);
+  assert.equal(next.run.outcome?.reason, "deadline");
+  assert.equal(
+    ((await started.json()) as { run_id: string }).run_id,
+    "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  );
 });
 
 test("a completed investigation is gated, answered with the composed reply, and returns its findings for the inbox note", async (t) => {

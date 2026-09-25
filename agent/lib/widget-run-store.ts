@@ -220,6 +220,34 @@ export async function completeWidgetRun(
   return run;
 }
 
+/**
+ * A run claimed but never given a session: the process died between the claim
+ * and the attach or the front-door reply. Nothing will ever finish it, and it
+ * holds the conversation's one open run, so once it is past the deadline it is
+ * settled here. The fence leaves a run that got a session or an outcome alone.
+ */
+export async function expireSessionlessWidgetRun(
+  id: string,
+  outcome: WidgetOutcome,
+  findings: unknown,
+  olderThanMs: number
+): Promise<boolean> {
+  const rows = await privateDatabase().query(
+    `UPDATE widget_support_runs SET outcome = $2::jsonb, findings = $3::jsonb, decision = $4,
+       completed_at = now()
+     WHERE id = $1 AND session_id IS NULL AND completed_at IS NULL
+       AND created_at < now() - make_interval(secs => $5::double precision / 1000) RETURNING id`,
+    [
+      id,
+      JSON.stringify(outcome),
+      JSON.stringify(findings),
+      outcome.decision,
+      olderThanMs,
+    ]
+  );
+  return rows.length === 1;
+}
+
 /** The customer reported a bug: the app offers a screen recording next to this run's reply. */
 export async function requestWidgetRecording(id: string) {
   await privateDatabase().query(
