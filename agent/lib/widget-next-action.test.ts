@@ -534,6 +534,18 @@ describe("widget next-action selector", () => {
     assert.equal(other.sent().tools.includes("widget_ask_customer"), false);
   });
 
+  it("a clarify pick with no ask tool on offer finishes instead of naming a tool the model lacks", async () => {
+    const { model, sent } = harness(jev("clarify"));
+    await model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(sent().note.includes("widget_ask_customer"), false);
+    assert.equal(sent().tools.includes("widget_ask_customer"), false);
+  });
+
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
     const { model, sent } = harness(jev("finish"));
     await model.doGenerate({

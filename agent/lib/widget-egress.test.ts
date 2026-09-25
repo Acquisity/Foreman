@@ -793,3 +793,31 @@ test("the default judge and composer run under a deadline, so a stalled model ca
   assert.equal(signals.length, 2);
   assert.ok(signals.every((signal) => signal instanceof AbortSignal));
 });
+
+test("a domain inside a url is covered only when it is that url's host", async () => {
+  const ownership = () =>
+    Promise.resolve({
+      domains: new Set(["shop.customer-site.com"]),
+      emails: new Set<string>(),
+      slugs: new Set<string>(),
+      uuids: new Set([campaignId]),
+    });
+  for (const [text, foreign] of [
+    [
+      "other-tenant.com had this too. See https://help.acquisity.ai/?ref=other-tenant.com",
+      "other-tenant.com",
+    ],
+    [
+      "https://shop.customer-site.com is live; customer-site.com is managed elsewhere.",
+      "customer-site.com",
+    ],
+  ]) {
+    const { deps: d } = deps({
+      compose: () => Promise.resolve(text),
+      resolve: ownership,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each reply is its own gate run.
+    const result = await gate(scope, question, findings(), d);
+    assert.equal(result.reason, `composed:foreign_identifier:${foreign}`);
+  }
+});
