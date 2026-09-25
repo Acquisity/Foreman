@@ -44,13 +44,14 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
 };
 
 /**
- * Intake channels whose asks Foreman investigates in Linear. A person tagging
- * Foreman here would start a second investigation beside the Linear one, so
- * only the Asks receiver's own mention (its fallback when Linear rejects the
- * handoff) is answered; the requester's thread replies wake the Linear session.
+ * Asks-receiver intake channels (feedback, refunds). Foreman starts there only
+ * from the receiver's own mention: its intake handoff, or its fallback when
+ * Linear rejects a delegation. A person tagging Foreman would start a second,
+ * independent investigation, so that mention is ignored.
  */
-const LINEAR_INVESTIGATED_CHANNELS: ReadonlySet<string> = new Set([
+const RECEIVER_ONLY_CHANNELS: ReadonlySet<string> = new Set([
   "C0BBPVC3N2X",
+  "C0BC011NAQL",
 ]);
 
 /** Whether a Slack mention in this channel may start a Foreman turn. */
@@ -58,7 +59,7 @@ export function admitsSlackMention(
   channelId: string,
   author: SlackAuthor | undefined
 ): boolean {
-  return !LINEAR_INVESTIGATED_CHANNELS.has(channelId) || author?.isBot === true;
+  return !RECEIVER_ONLY_CHANNELS.has(channelId) || author?.isBot === true;
 }
 
 // The final Slack-post rule, stated once here as the canonical home. The Slack
