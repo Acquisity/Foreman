@@ -136,7 +136,7 @@ Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
 
 ### Slack-facing reply
 
-Load slack-wording in C0BBPVC3N2X, C0BC011NAQL, and for every `reply_to_requester` message. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Slack session: the final thread message, per the `slack-intake.ts` stamp. Linear session: one `reply_to_requester` call; the Stage 6 comment is the durable report and the session's final response is one line pointing at it. Send the reply once, last, after the memory bookkeeping below; a later result never earns a recap, and a critic-wait line is never a `reply_to_requester` call.
+Load slack-wording in C0BBPVC3N2X, C0BC011NAQL, and for every `reply_to_requester` message. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Slack session: the final thread message, per the `slack-intake.ts` stamp. Linear session: one `reply_to_requester` call; the Stage 6 comment is the durable report and the session's final response is one line pointing at it. Send it once: in Slack last, after memory bookkeeping; in Linear before the critic when one runs (critic-review step 3). A later result never earns a recap.
 
 ### Record the investigation in memory
 
