@@ -221,7 +221,9 @@ export function buildWidgetProvisioningQuery(
       ${DFY_INBOX_COUNT} as "dfyInboxCount",
       ${detail} as diagnostics, left(dpo.error, 2000) as error,
       dpo.dismissed, (dpo.error is not null and dpo.error <> '') as "hasError",
-      coalesce((dpo.provisioning_log ->> 'totalAttempts')::int, 0) as "provisioningAttempts",
+      coalesce(case when jsonb_typeof(dpo.provisioning_log -> 'totalAttempts') = 'number'
+        and (dpo.provisioning_log ->> 'totalAttempts') ~ '^[0-9]{1,9}$'
+        then (dpo.provisioning_log ->> 'totalAttempts')::int end, 0) as "provisioningAttempts",
       (dpo.provisioning_log ->> 'lastUpdated') as "provisioningLastUpdated",
       dpo.created_at as "createdAt", dpo.updated_at as "updatedAt", dpo.paid_at as "paidAt",
       dpo.provisioning_started_at as "provisioningStartedAt", dpo.completed_at as "completedAt",
