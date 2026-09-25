@@ -42,12 +42,19 @@ const contactSchema = z.object({
 
 export type { FinContext } from "./fin-scope.js";
 
-/** Require one configured HTTPS origin before sending it a user's identity token. */
-function acquisityOrigin(): string {
+const LOOPBACK = new Set(["localhost", "127.0.0.1"]);
+
+/** Require one configured HTTPS origin before sending it a user's identity token; loopback http only outside production. */
+export function acquisityOrigin(): string {
   const configured = process.env.ACQUISITY_FIN_ORIGIN;
   const url = configured ? URL.parse(configured) : null;
+  const localHttp =
+    url?.protocol === "http:" &&
+    LOOPBACK.has(url.hostname) &&
+    process.env.NODE_ENV !== "production";
   if (
-    url?.protocol !== "https:" ||
+    !url ||
+    (url.protocol !== "https:" && !localHttp) ||
     url.username ||
     url.password ||
     url.pathname !== "/" ||
@@ -60,7 +67,7 @@ function acquisityOrigin(): string {
 }
 
 /** Keep the deadline active while consuming a streamed HTTP response. */
-async function readContextBody(response: Response, signal: AbortSignal) {
+export async function readContextBody(response: Response, signal: AbortSignal) {
   if (Number(response.headers.get("content-length")) > MAX_CONTEXT_BYTES) {
     response.body?.cancel().catch(() => undefined);
     throw new Error("Invalid verified workspace context.");

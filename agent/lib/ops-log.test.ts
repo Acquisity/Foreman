@@ -124,7 +124,7 @@ describe("formatOpsEvent", () => {
       sessionId: "s1",
       turnId: "t1",
     });
-    assert.equal(descriptorReads, 9);
+    assert.equal(descriptorReads, 12);
     assert.equal(ownKeysCalls, 0);
   });
 
@@ -347,5 +347,32 @@ describe("ops hook", () => {
     for (const handler of Object.values(opsHook.events ?? {})) {
       assert.equal(typeof handler, "function");
     }
+  });
+});
+
+describe("formatOpsEvent message redaction", () => {
+  it("redacts emails, secret-shaped tokens, and url query strings in message", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          "failed for user@example.com token sk_live_ABCDEFGHIJKLMNOP see https://h.test/x?sig=deadbeef",
+      })
+    );
+    assert.equal(record.message.includes("user@example.com"), false);
+    assert.equal(record.message.includes("sk_live_ABCDEFGHIJKLMNOP"), false);
+    assert.equal(record.message.includes("sig=deadbeef"), false);
+    assert.ok(record.message.includes("[email]"));
+    assert.ok(record.message.includes("[redacted]"));
+  });
+
+  it("leaves an ordinary message and non-message fields untouched", () => {
+    const record = JSON.parse(
+      formatOpsEvent("session.completed", {
+        message: "investigation completed",
+        tool: "widget_outreach_health",
+      })
+    );
+    assert.equal(record.message, "investigation completed");
+    assert.equal(record.tool, "widget_outreach_health");
   });
 });
