@@ -71,7 +71,13 @@ const deploymentsSchema = z.object({
 const projectDomainsSchema = z.object({
   domains: z.array(z.object({ name: z.string(), verified: z.boolean() })),
 });
-const eventsSchema = z.array(z.object({ text: z.string().nullish() }));
+// Build lines carry their text at the top level or, in other event variants, under payload.
+const eventsSchema = z.array(
+  z.object({
+    payload: z.object({ text: z.string().nullish() }).nullish(),
+    text: z.string().nullish(),
+  })
+);
 // Vercel's getDomainConfig contract; retain the actual recommended records.
 export const domainConfigSchema = z.object({
   acceptedChallenges: z
@@ -92,10 +98,12 @@ export const domainConfigSchema = z.object({
 
 /** From the first line that reports a failure to the end of the build, capped. */
 export function buildErrorExcerpt(
-  events: { text?: string | null }[]
+  events: { payload?: { text?: string | null } | null; text?: string | null }[]
 ): string | null {
   const lines = events
-    .map((event) => (event.text ?? "").replace(ANSI, "").trimEnd())
+    .map((event) =>
+      (event.text ?? event.payload?.text ?? "").replace(ANSI, "").trimEnd()
+    )
     .filter(Boolean);
   const start = lines.findIndex((line) => BUILD_ERROR_START.test(line));
   return start < 0

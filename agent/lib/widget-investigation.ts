@@ -55,6 +55,9 @@ import {
   claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
+  expireSessionlessWidgetRun,
+  expireSessionlessWidgetRuns,
+  FINISH_CLAIM_SECONDS,
   latestWidgetScope,
   readWidgetRun,
   recentWidgetTurns,
@@ -153,6 +156,15 @@ const inputSchema = z.discriminatedUnion("action", [
   }),
 ]);
 export type WidgetInput = z.infer<typeof inputSchema>;
+
+/**
+ * The largest body a valid start can be: the question, twelve turns with four
+ * citations each, and three screenshot readings at their schema limits, every
+ * character escaped to six in JSON (\u0000), plus room for the ids and keys.
+ * The default 8 KB read cap refused ordinary multi-turn conversations.
+ */
+const MAX_START_BODY_CHARS =
+  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500) * 6 + 4096;
 
 /** The question as the run stores it, readings and all, for the stages that read it back. */
 export const withScreenshots = (
@@ -338,6 +350,8 @@ export const defaultWidgetDependencies = {
   claim: claimWidgetRun,
   claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
+  expire: expireSessionlessWidgetRun,
+  expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
   gate: egressGate,
   handoffEligible,
@@ -417,6 +431,40 @@ const blockedOutcome = (
  * must land inside that window, or the answer completes after the last poll and is never delivered.
  */
 export const WIDGET_DEADLINE_MS = 170_000;
+/** The app's last poll, counted from when it sent the message. */
+const APP_POLL_WINDOW_MS = 285_000;
+/**
+ * Kept back for saving the outcome: the completion write's own 15-second
+ * database deadline (privateDatabase's default) plus a small margin.
+ */
+const FINISH_SAVE_RESERVE_MS = 17_000;
+
+/** The finish's time source, injectable so its budget can be tested. */
+export interface FinishClock {
+  now: () => number;
+  timeout: (ms: number) => AbortSignal;
+}
+const systemClock: FinishClock = {
+  now: () => Date.now(),
+  timeout: (ms) => AbortSignal.timeout(ms),
+};
+
+/**
+ * The moment the model work (extract, ownership reads, judge, compose) must be
+ * done: the earlier of the finish claim running out, counted from when it was
+ * taken, and the app's last poll, counted from when it sent the message, less
+ * the time to save the outcome. So a slow finish neither lets a second finisher
+ * start nor lands after the last poll; once it passes, each step takes its
+ * existing failure path.
+ */
+export const finishCutoff = (
+  run: Pick<WidgetRun, "created_at">,
+  claimedAt: number
+) =>
+  Math.min(
+    claimedAt + FINISH_CLAIM_SECONDS * 1000,
+    run.created_at.getTime() + APP_POLL_WINDOW_MS
+  ) - FINISH_SAVE_RESERVE_MS;
 /** How sure the router must be that a message is small talk before it gets a one-line reply. */
 const CHAT_ROUTE_CONFIDENCE = 0.6;
 /**
@@ -573,7 +621,8 @@ async function structureWriteUp(
   outcome: Extract<WaitOutcome, { status: "completed" }>,
   conversation: string,
   deps: Pick<WidgetDependencies, "extract"> &
-    Partial<Pick<WidgetDependencies, "handoffEligible">>
+    Partial<Pick<WidgetDependencies, "handoffEligible">>,
+  signal?: AbortSignal
 ) {
   const asked = nextActionEnabled() ? outcome.asked : null;
   if (asked) {
@@ -595,6 +644,7 @@ async function structureWriteUp(
           investigatorText: outcome.text,
           question: conversation,
           scope: run.scope,
+          signal,
         })
       : null);
   return {
@@ -622,11 +672,13 @@ export async function finishWidgetRun(
         WidgetDependencies,
         "changeRequested" | "handoffEligible" | "progress"
       >
-    >
+    >,
+  clock: FinishClock = systemClock
 ): Promise<WidgetRun | null> {
   if (outcome.status === "pending") {
     return null;
   }
+  const claimedAt = clock.now();
   // Someone else is already finishing this run: report pending and let the next
   // poll read what they save. Only the model work is worth claiming; a failed
   // session is recorded at once. A claim that cannot be checked never costs the
@@ -670,13 +722,18 @@ export async function finishWidgetRun(
     const changeAsked = (
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
     ).catch(() => false);
+    // Everything since the claim, the history read included, came out of it.
+    const deadline = clock.timeout(
+      Math.max(0, finishCutoff(run, claimedAt) - clock.now())
+    );
     const extractStartedAt = Date.now();
     const { gateDeps, structured } = await structureWriteUp(
       run,
       sessionId,
       outcome,
       conversation,
-      deps
+      deps,
+      deadline
     );
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
@@ -692,7 +749,8 @@ export async function finishWidgetRun(
         structured,
         gateDeps,
         conversation,
-        await changeAsked
+        await changeAsked,
+        deadline
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
@@ -792,6 +850,77 @@ async function settleResultRun(
     );
   }
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
+}
+
+/**
+ * A claimed run that never got a session and is past the deadline is handed to
+ * a person, as an overdue investigation is: nothing else will ever finish it,
+ * and it would hold the conversation's one open run for good.
+ */
+async function expireStaleClaim(
+  run: WidgetRun,
+  deps: Pick<WidgetDependencies, "expire">
+): Promise<boolean> {
+  if (
+    run.outcome ||
+    run.session_id ||
+    Date.now() - run.created_at.getTime() <= WIDGET_DEADLINE_MS
+  ) {
+    return false;
+  }
+  const handoff = humanHandoff(null, "deadline");
+  if (
+    !(
+      handoff &&
+      (await deps.expire(
+        run.id,
+        handoff.result,
+        handoff.findings,
+        WIDGET_DEADLINE_MS
+      ))
+    )
+  ) {
+    return false;
+  }
+  logGateDecision(
+    { conversationId: run.scope.conversationId, runId: run.id },
+    handoff.result
+  );
+  return true;
+}
+
+/** The run as it stands once a dead claim, if this is one, is settled. */
+const settledIfStale = async (
+  run: WidgetRun,
+  deps: Pick<WidgetDependencies, "expire" | "read">
+) => ((await expireStaleClaim(run, deps)) ? await deps.read(run.id) : run);
+
+/**
+ * Claim this message's run. Dead claims of this conversation are settled first,
+ * however old: this message then gets its own run, or, when it is the same
+ * message, the handoff that settled it.
+ */
+async function claimOpenRun(
+  scope: WidgetContext,
+  input: Extract<WidgetInput, { action: "start" }>,
+  deps: Pick<WidgetDependencies, "claim" | "expireAll">
+) {
+  const handoff = humanHandoff(null, "deadline");
+  if (handoff) {
+    const expired = await deps.expireAll(
+      scope,
+      handoff.result,
+      handoff.findings,
+      WIDGET_DEADLINE_MS
+    );
+    for (const runId of expired) {
+      logGateDecision(
+        { conversationId: scope.conversationId, runId },
+        handoff.result
+      );
+    }
+  }
+  return deps.claim(scope, requestKey(input), withScreenshots(input));
 }
 
 /** The reply to a confident help-center question nothing answered: a question back, never blank. */
@@ -1326,7 +1455,11 @@ export async function receiveWidgetMessage(
   }
   let input: WidgetInput;
   try {
-    const body = await readRequestBody(request);
+    const body = await readRequestBody(
+      request,
+      undefined,
+      MAX_START_BODY_CHARS
+    );
     if (body === null) {
       return json({ error: "Request is too large." }, 413);
     }
@@ -1350,14 +1483,21 @@ export async function receiveWidgetMessage(
   try {
     if (input.action !== "start") {
       let run = await deps.read(input.run_id);
-      assertWidgetRunOwner(run, scope);
       // A teammate's run is read only through the teammate's verified path.
-      if (run.scope.source !== scope.source) {
+      if (
+        !sameWidgetOwner(run.scope, scope) ||
+        run.scope.source !== scope.source
+      ) {
         throw new Error("Investigation unavailable for this conversation.");
       }
       if (input.action === "cancel") {
+        assertWidgetRunOwner(run, scope);
         return json(await cancelRun(run, attachSession, deps));
       }
+      // A dead claim is settled even past the result window, so it stops
+      // holding the conversation; its result is still refused below.
+      run = await settledIfStale(run, deps);
+      assertWidgetRunOwner(run, scope);
       if (!run.outcome && run.session_id && attachSession) {
         run = await pollWidgetRun(
           run,
@@ -1374,11 +1514,7 @@ export async function receiveWidgetMessage(
     if (previous && !sameWidgetOwner(previous, scope)) {
       return json({ error: "Conversation scope changed." }, 403);
     }
-    const { busy, fresh, run } = await deps.claim(
-      scope,
-      requestKey(input),
-      withScreenshots(input)
-    );
+    const { busy, fresh, run } = await claimOpenRun(scope, input, deps);
     if (busy) {
       return json({ run_id: run.id, status: "busy" });
     }

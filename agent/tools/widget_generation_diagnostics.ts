@@ -204,7 +204,7 @@ export function buildGenerationDiagnosticsQuery(
       case when a.agent_name = '${COPY_REVIEW_AGENT}'
         then (a.output->>'passed')::boolean else null end as passed,
       case when a.agent_name = '${COPY_REVIEW_AGENT}'
-        then coalesce((select jsonb_agg(distinct e->>'type') from jsonb_array_elements(
+        then coalesce((select jsonb_agg(distinct e->>'type') filter (where e->>'type' is not null) from jsonb_array_elements(
           case when jsonb_typeof(a.output->'issues') = 'array'
             then a.output->'issues' else '[]'::jsonb end) e), '[]'::jsonb)
         else null end as "issueTypes"

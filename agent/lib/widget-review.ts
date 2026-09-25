@@ -3,8 +3,11 @@ import { logOpsEvent, type OpsLogger } from "./ops-log.js";
 import type { GateDeps } from "./widget-egress.js";
 
 const REVIEW_TIMEOUT_MS = 10_000;
-// The existing reviewer has taken up to 90 seconds; the widget's own deadline is 170.
-const FALLBACK_TIMEOUT_MS = 90_000;
+/**
+ * JEV and the fallback share the judge's budget (JUDGE_TIMEOUT_MS in
+ * widget-egress.ts), so the finish still lands inside the app's poll window.
+ */
+const REVIEW_BUDGET_MS = 60_000;
 const MAX_ITEMS = 60;
 const MAX_STATE_CHARS = 60_000;
 const MIN_CONFIDENCE = 0.8;
@@ -131,11 +134,15 @@ function decide(items: ReviewInput["items"], answers: Record<string, Answer>) {
 async function reviewByFallback(
   fallback: Fallback,
   input: ReviewInput,
-  jev: ReturnType<typeof decide>
+  jev: ReturnType<typeof decide>,
+  startedAt: number
 ): Promise<Verdict> {
+  const budget = AbortSignal.timeout(
+    Math.max(0, REVIEW_BUDGET_MS - (Date.now() - startedAt))
+  );
   const verdict = await fallback(
     input,
-    AbortSignal.timeout(FALLBACK_TIMEOUT_MS)
+    input.signal ? AbortSignal.any([budget, input.signal]) : budget
   );
   if (verdict.decision === "block") {
     return verdict;
@@ -242,7 +249,12 @@ export async function reviewWidgetFindings(
         "content-type": "application/json",
       },
       method: "POST",
-      signal: AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+      signal: input.signal
+        ? AbortSignal.any([
+            AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+            input.signal,
+          ])
+        : AbortSignal.timeout(REVIEW_TIMEOUT_MS),
     }
   );
   if (!response.ok) {
@@ -292,7 +304,12 @@ export async function reviewWidgetFindings(
     return jev.verdict;
   }
   try {
-    const final = await reviewByFallback(options.fallback, input, jev);
+    const final = await reviewByFallback(
+      options.fallback,
+      input,
+      jev,
+      startedAt
+    );
     log(final);
     return final;
   } catch (error) {

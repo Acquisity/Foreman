@@ -48,6 +48,25 @@ describe("widget screenshot route", () => {
     assert.match(text, VERBATIM);
   });
 
+  it("returns a reading the message route accepts, however long the image model's answer", async () => {
+    const long = (length: number) => "x".repeat(length);
+    const response = await receiveWidgetScreenshot(
+      post({ image: PNG.toString("base64"), organization_id: ORG }),
+      verified,
+      () =>
+        Promise.resolve({
+          error_text: Array.from({ length: 6 }, (_, n) => `${n}${long(250)}`),
+          notable: long(500),
+          screen: long(200),
+          unreadable: [long(300), long(300), long(300)],
+        })
+    );
+    const { text } = (await response.json()) as { text: string };
+    assert.ok(text.length <= 1500, `${text.length}`);
+    assert.equal(text.includes('"3x'), false);
+    assert.ok(text.includes('"2x'));
+  });
+
   it("refuses a caller without a token or a verified workspace", async () => {
     const body = { image: PNG.toString("base64"), organization_id: ORG };
     assert.equal(

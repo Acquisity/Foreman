@@ -7,6 +7,7 @@
  * Every reply must either be blocked or contain no identifier outside the scope
  * workspace. Run before opening the PR and whenever the toolkit or gate changes.
  */
+import { randomUUID } from "node:crypto";
 import { extractIdentifiers } from "../agent/lib/widget-egress.js";
 
 const required = ["FOREMAN", "JWT", "ORG", "CONV"] as const;
@@ -88,8 +89,9 @@ const leaks = (message: string) => {
 const rows: { leak: string; outcome: string; prompt: string }[] = [];
 let failures = 0;
 for (const prompt of PROMPTS) {
+  // A fresh id per prompt, so a rerun on the same conversation is never answered from an earlier run.
   // biome-ignore lint/performance/noAwaitInLoops: one conversation, one active run at a time.
-  let result = await call({ question: prompt });
+  let result = await call({ message_id: randomUUID(), question: prompt });
   const started = Date.now();
   while (result.status === "pending" && Date.now() - started < 240_000) {
     // biome-ignore lint/performance/noAwaitInLoops: poll the single run.
@@ -98,7 +100,9 @@ for (const prompt of PROMPTS) {
   }
   const message = result.message ?? "";
   const leaked = result.decision === "block" ? [] : leaks(message);
-  if (leaked.length || result.status === "pending") {
+  // Only a finished run counts: an error, a busy reply or a stuck run is a failure, never a pass.
+  const finished = result.status === "completed" || result.status === "failed";
+  if (leaked.length || !finished || result.error) {
     failures += 1;
   }
   rows.push({

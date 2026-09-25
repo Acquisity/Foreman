@@ -136,18 +136,22 @@ async function readOnce(
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max)}...` : text;
 
+/** The message route accepts a screenshot reading of at most this many characters. */
+const MAX_READING_CHARS = 1500;
+const TRUNCATED = " [reading cut short]";
+
 /** The reading as the message carries it: labelled, so no reader takes it for the customer's own words. */
 export function renderReading(reading: ScreenshotReading): string {
   const errors = reading.error_text
     .map((line) => line.trim())
     .filter(Boolean)
-    .slice(0, 6)
+    .slice(0, 3)
     .map((line) => `"${clip(line, 200)}"`);
   const unreadable = reading.unreadable
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 3);
-  return [
+  const text = [
     "[Screenshot the customer attached, as read by an image model]",
     `Screen: ${clip(reading.screen.trim(), 150)}`,
     errors.length ? `Text shown: ${errors.join("; ")}` : null,
@@ -160,6 +164,9 @@ export function renderReading(reading: ScreenshotReading): string {
   ]
     .filter(Boolean)
     .join("\n");
+  return text.length > MAX_READING_CHARS
+    ? `${text.slice(0, MAX_READING_CHARS - TRUNCATED.length)}${TRUNCATED}`
+    : text;
 }
 
 const json = (body: unknown, status = 200) =>

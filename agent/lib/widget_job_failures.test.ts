@@ -118,6 +118,11 @@ test("every area subquery scopes to the org and re-checks membership", () => {
   assert.ok(q.includes(`o.id = '${scope.organizationId}'::uuid`));
   assert.ok(q.includes(`m.user_id = '${scope.userId}'::uuid`));
   assert.ok(q.includes("m.role in ('owner','admin')"));
+  assert.ok(
+    q.includes(
+      `(o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)`
+    )
+  );
   // each product join hangs off the authorized org
   for (const j of [
     "join authorized a on a.id = e.organization_id",

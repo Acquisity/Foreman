@@ -27,6 +27,8 @@ export interface GateDeps {
     findings: ComposerInput;
     organizationName: string;
     question: string;
+    /** The run's remaining finish deadline, when the caller has one. */
+    signal?: AbortSignal;
   }) => Promise<string>;
   judge: (input: {
     findings: WidgetFindings;
@@ -34,10 +36,13 @@ export interface GateDeps {
     items: RedactableItem[];
     question: string;
     scope: WidgetContext;
+    /** The run's remaining finish deadline, when the caller has one. */
+    signal?: AbortSignal;
   }) => Promise<{ decision: GateDecision; reason: string; remove?: number[] }>;
   resolve: (
     scope: WidgetContext,
-    candidates: IdentifierCandidates
+    candidates: IdentifierCandidates,
+    signal?: AbortSignal
   ) => Promise<OwnedIdentifiers>;
 }
 
@@ -83,6 +88,9 @@ const UUID =
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const URL_PATTERN = /\bhttps?:\/\/[^\s)>"']+/gi;
 const DOMAIN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
+/** A url's hostname shaped like a registrable domain, as the ownership check accepts it. */
+const TRAILING_DOT = /\.$/u;
+const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 // A website fix names the file that broke ("calendar.tsx", "next.config.js"). These
 // endings are not registrable domains, so such a name is never another tenant's
 // domain; treating it as one deleted the fix from the reply.
@@ -127,32 +135,45 @@ const isInternalHost = (host: string) =>
  * A bare domain is either one of ours (internal, always blocked) or something
  * the ownership check must vouch for, such as the customer's own sending domain.
  * One it cannot vouch for is foreign and blocks, as it always did. Domains that
- * are public, part of a url, or the domain of an email already in the text are
- * covered by those checks and skipped here.
+ * are public, a url's own host, or the domain of an email already in the text are
+ * covered by those checks and skipped here. A url's own hostname is not covered
+ * by anything else, so one that is neither ours nor public is checked the same
+ * way as a bare domain.
  */
 function classifyDomains(
   text: string,
-  urls: string[],
+  urlHosts: string[],
   emailDomains: Set<string>,
   internal: string[]
 ): string[] {
-  const domains: string[] = [];
+  const domains = new Set<string>();
+  for (const host of urlHosts) {
+    if (
+      DOMAIN_HOST.test(host) &&
+      !PUBLIC_HOSTS.has(host) &&
+      !emailDomains.has(host) &&
+      !isInternalHost(host)
+    ) {
+      domains.add(host);
+    }
+  }
   for (const domain of uniqueLower(text.match(DOMAIN))) {
     const covered =
       SOURCE_FILE.test(domain) ||
       PUBLIC_HOSTS.has(domain) ||
       emailDomains.has(domain) ||
-      urls.some((value) => value.toLowerCase().includes(domain));
+      // Only a url's own host is checked there: a domain elsewhere in a url is not.
+      urlHosts.includes(domain);
     if (covered) {
       continue;
     }
     if (isInternalHost(domain)) {
       internal.push(domain);
     } else {
-      domains.push(domain);
+      domains.add(domain);
     }
   }
-  return domains;
+  return Array.from(domains);
 }
 
 /** Everything identifier-shaped in an arbitrary customer-bound string. */
@@ -166,9 +187,11 @@ export function scanIdentifiers(
   const internal: string[] = [];
   const urls = text.match(URL_PATTERN) ?? [];
   const slugs = new Set<string>();
+  const urlHosts: string[] = [];
   for (const value of urls) {
     const url = URL.parse(value);
-    const host = url?.hostname.toLowerCase() ?? "";
+    const host = url?.hostname.toLowerCase().replace(TRAILING_DOT, "") ?? "";
+    urlHosts.push(host);
     if (isInternalHost(host)) {
       internal.push(value);
     }
@@ -178,7 +201,7 @@ export function scanIdentifiers(
   }
   const emails = uniqueLower(text.match(EMAIL));
   const emailDomains = new Set(emails.map((email) => email.split("@")[1]));
-  const domains = classifyDomains(text, urls, emailDomains, internal);
+  const domains = classifyDomains(text, urlHosts, emailDomains, internal);
   if (STACK_TRACE.test(text)) {
     internal.push("stack trace");
   }
@@ -236,7 +259,8 @@ async function deterministicTextReason(
   scope: WidgetContext,
   text: string,
   resolve: GateDeps["resolve"],
-  exemptTicketId?: string
+  exemptTicketId?: string,
+  signal?: AbortSignal
 ): Promise<string | null> {
   const { candidates, internal } = scanIdentifiers(text, exemptTicketId);
   if (internal.length) {
@@ -252,7 +276,7 @@ async function deterministicTextReason(
   ) {
     return null;
   }
-  const owned = await resolve(scope, candidates);
+  const owned = await resolve(scope, candidates, signal);
   const foreign =
     candidates.uuids.find((id) => !owned.uuids.has(id)) ??
     candidates.slugs.find((slug) => !owned.slugs.has(slug)) ??
@@ -264,13 +288,15 @@ async function deterministicTextReason(
 function deterministicReason(
   scope: WidgetContext,
   findings: WidgetFindings,
-  resolve: GateDeps["resolve"]
+  resolve: GateDeps["resolve"],
+  signal?: AbortSignal
 ): Promise<string | null> {
   return deterministicTextReason(
     scope,
     customerText(findings),
     resolve,
-    findings.ticket?.id
+    findings.ticket?.id,
+    signal
   );
 }
 
@@ -405,6 +431,12 @@ const verdictSchema = z.object({
 
 type JudgeInput = Parameters<GateDeps["judge"]>[0];
 
+/** A call's own deadline, cut short by the run's finish deadline when there is one. */
+const within = (ms: number, signal?: AbortSignal) =>
+  signal
+    ? AbortSignal.any([AbortSignal.timeout(ms), signal])
+    : AbortSignal.timeout(ms);
+
 /** The existing model reviewer; also the fallback for cases JEV is unsure about. */
 async function modelJudge(
   { findings, items, question, scope }: JudgeInput,
@@ -443,10 +475,26 @@ const CANT_CHANGE =
 const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
   askedForChange ? composed : composed.replace(CANT_CHANGE, "").trim();
 
+/**
+ * A stalled model call must fail closed as gate_unavailable, not hold the reply
+ * past the app's last poll. The app stops polling 285s after it sends and an
+ * investigation may run to its 170s deadline, so the finish (extract, judge,
+ * compose) has about 115s; the extractor gets 25s of it.
+ */
+const JUDGE_TIMEOUT_MS = 60_000;
+const COMPOSE_TIMEOUT_MS = 25_000;
+
 export const defaultGateDeps: GateDeps = {
-  async compose({ askedForChange, findings, organizationName, question }) {
+  async compose({
+    askedForChange,
+    findings,
+    organizationName,
+    question,
+    signal,
+  }) {
     const model = await resolveModel("widget");
     const { text } = await generateText({
+      abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
       model: gateway(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
@@ -462,8 +510,9 @@ export const defaultGateDeps: GateDeps = {
   judge: (input) =>
     process.env.WIDGET_REVIEWER === "jev"
       ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(input),
-  resolve: resolveOwnedIdentifiers,
+      : modelJudge(input, within(JUDGE_TIMEOUT_MS, input.signal)),
+  resolve: (scope, candidates, signal) =>
+    resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
 
 const handoffOnly = (findings: WidgetFindings) =>
@@ -522,11 +571,17 @@ export async function gate(
   /** The question within its conversation, for the composer only. */
   conversation: string = question,
   /** Jev's read of whether the customer asked for a change; see `asksForChange`. */
-  askedForChange = false
+  askedForChange = false,
+  /**
+   * The run's remaining finish deadline. Every ownership read and model call
+   * runs under it, and once it passes the gate fails closed as gate_unavailable.
+   */
+  signal?: AbortSignal
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
+    signal?.throwIfAborted();
     const startedAt = Date.now();
     try {
       return await work();
@@ -537,7 +592,7 @@ export async function gate(
   const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
     let reason = await timed("scan", () =>
-      deterministicReason(scope, findings, deps.resolve)
+      deterministicReason(scope, findings, deps.resolve, signal)
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
@@ -569,7 +624,7 @@ export async function gate(
       const current = findings;
       // biome-ignore lint/performance/noAwaitInLoops: each pass scans what the last one left.
       reason = await timed("scan", () =>
-        deterministicReason(scope, current, deps.resolve)
+        deterministicReason(scope, current, deps.resolve, signal)
       );
     }
     if (reason) {
@@ -586,6 +641,7 @@ export async function gate(
         items: redactableItems(findings),
         question,
         scope,
+        signal,
       })
     );
     if (verdict.decision === "block") {
@@ -605,7 +661,7 @@ export async function gate(
       }
       gated = rewritten;
       const again = await timed("scan", () =>
-        deterministicReason(scope, gated, deps.resolve)
+        deterministicReason(scope, gated, deps.resolve, signal)
       );
       if (again) {
         return done(blocked(findings, again));
@@ -617,6 +673,7 @@ export async function gate(
         findings: composerInput(gated),
         organizationName: scope.organizationName,
         question: conversation,
+        signal,
       })
     );
     const message = unaskedChangeRemoved(composed, askedForChange);
@@ -628,7 +685,7 @@ export async function gate(
     // in the gated findings; the customer message must contain no foreign
     // identifier and no ticket reference at all.
     const egress = await timed("scan", () =>
-      deterministicTextReason(scope, message, deps.resolve)
+      deterministicTextReason(scope, message, deps.resolve, undefined, signal)
     );
     if (egress) {
       return done(blocked(findings, `composed:${egress}`));

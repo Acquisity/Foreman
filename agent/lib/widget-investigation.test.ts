@@ -102,6 +102,8 @@ function dependencies(gateResult: GateResult = allowed) {
       run.completed_at = new Date();
       return Promise.resolve(run);
     },
+    expire: () => assert.fail("a live run must not be expired"),
+    expireAll: () => Promise.resolve([]),
     extract: () => Promise.resolve(findings),
     gate: (_scope, _question, raw) => {
       gated.push(raw);
@@ -237,7 +239,7 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
   assert.equal(
     (
       await receiveWidgetMessage(
-        request({ ...start, question: "x".repeat(9000) }),
+        request({ ...start, question: "x".repeat(600_000) }),
         noWork(),
         1,
         verified,
@@ -246,6 +248,36 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
     ).status,
     413
   );
+});
+
+test("a valid conversation at every schema limit is read whole, not refused as too large", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  // Control characters are the worst case: JSON writes each one as six.
+  const text = (length: number) => "\u0001".repeat(length);
+  const body = JSON.stringify({
+    ...start,
+    history: Array.from({ length: 12 }, (_, index) => ({
+      citations: Array.from({ length: 4 }, () => ({
+        title: text(300),
+        url: text(500),
+      })),
+      role: index % 2 ? "assistant" : "customer",
+      text: text(4000),
+    })),
+    question: `a${text(3998)}b`,
+    screenshots: Array.from({ length: 3 }, () => `a${text(1498)}b`),
+  });
+  assert.ok(body.length > 8192);
+  const response = await receiveWidgetMessage(
+    request(body),
+    noWork(),
+    1,
+    () => Promise.reject(new Error("denied")),
+    deps
+  );
+  // Past the body read and the schema, it reaches workspace verification.
+  assert.equal(response.status, 403);
 });
 
 test("an unverified workspace starts nothing", async (t) => {
@@ -338,6 +370,76 @@ test("a follow-up sent while an earlier message is still running is told to wait
     deps
   );
   assert.deepEqual(await response.json(), { run_id: run.id, status: "busy" });
+});
+
+test("a claim that never got a session is settled after the deadline, however old, so the conversation is not blocked for good", async (t) => {
+  enabled(t);
+  const freshId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const stale = (ageMs: number) => {
+    const made = dependencies();
+    made.run.created_at = new Date(Date.now() - ageMs);
+    const settle: WidgetDependencies["expire"] = (_id, outcome, stored) => {
+      made.run.outcome = outcome;
+      made.run.findings = stored;
+      made.run.completed_at = new Date();
+      return Promise.resolve(true);
+    };
+    made.deps.expire = settle;
+    made.deps.expireAll = async (owner, outcome, stored) => {
+      assert.equal(owner.conversationId, scope.conversationId);
+      assert.equal(owner.source, scope.source);
+      await settle(made.run.id, outcome, stored, 0);
+      return [made.run.id];
+    };
+    // The partial unique index: an open run of this conversation holds the slot.
+    made.deps.claim = () =>
+      Promise.resolve({
+        busy: true,
+        fresh: false,
+        run: made.run.completed_at
+          ? { ...made.run, created_at: new Date(), id: freshId, outcome: null }
+          : made.run,
+      });
+    return made;
+  };
+  for (const ageMs of [200_000, 3 * 60 * 60 * 1000]) {
+    // Polling the dead run settles it as a handoff instead of pending forever;
+    // past the result window its content is still refused.
+    const polled = stale(ageMs);
+    // biome-ignore lint/performance/noAwaitInLoops: each age is its own case.
+    const result = await receiveWidgetMessage(
+      request({
+        action: "result",
+        conversation_id: scope.conversationId,
+        organization_id: scope.organizationId,
+        run_id: runId,
+      }),
+      { attachSession: () => assert.fail("no session to attach"), ...noWork() },
+      1,
+      verify,
+      polled.deps
+    );
+    assert.equal(result.status, ageMs > 7_200_000 ? 503 : 200, `${ageMs}`);
+    assert.equal(polled.run.outcome?.reason, "deadline");
+    // A new message is no longer told to wait on it: it claims a run of its own.
+    const next = stale(ageMs);
+    const started = await receiveWidgetMessage(
+      request({ ...start, question: "Is it fixed now?" }),
+      {
+        from: () => assert.fail("still busy"),
+        waitUntil: () => undefined,
+      } as never,
+      1,
+      verify,
+      next.deps
+    );
+    assert.equal(next.run.outcome?.reason, "deadline");
+    assert.equal(
+      ((await started.json()) as { run_id: string }).run_id,
+      freshId,
+      `${ageMs}`
+    );
+  }
 });
 
 test("a completed investigation is gated, answered with the composed reply, and returns its findings for the inbox note", async (t) => {
@@ -2073,4 +2175,81 @@ test("result polls do not rewrite progress already saved by the background watch
   );
   assert.equal((await response.json()).status, "pending");
   assert.equal(writes, 0);
+});
+
+test("one finish deadline, bounded by the app's last poll and the finish claim, reaches extraction and the gate", async () => {
+  const deadlines = async (ageMs: number) => {
+    const { deps, run } = dependencies();
+    run.created_at = new Date(Date.now() - ageMs);
+    const seen: (AbortSignal | undefined)[] = [];
+    deps.extract = (input) => {
+      seen.push(input.signal);
+      return Promise.resolve(findings);
+    };
+    deps.gate = (...args) => {
+      seen.push(args[6]);
+      return Promise.resolve(allowed);
+    };
+    await finishWidgetRun(
+      run,
+      "widget-session-deadline",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return seen;
+  };
+  // Past the app's last poll: the finish runs out at once and fails closed.
+  const late = await deadlines(280_000);
+  assert.equal(late.length, 2);
+  assert.equal(late[0], late[1]);
+  assert.equal(late[0]?.aborted, true);
+  // A fresh run still has most of the finish claim to spend.
+  const fresh = await deadlines(0);
+  assert.equal(fresh[0]?.aborted, false);
+});
+
+test("the finish budget is counted from the claim, history read included, and leaves the completion write inside the lease and the last poll", async () => {
+  const LEASE_MS = 150_000;
+  const POLL_WINDOW_MS = 285_000;
+  const SAVE_MS = 15_000;
+  const budget = async (claimAgeMs: number) => {
+    const { deps, run } = dependencies();
+    const createdAt = 1_000_000;
+    run.created_at = new Date(createdAt);
+    let now = createdAt + claimAgeMs;
+    let granted: { at: number; ms: number } | undefined;
+    deps.history = () => {
+      now += 14_000;
+      return Promise.resolve([]);
+    };
+    await finishWidgetRun(
+      run,
+      "widget-session-budget",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps,
+      {
+        now: () => now,
+        timeout: (ms) => {
+          granted = { at: now, ms };
+          return new AbortController().signal;
+        },
+      }
+    );
+    assert.ok(granted);
+    // The model work may run to the deadline; the completion write then takes
+    // up to its own database deadline.
+    const savedAt = granted.at + granted.ms + SAVE_MS;
+    const claimedAt = createdAt + claimAgeMs;
+    assert.ok(savedAt - claimedAt <= LEASE_MS, `lease ${savedAt - claimedAt}`);
+    assert.ok(
+      savedAt - createdAt <= POLL_WINDOW_MS,
+      `poll ${savedAt - createdAt}`
+    );
+    return granted.ms;
+  };
+  // An early claim: 14s of history comes out of the 150s lease.
+  assert.equal(await budget(0), 119_000);
+  // A late claim at run age 169s: the app's last poll is the limit.
+  assert.equal(await budget(169_000), 85_000);
 });

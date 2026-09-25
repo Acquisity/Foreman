@@ -604,3 +604,29 @@ test("missing credentials, transport failures and oversized context cannot allow
     )
   );
 });
+
+test("the fallback gets only what is left of the judge budget after JEV", async (t) => {
+  const realNow = Date.now.bind(Date);
+  let offset = 0;
+  t.mock.method(Date, "now", () => realNow() + offset);
+  const jevFetch = mock(answers({ item_1: answer("keep", 0.5) }));
+  const seen: boolean[] = [];
+  const fallback = async (_data: unknown, signal: AbortSignal) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    seen.push(signal.aborted);
+    return { decision: "allow" as const, reason: "ok" };
+  };
+  for (const elapsed of [0, 61_000]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each run sets its own clock.
+    await reviewWidgetFindings(input, {
+      apiKey: "test",
+      fallback,
+      fetch: (url, init) => {
+        offset = elapsed;
+        return jevFetch(url, init);
+      },
+      log: () => undefined,
+    }).catch(() => undefined);
+  }
+  assert.deepEqual(seen, [false, true]);
+});

@@ -371,6 +371,38 @@ test("the generated verification subquery counts Instantly and verified imports 
   }
 });
 
+const STUCK_AGE = /current_timestamp - interval '\d+ minutes'/u;
+
+test("a pending run that has not started is never stuck, so the read still parses", () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    db.exec(`create table lead_scrape_run (id text, status text, started_at text);
+      insert into lead_scrape_run values ('waiting', 'pending', null),
+        ('old', 'running', '2000-01-01 00:00:00'), ('done', 'completed', '2000-01-01 00:00:00');`);
+    const query = buildWidgetLeadPipelineQuery(scope, {});
+    const end = query.indexOf(" as stuck,");
+    const start = query.lastIndexOf('as "verificationJobs",', end);
+    const predicate = query
+      .slice(start + 'as "verificationJobs",'.length, end)
+      .replace(STUCK_AGE, "current_timestamp");
+    const rows = db
+      .prepare(
+        `select id, ${predicate} as stuck from lead_scrape_run lsr order by id`
+      )
+      .all();
+    assert.deepEqual(
+      rows.map((row) => ({ ...row })),
+      [
+        { id: "done", stuck: 0 },
+        { id: "old", stuck: 1 },
+        { id: "waiting", stuck: 0 },
+      ]
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test("count differences in either direction do not diagnose failed processing", () => {
   for (const stored of [800, 1000]) {
     const result = parseWidgetLeadPipelineEvidence(

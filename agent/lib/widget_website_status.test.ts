@@ -351,3 +351,16 @@ test("website selector accepts explicit list mode without accepting invalid IDs"
     neverPublished.id
   );
 });
+
+const LEGACY_GUARD = /p\.metadata->>'legacyWebsiteId' ~ '([^']+)'/u;
+
+test("a malformed legacyWebsiteId resolves to no linked website instead of failing the uuid cast", () => {
+  const query = buildWidgetWebsiteStatusQuery(scope);
+  const guard = LEGACY_GUARD.exec(query)?.[1];
+  assert.ok(guard);
+  const uuid = new RegExp(guard, "u");
+  assert.equal(uuid.test("0f8fad5b-d9cb-469f-a165-70867728950e"), true);
+  assert.equal(uuid.test("-".repeat(36)), false);
+  assert.equal(uuid.test("0f8fad5bd-9cb-469f-a165-70867728950e"), false);
+  assert.equal(uuid.test("0f8fad5bd9cb469fa16570867728950e0000"), false);
+});

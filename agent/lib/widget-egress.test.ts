@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
   composerInput,
+  defaultGateDeps,
   extractIdentifiers,
   type GateDeps,
   gate,
@@ -709,5 +710,173 @@ test("the reply says it cannot change the account only when Jev read a request f
       (input) => (input as { askedForChange?: boolean }).askedForChange
     ),
     [false, true]
+  );
+});
+
+test("a foreign hostname inside a url is checked for ownership; the customer's own site and our help and app links pass", async () => {
+  const owned = "www.customer-site.com";
+  const reply = (url: string) =>
+    `Your campaign paused because its inbox disconnected. See ${url} for details.`;
+  const ownership = () =>
+    Promise.resolve({
+      domains: new Set([owned]),
+      emails: new Set<string>(),
+      slugs: new Set([scope.organizationSlug.toLowerCase()]),
+      uuids: new Set([campaignId]),
+    });
+  const foreign = deps({
+    compose: () =>
+      Promise.resolve(reply("https://other-tenant-site.com/private-report")),
+    resolve: ownership,
+  });
+  const blockedResult = await gate(scope, question, findings(), foreign.deps);
+  assert.equal(blockedResult.decision, "block");
+  assert.equal(
+    blockedResult.reason,
+    "composed:foreign_identifier:other-tenant-site.com"
+  );
+  for (const url of [
+    `https://${owned}/pricing.`,
+    "https://help.acquisity.ai/campaigns",
+    `https://app.acquisity.ai/dashboard/${scope.organizationSlug}/campaigns`,
+  ]) {
+    const own = deps({
+      compose: () => Promise.resolve(reply(url)),
+      resolve: ownership,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each url is its own gate run.
+    const result = await gate(scope, question, findings(), own.deps);
+    assert.equal(result.decision, "allow", url);
+    assert.equal(result.message, reply(url));
+  }
+});
+
+test("the default judge and composer run under a deadline, so a stalled model call fails closed", async () => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (
+      String(input instanceof Request ? input.url : input).includes(
+        "ai-gateway"
+      )
+    ) {
+      signals.push(init?.signal);
+    }
+    return Promise.resolve(new Response("{}", { status: 400 }));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      defaultGateDeps.judge({
+        findings: findings(),
+        items: redactableItems(findings()),
+        question,
+        scope,
+      })
+    );
+    await assert.rejects(
+      defaultGateDeps.compose({
+        findings: composerInput(findings()),
+        organizationName: scope.organizationName,
+        question,
+      })
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = realKey;
+    }
+  }
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every((signal) => signal instanceof AbortSignal));
+});
+
+test("a domain inside a url is covered only when it is that url's host", async () => {
+  const ownership = () =>
+    Promise.resolve({
+      domains: new Set(["shop.customer-site.com"]),
+      emails: new Set<string>(),
+      slugs: new Set<string>(),
+      uuids: new Set([campaignId]),
+    });
+  for (const [text, foreign] of [
+    [
+      "other-tenant.com had this too. See https://help.acquisity.ai/?ref=other-tenant.com",
+      "other-tenant.com",
+    ],
+    [
+      "https://shop.customer-site.com is live; customer-site.com is managed elsewhere.",
+      "customer-site.com",
+    ],
+  ]) {
+    const { deps: d } = deps({
+      compose: () => Promise.resolve(text),
+      resolve: ownership,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each reply is its own gate run.
+    const result = await gate(scope, question, findings(), d);
+    assert.equal(result.reason, `composed:foreign_identifier:${foreign}`);
+  }
+});
+
+test("the run's finish deadline reaches ownership reads and the judge, and its expiry fails closed", async () => {
+  const signals: (AbortSignal | undefined)[] = [];
+  const { deps: d } = deps({
+    judge: ({ signal }) =>
+      new Promise((resolve, reject) => {
+        signals.push(signal);
+        const late = setTimeout(
+          () => resolve({ decision: "allow", reason: "too late" }),
+          2000
+        );
+        signal?.addEventListener("abort", () => {
+          clearTimeout(late);
+          reject(signal.reason);
+        });
+      }),
+    resolve: (_scope, _candidates, signal) => {
+      signals.push(signal);
+      return Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set([campaignId]),
+      });
+    },
+  });
+  const deadline = AbortSignal.timeout(50);
+  const startedAt = Date.now();
+  const result = await gate(
+    scope,
+    question,
+    findings(),
+    d,
+    question,
+    false,
+    deadline
+  );
+  assert.equal(result.reason, "gate_unavailable");
+  assert.ok(Date.now() - startedAt < 1000);
+  assert.deepEqual(signals, [deadline, deadline]);
+  const expired = AbortSignal.abort();
+  const none = deps({
+    resolve: () => assert.fail("no read after the deadline"),
+  });
+  assert.equal(
+    (
+      await gate(
+        scope,
+        question,
+        findings(),
+        none.deps,
+        question,
+        false,
+        expired
+      )
+    ).reason,
+    "gate_unavailable"
   );
 });

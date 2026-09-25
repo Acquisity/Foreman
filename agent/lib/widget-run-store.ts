@@ -175,7 +175,7 @@ export async function attachWidgetRun(
  * 100s of model calls), shorter than the web app's 4-minute poll cap, so a
  * finisher that died is taken over while the customer is still waiting.
  */
-const FINISH_CLAIM_SECONDS = 150;
+export const FINISH_CLAIM_SECONDS = 150;
 
 /**
  * Only one caller finishes a run. The background watcher and the result poll
@@ -218,6 +218,65 @@ export async function completeWidgetRun(
     throw new Error("Investigation session ownership mismatch.");
   }
   return run;
+}
+
+/**
+ * A run claimed but never given a session: the process died between the claim
+ * and the attach or the front-door reply. Nothing will ever finish it, and it
+ * holds the conversation's one open run, so once it is past the deadline it is
+ * settled here. The fence leaves a run that got a session or an outcome alone.
+ */
+export async function expireSessionlessWidgetRun(
+  id: string,
+  outcome: WidgetOutcome,
+  findings: unknown,
+  olderThanMs: number
+): Promise<boolean> {
+  const rows = await privateDatabase().query(
+    `UPDATE widget_support_runs SET outcome = $2::jsonb, findings = $3::jsonb, decision = $4,
+       completed_at = now()
+     WHERE id = $1 AND session_id IS NULL AND completed_at IS NULL
+       AND created_at < now() - make_interval(secs => $5::double precision / 1000) RETURNING id`,
+    [
+      id,
+      JSON.stringify(outcome),
+      JSON.stringify(findings),
+      outcome.decision,
+      olderThanMs,
+    ]
+  );
+  return rows.length === 1;
+}
+
+/**
+ * The same settlement for every dead claim of one conversation and source,
+ * before a new message claims its run. It runs ahead of the claim because the
+ * claim refuses a run older than the result window, and a dead claim that old
+ * would otherwise hold the conversation's open run for good.
+ */
+export async function expireSessionlessWidgetRuns(
+  scope: WidgetContext,
+  outcome: WidgetOutcome,
+  findings: unknown,
+  olderThanMs: number
+): Promise<string[]> {
+  const rows = await privateDatabase().query(
+    `UPDATE widget_support_runs SET outcome = $4::jsonb, findings = $5::jsonb, decision = $6,
+       completed_at = now()
+     WHERE organization_id = $1 AND conversation_id = $2 AND scope->>'source' = $3
+       AND session_id IS NULL AND completed_at IS NULL
+       AND created_at < now() - make_interval(secs => $7::double precision / 1000) RETURNING id`,
+    [
+      scope.organizationId,
+      scope.conversationId,
+      scope.source,
+      JSON.stringify(outcome),
+      JSON.stringify(findings),
+      outcome.decision,
+      olderThanMs,
+    ]
+  );
+  return rows.map((row) => String(row.id));
 }
 
 /** The customer reported a bug: the app offers a screen recording next to this run's reply. */
