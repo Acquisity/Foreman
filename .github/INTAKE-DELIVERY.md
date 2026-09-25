@@ -53,21 +53,23 @@ Paths are under `agent/skills/`. TH is `triage-handling`, EH `engineering-handof
 
 | Id | Where | Conflict | Class | Status |
 | -- | -- | -- | -- | -- |
-| A1 | TH Stage 5 Bug bar, HL, CR gate | Bug needs a counted blast radius; hotlane allows `Unknown` and `NEEDS_HUMAN_URGENT`, but loads only after a Bug is selected, so an unproven high-risk case stops before it | contradiction and ordering | Open. Proposed: let the unproven branch run the hotlane assessment when the condition is high-risk. The Bug bar stays. Left as is per Aaron, 2026-09-18 |
-| A2 | `triage-investigate` blast radius, TH Bug bar | "tightest bound with the blocker named" against "counted by a query" | unclear exception | Open, resolve with A1 |
-| B1 | RP line 7, TH Stage 6 order | Reporting says state, priority, and labels are already saved; the comment is written before routing | ordering | Open. Proposed: reword RP, no behavior change |
-| C1 | TH Stage 6, EH return text | TH treats the requester comment as already written; EH says Stage 6 writes it after the return | duplicate responsibility | Open, resolve with B1 |
-| D1 | TH "exactly once", EH version precondition, `triage-critic` invalidation | One review and one adjudication, but a changed document version or master candidate invalidates it with no re-review allowed | contradiction | Open. Proposed: one critic delegation, Foreman self-adjudication may repeat per changed version, the post-routing Review save is exempt |
+| A1 | TH Stage 5 Bug bar, HL, CR gate | Bug needs a counted blast radius; hotlane allows `Unknown` and `NEEDS_HUMAN_URGENT`, but loads only after a Bug is selected, so an unproven high-risk case stops before it | contradiction and ordering | Open. `decide_triage` now enforces the Bug bar in code, so an unproven high-risk case still cannot reach the hotlane. Left as is per Aaron, 2026-09-18 |
+| A2 | `triage-investigate` blast radius, TH Bug bar | "tightest bound with the blocker named" against "counted by a query" | unclear exception | Open, resolve with A1: the `decide_triage` blast-radius input takes only a counted figure |
+| B1 | RP line 7, TH Stage 6 order | Reporting says state, priority, and labels are already saved; the comment is written before routing | ordering | Fixed 2026-09-25: RP now says the decisions go on the ticket, not that they are already there |
+| C1 | TH Stage 6, EH return text | TH treats the requester comment as already written; EH says Stage 6 writes it after the return | duplicate responsibility | Fixed 2026-09-25: TH and EH agree Stage 6 owns the requester comment |
+| D1 | TH "exactly once", EH version precondition, `triage-critic` invalidation | One review and one adjudication, but a changed document version or master candidate invalidates it with no re-review allowed | contradiction | Open. EH allows re-adjudication per changed version; TH and CR still say once. Critic challenges now re-run `decide_triage` instead of hand-editing (Aaron, 2026-09-25) |
 | E1 | SW Bug wording against SW promise rule | "the team is working on a fix" against no unverified promises | contradiction | Fixed in slice 1 with Aaron's rule: only when a matching engineering issue is In Progress or there is current explicit evidence of active work; no date, no deployed-fix claim |
-| F1 | TH state sentence against TH non-engineering close | Support paths are Todo, yet prose says the report closes | wording | Open |
-| F2 | `triage-investigate` duplicate step against TH | "comment and route in one update" against comment then one route call | wording | Open |
+| F1 | TH state sentence against TH non-engineering close | Support paths are Todo, yet prose says the report closes | wording | Fixed 2026-09-25: User Error, Platform Limitation, and Resolved by triage close as Done; Support/ paths stay Todo |
+| F2 | `triage-investigate` duplicate step against TH | "comment and route in one update" against comment then one route call | wording | Fixed: `decide_triage` settles duplicates and one `route_ticket` call routes them |
 | G1 | CR step 3, TH review paragraph, Slack final-post rule | Instructed interim progress post | duplicate responsibility | Addressed in slice 1, live UAT pending |
 | G2 | TH Stage 7 order, delegation prompt | Reply before memory work; late results produce a second terminal message | ordering | Addressed in slice 1, live UAT pending |
-| H1 | EH master window, `agent/tools/find_related_issues.ts` | The 30-day master window is keyed to the Slack intake-only stamp; a Linear session has no cutoff | unclear exception | Open. The pilot must carry a verified intake stamp into Linear |
-| H2 | `agent/lib/slack-intake.ts` boundary against `agent/lib/linear-context.ts` | No-implementation boundary, skill list, and single-issue rule are injected only on Slack | unclear exception | Open, same slice as H1 |
-| H3 | TH Stage 7 | The reply rule points at a Slack stamp a Linear session never receives | unclear exception | Open, same slice as H1 |
+| H1 | EH master window, `agent/tools/find_related_issues.ts` | The 30-day master window is keyed to the Slack intake-only stamp; a Linear session has no cutoff | unclear exception | Open. The 30-day master window still keys on the Slack intake-only stamp; Linear sessions have no cutoff |
+| H2 | `agent/lib/slack-intake.ts` boundary against `agent/lib/linear-context.ts` | No-implementation boundary, skill list, and single-issue rule are injected only on Slack | unclear exception | Partly fixed: every Linear session gets the triage line and the one-reply rule; no no-code boundary or preloaded clarify/wording skills yet |
+| H3 | TH Stage 7 | The reply rule points at a Slack stamp a Linear session never receives | unclear exception | Fixed 2026-09-25: TH Stage 7 names `reply_to_requester` for Linear sessions |
 
 Routing rules are untouched: projects, area owners, master assignee inheritance, states, priority, labels, duplicate and parent handling, fallback, and master eligibility all read as before.
+
+2026-09-25 audit (Aaron's decisions in PR "Resolve triage and billing skill conflicts"): a correction re-runs `decide_triage` and re-routes; clarifying stops after two rounds with a closing answer; closed non-engineering tickets keep their assignee; critic disputes re-run Jev; `fast-lane` goes on the master only; a ticket link only when asked; billing closes in plain words with no fixed status line; a current-thread-only approval stays needs-human; a changed wanted outcome re-runs `classify_ask`; a product defect found in billing is flagged to Aaron, never triaged from billing.
 
 ## Next slices and what blocks them
 
