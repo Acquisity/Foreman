@@ -13,6 +13,7 @@ import { extractRepositoryUrls } from "../lib/repository.js";
 import { slackSessionAuth } from "../lib/session-auth.js";
 import { slackFreshSessionHistory } from "../lib/slack-history.js";
 import {
+  admitsSlackMention,
   FINAL_SLACK_POST_RULE,
   slackAttachmentContext,
   slackIntakeContext,
@@ -118,6 +119,9 @@ export const dispatch = async (
   // author.
   const auth = defaultSlackAuth(message, ctx);
   if (auth === null) {
+    return null;
+  }
+  if (!admitsSlackMention(message.channelId, message.author)) {
     return null;
   }
   // A literal stop/cancel retires the exact session, never reaching the model.

@@ -8,6 +8,7 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { deliveryPolicy, intakeOnlyPolicy } from "./github/approval.js";
 import {
+  admitsSlackMention,
   FINAL_SLACK_POST_RULE,
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
@@ -208,4 +209,21 @@ describe("intake-only channels", () => {
       undefined
     );
   });
+});
+
+it("the receiver intake channels answer only the receiver's mention", () => {
+  const person = {
+    fullName: "A",
+    isBot: false,
+    isMe: false,
+    userId: "U1",
+    userName: "a",
+  };
+  const receiver = { ...person, isBot: true, userId: "U2" };
+  assert.equal(admitsSlackMention("C0BBPVC3N2X", person), false);
+  assert.equal(admitsSlackMention("C0BBPVC3N2X", receiver), true);
+  assert.equal(admitsSlackMention("C0BC011NAQL", person), false);
+  assert.equal(admitsSlackMention("C0BC011NAQL", receiver), true);
+  assert.equal(admitsSlackMention("C0BCV1WBR42", person), true);
+  assert.equal(admitsSlackMention("D123", person), true);
 });
