@@ -371,6 +371,8 @@ test("the generated verification subquery counts Instantly and verified imports 
   }
 });
 
+const STUCK_AGE = /current_timestamp - interval '\d+ minutes'/u;
+
 test("a pending run that has not started is never stuck, so the read still parses", () => {
   const db = new DatabaseSync(":memory:");
   try {
@@ -382,9 +384,11 @@ test("a pending run that has not started is never stuck, so the read still parse
     const start = query.lastIndexOf('as "verificationJobs",', end);
     const predicate = query
       .slice(start + 'as "verificationJobs",'.length, end)
-      .replace(/current_timestamp - interval '\d+ minutes'/u, "current_timestamp");
+      .replace(STUCK_AGE, "current_timestamp");
     const rows = db
-      .prepare(`select id, ${predicate} as stuck from lead_scrape_run lsr order by id`)
+      .prepare(
+        `select id, ${predicate} as stuck from lead_scrape_run lsr order by id`
+      )
       .all();
     assert.deepEqual(
       rows.map((row) => ({ ...row })),
