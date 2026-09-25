@@ -41,8 +41,12 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const SECRET_RE =
   /\b(?:eyJ[A-Za-z0-9._-]{10,}|[A-Fa-f0-9]{32,}|(?:sk|pk|rk)_[A-Za-z0-9_]{12,})\b/g;
 const URL_QUERY_RE = /(https?:\/\/[^\s?]+)\?\S*/g;
+// An opaque credential after an auth scheme looks like nothing else here.
+// Scheme names as headers write them, and a credential-length value, so "basic plan" stays readable.
+const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/g;
 const redactSensitive = (value: string): string =>
   value
+    .replace(AUTH_SCHEME_RE, "$1 [redacted]")
     .replace(EMAIL_RE, "[email]")
     .replace(SECRET_RE, "[redacted]")
     .replace(URL_QUERY_RE, "$1?[redacted]");
