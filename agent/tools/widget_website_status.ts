@@ -197,7 +197,7 @@ export function buildWidgetWebsiteStatusQuery(context: WidgetContext): string {
   )`;
   // v0-backed projects link a legacy website through metadata.legacyWebsiteId;
   // guard the cast so malformed JSON resolves to no linked domains, not an error.
-  const legacyWebsiteId = `(case when p.metadata->>'legacyWebsiteId' ~ '^[0-9a-fA-F-]{36}$'
+  const legacyWebsiteId = `(case when p.metadata->>'legacyWebsiteId' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
     then (p.metadata->>'legacyWebsiteId')::uuid else null end)`;
   // A builder project that links to a website IS that website: listing both made
   // one site look like two projects sharing a domain. The website row is kept,
