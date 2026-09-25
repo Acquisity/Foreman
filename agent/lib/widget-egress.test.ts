@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
   composerInput,
+  defaultGateDeps,
   extractIdentifiers,
   type GateDeps,
   gate,
@@ -710,4 +711,85 @@ test("the reply says it cannot change the account only when Jev read a request f
     ),
     [false, true]
   );
+});
+
+test("a foreign hostname inside a url is checked for ownership; the customer's own site and our help and app links pass", async () => {
+  const owned = "www.customer-site.com";
+  const reply = (url: string) =>
+    `Your campaign paused because its inbox disconnected. See ${url} for details.`;
+  const ownership = () =>
+    Promise.resolve({
+      domains: new Set([owned]),
+      emails: new Set<string>(),
+      slugs: new Set([scope.organizationSlug.toLowerCase()]),
+      uuids: new Set([campaignId]),
+    });
+  const foreign = deps({
+    compose: () =>
+      Promise.resolve(reply("https://other-tenant-site.com/private-report")),
+    resolve: ownership,
+  });
+  const blockedResult = await gate(scope, question, findings(), foreign.deps);
+  assert.equal(blockedResult.decision, "block");
+  assert.equal(
+    blockedResult.reason,
+    "composed:foreign_identifier:other-tenant-site.com"
+  );
+  for (const url of [
+    `https://${owned}/pricing.`,
+    "https://help.acquisity.ai/campaigns",
+    `https://app.acquisity.ai/dashboard/${scope.organizationSlug}/campaigns`,
+  ]) {
+    const own = deps({
+      compose: () => Promise.resolve(reply(url)),
+      resolve: ownership,
+    });
+    // biome-ignore lint/performance/noAwaitInLoops: each url is its own gate run.
+    const result = await gate(scope, question, findings(), own.deps);
+    assert.equal(result.decision, "allow", url);
+    assert.equal(result.message, reply(url));
+  }
+});
+
+test("the default judge and composer run under a deadline, so a stalled model call fails closed", async () => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (
+      String(input instanceof Request ? input.url : input).includes(
+        "ai-gateway"
+      )
+    ) {
+      signals.push(init?.signal);
+    }
+    return Promise.resolve(new Response("{}", { status: 400 }));
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      defaultGateDeps.judge({
+        findings: findings(),
+        items: redactableItems(findings()),
+        question,
+        scope,
+      })
+    );
+    await assert.rejects(
+      defaultGateDeps.compose({
+        findings: composerInput(findings()),
+        organizationName: scope.organizationName,
+        question,
+      })
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = realKey;
+    }
+  }
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every((signal) => signal instanceof AbortSignal));
 });
