@@ -167,7 +167,7 @@ const campaigns = {
 };
 
 describe("widget next-action selector", () => {
-  it("is opt-in and never on in production", () => {
+  it("is opt-in and behaves the same in production", () => {
     assert.equal(nextActionEnabled({}), false);
     assert.equal(nextActionEnabled({ WIDGET_NEXT_ACTION: "jev" }), true);
     assert.equal(
@@ -175,8 +175,9 @@ describe("widget next-action selector", () => {
         VERCEL_ENV: "production",
         WIDGET_NEXT_ACTION: "jev",
       }),
-      false
+      true
     );
+    assert.equal(nextActionEnabled({ VERCEL_ENV: "production" }), false);
   });
 
   it("selects the first useful read without reclassifying intent or ambiguity", async () => {

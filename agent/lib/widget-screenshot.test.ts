@@ -100,7 +100,7 @@ describe("screenshot readings beside the question", () => {
       rendered.indexOf("SCREENSHOTS ATTACHED") >
         rendered.indexOf("where is resources?")
     );
-    assert.ok(rendered.includes(shots[1] ?? ""));
+    assert.ok(rendered.includes(shots[1]));
     assert.equal(renderAsk(toWidgetAsk("hi", undefined)), "hi");
   });
 

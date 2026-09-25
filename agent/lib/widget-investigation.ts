@@ -1242,11 +1242,7 @@ async function answerFreshRun(
   responseWaitMs: number,
   deps: WidgetDependencies
 ): Promise<Response> {
-  const message = withHistory(
-    input.question,
-    input.history,
-    input.screenshots
-  );
+  const message = withHistory(input.question, input.history, input.screenshots);
   const ask = toWidgetAsk(input.question, input.history, input.screenshots);
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
