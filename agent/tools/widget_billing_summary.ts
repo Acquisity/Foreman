@@ -612,7 +612,13 @@ export async function composeWidgetBillingSummary(
   const credits = dbWallet
     ? {
         ...dbWallet.credits,
-        renewsAt: subscriptions[0]?.currentPeriodEnd ?? null,
+        // Stripe lists every status, newest first: a canceled subscription never renews.
+        renewsAt:
+          subscriptions.find(
+            (sub) =>
+              sub.status !== null &&
+              ACTIVE_SUBSCRIPTION_STATUSES.has(sub.status)
+          )?.currentPeriodEnd ?? null,
       }
     : null;
 
