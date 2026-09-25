@@ -545,3 +545,29 @@ test("actual thread messages are bounded and arbitrary fields are stripped", () 
     )
   );
 });
+
+test("a message cut at the SQL character limit with an emoji in it still reads", () => {
+  const content = `${"a".repeat(2998)}\u{1F600}b`;
+  assert.equal([...content].length, 3000);
+  assert.ok(content.length > 3000);
+  const result = parseWidgetSdrEvidence(
+    envelope([
+      {
+        ...detail,
+        messages: [
+          {
+            at: observedAt,
+            content,
+            contentTruncated: true,
+            direction: "received",
+            hasHtmlOnly: false,
+            id: threadId,
+          },
+        ],
+      },
+    ]),
+    scope,
+    { threadId }
+  );
+  assert.equal(result.status, "ok");
+});

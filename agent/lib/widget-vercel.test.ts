@@ -145,3 +145,13 @@ test("the build excerpt starts at the failure, drops colour codes, and is capped
   assert.equal(excerpt?.length, 1500);
   assert.equal(buildErrorExcerpt([{ text: "Build completed" }]), null);
 });
+
+test("a build line carried under payload.text is read like a top-level one", () => {
+  assert.equal(
+    buildErrorExcerpt([
+      { payload: { text: "Installing dependencies" } },
+      { payload: { text: "Failed to compile." } },
+    ]),
+    "Failed to compile."
+  );
+});

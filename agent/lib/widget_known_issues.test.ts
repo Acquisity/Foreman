@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
+import type { z } from "zod";
 import type { FindRelatedIssuesResult } from "#lib/linear-api.js";
-
-const HTTP_500_RE = /HTTP 500/;
+import definition, { searchKnownIssues } from "../tools/widget_known_issues.js";
 
 // Mirrors the shape searchKnownIssues() derives from findRelatedIssues().
 // biome-ignore lint/suspicious/useAwait: test mock mirrors the async helper signature.
@@ -49,50 +49,29 @@ const mockFindRelatedIssues = async (
   };
 };
 
-/** Reimplements the tool's sanitize/sort/cap step against the mocked search, since the module import below only checks exposure gating. */
-async function searchKnownIssuesForTest(query: string) {
-  try {
-    const result = await mockFindRelatedIssues([query]);
-    const CLOSED = new Set(["completed", "canceled"]);
-    const issues = [...result.issues]
-      .sort((a, b) => {
-        const aClosed = CLOSED.has(a.stateType) ? 1 : 0;
-        const bClosed = CLOSED.has(b.stateType) ? 1 : 0;
-        if (aClosed !== bClosed) {
-          return aClosed - bClosed;
-        }
-        return b.createdAt.localeCompare(a.createdAt);
-      })
-      .slice(0, 5)
-      .map((issue) => ({
-        identifier: issue.identifier,
-        status: issue.state,
-        title: issue.title,
-      }));
-    return { issues };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Linear search failed.",
-      issues: [],
-    };
-  }
-}
+const opts = {
+  client: {} as never,
+  signal: new AbortController().signal,
+};
+const searchKnownIssuesForTest = (query: string) =>
+  searchKnownIssues(query, opts, (input) =>
+    mockFindRelatedIssues(input.phrases)
+  );
+
+const widgetCtx = {
+  session: {
+    auth: {
+      initiator: {
+        attributes: {},
+        issuer: "foreman:widget-support",
+      } as SessionAuthContext,
+    },
+  },
+};
 
 describe("widget_known_issues tool", () => {
-  it("is exposed only for widget support auth", async () => {
-    const toolModule = await import("../tools/widget_known_issues.js");
-    const dynamic = toolModule.default;
-
-    const widgetCtx = {
-      session: {
-        auth: {
-          initiator: {
-            attributes: {},
-            issuer: "foreman:widget-support",
-          } as SessionAuthContext,
-        },
-      },
-    };
+  it("is exposed only for widget support auth", () => {
+    const dynamic = definition;
     const nonWidgetCtx = {
       session: { auth: { initiator: null } },
     };
@@ -147,14 +126,20 @@ describe("widget_known_issues tool", () => {
   it("reports an error without throwing when the search fails", async () => {
     const result = await searchKnownIssuesForTest("error test");
     assert.equal(result.issues.length, 0);
-    assert.match(result.error ?? "", HTTP_500_RE);
+    assert.equal(result.error, "Known-issue search could not run.");
   });
 
   it("input schema bounds query length and trims", () => {
-    const minLength = 3;
-    const maxLength = 120;
-    assert.ok("abc".length >= minLength, "3-char query should be valid");
-    assert.ok("a".repeat(120).length <= maxLength, "120-char query valid");
-    assert.equal("  query  ".trim(), "query");
+    const tool = definition.events["step.started"]?.({}, widgetCtx as never) as
+      | { inputSchema: z.ZodType }
+      | null
+      | undefined;
+    assert.ok(tool);
+    const parse = (query: string) => tool.inputSchema.safeParse({ query });
+    assert.equal(parse("ab").success, false);
+    assert.equal(parse("abc").success, true);
+    assert.equal(parse("a".repeat(120)).success, true);
+    assert.equal(parse("a".repeat(121)).success, false);
+    assert.deepEqual(parse("  query  ").data, { query: "query" });
   });
 });

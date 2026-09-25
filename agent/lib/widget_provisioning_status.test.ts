@@ -519,3 +519,21 @@ test("owned saved logs expose partial failures and retries without provider blob
     null
   );
 });
+
+const ATTEMPTS_GUARD =
+  /jsonb_typeof\(dpo\.provisioning_log -> 'totalAttempts'\) = 'number'\s+and \(dpo\.provisioning_log ->> 'totalAttempts'\) ~ '([^']+)'\s+then \(dpo\.provisioning_log ->> 'totalAttempts'\)::int end/u;
+
+test("a malformed attempt count in one order's log does not fail the whole read", () => {
+  const query = buildWidgetProvisioningQuery(scope, {});
+  const guard = ATTEMPTS_GUARD.exec(query)?.[1];
+  assert.ok(guard, "the totalAttempts cast is guarded");
+  const integer = new RegExp(guard, "u");
+  assert.equal(integer.test("3"), true);
+  for (const bad of ["3.0", "", "abc", "-1", "1e3", "12345678901"]) {
+    assert.equal(integer.test(bad), false, bad);
+  }
+  assert.equal(
+    query.replace(ATTEMPTS_GUARD, "").includes("'totalAttempts')::int"),
+    false
+  );
+});

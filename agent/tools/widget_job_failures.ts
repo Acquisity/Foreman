@@ -92,6 +92,7 @@ export function buildQuery(
       and m.user_id = '${scope.userId}'::uuid
       and m.role in ('owner','admin')
       and o.deleted_at is null and m.deleted_at is null
+      and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
     limit 1)`;
 
   // Each subquery is org-scoped. Project only bounded error messages; never
