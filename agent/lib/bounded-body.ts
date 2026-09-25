@@ -24,6 +24,10 @@ export async function readRequestBody(
       // biome-ignore lint/performance/noAwaitInLoops: bound the streamed request before parsing it.
       const { done, value } = await reader.read();
       if (done) {
+        // A cancelled reader can end the stream cleanly: a cut-off body is unreadable, not complete.
+        if (deadline.aborted) {
+          throw deadline.reason;
+        }
         return body;
       }
       if (body.length + value.length > maxChars) {
