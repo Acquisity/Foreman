@@ -4,6 +4,7 @@ import {
   createWidgetTicket,
   invokeProvider,
   REFUND_TICKET,
+  WIDGET_TICKET_OWNER,
   widgetScopeBlock,
 } from "./executor/dispatch.js";
 import { executorTransport } from "./executor/transport.js";
@@ -41,12 +42,14 @@ const withTransport = async (run: () => Promise<unknown>) => {
   return calls;
 };
 
-test("the widget ticket takes its team, state and scope from the session", async () => {
+test("the widget ticket is Aaron's, delegated to Foreman, with team, state and scope from the session", async () => {
   const [call] = await withTransport(() =>
     createWidgetTicket(ctx(), { report: "Report", title: "Inbox fails" })
   );
   assert.equal(call?.[1], WIDGET_TICKET_PATH);
   assert.deepEqual(call?.[2], {
+    assignee: "Aaron Fraga",
+    delegate: WIDGET_TICKET_OWNER.delegate,
     description: `Report\n\n${widgetScopeBlock(verifiedWidgetContext)}`,
     state: "Triage",
     team: "Engineering Team",
@@ -65,6 +68,7 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
   );
   assert.deepEqual(call?.[2], {
     assignee: "Aaron Fraga",
+    delegate: WIDGET_TICKET_OWNER.delegate,
     description: `Report\n\n${scope}`,
     labels: [...REFUND_TICKET.labels],
     project: REFUND_TICKET.project,
@@ -78,6 +82,7 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
     // Half the refund shape, or another label, is not the billing queue.
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...WIDGET_TICKET_OWNER,
         description: `x\n\n${scope}`,
         labels: [...REFUND_TICKET.labels],
         state: "Triage",
@@ -89,6 +94,7 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         ...REFUND_TICKET,
+        ...WIDGET_TICKET_OWNER,
         description: `x\n\n${scope}`,
         labels: ["Bug"],
         state: "Triage",
@@ -109,6 +115,7 @@ test("a widget session cannot shape the ticket write itself", async () => {
     // No server-written scope block.
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...WIDGET_TICKET_OWNER,
         description: "No scope",
         state: "Triage",
         team: "Engineering Team",
@@ -119,7 +126,19 @@ test("a widget session cannot shape the ticket write itself", async () => {
     // Right scope block, but a field the lane does not own.
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...WIDGET_TICKET_OWNER,
         assignee: "Someone",
+        description: `x\n\n${scope}`,
+        state: "Triage",
+        team: "Engineering Team",
+        title: "Unsafe",
+      }),
+      refused
+    );
+    // Another delegate, or none, is not the widget lane's ticket.
+    await assert.rejects(
+      invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        assignee: WIDGET_TICKET_OWNER.assignee,
         description: `x\n\n${scope}`,
         state: "Triage",
         team: "Engineering Team",

@@ -42,15 +42,22 @@ const finLinearTicketInput = z.strictObject({
 
 /**
  * Where a widget refund request lands: the Support project with the Refund
- * label, assigned to the billing owner, which is the queue billing triage reads.
+ * label, which is the queue billing triage reads.
  */
 export const REFUND_TICKET = {
-  assignee: "Aaron Fraga",
   labels: ["9120e30d-e188-4972-940b-20005b7f6d03"],
   project: "P-ENG-20",
 } as const;
 
+/** Every widget ticket is Aaron's, with the work delegated to the Foreman Linear agent. */
+export const WIDGET_TICKET_OWNER = {
+  assignee: "Aaron Fraga",
+  delegate: "d5325c6f-fbc8-451e-9fed-358667e58ad3",
+} as const;
+
 const widgetTicketShape = {
+  assignee: z.literal(WIDGET_TICKET_OWNER.assignee),
+  delegate: z.literal(WIDGET_TICKET_OWNER.delegate),
   description: z.string().min(1).max(16_000),
   state: z.literal("Triage"),
   team: z.literal("Engineering Team"),
@@ -60,7 +67,6 @@ const widgetLinearTicketInput = z.union([
   z.strictObject(widgetTicketShape),
   z.strictObject({
     ...widgetTicketShape,
-    assignee: z.literal(REFUND_TICKET.assignee),
     labels: z.tuple([z.literal(REFUND_TICKET.labels[0])]),
     project: z.literal(REFUND_TICKET.project),
   }),
@@ -299,6 +305,7 @@ export async function createWidgetTicket(
       ...(input.refund
         ? { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] }
         : {}),
+      ...WIDGET_TICKET_OWNER,
       description: `${input.report}\n\n${widgetScopeBlock(scope)}`,
       state: "Triage",
       team: "Engineering Team",
