@@ -83,7 +83,7 @@ test("triage intake hands off to the handling skill after Stage 4", () => {
 test("pre-evidence forward references name the handling skill", () => {
   assert.ok(
     triageSkill.includes(
-      "`triage-handling` Stage 6 chooses ownership from completed evidence"
+      "`decide_triage` chooses ownership from completed evidence"
     )
   );
   assert.ok(
@@ -307,6 +307,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "list_issues",
       "get_issue",
       "list_issue_labels",
+      "list_projects",
       "save_issue",
       "save_document",
       "list_comments",
@@ -902,7 +903,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "One master per root cause",
     "`fast-lane`",
     "area-routing roster in `triage-handling` Stage 6",
-    "in the product project Stage 6 selected from completed evidence (never the report's incoming intake project",
+    "in the product project `route.project` carries (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
   }
@@ -990,7 +991,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "A result with an empty `criteria_results` is a review that could not start",
     "None of these is a reason for a second delegation",
     "On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record",
-    "When the corrected record no longer supports the classification, change the classification and handling path",
+    "take every field it returns, including a changed classification, handling path",
     "read back its adjudicated-evidence `updatedAt`",
     "`**Review**: Adjudicated <that adjudicated-evidence updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`",
     "without adding settlement-summary clauses elsewhere in the document",

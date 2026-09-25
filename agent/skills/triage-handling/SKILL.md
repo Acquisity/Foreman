@@ -16,35 +16,41 @@ Purpose: either stop with the missing confirmation explicit when the claim remai
 
 Inputs: the completed Stage 4 evidence record. Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius.
 
-### Jev decides, Foreman acts
-
-Call `decide_triage` once with the evidence record, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, and `classify_ask`'s `sourceLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project below; record its notes and never override it. `unproven` takes the unproven branch with its `missing` list. Call it again after adjudication corrects the evidence. Only on `decided: false` apply the rules below, and say so.
-
 ### Rehash the claim against the evidence
 
 The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
 
-When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
-
-Otherwise classify as `User Error`, `Platform Limitation`, or `Bug` per the classification rules in `triage-investigate`. A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one, it is not a Bug yet: say what is missing and who can supply it. Verdict quality bar: name the cause, not the mechanism.
-
 ### Find the unblock
 
-The verdict says what is wrong, not what the customer does tomorrow morning. Answer that separately, even on a `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix. Ask what gets them working today: a setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product, a manual step on our side. The cause found here says which of these would actually work, which is why this follows the verdict.
+The verdict says what is wrong, not what the customer does tomorrow morning. Answer that separately, even on a `Bug`: a confirmed root cause is not a reason to leave someone stuck waiting for a fix. Ask what gets them working today: a setting they or support can change, a re-run of the failed job, a corrected record, a different path through the product, a manual step on our side. The cause the evidence points to says which of these would actually work.
 
 When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
 
-The unblock never replaces the root cause, never substitutes for the master ticket, and never changes the priority.
+The unblock never replaces the root cause or the master ticket.
 
-### Decide the handling path
+### Jev decides, Foreman acts
+
+Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, and `classify_ask`'s `sourceLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
+
+When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels, even an empty priority; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
+
+Every decision above is provisional until the review below has settled the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for a settled document version. Outcomes the review does not cover (`User Error`, `Platform Limitation`, a `Duplicate`, the unproven stop) are applied in Stage 6 without one.
+
+### Fallback: only when `decided: false`
+
+Say so in the document.
+
+Classify as `User Error`, `Platform Limitation`, or `Bug` per the classification rules in `triage-investigate`. A `Bug` verdict requires all three: a named file and function, direct evidence from the current production-data or runtime/provider lanes, and a blast radius counted by a query. Missing any one, it is not a Bug yet: say what is missing and who can supply it. Verdict quality bar: name the cause, not the mechanism.
+
+#### Decide the handling path
 
 Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`. The path classifies the root cause, not the remedy: a ticket can be `Engineering Todo` with the customer unblocked in the same pass, and the two are recorded separately, neither cancelling the other.
 
-### Decide the final Linear state
+#### Decide the final Linear state
 
 Set the state that matches the handling path: `Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`.
 
-### Set Linear priority
+#### Set Linear priority
 
 Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. Weigh in order:
 
@@ -63,7 +69,7 @@ Bands:
 
 A workaround never lowers the band. Between two adjacent bands take the higher one and flag the rationale for a domain expert where the verdict lives. Duplicates inherit the parent's priority and the parent's assignee.
 
-### Label the ticket
+#### Label the ticket
 
 Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never invent a label:
 
@@ -71,15 +77,13 @@ Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never 
 - The source labels (`classify_ask` returns them): `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
 - One `Root Cause` label when the team has one that matches the cause found in Stage 4.
 
-Every decision above is provisional until the review below has settled the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for a settled document version. Outcomes the review does not cover (`User Error`, `Platform Limitation`, a `Duplicate`, the unproven stop) are applied in Stage 6 without one.
-
 ### Review a Bug before routing it
 
 This review runs only when the classification is `Bug` and the handling path is not `Duplicate`. `User Error`, `Platform Limitation`, the unproven stop, and a `Duplicate` go straight to Stage 6: a duplicate routes nothing new to engineering, and the master it attaches to already carries the reviewed root cause.
 
 The critic runs exactly once per ticket. Foreman delegates once and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane in the protocol stops a reviewed ticket for a person. Read [references/critic-review.md](references/critic-review.md) and follow it before Stage 6.
 
-Completion: either the unproven branch has made the unblock explicit, preserved the current ticket state, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or one evidence-backed classification and handling path exist, the unblock is explicit, the final Linear state, numeric priority, and complete label union are decided, and, for a `Bug` other than a `Duplicate`, the review has settled the exact document version that records them or the hotlane stopped the review and the ticket is with a person.
+Completion: either the unproven branch has made the unblock explicit, preserved the ticket, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or the decision is recorded, the unblock is explicit, and, for a `Bug` other than a `Duplicate`, the review has settled the document version that records it or the hotlane stopped the review and the ticket is with a person.
 
 ## Stage 6: Persist and route
 
@@ -100,9 +104,7 @@ Write the report comment from [references/reporting.md](references/reporting.md)
 
 ### Choose the product project from completed evidence
 
-Now, and not before now, determine the owning product project from the confirmed root cause and owning code path established in Stage 4. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. `Support` is a valid evidence-backed final project when support closes the case without engineering, and it records to memory like any other area. Pass the evidence-backed project to the ticket's one `route_ticket` call alongside assignee, labels, priority, and state; its returned `projectId` is what optional memory recording uses.
-
-If the completed evidence genuinely cannot determine ownership, leave the project unset, assign Aaron Fraga as the explicit human-routing fallback, and say in the document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing.
+`decide_triage` chose it from the confirmed root cause and owning code path. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. Pass the evidence-backed project to the ticket's one `route_ticket` call as `route.project`, unchanged; its returned `projectId` is what memory recording uses. When `route` has no project, it already assigns Aaron Fraga: say in the document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing. On `decided: false`, choose the project the same way.
 
 When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
 
@@ -114,9 +116,9 @@ The roster exists on the production ENG team only; SAN sandbox tickets always ro
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged; a `Duplicate` adds the fields below. The ticket carries the explanation and closes into the Stage 5 state; nothing goes to engineering and no queue should hold a closed report.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. Add no assignee: the ticket keeps its current one. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
-A `Duplicate` still inherits. Call `route_ticket` once with `duplicateOf` and `inheritAssigneeFrom` both set to the other ticket, `assignee` set to the area owner from the roster as the fallback unless `route` names one, plus the Stage 5 state, priority, and labels, so the root cause's owner owns its reports. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment: the ticket still closes into its Stage 5 state.
+A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none, so the root cause's owner owns its reports. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment.
 
 ### When the root cause warrants action
 
@@ -134,7 +136,7 @@ Inputs: the persisted Stage 6 result and the runtime-stamped channel facts.
 
 ### Slack-facing reply
 
-Load slack-wording only in C0BBPVC3N2X or C0BC011NAQL. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Follow the final-post stamp from `slack-intake.ts`. Send it once, last, after the memory bookkeeping below; a later result never earns a recap.
+Load slack-wording in C0BBPVC3N2X, C0BC011NAQL, and for every `reply_to_requester` message. Give a concrete finding, check whose lane each next step is in, and hand the opener only theirs in one to three sentences. Slack session: the final thread message, per the `slack-intake.ts` stamp. Linear session: one `reply_to_requester` call; the Stage 6 comment is the durable report and the session's final response is one line pointing at it. Send the reply once, last, after the memory bookkeeping below; a later result never earns a recap, and a critic-wait line is never a `reply_to_requester` call.
 
 ### Record the investigation in memory
 
@@ -142,13 +144,13 @@ Before the reply, after the Triage investigation document is attached and the cl
 
 Send the pattern, not the customer: the claim, root cause, symptoms in the product's own words, identifier-stripped error signatures, the Stage 4 code path and commit, conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), counts with the date counted, and links back to the ticket. Never an email address, organization or user id, production row, log, or anything credential-shaped; the tool refuses them and they stay in the document.
 
-The product area comes from the evidence-backed project saved during Stage 6. Re-read the issue after saving it and pass that resulting project id to `record_investigation_case`. Add affected features only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
+The product area comes from the evidence-backed project saved during Stage 6: take `route_ticket`'s returned `projectId`, with no re-read, and pass that resulting project id to `record_investigation_case`. Add affected features only where this investigation found evidence they were affected, and dependency keys name the shared systems involved (`instantly`, `webhooks`, `inngest`). One case per ticket, never one per feature.
 
 A failure here changes nothing about the ticket: record it internally when useful and move on; do not retry into a second case, change the comment, or revisit the verdict. Never announce memory reads, writes, or availability in the Slack thread.
 
 If later evidence overturns a recorded conclusion, use `correct_investigation_case`. It supersedes rather than patches, so it takes the whole corrected case: the active case id, the correction reason, and the full payload again, on the same ticket and final project. Recover the case id by searching with the ticket identifier; that project-independent lookup drops the relevance filters and time window and returns the case however old it is. Never record a second case for the same ticket.
 
-A colleague correcting you in the thread or on the ticket is later evidence. When a trusted human contradicts a conclusion you gave, take the correction as the final classification, reply with the corrected guidance, and record it. Look up the ticket's own case first by identifier; `available: false` means memory is down: skip the bookkeeping, the corrected reply still goes out. With an active case, use `correct_investigation_case` with what the colleague said as the correction reason and the thread permalink among the evidence refs. With none, call `record_investigation_case` with the corrected conclusion and put your overturned conclusion in `ruledOut`, so the next search surfaces both the wrong theory and the right answer. Their unblock goes in `resolution`, in the product's own words. Never soften the correction into the record.
+A colleague correcting you in the thread or on the ticket is later evidence. When a trusted human contradicts a conclusion you gave, take the correction as evidence, call `decide_triage` again, route its new `route` with `route_ticket`, reply with the corrected guidance, and record it. Look up the ticket's own case first by identifier; `available: false` means memory is down: skip the bookkeeping, the corrected reply still goes out. With an active case, use `correct_investigation_case` with what the colleague said as the correction reason and the thread permalink among the evidence refs. With none, call `record_investigation_case` with the corrected conclusion and put your overturned conclusion in `ruledOut`, so the next search surfaces both the wrong theory and the right answer. Their unblock goes in `resolution`, in the product's own words. Never soften the correction into the record.
 
 When completed evidence cannot identify and save a mapped product project, record no investigation-memory case and use the explicit human-routing fallback from Stage 6. A memory denial, unavailable store, or failed write terminates bookkeeping only; it never changes the verdict, ticket, comment, or Slack reply. An explicitly read-only run also skips this write after recommending a project.
 
@@ -156,7 +158,7 @@ Completion: the attended surface follows the canonical final-post stamp from `sl
 
 ## Follow-ups
 
-Answer follow-ups with the gathered evidence, keep internal detail in the document, cap the back-and-forth, and on the third reply give a clear close. A follow-up that corrects your conclusion is not one to close: handle it as a correction under Stage 7.
+Answer follow-ups with the gathered evidence and keep internal detail in the document. Asking stops at clarify-with-requester's two-round cap: then close with the best answer and its reopen condition. A follow-up that corrects your conclusion is not one to close: handle it as a correction under Stage 7.
 
 ## Reporting reference
 
