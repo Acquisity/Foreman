@@ -4,12 +4,16 @@ import {
   detourGoal,
   detourReading,
   detourTurns,
+  stepsLatest,
+  stepsReading,
+  stepsTurns,
 } from "./widget-detour.fixture.js";
 import {
   activeArticleHits,
   answerFromHelpCenter,
   CANNOT_CHECK,
   CANNOT_CHECK_ALONE,
+  CONTINUES_STEPS,
   decideFromArticles,
   indexLine,
   type KbDeps,
@@ -585,4 +589,33 @@ test("going back to an earlier request drops the detour's articles and points ev
   const plain = await detourStages(ask);
   assert.deepEqual(plain.read, [articles[2].url, articles[0].url]);
   assert.equal(plain.generate.startsWith(RETURNS_TO_EARLIER_ASK), false);
+});
+
+// Preview 5fc15d15: the customer reached the first page of the steps and the
+// lane answered the setup checklist on their screenshot instead of the next step.
+test("a customer following the previous reply's steps gets every stage pointed at the next step, with those articles and without the screenshot in search", async () => {
+  const ask = {
+    activeArticles: [articles[0]],
+    latest: stepsLatest,
+    screenshots: [stepsReading],
+    turns: stepsTurns,
+  };
+  const going = await detourStages({
+    ...ask,
+    continuesSteps: true,
+    followUp: true,
+    screenshotIsContext: true,
+  });
+  assert.deepEqual(going.read, [articles[2].url, articles[0].url]);
+  for (const text of [going.search, going.decide, going.generate]) {
+    assert.equal(text.startsWith(CONTINUES_STEPS), true);
+  }
+  assert.equal(going.search.includes(stepsReading), false);
+  assert.equal(going.decide.includes(stepsReading), false);
+  assert.equal(going.generate.includes(stepsReading), true);
+  // What production did: no note, no carried article, the checklist searched.
+  const before = await detourStages(ask);
+  assert.deepEqual(before.read, [articles[2].url]);
+  assert.equal(before.generate.startsWith(CONTINUES_STEPS), false);
+  assert.equal(before.search.includes(stepsReading), true);
 });

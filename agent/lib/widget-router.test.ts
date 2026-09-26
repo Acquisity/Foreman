@@ -38,6 +38,7 @@ describe("routeWidgetMessage", () => {
       asksForHuman: 0.04,
       asksOwnData: 0.91,
       confidence: 0.87,
+      continuesSteps: 0,
       explainsPrevious: 0,
       followUp: 0,
       kbScore: 0,
@@ -55,6 +56,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_refund",
       "asks_for_ticket",
       "asks_own_data",
+      "continues_steps",
       "depends_on_previous",
       "explains_previous",
       "is_unclear",
@@ -62,7 +64,6 @@ describe("routeWidgetMessage", () => {
       "offers_recording",
       "reports_bug",
       "returns_to_earlier_ask",
-      "screenshot_shows_where",
     ]);
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
@@ -70,7 +71,7 @@ describe("routeWidgetMessage", () => {
     );
   });
 
-  it("reports whether the message goes back to an earlier request and whether it asks about its screenshot", async () => {
+  it("reports whether the message goes back to an earlier request and whether it continues the previous reply's steps", async () => {
     const route = await routeWidgetMessage("ok im here. now what?", {
       apiKey: "test-key",
       fetch: () =>
@@ -80,16 +81,16 @@ describe("routeWidgetMessage", () => {
               answers: {
                 asks_for_human: { noul: 0.04 },
                 asks_own_data: { noul: 0.3 },
+                continues_steps: { noul: 0.76 },
                 lane: { choice: "kb", confidence: 0.9 },
                 returns_to_earlier_ask: { noul: 0.81 },
-                screenshot_shows_where: { noul: 0.76 },
               },
             }),
           ok: true,
           status: 200,
         }),
     });
-    assert.equal(route.screenshotContext, 0.76);
+    assert.equal(route.continuesSteps, 0.76);
     assert.equal(route.returnsToEarlierAsk, 0.81);
   });
 

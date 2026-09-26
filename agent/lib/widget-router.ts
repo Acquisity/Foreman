@@ -57,6 +57,11 @@ export interface WidgetAsk {
    * "not something I can do" first, instead of stepping aside.
    */
   cannotLook?: boolean;
+  /**
+   * The router judged that `latest` says how far the customer got in the
+   * previous reply's steps and asks what to do next.
+   */
+  continuesSteps?: boolean;
   /** The router judged `latest` a continuation of the previous reply. */
   followUp?: boolean;
   latest: string;
@@ -71,8 +76,8 @@ export interface WidgetAsk {
    */
   returnsToEarlierAsk?: boolean;
   /**
-   * The router judged that the screenshots only show where the customer is
-   * while they continue their request, not what they are asking about. Their
+   * The customer continues the previous reply's steps, so the screenshots only
+   * show where they are, not what they are asking about. Their
    * readings then stay out of article search, which otherwise follows the
    * most alarming thing on the screen.
    */
@@ -215,6 +220,17 @@ const QUESTIONS = {
       "The customer is asking about their own account, workspace, campaigns, billing, or activity, rather than how the product works in general.",
     type: "noul",
   },
+  // Preview 5fc15d15: "i found the cold email agent where do i go from here?",
+  // with a screenshot of a setup checklist, scored depends_on_previous 0.19
+  // (it names a product) and screenshot_shows_where 0.47, so the checklist was
+  // answered instead of the next step. Asked about the steps rather than the
+  // screen: 0.66 to 0.90 for continuations, at most 0.44 for error screenshots
+  // (AI Gateway, 2026-09-26).
+  continues_steps: {
+    instructions:
+      "Support's previous answer gave the customer steps, and the latest message says how far they got in those steps (they reached a page, found a menu or finished a step that answer named) and asks what to do next. Asking what something on the screen means or how to fix an error, a new subject, a thank you, or a complaint that the answer missed their question is NOT this.",
+    type: "noul",
+  },
   // "what about the limit?" and "nothing works!!" were investigated for two to
   // three minutes before anyone asked what the customer meant.
   // A terse follow-up ("okay, and after that?") has no subject of its own, so
@@ -280,17 +296,6 @@ const QUESTIONS = {
       "The customer's latest message goes back to something they asked earlier in the conversation that Support has not finished answering: it says Support's previous answer did not address what they asked, asks that earlier question again, or reports finishing a side step Support gave and asks what to do next while that earlier request is still unanswered. A follow-up to an answer that did address what they asked is NOT this, and neither is a new subject.",
     type: "noul",
   },
-  // A screenshot of the page they were sent to ("ok im here. now what?")
-  // showed an unrelated re-authentication warning; the help center searched
-  // for the warning and the customer's request to add inboxes was dropped.
-  // Asked the other way round ("does it ask about the screen?") Jev scored
-  // that message 0.72 and "what does this mean?" 0.85: no line between them.
-  // Asked this way: 0.76 against 0.16 to 0.22 (AI Gateway, 2026-09-26).
-  screenshot_shows_where: {
-    instructions:
-      "The customer sent the screenshot to show which page they have reached while following Support's earlier steps, and wants the next step there. Their latest message does not mention or ask about an error, warning or status on the screen.",
-    type: "noul",
-  },
 } as const;
 
 const responseSchema = z.object({
@@ -300,6 +305,7 @@ const responseSchema = z.object({
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
+    continues_steps: z.object({ noul: z.number().min(0).max(1) }).optional(),
     depends_on_previous: z
       .object({ noul: z.number().min(0).max(1) })
       .optional(),
@@ -313,9 +319,6 @@ const responseSchema = z.object({
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
     returns_to_earlier_ask: z
-      .object({ noul: z.number().min(0).max(1) })
-      .optional(),
-    screenshot_shows_where: z
       .object({ noul: z.number().min(0).max(1) })
       .optional(),
   }),
@@ -342,6 +345,8 @@ export interface WidgetRoute {
   /** The customer is reporting a bug, so the app offers a screen recording. */
   bug?: boolean;
   confidence: number;
+  /** How likely the latest message says how far the customer got in the previous reply's steps and asks what next. */
+  continuesSteps?: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
   /** How likely the latest message only continues the previous reply. */
@@ -355,8 +360,6 @@ export interface WidgetRoute {
   refund?: boolean;
   /** How likely the latest message goes back to an earlier, unfinished request. */
   returnsToEarlierAsk?: number;
-  /** How likely the screenshot only shows where the customer is, not what they ask about. */
-  screenshotContext?: number;
   source: "jev" | "fallback";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
@@ -458,6 +461,7 @@ export async function routeWidgetMessage(
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
       confidence,
+      continuesSteps: answers.continues_steps?.noul ?? 0,
       explainsPrevious: answers.explains_previous?.noul ?? 0,
       followUp: answers.depends_on_previous?.noul ?? 0,
       // Jev may omit the per-lane probabilities; the winner's confidence stands in.
@@ -468,9 +472,6 @@ export async function routeWidgetMessage(
       // human lane skips the investigation, so a wrong guess costs the customer an answer.
       lane: supportedLane(answers),
       returnsToEarlierAsk: answers.returns_to_earlier_ask?.noul ?? 0,
-      ...(answers.screenshot_shows_where
-        ? { screenshotContext: answers.screenshot_shows_where.noul }
-        : {}),
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };
@@ -543,7 +544,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)} returns=${(route.returnsToEarlierAsk ?? 0).toFixed(2)}${route.screenshotContext === undefined ? "" : ` screenshotContext=${route.screenshotContext.toFixed(2)}`}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)} returns=${(route.returnsToEarlierAsk ?? 0).toFixed(2)} continues=${(route.continuesSteps ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
     runId: fields.runId,
   });
 }

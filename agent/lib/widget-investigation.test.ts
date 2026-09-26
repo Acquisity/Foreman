@@ -3,7 +3,13 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { detourReading, detourTurns } from "./widget-detour.fixture.js";
+import {
+  detourReading,
+  detourTurns,
+  stepsLatest,
+  stepsReading,
+  stepsTurns,
+} from "./widget-detour.fixture.js";
 import type { GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
@@ -2186,13 +2192,62 @@ test("a message that goes back to an earlier request drops the detour's articles
   }
 });
 
-test("a screenshot is context for the request only when the router says the message does not ask about it", async (t) => {
+// Preview 5fc15d15: "i found the cold email agent where do i go from here?"
+// scored followUp 0.19 and the screenshot 0.47, so its checklist was answered.
+// Scores are the ones measured through the AI Gateway on 2026-09-26.
+test("a message that says how far the customer got in the previous reply's steps keeps those articles and treats its screenshot as where they are", async (t) => {
   enabled(t);
-  for (const [screenshotContext, screenshots, context] of [
-    [0.8, [detourReading], true],
-    [0.2, [detourReading], false],
-    [undefined, [detourReading], false],
-    [0.8, undefined, false],
+  const errorReading =
+    "Email Accounts page. Warning banner: 'Google needs re-authentication'.";
+  for (const [name, history, question, screenshots, scores, want] of [
+    [
+      "5fc15d15 found the agent",
+      stepsTurns,
+      stepsLatest,
+      [stepsReading],
+      { continuesSteps: 0.72, followUp: 0.15, returnsToEarlierAsk: 0.11 },
+      { context: true, continues: true, followUp: true, returns: false },
+    ],
+    [
+      "741aab58 ok im here",
+      detourTurns.slice(0, 2),
+      "ok im here. now what?",
+      [detourReading],
+      { continuesSteps: 0.85, followUp: 0.8, returnsToEarlierAsk: 0.46 },
+      { context: true, continues: true, followUp: true, returns: false },
+    ],
+    [
+      "741aab58 reconnected: going back wins",
+      detourTurns.slice(0, 6),
+      "ah ok. ok i reconnected now what?",
+      [detourReading],
+      { continuesSteps: 0.75, followUp: 0.72, returnsToEarlierAsk: 0.85 },
+      { context: true, continues: false, followUp: false, returns: true },
+    ],
+    [
+      "error screenshot: what does this mean?",
+      detourTurns.slice(0, 2),
+      "what does this mean?",
+      [errorReading],
+      { continuesSteps: 0.27, followUp: 0.12, returnsToEarlierAsk: 0.09 },
+      { context: false, continues: false, followUp: false, returns: false },
+    ],
+    [
+      "error screenshot: how do i fix this?",
+      detourTurns.slice(0, 2),
+      "how do i fix this?",
+      [errorReading],
+      { continuesSteps: 0.29, followUp: 0.17, returnsToEarlierAsk: 0.11 },
+      { context: false, continues: false, followUp: false, returns: false },
+    ],
+    [
+      "new topic",
+      detourTurns.slice(0, 2),
+      "how do I change my sender name?",
+      undefined,
+      { continuesSteps: 0.1, followUp: 0.04, returnsToEarlierAsk: 0.04 },
+      { context: false, continues: false, followUp: false, returns: false },
+    ],
   ] as const) {
     const { deps } = dependencies();
     deps.route = () =>
@@ -2200,7 +2255,7 @@ test("a screenshot is context for the request only when the router says the mess
         ...followUpBase,
         confidence: 0.9,
         kbScore: 0.9,
-        ...(screenshotContext === undefined ? {} : { screenshotContext }),
+        ...scores,
       });
     let got: WidgetAsk | undefined;
     deps.answerKb = (ask) => {
@@ -2211,17 +2266,26 @@ test("a screenshot is context for the request only when the router says the mess
     await receiveWidgetMessage(
       request({
         ...start,
-        history: detourTurns.slice(0, 2),
+        history: [...history],
         message_id: crypto.randomUUID(),
-        question: "ok im here. now what?",
-        ...(screenshots ? { screenshots } : {}),
+        question,
+        ...(screenshots ? { screenshots: [...screenshots] } : {}),
       }),
       noWork(),
       200,
       verify,
       deps
     );
-    assert.equal(got?.screenshotIsContext === true, context);
+    assert.deepEqual(
+      {
+        context: got?.screenshotIsContext === true,
+        continues: got?.continuesSteps === true,
+        followUp: got?.followUp === true,
+        returns: got?.returnsToEarlierAsk === true,
+      },
+      want,
+      name
+    );
   }
 });
 
