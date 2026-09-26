@@ -1,0 +1,1 @@
+ALTER TABLE widget_support_runs ADD COLUMN progress jsonb;

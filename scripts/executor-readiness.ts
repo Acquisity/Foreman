@@ -6,7 +6,9 @@ import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js"
 import { toolkitPolicyMatches } from "../agent/lib/executor/toolkit-policy.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
-const support = process.argv.includes("--support");
+const flagged = ["widget", "support"].find((flag) =>
+  process.argv.includes(`--${flag}`)
+);
 const manifestSchema = z.object({
   toolkit: z.object({
     connectionPolicies: z
@@ -20,10 +22,7 @@ const manifestSchema = z.object({
 const manifest = manifestSchema.parse(
   JSON.parse(
     await readFile(
-      new URL(
-        support ? "support-toolkit-manifest.json" : "toolkit-manifest.json",
-        root
-      ),
+      new URL(`${flagged ? `${flagged}-` : ""}toolkit-manifest.json`, root),
       "utf8"
     )
   )

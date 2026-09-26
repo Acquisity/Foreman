@@ -9,9 +9,26 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 export const MODELS = {
   // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
+  // Support widget egress gate and composer: never investigates. On the same
+  // DeepSeek id as the orchestrator so it rides the working gateway routing;
+  // callers must apply gatewayRouting(id) since it is a deepseek/ model.
+  gate: "deepseek/deepseek-v4-pro-0813",
+  // Support widget knowledge-base lane: one grounded answer over a few public
+  // help articles, where time to reply matters more than reasoning depth.
+  kb: "google/gemini-3.5-flash-lite",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
+  // Support widget diagnosis: the investigator's write-up of what the evidence
+  // shows, a question for the customer, and the reply. It runs once or twice an
+  // investigation. Measured through the gateway 2026-09-23 on a full-size
+  // write-up: sonnet-5 12 to 20s, haiku-4.5 10 to 16s, the orchestrator's
+  // deepseek 39 to 41s, which with a deepseek call on every step ran 3 of 14
+  // investigations past the widget deadline. The egress reviewer stays on `gate`.
+  widget: "anthropic/claude-sonnet-5",
+  // Support widget steps: Jev picks each read, so this only fills in its
+  // arguments. ~1s a call; gemini-3.5-flash took ~15s a call the same afternoon.
+  widgetSteps: "anthropic/claude-haiku-4.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;
@@ -112,6 +129,18 @@ export const gatewayRouting = (modelId: string) =>
         },
       }
     : undefined;
+
+// For calls that reformat or summarise text they were handed rather than reason
+// about it. Measured on the support widget: on its defaults the fast model spends
+// about 90% of its output on hidden reasoning (8 to 12s a call); with reasoning
+// minimal the same call takes 1 to 3s with the same result. Providers that do not
+// recognise the option ignore it, so a slot override stays safe.
+export const fastCallOptions = (modelId: string) => ({
+  providerOptions: {
+    ...gatewayRouting(modelId)?.providerOptions,
+    google: { thinkingConfig: { thinkingLevel: "minimal" } },
+  },
+});
 
 // The gateway catalog, through the same authenticated provider eve's model calls use.
 // set_agent_models checks membership here before storing an id: a stored id the gateway
