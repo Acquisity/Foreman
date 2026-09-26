@@ -8,7 +8,13 @@ import {
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { askJev, type SelectorOptions } from "./widget-next-action.js";
-import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
+import {
+  DECISION_CONTEXT,
+  RECORDING_RULE,
+  recentTurns,
+  toAsk,
+  type WidgetAsk,
+} from "./widget-router.js";
 
 /**
  * The fast lane for general product questions: search the public help center,
@@ -27,7 +33,7 @@ import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
  */
 
 const MAX_ARTICLES = 4;
-/** How many previously cited articles ride along with a follow-up's fresh retrieval. */
+/** How many previously cited articles ride along with every fresh retrieval. */
 const MAX_ACTIVE_ARTICLES = 2;
 const INDEX_TIMEOUT_MS = 5000;
 const CHAT_TIMEOUT_MS = 12_000;
@@ -44,9 +50,25 @@ const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
+/** How Acquisity words a message that is only a screenshot (apps/web lib/support/foreman-reply.ts). */
+const SCREENSHOT_ONLY = /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
+const WORD = /[\p{L}\p{N}]/u;
 
-const TEXT_ONLY =
-  "The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. They cannot attach files or recordings of any other kind here. When the message carries a screenshot reading, it is the one source besides the articles you may use: when what it shows changes the answer, for example they are already on the page they are asking about or it shows an error, say so in a few words first, then answer from the articles. Never describe anything the reading does not say.";
+const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
+
+/**
+ * Every stage of this lane reads the conversation as a chat transcript, oldest
+ * first and the latest message last, with a screenshot labelled the way the app
+ * labels it in history. Latest-first with the rest marked "context only", a
+ * screenshot's warning outranked the customer's own request two turns earlier.
+ * The decision budget, not the one-line reply budget: four turns lost the
+ * customer's own request two detours later ("where can i add new inboxes").
+ */
+export const renderTranscript = (ask: WidgetAsk): string =>
+  [
+    ...recentTurns(ask.turns, DECISION_CONTEXT),
+    `Customer: ${[ask.latest, ...(ask.screenshots ?? []).map((reading) => `Screenshot reading: ${reading}`)].join("\n\n")}`,
+  ].join("\n");
 
 export const kbCitationSchema = z.object({
   n: z.number().int().positive(),
@@ -116,7 +138,7 @@ const guardedAnswerSchema = z.object({
   ...answerSchema.shape,
 });
 
-const LATEST_SUBJECT = `The input may carry a labelled LATEST CUSTOMER MESSAGE followed by EARLIER TURNS. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
+const LATEST_SUBJECT = `The input is the support conversation so far, oldest first, ending with the customer's latest message. Work out what the customer is trying to do from the whole conversation, the way a support person reading the chat would. A screenshot reading shows where the customer is on the way there: a warning or error on it is not what they are asking about unless their message asks about it. When the latest message itself asks about something new (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that new subject.`;
 
 const WHICH_PRODUCT =
   "When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ";
@@ -164,8 +186,8 @@ export type KbDecision = (typeof KB_DECISIONS)[number];
 
 const decisionCriteria = (accountLikely: boolean) => ({
   answer: accountLikely
-    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). A message that asks Support to check, look at or look into their own account is NOT this, even when it also says what went wrong."
-    : "The numbered articles answer the latest message: how to do something, where something is, what something means, or why the product in general behaves some way. It is still this when the message says 'my account' or 'my workspace', because the articles' general steps answer it.",
+    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). It is also this when the message asks where to go next or is only a screenshot, and an article gives the next step of what the customer was already doing. A message that asks Support to check, look at or look into their own account is NOT this, even when it also says what went wrong."
+    : "The numbered articles answer the latest message: how to do something, where something is, what something means, or why the product in general behaves some way. It is still this when the message says 'my account' or 'my workspace', because the articles' general steps answer it, and when it asks where to go next or is only a screenshot, and an article gives the next step of what the customer was already doing.",
   not_covered:
     "None of the numbered articles covers what the latest message asks. An article about a nearby topic, or one that only mentions the subject in passing, does not count.",
   which_product:
@@ -256,11 +278,11 @@ export const KB_MISS_FALLBACK =
 // No retrieval and no account data, like CHAT_PROMPT, so nothing to gate.
 export const CLARIFY_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message does not say clearly what they need help with. Ask ONE short, friendly question that gets what you need: which part of the product it is about, and what they expected versus what happened. If they sound frustrated, acknowledge it in a few words first. If the message could mean a few specific things, such as which limit or which charge, offer those as options. State no product facts, guess nothing about their account, and make no promises. Plain text, no sign-off, no em dashes. ${TEXT_ONLY}`;
 
-export const EXPLAIN_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks what Support's previous answer meant. Answer in one to three short, plain sentences using only what Support already said in the earlier turns: explain it, confirm it or spell out what it does and does not show. Keep its certainty exactly: something not recorded stays not recorded, which is not the same as it not having happened, and something that could not be checked stays unchecked. Add no fact, number, cause, step or promise that the earlier turns do not contain, and never say that nothing needs changing or that everything is fine unless Support already said a live check showed it. If the message asks you to check again, to check anything else, or needs anything the earlier turns do not contain, or the previous answer is cut off, reply with an empty string.`;
+export const EXPLAIN_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks what Support's previous answer meant. Answer in one to three short, plain sentences using only what Support already said in the earlier turns: explain it, confirm it or spell out what it does and does not show. Keep its certainty exactly: something not recorded stays not recorded, which is not the same as it not having happened, and something that could not be checked stays unchecked. Add no fact, number, cause, step or promise that the earlier turns do not contain, and never say that nothing needs changing or that everything is fine unless Support already said a live check showed it. If the message asks you to check again, to check anything else, or needs anything the earlier turns do not contain, or the previous answer is cut off, reply with an empty string. ${RECORDING_RULE}`;
 
 const chatSchema = z.object({ reply: z.string() });
 
-const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes.`;
+const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes. ${RECORDING_RULE}`;
 
 /**
  * A short conversational reply to a message that asks nothing. No retrieval, no
@@ -321,6 +343,8 @@ export interface KbDeps {
     /** Jev chose to answer: write, decide nothing. */
     decided?: boolean;
     question: string;
+    /** See {@link WidgetAsk.recordingOffered}; absent, the writer is told false. */
+    recordingOffered?: boolean;
     signal: AbortSignal;
   }) => Promise<unknown>;
   /** Every article's id and title, or null where the web app has no index route yet. */
@@ -348,6 +372,7 @@ export const defaultKbDeps: KbDeps = {
     cannotCheck,
     decided,
     question,
+    recordingOffered,
     signal,
   }) {
     const model = await resolveModel("kb");
@@ -361,6 +386,7 @@ export const defaultKbDeps: KbDeps = {
           title: article.title,
         })),
         question,
+        recordingOffered: recordingOffered === true,
       }),
       ...fastCallOptions(model),
       schema: accountLikely ? guardedAnswerSchema : answerSchema,
@@ -439,7 +465,7 @@ export const defaultKbDeps: KbDeps = {
       abortSignal: signal,
       model: gateway(model),
       // The listing comes first so the long, stable prefix can be cached.
-      prompt: `${index.map(indexLine).join("\n")}\n\nCustomer question: ${question}`,
+      prompt: `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
       ...fastCallOptions(model),
       schema: selectSchema,
       system: SELECT_PROMPT,
@@ -724,7 +750,7 @@ export async function answerFromHelpCenter(
   deps: KbDeps = defaultKbDeps
 ): Promise<KbAnswer | null> {
   const ask = toAsk(input);
-  const question = renderAsk(ask);
+  const question = renderTranscript(ask);
   const startedAt = Date.now();
   const signal = AbortSignal.timeout(KB_TIMEOUT_MS);
   const finish = (outcome: string, detail: string) =>
@@ -732,6 +758,15 @@ export async function answerFromHelpCenter(
       ...log,
       message: `${detail} ms=${Date.now() - startedAt}`,
       outcome,
+    });
+  // Which articles were read and cited, on a line of their own: the answer's
+  // line already fills most of the log's 200-character message.
+  let read: string[] = [];
+  const logArticles = (cited: { url: string }[]) =>
+    logOpsEvent("widget.kb.answer", {
+      ...log,
+      message: `read=${read.join(",")} cited=${cited.map((hit) => helpArticleSlug(hit.url) ?? hit.url).join(",")}`,
+      outcome: "articles",
     });
   const marks: string[] = [];
   let lap = startedAt;
@@ -746,6 +781,9 @@ export async function answerFromHelpCenter(
     const articles = (
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
+    read = articles.map(
+      (article) => helpArticleSlug(article.url) ?? article.url
+    );
     mark("read");
     const decided =
       (await deps
@@ -772,6 +810,7 @@ export async function answerFromHelpCenter(
       cannotCheck,
       decided: Boolean(decided),
       question,
+      recordingOffered: ask.recordingOffered,
       signal,
     });
     mark("generate");
@@ -805,22 +844,29 @@ export async function answerFromHelpCenter(
     );
   };
   try {
-    // A dependent follow-up also reads what the previous reply cited, but never
-    // instead of a fresh retrieval: "and if the chat bubble is missing?" scored as
-    // a follow-up, was answered from the ticket-status article alone and cited it.
-    // Fresh hits lead, so the latest message outweighs the earlier citation.
+    // Every message also reads what the previous reply cited, whatever the
+    // router made of it: "where do i go from here?" with a screenshot scored 0.25
+    // as a follow-up, was read without the buying guides it continued, and
+    // missed. Never instead of a fresh retrieval: "and if the chat bubble is
+    // missing?" answered from the ticket-status article alone. Fresh hits lead,
+    // so the latest message outweighs the earlier citation.
     const [active, { hits: fresh, via }] = await Promise.all([
-      ask.followUp ? activeArticleHits(ask, signal, deps) : [],
+      activeArticleHits(ask, signal, deps),
       findArticles(question, signal, deps),
     ]);
     const kept = active
       .filter((hit) => !fresh.some((found) => found.url === hit.url))
       .slice(0, MAX_ACTIVE_ARTICLES);
-    mark(`active=${kept.length} find:${via}`);
-    const result = await attempt([
-      ...fresh.slice(0, MAX_ARTICLES - kept.length),
-      ...kept,
-    ]);
+    const picked = fresh.slice(0, MAX_ARTICLES - kept.length);
+    // With no words of its own, the latest message has only its screenshot to
+    // pick by, and a warning on it outranked the guides being followed: every
+    // screenshot-only follow-up to "buy inboxes" was answered with Reconnect.
+    const wordless = !WORD.test(ask.latest.replace(SCREENSHOT_ONLY, ""));
+    mark(`active=${kept.length}${wordless ? ":first" : ""} find:${via}`);
+    const result = await attempt(
+      wordless ? [...kept, ...picked] : [...picked, ...kept]
+    );
+    logArticles("message" in result ? result.citations : []);
     if (!("message" in result)) {
       finish(
         "miss",

@@ -8,7 +8,12 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { LIMITATION_POLICY, reviewWidgetFindings } from "./widget-review.js";
+import {
+  judgeBudgetMs,
+  LIMITATION_POLICY,
+  reviewWidgetFindings,
+} from "./widget-review.js";
+import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
@@ -27,6 +32,8 @@ export interface GateDeps {
     findings: ComposerInput;
     organizationName: string;
     question: string;
+    /** The app shows its screen recording card under this reply (the run's `request_recording`). */
+    recordingOffered: boolean;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
   }) => Promise<string>;
@@ -38,6 +45,8 @@ export interface GateDeps {
     scope: WidgetContext;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
+    /** When that deadline passes (epoch ms), so the judge can leave the composer its time. */
+    finishAt?: number;
   }) => Promise<{ decision: GateDecision; reason: string; remove?: number[] }>;
   resolve: (
     scope: WidgetContext,
@@ -81,8 +90,9 @@ const PUBLIC_HOSTS = new Set([
   "docs.acquisity.ai",
 ]);
 const FOREIGN_PREFIX = "foreign_identifier:";
-/** How many foreign identifiers the gate deletes items for before it gives up and blocks. */
-const MAX_FOREIGN_PASSES = 5;
+const INTERNAL_PREFIX = "internal_artifact:";
+/** How many foreign identifiers or internal artifacts the gate deletes items for before it gives up and blocks. */
+const MAX_REMOVAL_PASSES = 5;
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -264,7 +274,7 @@ async function deterministicTextReason(
 ): Promise<string | null> {
   const { candidates, internal } = scanIdentifiers(text, exemptTicketId);
   if (internal.length) {
-    return `internal_artifact:${internal[0]}`;
+    return `${INTERNAL_PREFIX}${internal[0]}`;
   }
   const domains = candidates.domains ?? [];
   if (
@@ -416,7 +426,7 @@ ${LIMITATION_POLICY}
 Also remove an item that tells the customer to buy again, place a new order or pay again while the findings leave the original payment or delivery unresolved, and an item that promises sending or other activity will resume.
 Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
 
-const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. Never add a product step the findings do not give. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give only the article-backed steps already present in the findings. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When the findings lack applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have reported this to the engineering team as a ticket, without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and say you will report it to engineering if that shows a fault on our side; this is the one allowed exception to the rule against promises, because it happens in this chat when they reply, not later. If confidence is low, say what is uncertain. The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. They cannot attach files or recordings of any other kind here. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No greetings, no sign-off, no em dashes.`;
+const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. Never add a product step the findings do not give. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give only the article-backed steps already present in the findings. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When the findings lack applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have reported this to the engineering team as a ticket, without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and say you will report it to engineering if that shows a fault on our side; this is the one allowed exception to the rule against promises, because it happens in this chat when they reply, not later. If confidence is low, say what is uncertain. The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the findings come from a screen recording the customer already sent, call it their screen recording, never name the service that made it or link to it, and do not ask for another one. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No greetings, no sign-off, no em dashes.`;
 
 // The judge returns a verdict and, for a rewrite, the numbers of the items to
 // remove. It used to return the findings themselves, and re-emitted every one of
@@ -477,11 +487,9 @@ const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
 
 /**
  * A stalled model call must fail closed as gate_unavailable, not hold the reply
- * past the app's last poll. The app stops polling 285s after it sends and an
- * investigation may run to its 170s deadline, so the finish (extract, judge,
- * compose) has about 115s; the extractor gets 25s of it.
+ * past the app's last poll. The judge gets what the finish has left less the
+ * composer's time (see `judgeBudgetMs`).
  */
-const JUDGE_TIMEOUT_MS = 60_000;
 const COMPOSE_TIMEOUT_MS = 25_000;
 
 export const defaultGateDeps: GateDeps = {
@@ -490,6 +498,7 @@ export const defaultGateDeps: GateDeps = {
     findings,
     organizationName,
     question,
+    recordingOffered,
     signal,
   }) {
     const model = await resolveModel("widget");
@@ -501,6 +510,7 @@ export const defaultGateDeps: GateDeps = {
         askedForChange: askedForChange === true,
         findings,
         question,
+        recordingOffered,
         workspace: organizationName,
       }),
       system: COMPOSER_PROMPT,
@@ -510,7 +520,10 @@ export const defaultGateDeps: GateDeps = {
   judge: (input) =>
     process.env.WIDGET_REVIEWER === "jev"
       ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(input, within(JUDGE_TIMEOUT_MS, input.signal)),
+      : modelJudge(
+          input,
+          within(judgeBudgetMs(input.finishAt, Date.now()), input.signal)
+        ),
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
@@ -562,6 +575,34 @@ export function withoutTicketRefs(
   return cites.length ? removeItems(findings, cites) : findings;
 }
 
+/** The items holding a scan's foreign identifier or internal artifact, or null for any other reason. */
+function itemsCarrying(
+  findings: WidgetFindings,
+  reason: string | null
+): number[] | null {
+  const foreign = reason?.startsWith(FOREIGN_PREFIX)
+    ? reason.slice(FOREIGN_PREFIX.length)
+    : null;
+  const artifact = reason?.startsWith(INTERNAL_PREFIX)
+    ? reason.slice(INTERNAL_PREFIX.length)
+    : null;
+  const found = foreign ?? artifact;
+  if (found === null) {
+    return null;
+  }
+  return redactableItems(findings)
+    .filter((item) => {
+      const { candidates, internal } = scanIdentifiers(
+        item.text,
+        findings.ticket?.id
+      );
+      return foreign === null
+        ? internal.includes(found)
+        : Object.values(candidates).some((ids) => ids.includes(found));
+    })
+    .map((item) => item.n);
+}
+
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
 export async function gate(
   scope: WidgetContext,
@@ -576,7 +617,11 @@ export async function gate(
    * The run's remaining finish deadline. Every ownership read and model call
    * runs under it, and once it passes the gate fails closed as gate_unavailable.
    */
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Whether the app shows its screen recording card under this reply. */
+  recordingOffered = false,
+  /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
+  finishAt?: number
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
   const timings: Record<string, number> = {};
@@ -596,27 +641,13 @@ export async function gate(
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
-    // does not own never reaches the customer, but the item carrying it is
-    // deleted rather than the whole reply: nothing is reworded, and the scan runs
-    // again on what is left. It still blocks when nothing would be left or the
-    // identifier sits outside the removable items.
-    for (
-      let pass = 0;
-      reason?.startsWith(FOREIGN_PREFIX) && pass < MAX_FOREIGN_PASSES;
-      pass += 1
-    ) {
-      const foreign = reason.slice(FOREIGN_PREFIX.length);
-      const trimmed = removeItems(
-        findings,
-        redactableItems(findings)
-          .filter((item) => {
-            const { candidates } = scanIdentifiers(item.text);
-            return Object.values(candidates).some((ids) =>
-              ids.includes(foreign)
-            );
-          })
-          .map((item) => item.n)
-      );
+    // does not own, or an internal artifact, never reaches the customer, but the
+    // item carrying it is deleted rather than the whole reply: nothing is
+    // reworded, and the scan runs again on what is left. It still blocks when
+    // nothing would be left or the finding sits outside the removable items.
+    for (let pass = 0; pass < MAX_REMOVAL_PASSES; pass += 1) {
+      const carrying = itemsCarrying(findings, reason);
+      const trimmed = carrying && removeItems(findings, carrying);
       if (!trimmed) {
         break;
       }
@@ -638,6 +669,7 @@ export async function gate(
     const verdict = await timed("judge", () =>
       deps.judge({
         findings,
+        finishAt,
         items: redactableItems(findings),
         question,
         scope,
@@ -673,6 +705,7 @@ export async function gate(
         findings: composerInput(gated),
         organizationName: scope.organizationName,
         question: conversation,
+        recordingOffered,
         signal,
       })
     );

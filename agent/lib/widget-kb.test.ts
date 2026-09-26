@@ -9,6 +9,7 @@ import {
   indexLine,
   type KbDeps,
   mergeHits,
+  renderTranscript,
   resolveCitations,
 } from "./widget-kb.js";
 
@@ -144,7 +145,7 @@ test("the message is searched as keyword queries, and as itself when the rewrite
     ...recording,
     rewrite: () => Promise.reject(new Error("gateway down")),
   });
-  assert.deepEqual(searched, ["how do i add inboxes?"]);
+  assert.deepEqual(searched, ["Customer: how do i add inboxes?"]);
 });
 
 test("articles are picked from the title index, with keyword search only as the fallback", async () => {
@@ -214,62 +215,79 @@ test("a reaction gets a short conversational reply with no citations, not an inv
 
 const grounded = { answer: "Next, set your hours [1].", kind: "answer" };
 
-test("a dependent follow-up reads the article the previous reply cited alongside a fresh retrieval, fresh first", async () => {
-  const given: string[][] = [];
-  const result = await answerFromHelpCenter(
-    {
-      activeArticles: [articles[0]],
-      followUp: true,
-      latest: "okay, what next?",
-    },
-    log,
-    {
-      ...deps(null, [articles[2]]),
-      generate: ({ articles: read }) => {
-        given.push(read.map((a) => a.url));
-        return Promise.resolve({
-          answer: "Set your hours [2].",
-          kind: "answer",
-        });
-      },
-    }
-  );
-  assert.deepEqual(given, [[articles[2].url, articles[0].url]]);
-  assert.deepEqual(
-    result?.citations.map((c) => c.url),
-    [articles[0].url]
-  );
-});
-
-test("a new subject outweighs the previous citation: scored a follow-up or not, the fresh article is read and cited", async () => {
-  const [ticketStatus, , widgetMissing] = articles;
-  for (const followUp of [true, false]) {
-    // biome-ignore lint/performance/noAwaitInLoops: two independent cases.
+for (const [latest, screenshots, carriedFirst] of [
+  ["okay, what next?", undefined, false],
+  // A screenshot with no text, as the app words it, and one sent with just "?":
+  // nothing to pick by but the screenshot, so the guides being followed lead.
+  [
+    "(The customer sent only the screenshot below, with no message.)",
+    ["Screen: All Campaigns"],
+    true,
+  ],
+  ["?", ["Screen: All Campaigns"], true],
+] as const) {
+  test(`every message reads the articles the previous reply cited alongside a fresh retrieval, and Jev decides with both: ${latest}`, async () => {
+    const given: string[][] = [];
+    const decided: string[][] = [];
     const result = await answerFromHelpCenter(
       {
-        activeArticles: [ticketStatus],
-        followUp,
-        latest:
-          "And if the support chat bubble itself is missing, what should I try first?",
+        activeArticles: [articles[0]],
+        latest,
+        ...(screenshots ? { screenshots: [...screenshots] } : {}),
       },
       log,
       {
-        ...deps(null, [widgetMissing]),
+        ...deps(null, [articles[2]]),
+        decide: ({ articles: read }) => {
+          decided.push(read.map((a) => a.url));
+          return Promise.resolve({ choice: "answer", confidence: 0.9 });
+        },
         generate: ({ articles: read }) => {
-          // The fresh hit always leads, so the model is never left with only the old article.
-          assert.equal(read[0].url, widgetMissing.url);
+          given.push(read.map((a) => a.url));
           return Promise.resolve({
-            answer: "Check your ad blocker [1].",
+            answer: `Set your hours [${carriedFirst ? 1 : 2}].`,
             kind: "answer",
           });
         },
       }
     );
+    const [fresh, carried] = [articles[2].url, articles[0].url];
+    assert.deepEqual(given, [
+      carriedFirst ? [carried, fresh] : [fresh, carried],
+    ]);
+    assert.deepEqual(decided, given);
     assert.deepEqual(
       result?.citations.map((c) => c.url),
-      [widgetMissing.url]
+      [articles[0].url]
     );
-  }
+  });
+}
+
+test("a new subject outweighs the previous citation: the fresh article is read first and cited", async () => {
+  const [ticketStatus, , widgetMissing] = articles;
+  const result = await answerFromHelpCenter(
+    {
+      activeArticles: [ticketStatus],
+      latest:
+        "And if the support chat bubble itself is missing, what should I try first?",
+    },
+    log,
+    {
+      ...deps(null, [widgetMissing]),
+      generate: ({ articles: read }) => {
+        // The fresh hit always leads, so the model is never left with only the old article.
+        assert.equal(read[0].url, widgetMissing.url);
+        return Promise.resolve({
+          answer: "Check your ad blocker [1].",
+          kind: "answer",
+        });
+      },
+    }
+  );
+  assert.deepEqual(
+    result?.citations.map((c) => c.url),
+    [widgetMissing.url]
+  );
 });
 
 test("prior citations are hints only: foreign, malformed and unlisted urls never become something to read", async () => {
@@ -313,11 +331,10 @@ test("the selector sees path, description and keywords, bounded, and an older in
 });
 
 test("a timeout or error reports a technical failure instead of a missing guide", async () => {
-  const result = await answerFromHelpCenter(
-    { followUp: true, latest: "what next?" },
-    log,
-    { ...deps(grounded), generate: () => Promise.reject(new Error("timeout")) }
-  );
+  const result = await answerFromHelpCenter({ latest: "what next?" }, log, {
+    ...deps(grounded),
+    generate: () => Promise.reject(new Error("timeout")),
+  });
   assert.deepEqual(result, {
     citations: [],
     message:
@@ -507,4 +524,57 @@ test("help-center mode answers an ask for a look from the articles, saying first
     ),
     null
   );
+});
+test("each answer logs which articles it read and which it cited", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  await answerFromHelpCenter(
+    "how do i set up ai sdr?",
+    log,
+    deps({ answer: "Open setup [2].", kind: "answer" })
+  );
+  const logged = lines
+    .map((line) => JSON.parse(line))
+    .find((line) => line.outcome === "articles");
+  assert.equal(
+    logged?.message,
+    "read=ai-sdr/setup,ai-sdr/settings,availability cited=ai-sdr/settings"
+  );
+  assert.equal(logged?.event, "widget.kb.answer");
+  assert.equal(logged?.runId, "r");
+});
+
+// Preview cf5f2208: "where do i go from here?" with a screenshot of a Google
+// re-authentication warning, two turns after "can i buy more inboxes", was
+// answered with Reconnect. Latest-first, with the goal marked "context only".
+test("every stage reads the conversation as a transcript, latest message last with its screenshot labelled as in history", async () => {
+  const ask = {
+    latest: "where do i go from here?",
+    screenshots: ["Screen: All Campaigns"],
+    turns: [
+      { role: "customer" as const, text: "can i buy more inboxes?" },
+      { role: "assistant" as const, text: "Open Email Accounts [1]." },
+    ],
+  };
+  const transcript =
+    "Customer: can i buy more inboxes?\nSupport: Open Email Accounts [1].\nCustomer: where do i go from here?\n\nScreenshot reading: Screen: All Campaigns";
+  assert.equal(renderTranscript(ask), transcript);
+  const seen: string[] = [];
+  const base = deps({ answer: "Click Add New Inboxes [1].", kind: "answer" });
+  await answerFromHelpCenter(ask, log, {
+    ...base,
+    decide: ({ question }) => {
+      seen.push(question);
+      return Promise.resolve({ choice: "answer", confidence: 1 });
+    },
+    generate: (input) => {
+      seen.push(input.question);
+      return base.generate(input);
+    },
+    rewrite: (question, signal) => {
+      seen.push(question);
+      return base.rewrite(question, signal);
+    },
+  });
+  assert.deepEqual(seen, [transcript, transcript, transcript]);
 });

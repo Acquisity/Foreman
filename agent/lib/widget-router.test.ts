@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   asksForChange,
   DECISION_CONTEXT,
+  offersRecording,
   renderAsk,
   routeWidgetMessage,
 } from "./widget-router.js";
@@ -38,7 +39,6 @@ describe("routeWidgetMessage", () => {
       asksOwnData: 0.91,
       confidence: 0.87,
       explainsPrevious: 0,
-      followUp: 0,
       kbScore: 0,
       lane: "investigate",
       source: "jev",
@@ -53,10 +53,10 @@ describe("routeWidgetMessage", () => {
       "asks_for_refund",
       "asks_for_ticket",
       "asks_own_data",
-      "depends_on_previous",
       "explains_previous",
       "is_unclear",
       "lane",
+      "offers_recording",
       "reports_bug",
     ]);
     assert.equal(
@@ -160,6 +160,36 @@ describe("routeWidgetMessage", () => {
       fetch: bugReply({}, 0.2),
     });
     assert.equal(howTo.bug, undefined);
+  });
+
+  it("flags an ask or offer to send a recording when Jev says so, typos included", async () => {
+    const recordingReply = (offers: number) => () =>
+      Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              asks_for_human: { noul: 0.04 },
+              asks_own_data: { noul: 0.2 },
+              lane: { choice: "kb", confidence: 0.8 },
+              offers_recording: { noul: offers },
+              reports_bug: { noul: 0.1 },
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    const message = "i found a bug can i send a screen reco0rding";
+    const asked = await routeWidgetMessage(message, {
+      apiKey: "test-key",
+      fetch: recordingReply(0.96),
+    });
+    assert.equal(asked.recording, true);
+    assert.equal(asked.lane, "kb");
+    const notAsked = await routeWidgetMessage(
+      "how do I record a video in the app builder",
+      { apiKey: "test-key", fetch: recordingReply(0.25) }
+    );
+    assert.equal(notAsked.recording, undefined);
   });
 
   it("investigates a refund request as a ticket, unless the customer asked for a person", async () => {
@@ -279,7 +309,7 @@ describe("routeWidgetMessage", () => {
     assert.equal(renderAsk("hello"), "hello");
 
     let sent = "";
-    const route = await routeWidgetMessage(
+    await routeWidgetMessage(
       { latest: "okay, what next?", turns },
       {
         apiKey: "test-key",
@@ -291,7 +321,6 @@ describe("routeWidgetMessage", () => {
                 answers: {
                   asks_for_human: { noul: 0 },
                   asks_own_data: { noul: 0.1 },
-                  depends_on_previous: { noul: 0.93 },
                   lane: { choice: "kb", confidence: 0.8 },
                 },
               }),
@@ -306,7 +335,6 @@ describe("routeWidgetMessage", () => {
       sent,
       renderAsk({ latest: "okay, what next?", turns }, DECISION_CONTEXT)
     );
-    assert.equal(route.followUp, 0.93);
   });
 });
 
@@ -363,5 +391,27 @@ describe("asksForChange", () => {
       }),
       false
     );
+  });
+});
+
+describe("offersRecording", () => {
+  it("catches an ask or offer to send a recording", () => {
+    for (const message of [
+      "Can I send you a screen recording?",
+      "I can screen-record it for you",
+      "want me to record my screen?",
+      "I'll share a quick video of what happens",
+    ]) {
+      assert.equal(offersRecording(message), true, message);
+    }
+  });
+
+  it("ignores messages that are not about sending one", () => {
+    for (const message of [
+      "Why did my campaign stop sending?",
+      "How do I add a video to my website?",
+    ]) {
+      assert.equal(offersRecording(message), false, message);
+    }
   });
 });

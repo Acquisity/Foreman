@@ -31,6 +31,8 @@ const TICKET_REQUEST = 0.5;
 const REFUND_REQUEST = 0.5;
 /** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
 const BUG_REPORT = 0.7;
+/** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
+const RECORDING_REQUEST = 0.5;
 
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
@@ -55,9 +57,12 @@ export interface WidgetAsk {
    * "not something I can do" first, instead of stepping aside.
    */
   cannotLook?: boolean;
-  /** The router judged `latest` a continuation of the previous reply. */
-  followUp?: boolean;
   latest: string;
+  /**
+   * Whether the app shows its screen recording card under this reply: the same
+   * decision that sets `request_recording`. Absent until that decision is made.
+   */
+  recordingOffered?: boolean;
   /**
    * What an image model read from screenshots attached to `latest`. Kept apart
    * from the customer's words: joined into them, a reading of another page made
@@ -100,15 +105,24 @@ export function renderConversation(
   budget: ContextBudget = DECISION_CONTEXT,
   screenshots: string[] = []
 ): string {
-  const turns = history.filter((turn) => turn.text.trim());
   const shots = screenshots.length
     ? `\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (what the customer's screen showed, as read by an image model: context for the message, not part of what they wrote):\n${screenshots.join("\n\n")}`
     : "";
-  if (turns.length === 0) {
+  const context = recentTurns(history, budget);
+  if (context.length === 0) {
     return shots
       ? `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}`
       : latest;
   }
+  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context.join("\n")}`;
+}
+
+/** The earlier turns, oldest first, newest kept first within the budget, with every cut and omission marked. */
+export function recentTurns(
+  history: WidgetAsk["turns"] = [],
+  budget: ContextBudget = DECISION_CONTEXT
+): string[] {
+  const turns = history.filter((turn) => turn.text.trim());
   const kept: string[] = [];
   let left = budget.chars;
   for (const turn of turns.slice(-budget.turns).reverse()) {
@@ -128,14 +142,29 @@ export function renderConversation(
     );
   }
   const omitted = turns.length - kept.length;
-  const context = [
+  return [
     ...(omitted
       ? [`[${omitted} older message${omitted === 1 ? "" : "s"} not shown]`]
       : []),
     ...kept,
-  ].join("\n");
-  return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context}`;
+  ];
 }
+
+/** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
+export const RECORDING_RULE =
+  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the recording option below is the way to send it. When it is false, never mention a recording option or card, and never say a recording is impossible.";
+
+/** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
+export const renderReplyAsk = (
+  input: string | WidgetAsk,
+  budget: ContextBudget = REPLY_CONTEXT
+): string => {
+  const ask = toAsk(input);
+  const text = renderAsk(ask, budget);
+  return ask.recordingOffered === undefined
+    ? text
+    : `${text}\n\nrecordingOffered: ${ask.recordingOffered}`;
+};
 
 /** The ask as a front-door reply reads it; the router passes the full decision budget. */
 export const renderAsk = (
@@ -180,24 +209,15 @@ const QUESTIONS = {
       "The customer is asking about their own account, workspace, campaigns, billing, or activity, rather than how the product works in general.",
     type: "noul",
   },
-  // "what about the limit?" and "nothing works!!" were investigated for two to
-  // three minutes before anyone asked what the customer meant.
-  // A terse follow-up ("okay, and after that?") has no subject of its own, so
-  // retrieval on it alone drifts to another article. This is what keeps the
-  // article the previous reply cited; a named new subject scores low and resets it.
-  depends_on_previous: {
-    instructions:
-      "The customer's latest message only makes sense as a continuation of Support's previous answer: it asks for the next step, more detail, a part, a repeat or a clarification of what was just explained, and names no product, feature or subject of its own. A message that names a new product, feature, page or subject is NOT this, however short it is.",
-    type: "noul",
-  },
-  // Asked in the same request as the rest, so it costs no extra call. It is not
-  // depends_on_previous: "and what about campaign B?" continues the conversation
-  // and still needs a look.
+  // Asked in the same request as the rest, so it costs no extra call. "And what
+  // about campaign B?" continues the conversation and still needs a look.
   explains_previous: {
     instructions:
       "The customer's latest message only asks what Support's previous answer means: to explain, confirm, reword or spell out the implication of something that answer already said. It can be answered from that answer's own words with nothing looked up. A request to check again, to check something else, for the current status, or about anything the previous answer did not cover is NOT this.",
     type: "noul",
   },
+  // "what about the limit?" and "nothing works!!" were investigated for two to
+  // three minutes before anyone asked what the customer meant.
   is_unclear: {
     instructions:
       "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
@@ -222,6 +242,14 @@ const QUESTIONS = {
     instructions: "Which kind of help does the customer's message need?",
     type: "choice",
   },
+  // Asked in the same request, so it costs nothing. Like reports_bug, it only
+  // decides whether the app offers its recording card; the lanes ignore it.
+  // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
+  offers_recording: {
+    instructions:
+      "The customer asks whether they can send, share or show a screen recording or video of their problem, or offers to record one. A question about how to record something inside the product, or a problem with a recording feature, is NOT this.",
+    type: "noul",
+  },
   // Asked in the same request, so it costs nothing. It only decides whether the
   // app offers a screen recording next to the reply; the lanes ignore it.
   reports_bug: {
@@ -238,9 +266,6 @@ const responseSchema = z.object({
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
-    depends_on_previous: z
-      .object({ noul: z.number().min(0).max(1) })
-      .optional(),
     explains_previous: z.object({ noul: z.number().min(0).max(1) }).optional(),
     is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     lane: z.object({
@@ -248,6 +273,7 @@ const responseSchema = z.object({
       confidence: z.number().min(0).max(1).optional(),
       probabilities: z.record(z.string(), z.number()).optional(),
     }),
+    offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
@@ -275,11 +301,11 @@ export interface WidgetRoute {
   confidence: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
-  /** How likely the latest message only continues the previous reply. */
-  followUp?: number;
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
+  /** The customer asks or offers to send a screen recording, so the app offers one. */
+  recording?: boolean;
   /** The customer asked for a refund, which an investigation files as a ticket. */
   refund?: boolean;
   source: "jev" | "fallback";
@@ -376,13 +402,14 @@ export async function routeWidgetMessage(
     const { answers } = responseSchema.parse(await response.json());
     const confidence = answers.lane.confidence ?? 0;
     const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
+    const recording =
+      (answers.offers_recording?.noul ?? 0) >= RECORDING_REQUEST;
     const routed: WidgetRoute = ticketRoute(answers, confidence) ?? {
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
       confidence,
       explainsPrevious: answers.explains_previous?.noul ?? 0,
-      followUp: answers.depends_on_previous?.noul ?? 0,
       // Jev may omit the per-lane probabilities; the winner's confidence stands in.
       kbScore:
         answers.lane.probabilities?.kb ??
@@ -393,7 +420,11 @@ export async function routeWidgetMessage(
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };
-    return bug ? { ...routed, bug } : routed;
+    return {
+      ...routed,
+      ...(bug ? { bug } : {}),
+      ...(recording ? { recording } : {}),
+    };
   } catch {
     return FALLBACK;
   }
@@ -444,6 +475,13 @@ export async function asksForChange(
   }
 }
 
+const RECORDING_OFFER =
+  /\bscreen[\s-]?(?:record|cast|capture)|\brecord(?:ing)?\s+(?:of\s+)?(?:my|the)\s+screen|\b(?:send|share|upload|attach|record|show)\b[^.?!]{0,40}\b(?:video|loom|jam)\b/i;
+
+/** A cheap extra trigger beside Jev's offers_recording, which is what catches typos and rewordings. */
+export const offersRecording = (message: string) =>
+  RECORDING_OFFER.test(message.slice(0, 4000));
+
 export function logRouteDecision(
   fields: { conversationId: string; runId: string },
   route: WidgetRoute
@@ -451,7 +489,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
     runId: fields.runId,
   });
 }
