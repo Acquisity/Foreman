@@ -5,6 +5,7 @@ import {
   type BillingInput,
   billingQuestions,
   decideFollowUp,
+  followUpText,
   resolveBilling,
   resolveFollowUp,
   resolveTriage,
@@ -398,4 +399,14 @@ test("a follow-up that is only mentions is skipped without asking Jev", async ()
     }
   );
   assert.equal(outcome, "skip");
+});
+
+test("a relayed reply reaches Jev as the speaker and their words, mentions as teammates", () => {
+  assert.equal(
+    followUpText(
+      "https://linear.app/acquisity/profiles/acquisityforeman1 **Aaron Fraga** replied in Slack:\n\nHey <@U06M69EP1UG>! what was agreed?"
+    ),
+    "Aaron Fraga: Hey @teammate! what was agreed?"
+  );
+  assert.equal(followUpText("just text"), "Someone: just text");
 });

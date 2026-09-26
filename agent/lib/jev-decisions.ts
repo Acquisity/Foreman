@@ -671,17 +671,17 @@ export async function decideBilling(
 // ---------------------------------------------------------------- follow-up
 
 export const FOLLOW_UP_OUTCOMES = {
-  note: "context worth recording that asks nothing and changes nothing, such as saying what kind of case this is",
+  note: "people in the thread talking to each other, such as a question to a teammate, a hand-off, or context that asks Foreman nothing and settles nothing",
   respond:
-    "asks something, answers a question in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
-  skip: "a bare mention, an acknowledgement, thanks, or noise",
+    "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
+  skip: "an acknowledgement, thanks, or noise",
 } as const;
 export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES;
 
 export interface FollowUpInput {
   /** Foreman's last message in the Slack thread. */
   lastReply: string;
-  /** Everything the requester said since, oldest first. */
+  /** Everything said in the thread since, oldest first, as relayed. */
   replies: string[];
 }
 
@@ -689,7 +689,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
-      "Foreman already answered the requester with lastReply. Taking their replies since then together, what do they need from Foreman?",
+      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. Telling Foreman what kind of case this is, without settling what Foreman asked, is context.",
     type: "choice",
   },
 });
@@ -703,21 +703,40 @@ export function resolveFollowUp(answers: Answers): FollowUpOutcome {
 }
 
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
-// The Asks receiver heads each relayed reply with "<link> **Name** replied in Slack:".
-const RELAY_HEADER = /^[^\n]{0,300}replied in Slack:/u;
+// The Asks receiver heads each relayed reply with "<link> **Name** replied in
+// Slack:". The link always names Foreman, so it says nothing about who a
+// reply is for.
+const RELAY_HEADER =
+  /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?replied in Slack:/u;
+
+/**
+ * Rewrites a relayed reply as "Name: text" with every Slack mention as
+ * @teammate. Jev cannot resolve Slack ids, and none of them is Foreman: a
+ * relayed reply comes through Linear, not a Slack mention of the bot.
+ */
+export const followUpText = (reply: string): string => {
+  const name = RELAY_HEADER.exec(reply)?.[1] ?? "Someone";
+  const text = reply
+    .replace(RELAY_HEADER, "")
+    .replace(SLACK_MENTION, "@teammate")
+    .trim();
+  return `${name}: ${text}`;
+};
 
 /**
  * A reply that is only a mention is what wakes Foreman, not something said,
- * and Jev cannot tell a Slack user id is Foreman's own, so code drops it.
+ * so code skips it without asking Jev.
  */
 export async function decideFollowUp(
   input: FollowUpInput,
   opts?: JevOptions
 ): Promise<FollowUpOutcome> {
-  const replies = input.replies.filter(
-    (reply) =>
-      reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
-  );
+  const replies = input.replies
+    .filter(
+      (reply) =>
+        reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
+    )
+    .map(followUpText);
   if (replies.length === 0) {
     return "skip";
   }
