@@ -1052,7 +1052,7 @@ async function explainPrevious(
 
 /** A bug report, or an explicit ask or offer to send a recording, gets the app's recording card. */
 const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
-  route.bug === true || offersRecording(ask.latest);
+  route.bug === true || route.recording === true || offersRecording(ask.latest);
 
 /**
  * Ask the app for its recording card when the turn wants one. True only once
