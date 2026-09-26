@@ -780,6 +780,7 @@ test("the default judge and composer run under a deadline, so a stalled model ca
         findings: composerInput(findings()),
         organizationName: scope.organizationName,
         question,
+        recordingOffered: false,
       })
     );
   } finally {

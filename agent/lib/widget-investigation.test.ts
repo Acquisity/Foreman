@@ -860,8 +860,11 @@ test("an offer to send a screen recording asks the app for one without a bug sco
       lane: "chat" as const,
       source: "jev" as const,
     });
-  deps.answerChat = () =>
-    Promise.resolve({ citations: [], message: "Use the card below." });
+  const written: string[] = [];
+  deps.answerChat = (message) => {
+    written.push(message);
+    return Promise.resolve({ citations: [], message: "Use the card below." });
+  };
   deps.requestRecording = () => {
     run.recording_requested = true;
     return Promise.resolve();
@@ -879,6 +882,76 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   );
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.request_recording, true);
+  // The writer is told the card shows, so it can point to it.
+  assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
+});
+
+test("every reply lane is told whether the recording card shows, and only a recorded offer says it does", async (t) => {
+  enabled(t);
+  const bugRoute = (bug: boolean) => () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0,
+      bug,
+      confidence: 0.97,
+      kbScore: 0.9,
+      lane: "kb" as const,
+      source: "jev" as const,
+    });
+  const answeredWith = async (
+    bug: boolean,
+    requestRecording?: () => Promise<void>
+  ) => {
+    const { deps, run } = dependencies();
+    deps.route = bugRoute(bug);
+    const asks: WidgetAsk[] = [];
+    deps.answerKb = (ask) => {
+      asks.push(ask as WidgetAsk);
+      return Promise.resolve(kbAnswer);
+    };
+    deps.requestRecording =
+      requestRecording &&
+      (() =>
+        requestRecording().then(() => {
+          run.recording_requested = true;
+        }));
+    const body = (await (
+      await receiveWidgetMessage(request(start), noWork(), 200, verify, deps)
+    ).json()) as Record<string, unknown>;
+    return { body, offered: asks.at(-1)?.recordingOffered };
+  };
+  const shown = await answeredWith(true, () => Promise.resolve());
+  assert.equal(shown.body.request_recording, true);
+  assert.equal(shown.offered, true);
+  const notWanted = await answeredWith(false, () => Promise.resolve());
+  assert.equal(notWanted.body.request_recording, undefined);
+  assert.equal(notWanted.offered, false);
+  // A failed write shows no card, so the reply must not point to one.
+  const failed = await answeredWith(true, () =>
+    Promise.reject(new Error("db"))
+  );
+  assert.equal(failed.body.request_recording, undefined);
+  assert.equal(failed.offered, false);
+});
+
+test("the investigation composer is told whether the recording card shows", async () => {
+  const offered: boolean[] = [];
+  for (const requested of [true, false]) {
+    const { deps, run } = dependencies();
+    deps.gate = (...args) => {
+      offered.push(args[7] === true);
+      return Promise.resolve(allowed);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: two independent runs, in order.
+    await finishWidgetRun(
+      { ...run, recording_requested: requested },
+      "widget-session-recording",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps
+    );
+  }
+  assert.deepEqual(offered, [true, false]);
 });
 
 test("the guessed checks are saved as planned before the first real check runs", async (t) => {
@@ -2351,4 +2424,62 @@ test("the finish budget is counted from the claim, history read included, and le
   assert.equal(await budget(0), 119_000);
   // A late claim at run age 169s: the app's last poll is the limit.
   assert.equal(await budget(169_000), 85_000);
+});
+
+test("a recording the customer sent skips the front door and binds its id to the investigation", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = () => assert.fail("must not route a recording follow-up");
+  let auth: { attributes?: Record<string, unknown> } | undefined;
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      question: "(The customer sent the screen recording you asked for.)",
+      recording: { id: "0f3c9d6e-1b2a-4c5d-8e9f-a0b1c2d3e4f5" },
+    }),
+    {
+      from: () => ({
+        send: (_message: string, { auth: sent }: { auth: typeof auth }) => {
+          auth = sent;
+          return Promise.resolve(completedSession());
+        },
+      }),
+      waitUntil: () => undefined,
+    } as unknown as Pick<RouteHandlerArgs, "from" | "waitUntil">,
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(
+    auth?.attributes?.recordingId,
+    "0f3c9d6e-1b2a-4c5d-8e9f-a0b1c2d3e4f5"
+  );
+});
+
+test("a member's recording still takes the help-center front door, and a malformed recording id is refused", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  let routed = false;
+  const { route } = deps;
+  deps.route = (...args) => {
+    routed = true;
+    return route(...args);
+  };
+  await receiveWidgetMessage(
+    request({ ...start, recording: { id: "jam-1" } }),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" as const }),
+    deps
+  );
+  assert.equal(routed, true);
+  const refused = await receiveWidgetMessage(
+    request({ ...start, recording: { id: "../jams" } }),
+    noWork(),
+    1,
+    () => assert.fail("must not verify"),
+    deps
+  );
+  assert.equal(refused.status, 400);
 });

@@ -43,8 +43,8 @@ import {
   HUMAN_REQUEST_SCORE,
   logRouteDecision,
   offersRecording,
-  renderAsk,
   renderConversation,
+  renderReplyAsk,
   routeWidgetMessage,
   type WidgetAsk,
   type WidgetRoute,
@@ -141,6 +141,11 @@ const inputSchema = z.discriminatedUnion("action", [
     history: historySchema.optional(),
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
+    // The screen recording this turn follows up on, which the investigator
+    // reads through widget_read_recording.
+    recording: z
+      .strictObject({ id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) })
+      .optional(),
     // What /internal/widget/image read from each screenshot sent with this
     // message. The front door and the investigator read them beside the
     // question; the stored run keeps them joined onto it for later stages.
@@ -662,7 +667,10 @@ async function structureWriteUp(
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
-  run: Pick<WidgetRun, "created_at" | "id" | "question" | "scope">,
+  run: Pick<
+    WidgetRun,
+    "created_at" | "id" | "question" | "recording_requested" | "scope"
+  >,
   sessionId: string,
   outcome: WaitOutcome,
   deps: Pick<
@@ -752,7 +760,8 @@ export async function finishWidgetRun(
         gateDeps,
         conversation,
         await changeAsked,
-        deadline
+        deadline,
+        run.recording_requested === true
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
@@ -933,7 +942,7 @@ async function kbMissReply(
 ): Promise<WidgetRun | null> {
   const reply = await deps
     .answerChat(
-      renderAsk(ask),
+      renderReplyAsk(ask),
       { conversationId: run.scope.conversationId, runId: run.id },
       KB_MISS_PROMPT
     )
@@ -960,7 +969,7 @@ async function clarifyReply(
 ): Promise<WidgetRun | null> {
   const reply = await deps
     .answerChat(
-      renderAsk(ask),
+      renderReplyAsk(ask),
       { conversationId: run.scope.conversationId, runId: run.id },
       CLARIFY_PROMPT
     )
@@ -1008,7 +1017,7 @@ async function explainPrevious(
     try {
       // biome-ignore lint/performance/noAwaitInLoops: the second try only follows a failed first.
       const reply = await deps.answerChat(
-        renderAsk(ask, DECISION_CONTEXT),
+        renderReplyAsk(ask, DECISION_CONTEXT),
         ids,
         EXPLAIN_PROMPT,
         true
@@ -1046,6 +1055,30 @@ const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
   route.bug === true || offersRecording(ask.latest);
 
 /**
+ * Ask the app for its recording card when the turn wants one. True only once
+ * the row says so: a failed write shows no card, and loses only the offer.
+ */
+async function offerRecording(
+  run: WidgetRun,
+  route: WidgetRoute,
+  ask: WidgetAsk,
+  deps: Pick<WidgetDependencies, "requestRecording">
+): Promise<boolean> {
+  if (!(recordingWanted(route, ask) && deps.requestRecording)) {
+    return false;
+  }
+  const offered = await deps.requestRecording(run.id).then(
+    () => true,
+    () => false
+  );
+  if (offered) {
+    // The investigation's composer reads this same row object.
+    run.recording_requested = true;
+  }
+  return offered;
+}
+
+/**
  * Front door: an ask for a person hands off at once, and a general product
  * question is answered from the help center, both without starting an
  * investigation. Returns null for every other route, a router failure (which
@@ -1057,25 +1090,25 @@ const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
 async function answerFromKnowledgeBase(
   run: WidgetRun,
   scope: WidgetContext,
-  ask: WidgetAsk,
+  asked: WidgetAsk,
   signal: AbortSignal,
   deps: WidgetDependencies,
   helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
-  const route = await deps.route(ask, { signal });
+  const route = await deps.route(asked, { signal });
   // Every reply written at the front door reads the latest message first with
   // a few bounded turns; the full transcript is for a real investigation only.
-  const question = renderAsk(ask);
   logRouteDecision(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
   const ids = { conversationId: scope.conversationId, runId: run.id };
-  // Before any reply is written, so every lane's result carries the flag. A
-  // failed write only loses the recording offer, never the reply.
-  if (recordingWanted(route, ask) && deps.requestRecording) {
-    await deps.requestRecording(run.id).catch(() => undefined);
-  }
+  // Before any reply is written, so every lane's result carries the flag and
+  // every writer is told whether the card shows. A failed write only loses the
+  // recording offer, never the reply.
+  const recordingOffered = await offerRecording(run, route, asked, deps);
+  const ask = { ...asked, recordingOffered };
+  const question = renderReplyAsk(ask);
   const finish = (written: KbAnswer) =>
     deps.complete(
       run.id,
@@ -1382,17 +1415,19 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
-  // A teammate asked for an investigation: no help-center or handoff front door.
-  const answered = input.staff
-    ? null
-    : await answerFromKnowledgeBase(
-        run,
-        scope,
-        ask,
-        signal,
-        deps,
-        helpCenterOnly
-      );
+  // A teammate asked for an investigation, or the customer sent the recording
+  // an earlier reply asked for: no help-center or handoff front door.
+  const answered =
+    input.staff || (input.recording && !helpCenterOnly)
+      ? null
+      : await answerFromKnowledgeBase(
+          run,
+          scope,
+          ask,
+          signal,
+          deps,
+          helpCenterOnly
+        );
   if (answered) {
     return json(widgetRunResponse(answered));
   }
@@ -1410,7 +1445,7 @@ async function answerFreshRun(
     widgetRunResponse(
       await startInvestigation(
         run,
-        scope,
+        input.recording ? { ...scope, recordingId: input.recording.id } : scope,
         message,
         handlers,
         responseWaitMs,

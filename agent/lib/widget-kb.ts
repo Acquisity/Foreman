@@ -8,7 +8,12 @@ import {
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { askJev, type SelectorOptions } from "./widget-next-action.js";
-import { renderAsk, toAsk, type WidgetAsk } from "./widget-router.js";
+import {
+  RECORDING_RULE,
+  renderAsk,
+  toAsk,
+  type WidgetAsk,
+} from "./widget-router.js";
 
 /**
  * The fast lane for general product questions: search the public help center,
@@ -45,8 +50,7 @@ const MAX_KEYWORDS = 8;
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
 
-const TEXT_ONLY =
-  "The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. They cannot attach video or other files here, but when they ask or offer to send a screen recording, the app shows a Screen recording card below your reply: point them to it, and never say a recording is impossible. When the message carries a screenshot reading, it is the one source besides the articles you may use: when what it shows changes the answer, for example they are already on the page they are asking about or it shows an error, say so in a few words first, then answer from the articles. Never describe anything the reading does not say.";
+const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the message carries a screenshot reading, it is the one source besides the articles you may use: when what it shows changes the answer, for example they are already on the page they are asking about or it shows an error, say so in a few words first, then answer from the articles. Never describe anything the reading does not say.`;
 
 export const kbCitationSchema = z.object({
   n: z.number().int().positive(),
@@ -256,11 +260,11 @@ export const KB_MISS_FALLBACK =
 // No retrieval and no account data, like CHAT_PROMPT, so nothing to gate.
 export const CLARIFY_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message does not say clearly what they need help with. Ask ONE short, friendly question that gets what you need: which part of the product it is about, and what they expected versus what happened. If they sound frustrated, acknowledge it in a few words first. If the message could mean a few specific things, such as which limit or which charge, offer those as options. State no product facts, guess nothing about their account, and make no promises. Plain text, no sign-off, no em dashes. ${TEXT_ONLY}`;
 
-export const EXPLAIN_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks what Support's previous answer meant. Answer in one to three short, plain sentences using only what Support already said in the earlier turns: explain it, confirm it or spell out what it does and does not show. Keep its certainty exactly: something not recorded stays not recorded, which is not the same as it not having happened, and something that could not be checked stays unchecked. Add no fact, number, cause, step or promise that the earlier turns do not contain, and never say that nothing needs changing or that everything is fine unless Support already said a live check showed it. If the message asks you to check again, to check anything else, or needs anything the earlier turns do not contain, or the previous answer is cut off, reply with an empty string.`;
+export const EXPLAIN_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks what Support's previous answer meant. Answer in one to three short, plain sentences using only what Support already said in the earlier turns: explain it, confirm it or spell out what it does and does not show. Keep its certainty exactly: something not recorded stays not recorded, which is not the same as it not having happened, and something that could not be checked stays unchecked. Add no fact, number, cause, step or promise that the earlier turns do not contain, and never say that nothing needs changing or that everything is fine unless Support already said a live check showed it. If the message asks you to check again, to check anything else, or needs anything the earlier turns do not contain, or the previous answer is cut off, reply with an empty string. ${RECORDING_RULE}`;
 
 const chatSchema = z.object({ reply: z.string() });
 
-const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes.`;
+const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes. ${RECORDING_RULE}`;
 
 /**
  * A short conversational reply to a message that asks nothing. No retrieval, no
@@ -321,6 +325,8 @@ export interface KbDeps {
     /** Jev chose to answer: write, decide nothing. */
     decided?: boolean;
     question: string;
+    /** See {@link WidgetAsk.recordingOffered}; absent, the writer is told false. */
+    recordingOffered?: boolean;
     signal: AbortSignal;
   }) => Promise<unknown>;
   /** Every article's id and title, or null where the web app has no index route yet. */
@@ -348,6 +354,7 @@ export const defaultKbDeps: KbDeps = {
     cannotCheck,
     decided,
     question,
+    recordingOffered,
     signal,
   }) {
     const model = await resolveModel("kb");
@@ -361,6 +368,7 @@ export const defaultKbDeps: KbDeps = {
           title: article.title,
         })),
         question,
+        recordingOffered: recordingOffered === true,
       }),
       ...fastCallOptions(model),
       schema: accountLikely ? guardedAnswerSchema : answerSchema,
@@ -772,6 +780,7 @@ export async function answerFromHelpCenter(
       cannotCheck,
       decided: Boolean(decided),
       question,
+      recordingOffered: ask.recordingOffered,
       signal,
     });
     mark("generate");
