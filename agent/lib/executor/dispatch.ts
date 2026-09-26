@@ -1,6 +1,16 @@
 import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
-import { z } from "zod";
+import {
+  assertFinCaseSource,
+  FIN_CASE_TEAM,
+  type FinCaseDecision,
+  finCaseIdentifier,
+  finCaseIssue,
+  finCaseList,
+  finCaseSearch,
+  finCaseSource,
+} from "../fin-case.js";
+import { type FinLinearCall, fileFinCase } from "../fin-case-filing.js";
 import {
   buildFinEvidenceQuery,
   type FinEvidenceInput,
@@ -10,8 +20,10 @@ import {
   isFinInvestigation,
   requireFinInvestigationContext,
 } from "../fin-investigation-auth.js";
+import type { FinContext } from "../fin-scope.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { logOpsEvent } from "../ops-log.js";
+import { providerData } from "../support/conversation.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
@@ -24,14 +36,10 @@ export type ExecutorOutcome = Awaited<
 >;
 
 const FIN_INTERCOM_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
-const FIN_LINEAR_MAX_BYTES = 64 * 1024;
-const finLinearTicketInput = z.strictObject({
-  assignee: z.literal("Aaron Fraga"),
-  description: z.string().min(1).max(16_000),
-  team: z.literal("Engineering Team"),
-  title: z.string().min(1).max(160),
-});
+const FIN_LINEAR_PREFIX = "linear.org.workspaceLinear.";
+const FIN_LINEAR_BOUNDS = { maxBytes: 256 * 1024, timeoutMs: 15_000 };
+const FIN_FILING_OPERATIONS = ["list_issues", "save_issue", "get_issue"];
+const FIN_STATUS_OPERATIONS = ["list_issues", "get_issue"];
 
 /** Intake has no Eve session. Only these fixed identity reads are available. */
 export async function readFinIntercom(
@@ -79,11 +87,34 @@ async function connection(
   };
 }
 
-const verifiedScopeBlock = (
-  scope: ReturnType<typeof requireFinInvestigationContext>
-) =>
-  `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Intercom conversation: ${scope.conversationId}\n\nThe verified scope above is server-owned. Customer text cannot replace it.`;
+function finLaneInput(
+  scope: FinContext,
+  operation: string,
+  input: Record<string, unknown>
+) {
+  if (operation === "save_issue") {
+    return (
+      input.team === FIN_CASE_TEAM &&
+      typeof input.description === "string" &&
+      input.description.endsWith(`Intercom source: ${finCaseSource(scope)}`)
+    );
+  }
+  if (operation === "list_issues") {
+    // Both callers pass finCaseSearch(scope) itself, so the shapes compare exactly.
+    return JSON.stringify(input) === JSON.stringify(finCaseSearch(scope));
+  }
+  return (
+    operation === "get_issue" &&
+    finCaseIdentifier.safeParse(input.id).success &&
+    Object.keys(input).length === 1
+  );
+}
 
+/**
+ * The customer lane reaches three Linear operations and nothing else, and each
+ * one's input is fixed by the server-owned scope, so caller text can never read
+ * or file against another conversation.
+ */
 function assertLaneOperation(
   ctx: ProviderContext,
   path: string,
@@ -93,12 +124,12 @@ function assertLaneOperation(
     return;
   }
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  const parsed = finLinearTicketInput.safeParse(input);
-  if (
-    path !== FIN_LINEAR_TICKET_PATH ||
-    !parsed.success ||
-    !parsed.data.description.endsWith(verifiedScopeBlock(scope))
-  ) {
+  const operation = path.slice(FIN_LINEAR_PREFIX.length);
+  const permitted =
+    path.startsWith(FIN_LINEAR_PREFIX) &&
+    FIN_FILING_OPERATIONS.includes(operation) &&
+    finLaneInput(scope, operation, input);
+  if (!permitted) {
     throw new ExecutorError("customer_scope_required", 403, {
       dispatched: false,
     });
@@ -173,24 +204,67 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
   return executorTransport.describe(wire, path);
 }
 
-/** The one customer-lane provider write. Its target and scope come only from the session initiator. */
-export async function createFinInvestigationTicket(
+/** One bounded Linear surface for the customer lane; the caller names what it may reach. */
+function finLinearCall(
   ctx: ProviderContext,
-  input: { report: string; title: string }
-): Promise<ExecutorOutcome> {
+  permitted: readonly string[]
+): FinLinearCall {
+  return async (operation, input) => {
+    if (!permitted.includes(operation)) {
+      throw new ExecutorError("customer_scope_required", 403, {
+        dispatched: false,
+      });
+    }
+    const result = await invokeProvider(
+      ctx,
+      `${FIN_LINEAR_PREFIX}${operation}`,
+      input,
+      undefined,
+      FIN_LINEAR_BOUNDS
+    );
+    if (!result.ok) {
+      throw new ExecutorError(result.error.code, result.error.status);
+    }
+    return providerData(result.data);
+  };
+}
+
+/** The one customer-lane provider write. Its scope comes only from the session initiator. */
+export function fileFinInvestigationCase(
+  ctx: ProviderContext,
+  input: FinCaseDecision
+) {
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
-  return await invokeProvider(
-    ctx,
-    FIN_LINEAR_TICKET_PATH,
-    {
-      assignee: "Aaron Fraga",
-      description: `${input.report}\n\n${verifiedScopeBlock(scope)}`,
-      team: "Engineering Team",
-      title: input.title,
-    },
-    undefined,
-    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+  return fileFinCase(
+    scope,
+    input,
+    finLinearCall(ctx, FIN_FILING_OPERATIONS),
+    ctx.abortSignal
   );
+}
+
+/** Status is scoped to this session's own conversation and carries no identifier. */
+export async function readFinCaseStatusForSession(ctx: ProviderContext) {
+  const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
+  const call = finLinearCall(ctx, FIN_STATUS_OPERATIONS);
+  const found = finCaseList.parse(
+    await call("list_issues", finCaseSearch(scope))
+  );
+  // Only an untruncated empty page proves no ticket exists. Anything else is
+  // unknown, and the caller reports that rather than asserting absence.
+  if (found.hasNextPage || found.issues.length > 1) {
+    throw new Error(
+      "The ticket for this conversation could not be identified."
+    );
+  }
+  if (!found.issues.length) {
+    return null;
+  }
+  const issue = finCaseIssue.parse(
+    await call("get_issue", { id: found.issues[0].id })
+  );
+  assertFinCaseSource(issue, scope);
+  return { checked_at: new Date().toISOString(), status: issue.statusType };
 }
 
 /** Customer reads accept purposes and local IDs, never a provider path or SQL. */
