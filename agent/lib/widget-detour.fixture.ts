@@ -40,3 +40,26 @@ export const detourTurns = [
 ];
 
 export const detourGoal = "where can i add new inboxes";
+
+/**
+ * Preview conversation 5fc15d15 (2026-09-26): asked to buy inboxes, got steps
+ * starting at the Cold Email Agent, then sent a screenshot of its campaigns
+ * page, whose setup checklist highlighted Review inboxes, and was sent to that
+ * checklist instead of the next step. The reading is a reconstruction.
+ */
+export const stepsReading =
+  "[Screenshot the customer attached, as read by an image model]\nScreen: Cold Email Agent, All Campaigns page. Tabs: Campaigns, Email Accounts, Leads. Buttons: New Campaign, Search. A setup checklist card lists: Connect your inboxes, Review inboxes, Create your first campaign.\nWhat stands out: The setup checklist is incomplete; Review inboxes is highlighted as the next item.";
+
+export const stepsTurns = [
+  {
+    role: "customer" as const,
+    text: "can i buy more inboxes to add to a campaign?",
+  },
+  {
+    role: "assistant" as const,
+    text: "Yes, you can buy more inboxes and then add them to a campaign. First, go to Cold Email Agent, open Email Accounts, and click Add New Inboxes to buy the inboxes you need [1]. Once they are ready, open your campaign, go to Options, then Email accounts, and click Add or remove accounts to add them [2].",
+  },
+];
+
+export const stepsLatest =
+  "i found the cold email agent where do i go from here?";

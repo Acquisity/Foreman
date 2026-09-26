@@ -525,19 +525,29 @@ const UNCLEAR_SCORE = 0.8;
 const EXPLAIN_SCORE = 0.8;
 /** At or above this, the latest message goes back to an earlier, unfinished request. */
 const RETURNS_SCORE = 0.5;
-/** At or above this, a screenshot only shows where the customer is, not what they ask about. */
-const SCREENSHOT_CONTEXT_SCORE = 0.5;
+/**
+ * At or above this, the latest message says how far the customer got in the
+ * previous reply's steps. Continuations scored 0.66 to 0.90, error screenshots
+ * at most 0.44, and messages going back to an earlier request 0.53 to 0.57.
+ */
+const CONTINUES_SCORE = 0.6;
 
-/** What the router's goal and screenshot judgments tell the help-center lane. */
+/** What the router's goal and continuation judgments tell the help-center lane. */
 const kbAsk = (route: WidgetRoute, ask: WidgetAsk): WidgetAsk => {
   const returnsToEarlierAsk = (route.returnsToEarlierAsk ?? 0) >= RETURNS_SCORE;
+  const continues = (route.continuesSteps ?? 0) >= CONTINUES_SCORE;
+  // Going back wins: the previous reply's steps were the detour.
+  const continuesSteps = continues && !returnsToEarlierAsk;
   return {
     ...ask,
     // The previous reply's articles are the detour, so they are not carried.
-    followUp: !returnsToEarlierAsk && (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    followUp:
+      !returnsToEarlierAsk &&
+      ((route.followUp ?? 0) >= FOLLOW_UP_SCORE || continuesSteps),
+    ...(continuesSteps ? { continuesSteps } : {}),
     ...(returnsToEarlierAsk ? { returnsToEarlierAsk } : {}),
-    ...(ask.screenshots?.length &&
-    (route.screenshotContext ?? 0) >= SCREENSHOT_CONTEXT_SCORE
+    // A screenshot sent while following steps shows where they are, not what they ask.
+    ...(ask.screenshots?.length && continues
       ? { screenshotIsContext: true }
       : {}),
   };

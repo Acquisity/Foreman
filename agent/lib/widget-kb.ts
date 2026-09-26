@@ -68,6 +68,14 @@ const TEXT_ONLY = textOnly(SCREENSHOT_FIRST);
 export const RETURNS_TO_EARLIER_ASK =
   "NOTE: the customer's latest message goes back to an earlier request of theirs that Support has not finished answering; the previous answer was a side point. Find that request in the earlier turns and work on it: say in a few words that the previous answer was a side point, then give the next step of that request. A step Support already gave may be repeated when it is the next one.";
 
+/**
+ * Leads the ask when the router judged the customer says how far they got in
+ * the previous reply's steps, so every stage looks for the step after that one
+ * instead of anything else a screenshot happens to show.
+ */
+export const CONTINUES_STEPS =
+  "NOTE: the customer is following the steps in Support's previous answer and says how far they got. Find that point in those steps and give the next step after it, from the articles.";
+
 export const kbCitationSchema = z.object({
   n: z.number().int().positive(),
   title: z.string().min(1).max(300),
@@ -770,7 +778,10 @@ export async function answerFromHelpCenter(
   const ask = toAsk(input);
   // The decision budget, not the one-line reply budget: four turns lost the
   // customer's own request two detours later ("where can i add new inboxes").
-  const lead = ask.returnsToEarlierAsk ? `${RETURNS_TO_EARLIER_ASK}\n\n` : "";
+  const note = ask.returnsToEarlierAsk
+    ? RETURNS_TO_EARLIER_ASK
+    : ask.continuesSteps && CONTINUES_STEPS;
+  const lead = note ? `${note}\n\n` : "";
   const question = `${lead}${renderAsk(ask, DECISION_CONTEXT)}`;
   // A screenshot that only shows where they are stays out of search and Jev's
   // decision: the writer still reads it, as context for the request.
@@ -785,6 +796,15 @@ export async function answerFromHelpCenter(
       message: `${detail} ms=${Date.now() - startedAt}`,
       outcome,
     });
+  // Which articles were read and cited, on a line of their own: the answer's
+  // line already fills most of the log's 200-character message.
+  let read: string[] = [];
+  const logArticles = (cited: { url: string }[]) =>
+    logOpsEvent("widget.kb.answer", {
+      ...log,
+      message: `read=${read.join(",")} cited=${cited.map((hit) => helpArticleSlug(hit.url) ?? hit.url).join(",")}`,
+      outcome: "articles",
+    });
   const marks: string[] = [];
   let lap = startedAt;
   const mark = (step: string) => {
@@ -798,6 +818,9 @@ export async function answerFromHelpCenter(
     const articles = (
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
+    read = articles.map(
+      (article) => helpArticleSlug(article.url) ?? article.url
+    );
     mark("read");
     const decided =
       (await deps
@@ -877,6 +900,7 @@ export async function answerFromHelpCenter(
       ...fresh.slice(0, MAX_ARTICLES - kept.length),
       ...kept,
     ]);
+    logArticles("message" in result ? result.citations : []);
     if (!("message" in result)) {
       finish(
         "miss",
