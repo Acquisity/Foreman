@@ -11,7 +11,7 @@ import { askJev, type SelectorOptions } from "./widget-next-action.js";
 import {
   DECISION_CONTEXT,
   RECORDING_RULE,
-  renderAsk,
+  recentTurns,
   toAsk,
   type WidgetAsk,
 } from "./widget-router.js";
@@ -51,30 +51,21 @@ const MAX_KEYWORDS = 8;
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
 
-const SCREENSHOT_FIRST =
-  "When the message carries a screenshot reading, it is the one source besides the articles you may use: when what it shows changes the answer, for example they are already on the page they are asking about or it shows an error, say so in a few words first, then answer from the articles.";
-/** The router judged the screenshot shows where the customer is, not what they ask about. */
-const SCREENSHOT_AS_CONTEXT =
-  "When the message carries a screenshot reading, it is the one source besides the articles you may use. It shows where the customer is while they continue what they asked; it is not a new question. Use it to place them, then give the next step of what they asked from the articles. If it shows an error or warning, mention it in one short sentence after that answer, and do not switch to fixing it.";
-const textOnly = (screenshotRule: string) =>
-  `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} ${screenshotRule} Never describe anything the reading does not say.`;
-const TEXT_ONLY = textOnly(SCREENSHOT_FIRST);
+const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
 
 /**
- * Leads the ask when the router judged the latest message goes back to an
- * earlier request, so the picker, Jev and the writer all look for it in the
- * earlier turns instead of continuing the detour the previous reply took.
+ * Every stage of this lane reads the conversation as a chat transcript, oldest
+ * first and the latest message last, with a screenshot labelled the way the app
+ * labels it in history. Latest-first with the rest marked "context only", a
+ * screenshot's warning outranked the customer's own request two turns earlier.
+ * The decision budget, not the one-line reply budget: four turns lost the
+ * customer's own request two detours later ("where can i add new inboxes").
  */
-export const RETURNS_TO_EARLIER_ASK =
-  "NOTE: the customer's latest message goes back to an earlier request of theirs that Support has not finished answering; the previous answer was a side point. Find that request in the earlier turns and work on it: say in a few words that the previous answer was a side point, then give the next step of that request. A step Support already gave may be repeated when it is the next one.";
-
-/**
- * Leads the ask when the router judged the customer says how far they got in
- * the previous reply's steps, so every stage looks for the step after that one
- * instead of anything else a screenshot happens to show.
- */
-export const CONTINUES_STEPS =
-  "NOTE: the customer is following the steps in Support's previous answer and says how far they got. Find that point in those steps and give the next step after it, from the articles.";
+export const renderTranscript = (ask: WidgetAsk): string =>
+  [
+    ...recentTurns(ask.turns, DECISION_CONTEXT),
+    `Customer: ${[ask.latest, ...(ask.screenshots ?? []).map((reading) => `Screenshot reading: ${reading}`)].join("\n\n")}`,
+  ].join("\n");
 
 export const kbCitationSchema = z.object({
   n: z.number().int().positive(),
@@ -144,17 +135,13 @@ const guardedAnswerSchema = z.object({
   ...answerSchema.shape,
 });
 
-const LATEST_SUBJECT = `The input may carry a labelled LATEST CUSTOMER MESSAGE followed by EARLIER TURNS. Work for the customer's LATEST message: use the earlier turns only to work out what a word like "it", "that" or "the crm one" refers to. When the latest message names or implies its own subject (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that subject, not the subject of the earlier turns.`;
+const LATEST_SUBJECT = `The input is the support conversation so far, oldest first, ending with the customer's latest message. Work out what the customer is trying to do from the whole conversation, the way a support person reading the chat would. A screenshot reading shows where the customer is on the way there: a warning or error on it is not what they are asking about unless their message asks about it. When the latest message itself asks about something new (CRM contacts rather than campaign leads, the subscription rather than domains or inboxes), follow that new subject.`;
 
 const WHICH_PRODUCT =
   "When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ";
 
-const kbPrompt = (
-  ownAccountRule: string,
-  whichProduct = WHICH_PRODUCT,
-  textRule = TEXT_ONLY
-) =>
-  `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a concise, plain, warm reply in the second person that gives the customer enough information to understand or take the next step. A simple location question may need only one sentence; do not compress a procedure or a meaningful choice into one sentence just to be brief. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps, starting with how to reach the relevant page when the customer does not know where to go. When explaining choices such as roles, include the documented differences that matter to the decision. Include only details supported by the articles; do not add background, repeat known steps, or ask a follow-up when the request is already clear. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. ${ownAccountRule} You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). ${whichProduct}${textRule} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. A timezone conversion is only a possible explanation, never proof of the customer's calendar configuration; if they say their settings match, accept that and do not repeat the hypothesis as a diagnosis. No sign-off, no em dashes.`;
+const kbPrompt = (ownAccountRule: string, whichProduct = WHICH_PRODUCT) =>
+  `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a concise, plain, warm reply in the second person that gives the customer enough information to understand or take the next step. A simple location question may need only one sentence; do not compress a procedure or a meaningful choice into one sentence just to be brief. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps, starting with how to reach the relevant page when the customer does not know where to go. When explaining choices such as roles, include the documented differences that matter to the decision. Include only details supported by the articles; do not add background, repeat known steps, or ask a follow-up when the request is already clear. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. ${ownAccountRule} You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). ${whichProduct}${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. A timezone conversion is only a possible explanation, never proof of the customer's calendar configuration; if they say their settings match, accept that and do not repeat the hypothesis as a diagnosis. No sign-off, no em dashes.`;
 
 // The router's Jev cannot tell these apart from the message alone: "Google says
 // the app is blocked when I connect Email and Calendar" scored investigate 0.84
@@ -173,20 +160,7 @@ const ACCOUNT_LIKELY_KB_PROMPT = kbPrompt(ACCOUNT_LIKELY);
 /** Jev already chose to answer, so the writer only writes. */
 const DECIDED_KB_PROMPT = kbPrompt(MY_IS_HOW_TO, "");
 
-const SCREENSHOT_CONTEXT_TEXT = textOnly(SCREENSHOT_AS_CONTEXT);
-
-function writerPrompt(
-  accountLikely?: boolean,
-  decided?: boolean,
-  screenshotIsContext?: boolean
-) {
-  if (screenshotIsContext) {
-    return kbPrompt(
-      accountLikely && !decided ? ACCOUNT_LIKELY : MY_IS_HOW_TO,
-      decided ? "" : WHICH_PRODUCT,
-      SCREENSHOT_CONTEXT_TEXT
-    );
-  }
+function writerPrompt(accountLikely?: boolean, decided?: boolean) {
   if (decided) {
     return DECIDED_KB_PROMPT;
   }
@@ -368,8 +342,6 @@ export interface KbDeps {
     question: string;
     /** See {@link WidgetAsk.recordingOffered}; absent, the writer is told false. */
     recordingOffered?: boolean;
-    /** See {@link WidgetAsk.screenshotIsContext}. */
-    screenshotIsContext?: boolean;
     signal: AbortSignal;
   }) => Promise<unknown>;
   /** Every article's id and title, or null where the web app has no index route yet. */
@@ -398,7 +370,6 @@ export const defaultKbDeps: KbDeps = {
     decided,
     question,
     recordingOffered,
-    screenshotIsContext,
     signal,
   }) {
     const model = await resolveModel("kb");
@@ -416,7 +387,7 @@ export const defaultKbDeps: KbDeps = {
       }),
       ...fastCallOptions(model),
       schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: `${writerPrompt(accountLikely, decided, screenshotIsContext)}${cannotCheck ? ALREADY_SAID : ""}`,
+      system: `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
     });
     return object;
   },
@@ -491,7 +462,7 @@ export const defaultKbDeps: KbDeps = {
       abortSignal: signal,
       model: gateway(model),
       // The listing comes first so the long, stable prefix can be cached.
-      prompt: `${index.map(indexLine).join("\n")}\n\nCustomer question: ${question}`,
+      prompt: `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
       ...fastCallOptions(model),
       schema: selectSchema,
       system: SELECT_PROMPT,
@@ -776,18 +747,7 @@ export async function answerFromHelpCenter(
   deps: KbDeps = defaultKbDeps
 ): Promise<KbAnswer | null> {
   const ask = toAsk(input);
-  // The decision budget, not the one-line reply budget: four turns lost the
-  // customer's own request two detours later ("where can i add new inboxes").
-  const note = ask.returnsToEarlierAsk
-    ? RETURNS_TO_EARLIER_ASK
-    : ask.continuesSteps && CONTINUES_STEPS;
-  const lead = note ? `${note}\n\n` : "";
-  const question = `${lead}${renderAsk(ask, DECISION_CONTEXT)}`;
-  // A screenshot that only shows where they are stays out of search and Jev's
-  // decision: the writer still reads it, as context for the request.
-  const searched = ask.screenshotIsContext
-    ? `${lead}${renderAsk({ ...ask, screenshots: [] }, DECISION_CONTEXT)}`
-    : question;
+  const question = renderTranscript(ask);
   const startedAt = Date.now();
   const signal = AbortSignal.timeout(KB_TIMEOUT_MS);
   const finish = (outcome: string, detail: string) =>
@@ -828,7 +788,7 @@ export async function answerFromHelpCenter(
           // Help-center mode needs the same "asks for a look" choice.
           accountLikely: ask.accountLikely || ask.cannotLook,
           articles,
-          question: searched,
+          question,
           signal,
         })
         .catch(() => null)) ?? null;
@@ -848,7 +808,6 @@ export async function answerFromHelpCenter(
       decided: Boolean(decided),
       question,
       recordingOffered: ask.recordingOffered,
-      screenshotIsContext: ask.screenshotIsContext,
       signal,
     });
     mark("generate");
@@ -887,10 +846,8 @@ export async function answerFromHelpCenter(
     // a follow-up, was answered from the ticket-status article alone and cited it.
     // Fresh hits lead, so the latest message outweighs the earlier citation.
     const [active, { hits: fresh, via }] = await Promise.all([
-      ask.followUp && !ask.returnsToEarlierAsk
-        ? activeArticleHits(ask, signal, deps)
-        : [],
-      findArticles(searched, signal, deps),
+      ask.followUp ? activeArticleHits(ask, signal, deps) : [],
+      findArticles(question, signal, deps),
     ]);
     const kept = active
       .filter((hit) => !fresh.some((found) => found.url === hit.url))
