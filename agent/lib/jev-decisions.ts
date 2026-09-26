@@ -703,6 +703,8 @@ export function resolveFollowUp(answers: Answers): FollowUpOutcome {
 }
 
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
+// The Asks receiver heads each relayed reply with "<link> **Name** replied in Slack:".
+const RELAY_HEADER = /^[^\n]{0,300}replied in Slack:/u;
 
 /**
  * A reply that is only a mention is what wakes Foreman, not something said,
@@ -713,7 +715,8 @@ export async function decideFollowUp(
   opts?: JevOptions
 ): Promise<FollowUpOutcome> {
   const replies = input.replies.filter(
-    (reply) => reply.replace(SLACK_MENTION, "").trim() !== ""
+    (reply) =>
+      reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
   );
   if (replies.length === 0) {
     return "skip";

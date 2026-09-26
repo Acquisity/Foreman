@@ -383,7 +383,13 @@ test("a follow-up stays quiet only on a clear skip or note", () => {
 
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
   const outcome = await decideFollowUp(
-    { lastReply: "Which amount?", replies: ["<@U0950315SDC>", " <@U1|bot> "] },
+    {
+      lastReply: "Which amount?",
+      replies: [
+        "https://linear.app/acquisity/profiles/acquisityforeman1 **Gary** replied in Slack:\n\n<@U0950315SDC>",
+        " <@U1|bot> ",
+      ],
+    },
     {
       fetch: () => {
         throw new Error("Jev should not be asked.");
