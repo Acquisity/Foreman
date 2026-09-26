@@ -42,6 +42,7 @@ describe("routeWidgetMessage", () => {
       followUp: 0,
       kbScore: 0,
       lane: "investigate",
+      returnsToEarlierAsk: 0,
       source: "jev",
       unclear: 0,
     });
@@ -49,6 +50,7 @@ describe("routeWidgetMessage", () => {
     const body = JSON.parse((sent as { body: string }).body);
     assert.equal(body.state, "why did my campaign stop?");
     assert.deepEqual(Object.keys(body.questions).sort(), [
+      "asks_about_screenshot",
       "asks_for_action",
       "asks_for_human",
       "asks_for_refund",
@@ -60,11 +62,35 @@ describe("routeWidgetMessage", () => {
       "lane",
       "offers_recording",
       "reports_bug",
+      "returns_to_earlier_ask",
     ]);
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
       "Bearer test-key"
     );
+  });
+
+  it("reports whether the message goes back to an earlier request and whether it asks about its screenshot", async () => {
+    const route = await routeWidgetMessage("ok im here. now what?", {
+      apiKey: "test-key",
+      fetch: () =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              answers: {
+                asks_about_screenshot: { noul: 0.12 },
+                asks_for_human: { noul: 0.04 },
+                asks_own_data: { noul: 0.3 },
+                lane: { choice: "kb", confidence: 0.9 },
+                returns_to_earlier_ask: { noul: 0.81 },
+              },
+            }),
+          ok: true,
+          status: 200,
+        }),
+    });
+    assert.equal(route.aboutScreenshot, 0.12);
+    assert.equal(route.returnsToEarlierAsk, 0.81);
   });
 
   it("reports how likely the help center is, whichever lane won", async () => {

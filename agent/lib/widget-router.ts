@@ -66,6 +66,18 @@ export interface WidgetAsk {
    */
   recordingOffered?: boolean;
   /**
+   * The router judged that `latest` goes back to an earlier request Support has
+   * not finished answering, so the previous reply's subject was a detour.
+   */
+  returnsToEarlierAsk?: boolean;
+  /**
+   * The router judged that the screenshots only show where the customer is
+   * while they continue their request, not what they are asking about. Their
+   * readings then stay out of article search, which otherwise follows the
+   * most alarming thing on the screen.
+   */
+  screenshotIsContext?: boolean;
+  /**
    * What an image model read from screenshots attached to `latest`. Kept apart
    * from the customer's words: joined into them, a reading of another page made
    * Jev judge a matching article "not covered" (0.58, against 1.00 without it).
@@ -170,6 +182,14 @@ export const renderAsk = (
 };
 
 const QUESTIONS = {
+  // A screenshot of the page they were sent to ("ok im here. now what?")
+  // showed an unrelated re-authentication warning; the help center searched
+  // for the warning and the customer's request to add inboxes was dropped.
+  asks_about_screenshot: {
+    instructions:
+      "The customer's latest message asks about something the attached screenshot shows, such as an error, a warning, a status or a problem on that screen. A message that continues an earlier request and only sends the screenshot to show where they are, such as 'ok I'm here, now what?', is NOT this, even when the screenshot shows a warning.",
+    type: "noul",
+  },
   // Foreman can never act on an account, and the reply to a request to act is
   // always the same: a short apology and the steps. Knowing this up front keeps
   // such a message out of a minutes-long investigation it cannot benefit from.
@@ -260,10 +280,21 @@ const QUESTIONS = {
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
     type: "noul",
   },
+  // "what does that have to do with adding inboxes?" scored explain 0.50 and
+  // got the previous detour defended; "what about inboxes for my campaigns"
+  // was answered inside that detour.
+  returns_to_earlier_ask: {
+    instructions:
+      "The customer's latest message goes back to something they asked earlier in the conversation that Support has not finished answering: it says Support's previous answer did not address what they asked, asks that earlier question again, or reports finishing a side step Support gave and asks what to do next while that earlier request is still unanswered. A follow-up to an answer that did address what they asked is NOT this, and neither is a new subject.",
+    type: "noul",
+  },
 } as const;
 
 const responseSchema = z.object({
   answers: z.object({
+    asks_about_screenshot: z
+      .object({ noul: z.number().min(0).max(1) })
+      .optional(),
     asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
@@ -281,6 +312,9 @@ const responseSchema = z.object({
     }),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    returns_to_earlier_ask: z
+      .object({ noul: z.number().min(0).max(1) })
+      .optional(),
   }),
 });
 
@@ -299,6 +333,8 @@ function supportedLane(
     : "investigate";
 }
 export interface WidgetRoute {
+  /** How likely the latest message asks about what its screenshot shows. */
+  aboutScreenshot?: number;
   asksForAction: number;
   asksForHuman: number;
   asksOwnData: number;
@@ -316,6 +352,8 @@ export interface WidgetRoute {
   recording?: boolean;
   /** The customer asked for a refund, which an investigation files as a ticket. */
   refund?: boolean;
+  /** How likely the latest message goes back to an earlier, unfinished request. */
+  returnsToEarlierAsk?: number;
   source: "jev" | "fallback";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
@@ -413,6 +451,9 @@ export async function routeWidgetMessage(
     const recording =
       (answers.offers_recording?.noul ?? 0) >= RECORDING_REQUEST;
     const routed: WidgetRoute = ticketRoute(answers, confidence) ?? {
+      ...(answers.asks_about_screenshot
+        ? { aboutScreenshot: answers.asks_about_screenshot.noul }
+        : {}),
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
       asksOwnData: answers.asks_own_data.noul,
@@ -426,6 +467,7 @@ export async function routeWidgetMessage(
       // The lane choice and the direct question must agree before a handoff: the
       // human lane skips the investigation, so a wrong guess costs the customer an answer.
       lane: supportedLane(answers),
+      returnsToEarlierAsk: answers.returns_to_earlier_ask?.noul ?? 0,
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };
@@ -498,7 +540,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)} returns=${(route.returnsToEarlierAsk ?? 0).toFixed(2)}${route.aboutScreenshot === undefined ? "" : ` screenshot=${route.aboutScreenshot.toFixed(2)}`}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
     runId: fields.runId,
   });
 }
