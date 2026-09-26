@@ -3,6 +3,7 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
+import { detourReading, detourTurns } from "./widget-detour.fixture.js";
 import type { GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
@@ -19,7 +20,7 @@ import {
 } from "./widget-investigation.js";
 import type { KbAnswer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
-import type { WidgetAsk } from "./widget-router.js";
+import { toAsk, type WidgetAsk } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
 
@@ -2140,6 +2141,87 @@ test("a genuine account question in the same score range still investigates: the
     assert.equal(asked, tried);
     assert.equal(body.message, allowed.message);
     assert.deepEqual(gated, [findings]);
+  }
+});
+
+// Preview 741aab58: "what does that have to do with adding inboxes?" defended
+// the reconnect detour, and a screenshot of the right page sent search to its warning.
+test("a message that goes back to an earlier request drops the detour's articles and skips the explain reply", async (t) => {
+  enabled(t);
+  for (const [returnsToEarlierAsk, back] of [
+    [0.8, true],
+    [0.2, false],
+  ] as const) {
+    const { deps } = dependencies();
+    deps.route = () =>
+      Promise.resolve({
+        ...followUpBase,
+        confidence: 0.9,
+        explainsPrevious: back ? 0.9 : 0,
+        followUp: 0.9,
+        kbScore: 0.9,
+        returnsToEarlierAsk,
+      });
+    let got: WidgetAsk | undefined;
+    deps.answerKb = (ask) => {
+      got = toAsk(ask);
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history: detourTurns.slice(0, 4),
+        message_id: crypto.randomUUID(),
+        question:
+          "what does that have to do with adding inboxes for my campaign?",
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.equal(got?.returnsToEarlierAsk === true, back);
+    assert.equal(got?.followUp, !back);
+  }
+});
+
+test("a screenshot is context for the request only when the router says the message does not ask about it", async (t) => {
+  enabled(t);
+  for (const [aboutScreenshot, screenshots, context] of [
+    [0.1, [detourReading], true],
+    [0.9, [detourReading], false],
+    [undefined, [detourReading], false],
+    [0.1, undefined, false],
+  ] as const) {
+    const { deps } = dependencies();
+    deps.route = () =>
+      Promise.resolve({
+        ...followUpBase,
+        confidence: 0.9,
+        kbScore: 0.9,
+        ...(aboutScreenshot === undefined ? {} : { aboutScreenshot }),
+      });
+    let got: WidgetAsk | undefined;
+    deps.answerKb = (ask) => {
+      got = toAsk(ask);
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history: detourTurns.slice(0, 2),
+        message_id: crypto.randomUUID(),
+        question: "ok im here. now what?",
+        ...(screenshots ? { screenshots } : {}),
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.equal(got?.screenshotIsContext === true, context);
   }
 });
 

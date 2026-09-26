@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  detourGoal,
+  detourReading,
+  detourTurns,
+} from "./widget-detour.fixture.js";
+import {
   activeArticleHits,
   answerFromHelpCenter,
   CANNOT_CHECK,
@@ -9,6 +14,7 @@ import {
   indexLine,
   type KbDeps,
   mergeHits,
+  RETURNS_TO_EARLIER_ASK,
   resolveCitations,
 } from "./widget-kb.js";
 
@@ -507,4 +513,76 @@ test("help-center mode answers an ask for a look from the articles, saying first
     ),
     null
   );
+});
+
+/** Every text each stage of the lane was given, for the detour conversation. */
+const detourStages = async (
+  ask: Parameters<typeof answerFromHelpCenter>[0]
+) => {
+  const seen = { decide: "", generate: "", read: [] as string[], search: "" };
+  await answerFromHelpCenter(ask, log, {
+    ...deps(null, [articles[2]]),
+    decide: ({ question }) => {
+      seen.decide = question;
+      return Promise.resolve({ choice: "answer", confidence: 0.9 });
+    },
+    generate: ({ articles: read, question }) => {
+      seen.generate = question;
+      seen.read = read.map((a) => a.url);
+      return Promise.resolve({
+        answer: "Click Add New Inboxes [1].",
+        kind: "answer",
+      });
+    },
+    rewrite: (question) => {
+      seen.search = question;
+      return Promise.resolve({ queries: ["buy inboxes"] });
+    },
+  });
+  return seen;
+};
+
+// Preview 741aab58: four turns after "where can i add new inboxes", the lane
+// no longer saw it and answered inside the reconnect detour.
+test("the customer's own request stays in view for search, Jev and the writer two detours later", async () => {
+  const seen = await detourStages({
+    latest: "what about inboxes for my sending campaigns/",
+    turns: detourTurns,
+  });
+  for (const text of [seen.search, seen.decide, seen.generate]) {
+    assert.equal(text.includes(detourGoal), true);
+  }
+});
+
+test("a screenshot that only shows where the customer is stays out of search and Jev, and still reaches the writer", async () => {
+  const turn2 = {
+    latest: "ok im here. now what?",
+    screenshots: [detourReading],
+    turns: detourTurns.slice(0, 2),
+  };
+  const context = await detourStages({ ...turn2, screenshotIsContext: true });
+  assert.equal(context.search.includes(detourReading), false);
+  assert.equal(context.decide.includes(detourReading), false);
+  assert.equal(context.generate.includes(detourReading), true);
+  // Asked about what it shows ("what does this mean?"), it is searched as before.
+  const about = await detourStages(turn2);
+  assert.equal(about.search.includes(detourReading), true);
+  assert.equal(about.decide.includes(detourReading), true);
+});
+
+test("going back to an earlier request drops the detour's articles and points every stage at that request", async () => {
+  const ask = {
+    activeArticles: [articles[0]],
+    followUp: true,
+    latest: "what does that have to do with adding inboxes for my campaign?",
+    turns: detourTurns.slice(0, 4),
+  };
+  const back = await detourStages({ ...ask, returnsToEarlierAsk: true });
+  assert.deepEqual(back.read, [articles[2].url]);
+  for (const text of [back.search, back.decide, back.generate]) {
+    assert.equal(text.startsWith(RETURNS_TO_EARLIER_ASK), true);
+  }
+  const plain = await detourStages(ask);
+  assert.deepEqual(plain.read, [articles[2].url, articles[0].url]);
+  assert.equal(plain.generate.startsWith(RETURNS_TO_EARLIER_ASK), false);
 });

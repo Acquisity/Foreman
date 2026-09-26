@@ -523,6 +523,26 @@ const UNCLEAR_SCORE = 0.8;
  * reply meant. High on purpose: a request for fresh evidence must still be investigated.
  */
 const EXPLAIN_SCORE = 0.8;
+/** At or above this, the latest message goes back to an earlier, unfinished request. */
+const RETURNS_SCORE = 0.5;
+/** Below this, a screenshot only shows where the customer is, not what they ask about. */
+const ABOUT_SCREENSHOT_SCORE = 0.5;
+
+/** What the router's goal and screenshot judgments tell the help-center lane. */
+const kbAsk = (route: WidgetRoute, ask: WidgetAsk): WidgetAsk => {
+  const returnsToEarlierAsk = (route.returnsToEarlierAsk ?? 0) >= RETURNS_SCORE;
+  return {
+    ...ask,
+    // The previous reply's articles are the detour, so they are not carried.
+    followUp: !returnsToEarlierAsk && (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    ...(returnsToEarlierAsk ? { returnsToEarlierAsk } : {}),
+    ...(ask.screenshots?.length &&
+    route.aboutScreenshot !== undefined &&
+    route.aboutScreenshot < ABOUT_SCREENSHOT_SCORE
+      ? { screenshotIsContext: true }
+      : {}),
+  };
+};
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
 /**
@@ -1146,6 +1166,8 @@ async function answerFromKnowledgeBase(
   if (
     route.lane !== "human" &&
     (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
+    // "What does that have to do with X?" is not a request to explain the detour.
+    (route.returnsToEarlierAsk ?? 0) < RETURNS_SCORE &&
     ask.turns?.some((turn) => turn.role === "assistant")
   ) {
     const explained = await explainPrevious(run, ask, ids, deps);
@@ -1194,11 +1216,7 @@ async function helpCenterReply(
     );
   }
   const answer = await deps.answerKb(
-    {
-      ...ask,
-      cannotLook: true,
-      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
-    },
+    { ...kbAsk(route, ask), cannotLook: true },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
   if (answer?.unclear) {
@@ -1233,11 +1251,7 @@ async function answerGeneralQuestion(
     return null;
   }
   const answer = await deps.answerKb(
-    {
-      ...ask,
-      accountLikely: guardedTry,
-      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
-    },
+    { ...kbAsk(route, ask), accountLikely: guardedTry },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
   if (answer?.unclear) {

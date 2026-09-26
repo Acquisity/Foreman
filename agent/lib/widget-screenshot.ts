@@ -72,7 +72,7 @@ const readingSchema = z.object({
 export type ScreenshotReading = z.infer<typeof readingSchema>;
 
 const READ_PROMPT =
-  "A customer of Acquisity, a sales and marketing SaaS app, attached this screenshot to a support chat. Report only what is visible. Say which screen it is, transcribe any error, warning or status message verbatim (not ordinary page or chat text), note what looks highlighted, circled, empty, disabled, failed or otherwise wrong, and list what you could not read. Never guess at text you cannot read. Be brief.";
+  "A customer of Acquisity, a sales and marketing SaaS app, attached this screenshot to a support chat. Report only what is visible. Say which screen it is, name the main buttons, tabs and actions visible, transcribe any error, warning or status message verbatim (not ordinary page or chat text), note what looks highlighted, circled, empty, disabled, failed or otherwise wrong, and list what you could not read. Never guess at text you cannot read. Be brief.";
 
 export async function readScreenshot(
   image: Buffer,
