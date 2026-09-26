@@ -671,10 +671,9 @@ export async function decideBilling(
 // ---------------------------------------------------------------- follow-up
 
 export const FOLLOW_UP_OUTCOMES = {
-  note: "people in the thread talking to each other, such as a question to a teammate, a hand-off, or context that asks Foreman nothing and settles nothing",
   respond:
     "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
-  skip: "an acknowledgement, thanks, or noise",
+  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that settles nothing Foreman asked, an acknowledgement, thanks, or noise",
 } as const;
 export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES;
 
@@ -689,7 +688,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
-      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. Telling Foreman what kind of case this is, without settling what Foreman asked, is context.",
+      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman.",
     type: "choice",
   },
 });
@@ -697,9 +696,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
 /** Staying quiet needs a clear call; when unsure, the requester is answered. */
 export function resolveFollowUp(answers: Answers): FollowUpOutcome {
   const { choice, confidence } = choiceOf(answers.follow_up);
-  return choice !== "respond" && confidence >= BARS.followUp
-    ? (choice as FollowUpOutcome)
-    : "respond";
+  return choice === "skip" && confidence >= BARS.followUp ? "skip" : "respond";
 }
 
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
