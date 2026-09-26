@@ -59,10 +59,17 @@ export const onAgentSession = async (
   }
   // Every relayed Slack reply opens a session; one that needs nothing from
   // Foreman ends here with a line in the session chat, never on the ticket.
-  if (await skipsFollowUp(event)) {
-    await ctx.linear
+  // If the line cannot be posted, dispatch rather than leave the session
+  // with nothing.
+  if (
+    (await skipsFollowUp(event)) &&
+    (await ctx.linear
       .createActivity({ body: "No reply needed.", type: "response" })
-      .catch(() => undefined);
+      .then(
+        () => true,
+        () => false
+      ))
+  ) {
     return null;
   }
   // URLs only: a bare `owner/repo` token in an issue title, description, or
