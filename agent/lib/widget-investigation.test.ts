@@ -3,13 +3,6 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import {
-  detourReading,
-  detourTurns,
-  stepsLatest,
-  stepsReading,
-  stepsTurns,
-} from "./widget-detour.fixture.js";
 import type { GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
@@ -26,7 +19,7 @@ import {
 } from "./widget-investigation.js";
 import type { KbAnswer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
-import { toAsk, type WidgetAsk } from "./widget-router.js";
+import type { WidgetAsk } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import { WIDGET_SUPPORT_ISSUER } from "./widget-scope.js";
 
@@ -2147,145 +2140,6 @@ test("a genuine account question in the same score range still investigates: the
     assert.equal(asked, tried);
     assert.equal(body.message, allowed.message);
     assert.deepEqual(gated, [findings]);
-  }
-});
-
-// Preview 741aab58: "what does that have to do with adding inboxes?" defended
-// the reconnect detour, and a screenshot of the right page sent search to its warning.
-test("a message that goes back to an earlier request drops the detour's articles and skips the explain reply", async (t) => {
-  enabled(t);
-  for (const [returnsToEarlierAsk, back] of [
-    [0.8, true],
-    [0.2, false],
-  ] as const) {
-    const { deps } = dependencies();
-    deps.route = () =>
-      Promise.resolve({
-        ...followUpBase,
-        confidence: 0.9,
-        explainsPrevious: back ? 0.9 : 0,
-        followUp: 0.9,
-        kbScore: 0.9,
-        returnsToEarlierAsk,
-      });
-    let got: WidgetAsk | undefined;
-    deps.answerKb = (ask) => {
-      got = toAsk(ask);
-      return Promise.resolve(kbAnswer);
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    await receiveWidgetMessage(
-      request({
-        ...start,
-        history: detourTurns.slice(0, 4),
-        message_id: crypto.randomUUID(),
-        question:
-          "what does that have to do with adding inboxes for my campaign?",
-      }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    assert.equal(got?.returnsToEarlierAsk === true, back);
-    assert.equal(got?.followUp, !back);
-  }
-});
-
-// Preview 5fc15d15: "i found the cold email agent where do i go from here?"
-// scored followUp 0.19 and the screenshot 0.47, so its checklist was answered.
-// Scores are the ones measured through the AI Gateway on 2026-09-26.
-test("a message that says how far the customer got in the previous reply's steps keeps those articles and treats its screenshot as where they are", async (t) => {
-  enabled(t);
-  const errorReading =
-    "Email Accounts page. Warning banner: 'Google needs re-authentication'.";
-  for (const [name, history, question, screenshots, scores, want] of [
-    [
-      "5fc15d15 found the agent",
-      stepsTurns,
-      stepsLatest,
-      [stepsReading],
-      { continuesSteps: 0.72, followUp: 0.15, returnsToEarlierAsk: 0.11 },
-      { context: true, continues: true, followUp: true, returns: false },
-    ],
-    [
-      "741aab58 ok im here",
-      detourTurns.slice(0, 2),
-      "ok im here. now what?",
-      [detourReading],
-      { continuesSteps: 0.85, followUp: 0.8, returnsToEarlierAsk: 0.46 },
-      { context: true, continues: true, followUp: true, returns: false },
-    ],
-    [
-      "741aab58 reconnected: going back wins",
-      detourTurns.slice(0, 6),
-      "ah ok. ok i reconnected now what?",
-      [detourReading],
-      { continuesSteps: 0.75, followUp: 0.72, returnsToEarlierAsk: 0.85 },
-      { context: true, continues: false, followUp: false, returns: true },
-    ],
-    [
-      "error screenshot: what does this mean?",
-      detourTurns.slice(0, 2),
-      "what does this mean?",
-      [errorReading],
-      { continuesSteps: 0.27, followUp: 0.12, returnsToEarlierAsk: 0.09 },
-      { context: false, continues: false, followUp: false, returns: false },
-    ],
-    [
-      "error screenshot: how do i fix this?",
-      detourTurns.slice(0, 2),
-      "how do i fix this?",
-      [errorReading],
-      { continuesSteps: 0.29, followUp: 0.17, returnsToEarlierAsk: 0.11 },
-      { context: false, continues: false, followUp: false, returns: false },
-    ],
-    [
-      "new topic",
-      detourTurns.slice(0, 2),
-      "how do I change my sender name?",
-      undefined,
-      { continuesSteps: 0.1, followUp: 0.04, returnsToEarlierAsk: 0.04 },
-      { context: false, continues: false, followUp: false, returns: false },
-    ],
-  ] as const) {
-    const { deps } = dependencies();
-    deps.route = () =>
-      Promise.resolve({
-        ...followUpBase,
-        confidence: 0.9,
-        kbScore: 0.9,
-        ...scores,
-      });
-    let got: WidgetAsk | undefined;
-    deps.answerKb = (ask) => {
-      got = toAsk(ask);
-      return Promise.resolve(kbAnswer);
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    await receiveWidgetMessage(
-      request({
-        ...start,
-        history: [...history],
-        message_id: crypto.randomUUID(),
-        question,
-        ...(screenshots ? { screenshots: [...screenshots] } : {}),
-      }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    assert.deepEqual(
-      {
-        context: got?.screenshotIsContext === true,
-        continues: got?.continuesSteps === true,
-        followUp: got?.followUp === true,
-        returns: got?.returnsToEarlierAsk === true,
-      },
-      want,
-      name
-    );
   }
 });
 

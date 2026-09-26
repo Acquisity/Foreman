@@ -523,35 +523,6 @@ const UNCLEAR_SCORE = 0.8;
  * reply meant. High on purpose: a request for fresh evidence must still be investigated.
  */
 const EXPLAIN_SCORE = 0.8;
-/** At or above this, the latest message goes back to an earlier, unfinished request. */
-const RETURNS_SCORE = 0.5;
-/**
- * At or above this, the latest message says how far the customer got in the
- * previous reply's steps. Continuations scored 0.66 to 0.90, error screenshots
- * at most 0.44, and messages going back to an earlier request 0.53 to 0.57.
- */
-const CONTINUES_SCORE = 0.6;
-
-/** What the router's goal and continuation judgments tell the help-center lane. */
-const kbAsk = (route: WidgetRoute, ask: WidgetAsk): WidgetAsk => {
-  const returnsToEarlierAsk = (route.returnsToEarlierAsk ?? 0) >= RETURNS_SCORE;
-  const continues = (route.continuesSteps ?? 0) >= CONTINUES_SCORE;
-  // Going back wins: the previous reply's steps were the detour.
-  const continuesSteps = continues && !returnsToEarlierAsk;
-  return {
-    ...ask,
-    // The previous reply's articles are the detour, so they are not carried.
-    followUp:
-      !returnsToEarlierAsk &&
-      ((route.followUp ?? 0) >= FOLLOW_UP_SCORE || continuesSteps),
-    ...(continuesSteps ? { continuesSteps } : {}),
-    ...(returnsToEarlierAsk ? { returnsToEarlierAsk } : {}),
-    // A screenshot sent while following steps shows where they are, not what they ask.
-    ...(ask.screenshots?.length && continues
-      ? { screenshotIsContext: true }
-      : {}),
-  };
-};
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
 /**
@@ -1175,8 +1146,6 @@ async function answerFromKnowledgeBase(
   if (
     route.lane !== "human" &&
     (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
-    // "What does that have to do with X?" is not a request to explain the detour.
-    (route.returnsToEarlierAsk ?? 0) < RETURNS_SCORE &&
     ask.turns?.some((turn) => turn.role === "assistant")
   ) {
     const explained = await explainPrevious(run, ask, ids, deps);
@@ -1225,7 +1194,11 @@ async function helpCenterReply(
     );
   }
   const answer = await deps.answerKb(
-    { ...kbAsk(route, ask), cannotLook: true },
+    {
+      ...ask,
+      cannotLook: true,
+      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
   if (answer?.unclear) {
@@ -1260,7 +1233,11 @@ async function answerGeneralQuestion(
     return null;
   }
   const answer = await deps.answerKb(
-    { ...kbAsk(route, ask), accountLikely: guardedTry },
+    {
+      ...ask,
+      accountLikely: guardedTry,
+      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
+    },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
   if (answer?.unclear) {
