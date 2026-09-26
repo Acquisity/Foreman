@@ -46,7 +46,8 @@ describe("buildLinearContext", () => {
   it("leaves the follow-up decision to reply_to_requester and keeps other comments out of the thread", () => {
     for (const rule of [
       "pass your answer to reply_to_requester",
-      "returns posted false, post nothing",
+      "returns posted false with an outcome, post nothing",
+      "A result with an error is a failed delivery",
       "Never comment under the Slack thread comment any other way",
     ]) {
       assert.ok(LINEAR_TRIAGE_ROUTE.includes(rule), rule);
