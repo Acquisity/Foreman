@@ -8,7 +8,11 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { LIMITATION_POLICY, reviewWidgetFindings } from "./widget-review.js";
+import {
+  judgeBudgetMs,
+  LIMITATION_POLICY,
+  reviewWidgetFindings,
+} from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
 
@@ -41,6 +45,8 @@ export interface GateDeps {
     scope: WidgetContext;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
+    /** When that deadline passes (epoch ms), so the judge can leave the composer its time. */
+    finishAt?: number;
   }) => Promise<{ decision: GateDecision; reason: string; remove?: number[] }>;
   resolve: (
     scope: WidgetContext,
@@ -84,8 +90,9 @@ const PUBLIC_HOSTS = new Set([
   "docs.acquisity.ai",
 ]);
 const FOREIGN_PREFIX = "foreign_identifier:";
-/** How many foreign identifiers the gate deletes items for before it gives up and blocks. */
-const MAX_FOREIGN_PASSES = 5;
+const INTERNAL_PREFIX = "internal_artifact:";
+/** How many foreign identifiers or internal artifacts the gate deletes items for before it gives up and blocks. */
+const MAX_REMOVAL_PASSES = 5;
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -267,7 +274,7 @@ async function deterministicTextReason(
 ): Promise<string | null> {
   const { candidates, internal } = scanIdentifiers(text, exemptTicketId);
   if (internal.length) {
-    return `internal_artifact:${internal[0]}`;
+    return `${INTERNAL_PREFIX}${internal[0]}`;
   }
   const domains = candidates.domains ?? [];
   if (
@@ -480,11 +487,9 @@ const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
 
 /**
  * A stalled model call must fail closed as gate_unavailable, not hold the reply
- * past the app's last poll. The app stops polling 285s after it sends and an
- * investigation may run to its 170s deadline, so the finish (extract, judge,
- * compose) has about 115s; the extractor gets 25s of it.
+ * past the app's last poll. The judge gets what the finish has left less the
+ * composer's time (see `judgeBudgetMs`).
  */
-const JUDGE_TIMEOUT_MS = 60_000;
 const COMPOSE_TIMEOUT_MS = 25_000;
 
 export const defaultGateDeps: GateDeps = {
@@ -515,7 +520,10 @@ export const defaultGateDeps: GateDeps = {
   judge: (input) =>
     process.env.WIDGET_REVIEWER === "jev"
       ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(input, within(JUDGE_TIMEOUT_MS, input.signal)),
+      : modelJudge(
+          input,
+          within(judgeBudgetMs(input.finishAt, Date.now()), input.signal)
+        ),
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
@@ -567,6 +575,34 @@ export function withoutTicketRefs(
   return cites.length ? removeItems(findings, cites) : findings;
 }
 
+/** The items holding a scan's foreign identifier or internal artifact, or null for any other reason. */
+function itemsCarrying(
+  findings: WidgetFindings,
+  reason: string | null
+): number[] | null {
+  const foreign = reason?.startsWith(FOREIGN_PREFIX)
+    ? reason.slice(FOREIGN_PREFIX.length)
+    : null;
+  const artifact = reason?.startsWith(INTERNAL_PREFIX)
+    ? reason.slice(INTERNAL_PREFIX.length)
+    : null;
+  const found = foreign ?? artifact;
+  if (found === null) {
+    return null;
+  }
+  return redactableItems(findings)
+    .filter((item) => {
+      const { candidates, internal } = scanIdentifiers(
+        item.text,
+        findings.ticket?.id
+      );
+      return foreign === null
+        ? internal.includes(found)
+        : Object.values(candidates).some((ids) => ids.includes(found));
+    })
+    .map((item) => item.n);
+}
+
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
 export async function gate(
   scope: WidgetContext,
@@ -583,7 +619,9 @@ export async function gate(
    */
   signal?: AbortSignal,
   /** Whether the app shows its screen recording card under this reply. */
-  recordingOffered = false
+  recordingOffered = false,
+  /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
+  finishAt?: number
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
   const timings: Record<string, number> = {};
@@ -603,27 +641,13 @@ export async function gate(
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
-    // does not own never reaches the customer, but the item carrying it is
-    // deleted rather than the whole reply: nothing is reworded, and the scan runs
-    // again on what is left. It still blocks when nothing would be left or the
-    // identifier sits outside the removable items.
-    for (
-      let pass = 0;
-      reason?.startsWith(FOREIGN_PREFIX) && pass < MAX_FOREIGN_PASSES;
-      pass += 1
-    ) {
-      const foreign = reason.slice(FOREIGN_PREFIX.length);
-      const trimmed = removeItems(
-        findings,
-        redactableItems(findings)
-          .filter((item) => {
-            const { candidates } = scanIdentifiers(item.text);
-            return Object.values(candidates).some((ids) =>
-              ids.includes(foreign)
-            );
-          })
-          .map((item) => item.n)
-      );
+    // does not own, or an internal artifact, never reaches the customer, but the
+    // item carrying it is deleted rather than the whole reply: nothing is
+    // reworded, and the scan runs again on what is left. It still blocks when
+    // nothing would be left or the finding sits outside the removable items.
+    for (let pass = 0; pass < MAX_REMOVAL_PASSES; pass += 1) {
+      const carrying = itemsCarrying(findings, reason);
+      const trimmed = carrying && removeItems(findings, carrying);
       if (!trimmed) {
         break;
       }
@@ -645,6 +669,7 @@ export async function gate(
     const verdict = await timed("judge", () =>
       deps.judge({
         findings,
+        finishAt,
         items: redactableItems(findings),
         question,
         scope,
