@@ -1141,16 +1141,7 @@ test('a follow-up reaches the router and the fast lane with the earlier turns, s
   }
 });
 
-const followUpRoute =
-  (followUp: number, confidence = 0.9) =>
-  () =>
-    Promise.resolve({
-      ...followUpBase,
-      confidence,
-      followUp,
-      kbScore: confidence,
-    });
-const followUpBase = {
+const kbBase = {
   asksForAction: 0,
   asksForHuman: 0,
   asksOwnData: 0,
@@ -1161,7 +1152,7 @@ const cited = [
   { title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
 ];
 
-test("the previous reply's citations reach the fast lane, flagged as a follow-up only when the router says so", async (t) => {
+test("the previous reply's citations reach the fast lane, whatever the message", async (t) => {
   enabled(t);
   const history = [
     { role: "customer" as const, text: "how do i set up ai sdr?" },
@@ -1171,12 +1162,9 @@ test("the previous reply's citations reach the fast lane, flagged as a follow-up
       text: "Connect a calendar.",
     },
   ];
-  for (const [asked, score, expected] of [
-    ["okay, what next?", 0.95, true],
-    ["how do i buy a domain?", 0.05, false],
-  ] as const) {
+  for (const asked of ["okay, what next?", "how do i buy a domain?"]) {
     const { deps } = dependencies();
-    deps.route = followUpRoute(score);
+    deps.route = kbRoute(0.9);
     let got: unknown;
     deps.answerKb = (ask) => {
       got = ask;
@@ -1195,16 +1183,17 @@ test("the previous reply's citations reach the fast lane, flagged as a follow-up
       verify,
       deps
     );
-    const sent = got as { activeArticles: unknown; followUp: boolean };
-    assert.deepEqual(sent.activeArticles, cited);
-    assert.equal(sent.followUp, expected);
+    assert.deepEqual(
+      (got as { activeArticles: unknown }).activeArticles,
+      cited
+    );
   }
 });
 
 test("malformed citation history is dropped, not a reason to refuse the message", async (t) => {
   enabled(t);
   const { deps } = dependencies();
-  deps.route = followUpRoute(0.95);
+  deps.route = kbRoute(0.9);
   let got: unknown;
   deps.answerKb = (ask) => {
     got = ask;
@@ -1244,7 +1233,7 @@ test("a confident help-center question that misses gets a clarifying reply: no i
     () => Promise.reject(new Error("timeout")),
   ]) {
     const { deps, gated, run } = dependencies();
-    deps.route = followUpRoute(0, 0.9);
+    deps.route = kbRoute(0.9);
     deps.answerKb = () => Promise.resolve(null);
     deps.answerChat = clarify;
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
@@ -1275,20 +1264,20 @@ test("the replies written at the front door read the latest message first with f
   }));
   const chatRoute = () =>
     Promise.resolve({
-      ...followUpBase,
+      ...kbBase,
       confidence: 0.9,
       kbScore: 0,
       lane: "chat" as const,
     });
   const unclearRoute = () =>
     Promise.resolve({
-      ...followUpBase,
+      ...kbBase,
       confidence: 0.2,
       kbScore: 0,
       lane: "investigate" as const,
       unclear: 0.95,
     });
-  for (const route of [followUpRoute(0, 0.9), chatRoute, unclearRoute]) {
+  for (const route of [kbRoute(0.9), chatRoute, unclearRoute]) {
     const { deps } = dependencies();
     deps.route = route;
     deps.answerKb = () => Promise.resolve(null);
@@ -1322,10 +1311,10 @@ test("the replies written at the front door read the latest message first with f
 test("a miss the router was unsure about, or an account question, still investigates", async (t) => {
   enabled(t);
   for (const route of [
-    followUpRoute(0, 0.4),
+    kbRoute(0.4),
     () =>
       Promise.resolve({
-        ...followUpBase,
+        ...kbBase,
         asksOwnData: 0.95,
         confidence: 0.9,
         kbScore: 0.55,
@@ -1886,7 +1875,6 @@ const loggedRoute = (latest: string) => {
       ...base,
       asksOwnData: 0.9,
       confidence: 0.61,
-      followUp: 0.04,
       kbScore: 0.29,
       lane: "investigate" as const,
       unclear: 0.46,
@@ -1897,7 +1885,6 @@ const loggedRoute = (latest: string) => {
       ...base,
       asksOwnData: 0.77,
       confidence: 0.51,
-      followUp: 0.12,
       kbScore: 0.33,
       lane: "investigate" as const,
       unclear: 0.66,
@@ -2150,7 +2137,6 @@ const explainRoute = (explainsPrevious: number) => () =>
     asksOwnData: 0.9,
     confidence: 0.95,
     explainsPrevious,
-    followUp: 0.84,
     kbScore: 0,
     lane: "investigate" as const,
     source: "jev" as const,

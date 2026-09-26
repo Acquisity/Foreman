@@ -33,7 +33,7 @@ import {
  */
 
 const MAX_ARTICLES = 4;
-/** How many previously cited articles ride along with a follow-up's fresh retrieval. */
+/** How many previously cited articles ride along with every fresh retrieval. */
 const MAX_ACTIVE_ARTICLES = 2;
 const INDEX_TIMEOUT_MS = 5000;
 const CHAT_TIMEOUT_MS = 12_000;
@@ -50,6 +50,9 @@ const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
+/** How Acquisity words a message that is only a screenshot (apps/web lib/support/foreman-reply.ts). */
+const SCREENSHOT_ONLY = /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
+const WORD = /[\p{L}\p{N}]/u;
 
 const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
 
@@ -183,8 +186,8 @@ export type KbDecision = (typeof KB_DECISIONS)[number];
 
 const decisionCriteria = (accountLikely: boolean) => ({
   answer: accountLikely
-    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). A message that asks Support to check, look at or look into their own account is NOT this, even when it also says what went wrong."
-    : "The numbered articles answer the latest message: how to do something, where something is, what something means, or why the product in general behaves some way. It is still this when the message says 'my account' or 'my workspace', because the articles' general steps answer it.",
+    ? "The numbered articles answer the latest message: it names a specific error, warning or blocked screen whose fix an article documents, or asks how to do something, where something is, what something means, or why the product in general behaves some way (such as why two totals in the product can differ). It is also this when the message asks where to go next or is only a screenshot, and an article gives the next step of what the customer was already doing. A message that asks Support to check, look at or look into their own account is NOT this, even when it also says what went wrong."
+    : "The numbered articles answer the latest message: how to do something, where something is, what something means, or why the product in general behaves some way. It is still this when the message says 'my account' or 'my workspace', because the articles' general steps answer it, and when it asks where to go next or is only a screenshot, and an article gives the next step of what the customer was already doing.",
   not_covered:
     "None of the numbered articles covers what the latest message asks. An article about a nearby topic, or one that only mentions the subject in passing, does not count.",
   which_product:
@@ -841,22 +844,28 @@ export async function answerFromHelpCenter(
     );
   };
   try {
-    // A dependent follow-up also reads what the previous reply cited, but never
-    // instead of a fresh retrieval: "and if the chat bubble is missing?" scored as
-    // a follow-up, was answered from the ticket-status article alone and cited it.
-    // Fresh hits lead, so the latest message outweighs the earlier citation.
+    // Every message also reads what the previous reply cited, whatever the
+    // router made of it: "where do i go from here?" with a screenshot scored 0.25
+    // as a follow-up, was read without the buying guides it continued, and
+    // missed. Never instead of a fresh retrieval: "and if the chat bubble is
+    // missing?" answered from the ticket-status article alone. Fresh hits lead,
+    // so the latest message outweighs the earlier citation.
     const [active, { hits: fresh, via }] = await Promise.all([
-      ask.followUp ? activeArticleHits(ask, signal, deps) : [],
+      activeArticleHits(ask, signal, deps),
       findArticles(question, signal, deps),
     ]);
     const kept = active
       .filter((hit) => !fresh.some((found) => found.url === hit.url))
       .slice(0, MAX_ACTIVE_ARTICLES);
-    mark(`active=${kept.length} find:${via}`);
-    const result = await attempt([
-      ...fresh.slice(0, MAX_ARTICLES - kept.length),
-      ...kept,
-    ]);
+    const picked = fresh.slice(0, MAX_ARTICLES - kept.length);
+    // With no words of its own, the latest message has only its screenshot to
+    // pick by, and a warning on it outranked the guides being followed: every
+    // screenshot-only follow-up to "buy inboxes" was answered with Reconnect.
+    const wordless = !WORD.test(ask.latest.replace(SCREENSHOT_ONLY, ""));
+    mark(`active=${kept.length}${wordless ? ":first" : ""} find:${via}`);
+    const result = await attempt(
+      wordless ? [...kept, ...picked] : [...picked, ...kept]
+    );
     logArticles("message" in result ? result.citations : []);
     if (!("message" in result)) {
       finish(

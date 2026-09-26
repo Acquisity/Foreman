@@ -39,7 +39,6 @@ describe("routeWidgetMessage", () => {
       asksOwnData: 0.91,
       confidence: 0.87,
       explainsPrevious: 0,
-      followUp: 0,
       kbScore: 0,
       lane: "investigate",
       source: "jev",
@@ -54,7 +53,6 @@ describe("routeWidgetMessage", () => {
       "asks_for_refund",
       "asks_for_ticket",
       "asks_own_data",
-      "depends_on_previous",
       "explains_previous",
       "is_unclear",
       "lane",
@@ -311,7 +309,7 @@ describe("routeWidgetMessage", () => {
     assert.equal(renderAsk("hello"), "hello");
 
     let sent = "";
-    const route = await routeWidgetMessage(
+    await routeWidgetMessage(
       { latest: "okay, what next?", turns },
       {
         apiKey: "test-key",
@@ -323,7 +321,6 @@ describe("routeWidgetMessage", () => {
                 answers: {
                   asks_for_human: { noul: 0 },
                   asks_own_data: { noul: 0.1 },
-                  depends_on_previous: { noul: 0.93 },
                   lane: { choice: "kb", confidence: 0.8 },
                 },
               }),
@@ -338,7 +335,6 @@ describe("routeWidgetMessage", () => {
       sent,
       renderAsk({ latest: "okay, what next?", turns }, DECISION_CONTEXT)
     );
-    assert.equal(route.followUp, 0.93);
   });
 });
 

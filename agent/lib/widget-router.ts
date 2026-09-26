@@ -57,8 +57,6 @@ export interface WidgetAsk {
    * "not something I can do" first, instead of stepping aside.
    */
   cannotLook?: boolean;
-  /** The router judged `latest` a continuation of the previous reply. */
-  followUp?: boolean;
   latest: string;
   /**
    * Whether the app shows its screen recording card under this reply: the same
@@ -211,24 +209,15 @@ const QUESTIONS = {
       "The customer is asking about their own account, workspace, campaigns, billing, or activity, rather than how the product works in general.",
     type: "noul",
   },
-  // "what about the limit?" and "nothing works!!" were investigated for two to
-  // three minutes before anyone asked what the customer meant.
-  // A terse follow-up ("okay, and after that?") has no subject of its own, so
-  // retrieval on it alone drifts to another article. This is what keeps the
-  // article the previous reply cited; a named new subject scores low and resets it.
-  depends_on_previous: {
-    instructions:
-      "The customer's latest message only makes sense as a continuation of Support's previous answer: it asks for the next step, more detail, a part, a repeat or a clarification of what was just explained, and names no product, feature or subject of its own. A message that names a new product, feature, page or subject is NOT this, however short it is.",
-    type: "noul",
-  },
-  // Asked in the same request as the rest, so it costs no extra call. It is not
-  // depends_on_previous: "and what about campaign B?" continues the conversation
-  // and still needs a look.
+  // Asked in the same request as the rest, so it costs no extra call. "And what
+  // about campaign B?" continues the conversation and still needs a look.
   explains_previous: {
     instructions:
       "The customer's latest message only asks what Support's previous answer means: to explain, confirm, reword or spell out the implication of something that answer already said. It can be answered from that answer's own words with nothing looked up. A request to check again, to check something else, for the current status, or about anything the previous answer did not cover is NOT this.",
     type: "noul",
   },
+  // "what about the limit?" and "nothing works!!" were investigated for two to
+  // three minutes before anyone asked what the customer meant.
   is_unclear: {
     instructions:
       "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
@@ -277,9 +266,6 @@ const responseSchema = z.object({
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
-    depends_on_previous: z
-      .object({ noul: z.number().min(0).max(1) })
-      .optional(),
     explains_previous: z.object({ noul: z.number().min(0).max(1) }).optional(),
     is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     lane: z.object({
@@ -315,8 +301,6 @@ export interface WidgetRoute {
   confidence: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
-  /** How likely the latest message only continues the previous reply. */
-  followUp?: number;
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
@@ -426,7 +410,6 @@ export async function routeWidgetMessage(
       asksOwnData: answers.asks_own_data.noul,
       confidence,
       explainsPrevious: answers.explains_previous?.noul ?? 0,
-      followUp: answers.depends_on_previous?.noul ?? 0,
       // Jev may omit the per-lane probabilities; the winner's confidence stands in.
       kbScore:
         answers.lane.probabilities?.kb ??
@@ -506,7 +489,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
     runId: fields.runId,
   });
 }

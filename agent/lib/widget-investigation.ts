@@ -504,8 +504,6 @@ const STRONG_KB_CONFIDENCE = 0.6;
  * picks the router is sure of (0.91 to 1.00 in the same runs) skip it.
  */
 const SURE_INVESTIGATE_CONFIDENCE = 0.9;
-/** How sure the router must be that the message only continues the previous reply. */
-const FOLLOW_UP_SCORE = 0.6;
 /**
  * How sure the router must be that the customer wants something done for them.
  * High on purpose: a lookup wrongly read as a request to act would get general
@@ -1197,7 +1195,6 @@ async function helpCenterReply(
     {
       ...ask,
       cannotLook: true,
-      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
     },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
@@ -1236,7 +1233,6 @@ async function answerGeneralQuestion(
     {
       ...ask,
       accountLikely: guardedTry,
-      followUp: (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
     },
     { conversationId: run.scope.conversationId, runId: run.id }
   );
