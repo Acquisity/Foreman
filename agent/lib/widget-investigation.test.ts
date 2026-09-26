@@ -886,6 +886,53 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
 });
 
+test("Jev's recording judgment asks the app for the card and tells the help-center writer", async (t) => {
+  enabled(t);
+  const answeredWith = async (recording: boolean) => {
+    const { deps, run } = dependencies();
+    deps.route = () =>
+      Promise.resolve({
+        asksForAction: 0,
+        asksForHuman: 0,
+        asksOwnData: 0,
+        confidence: 0.97,
+        kbScore: 0.9,
+        lane: "kb" as const,
+        ...(recording ? { recording } : {}),
+        source: "jev" as const,
+      });
+    const asks: WidgetAsk[] = [];
+    deps.answerKb = (ask) => {
+      asks.push(ask as WidgetAsk);
+      return Promise.resolve(kbAnswer);
+    };
+    deps.requestRecording = () => {
+      run.recording_requested = true;
+      return Promise.resolve();
+    };
+    const body = (await (
+      await receiveWidgetMessage(
+        request({
+          ...start,
+          // The pattern misses this typo; only Jev's judgment catches it.
+          question: "i found a bug can i send a screen reco0rding",
+        }),
+        noWork(),
+        200,
+        verify,
+        deps
+      )
+    ).json()) as Record<string, unknown>;
+    return { body, offered: asks.at(-1)?.recordingOffered };
+  };
+  const asked = await answeredWith(true);
+  assert.equal(asked.body.request_recording, true);
+  assert.equal(asked.offered, true);
+  const notAsked = await answeredWith(false);
+  assert.equal(notAsked.body.request_recording, undefined);
+  assert.equal(notAsked.offered, false);
+});
+
 test("every reply lane is told whether the recording card shows, and only a recorded offer says it does", async (t) => {
   enabled(t);
   const bugRoute = (bug: boolean) => () =>

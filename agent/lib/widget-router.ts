@@ -31,6 +31,8 @@ const TICKET_REQUEST = 0.5;
 const REFUND_REQUEST = 0.5;
 /** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
 const BUG_REPORT = 0.7;
+/** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
+const RECORDING_REQUEST = 0.5;
 
 export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
 export type WidgetLane = (typeof WIDGET_LANES)[number];
@@ -144,7 +146,7 @@ export function renderConversation(
 
 /** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
 export const RECORDING_RULE =
-  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is false, never mention a recording option or card, and never say a recording is impossible.";
+  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the recording option below is the way to send it. When it is false, never mention a recording option or card, and never say a recording is impossible.";
 
 /** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
 export const renderReplyAsk = (
@@ -243,6 +245,14 @@ const QUESTIONS = {
     instructions: "Which kind of help does the customer's message need?",
     type: "choice",
   },
+  // Asked in the same request, so it costs nothing. Like reports_bug, it only
+  // decides whether the app offers its recording card; the lanes ignore it.
+  // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
+  offers_recording: {
+    instructions:
+      "The customer asks whether they can send, share or show a screen recording or video of their problem, or offers to record one. A question about how to record something inside the product, or a problem with a recording feature, is NOT this.",
+    type: "noul",
+  },
   // Asked in the same request, so it costs nothing. It only decides whether the
   // app offers a screen recording next to the reply; the lanes ignore it.
   reports_bug: {
@@ -269,6 +279,7 @@ const responseSchema = z.object({
       confidence: z.number().min(0).max(1).optional(),
       probabilities: z.record(z.string(), z.number()).optional(),
     }),
+    offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
@@ -301,6 +312,8 @@ export interface WidgetRoute {
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
+  /** The customer asks or offers to send a screen recording, so the app offers one. */
+  recording?: boolean;
   /** The customer asked for a refund, which an investigation files as a ticket. */
   refund?: boolean;
   source: "jev" | "fallback";
@@ -397,6 +410,8 @@ export async function routeWidgetMessage(
     const { answers } = responseSchema.parse(await response.json());
     const confidence = answers.lane.confidence ?? 0;
     const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
+    const recording =
+      (answers.offers_recording?.noul ?? 0) >= RECORDING_REQUEST;
     const routed: WidgetRoute = ticketRoute(answers, confidence) ?? {
       asksForAction: answers.asks_for_action?.noul ?? 0,
       asksForHuman: answers.asks_for_human.noul,
@@ -414,7 +429,11 @@ export async function routeWidgetMessage(
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
     };
-    return bug ? { ...routed, bug } : routed;
+    return {
+      ...routed,
+      ...(bug ? { bug } : {}),
+      ...(recording ? { recording } : {}),
+    };
   } catch {
     return FALLBACK;
   }
@@ -468,7 +487,7 @@ export async function asksForChange(
 const RECORDING_OFFER =
   /\bscreen[\s-]?(?:record|cast|capture)|\brecord(?:ing)?\s+(?:of\s+)?(?:my|the)\s+screen|\b(?:send|share|upload|attach|record|show)\b[^.?!]{0,40}\b(?:video|loom|jam)\b/i;
 
-/** The customer asks or offers to send a screen recording, so the app offers one whatever the bug score. */
+/** A cheap extra trigger beside Jev's offers_recording, which is what catches typos and rewordings. */
 export const offersRecording = (message: string) =>
   RECORDING_OFFER.test(message.slice(0, 4000));
 
@@ -479,7 +498,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} followUp=${(route.followUp ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
     runId: fields.runId,
   });
 }

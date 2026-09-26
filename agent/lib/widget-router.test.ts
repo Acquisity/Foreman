@@ -58,6 +58,7 @@ describe("routeWidgetMessage", () => {
       "explains_previous",
       "is_unclear",
       "lane",
+      "offers_recording",
       "reports_bug",
     ]);
     assert.equal(
@@ -161,6 +162,36 @@ describe("routeWidgetMessage", () => {
       fetch: bugReply({}, 0.2),
     });
     assert.equal(howTo.bug, undefined);
+  });
+
+  it("flags an ask or offer to send a recording when Jev says so, typos included", async () => {
+    const recordingReply = (offers: number) => () =>
+      Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              asks_for_human: { noul: 0.04 },
+              asks_own_data: { noul: 0.2 },
+              lane: { choice: "kb", confidence: 0.8 },
+              offers_recording: { noul: offers },
+              reports_bug: { noul: 0.1 },
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    const message = "i found a bug can i send a screen reco0rding";
+    const asked = await routeWidgetMessage(message, {
+      apiKey: "test-key",
+      fetch: recordingReply(0.96),
+    });
+    assert.equal(asked.recording, true);
+    assert.equal(asked.lane, "kb");
+    const notAsked = await routeWidgetMessage(
+      "how do I record a video in the app builder",
+      { apiKey: "test-key", fetch: recordingReply(0.25) }
+    );
+    assert.equal(notAsked.recording, undefined);
   });
 
   it("investigates a refund request as a ticket, unless the customer asked for a person", async () => {
