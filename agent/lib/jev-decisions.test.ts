@@ -4,7 +4,9 @@ import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
+  decideFollowUp,
   resolveBilling,
+  resolveFollowUp,
   resolveTriage,
   type TriageInput,
   triageQuestions,
@@ -364,4 +366,36 @@ test("askJev stops before the request when the call is already cancelled", async
   await assert.rejects(cancelled());
   await assert.rejects(cancelled("t"));
   assert.equal(called, false);
+});
+
+test("a follow-up stays quiet only on a clear skip or note", () => {
+  assert.equal(resolveFollowUp({ follow_up: pick("skip") }), "skip");
+  assert.equal(resolveFollowUp({ follow_up: pick("note") }), "note");
+  assert.equal(resolveFollowUp({ follow_up: pick("respond", 0.4) }), "respond");
+  for (const quiet of ["skip", "note"]) {
+    assert.equal(
+      resolveFollowUp({ follow_up: pick(quiet, 0.5) }),
+      "respond",
+      `an unsure ${quiet} answers the requester`
+    );
+  }
+});
+
+test("a follow-up that is only mentions is skipped without asking Jev", async () => {
+  const outcome = await decideFollowUp(
+    {
+      lastReply: "Which amount?",
+      replies: [
+        "https://linear.app/acquisity/profiles/acquisityforeman1 **Gary** replied in Slack:\n\n<@U0950315SDC>",
+        " <@U1|bot> ",
+      ],
+    },
+    {
+      fetch: () => {
+        throw new Error("Jev should not be asked.");
+      },
+      token: "t",
+    }
+  );
+  assert.equal(outcome, "skip");
 });

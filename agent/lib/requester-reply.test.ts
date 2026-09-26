@@ -25,6 +25,7 @@ const reply = (
 test("replies under the anchor when Foreman has not spoken yet", () => {
   assert.deepEqual(planReply([anchor], FOREMAN), {
     anchorId: "anchor",
+    followUp: null,
     ok: true,
   });
 });
@@ -61,6 +62,30 @@ test("uses the earliest top-level anchor, not a later or nested lookalike", () =
   const later = { ...anchor, createdAt: "2026-09-25T16:00:00Z", id: "later" };
   assert.deepEqual(planReply([later, nested, anchor], FOREMAN), {
     anchorId: "anchor",
+    followUp: null,
+    ok: true,
+  });
+});
+
+test("a reply after Foreman spoke is a follow-up carrying everything said since", () => {
+  // ENG-14323: three requester replies after one Foreman answer, each waking
+  // a new turn. Every turn sees all of them until Foreman posts again.
+  const thread = [
+    anchor,
+    { ...reply("q", "gary", "2026-09-26T09:50:00Z"), body: "refund please" },
+    { ...reply("f1", FOREMAN, "2026-09-26T10:04:00Z"), body: "scope ask" },
+    { ...reply("r1", "gary", "2026-09-26T10:05:00Z"), body: "<@U0950315SDC>" },
+    {
+      ...reply("r2", "gary", "2026-09-26T10:06:00Z"),
+      body: "This is a refund save.",
+    },
+  ];
+  assert.deepEqual(planReply(thread, FOREMAN), {
+    anchorId: "anchor",
+    followUp: {
+      lastReply: "scope ask",
+      replies: ["<@U0950315SDC>", "This is a refund save."],
+    },
     ok: true,
   });
 });

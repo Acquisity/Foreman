@@ -1,4 +1,9 @@
 import { callLinearGraphQL } from "eve/channels/linear";
+import {
+  decideFollowUp,
+  type FollowUpInput,
+  type FollowUpOutcome,
+} from "./jev-decisions.js";
 
 /**
  * Replies to the requester in their Slack thread, as Foreman.
@@ -12,7 +17,9 @@ import { callLinearGraphQL } from "eve/channels/linear";
  *
  * One reply per requester message: when Foreman already spoke last under the
  * anchor, a second post is refused, so a late result cannot add a recap. A
- * new requester reply opens the next one.
+ * new requester reply opens the next one only when Jev says it needs an
+ * answer: every Slack reply wakes Foreman, and a bare mention, a thanks, or a
+ * remark that asks nothing must not earn another message in the thread.
  */
 const ANCHOR_PATTERN = /^Slack thread connected in /u;
 
@@ -25,7 +32,7 @@ export interface ThreadComment {
 }
 
 export type ReplyPlan =
-  | { anchorId: string; ok: true }
+  | { anchorId: string; followUp: FollowUpInput | null; ok: true }
   | { error: string; ok: false };
 
 export function planReply(
@@ -45,18 +52,44 @@ export function planReply(
       ok: false,
     };
   }
-  const last = comments
+  const thread = comments
     .filter((c) => c.parentId === anchor.id)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .at(-1);
-  if (last?.userId === foremanUserId) {
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (thread.at(-1)?.userId === foremanUserId) {
     return {
       error:
         "Foreman already replied and the requester has not answered since. Do not post again; put anything new in the investigation document.",
       ok: false,
     };
   }
-  return { anchorId: anchor.id, ok: true };
+  const lastReply = thread.map((c) => c.userId).lastIndexOf(foremanUserId);
+  const followUp =
+    lastReply === -1
+      ? null
+      : {
+          lastReply: thread[lastReply]?.body ?? "",
+          replies: thread.slice(lastReply + 1).map((c) => c.body),
+        };
+  return { anchorId: anchor.id, followUp, ok: true };
+}
+
+/** What the tool tells Foreman when Jev says a follow-up needs no message. */
+const QUIET_FOLLOW_UP: Record<Exclude<FollowUpOutcome, "respond">, string> = {
+  note: "Their reply is context, not a question. Post nothing to the requester or under the Slack thread comment; record it in the investigation document if it adds anything.",
+  skip: "Their reply needs no answer. Post nothing anywhere and end the turn.",
+};
+
+/** Jev down or slow: answering a person beats leaving them unanswered. */
+async function followUpOutcome(
+  followUp: FollowUpInput,
+  signal?: AbortSignal
+): Promise<FollowUpOutcome> {
+  try {
+    return await decideFollowUp(followUp, { signal });
+  } catch {
+    signal?.throwIfAborted();
+    return "respond";
+  }
 }
 
 const THREAD_QUERY = `query RequesterThread($id: String!) {
@@ -98,11 +131,20 @@ interface ReplyResponse {
   };
 }
 
+export type ReplyResult =
+  | { commentId: string; posted: true; url: string }
+  | {
+      outcome: Exclude<FollowUpOutcome, "respond">;
+      posted: false;
+      reason: string;
+    };
+
 export async function replyToRequester(
   issue: string,
   message: string,
-  accessToken: string
-): Promise<{ commentId: string; url: string }> {
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<ReplyResult> {
   const credentials = { accessToken };
   const thread = await callLinearGraphQL<ThreadResponse>({
     credentials,
@@ -133,6 +175,12 @@ export async function replyToRequester(
   if (!plan.ok) {
     throw new Error(plan.error);
   }
+  if (plan.followUp) {
+    const outcome = await followUpOutcome(plan.followUp, signal);
+    if (outcome !== "respond") {
+      return { outcome, posted: false, reason: QUIET_FOLLOW_UP[outcome] };
+    }
+  }
   const created = await callLinearGraphQL<ReplyResponse>({
     credentials,
     query: REPLY_MUTATION,
@@ -149,5 +197,5 @@ export async function replyToRequester(
   if (!(success && comment)) {
     throw new Error("Linear did not create the reply.");
   }
-  return { commentId: comment.id, url: comment.url };
+  return { commentId: comment.id, posted: true, url: comment.url };
 }

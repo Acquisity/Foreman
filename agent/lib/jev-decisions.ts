@@ -26,6 +26,8 @@ export const BARS = {
   discretion: 0.7,
   /** A duplicate closes the ticket, so it needs a near-certain match. */
   duplicate: 0.8,
+  /** Below this, staying quiet on a requester follow-up is not trusted. */
+  followUp: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
   /** Below this, the project is left unset and Aaron routes it. */
@@ -664,4 +666,62 @@ export async function decideBilling(
   };
   const answers = await askJev(billingQuestions(), state, opts);
   return resolveBilling(input, answers);
+}
+
+// ---------------------------------------------------------------- follow-up
+
+export const FOLLOW_UP_OUTCOMES = {
+  note: "context worth recording that asks nothing and changes nothing, such as saying what kind of case this is",
+  respond:
+    "asks something, answers a question in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
+  skip: "a bare mention, an acknowledgement, thanks, or noise",
+} as const;
+export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES;
+
+export interface FollowUpInput {
+  /** Foreman's last message in the Slack thread. */
+  lastReply: string;
+  /** Everything the requester said since, oldest first. */
+  replies: string[];
+}
+
+export const followUpQuestions = (): Record<string, JevQuestion> => ({
+  follow_up: {
+    criteria: { ...FOLLOW_UP_OUTCOMES },
+    instructions:
+      "Foreman already answered the requester with lastReply. Taking their replies since then together, what do they need from Foreman?",
+    type: "choice",
+  },
+});
+
+/** Staying quiet needs a clear call; when unsure, the requester is answered. */
+export function resolveFollowUp(answers: Answers): FollowUpOutcome {
+  const { choice, confidence } = choiceOf(answers.follow_up);
+  return choice !== "respond" && confidence >= BARS.followUp
+    ? (choice as FollowUpOutcome)
+    : "respond";
+}
+
+const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
+// The Asks receiver heads each relayed reply with "<link> **Name** replied in Slack:".
+const RELAY_HEADER = /^[^\n]{0,300}replied in Slack:/u;
+
+/**
+ * A reply that is only a mention is what wakes Foreman, not something said,
+ * and Jev cannot tell a Slack user id is Foreman's own, so code drops it.
+ */
+export async function decideFollowUp(
+  input: FollowUpInput,
+  opts?: JevOptions
+): Promise<FollowUpOutcome> {
+  const replies = input.replies.filter(
+    (reply) =>
+      reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
+  );
+  if (replies.length === 0) {
+    return "skip";
+  }
+  return resolveFollowUp(
+    await askJev(followUpQuestions(), { ...input, replies }, opts)
+  );
 }
