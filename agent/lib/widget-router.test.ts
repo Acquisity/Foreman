@@ -50,7 +50,6 @@ describe("routeWidgetMessage", () => {
     const body = JSON.parse((sent as { body: string }).body);
     assert.equal(body.state, "why did my campaign stop?");
     assert.deepEqual(Object.keys(body.questions).sort(), [
-      "asks_about_screenshot",
       "asks_for_action",
       "asks_for_human",
       "asks_for_refund",
@@ -63,6 +62,7 @@ describe("routeWidgetMessage", () => {
       "offers_recording",
       "reports_bug",
       "returns_to_earlier_ask",
+      "screenshot_shows_where",
     ]);
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
@@ -78,18 +78,18 @@ describe("routeWidgetMessage", () => {
           json: () =>
             Promise.resolve({
               answers: {
-                asks_about_screenshot: { noul: 0.12 },
                 asks_for_human: { noul: 0.04 },
                 asks_own_data: { noul: 0.3 },
                 lane: { choice: "kb", confidence: 0.9 },
                 returns_to_earlier_ask: { noul: 0.81 },
+                screenshot_shows_where: { noul: 0.76 },
               },
             }),
           ok: true,
           status: 200,
         }),
     });
-    assert.equal(route.aboutScreenshot, 0.12);
+    assert.equal(route.screenshotContext, 0.76);
     assert.equal(route.returnsToEarlierAsk, 0.81);
   });
 

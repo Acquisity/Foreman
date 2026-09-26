@@ -525,8 +525,8 @@ const UNCLEAR_SCORE = 0.8;
 const EXPLAIN_SCORE = 0.8;
 /** At or above this, the latest message goes back to an earlier, unfinished request. */
 const RETURNS_SCORE = 0.5;
-/** Below this, a screenshot only shows where the customer is, not what they ask about. */
-const ABOUT_SCREENSHOT_SCORE = 0.5;
+/** At or above this, a screenshot only shows where the customer is, not what they ask about. */
+const SCREENSHOT_CONTEXT_SCORE = 0.5;
 
 /** What the router's goal and screenshot judgments tell the help-center lane. */
 const kbAsk = (route: WidgetRoute, ask: WidgetAsk): WidgetAsk => {
@@ -537,8 +537,7 @@ const kbAsk = (route: WidgetRoute, ask: WidgetAsk): WidgetAsk => {
     followUp: !returnsToEarlierAsk && (route.followUp ?? 0) >= FOLLOW_UP_SCORE,
     ...(returnsToEarlierAsk ? { returnsToEarlierAsk } : {}),
     ...(ask.screenshots?.length &&
-    route.aboutScreenshot !== undefined &&
-    route.aboutScreenshot < ABOUT_SCREENSHOT_SCORE
+    (route.screenshotContext ?? 0) >= SCREENSHOT_CONTEXT_SCORE
       ? { screenshotIsContext: true }
       : {}),
   };
