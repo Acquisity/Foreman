@@ -847,6 +847,40 @@ test("a bug report asks the app for a screen recording next to the reply", async
   assert.equal(body.request_recording, true);
 });
 
+test("an offer to send a screen recording asks the app for one without a bug score", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.route = () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0,
+      confidence: 0.97,
+      kbScore: 0,
+      lane: "chat" as const,
+      source: "jev" as const,
+    });
+  deps.answerChat = () =>
+    Promise.resolve({ citations: [], message: "Use the card below." });
+  deps.requestRecording = () => {
+    run.recording_requested = true;
+    return Promise.resolve();
+  };
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      message_id: "ffffffff-6666-4666-8666-ffffffffffff",
+      question: "Can I send you a screen recording?",
+    }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.request_recording, true);
+});
+
 test("the guessed checks are saved as planned before the first real check runs", async (t) => {
   enabled(t);
   const { deps } = dependencies();
