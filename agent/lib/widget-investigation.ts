@@ -733,9 +733,8 @@ export async function finishWidgetRun(
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
     ).catch(() => false);
     // Everything since the claim, the history read included, came out of it.
-    const deadline = clock.timeout(
-      Math.max(0, finishCutoff(run, claimedAt) - clock.now())
-    );
+    const cutoff = finishCutoff(run, claimedAt);
+    const deadline = clock.timeout(Math.max(0, cutoff - clock.now()));
     const extractStartedAt = Date.now();
     const { gateDeps, structured } = await structureWriteUp(
       run,
@@ -761,7 +760,8 @@ export async function finishWidgetRun(
         conversation,
         await changeAsked,
         deadline,
-        run.recording_requested === true
+        run.recording_requested === true,
+        cutoff
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per

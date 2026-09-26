@@ -630,3 +630,32 @@ test("the fallback gets only what is left of the judge budget after JEV", async 
   }
   assert.deepEqual(seen, [false, true]);
 });
+
+test("with the run's finish time the fallback gets what is left less the composer's reserve, never under the floor, and still stops at the cutoff", async (t) => {
+  const budgets: number[] = [];
+  const timeout = AbortSignal.timeout.bind(AbortSignal);
+  t.mock.method(AbortSignal, "timeout", (ms: number) => {
+    budgets.push(ms);
+    return timeout(ms);
+  });
+  const jevFetch = mock(answers({ item_1: answer("keep", 0.5) }));
+  const run = (finishAt: number, signal?: AbortSignal) =>
+    reviewWidgetFindings(
+      { ...input, finishAt, signal },
+      {
+        apiKey: "test",
+        fallback: (_data, fallbackSignal) =>
+          fallbackSignal.aborted
+            ? Promise.reject(fallbackSignal.reason)
+            : Promise.resolve({ decision: "allow" as const, reason: "ok" }),
+        fetch: jevFetch,
+        log: () => undefined,
+      }
+    );
+  await run(Date.now() + 120_000);
+  const long = budgets.at(-1) ?? 0;
+  assert.ok(long > 90_000 && long <= 95_000, String(long));
+  await run(Date.now() + 5000);
+  assert.equal(budgets.at(-1), 10_000);
+  await assert.rejects(run(Date.now() + 120_000, AbortSignal.abort()));
+});
