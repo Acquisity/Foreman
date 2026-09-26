@@ -2188,11 +2188,11 @@ test("a message that goes back to an earlier request drops the detour's articles
 
 test("a screenshot is context for the request only when the router says the message does not ask about it", async (t) => {
   enabled(t);
-  for (const [aboutScreenshot, screenshots, context] of [
-    [0.1, [detourReading], true],
-    [0.9, [detourReading], false],
+  for (const [screenshotContext, screenshots, context] of [
+    [0.8, [detourReading], true],
+    [0.2, [detourReading], false],
     [undefined, [detourReading], false],
-    [0.1, undefined, false],
+    [0.8, undefined, false],
   ] as const) {
     const { deps } = dependencies();
     deps.route = () =>
@@ -2200,7 +2200,7 @@ test("a screenshot is context for the request only when the router says the mess
         ...followUpBase,
         confidence: 0.9,
         kbScore: 0.9,
-        ...(aboutScreenshot === undefined ? {} : { aboutScreenshot }),
+        ...(screenshotContext === undefined ? {} : { screenshotContext }),
       });
     let got: WidgetAsk | undefined;
     deps.answerKb = (ask) => {
