@@ -1,8 +1,12 @@
-import { callLinearGraphQL } from "eve/channels/linear";
+import {
+  callLinearGraphQL,
+  type LinearChannelCredentials,
+} from "eve/channels/linear";
 import {
   decideFollowUp,
   type FollowUpInput,
   type FollowUpOutcome,
+  RELAY_HEADER,
 } from "./jev-decisions.js";
 
 /**
@@ -137,13 +141,10 @@ export type ReplyResult =
       reason: string;
     };
 
-export async function replyToRequester(
+async function readThread(
   issue: string,
-  message: string,
-  accessToken: string,
-  signal?: AbortSignal
-): Promise<ReplyResult> {
-  const credentials = { accessToken };
+  credentials: LinearChannelCredentials
+): Promise<{ comments: ThreadComment[]; issueId: string; plan: ReplyPlan }> {
   const thread = await callLinearGraphQL<ThreadResponse>({
     credentials,
     query: THREAD_QUERY,
@@ -160,16 +161,65 @@ export async function replyToRequester(
       `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
     );
   }
-  const plan = planReply(
-    thread.issue.comments.nodes.map((c) => ({
-      body: c.body,
-      createdAt: c.createdAt,
-      id: c.id,
-      parentId: c.parent?.id ?? null,
-      userId: c.user?.id ?? null,
-    })),
-    thread.viewer.id
+  const comments = thread.issue.comments.nodes.map((c) => ({
+    body: c.body,
+    createdAt: c.createdAt,
+    id: c.id,
+    parentId: c.parent?.id ?? null,
+    userId: c.user?.id ?? null,
+  }));
+  return {
+    comments,
+    issueId: thread.issue.id,
+    plan: planReply(comments, thread.viewer.id),
+  };
+}
+
+/**
+ * Whether a session opened by a relayed Slack reply needs nothing from
+ * Foreman, decided before the model runs so a skip costs one read and one
+ * Jev call instead of a full turn. Anything that is not a clear skip,
+ * including a session opened by a person on the ticket, returns false.
+ */
+export async function followUpNeedsNothing(
+  issue: string,
+  commentId: string,
+  credentials: LinearChannelCredentials,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const { comments, plan } = await readThread(issue, credentials);
+  const followUp = relayedFollowUp(comments, plan, commentId);
+  return (
+    followUp !== null && (await decideFollowUp(followUp, { signal })) === "skip"
   );
+}
+
+/** The follow-up to judge when a relayed Slack reply opened the session. */
+export function relayedFollowUp(
+  comments: readonly ThreadComment[],
+  plan: ReplyPlan,
+  commentId: string
+): FollowUpInput | null {
+  const said = (body: string) => body.replace(RELAY_HEADER, "").trim();
+  const trigger = comments.find((c) => c.id === commentId);
+  // The receiver writes the copy under the anchor first; until it is there,
+  // the thread does not include this reply and must not be judged without it.
+  return trigger &&
+    RELAY_HEADER.test(trigger.body) &&
+    plan.ok &&
+    plan.followUp?.replies.some((r) => said(r) === said(trigger.body))
+    ? plan.followUp
+    : null;
+}
+
+export async function replyToRequester(
+  issue: string,
+  message: string,
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<ReplyResult> {
+  const credentials = { accessToken };
+  const { issueId, plan } = await readThread(issue, credentials);
   if (!plan.ok) {
     throw new Error(plan.error);
   }
@@ -186,7 +236,7 @@ export async function replyToRequester(
     variables: {
       input: {
         body: message,
-        issueId: thread.issue.id,
+        issueId,
         parentId: plan.anchorId,
       },
     },

@@ -29,6 +29,7 @@ Billing, Instantly, Inngest, Linear, and help-center helpers call an injected ty
 | `agent/lib/instantly-api.ts` | 15s per request | ENG-13316. The deadline covers the complete typed call, including MCP response streaming in Executor transport; provider retries begin only after the prior invocation has settled. |
 | `agent/lib/linear-api.ts` | 15s per request | Composed with the caller's signal. |
 | `agent/lib/inngest-api.ts` | 15s per request | Composed with the caller's signal; a caller abort rethrows unwrapped. |
+| `agent/channels/linear.ts` follow-up gate (Linear thread read, Jev) | 7s for the whole gate | ENG-14324. Runs before a relayed Slack follow-up reaches the model. The Linear read takes no signal, so the gate races a 7s deadline that also aborts the Jev call; a timeout or any failure dispatches the session as usual. |
 | `agent/lib/help-center.ts` | 10s per request | Composed with the caller's signal. A failure returns `error` rather than throwing, because search is advisory. |
 | `agent/lib/planetscale.ts` | 50s via Executor | Result parsing and truncation remain local; oversized transport responses fail with a bounded error. |
 | `agent/lib/executor/sentry.ts` (`read_sentry_issue`) | 50s via Executor | Strict input permits issue details and event search only; output is capped at 100,000 characters after transport parsing. The underlying dispatcher is also available through the shared toolkit; critic instructions require read-only review. |
