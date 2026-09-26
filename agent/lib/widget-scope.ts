@@ -11,6 +11,12 @@ const shape = {
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
+  // The Jam id of the screen recording this turn follows up on. Acquisity sets
+  // it only after checking the recording's signed conversation reference.
+  recordingId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,200}$/)
+    .optional(),
   role: z.enum(["owner", "admin", "member", "client"]),
   // "inbox" marks a run a teammate started from the support inbox: its result is
   // team-only and it never becomes context for a customer reply.

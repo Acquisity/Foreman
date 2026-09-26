@@ -2352,3 +2352,61 @@ test("the finish budget is counted from the claim, history read included, and le
   // A late claim at run age 169s: the app's last poll is the limit.
   assert.equal(await budget(169_000), 85_000);
 });
+
+test("a recording the customer sent skips the front door and binds its id to the investigation", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = () => assert.fail("must not route a recording follow-up");
+  let auth: { attributes?: Record<string, unknown> } | undefined;
+  const response = await receiveWidgetMessage(
+    request({
+      ...start,
+      question: "(The customer sent the screen recording you asked for.)",
+      recording: { id: "0f3c9d6e-1b2a-4c5d-8e9f-a0b1c2d3e4f5" },
+    }),
+    {
+      from: () => ({
+        send: (_message: string, { auth: sent }: { auth: typeof auth }) => {
+          auth = sent;
+          return Promise.resolve(completedSession());
+        },
+      }),
+      waitUntil: () => undefined,
+    } as unknown as Pick<RouteHandlerArgs, "from" | "waitUntil">,
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(
+    auth?.attributes?.recordingId,
+    "0f3c9d6e-1b2a-4c5d-8e9f-a0b1c2d3e4f5"
+  );
+});
+
+test("a member's recording still takes the help-center front door, and a malformed recording id is refused", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  let routed = false;
+  const { route } = deps;
+  deps.route = (...args) => {
+    routed = true;
+    return route(...args);
+  };
+  await receiveWidgetMessage(
+    request({ ...start, recording: { id: "jam-1" } }),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" as const }),
+    deps
+  );
+  assert.equal(routed, true);
+  const refused = await receiveWidgetMessage(
+    request({ ...start, recording: { id: "../jams" } }),
+    noWork(),
+    1,
+    () => assert.fail("must not verify"),
+    deps
+  );
+  assert.equal(refused.status, 400);
+});
