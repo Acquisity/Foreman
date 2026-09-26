@@ -796,6 +796,15 @@ export async function answerFromHelpCenter(
       message: `${detail} ms=${Date.now() - startedAt}`,
       outcome,
     });
+  // Which articles were read and cited, on a line of their own: the answer's
+  // line already fills most of the log's 200-character message.
+  let read: string[] = [];
+  const logArticles = (cited: { url: string }[]) =>
+    logOpsEvent("widget.kb.answer", {
+      ...log,
+      message: `read=${read.join(",")} cited=${cited.map((hit) => helpArticleSlug(hit.url) ?? hit.url).join(",")}`,
+      outcome: "articles",
+    });
   const marks: string[] = [];
   let lap = startedAt;
   const mark = (step: string) => {
@@ -809,6 +818,9 @@ export async function answerFromHelpCenter(
     const articles = (
       await Promise.all(hits.map((hit) => deps.read(hit.url, signal)))
     ).filter((article): article is KbArticle => article !== null);
+    read = articles.map(
+      (article) => helpArticleSlug(article.url) ?? article.url
+    );
     mark("read");
     const decided =
       (await deps
@@ -888,6 +900,7 @@ export async function answerFromHelpCenter(
       ...fresh.slice(0, MAX_ARTICLES - kept.length),
       ...kept,
     ]);
+    logArticles("message" in result ? result.citations : []);
     if (!("message" in result)) {
       finish(
         "miss",

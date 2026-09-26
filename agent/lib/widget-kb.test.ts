@@ -619,3 +619,22 @@ test("a customer following the previous reply's steps gets every stage pointed a
   assert.equal(before.generate.startsWith(CONTINUES_STEPS), false);
   assert.equal(before.search.includes(stepsReading), true);
 });
+
+test("each answer logs which articles it read and which it cited", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  await answerFromHelpCenter(
+    "how do i set up ai sdr?",
+    log,
+    deps({ answer: "Open setup [2].", kind: "answer" })
+  );
+  const logged = lines
+    .map((line) => JSON.parse(line))
+    .find((line) => line.outcome === "articles");
+  assert.equal(
+    logged?.message,
+    "read=ai-sdr/setup,ai-sdr/settings,availability cited=ai-sdr/settings"
+  );
+  assert.equal(logged?.event, "widget.kb.answer");
+  assert.equal(logged?.runId, "r");
+});
