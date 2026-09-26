@@ -42,6 +42,7 @@ import {
   DECISION_CONTEXT,
   HUMAN_REQUEST_SCORE,
   logRouteDecision,
+  offersRecording,
   renderAsk,
   renderConversation,
   routeWidgetMessage,
@@ -1040,6 +1041,10 @@ async function explainPrevious(
   );
 }
 
+/** A bug report, or an explicit ask or offer to send a recording, gets the app's recording card. */
+const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
+  route.bug === true || offersRecording(ask.latest);
+
 /**
  * Front door: an ask for a person hands off at once, and a general product
  * question is answered from the help center, both without starting an
@@ -1068,7 +1073,7 @@ async function answerFromKnowledgeBase(
   const ids = { conversationId: scope.conversationId, runId: run.id };
   // Before any reply is written, so every lane's result carries the flag. A
   // failed write only loses the recording offer, never the reply.
-  if (route.bug && deps.requestRecording) {
+  if (recordingWanted(route, ask) && deps.requestRecording) {
     await deps.requestRecording(run.id).catch(() => undefined);
   }
   const finish = (written: KbAnswer) =>

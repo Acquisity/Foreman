@@ -444,6 +444,13 @@ export async function asksForChange(
   }
 }
 
+const RECORDING_OFFER =
+  /\bscreen[\s-]?(?:record|cast|capture)|\brecord(?:ing)?\s+(?:of\s+)?(?:my|the)\s+screen|\b(?:send|share|upload|attach|record|show)\b[^.?!]{0,40}\b(?:video|loom|jam)\b/i;
+
+/** The customer asks or offers to send a screen recording, so the app offers one whatever the bug score. */
+export const offersRecording = (message: string) =>
+  RECORDING_OFFER.test(message.slice(0, 4000));
+
 export function logRouteDecision(
   fields: { conversationId: string; runId: string },
   route: WidgetRoute

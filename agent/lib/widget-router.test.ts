@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   asksForChange,
   DECISION_CONTEXT,
+  offersRecording,
   renderAsk,
   routeWidgetMessage,
 } from "./widget-router.js";
@@ -363,5 +364,27 @@ describe("asksForChange", () => {
       }),
       false
     );
+  });
+});
+
+describe("offersRecording", () => {
+  it("catches an ask or offer to send a recording", () => {
+    for (const message of [
+      "Can I send you a screen recording?",
+      "I can screen-record it for you",
+      "want me to record my screen?",
+      "I'll share a quick video of what happens",
+    ]) {
+      assert.equal(offersRecording(message), true, message);
+    }
+  });
+
+  it("ignores messages that are not about sending one", () => {
+    for (const message of [
+      "Why did my campaign stop sending?",
+      "How do I add a video to my website?",
+    ]) {
+      assert.equal(offersRecording(message), false, message);
+    }
   });
 });
