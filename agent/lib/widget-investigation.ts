@@ -141,6 +141,11 @@ const inputSchema = z.discriminatedUnion("action", [
     history: historySchema.optional(),
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
+    // The screen recording this turn follows up on, which the investigator
+    // reads through widget_read_recording.
+    recording: z
+      .strictObject({ id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) })
+      .optional(),
     // What /internal/widget/image read from each screenshot sent with this
     // message. The front door and the investigator read them beside the
     // question; the stored run keeps them joined onto it for later stages.
@@ -1382,17 +1387,19 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
-  // A teammate asked for an investigation: no help-center or handoff front door.
-  const answered = input.staff
-    ? null
-    : await answerFromKnowledgeBase(
-        run,
-        scope,
-        ask,
-        signal,
-        deps,
-        helpCenterOnly
-      );
+  // A teammate asked for an investigation, or the customer sent the recording
+  // an earlier reply asked for: no help-center or handoff front door.
+  const answered =
+    input.staff || (input.recording && !helpCenterOnly)
+      ? null
+      : await answerFromKnowledgeBase(
+          run,
+          scope,
+          ask,
+          signal,
+          deps,
+          helpCenterOnly
+        );
   if (answered) {
     return json(widgetRunResponse(answered));
   }
@@ -1410,7 +1417,7 @@ async function answerFreshRun(
     widgetRunResponse(
       await startInvestigation(
         run,
-        scope,
+        input.recording ? { ...scope, recordingId: input.recording.id } : scope,
         message,
         handlers,
         responseWaitMs,
