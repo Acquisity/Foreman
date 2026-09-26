@@ -7,7 +7,39 @@ import type {
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
+import { followUpNeedsNothing } from "../lib/requester-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
+
+const credentials = connectLinearCredentials(
+  process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent"
+);
+
+/** Leaves time for the one-line response inside Linear's ten-second window. */
+const FOLLOW_UP_GATE_MS = 7000;
+
+/**
+ * Settles a relayed Slack follow-up before the model runs. Any failure or a
+ * slow answer dispatches the session as usual: a throw here would drop it.
+ */
+const skipsFollowUp = async (event: LinearAgentSessionEvent) => {
+  const { commentId } = event.agentSession;
+  const issue = event.agentSession.issueId ?? event.agentSession.issue?.id;
+  if (event.action !== "created" || !issue || !commentId) {
+    return false;
+  }
+  const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
+  const timedOut = new Promise<false>((resolve) =>
+    deadline.addEventListener("abort", () => resolve(false), { once: true })
+  );
+  try {
+    return await Promise.race([
+      followUpNeedsNothing(issue, commentId, credentials, deadline),
+      timedOut,
+    ]);
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Dispatches one Linear Agent Session event.
@@ -17,12 +49,20 @@ import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
  * has to be asserted against the handler that actually runs, not against an
  * auth object assembled by hand.
  */
-export const onAgentSession = (
-  _ctx: LinearSessionContext,
+export const onAgentSession = async (
+  ctx: LinearSessionContext,
   event: LinearAgentSessionEvent
-): LinearInboundResult => {
+): Promise<LinearInboundResult> => {
   const context = buildLinearContext(event);
   if (context === null) {
+    return null;
+  }
+  // Every relayed Slack reply opens a session; one that needs nothing from
+  // Foreman ends here with a line in the session chat, never on the ticket.
+  if (await skipsFollowUp(event)) {
+    await ctx.linear
+      .createActivity({ body: "No reply needed.", type: "response" })
+      .catch(() => undefined);
     return null;
   }
   // URLs only: a bare `owner/repo` token in an issue title, description, or
@@ -55,8 +95,6 @@ export const onAgentSession = (
  * workspace membership is the gate behind {@link stampTrusted}.
  */
 export default linearChannel({
-  credentials: connectLinearCredentials(
-    process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent"
-  ),
+  credentials,
   onAgentSession,
 });

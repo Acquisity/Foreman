@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { planReply, type ThreadComment } from "./requester-reply.js";
+import {
+  planReply,
+  relayedFollowUp,
+  type ThreadComment,
+} from "./requester-reply.js";
 
 const FOREMAN = "foreman";
 const anchor: ThreadComment = {
@@ -88,4 +92,32 @@ test("a reply after Foreman spoke is a follow-up carrying everything said since"
     },
     ok: true,
   });
+});
+
+test("only a relayed Slack reply after Foreman spoke is judged before the model runs", () => {
+  const relay = (id: string, parentId: string | null): ThreadComment => ({
+    body: "@acquisityforeman1 **Gary** replied in Slack:\n\nthanks!",
+    createdAt: "2026-09-26T10:05:00Z",
+    id,
+    parentId,
+    userId: "aaron",
+  });
+  const foreman = reply("f1", FOREMAN, "2026-09-26T10:04:00Z");
+  const thread = [
+    anchor,
+    foreman,
+    relay("under", "anchor"),
+    relay("top", null),
+  ];
+  const plan = planReply(thread, FOREMAN);
+  assert.ok(relayedFollowUp(thread, plan, "top"));
+
+  const direct = {
+    ...relay("ask", null),
+    body: "@acquisityforeman1 look again",
+  };
+  assert.equal(relayedFollowUp([...thread, direct], plan, "ask"), null);
+
+  const first = [anchor, relay("under", "anchor"), relay("top", null)];
+  assert.equal(relayedFollowUp(first, planReply(first, FOREMAN), "top"), null);
 });

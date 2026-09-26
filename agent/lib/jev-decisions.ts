@@ -703,7 +703,7 @@ const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
 // The Asks receiver heads each relayed reply with "<link> **Name** replied in
 // Slack:". The link always names Foreman, so it says nothing about who a
 // reply is for.
-const RELAY_HEADER =
+export const RELAY_HEADER =
   /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?replied in Slack:/u;
 
 /**
