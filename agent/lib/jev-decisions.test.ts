@@ -5,6 +5,7 @@ import {
   type BillingInput,
   billingQuestions,
   decideFollowUp,
+  followUpText,
   resolveBilling,
   resolveFollowUp,
   resolveTriage,
@@ -368,17 +369,14 @@ test("askJev stops before the request when the call is already cancelled", async
   assert.equal(called, false);
 });
 
-test("a follow-up stays quiet only on a clear skip or note", () => {
+test("a follow-up stays quiet only on a clear skip", () => {
   assert.equal(resolveFollowUp({ follow_up: pick("skip") }), "skip");
-  assert.equal(resolveFollowUp({ follow_up: pick("note") }), "note");
   assert.equal(resolveFollowUp({ follow_up: pick("respond", 0.4) }), "respond");
-  for (const quiet of ["skip", "note"]) {
-    assert.equal(
-      resolveFollowUp({ follow_up: pick(quiet, 0.5) }),
-      "respond",
-      `an unsure ${quiet} answers the requester`
-    );
-  }
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("skip", 0.5) }),
+    "respond",
+    "an unsure skip answers the requester"
+  );
 });
 
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
@@ -398,4 +396,14 @@ test("a follow-up that is only mentions is skipped without asking Jev", async ()
     }
   );
   assert.equal(outcome, "skip");
+});
+
+test("a relayed reply reaches Jev as the speaker and their words, mentions as teammates", () => {
+  assert.equal(
+    followUpText(
+      "https://linear.app/acquisity/profiles/acquisityforeman1 **Aaron Fraga** replied in Slack:\n\nHey <@U06M69EP1UG>! what was agreed?"
+    ),
+    "Aaron Fraga: Hey @teammate! what was agreed?"
+  );
+  assert.equal(followUpText("just text"), "Someone: just text");
 });

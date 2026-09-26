@@ -46,7 +46,8 @@ describe("buildLinearContext", () => {
   it("leaves the follow-up decision to reply_to_requester and keeps other comments out of the thread", () => {
     for (const rule of [
       "pass your answer to reply_to_requester",
-      "returns posted false with an outcome, post nothing",
+      "returns posted false with an outcome, their reply needed nothing from you: post nothing anywhere",
+      "On a follow-up, post no new ticket comment",
       "A result with an error is a failed delivery",
       "Never comment under the Slack thread comment any other way",
     ]) {

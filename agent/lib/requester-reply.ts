@@ -74,10 +74,8 @@ export function planReply(
 }
 
 /** What the tool tells Foreman when Jev says a follow-up needs no message. */
-const QUIET_FOLLOW_UP: Record<Exclude<FollowUpOutcome, "respond">, string> = {
-  note: "Their reply is context, not a question. Post nothing to the requester or under the Slack thread comment; record it in the investigation document if it adds anything.",
-  skip: "Their reply needs no answer. Post nothing anywhere and end the turn.",
-};
+const SKIP_REASON =
+  "Their reply needs nothing from Foreman. Post nothing: no Slack reply, no ticket comment, no document change. End the session with one short line.";
 
 /** Jev down or slow: answering a person beats leaving them unanswered. */
 async function followUpOutcome(
@@ -134,7 +132,7 @@ interface ReplyResponse {
 export type ReplyResult =
   | { commentId: string; posted: true; url: string }
   | {
-      outcome: Exclude<FollowUpOutcome, "respond">;
+      outcome: "skip";
       posted: false;
       reason: string;
     };
@@ -177,8 +175,8 @@ export async function replyToRequester(
   }
   if (plan.followUp) {
     const outcome = await followUpOutcome(plan.followUp, signal);
-    if (outcome !== "respond") {
-      return { outcome, posted: false, reason: QUIET_FOLLOW_UP[outcome] };
+    if (outcome === "skip") {
+      return { outcome, posted: false, reason: SKIP_REASON };
     }
   }
   const created = await callLinearGraphQL<ReplyResponse>({
