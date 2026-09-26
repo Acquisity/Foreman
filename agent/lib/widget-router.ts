@@ -59,6 +59,11 @@ export interface WidgetAsk {
   followUp?: boolean;
   latest: string;
   /**
+   * Whether the app shows its screen recording card under this reply: the same
+   * decision that sets `request_recording`. Absent until that decision is made.
+   */
+  recordingOffered?: boolean;
+  /**
    * What an image model read from screenshots attached to `latest`. Kept apart
    * from the customer's words: joined into them, a reading of another page made
    * Jev judge a matching article "not covered" (0.58, against 1.00 without it).
@@ -136,6 +141,22 @@ export function renderConversation(
   ].join("\n");
   return `LATEST CUSTOMER MESSAGE (the one to work on):\n${latest}${shots}\n\nEARLIER TURNS (context only: they resolve what "it", "that" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\n${context}`;
 }
+
+/** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
+export const RECORDING_RULE =
+  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is false, never mention a recording option or card, and never say a recording is impossible.";
+
+/** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
+export const renderReplyAsk = (
+  input: string | WidgetAsk,
+  budget: ContextBudget = REPLY_CONTEXT
+): string => {
+  const ask = toAsk(input);
+  const text = renderAsk(ask, budget);
+  return ask.recordingOffered === undefined
+    ? text
+    : `${text}\n\nrecordingOffered: ${ask.recordingOffered}`;
+};
 
 /** The ask as a front-door reply reads it; the router passes the full decision budget. */
 export const renderAsk = (

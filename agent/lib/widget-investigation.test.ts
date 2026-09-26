@@ -860,8 +860,11 @@ test("an offer to send a screen recording asks the app for one without a bug sco
       lane: "chat" as const,
       source: "jev" as const,
     });
-  deps.answerChat = () =>
-    Promise.resolve({ citations: [], message: "Use the card below." });
+  const written: string[] = [];
+  deps.answerChat = (message) => {
+    written.push(message);
+    return Promise.resolve({ citations: [], message: "Use the card below." });
+  };
   deps.requestRecording = () => {
     run.recording_requested = true;
     return Promise.resolve();
@@ -879,6 +882,76 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   );
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.request_recording, true);
+  // The writer is told the card shows, so it can point to it.
+  assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
+});
+
+test("every reply lane is told whether the recording card shows, and only a recorded offer says it does", async (t) => {
+  enabled(t);
+  const bugRoute = (bug: boolean) => () =>
+    Promise.resolve({
+      asksForAction: 0,
+      asksForHuman: 0,
+      asksOwnData: 0,
+      bug,
+      confidence: 0.97,
+      kbScore: 0.9,
+      lane: "kb" as const,
+      source: "jev" as const,
+    });
+  const answeredWith = async (
+    bug: boolean,
+    requestRecording?: () => Promise<void>
+  ) => {
+    const { deps, run } = dependencies();
+    deps.route = bugRoute(bug);
+    const asks: WidgetAsk[] = [];
+    deps.answerKb = (ask) => {
+      asks.push(ask as WidgetAsk);
+      return Promise.resolve(kbAnswer);
+    };
+    deps.requestRecording =
+      requestRecording &&
+      (() =>
+        requestRecording().then(() => {
+          run.recording_requested = true;
+        }));
+    const body = (await (
+      await receiveWidgetMessage(request(start), noWork(), 200, verify, deps)
+    ).json()) as Record<string, unknown>;
+    return { body, offered: asks.at(-1)?.recordingOffered };
+  };
+  const shown = await answeredWith(true, () => Promise.resolve());
+  assert.equal(shown.body.request_recording, true);
+  assert.equal(shown.offered, true);
+  const notWanted = await answeredWith(false, () => Promise.resolve());
+  assert.equal(notWanted.body.request_recording, undefined);
+  assert.equal(notWanted.offered, false);
+  // A failed write shows no card, so the reply must not point to one.
+  const failed = await answeredWith(true, () =>
+    Promise.reject(new Error("db"))
+  );
+  assert.equal(failed.body.request_recording, undefined);
+  assert.equal(failed.offered, false);
+});
+
+test("the investigation composer is told whether the recording card shows", async () => {
+  const offered: boolean[] = [];
+  for (const requested of [true, false]) {
+    const { deps, run } = dependencies();
+    deps.gate = (...args) => {
+      offered.push(args[7] === true);
+      return Promise.resolve(allowed);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: two independent runs, in order.
+    await finishWidgetRun(
+      { ...run, recording_requested: requested },
+      "widget-session-recording",
+      { findings: null, status: "completed", text: "The inbox disconnected." },
+      deps
+    );
+  }
+  assert.deepEqual(offered, [true, false]);
 });
 
 test("the guessed checks are saved as planned before the first real check runs", async (t) => {
