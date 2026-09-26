@@ -200,8 +200,14 @@ export function relayedFollowUp(
   plan: ReplyPlan,
   commentId: string
 ): FollowUpInput | null {
+  const said = (body: string) => body.replace(RELAY_HEADER, "").trim();
   const trigger = comments.find((c) => c.id === commentId);
-  return trigger && RELAY_HEADER.test(trigger.body) && plan.ok
+  // The receiver writes the copy under the anchor first; until it is there,
+  // the thread does not include this reply and must not be judged without it.
+  return trigger &&
+    RELAY_HEADER.test(trigger.body) &&
+    plan.ok &&
+    plan.followUp?.replies.some((r) => said(r) === said(trigger.body))
     ? plan.followUp
     : null;
 }

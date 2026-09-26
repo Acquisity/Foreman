@@ -118,6 +118,16 @@ test("only a relayed Slack reply after Foreman spoke is judged before the model 
   };
   assert.equal(relayedFollowUp([...thread, direct], plan, "ask"), null);
 
+  const late = {
+    ...relay("new", null),
+    body: "@acquisityforeman1 **Gary** replied in Slack:\n\nwhat does it cost?",
+  };
+  assert.equal(
+    relayedFollowUp([...thread, late], plan, "new"),
+    null,
+    "a relay whose copy under the anchor has not landed is not judged"
+  );
+
   const first = [anchor, relay("under", "anchor"), relay("top", null)];
   assert.equal(relayedFollowUp(first, planReply(first, FOREMAN), "top"), null);
 });
