@@ -51,9 +51,6 @@ const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
 const MARK_TAG = /<\/?mark>/gu;
-/** How Acquisity words a message that is only a screenshot (apps/web lib/support/foreman-reply.ts). */
-const SCREENSHOT_ONLY = /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
-const WORD = /[\p{L}\p{N}]/u;
 
 const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
 
@@ -929,12 +926,6 @@ export async function answerFromHelpCenter(
     );
   };
   try {
-    // Every message also reads what the previous reply cited, whatever the
-    // router made of it: "where do i go from here?" with a screenshot scored 0.25
-    // as a follow-up, was read without the buying guides it continued, and
-    // missed. Never instead of a fresh retrieval: "and if the chat bubble is
-    // missing?" answered from the ticket-status article alone. Fresh hits lead,
-    // so the latest message outweighs the earlier citation.
     images =
       ask.images?.length && deps.images
         ? await deps.images(ask.images, signal).catch(() => [])
@@ -942,6 +933,12 @@ export async function answerFromHelpCenter(
     if (ask.images?.length) {
       mark(`images=${images.length}/${ask.images.length}`);
     }
+    // Every message also reads what the previous reply cited, whatever the
+    // router made of it: "where do i go from here?" with a screenshot scored 0.25
+    // as a follow-up, was read without the buying guides it continued, and
+    // missed. Never instead of a fresh retrieval: "and if the chat bubble is
+    // missing?" answered from the ticket-status article alone. Fresh hits lead,
+    // so the latest message outweighs the earlier citation.
     const [active, { hits: fresh, via }] = await Promise.all([
       activeArticleHits(ask, signal, deps),
       findArticles(question, signal, deps, images),
@@ -950,14 +947,8 @@ export async function answerFromHelpCenter(
       .filter((hit) => !fresh.some((found) => found.url === hit.url))
       .slice(0, MAX_ACTIVE_ARTICLES);
     const picked = fresh.slice(0, MAX_ARTICLES - kept.length);
-    // With no words of its own, the latest message has only its screenshot to
-    // pick by, and a warning on it outranked the guides being followed: every
-    // screenshot-only follow-up to "buy inboxes" was answered with Reconnect.
-    const wordless = !WORD.test(ask.latest.replace(SCREENSHOT_ONLY, ""));
-    mark(`active=${kept.length}${wordless ? ":first" : ""} find:${via}`);
-    const result = await attempt(
-      wordless ? [...kept, ...picked] : [...picked, ...kept]
-    );
+    mark(`active=${kept.length} find:${via}`);
+    const result = await attempt([...picked, ...kept]);
     logArticles("message" in result ? result.citations : []);
     if (!("message" in result)) {
       finish(
