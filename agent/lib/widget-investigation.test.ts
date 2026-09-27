@@ -250,7 +250,7 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
   assert.equal(
     (
       await receiveWidgetMessage(
-        request({ ...start, question: "x".repeat(600_000) }),
+        request({ ...start, question: "x".repeat(700_000) }),
         noWork(),
         1,
         verified,
@@ -276,6 +276,10 @@ test("a valid conversation at every schema limit is read whole, not refused as t
       role: index % 2 ? "assistant" : "customer",
       text: text(4000),
     })),
+    images: Array.from(
+      { length: 3 },
+      (_, index) => `https://shots.example/${index}${"a".repeat(2025)}`
+    ),
     question: `a${text(3998)}b`,
     screenshots: Array.from({ length: 3 }, () => `a${text(1498)}b`),
   });
@@ -289,6 +293,42 @@ test("a valid conversation at every schema limit is read whole, not refused as t
   );
   // Past the body read and the schema, it reaches workspace verification.
   assert.equal(response.status, 403);
+});
+
+test("screenshot links reach the help-center lane beside their readings, and only https links are accepted", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = kbRoute(0.98);
+  const asks: WidgetAsk[] = [];
+  deps.answerKb = (ask) => {
+    asks.push(ask as WidgetAsk);
+    return Promise.resolve(kbAnswer);
+  };
+  const shot = {
+    ...start,
+    images: ["https://shots.example/one.jpg"],
+    question: "where do i go from here?",
+    screenshots: ["[Screenshot] Screen: All Campaigns"],
+  };
+  const response = await receiveWidgetMessage(
+    request(shot),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(asks.at(-1)?.images, shot.images);
+  assert.deepEqual(asks.at(-1)?.screenshots, shot.screenshots);
+
+  const refused = await receiveWidgetMessage(
+    request({ ...shot, images: ["http://shots.example/one.jpg"] }),
+    noWork(),
+    1,
+    () => assert.fail("must not verify"),
+    deps
+  );
+  assert.equal(refused.status, 400);
 });
 
 test("a widget request without the Acquisity service secret is refused before the identity is checked", async (t) => {

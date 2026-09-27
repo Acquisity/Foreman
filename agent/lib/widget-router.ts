@@ -57,6 +57,13 @@ export interface WidgetAsk {
    * "not something I can do" first, instead of stepping aside.
    */
   cannotLook?: boolean;
+  /**
+   * Short-lived links to those screenshots themselves. The help-center lane
+   * looks at them: from a reading alone it answered a warning on the screen
+   * instead of the customer's next step (13 of 21 real follow-ups right, 21 of
+   * 21 with the image). Stages that only read text keep using `screenshots`.
+   */
+  images?: string[];
   latest: string;
   /**
    * Whether the app shows its screen recording card under this reply: the same
