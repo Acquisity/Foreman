@@ -158,6 +158,10 @@ export function recentTurns(
 }
 
 /** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
+/** How the app words a message that is only a screenshot (Acquisity lib/support/foreman-reply.ts). */
+export const SCREENSHOT_ONLY =
+  /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
+
 export const RECORDING_RULE =
   "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the recording option below is the way to send it. When it is false, never mention a recording option or card, and never say a recording is impossible.";
 

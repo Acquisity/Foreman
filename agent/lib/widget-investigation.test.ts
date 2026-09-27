@@ -1853,6 +1853,43 @@ test("an unclear message gets one clarifying question instead of an investigatio
   assert.deepEqual(gated, []);
 });
 
+test("a screenshot sent before the customer has said anything gets a question back, even on a confident help-center route", async (t) => {
+  enabled(t);
+  const bare = {
+    ...start,
+    question: "(The customer sent only the screenshot below, with no message.)",
+    screenshots: ["[Screenshot] Screen: AI SDR Inbox"],
+  };
+  for (const [history, reason] of [
+    [undefined, "clarify"],
+    // Only the greeting before it: the customer still has not asked anything.
+    [
+      [{ role: "assistant", text: "Hey! What can I help you with?" }],
+      "clarify",
+    ],
+    // After their own question, the screenshot continues it.
+    [[{ role: "customer", text: "can i buy more inboxes?" }], "kb"],
+  ] as const) {
+    const { deps, run } = dependencies();
+    deps.route = kbRoute(0.98);
+    deps.answerKb = () => Promise.resolve(kbAnswer);
+    deps.answerChat = () =>
+      Promise.resolve({
+        citations: [],
+        message: "I can see your AI SDR Inbox. What can I help you with there?",
+      });
+    // biome-ignore lint/performance/noAwaitInLoops: cases share nothing and are tiny.
+    await receiveWidgetMessage(
+      request({ ...bare, ...(history ? { history } : {}) }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.equal(run.outcome?.reason, reason);
+  }
+});
+
 test("a teammate's inbox run skips the front door, verifies as staff, and keeps its own session", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();
