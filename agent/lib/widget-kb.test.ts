@@ -216,16 +216,15 @@ test("a reaction gets a short conversational reply with no citations, not an inv
 
 const grounded = { answer: "Next, set your hours [1].", kind: "answer" };
 
-for (const [latest, screenshots, carriedFirst] of [
-  ["okay, what next?", undefined, false],
+for (const [latest, screenshots] of [
+  ["okay, what next?", undefined],
   // A screenshot with no text, as the app words it, and one sent with just "?":
-  // nothing to pick by but the screenshot, so the guides being followed lead.
+  // the carried guides are still read, after the fresh pick like any message.
   [
     "(The customer sent only the screenshot below, with no message.)",
     ["Screen: All Campaigns"],
-    true,
   ],
-  ["?", ["Screen: All Campaigns"], true],
+  ["?", ["Screen: All Campaigns"]],
 ] as const) {
   test(`every message reads the articles the previous reply cited alongside a fresh retrieval, and Jev decides with both: ${latest}`, async () => {
     const given: string[][] = [];
@@ -246,16 +245,14 @@ for (const [latest, screenshots, carriedFirst] of [
         generate: ({ articles: read }) => {
           given.push(read.map((a) => a.url));
           return Promise.resolve({
-            answer: `Set your hours [${carriedFirst ? 1 : 2}].`,
+            answer: "Set your hours [2].",
             kind: "answer",
           });
         },
       }
     );
     const [fresh, carried] = [articles[2].url, articles[0].url];
-    assert.deepEqual(given, [
-      carriedFirst ? [carried, fresh] : [fresh, carried],
-    ]);
+    assert.deepEqual(given, [[fresh, carried]]);
     assert.deepEqual(decided, given);
     assert.deepEqual(
       result?.citations.map((c) => c.url),
