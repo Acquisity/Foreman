@@ -8,6 +8,7 @@ import {
   decideFromArticles,
   indexLine,
   type KbDeps,
+  loadImages,
   mergeHits,
   renderTranscript,
   resolveCitations,
@@ -577,4 +578,80 @@ test("every stage reads the conversation as a transcript, latest message last wi
     },
   });
   assert.deepEqual(seen, [transcript, transcript, transcript]);
+});
+
+test("the selector and the writer look at the screenshots; without them, a load failure or no loader, they read text only", async () => {
+  const image = { data: new Uint8Array([1, 2, 3]), mediaType: "image/jpeg" };
+  const seen: { select?: number; generate?: number }[] = [];
+  const ask = {
+    images: ["https://shots.example/one.jpg"],
+    latest: "where do i go from here?",
+    screenshots: ["[Screenshot] Screen: All Campaigns"],
+  };
+  const run = async (images?: KbDeps["images"]) => {
+    const record: { select?: number; generate?: number } = {};
+    seen.push(record);
+    const base = deps({ answer: "Click Email Accounts [1].", kind: "answer" });
+    return await answerFromHelpCenter(ask, log, {
+      ...base,
+      generate: (input) => {
+        record.generate = input.images?.length ?? 0;
+        return base.generate(input);
+      },
+      images,
+      index: () =>
+        Promise.resolve([{ id: "ai-sdr/setup", title: "Email accounts" }]),
+      select: (input) => {
+        record.select = input.images?.length ?? 0;
+        return Promise.resolve({ articles: [1] });
+      },
+    });
+  };
+  const loaded: string[][] = [];
+  const answered = await run((urls) => {
+    loaded.push(urls);
+    return Promise.resolve([image]);
+  });
+  assert.equal(answered?.message, "Click Email Accounts.");
+  assert.deepEqual(loaded, [ask.images]);
+  await run(() => Promise.reject(new Error("r2 down")));
+  await run(undefined);
+  assert.deepEqual(seen, [
+    { generate: 1, select: 1 },
+    { generate: 0, select: 0 },
+    { generate: 0, select: 0 },
+  ]);
+});
+
+test("a screenshot link loads as an image only when it answers with image bytes", async (t) => {
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(16),
+  ]);
+  const requested: RequestInit[] = [];
+  t.mock.method(globalThis, "fetch", (url: string, init: RequestInit) => {
+    requested.push(init);
+    if (url.endsWith("/png")) {
+      return Promise.resolve(new Response(png));
+    }
+    if (url.endsWith("/json")) {
+      return Promise.resolve(new Response('{"error":"expired"}'));
+    }
+    if (url.endsWith("/missing")) {
+      return Promise.resolve(new Response(png, { status: 404 }));
+    }
+    return Promise.reject(new Error("network down"));
+  });
+  const images = await loadImages(
+    ["/png", "/json", "/missing", "/down"].map(
+      (path) => `https://shots.example${path}`
+    ),
+    AbortSignal.timeout(1000)
+  );
+  assert.deepEqual(
+    images.map((image) => image.mediaType),
+    ["image/png"]
+  );
+  // A redirect would leave the signed storage link for somewhere else.
+  assert.ok(requested.every((init) => init.redirect === "error"));
 });

@@ -1,5 +1,6 @@
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
+import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import {
   getHelpArticleContent,
   HELP_CENTER_BASE_URL,
@@ -55,6 +56,74 @@ const SCREENSHOT_ONLY = /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
 const WORD = /[\p{L}\p{N}]/u;
 
 const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
+
+/**
+ * TEXT_ONLY for a writer or selector that has the screenshots themselves. A
+ * reading is made before the customer sends, without the conversation, so it
+ * leads with warnings and leaves out the button they need next; with the image
+ * the model sees where they are, as a support person would.
+ */
+const WITH_IMAGES = `The customer can attach up to three screenshots to a message. The screenshots attached to their latest message are the images with this input: they show the customer's screen as they wrote it. Look at them the way a support person would: see where the customer is and what they can click there, and use that to give the next step toward what they are trying to do in this conversation. When the screen shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything you cannot see clearly. ${RECORDING_RULE}`;
+
+interface KbImage {
+  data: Uint8Array;
+  mediaType: string;
+}
+
+const withImages = (system: string, images: KbImage[] | undefined) =>
+  images?.length ? system.replace(TEXT_ONLY, WITH_IMAGES) : system;
+
+/** The input as one user message: the text, then each screenshot. */
+const withImageParts = (text: string, images: KbImage[] | undefined) => [
+  {
+    content: [
+      { text, type: "text" as const },
+      ...(images ?? []).map((image) => ({
+        data: image.data,
+        mediaType: image.mediaType,
+        type: "file" as const,
+      })),
+    ],
+    role: "user" as const,
+  },
+];
+
+const IMAGE_TIMEOUT_MS = 5000;
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
+/** The screenshots behind the links. One that fails to load is left out; its reading still stands. */
+export async function loadImages(
+  urls: string[],
+  signal: AbortSignal
+): Promise<KbImage[]> {
+  const loaded = await Promise.all(
+    urls.map(async (url): Promise<KbImage | null> => {
+      try {
+        const response = await fetch(url, {
+          redirect: "error",
+          signal: AbortSignal.any([
+            signal,
+            AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+          ]),
+        });
+        if (
+          !response.ok ||
+          Number(response.headers.get("content-length")) > MAX_IMAGE_BYTES
+        ) {
+          return null;
+        }
+        const data = Buffer.from(await response.arrayBuffer());
+        const mediaType = sniffImage(data);
+        return mediaType && data.length <= MAX_IMAGE_BYTES
+          ? { data, mediaType }
+          : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+  return loaded.filter((image): image is KbImage => image !== null);
+}
 
 /**
  * Every stage of this lane reads the conversation as a chat transcript, oldest
@@ -342,11 +411,14 @@ export interface KbDeps {
     cannotCheck?: boolean;
     /** Jev chose to answer: write, decide nothing. */
     decided?: boolean;
+    images?: KbImage[];
     question: string;
     /** See {@link WidgetAsk.recordingOffered}; absent, the writer is told false. */
     recordingOffered?: boolean;
     signal: AbortSignal;
   }) => Promise<unknown>;
+  /** The screenshots behind `WidgetAsk.images`; absent, the lane reads only their readings. */
+  images?: (urls: string[], signal: AbortSignal) => Promise<KbImage[]>;
   /** Every article's id and title, or null where the web app has no index route yet. */
   index: (signal: AbortSignal) => Promise<KbIndex | null>;
   read: (url: string, signal: AbortSignal) => Promise<KbArticle | null>;
@@ -356,6 +428,7 @@ export interface KbDeps {
     signal: AbortSignal
   ) => Promise<{ title: string; url: string }[]>;
   select: (input: {
+    images?: KbImage[];
     index: KbIndex;
     question: string;
     signal: AbortSignal;
@@ -371,29 +444,35 @@ export const defaultKbDeps: KbDeps = {
     articles,
     cannotCheck,
     decided,
+    images,
     question,
     recordingOffered,
     signal,
   }) {
     const model = await resolveModel("kb");
+    const input = JSON.stringify({
+      articles: articles.map((article, index) => ({
+        content: article.content,
+        number: index + 1,
+        title: article.title,
+      })),
+      question,
+      recordingOffered: recordingOffered === true,
+    });
     const { object } = await generateObject({
       abortSignal: signal,
+      messages: withImageParts(input, images),
       model: gateway(model),
-      prompt: JSON.stringify({
-        articles: articles.map((article, index) => ({
-          content: article.content,
-          number: index + 1,
-          title: article.title,
-        })),
-        question,
-        recordingOffered: recordingOffered === true,
-      }),
       ...fastCallOptions(model),
       schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
+      system: withImages(
+        `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
+        images
+      ),
     });
     return object;
   },
+  images: loadImages,
   // The list changes only when docs ship, so one warm instance fetches it rarely.
   async index(signal) {
     if (indexCache && Date.now() - indexCache.at < INDEX_CACHE_MS) {
@@ -459,13 +538,16 @@ export const defaultKbDeps: KbDeps = {
         url: new URL(hit.url, HELP_CENTER_BASE_URL).toString(),
       }));
   },
-  async select({ index, question, signal }) {
+  async select({ images, index, question, signal }) {
     const model = await resolveModel("kb");
     const { object } = await generateObject({
       abortSignal: signal,
-      model: gateway(model),
       // The listing comes first so the long, stable prefix can be cached.
-      prompt: `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
+      messages: withImageParts(
+        `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
+        images
+      ),
+      model: gateway(model),
       ...fastCallOptions(model),
       schema: selectSchema,
       system: SELECT_PROMPT,
@@ -546,13 +628,14 @@ export function mergeHits(
 async function findArticles(
   question: string,
   signal: AbortSignal,
-  deps: KbDeps
+  deps: KbDeps,
+  images?: KbImage[]
 ): Promise<{ hits: { title: string; url: string }[]; via: string }> {
   try {
     const index = await deps.index(signal);
     if (index) {
       const { articles } = selectSchema.parse(
-        await deps.select({ index, question, signal })
+        await deps.select({ images, index, question, signal })
       );
       const hits = [...new Set(articles)]
         .map((n) => index[n - 1])
@@ -774,6 +857,7 @@ export async function answerFromHelpCenter(
     marks.push(`${step}=${Date.now() - lap}`);
     lap = Date.now();
   };
+  let images: KbImage[] = [];
   /** Read the hits and answer from them; null when the answer is not grounded in them. */
   const attempt = async (
     hits: { title: string; url: string }[]
@@ -809,6 +893,7 @@ export async function answerFromHelpCenter(
       articles,
       cannotCheck,
       decided: Boolean(decided),
+      images,
       question,
       recordingOffered: ask.recordingOffered,
       signal,
@@ -850,9 +935,16 @@ export async function answerFromHelpCenter(
     // missed. Never instead of a fresh retrieval: "and if the chat bubble is
     // missing?" answered from the ticket-status article alone. Fresh hits lead,
     // so the latest message outweighs the earlier citation.
+    images =
+      ask.images?.length && deps.images
+        ? await deps.images(ask.images, signal).catch(() => [])
+        : [];
+    if (ask.images?.length) {
+      mark(`images=${images.length}/${ask.images.length}`);
+    }
     const [active, { hits: fresh, via }] = await Promise.all([
       activeArticleHits(ask, signal, deps),
-      findArticles(question, signal, deps),
+      findArticles(question, signal, deps, images),
     ]);
     const kept = active
       .filter((hit) => !fresh.some((found) => found.url === hit.url))

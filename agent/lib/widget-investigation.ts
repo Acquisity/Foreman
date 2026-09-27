@@ -122,23 +122,33 @@ export const withHistory = (
 export const toWidgetAsk = (
   question: string,
   history: WidgetHistory | undefined,
-  screenshots?: string[]
+  screenshots?: string[],
+  images?: string[]
 ): WidgetAsk => {
   const turns = (history ?? []).filter((turn) => turn.text.trim());
   return {
     activeArticles:
       turns.filter((turn) => turn.role === "assistant").at(-1)?.citations ?? [],
+    ...(images?.length ? { images } : {}),
     latest: question,
     ...(screenshots?.length ? { screenshots } : {}),
     turns: turns.map(({ role, text }) => ({ role, text })),
   };
 };
 
+const MAX_IMAGE_URL_CHARS = 2048;
+
 const inputSchema = z.discriminatedUnion("action", [
   z.strictObject({
     ...scopeFields,
     action: z.literal("start"),
     history: historySchema.optional(),
+    // Short-lived links to the same screenshots, for the help-center lane to
+    // look at. The readings stay: every other stage reads only text.
+    images: z
+      .array(z.url({ protocol: /^https$/u }).max(MAX_IMAGE_URL_CHARS))
+      .max(3)
+      .optional(),
     message_id: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
     // The screen recording this turn follows up on, which the investigator
@@ -166,12 +176,14 @@ export type WidgetInput = z.infer<typeof inputSchema>;
 
 /**
  * The largest body a valid start can be: the question, twelve turns with four
- * citations each, and three screenshot readings at their schema limits, every
+ * citations each, three screenshot readings and three image links at their schema limits, every
  * character escaped to six in JSON (\u0000), plus room for the ids and keys.
  * The default 8 KB read cap refused ordinary multi-turn conversations.
  */
 const MAX_START_BODY_CHARS =
-  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500) * 6 + 4096;
+  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500 + 3 * MAX_IMAGE_URL_CHARS) *
+    6 +
+  4096;
 
 /** The question as the run stores it, readings and all, for the stages that read it back. */
 export const withScreenshots = (
@@ -1407,7 +1419,12 @@ async function answerFreshRun(
   deps: WidgetDependencies
 ): Promise<Response> {
   const message = withHistory(input.question, input.history, input.screenshots);
-  const ask = toWidgetAsk(input.question, input.history, input.screenshots);
+  const ask = toWidgetAsk(
+    input.question,
+    input.history,
+    input.screenshots,
+    input.images
+  );
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
