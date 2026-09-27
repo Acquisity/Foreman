@@ -19,7 +19,7 @@ export interface WidgetFeedbackMarker {
 }
 
 const MARKER_PATTERN =
-  /<!-- chat-widget-feedback conversation=([\w-]{1,128}) message=([\w-]{1,128}) run=([\w-]{1,128})(?: replay=([\w-]{1,128}))?(?: at=([\w:.+-]{1,40}))? -->\s*$/u;
+  /(?:^|\n)<!-- chat-widget-feedback conversation=([\w-]{1,128}) message=([\w-]{1,128}) run=([\w-]{1,128})(?: replay=([\w-]{1,128}))?(?: at=([\w:.+-]{1,40}))? -->\s*$/u;
 
 /**
  * Reads the machine line the widget ends every feedback ticket with. Only the

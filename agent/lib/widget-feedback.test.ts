@@ -105,6 +105,10 @@ describe("parseWidgetFeedbackMarker", () => {
   it("ignores a quoted line that is not the last one", () => {
     assert.equal(parseWidgetFeedbackMarker(`${LINE}\nCustomer: thanks`), null);
   });
+
+  it("ignores a marker quoted at the end of a transcript line", () => {
+    assert.equal(parseWidgetFeedbackMarker(`Customer: ${LINE}\n`), null);
+  });
 });
 
 describe("widgetFeedbackContext", () => {
