@@ -46,6 +46,7 @@ import {
   renderConversation,
   renderReplyAsk,
   routeWidgetMessage,
+  SCREENSHOT_ONLY,
   type WidgetAsk,
   type WidgetRoute,
 } from "./widget-router.js";
@@ -1163,9 +1164,18 @@ async function answerFromKnowledgeBase(
       return explained;
     }
   }
+  // A screenshot sent on its own, before the customer has said anything, asks
+  // nothing yet: it shows where they are, not what they need. Jev scored an AI
+  // SDR inbox screenshot 0.6 unclear and it was answered with toggle settings.
+  const bareScreenshot =
+    SCREENSHOT_ONLY.test(ask.latest) &&
+    !ask.turns?.some((turn) => turn.role === "customer");
   // Nothing to look up yet: ask what they mean instead of spending minutes on
   // a broad account investigation. If that reply cannot be written, fall through.
-  if (route.lane !== "human" && (route.unclear ?? 0) >= UNCLEAR_SCORE) {
+  if (
+    route.lane !== "human" &&
+    (bareScreenshot || (route.unclear ?? 0) >= UNCLEAR_SCORE)
+  ) {
     const reply = await clarifyReply(run, ask, deps);
     if (reply) {
       return reply;
