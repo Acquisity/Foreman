@@ -9,6 +9,7 @@ import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { followUpNeedsNothing } from "../lib/requester-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
+import { widgetFeedbackContext } from "../lib/widget-feedback.js";
 
 const credentials = connectLinearCredentials(
   process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent"
@@ -42,6 +43,31 @@ const skipsFollowUp = async (event: LinearAgentSessionEvent) => {
 };
 
 /**
+ * The widget-feedback route when the issue sits in the chat widget project.
+ * A failed or slow read falls back to triage, the path every issue had before.
+ */
+const widgetRoute = async (event: LinearAgentSessionEvent) => {
+  const issue = event.agentSession.issueId ?? event.agentSession.issue?.id;
+  if (!issue) {
+    return;
+  }
+  const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
+  const timedOut = new Promise<null>((resolve) =>
+    deadline.addEventListener("abort", () => resolve(null), { once: true })
+  );
+  try {
+    return (
+      (await Promise.race([
+        widgetFeedbackContext(issue, credentials),
+        timedOut,
+      ])) ?? undefined
+    );
+  } catch {
+    // Triage stays the route.
+  }
+};
+
+/**
  * Dispatches one Linear Agent Session event.
  *
  * @remarks
@@ -53,16 +79,20 @@ export const onAgentSession = async (
   ctx: LinearSessionContext,
   event: LinearAgentSessionEvent
 ): Promise<LinearInboundResult> => {
-  const context = buildLinearContext(event);
-  if (context === null) {
+  if (buildLinearContext(event) === null) {
     return null;
   }
+  const [skips, route] = await Promise.all([
+    skipsFollowUp(event),
+    widgetRoute(event),
+  ]);
+  const context = buildLinearContext(event, route) ?? [];
   // Every relayed Slack reply opens a session; one that needs nothing from
   // Foreman ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
   if (
-    (await skipsFollowUp(event)) &&
+    skips &&
     (await ctx.linear
       .createActivity({ body: "No reply needed.", type: "response" })
       .then(
