@@ -14,8 +14,10 @@ export const MODELS = {
   // callers must apply gatewayRouting(id) since it is a deepseek/ model.
   gate: "deepseek/deepseek-v4-pro-0813",
   // Support widget knowledge-base lane: one grounded answer over a few public
-  // help articles, where time to reply matters more than reasoning depth.
-  kb: "google/gemini-3.5-flash-lite",
+  // help articles. Not flash-lite: on the #6627 preview's real conversations it
+  // answered a screenshot's warning instead of the customer's request two turns
+  // earlier and dropped citations; flash follows the conversation for about 1s more.
+  kb: "google/gemini-3.5-flash",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",

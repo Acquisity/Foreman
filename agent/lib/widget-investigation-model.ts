@@ -34,6 +34,8 @@ const ALLOWED_TOOLS = new Set([
   "widget_outreach_health",
   "widget_provisioning_status",
   "widget_read_help_article",
+  // Registered only on a turn that follows up on a screen recording.
+  "widget_read_recording",
   "widget_sdr_thread_status",
   "widget_website_status",
 ]);

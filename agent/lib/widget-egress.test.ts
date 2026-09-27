@@ -136,23 +136,50 @@ for (const [label, text] of [
     "See https://acquisity.sentry.io/issues/12345 for the trace.",
   ],
   ["an Inngest run id", "Run 01J8ZQ3K4M5N6P7Q8R9S0T1V2W failed twice."],
-  ["a stack trace", "It threw:\n    at sendCampaign (campaign.ts:12:5)"],
   ["a bare internal host", "The failure is visible on sentry.io."],
 ] as const) {
-  test(`${label} in a claim blocks without resolving identifiers`, async () => {
+  test(`${label} is deleted with its item and the rest is answered; alone it blocks`, async () => {
     const { calls, deps: d } = deps();
     const result = await gate(
       scope,
       question,
-      findings({ recommendation: text }),
+      findings({ recommendation: `Reconnect the inbox. ${text}` }),
       d
     );
-    assert.equal(result.decision, "block");
-    assert.match(result.reason, INTERNAL);
-    assert.equal(calls.resolve.length, 0);
-    assert.equal(calls.judge.length, 0);
+    assert.equal(result.decision, "allow");
+    assert.equal(result.findings.recommendation, "Reconnect the inbox.");
+    assert.equal(
+      JSON.stringify([calls.judge, calls.compose]).includes(text),
+      false
+    );
+    const alone = deps();
+    const blocked = await gate(
+      scope,
+      question,
+      findings({ facts: [], recommendation: text }),
+      alone.deps
+    );
+    assert.equal(blocked.decision, "block");
+    assert.match(blocked.reason, INTERNAL);
+    assert.equal(alone.calls.resolve.length, 0);
+    assert.equal(alone.calls.judge.length, 0);
   });
 }
+
+test("a stack trace spanning items is not a removable item and still blocks", async () => {
+  const { calls, deps: d } = deps();
+  const result = await gate(
+    scope,
+    question,
+    findings({
+      recommendation: "It threw:\n    at sendCampaign (campaign.ts:12:5)",
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.match(result.reason, INTERNAL);
+  assert.equal(calls.judge.length, 0);
+});
 
 test("the customer's own lead, inbox and sending domain pass; ones the workspace does not own block", async () => {
   const mine = {
@@ -545,8 +572,8 @@ test("a provider id in entityIds never reaches the customer, so it does not bloc
   assert.doesNotMatch(JSON.stringify(calls.compose), STRIPE_CUSTOMER_ID);
 });
 
-test("the same provider id inside a claim still blocks", async () => {
-  const { deps: d } = deps();
+test("the same provider id inside a claim never reaches the customer: its item is deleted", async () => {
+  const { calls, deps: d } = deps();
   const result = await gate(
     scope,
     "What plan am I on?",
@@ -561,8 +588,12 @@ test("the same provider id inside a claim still blocks", async () => {
     }),
     d
   );
-  assert.equal(result.decision, "block");
-  assert.match(result.reason, INTERNAL);
+  assert.equal(result.decision, "allow");
+  assert.equal(result.findings.facts.length, 0);
+  assert.doesNotMatch(
+    JSON.stringify([calls.judge, calls.compose]),
+    STRIPE_CUSTOMER_ID
+  );
 });
 
 test("a website's custom domain and the workspace's billing account are owned; the same shapes elsewhere stay foreign", async () => {
@@ -780,6 +811,7 @@ test("the default judge and composer run under a deadline, so a stalled model ca
         findings: composerInput(findings()),
         organizationName: scope.organizationName,
         question,
+        recordingOffered: false,
       })
     );
   } finally {
@@ -879,4 +911,56 @@ test("the run's finish deadline reaches ownership reads and the judge, and its e
     ).reason,
     "gate_unavailable"
   );
+});
+
+test("the default judge gets what the finish has left less the composer's reserve, never under the floor", async (t) => {
+  const budgets: number[] = [];
+  const timeout = AbortSignal.timeout.bind(AbortSignal);
+  t.mock.method(AbortSignal, "timeout", (ms: number) => {
+    budgets.push(ms);
+    return timeout(ms);
+  });
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("{}", { status: 400 }))) as typeof fetch;
+  const judge = (finishAt: number) =>
+    assert.rejects(
+      defaultGateDeps.judge({
+        findings: findings(),
+        finishAt,
+        items: redactableItems(findings()),
+        question,
+        scope,
+      })
+    );
+  try {
+    await judge(Date.now() + 120_000);
+    const long = budgets[0] ?? 0;
+    assert.ok(long > 90_000 && long <= 95_000, String(long));
+    budgets.length = 0;
+    await judge(Date.now());
+    assert.equal(budgets[0], 10_000);
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = realKey;
+    }
+  }
+  const { calls, deps: d } = deps();
+  await gate(
+    scope,
+    question,
+    findings(),
+    d,
+    question,
+    false,
+    undefined,
+    false,
+    12_345
+  );
+  assert.equal((calls.judge[0] as { finishAt?: number }).finishAt, 12_345);
 });

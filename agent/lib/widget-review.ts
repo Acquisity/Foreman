@@ -3,11 +3,12 @@ import { logOpsEvent, type OpsLogger } from "./ops-log.js";
 import type { GateDeps } from "./widget-egress.js";
 
 const REVIEW_TIMEOUT_MS = 10_000;
-/**
- * JEV and the fallback share the judge's budget (JUDGE_TIMEOUT_MS in
- * widget-egress.ts), so the finish still lands inside the app's poll window.
- */
+/** The judge's budget, JEV and the fallback together, when the caller gives no finish time. */
 const REVIEW_BUDGET_MS = 60_000;
+/** Left for the composer after the judge (COMPOSE_TIMEOUT_MS in widget-egress.ts). */
+const COMPOSE_RESERVE_MS = 25_000;
+/** The least a judge gets; the run's finish signal still aborts it at the cutoff. */
+const MIN_JUDGE_MS = 10_000;
 const MAX_ITEMS = 60;
 const MAX_STATE_CHARS = 60_000;
 const MIN_CONFIDENCE = 0.8;
@@ -48,6 +49,21 @@ type Answer = z.infer<typeof answerSchema>;
 type ReviewInput = Parameters<GateDeps["judge"]>[0];
 type Verdict = Awaited<ReturnType<GateDeps["judge"]>>;
 type Fallback = (input: ReviewInput, signal: AbortSignal) => Promise<Verdict>;
+
+/**
+ * How long a judge may take from now. With the run's finish time it is what the
+ * finish has left less the composer's reserve: the gate model took over 60s on
+ * about a third of reviews, and a fixed 60s threw those replies away with a
+ * minute of the finish still unused. Without one, the fixed budget counts from
+ * `startedAt`.
+ */
+export const judgeBudgetMs = (
+  finishAt: number | undefined,
+  startedAt: number
+) =>
+  finishAt === undefined
+    ? Math.max(0, REVIEW_BUDGET_MS - (Date.now() - startedAt))
+    : Math.max(MIN_JUDGE_MS, finishAt - COMPOSE_RESERVE_MS - Date.now());
 
 const sure = (answer: Answer, choice: string) =>
   answer.choice === choice && answer.confidence >= MIN_CONFIDENCE;
@@ -137,9 +153,7 @@ async function reviewByFallback(
   jev: ReturnType<typeof decide>,
   startedAt: number
 ): Promise<Verdict> {
-  const budget = AbortSignal.timeout(
-    Math.max(0, REVIEW_BUDGET_MS - (Date.now() - startedAt))
-  );
+  const budget = AbortSignal.timeout(judgeBudgetMs(input.finishAt, startedAt));
   const verdict = await fallback(
     input,
     input.signal ? AbortSignal.any([budget, input.signal]) : budget
