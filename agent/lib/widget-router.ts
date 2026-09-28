@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import {
+  askJev,
+  FRONT_DOOR_JEV_MS,
+  fallbackReason,
+} from "./widget-next-action.js";
 
 /**
  * Front-door intent router for the support widget, backed by TypeSafe's Jev
@@ -312,6 +317,8 @@ export interface WidgetRoute {
   confidence: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
+  /** Why Jev gave no route, for the log: a fixed code and the time it took. */
+  failure?: string;
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
@@ -389,28 +396,19 @@ export async function routeWidgetMessage(
   if (!apiKey) {
     return FALLBACK;
   }
-  const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
-  const signal = opts?.signal
-    ? AbortSignal.any([opts.signal, AbortSignal.timeout(ROUTER_TIMEOUT_MS)])
-    : AbortSignal.timeout(ROUTER_TIMEOUT_MS);
+  const startedAt = Date.now();
   try {
-    const response = await doFetch(TYPESAFE_URL, {
-      body: JSON.stringify({
-        model: TYPESAFE_MODEL,
-        questions: QUESTIONS,
-        state: renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
-      }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      signal,
-    });
-    if (!response.ok) {
-      return FALLBACK;
-    }
-    const { answers } = responseSchema.parse(await response.json());
+    const response = await askJev(
+      QUESTIONS,
+      renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
+      apiKey,
+      {
+        fetch: opts?.fetch,
+        signal: opts?.signal,
+        timeoutMs: FRONT_DOOR_JEV_MS,
+      }
+    );
+    const { answers } = responseSchema.parse(response);
     const confidence = answers.lane.confidence ?? 0;
     const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
     const recording =
@@ -436,8 +434,11 @@ export async function routeWidgetMessage(
       ...(bug ? { bug } : {}),
       ...(recording ? { recording } : {}),
     };
-  } catch {
-    return FALLBACK;
+  } catch (error) {
+    return {
+      ...FALLBACK,
+      failure: `reason=${fallbackReason(error)} ms=${Date.now() - startedAt}`,
+    };
   }
 }
 
@@ -500,7 +501,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

@@ -4,12 +4,15 @@ import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
+  askJev,
   nextActionEnabled,
   note,
   selectNextAction,
   turnEvidence,
   widgetNextActionMiddleware,
 } from "./widget-next-action.js";
+
+const RUN_ENDED = /run ended/;
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
@@ -1040,5 +1043,47 @@ describe("step model", () => {
     });
     assert.equal(step.doGenerateCalls.length, 0);
     assert.equal(main.doGenerateCalls.length, 1);
+  });
+});
+
+describe("askJev", () => {
+  const ok = {
+    json: () => Promise.resolve({ answers: {} }),
+    ok: true,
+    status: 200,
+  };
+  it("tries once per limit after its own timeout, and not after the caller's abort", async () => {
+    let calls = 0;
+    const stallOnce = (_url: string, init: { signal: AbortSignal }) => {
+      calls += 1;
+      return calls === 1
+        ? new Promise<never>((_resolve, reject) =>
+            init.signal.addEventListener("abort", () =>
+              reject(init.signal.reason)
+            )
+          )
+        : Promise.resolve(ok);
+    };
+    assert.deepEqual(
+      await askJev({}, "s", "k", { fetch: stallOnce, timeoutMs: [20, 1000] }),
+      { answers: {} }
+    );
+    assert.equal(calls, 2);
+    calls = 0;
+    await assert.rejects(
+      askJev({}, "s", "k", { fetch: stallOnce, timeoutMs: [20] }),
+      { name: "TimeoutError" }
+    );
+    assert.equal(calls, 1);
+    calls = 0;
+    const caller = new AbortController();
+    const pending = askJev({}, "s", "k", {
+      fetch: stallOnce,
+      signal: caller.signal,
+      timeoutMs: [1000, 1000],
+    });
+    caller.abort(new Error("run ended"));
+    await assert.rejects(pending, RUN_ENDED);
+    assert.equal(calls, 1);
   });
 });

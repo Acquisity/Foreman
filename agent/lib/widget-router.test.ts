@@ -8,6 +8,9 @@ import {
   routeWidgetMessage,
 } from "./widget-router.js";
 
+const TRAILING_MS = / ms=\d+$/;
+const REFUSED_401 = /^reason=http_401 ms=\d+$/;
+
 const jevReply = (lane: string, confidence: number) => ({
   json: () =>
     Promise.resolve({
@@ -291,6 +294,50 @@ describe("routeWidgetMessage", () => {
       assert.equal(route.lane, "investigate");
       assert.equal(route.source, "fallback");
     }
+    // The log says why, as a fixed code, after the one retry the first two earn.
+    assert.deepEqual(
+      routes.map((route) => route.failure?.replace(TRAILING_MS, "")),
+      ["reason=boom", "reason=http_500", "reason=invalid_output"]
+    );
+  });
+
+  // 2026-09-28: "where can i buy more inboxes?" fell back to an investigation
+  // while TypeSafe answered 529 in about 160ms.
+  it("retries once after an overloaded TypeSafe and routes on the second answer", async () => {
+    const statuses = [529];
+    let calls = 0;
+    const route = await routeWidgetMessage("where can i buy more inboxes?", {
+      apiKey: "test-key",
+      fetch: () => {
+        calls += 1;
+        const status = statuses.shift();
+        return Promise.resolve(
+          status
+            ? { json: () => Promise.resolve({}), ok: false, status }
+            : jevReply("kb", 0.99)
+        );
+      },
+    });
+    assert.equal(calls, 2);
+    assert.equal(route.source, "jev");
+    assert.equal(route.lane, "kb");
+  });
+
+  it("does not retry a request TypeSafe refused", async () => {
+    let calls = 0;
+    const route = await routeWidgetMessage("hello", {
+      apiKey: "test-key",
+      fetch: () => {
+        calls += 1;
+        return Promise.resolve({
+          json: () => Promise.resolve({}),
+          ok: false,
+          status: 401,
+        });
+      },
+    });
+    assert.equal(calls, 1);
+    assert.match(route.failure ?? "", REFUSED_401);
   });
 
   it("puts the latest message first and apart from a few bounded earlier turns", async () => {

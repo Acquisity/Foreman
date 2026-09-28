@@ -6,6 +6,7 @@ import {
   CANNOT_CHECK,
   CANNOT_CHECK_ALONE,
   decideFromArticles,
+  hedged,
   indexLine,
   type KbDeps,
   loadImages,
@@ -13,6 +14,10 @@ import {
   renderTranscript,
   resolveCitations,
 } from "./widget-kb.js";
+
+const DECIDE_TIMEOUT_MARK = / decide:fallback:timeout=\d+ /;
+const GENERATE_529 =
+  /^step=generate attempt=1 reason=AI_APICallError:529 ms=\d+$/;
 
 const articles = [
   { title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
@@ -651,4 +656,75 @@ test("a screenshot link loads as an image only when it answers with image bytes"
   );
   // A redirect would leave the signed storage link for somewhere else.
   assert.ok(requested.every((init) => init.redirect === "error"));
+});
+
+test("a Jev decision that fails logs why in the answer's step marks", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  const timeout = new DOMException("slow", "TimeoutError");
+  await answerFromHelpCenter("how do i set up ai sdr?", log, {
+    ...deps({ answer: "Open setup [2].", kind: "answer" }),
+    decide: () => Promise.reject(timeout),
+  });
+  const done = lines
+    .map((line) => JSON.parse(line))
+    .find((line) => line.outcome === "ok");
+  assert.match(done?.message, DECIDE_TIMEOUT_MARK);
+});
+
+test("a stalled help-center model call is raced by a second one, and every failed try is logged", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  const never = (scoped: AbortSignal) =>
+    new Promise<string>((_resolve, reject) =>
+      scoped.addEventListener("abort", () => reject(scoped.reason))
+    );
+  // Stalled: the second call starts after the hedge delay and wins.
+  let calls = 0;
+  const { signal } = new AbortController();
+  assert.equal(
+    await hedged(
+      "select",
+      signal,
+      (scoped) => {
+        calls += 1;
+        return calls === 1 ? never(scoped) : Promise.resolve("second");
+      },
+      10
+    ),
+    "second"
+  );
+  // Failed: the second starts at once, long before the hedge delay.
+  const overloaded = Object.assign(new Error("busy"), {
+    name: "AI_APICallError",
+    statusCode: 529,
+  });
+  calls = 0;
+  const startedAt = Date.now();
+  assert.equal(
+    await hedged(
+      "generate",
+      signal,
+      () => {
+        calls += 1;
+        return calls === 1 ? Promise.reject(overloaded) : Promise.resolve("ok");
+      },
+      60_000
+    ),
+    "ok"
+  );
+  assert.ok(Date.now() - startedAt < 1000);
+  // Both fail: the last reason surfaces, not an AggregateError.
+  await assert.rejects(
+    hedged("chat", signal, () => Promise.reject(overloaded), 10),
+    overloaded
+  );
+  const logged = lines.map((line) => JSON.parse(line).message);
+  assert.ok(logged.some((line) => GENERATE_529.test(line)));
+  assert.equal(
+    logged.filter((line) => line.startsWith("step=chat ")).length,
+    2
+  );
+  // The loser aborted when the winner finished is not a failure.
+  assert.ok(!logged.some((line) => line.startsWith("step=select ")));
 });
