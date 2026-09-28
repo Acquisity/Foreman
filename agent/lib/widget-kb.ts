@@ -620,7 +620,7 @@ export const defaultKbDeps: KbDeps = {
       }));
   },
   async select({ images, index, question, signal }) {
-    const model = await resolveModel("kb");
+    const model = await resolveModel("kbSelect");
     const { object } = await hedged("select", signal, (abortSignal) =>
       generateObject({
         abortSignal,

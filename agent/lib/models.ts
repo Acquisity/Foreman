@@ -18,6 +18,11 @@ export const MODELS = {
   // answered a screenshot's warning instead of the customer's request two turns
   // earlier and dropped citations; flash follows the conversation for about 1s more.
   kb: "google/gemini-3.5-flash",
+  // Picking help-center articles from the ~25k-token title index: no writing, so
+  // flash-lite's weaknesses above do not apply. Measured through the gateway
+  // 2026-09-28, 30 picks each on the full index: flash-lite p50 1.3s, max 1.6s,
+  // with the same articles or better; flash p50 12.7s, max 27.8s.
+  kbSelect: "google/gemini-3.5-flash-lite",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
