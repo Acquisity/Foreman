@@ -14,10 +14,14 @@ export const MODELS = {
   // callers must apply gatewayRouting(id) since it is a deepseek/ model.
   gate: "deepseek/deepseek-v4-pro-0813",
   // Support widget knowledge-base lane: one grounded answer over a few public
-  // help articles. Not flash-lite: on the #6627 preview's real conversations it
-  // answered a screenshot's warning instead of the customer's request two turns
-  // earlier and dropped citations; flash follows the conversation for about 1s more.
-  kb: "google/gemini-3.5-flash",
+  // help articles, and the lane's short chat, clarify and explain replies.
+  // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite
+  // p50 1.0s, flash p50 8.7s (4 to 16s), and 4 to 39s live on the preview.
+  kb: "google/gemini-3.5-flash-lite",
+  // The same answer when the customer's message carries screenshots. On the
+  // #6627 preview's real conversations flash-lite answered a screenshot's
+  // warning instead of the customer's request; flash followed the request.
+  kbImages: "google/gemini-3.5-flash",
   // Picking help-center articles from the ~25k-token title index: no writing, so
   // flash-lite's weaknesses above do not apply. Measured through the gateway
   // 2026-09-28, 30 picks each on the full index: flash-lite p50 1.3s, max 1.6s,
