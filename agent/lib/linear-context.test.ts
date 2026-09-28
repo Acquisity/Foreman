@@ -43,6 +43,18 @@ describe("buildLinearContext", () => {
     }
   });
 
+  it("leaves the follow-up decision to reply_to_requester and keeps other comments out of the thread", () => {
+    for (const rule of [
+      "pass your answer to reply_to_requester",
+      "returns posted false with an outcome, their reply needed nothing from you: post nothing anywhere",
+      "On a follow-up, post no new ticket comment",
+      "A result with an error is a failed delivery",
+      "Never comment under that thread comment any other way",
+    ]) {
+      assert.ok(LINEAR_TRIAGE_ROUTE.includes(rule), rule);
+    }
+  });
+
   it("returns null for unsupported actions", () => {
     assert.equal(buildLinearContext(makeEvent({ action: "updated" })), null);
   });
@@ -56,6 +68,12 @@ describe("buildLinearContext", () => {
       })
     );
     assert.ok(context);
-    assert.ok(context.includes("The requesting user is Ada Lovelace."));
+    assert.ok(
+      context.some(
+        (line) =>
+          line.startsWith("This Linear session was opened by Ada Lovelace.") &&
+          line.includes("'Ask from <name>' link, that person is the requester")
+      )
+    );
   });
 });

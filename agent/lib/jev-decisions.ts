@@ -26,6 +26,8 @@ export const BARS = {
   discretion: 0.7,
   /** A duplicate closes the ticket, so it needs a near-certain match. */
   duplicate: 0.8,
+  /** Below this, staying quiet on a requester follow-up is not trusted. */
+  followUp: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
   /** Below this, the project is left unset and Aaron routes it. */
@@ -34,6 +36,8 @@ export const BARS = {
   rootCauseLabel: 0.6,
   /** Yes/no signals that only add a label or raise a floor. */
   signal: 0.5,
+  /** Below this, a follow-up is not trusted to be only a status move. */
+  statusOnly: 0.7,
   /** Below this, the claim is treated as unproven. */
   verdict: 0.6,
 } as const;
@@ -664,4 +668,116 @@ export async function decideBilling(
   };
   const answers = await askJev(billingQuestions(), state, opts);
   return resolveBilling(input, answers);
+}
+
+// ---------------------------------------------------------------- follow-up
+
+export const FOLLOW_UP_OUTCOMES = {
+  respond:
+    "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
+  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that settles nothing Foreman asked, an acknowledgement, thanks, or noise",
+} as const;
+/** status: the only ask is a ticket status move, so nothing is re-checked. */
+export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
+
+export interface FollowUpInput {
+  /** Replies since lastReply that Foreman already handled; context only. */
+  earlier?: string[];
+  /** Foreman's last message in the requester thread. */
+  lastReply: string;
+  /** Everything said in the thread since, oldest first, as relayed. */
+  replies: string[];
+}
+
+export const followUpQuestions = (): Record<string, JevQuestion> => ({
+  follow_up: {
+    criteria: { ...FOLLOW_UP_OUTCOMES },
+    instructions:
+      "Foreman posted lastReply in a thread shared by several people (a Slack thread, or a support team's notes on a customer conversation). Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
+    type: "choice",
+  },
+  status_only: {
+    instructions:
+      "Is the only thing the replies ask of Foreman to move the ticket to a status (done, complete, closed, cancelled), with no question for Foreman and no request to check, verify, or change anything else?",
+    type: "boolean",
+  },
+});
+
+/**
+ * Staying quiet needs a clear call; when unsure, the requester is answered.
+ * A clear status-only ask is answered without re-checking the work.
+ */
+export function resolveFollowUp(answers: Answers): FollowUpOutcome {
+  const { choice, confidence } = choiceOf(answers.follow_up);
+  if (choice === "skip" && confidence >= BARS.followUp) {
+    return "skip";
+  }
+  return answers.status_only &&
+    probabilityOf(answers.status_only) >= BARS.statusOnly
+    ? "status"
+    : "respond";
+}
+
+/**
+ * The prompt into a ticket's Foreman session: one line naming who replied in
+ * Slack (the Asks receiver) or added a note in the Acquisity support inbox.
+ * The reply itself is under the requester thread's anchor comment.
+ */
+export const SLACK_PROMPT =
+  /^\*\*([^*\n]{1,100})\*\* (?:replied in Slack|added a note in the support inbox)\.$/u;
+
+const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
+// The Asks receiver heads each relayed reply with "<link> **Name** replied in
+// Slack:", and the support inbox each note with "**Name** added a note in the
+// support inbox:". The link always names Foreman, so it says nothing about
+// who a reply is for.
+export const RELAY_HEADER =
+  /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?(?:replied in Slack|added a note in the support inbox):/u;
+
+/**
+ * Rewrites a relayed reply as "Name: text" with every Slack mention as
+ * @teammate. Jev cannot resolve Slack ids, and none of them is Foreman: a
+ * relayed reply comes through Linear, not a Slack mention of the bot.
+ */
+export const followUpText = (reply: string): string => {
+  const name = RELAY_HEADER.exec(reply)?.[1] ?? "Someone";
+  const text = reply
+    .replace(RELAY_HEADER, "")
+    .replace(SLACK_MENTION, "@teammate")
+    .trim();
+  return `${name}: ${text}`;
+};
+
+/**
+ * A reply that is only a mention is what wakes Foreman, not something said,
+ * so code skips it without asking Jev.
+ */
+export async function decideFollowUp(
+  input: FollowUpInput,
+  opts?: JevOptions
+): Promise<FollowUpOutcome> {
+  const said = (list: string[] = []) =>
+    list
+      .filter(
+        (reply) =>
+          reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !==
+          ""
+      )
+      .map(followUpText);
+  const replies = said(input.replies);
+  if (replies.length === 0) {
+    return "skip";
+  }
+  const earlier = said(input.earlier);
+  return resolveFollowUp(
+    await askJev(
+      followUpQuestions(),
+      {
+        lastReply: input.lastReply,
+        replies,
+        ...(earlier.length > 0 ? { earlier } : {}),
+      },
+      opts
+    )
+  );
 }

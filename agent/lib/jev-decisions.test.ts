@@ -4,7 +4,10 @@ import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
+  decideFollowUp,
+  followUpText,
   resolveBilling,
+  resolveFollowUp,
   resolveTriage,
   type TriageInput,
   triageQuestions,
@@ -364,4 +367,65 @@ test("askJev stops before the request when the call is already cancelled", async
   await assert.rejects(cancelled());
   await assert.rejects(cancelled("t"));
   assert.equal(called, false);
+});
+
+test("a follow-up stays quiet only on a clear skip", () => {
+  assert.equal(resolveFollowUp({ follow_up: pick("skip") }), "skip");
+  assert.equal(resolveFollowUp({ follow_up: pick("respond", 0.4) }), "respond");
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("skip", 0.5) }),
+    "respond",
+    "an unsure skip answers the requester"
+  );
+});
+
+test("a clear status-only follow-up is moved without re-checking", () => {
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("respond"), status_only: yes(0.9) }),
+    "status"
+  );
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("respond"), status_only: yes(0.6) }),
+    "respond",
+    "an unsure status move is handled as a normal follow-up"
+  );
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("skip"), status_only: yes(0.9) }),
+    "skip"
+  );
+});
+
+test("a follow-up that is only mentions is skipped without asking Jev", async () => {
+  const outcome = await decideFollowUp(
+    {
+      lastReply: "Which amount?",
+      replies: [
+        "https://linear.app/acquisity/profiles/acquisityforeman1 **Gary** replied in Slack:\n\n<@U0950315SDC>",
+        " <@U1|bot> ",
+      ],
+    },
+    {
+      fetch: () => {
+        throw new Error("Jev should not be asked.");
+      },
+      token: "t",
+    }
+  );
+  assert.equal(outcome, "skip");
+});
+
+test("a relayed reply reaches Jev as the speaker and their words, mentions as teammates", () => {
+  assert.equal(
+    followUpText(
+      "https://linear.app/acquisity/profiles/acquisityforeman1 **Aaron Fraga** replied in Slack:\n\nHey <@U06M69EP1UG>! what was agreed?"
+    ),
+    "Aaron Fraga: Hey @teammate! what was agreed?"
+  );
+  assert.equal(followUpText("just text"), "Someone: just text");
+  assert.equal(
+    followUpText(
+      "**Dana** added a note in the support inbox:\n\nIs their domain verified?"
+    ),
+    "Dana: Is their domain verified?"
+  );
 });

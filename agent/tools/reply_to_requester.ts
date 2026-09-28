@@ -7,16 +7,16 @@ import { replyToRequester } from "#lib/requester-reply.js";
 export default defineTool({
   approval: () => "not-applicable",
   description:
-    "Reply to the requester in the Slack thread behind an intake ticket, as Acquisity Foreman. Use it only in a Linear session; in a Slack conversation, answer in the thread directly instead. Post exactly one message: your answer, or your questions when you need more from them. " +
-    "It refuses a second post until the requester replies, and fails when the issue has no Slack thread. Never put the investigation itself here; that belongs in the document.",
+    "Reply to the requester in the thread behind an intake ticket (a Slack thread, or the support team's notes on an Acquisity inbox conversation), as Acquisity Foreman. Use it only in a Linear session; in a Slack conversation, answer in the thread directly instead. Post exactly one message: your answer, or your questions when you need more from them. " +
+    "It refuses a second post until the requester replies, and fails when the issue has no requester thread. On a follow-up, Jev decides whether their reply needs an answer; posted false with an outcome means it posted nothing, so follow its reason and do not post the message anywhere else. Never put the investigation itself here; that belongs in the document.",
   async execute({ issue, message }, ctx) {
     try {
-      const reply = await replyToRequester(
+      return await replyToRequester(
         issue,
         message,
-        (await ctx.getToken(linearAuth)).token
+        (await ctx.getToken(linearAuth)).token,
+        ctx.abortSignal
       );
-      return { posted: true as const, ...reply };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
