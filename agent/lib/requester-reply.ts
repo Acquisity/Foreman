@@ -264,8 +264,10 @@ export function promptedFollowUp(
   const since = plan.followUp
     ? thread.slice(thread.length - plan.followUp.replies.length)
     : thread;
-  const earlier = since.filter((c) => handledAt && c.createdAt <= handledAt);
-  const fresh = since.filter((c) => !earlier.includes(c));
+  // A reply after this prompt belongs to the next prompt's judgment.
+  const eligible = since.filter((c) => c.createdAt <= prompt.createdAt);
+  const earlier = eligible.filter((c) => handledAt && c.createdAt <= handledAt);
+  const fresh = eligible.filter((c) => !earlier.includes(c));
   if (fresh.length === 0) {
     return null;
   }

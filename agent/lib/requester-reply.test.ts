@@ -168,8 +168,8 @@ test("a prompted reply is judged against what arrived since the previous prompt"
   });
   assert.deepEqual(
     promptedFollowUp(thread, plan, "p1"),
-    { lastReply: "Which amount?", replies: [thread[2].body, thread[4].body] },
-    "the first prompt judges every reply since Foreman spoke"
+    { lastReply: "Which amount?", replies: [thread[2].body] },
+    "the first prompt judges replies up to itself, not the next prompt's"
   );
   assert.equal(
     promptedFollowUp(thread, plan, "r2"),
