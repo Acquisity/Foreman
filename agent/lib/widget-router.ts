@@ -234,10 +234,13 @@ const QUESTIONS = {
     type: "noul",
   },
   // "what about the limit?" and "nothing works!!" were investigated for two to
-  // three minutes before anyone asked what the customer meant.
+  // three minutes before anyone asked what the customer meant. Asking for "what
+  // actually went wrong" on every message scored a plain "what is the growth
+  // plan creator?" 0.61 and "what about the niche researcher?" after it 0.84,
+  // so a clear question got a clarifying one (2026-09-28).
   is_unclear: {
     instructions:
-      "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
+      "Taking the earlier conversation into account, a careful support person could not tell what the customer wants from the latest message: it does not say which feature, page or thing it is about, or it reports a problem without saying what went wrong, so they would have to ask what the customer means before they could even start. A question about a named feature or page (what it is, how it works, where it is) is NOT this, and neither is a short follow-up such as 'what about X?' or 'and X?' that asks the earlier question again about X, a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there), or one that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
     type: "noul",
   },
   lane: {
