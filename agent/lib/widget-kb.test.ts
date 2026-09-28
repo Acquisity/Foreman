@@ -6,12 +6,14 @@ import {
   CANNOT_CHECK,
   CANNOT_CHECK_ALONE,
   decideFromArticles,
+  defaultKbDeps,
   hedged,
   indexLine,
   type KbDeps,
   loadImages,
   mergeHits,
   renderTranscript,
+  replyToChat,
   resolveCitations,
 } from "./widget-kb.js";
 
@@ -727,4 +729,47 @@ test("a stalled help-center model call is raced by a second one, and every faile
   );
   // The loser aborted when the winner finished is not a failure.
   assert.ok(!logged.some((line) => line.startsWith("step=select ")));
+});
+
+test("article picking runs on the kbSelect model while answers and chat stay on kb", async (t) => {
+  t.mock.method(console, "info", () => undefined);
+  const key = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test";
+  t.after(() => {
+    if (key === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = key;
+    }
+  });
+  const models: string[] = [];
+  t.mock.method(globalThis, "fetch", (_url: string, init?: RequestInit) => {
+    const id = new Headers(init?.headers).get("ai-language-model-id");
+    if (id) {
+      models.push(id);
+    }
+    return Promise.resolve(new Response("{}", { status: 500 }));
+  });
+  const used = async (call: () => Promise<unknown>) => {
+    models.length = 0;
+    await call().catch(() => undefined);
+    return [...new Set(models)];
+  };
+  const signal = AbortSignal.timeout(5000);
+  const index = [{ id: "a", title: "Buying inboxes" }];
+  assert.deepEqual(
+    await used(() =>
+      defaultKbDeps.select({ index, question: "Customer: hi", signal })
+    ),
+    ["google/gemini-3.5-flash-lite"]
+  );
+  assert.deepEqual(
+    await used(() =>
+      defaultKbDeps.generate({ articles: [], question: "Customer: hi", signal })
+    ),
+    ["google/gemini-3.5-flash"]
+  );
+  assert.deepEqual(await used(() => replyToChat("thanks", log)), [
+    "google/gemini-3.5-flash",
+  ]);
 });
