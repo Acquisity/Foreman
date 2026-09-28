@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
-import { askJev, type SelectorOptions } from "./widget-next-action.js";
+import {
+  askJev,
+  FRONT_DOOR_JEV_MS,
+  fallbackReason,
+  type SelectorOptions,
+} from "./widget-next-action.js";
 
 export const widgetProgressSchema = z.object({
   checks: z
@@ -176,6 +181,7 @@ export async function planWidgetChecks(
   if (!apiKey) {
     return [];
   }
+  const startedAt = Date.now();
   try {
     const entries = Object.entries(PLANNABLE) as [CheckId, string][];
     const response = z
@@ -195,7 +201,7 @@ export async function planWidgetChecks(
           ),
           JSON.stringify({ conversation: question.slice(0, 12_000) }),
           apiKey,
-          opts
+          { ...opts, timeoutMs: FRONT_DOOR_JEV_MS }
         )
       );
     const scored = entries
@@ -211,8 +217,12 @@ export async function planWidgetChecks(
       .filter(({ score }) => score >= PLAN_SCORE)
       .slice(0, PLAN_MAX)
       .map(({ id }) => id);
-  } catch {
-    logOpsEvent("widget.plan", { outcome: "fallback", runId: opts.runId });
+  } catch (error) {
+    logOpsEvent("widget.plan", {
+      message: `reason=${fallbackReason(error)} ms=${Date.now() - startedAt}`,
+      outcome: "fallback",
+      runId: opts.runId,
+    });
     return [];
   }
 }

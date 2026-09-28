@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
@@ -8,7 +9,12 @@ import {
 } from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
-import { askJev, type SelectorOptions } from "./widget-next-action.js";
+import {
+  askJev,
+  FRONT_DOOR_JEV_MS,
+  fallbackReason,
+  type SelectorOptions,
+} from "./widget-next-action.js";
 import {
   DECISION_CONTEXT,
   RECORDING_RULE,
@@ -45,6 +51,15 @@ const SEARCH_TIMEOUT_MS = 5000;
 // Article selection and answer generation are sequential model calls. Live
 // selection alone can take 15s; leave time for the grounded answer as well.
 const KB_TIMEOUT_MS = 45_000;
+/**
+ * gemini-3.5-flash through the gateway is bimodal, about 2s or a 15 to 20s
+ * stall (widget-screenshot.ts), and a failed call used to wait 2 then 4s for
+ * the SDK's unlogged retries: the help-center lane took 15 to 45s and chat
+ * replies timed out on "Delay was aborted" (2026-09-28). So a call still
+ * running after this is raced by a second identical one.
+ */
+export const HEDGE_AFTER_MS = 4000;
+
 const MAX_ANSWER_CHARS = 4000;
 const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
@@ -314,7 +329,7 @@ export async function decideFromArticles(
         conversation: input.question,
       }),
       apiKey,
-      { ...opts, signal: input.signal }
+      { ...opts, signal: input.signal, timeoutMs: FRONT_DOOR_JEV_MS }
     )
   );
   if (!(answers.kb.choice in criteria)) {
@@ -350,6 +365,63 @@ const chatSchema = z.object({ reply: z.string() });
 
 const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes. ${RECORDING_RULE}`;
 
+/** The failure as a fixed code: the error class and any HTTP status, never a body. */
+const modelFailure = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return "unknown";
+  }
+  const status = (error as { statusCode?: unknown }).statusCode;
+  return typeof status === "number" ? `${error.name}:${status}` : error.name;
+};
+
+/**
+ * One help-center model call, hedged like the screenshot read: a call still
+ * running after {@link HEDGE_AFTER_MS}, or one that fails, starts a second
+ * identical call, and the first to finish wins. Every failed try is logged
+ * with its reason, which the SDK's in-place retries used to hide.
+ */
+export async function hedged<T>(
+  step: string,
+  signal: AbortSignal,
+  call: (signal: AbortSignal) => Promise<T>,
+  hedgeAfterMs = HEDGE_AFTER_MS
+): Promise<T> {
+  const settled = new AbortController();
+  const scoped = AbortSignal.any([signal, settled.signal]);
+  const startedAt = Date.now();
+  const attempt = (n: number) =>
+    call(scoped).catch((error: unknown) => {
+      if (!settled.signal.aborted) {
+        logOpsEvent("widget.kb.model", {
+          message: `step=${step} attempt=${n} reason=${modelFailure(error)} ms=${Date.now() - startedAt}`,
+          outcome: "error",
+        });
+      }
+      throw error;
+    });
+  const primary = attempt(1);
+  const backup = (async () => {
+    await Promise.race([
+      sleep(hedgeAfterMs, undefined, { signal: scoped }),
+      // A failed primary starts the backup at once; a successful one never
+      // does, since the abort below ends the wait first.
+      primary.then(
+        () => new Promise<never>(() => undefined),
+        () => undefined
+      ),
+    ]);
+    return attempt(2);
+  })();
+  try {
+    return await Promise.any([primary, backup]);
+  } catch (error) {
+    // Both failed: surface the last reason, not "All promises were rejected".
+    throw error instanceof AggregateError ? error.errors.at(-1) : error;
+  } finally {
+    settled.abort();
+  }
+}
+
 /**
  * A short conversational reply to a message that asks nothing. No retrieval, no
  * tools, no account data, so like the rest of this lane there is nothing to
@@ -367,14 +439,20 @@ export async function replyToChat(
   const startedAt = Date.now();
   try {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      prompt: message,
-      schema: chatSchema,
-      system,
-    });
+    const { object } = await hedged(
+      "chat",
+      AbortSignal.timeout(CHAT_TIMEOUT_MS),
+      (abortSignal) =>
+        generateObject({
+          abortSignal,
+          maxRetries: 0,
+          model: gateway(model),
+          ...fastCallOptions(model),
+          prompt: message,
+          schema: chatSchema,
+          system,
+        })
+    );
     const reply = object.reply.replace(MARKER, "").trim();
     logOpsEvent("widget.kb.answer", {
       ...log,
@@ -456,17 +534,20 @@ export const defaultKbDeps: KbDeps = {
       question,
       recordingOffered: recordingOffered === true,
     });
-    const { object } = await generateObject({
-      abortSignal: signal,
-      messages: withImageParts(input, images),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: withImages(
-        `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
-        images
-      ),
-    });
+    const { object } = await hedged("generate", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        messages: withImageParts(input, images),
+        model: gateway(model),
+        ...fastCallOptions(model),
+        schema: accountLikely ? guardedAnswerSchema : answerSchema,
+        system: withImages(
+          `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
+          images
+        ),
+      })
+    );
     return object;
   },
   images: loadImages,
@@ -499,14 +580,17 @@ export const defaultKbDeps: KbDeps = {
   },
   async rewrite(question, signal) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      model: gateway(model),
-      prompt: question,
-      ...fastCallOptions(model),
-      schema: rewriteSchema,
-      system: REWRITE_PROMPT,
-    });
+    const { object } = await hedged("rewrite", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        model: gateway(model),
+        prompt: question,
+        ...fastCallOptions(model),
+        schema: rewriteSchema,
+        system: REWRITE_PROMPT,
+      })
+    );
     return object;
   },
   // The help-center search is a public route, so this lane calls it directly
@@ -537,18 +621,21 @@ export const defaultKbDeps: KbDeps = {
   },
   async select({ images, index, question, signal }) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      // The listing comes first so the long, stable prefix can be cached.
-      messages: withImageParts(
-        `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
-        images
-      ),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      schema: selectSchema,
-      system: SELECT_PROMPT,
-    });
+    const { object } = await hedged("select", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        // The listing comes first so the long, stable prefix can be cached.
+        messages: withImageParts(
+          `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
+          images
+        ),
+        model: gateway(model),
+        ...fastCallOptions(model),
+        schema: selectSchema,
+        system: SELECT_PROMPT,
+      })
+    );
     return object;
   },
 };
@@ -800,10 +887,11 @@ function withCannotCheck(
  */
 const SURE_ACCOUNT = 0.4;
 
-const decisionMark = (decided: Decision) =>
+/** A fallback names why Jev did not decide, such as `decide:fallback:timeout`. */
+const decisionMark = (decided: Decision, failure = "") =>
   decided
     ? `decide:${decided.choice}@${decided.confidence.toFixed(2)}`
-    : "decide:fallback";
+    : `decide:fallback${failure ? `:${failure}` : ""}`;
 
 /** What Jev's decision settles before anything is written; null leaves it to the writer. */
 function settledByDecision(
@@ -866,6 +954,7 @@ export async function answerFromHelpCenter(
       (article) => helpArticleSlug(article.url) ?? article.url
     );
     mark("read");
+    let failure = "";
     const decided =
       (await deps
         .decide?.({
@@ -875,8 +964,11 @@ export async function answerFromHelpCenter(
           question,
           signal,
         })
-        .catch(() => null)) ?? null;
-    mark(decisionMark(decided));
+        .catch((error: unknown) => {
+          failure = fallbackReason(error);
+          return null;
+        })) ?? null;
+    mark(decisionMark(decided, failure));
     const { cannotCheck, settled } = afterDecision(
       decided,
       articles.length,

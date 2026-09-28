@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { planWidgetChecks, progressFromEvents } from "./widget-progress.js";
 
+const PLAN_400 = /^reason=http_400 ms=\d+$/;
+
 const start = (sequence: number, ids: string[]) => ({
   data: {
     actions: ids.map((callId) => ({
@@ -85,4 +87,35 @@ test("the plan keeps the likely checks, most likely first, and is empty on any f
     []
   );
   assert.deepEqual(await planWidgetChecks("x", { apiKey: "" }), []);
+});
+test("the plan retries one overloaded TypeSafe and logs why it gave up", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  const statuses = [529, 200];
+  const plan = await planWidgetChecks("Why was I charged twice?", {
+    apiKey: "k",
+    fetch: () =>
+      Promise.resolve({
+        json: () => Promise.resolve({ answers: { billing: { noul: 0.9 } } }),
+        ok: statuses[0] === 200,
+        status: statuses.shift() ?? 500,
+      }),
+    runId: "r",
+  });
+  assert.deepEqual(plan, ["billing"]);
+  await planWidgetChecks("x", {
+    apiKey: "k",
+    fetch: () =>
+      Promise.resolve({
+        json: () => Promise.resolve({}),
+        ok: false,
+        status: 400,
+      }),
+    runId: "r",
+  });
+  const failed = lines
+    .map((line) => JSON.parse(line))
+    .find((line) => line.outcome === "fallback");
+  assert.match(failed?.message, PLAN_400);
+  assert.equal(failed?.runId, "r");
 });

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
@@ -298,29 +299,63 @@ export interface SelectorOptions {
   sessionId?: string;
 }
 
+/**
+ * Worth one more try: TypeSafe answered HTTP 529 (overloaded) in about 160ms,
+ * and a request stalled past its limit (2026-09-28). A caller's own abort is not.
+ */
+const RETRYABLE_STATUS = /^http_(408|429|5\d\d)$/;
+const retryable = (error: unknown) =>
+  error instanceof Error &&
+  (error.name === "TimeoutError" ||
+    error instanceof TypeError ||
+    RETRYABLE_STATUS.test(error.message));
+const RETRY_DELAY_MS = 300;
+/**
+ * The router, the checklist plan and the help-center decision run before the
+ * customer sees anything. At a single 3 to 5s try, one TypeSafe 529 or a slow
+ * answer over the articles (2.9s seen) sent a help question to an investigation,
+ * dropped the plan, or added 3s to every help-center answer (2026-09-28). One
+ * retry costs at most 3.3s more, and only when the first try failed.
+ */
+export const FRONT_DOOR_JEV_MS = [4000, 3000];
+
+/**
+ * One Jev request. `timeoutMs` holds one limit per attempt: a further entry
+ * retries once after a timeout, a network error or an overloaded or failing
+ * TypeSafe, so a single blip no longer decides the outcome.
+ */
 export async function askJev(
   questions: object,
   state: string,
   apiKey: string,
-  opts: SelectorOptions & { signal?: AbortSignal }
+  opts: SelectorOptions & { signal?: AbortSignal; timeoutMs?: number[] }
 ): Promise<unknown> {
-  const timeout = AbortSignal.timeout(SELECTOR_TIMEOUT_MS);
-  const response = await ((opts.fetch ?? fetch) as unknown as FetchLike)(
-    TYPESAFE_URL,
-    {
-      body: JSON.stringify({ model: "jev-latest", questions, state }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+  const [limit = SELECTOR_TIMEOUT_MS, ...retries] = opts.timeoutMs ?? [];
+  const timeout = AbortSignal.timeout(limit);
+  try {
+    const response = await ((opts.fetch ?? fetch) as unknown as FetchLike)(
+      TYPESAFE_URL,
+      {
+        body: JSON.stringify({ model: "jev-latest", questions, state }),
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        method: "POST",
+        signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`http_${response.status}`);
     }
-  );
-  if (!response.ok) {
-    throw new Error(`http_${response.status}`);
+    return await response.json();
+  } catch (error) {
+    if (!(retries.length > 0 && retryable(error)) || opts.signal?.aborted) {
+      throw error;
+    }
+    await sleep(RETRY_DELAY_MS, undefined, { signal: opts.signal });
+    return askJev(questions, state, apiKey, { ...opts, timeoutMs: retries });
   }
-  return response.json();
 }
 
 const eligibleSchema = z.object({
@@ -506,7 +541,8 @@ export async function selectNextAction(
   throw new Error("invalid_choice");
 }
 
-const fallbackReason = (error: unknown) => {
+/** Why a Jev call failed, as a fixed code: never the customer's words. */
+export const fallbackReason = (error: unknown) => {
   if (error instanceof z.ZodError) {
     return "invalid_output";
   }
