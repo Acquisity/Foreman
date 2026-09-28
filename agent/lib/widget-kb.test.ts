@@ -97,7 +97,7 @@ test("a grounded answer is returned with the urls of the searched articles only"
   const result = await answerFromHelpCenter(
     "how do i set up my ai sdr?",
     log,
-    deps({ answer: "Connect your calendar [1].", kind: "answer" })
+    deps({ answer: "Connect your calendar [1].", kind: "answer", sources: [] })
   );
   assert.deepEqual(result, {
     citations: [{ n: 1, title: "Setup", url: articles[0].url }],
@@ -107,14 +107,38 @@ test("a grounded answer is returned with the urls of the searched articles only"
 
 test("no hits, an unanswerable question, and an uncited answer fall back to null", async () => {
   const cases: KbDeps[] = [
-    deps({ answer: "x [1]", kind: "answer" }, []),
-    deps({ answer: "", kind: "none" }),
-    deps({ answer: "Just trust me.", kind: "answer" }),
+    deps({ answer: "x [1]", kind: "answer", sources: [] }, []),
+    deps({ answer: "", kind: "none", sources: [] }),
+    deps({ answer: "Just trust me.", kind: "answer", sources: [] }),
   ];
   for (const kbDeps of cases) {
     // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
     assert.equal(await answerFromHelpCenter("q", log, kbDeps), null);
   }
+});
+
+test("an answer without markers is kept when it lists its sources, and only real ones", async () => {
+  const result = await answerFromHelpCenter(
+    "q",
+    log,
+    deps({
+      answer: "Connect your calendar.",
+      kind: "answer",
+      sources: [1, 1, 9],
+    })
+  );
+  assert.deepEqual(result, {
+    citations: [{ n: 1, title: "Setup", url: articles[0].url }],
+    message: "Connect your calendar.",
+  });
+  assert.equal(
+    await answerFromHelpCenter(
+      "q",
+      log,
+      deps({ answer: "Just trust me.", kind: "answer", sources: [9] })
+    ),
+    null
+  );
 });
 
 test("hits from several queries merge by agreement and rank, capped at four", () => {
@@ -135,7 +159,7 @@ test("hits from several queries merge by agreement and rank, capped at four", ()
 
 test("the message is searched as keyword queries, and as itself when the rewrite fails", async () => {
   const searched: string[] = [];
-  const base = deps({ answer: "Do this [1].", kind: "answer" });
+  const base = deps({ answer: "Do this [1].", kind: "answer", sources: [] });
   const recording: KbDeps = {
     ...base,
     rewrite: () =>
@@ -165,7 +189,11 @@ test("articles are picked from the title index, with keyword search only as the 
     },
   ];
   const read: string[] = [];
-  const base = deps({ answer: "Open Add New Inboxes [1].", kind: "answer" });
+  const base = deps({
+    answer: "Open Add New Inboxes [1].",
+    kind: "answer",
+    sources: [],
+  });
   const picking: KbDeps = {
     ...base,
     index: () => Promise.resolve(index),
@@ -211,6 +239,7 @@ test("a reaction gets a short conversational reply with no citations, not an inv
       {
         answer: "Glad that helps! Anything else you want to set up? [1]",
         kind: "chat",
+        sources: [],
       },
       []
     )
@@ -221,7 +250,11 @@ test("a reaction gets a short conversational reply with no citations, not an inv
   });
 });
 
-const grounded = { answer: "Next, set your hours [1].", kind: "answer" };
+const grounded = {
+  answer: "Next, set your hours [1].",
+  kind: "answer",
+  sources: [],
+};
 
 for (const [latest, screenshots] of [
   ["okay, what next?", undefined],
@@ -254,6 +287,7 @@ for (const [latest, screenshots] of [
           return Promise.resolve({
             answer: "Set your hours [2].",
             kind: "answer",
+            sources: [],
           });
         },
       }
@@ -285,6 +319,7 @@ test("a new subject outweighs the previous citation: the fresh article is read f
         return Promise.resolve({
           answer: "Check your ad blocker [1].",
           kind: "answer",
+          sources: [],
         });
       },
     }
@@ -354,7 +389,12 @@ test("an account-likely ask decides what the message needs first: a fragment is 
     generate: ({ accountLikely }) => {
       told.push(accountLikely);
       // A model that answers anyway must not get past "needs".
-      return Promise.resolve({ answer: "Do this [1].", kind: "answer", needs });
+      return Promise.resolve({
+        answer: "Do this [1].",
+        kind: "answer",
+        needs,
+        sources: [],
+      });
     },
   });
   const guarded = (latest: string, needs: string) =>
@@ -388,7 +428,11 @@ test("Jev decides what the articles can do and the writer only writes when Jev s
     decide: () => Promise.resolve({ choice, confidence: 0.9 } as never),
     generate: ({ accountLikely, decided }) => {
       written.push({ accountLikely, decided });
-      return Promise.resolve({ answer: "Do this [1].", kind: "answer" });
+      return Promise.resolve({
+        answer: "Do this [1].",
+        kind: "answer",
+        sources: [],
+      });
     },
   });
   const ask = (choice: string) =>
@@ -418,7 +462,11 @@ test("an unsure account pick is answered from the articles; only a sure one step
     decide: () => Promise.resolve({ choice: "account", confidence }),
     generate: () => {
       writes += 1;
-      return Promise.resolve({ answer: "Do this [1].", kind: "answer" });
+      return Promise.resolve({
+        answer: "Do this [1].",
+        kind: "answer",
+        sources: [],
+      });
     },
   });
   const ask = { accountLikely: true, latest: "why was I charged twice?" };
@@ -438,7 +486,12 @@ test("a failed Jev decision leaves the call to the writer, as before", async () 
       decide: () => Promise.reject(new Error("timeout")),
       generate: ({ accountLikely, decided }) => {
         written.push(accountLikely, decided);
-        return Promise.resolve({ answer: "", kind: "none", needs: "account" });
+        return Promise.resolve({
+          answer: "",
+          kind: "none",
+          needs: "account",
+          sources: [],
+        });
       },
     }
   );
@@ -493,7 +546,7 @@ test("help-center mode answers an ask for a look from the articles, saying first
   const answered = await answerFromHelpCenter(
     ask,
     log,
-    lane({ answer: "Open Campaigns [1].", kind: "answer" })
+    lane({ answer: "Open Campaigns [1].", kind: "answer", sources: [] })
   );
   assert.ok(answered?.message.startsWith(CANNOT_CHECK));
   assert.deepEqual(
@@ -510,6 +563,7 @@ test("help-center mode answers an ask for a look from the articles, saying first
         answer:
           "I am not able to access or view your account. Open Campaigns [1].",
         kind: "answer",
+        sources: [],
       });
     },
   });
@@ -517,7 +571,11 @@ test("help-center mode answers an ask for a look from the articles, saying first
   assert.deepEqual(told, [true]);
   // Nothing in the articles: the plain line alone, never a silent miss.
   assert.deepEqual(
-    await answerFromHelpCenter(ask, log, lane({ answer: "", kind: "none" })),
+    await answerFromHelpCenter(
+      ask,
+      log,
+      lane({ answer: "", kind: "none", sources: [] })
+    ),
     { citations: [], message: CANNOT_CHECK_ALONE }
   );
   // Full mode steps aside for the investigation instead, and never says it.
@@ -525,7 +583,7 @@ test("help-center mode answers an ask for a look from the articles, saying first
     await answerFromHelpCenter(
       { accountLikely: true, latest: "what campaigns do you see?" },
       log,
-      lane({ answer: "Open Campaigns [1].", kind: "answer" })
+      lane({ answer: "Open Campaigns [1].", kind: "answer", sources: [] })
     ),
     null
   );
@@ -536,7 +594,7 @@ test("each answer logs which articles it read and which it cited", async (t) => 
   await answerFromHelpCenter(
     "how do i set up ai sdr?",
     log,
-    deps({ answer: "Open setup [2].", kind: "answer" })
+    deps({ answer: "Open setup [2].", kind: "answer", sources: [] })
   );
   const logged = lines
     .map((line) => JSON.parse(line))
@@ -565,7 +623,11 @@ test("every stage reads the conversation as a transcript, latest message last wi
     "Customer: can i buy more inboxes?\nSupport: Open Email Accounts [1].\nCustomer: where do i go from here?\n\nScreenshot reading: Screen: All Campaigns";
   assert.equal(renderTranscript(ask), transcript);
   const seen: string[] = [];
-  const base = deps({ answer: "Click Add New Inboxes [1].", kind: "answer" });
+  const base = deps({
+    answer: "Click Add New Inboxes [1].",
+    kind: "answer",
+    sources: [],
+  });
   await answerFromHelpCenter(ask, log, {
     ...base,
     decide: ({ question }) => {
@@ -595,7 +657,11 @@ test("the selector and the writer look at the screenshots; without them, a load 
   const run = async (images?: KbDeps["images"]) => {
     const record: { select?: number; generate?: number } = {};
     seen.push(record);
-    const base = deps({ answer: "Click Email Accounts [1].", kind: "answer" });
+    const base = deps({
+      answer: "Click Email Accounts [1].",
+      kind: "answer",
+      sources: [],
+    });
     return await answerFromHelpCenter(ask, log, {
       ...base,
       generate: (input) => {
@@ -665,7 +731,7 @@ test("a Jev decision that fails logs why in the answer's step marks", async (t) 
   t.mock.method(console, "info", (line: string) => lines.push(line));
   const timeout = new DOMException("slow", "TimeoutError");
   await answerFromHelpCenter("how do i set up ai sdr?", log, {
-    ...deps({ answer: "Open setup [2].", kind: "answer" }),
+    ...deps({ answer: "Open setup [2].", kind: "answer", sources: [] }),
     decide: () => Promise.reject(timeout),
   });
   const done = lines
@@ -731,7 +797,7 @@ test("a stalled help-center model call is raced by a second one, and every faile
   assert.ok(!logged.some((line) => line.startsWith("step=select ")));
 });
 
-test("article picking runs on the kbSelect model while answers and chat stay on kb", async (t) => {
+test("article picking and text answers run on flash-lite, and an answer with screenshots on kbImages", async (t) => {
   t.mock.method(console, "info", () => undefined);
   const key = process.env.AI_GATEWAY_API_KEY;
   process.env.AI_GATEWAY_API_KEY = "test";
@@ -767,9 +833,20 @@ test("article picking runs on the kbSelect model while answers and chat stay on 
     await used(() =>
       defaultKbDeps.generate({ articles: [], question: "Customer: hi", signal })
     ),
+    ["google/gemini-3.5-flash-lite"]
+  );
+  assert.deepEqual(
+    await used(() =>
+      defaultKbDeps.generate({
+        articles: [],
+        images: [{ data: new Uint8Array([1]), mediaType: "image/png" }],
+        question: "Customer: hi",
+        signal,
+      })
+    ),
     ["google/gemini-3.5-flash"]
   );
   assert.deepEqual(await used(() => replyToChat("thanks", log)), [
-    "google/gemini-3.5-flash",
+    "google/gemini-3.5-flash-lite",
   ]);
 });
