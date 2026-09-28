@@ -7,6 +7,7 @@ import {
   type FollowUpInput,
   type FollowUpOutcome,
   RELAY_HEADER,
+  SLACK_PROMPT,
 } from "./jev-decisions.js";
 
 /**
@@ -176,18 +177,21 @@ async function readThread(
 }
 
 /**
- * What a session opened by a relayed Slack reply needs from Foreman, decided
+ * What a relayed Slack reply needs from Foreman, whether it opened a session
+ * or was prompted into the ticket's existing one, decided
  * before the model runs so a skip costs one read and one Jev call instead of
  * a full turn. A session opened by a person on the ticket returns null.
  */
 export async function relayedFollowUpOutcome(
   issue: string,
-  commentId: string,
+  trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
 ): Promise<FollowUpOutcome | null> {
   const { comments, plan } = await readThread(issue, credentials);
-  const followUp = relayedFollowUp(comments, plan, commentId);
+  const followUp = trigger.prompted
+    ? promptedFollowUp(comments, plan, trigger.commentId)
+    : relayedFollowUp(comments, plan, trigger.commentId);
   if (followUp === null) {
     return null;
   }
@@ -226,6 +230,50 @@ export function relayedFollowUp(
     followUp.replies.some((r) => said(r) === said(trigger.body))
     ? followUp
     : null;
+}
+
+/**
+ * The follow-up to judge when the receiver prompted the ticket's Foreman
+ * session. Replies that arrived before the session's previous prompt were
+ * already judged or handled, so they go to Jev as context only; judging them
+ * again let one old question wake every later reply in a burst (ENG-14396).
+ */
+export function promptedFollowUp(
+  comments: readonly ThreadComment[],
+  plan: ReplyPlan,
+  promptId: string
+): FollowUpInput | null {
+  const prompt = comments.find((c) => c.id === promptId);
+  if (!(plan.ok && prompt && SLACK_PROMPT.test(prompt.body.trim()))) {
+    return null;
+  }
+  const handledAt = comments
+    .filter(
+      (c) =>
+        c.parentId === prompt.parentId &&
+        c.id !== prompt.id &&
+        c.createdAt < prompt.createdAt &&
+        SLACK_PROMPT.test(c.body.trim())
+    )
+    .map((c) => c.createdAt)
+    .sort()
+    .at(-1);
+  const thread = comments
+    .filter((c) => c.parentId === plan.anchorId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const since = plan.followUp
+    ? thread.slice(thread.length - plan.followUp.replies.length)
+    : thread;
+  const earlier = since.filter((c) => handledAt && c.createdAt <= handledAt);
+  const fresh = since.filter((c) => !earlier.includes(c));
+  if (fresh.length === 0) {
+    return null;
+  }
+  return {
+    lastReply: plan.followUp?.lastReply ?? "",
+    replies: fresh.map((c) => c.body),
+    ...(earlier.length > 0 ? { earlier: earlier.map((c) => c.body) } : {}),
+  };
 }
 
 export async function replyToRequester(

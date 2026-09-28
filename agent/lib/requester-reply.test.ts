@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   planReply,
+  promptedFollowUp,
   relayedFollowUp,
   type ThreadComment,
 } from "./requester-reply.js";
@@ -133,5 +134,46 @@ test("a relayed Slack reply is judged before the model runs", () => {
     relayedFollowUp(first, planReply(first, FOREMAN), "top"),
     { lastReply: "", replies: [relay("under", "anchor").body] },
     "a relay before Foreman's first reply is judged against the whole thread"
+  );
+});
+
+test("a prompted reply is judged against what arrived since the previous prompt", () => {
+  const said = (id: string, at: string, body: string): ThreadComment => ({
+    body: `**Gary** replied in Slack:\n\n${body}`,
+    createdAt: at,
+    id,
+    parentId: "anchor",
+    userId: "aaron",
+  });
+  const prompt = (id: string, at: string): ThreadComment => ({
+    body: "**Gary** replied in Slack.",
+    createdAt: at,
+    id,
+    parentId: "session",
+    userId: "aaron",
+  });
+  const thread = [
+    anchor,
+    { ...reply("f1", FOREMAN, "2026-09-26T10:00:00Z"), body: "Which amount?" },
+    said("r1", "2026-09-26T10:01:00Z", "the $40 one?"),
+    prompt("p1", "2026-09-26T10:01:01Z"),
+    said("r2", "2026-09-26T10:02:00Z", "@teammate can you check?"),
+    prompt("p2", "2026-09-26T10:02:01Z"),
+  ];
+  const plan = planReply(thread, FOREMAN);
+  assert.deepEqual(promptedFollowUp(thread, plan, "p2"), {
+    earlier: [thread[2].body],
+    lastReply: "Which amount?",
+    replies: [thread[4].body],
+  });
+  assert.deepEqual(
+    promptedFollowUp(thread, plan, "p1"),
+    { lastReply: "Which amount?", replies: [thread[2].body, thread[4].body] },
+    "the first prompt judges every reply since Foreman spoke"
+  );
+  assert.equal(
+    promptedFollowUp(thread, plan, "r2"),
+    null,
+    "only the receiver's prompt is judged this way"
   );
 });

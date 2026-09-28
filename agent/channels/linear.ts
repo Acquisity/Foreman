@@ -29,9 +29,14 @@ export const STATUS_ONLY_FOLLOW_UP =
 const followUpOutcome = async (
   event: LinearAgentSessionEvent
 ): Promise<FollowUpOutcome | null> => {
-  const { commentId } = event.agentSession;
+  // A reply either opened its own session (legacy relay with a mention) or
+  // was prompted into the ticket's existing one by the receiver.
+  const prompted = event.action === "prompted";
+  const commentId = prompted
+    ? event.agentActivity?.sourceCommentId
+    : event.action === "created" && event.agentSession.commentId;
   const issue = event.agentSession.issueId ?? event.agentSession.issue?.id;
-  if (event.action !== "created" || !issue || !commentId) {
+  if (!(issue && commentId)) {
     return null;
   }
   const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
@@ -40,7 +45,12 @@ const followUpOutcome = async (
   );
   try {
     return await Promise.race([
-      relayedFollowUpOutcome(issue, commentId, credentials, deadline),
+      relayedFollowUpOutcome(
+        issue,
+        { commentId, prompted },
+        credentials,
+        deadline
+      ),
       timedOut,
     ]);
   } catch {
@@ -113,4 +123,8 @@ export const onAgentSession = async (
 export default linearChannel({
   credentials,
   onAgentSession,
+  // One session per intake ticket: Slack replies are prompted into it, so a
+  // burst waits for the running turn and folds into the next one instead of
+  // cancelling an investigation. Linear's Stop button still interrupts.
+  turnPolicy: "queue",
 });
