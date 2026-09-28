@@ -379,6 +379,22 @@ test("a follow-up stays quiet only on a clear skip", () => {
   );
 });
 
+test("a clear status-only follow-up is moved without re-checking", () => {
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("respond"), status_only: yes(0.9) }),
+    "status"
+  );
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("respond"), status_only: yes(0.6) }),
+    "respond",
+    "an unsure status move is handled as a normal follow-up"
+  );
+  assert.equal(
+    resolveFollowUp({ follow_up: pick("skip"), status_only: yes(0.9) }),
+    "skip"
+  );
+});
+
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
   const outcome = await decideFollowUp(
     {
