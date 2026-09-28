@@ -50,7 +50,7 @@ test("ignores comments outside the anchor thread", () => {
   assert.equal(planReply([anchor, session], FOREMAN).ok, true);
 });
 
-test("fails when the issue has no Slack thread", () => {
+test("fails when the issue has no requester thread", () => {
   assert.equal(
     planReply([{ ...anchor, body: "a normal comment" }], FOREMAN).ok,
     false
@@ -176,4 +176,36 @@ test("a prompted reply is judged against what arrived since the previous prompt"
     null,
     "only the receiver's prompt is judged this way"
   );
+});
+
+test("a support inbox note is judged like a Slack reply", () => {
+  const inbox: ThreadComment = {
+    ...anchor,
+    body: "Support conversation connected in [Acquisity inbox](https://app.acquisity.ai/dashboard/admin/support?conversation=c1)",
+  };
+  const note: ThreadComment = {
+    body: "**Dana** added a note in the support inbox:\n\nCan you check their domains?",
+    createdAt: "2026-09-26T10:01:00Z",
+    id: "n1",
+    parentId: "anchor",
+    userId: "aaron",
+  };
+  const prompt: ThreadComment = {
+    body: "**Dana** added a note in the support inbox.",
+    createdAt: "2026-09-26T10:01:01Z",
+    id: "p1",
+    parentId: "session",
+    userId: "aaron",
+  };
+  const thread = [inbox, note, prompt];
+  const plan = planReply(thread, FOREMAN);
+  assert.equal(plan.ok, true);
+  assert.deepEqual(relayedFollowUp(thread, plan, "n1"), {
+    lastReply: "",
+    replies: [note.body],
+  });
+  assert.deepEqual(promptedFollowUp(thread, plan, "p1"), {
+    lastReply: "",
+    replies: [note.body],
+  });
 });

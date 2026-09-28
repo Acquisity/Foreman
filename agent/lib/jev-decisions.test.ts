@@ -422,4 +422,10 @@ test("a relayed reply reaches Jev as the speaker and their words, mentions as te
     "Aaron Fraga: Hey @teammate! what was agreed?"
   );
   assert.equal(followUpText("just text"), "Someone: just text");
+  assert.equal(
+    followUpText(
+      "**Dana** added a note in the support inbox:\n\nIs their domain verified?"
+    ),
+    "Dana: Is their domain verified?"
+  );
 });

@@ -26,7 +26,9 @@ import {
  * answer: every Slack reply wakes Foreman, and a bare mention, a thanks, or a
  * remark that asks nothing must not earn another message in the thread.
  */
-const ANCHOR_PATTERN = /^Slack thread connected in /u;
+// The Acquisity support inbox roots its notes the same way, in "Support
+// conversation connected in …", and imports Foreman's reply as a team note.
+const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
   body: string;
@@ -53,7 +55,7 @@ export function planReply(
   if (!anchor) {
     return {
       error:
-        "This issue has no Slack thread (no 'Slack thread connected in' comment), so there is nobody to reply to there.",
+        "This issue has no requester thread (no 'Slack thread connected in' or 'Support conversation connected in' comment), so there is nobody to reply to there.",
       ok: false,
     };
   }

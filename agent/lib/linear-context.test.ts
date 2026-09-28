@@ -49,7 +49,7 @@ describe("buildLinearContext", () => {
       "returns posted false with an outcome, their reply needed nothing from you: post nothing anywhere",
       "On a follow-up, post no new ticket comment",
       "A result with an error is a failed delivery",
-      "Never comment under the Slack thread comment any other way",
+      "Never comment under that thread comment any other way",
     ]) {
       assert.ok(LINEAR_TRIAGE_ROUTE.includes(rule), rule);
     }
