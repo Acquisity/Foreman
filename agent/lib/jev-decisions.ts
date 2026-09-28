@@ -681,6 +681,8 @@ export const FOLLOW_UP_OUTCOMES = {
 export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
 
 export interface FollowUpInput {
+  /** Replies since lastReply that Foreman already handled; context only. */
+  earlier?: string[];
   /** Foreman's last message in the Slack thread. */
   lastReply: string;
   /** Everything said in the thread since, oldest first, as relayed. */
@@ -691,7 +693,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
-      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman.",
+      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
     type: "choice",
   },
   status_only: {
@@ -715,6 +717,12 @@ export function resolveFollowUp(answers: Answers): FollowUpOutcome {
     ? "status"
     : "respond";
 }
+
+/**
+ * The receiver's prompt into a ticket's Foreman session: one line naming who
+ * replied in Slack. The reply itself is under the Slack thread comment.
+ */
+export const SLACK_PROMPT = /^\*\*([^*\n]{1,100})\*\* replied in Slack\.$/u;
 
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
 // The Asks receiver heads each relayed reply with "<link> **Name** replied in
@@ -745,16 +753,28 @@ export async function decideFollowUp(
   input: FollowUpInput,
   opts?: JevOptions
 ): Promise<FollowUpOutcome> {
-  const replies = input.replies
-    .filter(
-      (reply) =>
-        reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
-    )
-    .map(followUpText);
+  const said = (list: string[] = []) =>
+    list
+      .filter(
+        (reply) =>
+          reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !==
+          ""
+      )
+      .map(followUpText);
+  const replies = said(input.replies);
   if (replies.length === 0) {
     return "skip";
   }
+  const earlier = said(input.earlier);
   return resolveFollowUp(
-    await askJev(followUpQuestions(), { ...input, replies }, opts)
+    await askJev(
+      followUpQuestions(),
+      {
+        lastReply: input.lastReply,
+        replies,
+        ...(earlier.length > 0 ? { earlier } : {}),
+      },
+      opts
+    )
   );
 }
