@@ -188,24 +188,43 @@ export async function relayedFollowUpOutcome(
 ): Promise<FollowUpOutcome | null> {
   const { comments, plan } = await readThread(issue, credentials);
   const followUp = relayedFollowUp(comments, plan, commentId);
-  return followUp === null ? null : await decideFollowUp(followUp, { signal });
+  if (followUp === null) {
+    return null;
+  }
+  const outcome = await decideFollowUp(followUp, { signal });
+  // Before Foreman has spoken there is nothing a reply could leave settled,
+  // so only a status move is acted on; anything else runs as before.
+  return followUp.lastReply === "" && outcome === "skip" ? null : outcome;
 }
 
-/** The follow-up to judge when a relayed Slack reply opened the session. */
+/**
+ * The follow-up to judge when a relayed Slack reply opened the session.
+ * Before Foreman has replied, lastReply is empty and every reply under the
+ * anchor is judged, so a close-out that lands first is still seen.
+ */
 export function relayedFollowUp(
   comments: readonly ThreadComment[],
   plan: ReplyPlan,
   commentId: string
 ): FollowUpInput | null {
+  if (!plan.ok) {
+    return null;
+  }
+  const followUp = plan.followUp ?? {
+    lastReply: "",
+    replies: comments
+      .filter((c) => c.parentId === plan.anchorId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((c) => c.body),
+  };
   const said = (body: string) => body.replace(RELAY_HEADER, "").trim();
   const trigger = comments.find((c) => c.id === commentId);
   // The receiver writes the copy under the anchor first; until it is there,
   // the thread does not include this reply and must not be judged without it.
   return trigger &&
     RELAY_HEADER.test(trigger.body) &&
-    plan.ok &&
-    plan.followUp?.replies.some((r) => said(r) === said(trigger.body))
-    ? plan.followUp
+    followUp.replies.some((r) => said(r) === said(trigger.body))
+    ? followUp
     : null;
 }
 
