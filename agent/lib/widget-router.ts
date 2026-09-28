@@ -13,10 +13,11 @@ import {
  * @remarks
  * Runs on the raw customer message before the investigator session starts.
  * It never calls tools, never sees account data, and never writes the reply;
- * it only says which lane the message belongs in and how sure it is. Any
- * failure, including a missing key, falls open to `investigate`, which is
- * the investigation pipeline, so removing `TYPESAFE_API_KEY` restores the old
- * single-lane behavior exactly. A confident `kb` decision is acted on by the
+ * it only says which lane the message belongs in and how sure it is. A
+ * missing key falls open to `investigate`, the investigation pipeline, so
+ * removing `TYPESAFE_API_KEY` restores the old single-lane behavior exactly.
+ * A Jev failure after its retry tries the help center first (`kb` at zero
+ * confidence), and a help-center miss still goes on to the investigation. A confident `kb` decision is acted on by the
  * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
  */
 
@@ -435,9 +436,12 @@ export async function routeWidgetMessage(
       ...(recording ? { recording } : {}),
     };
   } catch (error) {
+    // When unsure, answer from the help center (Aaron, 2026-09-28): a 529 sent
+    // "where can i buy more inboxes?" to an investigation.
     return {
       ...FALLBACK,
       failure: `reason=${fallbackReason(error)} ms=${Date.now() - startedAt}`,
+      lane: "kb",
     };
   }
 }

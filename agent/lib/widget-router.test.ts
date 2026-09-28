@@ -269,7 +269,7 @@ describe("routeWidgetMessage", () => {
     assert.equal(called, false);
   });
 
-  it("falls open on a network error, a bad status, and a malformed body", async () => {
+  it("falls back to the help center on a network error, a bad status, and a malformed body", async () => {
     const failures = [
       () => Promise.reject(new Error("boom")),
       () =>
@@ -290,8 +290,10 @@ describe("routeWidgetMessage", () => {
         routeWidgetMessage("hello", { apiKey: "test-key", fetch: fetchImpl })
       )
     );
+    // The help center first; a miss there, at zero confidence, still investigates.
     for (const route of routes) {
-      assert.equal(route.lane, "investigate");
+      assert.equal(route.lane, "kb");
+      assert.equal(route.confidence, 0);
       assert.equal(route.source, "fallback");
     }
     // The log says why, as a fixed code, after the one retry the first two earn.

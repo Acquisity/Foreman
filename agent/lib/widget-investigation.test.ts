@@ -1085,10 +1085,22 @@ const routeWith =
       lane,
       source: "jev" as const,
     });
+/** What the router returns when Jev fails after its retry. */
+const jevDown = () =>
+  Promise.resolve({
+    asksForAction: 0,
+    asksForHuman: 0,
+    asksOwnData: 0,
+    confidence: 0,
+    failure: "reason=http_529 ms=3400",
+    kbScore: 0,
+    lane: "kb" as const,
+    source: "fallback" as const,
+  });
 
 test("the help center gets the first try when it is the router's pick however unsure, or a close second", async (t) => {
   enabled(t);
-  for (const route of [kbRoute(0.39), routeWith("investigate", 0.5)]) {
+  for (const route of [kbRoute(0.39), routeWith("investigate", 0.5), jevDown]) {
     const { deps, gated, run } = dependencies();
     deps.route = route;
     deps.answerKb = () => Promise.resolve(kbAnswer);
@@ -1116,6 +1128,8 @@ test("an unsure help-center miss or a distant second is investigated instead", a
   enabled(t);
   for (const [route, answer] of [
     [kbRoute(0.4), null],
+    // Jev down: the help center first, and its miss is still investigated.
+    [jevDown, null],
     // An investigate pick the router is sure of never detours through the help center.
     [routeWith("investigate", 0.1, 0.96), kbAnswer],
   ] as const) {
