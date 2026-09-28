@@ -46,12 +46,25 @@ export function planReply(
   comments: readonly ThreadComment[],
   foremanUserId: string
 ): ReplyPlan {
-  // The receiver writes the anchor top-level at intake, before anyone else
-  // can comment, so the earliest top-level match is the real one.
-  const anchor = comments
+  const byTime = (a: ThreadComment, b: ThreadComment) =>
+    a.createdAt.localeCompare(b.createdAt);
+  const anchors = comments
     .filter((c) => c.parentId === null && ANCHOR_PATTERN.test(c.body.trim()))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .at(0);
+    .sort(byTime);
+  const lastIn = (anchorId: string) =>
+    comments
+      .filter((c) => c.parentId === anchorId)
+      .sort(byTime)
+      .at(-1);
+  // One issue can carry a Slack thread and several support conversations.
+  // The reply belongs to the one whose newest message is still unanswered;
+  // with none waiting, the earliest anchor is the intake's own.
+  const waiting = anchors
+    .map((a) => ({ anchor: a, last: lastIn(a.id) }))
+    .filter(({ last }) => last && last.userId !== foremanUserId)
+    .sort((a, b) => byTime(a.last as ThreadComment, b.last as ThreadComment))
+    .at(-1)?.anchor;
+  const anchor = waiting ?? anchors.at(0);
   if (!anchor) {
     return {
       error:
@@ -59,9 +72,7 @@ export function planReply(
       ok: false,
     };
   }
-  const thread = comments
-    .filter((c) => c.parentId === anchor.id)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
   if (thread.at(-1)?.userId === foremanUserId) {
     return {
       error:

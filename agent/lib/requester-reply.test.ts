@@ -72,6 +72,45 @@ test("uses the earliest top-level anchor, not a later or nested lookalike", () =
   });
 });
 
+test("replies under the conversation whose note is waiting, not the earliest anchor", () => {
+  const support = (id: string, createdAt: string): ThreadComment => ({
+    body: `Support conversation connected in [Acquisity inbox](https://app/${id})`,
+    createdAt,
+    id,
+    parentId: null,
+    userId: "aaron",
+  });
+  const note = (
+    id: string,
+    parentId: string,
+    userId: string,
+    createdAt: string
+  ): ThreadComment => ({ body: "note", createdAt, id, parentId, userId });
+  const thread = [
+    anchor,
+    support("a", "2026-09-25T16:00:00Z"),
+    support("b", "2026-09-25T16:05:00Z"),
+    note("a1", "a", "aaron", "2026-09-25T16:10:00Z"),
+    note("a2", "a", FOREMAN, "2026-09-25T16:12:00Z"),
+    note("b1", "b", "aaron", "2026-09-25T16:20:00Z"),
+  ];
+  assert.deepEqual(planReply(thread, FOREMAN), {
+    anchorId: "b",
+    followUp: null,
+    ok: true,
+  });
+  const laterOnA = [
+    ...thread,
+    note("a3", "a", "aaron", "2026-09-25T16:30:00Z"),
+  ];
+  const plan = planReply(laterOnA, FOREMAN);
+  assert.equal(plan.ok && plan.anchorId, "a");
+  assert.deepEqual(plan.ok && plan.followUp, {
+    lastReply: "note",
+    replies: ["note"],
+  });
+});
+
 test("a reply after Foreman spoke is a follow-up carrying everything said since", () => {
   // ENG-14323: three requester replies after one Foreman answer, each waking
   // a new turn. Every turn sees all of them until Foreman posts again.
