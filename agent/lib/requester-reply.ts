@@ -176,22 +176,19 @@ async function readThread(
 }
 
 /**
- * Whether a session opened by a relayed Slack reply needs nothing from
- * Foreman, decided before the model runs so a skip costs one read and one
- * Jev call instead of a full turn. Anything that is not a clear skip,
- * including a session opened by a person on the ticket, returns false.
+ * What a session opened by a relayed Slack reply needs from Foreman, decided
+ * before the model runs so a skip costs one read and one Jev call instead of
+ * a full turn. A session opened by a person on the ticket returns null.
  */
-export async function followUpNeedsNothing(
+export async function relayedFollowUpOutcome(
   issue: string,
   commentId: string,
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
-): Promise<boolean> {
+): Promise<FollowUpOutcome | null> {
   const { comments, plan } = await readThread(issue, credentials);
   const followUp = relayedFollowUp(comments, plan, commentId);
-  return (
-    followUp !== null && (await decideFollowUp(followUp, { signal })) === "skip"
-  );
+  return followUp === null ? null : await decideFollowUp(followUp, { signal });
 }
 
 /** The follow-up to judge when a relayed Slack reply opened the session. */

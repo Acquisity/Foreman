@@ -36,6 +36,8 @@ export const BARS = {
   rootCauseLabel: 0.6,
   /** Yes/no signals that only add a label or raise a floor. */
   signal: 0.5,
+  /** Below this, a follow-up is not trusted to be only a status move. */
+  statusOnly: 0.7,
   /** Below this, the claim is treated as unproven. */
   verdict: 0.6,
 } as const;
@@ -675,7 +677,8 @@ export const FOLLOW_UP_OUTCOMES = {
     "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
   skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that settles nothing Foreman asked, an acknowledgement, thanks, or noise",
 } as const;
-export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES;
+/** status: the only ask is a ticket status move, so nothing is re-checked. */
+export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
 
 export interface FollowUpInput {
   /** Foreman's last message in the Slack thread. */
@@ -691,12 +694,26 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
       "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman.",
     type: "choice",
   },
+  status_only: {
+    instructions:
+      "Is the only thing the replies ask of Foreman to move the ticket to a status (done, complete, closed, cancelled), with no question for Foreman and no request to check, verify, or change anything else?",
+    type: "boolean",
+  },
 });
 
-/** Staying quiet needs a clear call; when unsure, the requester is answered. */
+/**
+ * Staying quiet needs a clear call; when unsure, the requester is answered.
+ * A clear status-only ask is answered without re-checking the work.
+ */
 export function resolveFollowUp(answers: Answers): FollowUpOutcome {
   const { choice, confidence } = choiceOf(answers.follow_up);
-  return choice === "skip" && confidence >= BARS.followUp ? "skip" : "respond";
+  if (choice === "skip" && confidence >= BARS.followUp) {
+    return "skip";
+  }
+  return answers.status_only &&
+    probabilityOf(answers.status_only) >= BARS.statusOnly
+    ? "status"
+    : "respond";
 }
 
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;

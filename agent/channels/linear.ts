@@ -5,9 +5,10 @@ import type {
   LinearSessionContext,
 } from "eve/channels/linear";
 import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
+import type { FollowUpOutcome } from "../lib/jev-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
-import { followUpNeedsNothing } from "../lib/requester-reply.js";
+import { relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 const credentials = connectLinearCredentials(
@@ -17,27 +18,33 @@ const credentials = connectLinearCredentials(
 /** Leaves time for the one-line response inside Linear's ten-second window. */
 const FOLLOW_UP_GATE_MS = 7000;
 
+/** Tells the model a follow-up only asks for a status move (ENG-14387). */
+export const STATUS_ONLY_FOLLOW_UP =
+  "Jev read this follow-up as only asking to move the ticket to a status. The work is already done: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
+
 /**
- * Settles a relayed Slack follow-up before the model runs. Any failure or a
+ * Judges a relayed Slack follow-up before the model runs. Any failure or a
  * slow answer dispatches the session as usual: a throw here would drop it.
  */
-const skipsFollowUp = async (event: LinearAgentSessionEvent) => {
+const followUpOutcome = async (
+  event: LinearAgentSessionEvent
+): Promise<FollowUpOutcome | null> => {
   const { commentId } = event.agentSession;
   const issue = event.agentSession.issueId ?? event.agentSession.issue?.id;
   if (event.action !== "created" || !issue || !commentId) {
-    return false;
+    return null;
   }
   const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
-  const timedOut = new Promise<false>((resolve) =>
-    deadline.addEventListener("abort", () => resolve(false), { once: true })
+  const timedOut = new Promise<null>((resolve) =>
+    deadline.addEventListener("abort", () => resolve(null), { once: true })
   );
   try {
     return await Promise.race([
-      followUpNeedsNothing(issue, commentId, credentials, deadline),
+      relayedFollowUpOutcome(issue, commentId, credentials, deadline),
       timedOut,
     ]);
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -61,8 +68,9 @@ export const onAgentSession = async (
   // Foreman ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
+  const outcome = await followUpOutcome(event);
   if (
-    (await skipsFollowUp(event)) &&
+    outcome === "skip" &&
     (await ctx.linear
       .createActivity({ body: "No reply needed.", type: "response" })
       .then(
@@ -89,7 +97,8 @@ export const onAgentSession = async (
       : auth;
   return {
     auth: withRepository,
-    context,
+    context:
+      outcome === "status" ? [...context, STATUS_ONLY_FOLLOW_UP] : context,
   };
 };
 

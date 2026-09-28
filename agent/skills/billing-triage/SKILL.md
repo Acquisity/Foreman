@@ -204,7 +204,7 @@ Anything worth a separate ticket, kept out of this refund decision.
 
 ## Requester reply
 
-At most two things reach the requester on a financial ticket, one message each: the batched clarifying questions, if any, and one closing reply. A channel-mismatch note is one sentence inside the first of them. In a Linear session each goes through `reply_to_requester`; in a Slack session it is the thread message.
+At most two things reach the requester on a financial ticket, one message each: the batched clarifying questions, if any, and one closing reply. A channel-mismatch note is one sentence inside the first of them. In a Linear session each goes through `reply_to_requester`; in a Slack session it is the thread message. A follow-up whose only ask is to move the ticket to a status (done, complete, close, cancel) means a person already finished the work: move it with `route_ticket`, confirm in one line, and stop, with no re-verification, decision tool, document change, or critic. If it also asks a question or asks you to check something, handle that normally.
 
 The closing reply says what happened and what happens next, and by whom, in two or three plain sentences: never a promise to move money, and never Stripe, Autumn, or billing systems by name.
 
