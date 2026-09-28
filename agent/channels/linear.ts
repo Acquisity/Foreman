@@ -20,7 +20,7 @@ const FOLLOW_UP_GATE_MS = 7000;
 
 /** Tells the model a follow-up only asks for a status move (ENG-14387). */
 export const STATUS_ONLY_FOLLOW_UP =
-  "Jev read this follow-up as only asking to move the ticket to a status. The work is already done: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
+  "Jev read this follow-up as only asking to move the ticket to a status. A person has already decided it: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
 
 /**
  * Judges a relayed Slack follow-up before the model runs. Any failure or a

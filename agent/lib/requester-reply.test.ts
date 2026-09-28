@@ -94,7 +94,7 @@ test("a reply after Foreman spoke is a follow-up carrying everything said since"
   });
 });
 
-test("only a relayed Slack reply after Foreman spoke is judged before the model runs", () => {
+test("a relayed Slack reply is judged before the model runs", () => {
   const relay = (id: string, parentId: string | null): ThreadComment => ({
     body: "@acquisityforeman1 **Gary** replied in Slack:\n\nthanks!",
     createdAt: "2026-09-26T10:05:00Z",
@@ -129,5 +129,9 @@ test("only a relayed Slack reply after Foreman spoke is judged before the model 
   );
 
   const first = [anchor, relay("under", "anchor"), relay("top", null)];
-  assert.equal(relayedFollowUp(first, planReply(first, FOREMAN), "top"), null);
+  assert.deepEqual(
+    relayedFollowUp(first, planReply(first, FOREMAN), "top"),
+    { lastReply: "", replies: [relay("under", "anchor").body] },
+    "a relay before Foreman's first reply is judged against the whole thread"
+  );
 });
