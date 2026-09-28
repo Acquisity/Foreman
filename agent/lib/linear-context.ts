@@ -16,7 +16,11 @@ export function buildLinearContext(
   const context: string[] = [LINEAR_TRIAGE_ROUTE];
   const requesterName = requester?.displayName ?? requester?.name;
   if (requesterName) {
-    context.push(`The requesting user is ${requesterName}.`);
+    // The Asks receiver opens and prompts intake sessions with one person's
+    // key, so the opener is not the requester there (ENG-14406).
+    context.push(
+      `This Linear session was opened by ${requesterName}. When the ticket has an 'Ask from <name>' link, that person is the requester: address every reply_to_requester message to them, never to ${requesterName} or whoever wrote last in the Slack thread. Otherwise ${requesterName} is the requester.`
+    );
   }
   return context;
 }

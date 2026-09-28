@@ -68,6 +68,12 @@ describe("buildLinearContext", () => {
       })
     );
     assert.ok(context);
-    assert.ok(context.includes("The requesting user is Ada Lovelace."));
+    assert.ok(
+      context.some(
+        (line) =>
+          line.startsWith("This Linear session was opened by Ada Lovelace.") &&
+          line.includes("'Ask from <name>' link, that person is the requester")
+      )
+    );
   });
 });
