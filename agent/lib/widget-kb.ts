@@ -742,13 +742,42 @@ export function resolveCitations(
       title: articles[index].title.slice(0, 300),
       url: articles[index].url,
     })),
-    message: message
-      .replace(/[ \t]+([.,;:!?])/gu, "$1")
-      .replace(/[ \t]{2,}/gu, " ")
-      .replace(/[ \t]+$/gmu, "")
+    message: stepsOnOwnLines(
+      message
+        .replace(/[ \t]+([.,;:!?])/gu, "$1")
+        .replace(/[ \t]{2,}/gu, " ")
+        .replace(/[ \t]+$/gmu, "")
+    )
       .trim()
       .slice(0, MAX_ANSWER_CHARS),
   };
+}
+
+/**
+ * The writer is asked for one step per line but sometimes runs a numbered list
+ * into one paragraph. A run of "1. … 2. …" (at least two steps, counting up
+ * from 1) gets a line break before each step; anything else is left alone.
+ */
+export function stepsOnOwnLines(text: string): string {
+  const breaks: number[] = [];
+  let next = 1;
+  for (const match of text.matchAll(/(^|\s)(\d{1,2})\.[ \t]/gu)) {
+    if (Number(match[2]) !== next) {
+      continue;
+    }
+    next += 1;
+    if (match[1] === " " || match[1] === "\t") {
+      breaks.push(match.index);
+    }
+  }
+  if (next < 3) {
+    return text;
+  }
+  let out = text;
+  for (const index of breaks.reverse()) {
+    out = `${out.slice(0, index)}\n${out.slice(index + 1)}`;
+  }
+  return out;
 }
 
 type Decision = Awaited<ReturnType<typeof decideFromArticles>> | null;
