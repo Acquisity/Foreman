@@ -4,19 +4,21 @@ import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
-  checkGrounding,
   decideFollowUp,
   decidePriorWork,
   followUpText,
   resolveBilling,
   resolveFollowUp,
-  resolveGrounding,
   resolvePriorWork,
   resolveTriage,
-  splitClaims,
   type TriageInput,
   triageQuestions,
 } from "./jev-decisions.js";
+import {
+  checkGrounding,
+  resolveGrounding,
+  splitClaims,
+} from "./jev-grounding.js";
 
 const yes = (probability = 0.9): JevAnswer => ({
   probability,

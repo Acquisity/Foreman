@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { checkGrounding } from "#lib/jev-decisions.js";
+import { checkGrounding } from "#lib/jev-grounding.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
