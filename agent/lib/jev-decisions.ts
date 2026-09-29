@@ -22,12 +22,20 @@ import {
 export const BARS = {
   /** Below this, money versus product is unclear and the requester is asked. */
   askKind: 0.7,
+  /** Below this, an existing investigation is not reused. */
+  continuation: 0.6,
   /** A billing verdict below this is left to a person. */
   discretion: 0.7,
+  /** A done claim without near-certain evidence is flagged. */
+  doneClaim: 0.8,
   /** A duplicate closes the ticket, so it needs a near-certain match. */
   duplicate: 0.8,
   /** Below this, staying quiet on a requester follow-up is not trusted. */
   followUp: 0.6,
+  /** Below this, a claim the reply makes is flagged as not shown. */
+  grounded: 0.5,
+  /** Below this, a hotlane call goes to a person instead of the fast lane. */
+  incident: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
   /** Below this, the project is left unset and Aaron routes it. */
@@ -220,6 +228,8 @@ export type TriageDecision =
   | {
       assignee: "Aaron Fraga" | "area owner";
       classification: TriageClassification;
+      /** The incident-hotlane route, only for a Bug that is not a Duplicate. */
+      hotlane?: HotlaneDecision;
       needsCriticReview: boolean;
       notes: string[];
       outcome: "route";
@@ -251,6 +261,63 @@ const DUPLICATE_OUTCOMES = {
   stale_or_superseded: "the same area, but already fixed or decided",
 } as const;
 
+export const HOTLANE_ROUTES = {
+  hotlane:
+    "current evidence confirms at least one of: a core workflow blocked or materially impaired; data lost, corrupted, exposed, or written to the wrong tenant; permissions, authentication, security, or privacy controls failing; paid work silently skipped or false success reported; customers actively charged or financially harmed incorrectly; material revenue loss, uncontrolled provider-cost burn, or customer-trust harm needing immediate containment; a high-frequency failure on a core path; or no safe workaround for a material customer outcome",
+  needs_human_urgent:
+    "the evidence points at one of those high-risk conditions, but a critical evidence lane was unavailable, so it cannot be confirmed",
+  standard: "a confirmed defect that meets none of those conditions",
+} as const;
+
+const HOTLANE_IMPACTS = {
+  BLOCKED: "completely blocks the user's objective",
+  DATA_OR_SECURITY_RISK: "risks data loss, corruption, security, or privacy",
+  INCORRECT_RESULT: "produces materially incorrect results",
+  MATERIAL_BUSINESS_HARM:
+    "active revenue, provider-cost, or customer-trust harm",
+  MATERIALLY_IMPAIRED: "materially impairs the user's objective",
+  MONEY_IMPACT: "customers charged or financially harmed incorrectly",
+  NON_CORE: "cosmetic, inconvenient, or a non-core edge case",
+  SILENTLY_SKIPPED: "silently skips paid or expected work",
+} as const;
+
+export interface HotlaneDecision {
+  impact: keyof typeof HOTLANE_IMPACTS | "UNCONFIRMED";
+  notes: string[];
+  proposedLabel: "fast-lane" | "none";
+  route: "HOTLANE" | "NEEDS_HUMAN_URGENT" | "STANDARD_ENGINEERING";
+}
+
+/**
+ * Whether a Bug is an incident. Route by impact, never by report count; a
+ * hotlane call below the bar goes to a person rather than to routine work.
+ */
+export function resolveHotlane(answers: Answers): HotlaneDecision {
+  const notes: string[] = [];
+  const { choice, confidence } = choiceOf(answers.incident);
+  let route: HotlaneDecision["route"] = "STANDARD_ENGINEERING";
+  if (choice === "needs_human_urgent") {
+    route = "NEEDS_HUMAN_URGENT";
+  } else if (choice === "hotlane" && confidence >= BARS.incident) {
+    route = "HOTLANE";
+  } else if (choice === "hotlane") {
+    route = "NEEDS_HUMAN_URGENT";
+    notes.push(
+      "A hotlane condition was likely but not clear enough to confirm; a person confirms it."
+    );
+  }
+  return {
+    impact:
+      route === "NEEDS_HUMAN_URGENT"
+        ? "UNCONFIRMED"
+        : (choiceOf(answers.incident_impact)
+            .choice as keyof typeof HOTLANE_IMPACTS),
+    notes,
+    proposedLabel: route === "HOTLANE" ? "fast-lane" : "none",
+    route,
+  };
+}
+
 export function triageQuestions(
   input: TriageInput
 ): Record<string, JevQuestion> {
@@ -281,6 +348,18 @@ export function triageQuestions(
       instructions:
         "How severe is the impact, weighing blast radius, then frequency, then customer tier? A workaround does not reduce it.",
       type: "score",
+    },
+    incident: {
+      criteria: { ...HOTLANE_ROUTES },
+      instructions:
+        "If this is a Bug, does it need urgent handling? Judge by user and business impact on the objective the customer was pursuing, not by how many reports there are or how the reporter phrased it. One affected workspace is enough when a core function is blocked.",
+      type: "choice",
+    },
+    incident_impact: {
+      criteria: { ...HOTLANE_IMPACTS },
+      instructions:
+        "Which one impact best describes the failure on the user's objective?",
+      type: "choice",
     },
     money_blocker: {
       instructions:
@@ -493,11 +572,13 @@ export function resolveTriage(
   }
   const aaron =
     !projectSettled || input.identifier.toUpperCase().startsWith("SAN-");
+  const needsCriticReview = classification === "Bug" && path !== "Duplicate";
 
   return {
     assignee: aaron ? "Aaron Fraga" : "area owner",
     classification,
-    needsCriticReview: classification === "Bug" && path !== "Duplicate",
+    ...(needsCriticReview ? { hotlane: resolveHotlane(answers) } : {}),
+    needsCriticReview,
     notes,
     outcome: "route",
     path,
@@ -538,6 +619,131 @@ export async function decideTriage(
   };
   const answers = await askJev(triageQuestions(input), state, opts);
   return resolveTriage(input, answers);
+}
+
+// ---------------------------------------------------------------- prior work
+
+export interface PriorWorkInput {
+  /** Hits from find_related_issues worth comparing. */
+  candidates: { identifier: string; summary: string; title: string }[];
+  /** This ticket's existing investigation findings, when one exists. */
+  existingInvestigation?: string;
+  /** The master this ticket is already attached to, when it has one. */
+  parent?: { identifier: string; summary: string; title: string };
+  /** The testable claim or symptom. */
+  report: string;
+}
+
+export type CandidateMatch = keyof typeof DUPLICATE_OUTCOMES;
+
+export interface PriorWorkDecision {
+  candidates: { identifier: string; match: CandidateMatch }[];
+  /** The master or same-outcome candidate a known issue belongs to. */
+  knownIssue?: string;
+  notes: string[];
+  outcome: "continuation" | "fresh" | "known_issue";
+}
+
+export function priorWorkQuestions(
+  input: PriorWorkInput
+): Record<string, JevQuestion> {
+  const questions: Record<string, JevQuestion> = {};
+  if (input.existingInvestigation) {
+    questions.continuation = {
+      instructions:
+        "Does the existing investigation still answer this report: the same claim, with nothing new since that it does not cover?",
+      type: "boolean",
+    };
+  }
+  if (input.parent) {
+    questions.parent_match = {
+      instructions:
+        "Does this report describe the same symptom as the parent master ticket?",
+      type: "boolean",
+    };
+  }
+  input.candidates.forEach((_candidate, index) => {
+    questions[`candidate_${index}`] = {
+      criteria: { ...DUPLICATE_OUTCOMES },
+      instructions: `Compare this report with the candidate whose candidate field is ${index}. Judge by outcome, not keyword overlap: a shared component or error string is not enough.`,
+      type: "choice",
+    };
+  });
+  return questions;
+}
+
+/**
+ * Continuation, known issue, or fresh. An attached master is a fact, so it
+ * decides without Jev; Jev's view of the match only adds a note.
+ */
+export function resolvePriorWork(
+  input: PriorWorkInput,
+  answers: Answers
+): PriorWorkDecision {
+  const notes: string[] = [];
+  const matches = input.candidates.map((candidate, index) => {
+    const { choice, confidence } = choiceOf(answers[`candidate_${index}`]);
+    // A weak same-outcome call is related work, never a known issue.
+    const match: CandidateMatch =
+      choice === "same_outcome" && confidence < BARS.signal
+        ? "partial_or_adjacent"
+        : (choice as CandidateMatch);
+    return { confidence, identifier: candidate.identifier, match };
+  });
+  const candidates = matches.map(({ identifier, match }) => ({
+    identifier,
+    match,
+  }));
+  if (input.parent) {
+    if (probabilityOf(answers.parent_match) < BARS.signal) {
+      notes.push(
+        `This report may not match its master ${input.parent.identifier}; say so in its note.`
+      );
+    }
+    return {
+      candidates,
+      knownIssue: input.parent.identifier,
+      notes,
+      outcome: "known_issue",
+    };
+  }
+  if (
+    input.existingInvestigation &&
+    probabilityOf(answers.continuation) >= BARS.continuation
+  ) {
+    return { candidates, notes, outcome: "continuation" };
+  }
+  const same = matches
+    .filter((m) => m.match === "same_outcome")
+    .sort((a, b) => b.confidence - a.confidence)
+    .at(0);
+  return same
+    ? { candidates, knownIssue: same.identifier, notes, outcome: "known_issue" }
+    : { candidates, notes, outcome: "fresh" };
+}
+
+export async function decidePriorWork(
+  input: PriorWorkInput,
+  opts?: JevOptions
+): Promise<PriorWorkDecision> {
+  const questions = priorWorkQuestions(input);
+  const answers =
+    Object.keys(questions).length > 0
+      ? await askJev(
+          questions,
+          {
+            candidates: input.candidates.map((c, candidate) => ({
+              candidate,
+              ...c,
+            })),
+            existingInvestigation: input.existingInvestigation ?? null,
+            parent: input.parent ?? null,
+            report: input.report,
+          },
+          opts
+        )
+      : {};
+  return resolvePriorWork(input, answers);
 }
 
 // ---------------------------------------------------------------- billing
@@ -740,4 +946,120 @@ export async function decideFollowUp(
   return resolveFollowUp(
     await askJev(followUpQuestions(), { ...input, replies }, opts)
   );
+}
+
+// ---------------------------------------------------------------- grounding
+
+const MAX_CLAIMS = 40;
+const CLAIM_BREAK = /(?<=[.!?])\s+|\n+/u;
+const HAS_LETTER = /\p{L}/u;
+const CLOSING_PUNCTUATION = /([.!?]*)$/u;
+const UNCONFIRMED = " (unconfirmed)";
+
+export interface GroundingFlag {
+  claim: string;
+  reason: "done_unconfirmed" | "not_shown";
+}
+
+export interface GroundingResult {
+  checked: boolean;
+  flagged: GroundingFlag[];
+  /** The reply to send: the draft with each flagged claim marked unconfirmed. */
+  reply: string;
+}
+
+/** Sentences and lines of a draft, each judged as one claim. */
+export const splitClaims = (draft: string): string[] =>
+  draft
+    .split(CLAIM_BREAK)
+    .map((claim) => claim.trim())
+    .filter((claim) => HAS_LETTER.test(claim))
+    .slice(0, MAX_CLAIMS);
+
+export const groundingQuestions = (
+  claims: string[]
+): Record<string, JevQuestion> =>
+  Object.fromEntries(
+    claims.flatMap((_claim, index) => [
+      [
+        `shown_${index}`,
+        {
+          instructions: `Does the evidence show what the claim whose index is ${index} says? A claim that asserts nothing (a question, an offer, a greeting) counts as shown.`,
+          type: "boolean",
+        } satisfies JevQuestion,
+      ],
+      [
+        `done_${index}`,
+        {
+          instructions: `Does the claim whose index is ${index} say work is done: fixed, shipped, merged, sent, deployed, resolved, or complete?`,
+          type: "boolean",
+        } satisfies JevQuestion,
+      ],
+    ])
+  );
+
+/** Marks a claim unconfirmed before its closing punctuation. */
+const markUnconfirmed = (claim: string): string =>
+  claim.replace(CLOSING_PUNCTUATION, `${UNCONFIRMED}$1`);
+
+/**
+ * Which claims to flag and the reply with each one marked. A flag only
+ * changes the wording; the reply always goes out.
+ */
+export function resolveGrounding(
+  draft: string,
+  claims: string[],
+  answers: Answers
+): GroundingResult {
+  const flagged: GroundingFlag[] = [];
+  claims.forEach((claim, index) => {
+    const shown = probabilityOf(answers[`shown_${index}`]);
+    if (shown < BARS.grounded) {
+      flagged.push({ claim, reason: "not_shown" });
+    } else if (
+      probabilityOf(answers[`done_${index}`]) >= BARS.signal &&
+      shown < BARS.doneClaim
+    ) {
+      flagged.push({ claim, reason: "done_unconfirmed" });
+    }
+  });
+  const reply = flagged.reduce(
+    (text, { claim }) =>
+      claim.includes(UNCONFIRMED.trim())
+        ? text
+        : text.replace(claim, markUnconfirmed(claim)),
+    draft
+  );
+  return { checked: true, flagged, reply };
+}
+
+/**
+ * Checks a draft reply against the turn's evidence. Never withholds it: a
+ * Jev failure or timeout returns the draft unchanged, and only a cancelled
+ * turn throws.
+ */
+export async function checkGrounding(
+  input: { draft: string; evidence: string },
+  opts?: JevOptions
+): Promise<GroundingResult> {
+  const claims = splitClaims(input.draft);
+  if (claims.length === 0) {
+    return { checked: true, flagged: [], reply: input.draft };
+  }
+  try {
+    const answers = await askJev(
+      groundingQuestions(claims),
+      {
+        claims: claims.map((text, index) => ({ index, text })),
+        evidence: input.evidence,
+      },
+      opts
+    );
+    return resolveGrounding(input.draft, claims, answers);
+  } catch (error) {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
+    return { checked: false, flagged: [], reply: input.draft };
+  }
 }
