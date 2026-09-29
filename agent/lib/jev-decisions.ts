@@ -693,7 +693,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
-      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text', and @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
+      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text'. @Foreman is Foreman; @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
     type: "choice",
   },
   status_only: {
@@ -724,6 +724,8 @@ export function resolveFollowUp(answers: Answers): FollowUpOutcome {
  */
 export const SLACK_PROMPT = /^\*\*([^*\n]{1,100})\*\* replied in Slack\.$/u;
 
+/** Foreman's bot user in the intake Slack workspace, as the receiver mentions it. */
+const FOREMAN_MENTION = /<@U0BQ5QMHM7D(?:\|[^>]*)?>/gu;
 const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
 // The Asks receiver heads each relayed reply with "<link> **Name** replied in
 // Slack:". The link always names Foreman, so it says nothing about who a
@@ -732,14 +734,16 @@ export const RELAY_HEADER =
   /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?replied in Slack:/u;
 
 /**
- * Rewrites a relayed reply as "Name: text" with every Slack mention as
- * @teammate. Jev cannot resolve Slack ids, and none of them is Foreman: a
- * relayed reply comes through Linear, not a Slack mention of the bot.
+ * Rewrites a relayed reply as "Name: text" with a mention of Foreman as
+ * @Foreman and every other Slack mention as @teammate, since Jev cannot
+ * resolve Slack ids. The receiver relays a reply that mentions the bot like
+ * any other, so "@Foreman move this to done" must not read as a hand-off.
  */
 export const followUpText = (reply: string): string => {
   const name = RELAY_HEADER.exec(reply)?.[1] ?? "Someone";
   const text = reply
     .replace(RELAY_HEADER, "")
+    .replace(FOREMAN_MENTION, "@Foreman")
     .replace(SLACK_MENTION, "@teammate")
     .trim();
   return `${name}: ${text}`;
