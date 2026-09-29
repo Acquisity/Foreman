@@ -15,6 +15,7 @@ import {
   renderTranscript,
   replyToChat,
   resolveCitations,
+  stepsOnOwnLines,
 } from "./widget-kb.js";
 
 const DECIDE_TIMEOUT_MARK = / decide:fallback:timeout=\d+ /;
@@ -91,6 +92,25 @@ test("one source means no numbers at all; several sources are numbered only wher
     resolveCitations("A [1]. B [1]. C [2]. D [2].", articles).message,
     "A. B [1]. C. D [2]."
   );
+});
+
+test("a numbered list run into one paragraph comes back one step per line", () => {
+  assert.equal(
+    resolveCitations(
+      "To get more credits: 1. Click Settings [1]. 2. Click Billing [1]. 3. Click Buy More [1].",
+      articles
+    ).message,
+    "To get more credits:\n1. Click Settings.\n2. Click Billing.\n3. Click Buy More."
+  );
+  assert.equal(
+    stepsOnOwnLines("1. Open it.\n2. Save it."),
+    "1. Open it.\n2. Save it."
+  );
+  assert.equal(
+    stepsOnOwnLines("Plan 2. costs more than plan 1. does."),
+    "Plan 2. costs more than plan 1. does."
+  );
+  assert.equal(stepsOnOwnLines("Version 1.5 is out."), "Version 1.5 is out.");
 });
 
 test("a grounded answer is returned with the urls of the searched articles only", async () => {
