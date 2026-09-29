@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
+import { logOpsEvent } from "#lib/ops-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -12,15 +13,20 @@ export default defineTool({
     "Jev decides the Stage 5 handling for a triage ticket from the completed Stage 4 evidence record: verdict, classification, duplicate, handling path, final state, priority, labels, and project. " +
     "Code applies the Bug bar, the state for each path, the priority rules, and the Aaron fallback. " +
     "outcome unproven means take the unproven branch with the missing confirmations it lists. " +
+    "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
     "outcome route carries the exact state, priority, addLabels, project, and duplicate fields for route_ticket; pass them unchanged. assignee 'area owner' means the roster owner for the chosen project. " +
     "Put every note in the Triage investigation document. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute(input, ctx) {
     try {
-      return {
-        decided: true as const,
-        decision: await decideTriage(input, { signal: ctx.abortSignal }),
-      };
+      const decision = await decideTriage(input, { signal: ctx.abortSignal });
+      logOpsEvent("jev.decision", {
+        code: decision.outcome === "route" ? decision.hotlane?.route : null,
+        outcome: decision.outcome === "route" ? decision.path : "unproven",
+        sessionId: ctx.session.id,
+        tool: "decide_triage",
+      });
+      return { decided: true as const, decision };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
