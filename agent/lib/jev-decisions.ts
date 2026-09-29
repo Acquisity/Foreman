@@ -1012,24 +1012,31 @@ export function resolveGrounding(
   answers: Answers
 ): GroundingResult {
   const flagged: GroundingFlag[] = [];
+  let cursor = 0;
+  let reply = "";
   claims.forEach((claim, index) => {
     const shown = probabilityOf(answers[`shown_${index}`]);
+    let reason: GroundingFlag["reason"] | undefined;
     if (shown < BARS.grounded) {
-      flagged.push({ claim, reason: "not_shown" });
+      reason = "not_shown";
     } else if (
       probabilityOf(answers[`done_${index}`]) >= BARS.signal &&
       shown < BARS.doneClaim
     ) {
-      flagged.push({ claim, reason: "done_unconfirmed" });
+      reason = "done_unconfirmed";
     }
+    if (reason) {
+      flagged.push({ claim, reason });
+    }
+    const start = draft.indexOf(claim, cursor);
+    reply += draft.slice(cursor, start);
+    reply +=
+      reason && !claim.includes(UNCONFIRMED.trim())
+        ? markUnconfirmed(claim)
+        : claim;
+    cursor = start + claim.length;
   });
-  const reply = flagged.reduce(
-    (text, { claim }) =>
-      claim.includes(UNCONFIRMED.trim())
-        ? text
-        : text.replace(claim, markUnconfirmed(claim)),
-    draft
-  );
+  reply += draft.slice(cursor);
   return { checked: true, flagged, reply };
 }
 

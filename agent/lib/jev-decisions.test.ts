@@ -612,3 +612,28 @@ test("a cancelled turn is not mistaken for a Jev failure", async () => {
     )
   );
 });
+
+test("grounding adjusts only the flagged occurrence and preserves literal reply text", () => {
+  for (const draft of [
+    "  Fixed. Fixed.\n",
+    "  Still not fixed. Fixed.\n",
+    "  Evidence mentions $& and $`. Fixed.\n",
+  ]) {
+    const claims = splitClaims(draft);
+    const result = resolveGrounding(draft, claims, {
+      done_0: no(),
+      done_1: yes(),
+      shown_0: yes(),
+      shown_1: no(),
+    });
+    assert.equal(result.reply, `${draft.slice(0, -7)}Fixed (unconfirmed).\n`);
+    assert.deepEqual(result.flagged, [
+      { claim: "Fixed.", reason: "not_shown" },
+    ]);
+  }
+  const draft = "Sent $& and $` and $' and $1.";
+  assert.equal(
+    resolveGrounding(draft, splitClaims(draft), { shown_0: no() }).reply,
+    "Sent $& and $` and $' and $1 (unconfirmed)."
+  );
+});

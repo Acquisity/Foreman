@@ -26,7 +26,11 @@ export default defineTool({
     return result;
   },
   inputSchema: z.object({
-    draft: text(20_000).describe("The reply exactly as you would send it."),
+    draft: z
+      .string()
+      .min(1)
+      .max(20_000)
+      .describe("The reply exactly as you would send it."),
     evidence: text(20_000).describe(
       "What this turn's tools and reads actually showed: ids, counts, results, and what could not be checked."
     ),
