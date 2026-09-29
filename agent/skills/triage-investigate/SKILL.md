@@ -67,7 +67,7 @@ Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and 
 
 ### Check existing work
 
-A Duplicate state still gets Stage 5 on; say what is already done. `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Then call `decide_prior_work` with the claim, this ticket's prior findings, and every hit. `continuation` reuses those findings, `known_issue` names the ticket, `fresh` starts over. Per hit `match`:
+A Duplicate still gets Stage 5; say what is done. `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit. Call `decide_prior_work` with the claim, prior findings, and hits in batches of at most 8. `continuation` reuses those findings, `known_issue` names the ticket, `fresh` starts over. Per hit `match`:
 
 - `same_outcome`: a duplicate candidate that `decide_triage` settles in Stage 5.
 - `partial_or_adjacent`: relate, never close.
