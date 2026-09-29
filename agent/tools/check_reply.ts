@@ -10,7 +10,7 @@ export default defineTool({
   description:
     "Jev checks a draft final reply against the evidence this turn gathered: which claims the evidence does not show, and which say work is done without evidence that it is. " +
     "It never stops the reply. reply is the draft with each flagged claim marked unconfirmed; send it, or first adjust each flagged claim yourself (remove it, mark it unconfirmed, or back it with evidence you already have), then send. " +
-    "checked false means Jev could not answer: send the draft unchanged.",
+    "checked false means the draft could not be fully checked (including more than 40 claims): send it unchanged.",
   async execute(input, ctx) {
     const result = await checkGrounding(input, { signal: ctx.abortSignal });
     let outcome = "failed";

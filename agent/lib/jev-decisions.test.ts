@@ -618,7 +618,7 @@ test("a cancelled turn is not mistaken for a Jev failure", async () => {
 test("grounding adjusts only the flagged occurrence and preserves literal reply text", () => {
   for (const draft of [
     "  Fixed. Fixed.\n",
-    "  Still not fixed. Fixed.\n",
+    "  Not yet Fixed. Fixed.\n",
     "  Evidence mentions $& and $`. Fixed.\n",
   ]) {
     const claims = splitClaims(draft);
@@ -637,5 +637,53 @@ test("grounding adjusts only the flagged occurrence and preserves literal reply 
   assert.equal(
     resolveGrounding(draft, splitClaims(draft), { shown_0: no() }).reply,
     "Sent $& and $` and $' and $1 (unconfirmed)."
+  );
+});
+
+test("a reply beyond the claim limit is sent unchanged without a partial success", async () => {
+  const draft = `${"Confirmed.\n".repeat(40)}Everything is deployed.`;
+  let asked = false;
+  const result = await checkGrounding(
+    { draft, evidence: "No deployment was checked." },
+    {
+      fetch: () => {
+        asked = true;
+        throw new Error("An oversized draft must not be partially checked.");
+      },
+      token: "t",
+    }
+  );
+  assert.equal(asked, false);
+  assert.deepEqual(result, { checked: false, flagged: [], reply: draft });
+});
+
+test("a reply at the claim limit is still checked in full", async () => {
+  const draft = `${"Confirmed.\n".repeat(39)}Everything is deployed.`;
+  let asked = false;
+  const result = await checkGrounding(
+    { draft, evidence: "No deployment was checked." },
+    {
+      fetch: (_url, init) => {
+        asked = true;
+        const { questions } = JSON.parse(init.body as string);
+        assert.equal(Object.keys(questions).length, 80);
+        return reply({
+          answers: Object.fromEntries(
+            Object.keys(questions).map((key) => [
+              key,
+              key === "shown_39" ? no() : yes(),
+            ])
+          ),
+          model: "typesafe-ai/jev",
+        });
+      },
+      token: "t",
+    }
+  );
+  assert.equal(asked, true);
+  assert.equal(result.checked, true);
+  assert.equal(
+    result.reply,
+    `${"Confirmed.\n".repeat(39)}Everything is deployed (unconfirmed).`
   );
 });

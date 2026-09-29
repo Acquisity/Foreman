@@ -31,7 +31,7 @@ export const splitClaims = (draft: string): string[] =>
     .split(CLAIM_BREAK)
     .map((claim) => claim.trim())
     .filter((claim) => HAS_LETTER.test(claim))
-    .slice(0, MAX_CLAIMS);
+    .slice(0, MAX_CLAIMS + 1);
 
 export const groundingQuestions = (
   claims: string[]
@@ -107,6 +107,9 @@ export async function checkGrounding(
   opts?: JevOptions
 ): Promise<GroundingResult> {
   const claims = splitClaims(input.draft);
+  if (claims.length > MAX_CLAIMS) {
+    return { checked: false, flagged: [], reply: input.draft };
+  }
   if (claims.length === 0) {
     return { checked: true, flagged: [], reply: input.draft };
   }
