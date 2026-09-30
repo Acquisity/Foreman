@@ -5,13 +5,20 @@ import {
   type BillingInput,
   billingQuestions,
   decideFollowUp,
+  decidePriorWork,
   followUpText,
   resolveBilling,
   resolveFollowUp,
+  resolvePriorWork,
   resolveTriage,
   type TriageInput,
   triageQuestions,
 } from "./jev-decisions.js";
+import {
+  checkGrounding,
+  resolveGrounding,
+  splitClaims,
+} from "./jev-grounding.js";
 
 const yes = (probability = 0.9): JevAnswer => ({
   probability,
@@ -58,6 +65,8 @@ const bugAnswers = (
   data_loss_or_security: no(),
   direct_evidence: yes(),
   impact: band({ "0": 0.05, "1": 0.8, "2": 0.1, "3": 0.05 }),
+  incident: pick("standard"),
+  incident_impact: pick("MATERIALLY_IMPAIRED"),
   money_blocker: no(),
   path: pick("Engineering Todo"),
   project: pick("AI SDR Core"),
@@ -428,4 +437,285 @@ test("a relayed reply reaches Jev as the speaker and their words, mentions as Fo
     "Aaron Fraga: @Foreman can u move this to done please"
   );
   assert.equal(followUpText("just text"), "Someone: just text");
+});
+
+test("a reviewed Bug carries its hotlane route; a duplicate or non-Bug carries none", () => {
+  const standard = resolveTriage(triageInput(), bugAnswers());
+  assert.ok(standard.outcome === "route");
+  assert.deepEqual(standard.hotlane, {
+    impact: "MATERIALLY_IMPAIRED",
+    notes: [],
+    proposedLabel: "none",
+    route: "STANDARD_ENGINEERING",
+  });
+
+  const hot = resolveTriage(
+    triageInput(),
+    bugAnswers({ incident: pick("hotlane"), incident_impact: pick("BLOCKED") })
+  );
+  assert.ok(hot.outcome === "route");
+  assert.equal(hot.hotlane?.route, "HOTLANE");
+  assert.equal(hot.hotlane?.proposedLabel, "fast-lane");
+
+  const userError = resolveTriage(
+    triageInput(),
+    bugAnswers({ classification: pick("user_error"), path: pick("User Error") })
+  );
+  assert.ok(userError.outcome === "route");
+  assert.equal(userError.hotlane, undefined);
+});
+
+test("an unconfirmed or unsure hotlane goes to a person, never routine work", () => {
+  for (const incident of [
+    pick("needs_human_urgent", 0.4),
+    pick("hotlane", 0.5),
+  ]) {
+    const decision = resolveTriage(triageInput(), bugAnswers({ incident }));
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.hotlane?.route, "NEEDS_HUMAN_URGENT");
+    assert.equal(decision.hotlane?.impact, "UNCONFIRMED");
+    assert.equal(decision.hotlane?.proposedLabel, "none");
+  }
+});
+
+const candidate = (identifier: string) => ({
+  identifier,
+  summary: "s",
+  title: "t",
+});
+
+test("an attached master makes a known issue whatever Jev thinks of the match", () => {
+  const input = { candidates: [], parent: candidate("ENG-5"), report: "r" };
+  const matched = resolvePriorWork(input, { parent_match: yes() });
+  assert.equal(matched.outcome, "known_issue");
+  assert.equal(matched.knownIssue, "ENG-5");
+  assert.deepEqual(matched.notes, []);
+  const doubted = resolvePriorWork(input, { parent_match: no() });
+  assert.equal(doubted.outcome, "known_issue");
+  assert.equal(doubted.notes.length, 1);
+});
+
+test("with no master, a bug is fresh without asking Jev", async () => {
+  const decision = await decidePriorWork(
+    { candidates: [], report: "r" },
+    {
+      fetch: () => {
+        throw new Error("Jev must not be called.");
+      },
+      token: "t",
+    }
+  );
+  assert.equal(decision.outcome, "fresh");
+});
+
+test("a live existing investigation is a continuation, a stale one is not", () => {
+  const input = {
+    candidates: [],
+    existingInvestigation: "Found the webhook drop.",
+    report: "r",
+  };
+  assert.equal(
+    resolvePriorWork(input, { continuation: yes() }).outcome,
+    "continuation"
+  );
+  assert.equal(
+    resolvePriorWork(input, { continuation: no() }).outcome,
+    "fresh"
+  );
+});
+
+test("a same-outcome candidate is a known issue; a weak one is only related", () => {
+  const input = {
+    candidates: [candidate("ENG-7"), candidate("ENG-8")],
+    report: "r",
+  };
+  const known = resolvePriorWork(input, {
+    candidate_0: pick("partial_or_adjacent"),
+    candidate_1: pick("same_outcome", 0.7),
+  });
+  assert.equal(known.outcome, "known_issue");
+  assert.equal(known.knownIssue, "ENG-8");
+  assert.deepEqual(known.candidates, [
+    { identifier: "ENG-7", match: "partial_or_adjacent" },
+    { identifier: "ENG-8", match: "same_outcome" },
+  ]);
+
+  const weak = resolvePriorWork(input, {
+    candidate_0: pick("not_relevant"),
+    candidate_1: pick("same_outcome", 0.4),
+  });
+  assert.equal(weak.outcome, "fresh");
+  assert.equal(weak.candidates[1]?.match, "partial_or_adjacent");
+});
+
+const DRAFT =
+  "I found the failed run in Inngest. The fix is deployed.\nCan you retry?";
+
+test("a draft splits into one claim per sentence or line", () => {
+  assert.deepEqual(splitClaims(DRAFT), [
+    "I found the failed run in Inngest.",
+    "The fix is deployed.",
+    "Can you retry?",
+  ]);
+});
+
+test("a grounding flag marks the claim unconfirmed and still returns a reply to send", () => {
+  const claims = splitClaims(DRAFT);
+  const result = resolveGrounding(DRAFT, claims, {
+    done_0: no(),
+    done_1: yes(),
+    done_2: no(),
+    shown_0: yes(),
+    shown_1: yes(0.6),
+    shown_2: yes(),
+  });
+  assert.deepEqual(result.flagged, [
+    { claim: "The fix is deployed.", reason: "done_unconfirmed" },
+  ]);
+  assert.equal(
+    result.reply,
+    "I found the failed run in Inngest. The fix is deployed (unconfirmed).\nCan you retry?"
+  );
+
+  const notShown = resolveGrounding(DRAFT, claims, {
+    done_0: no(),
+    done_1: no(),
+    done_2: no(),
+    shown_0: no(),
+    shown_1: yes(),
+    shown_2: yes(),
+  });
+  assert.equal(notShown.flagged[0]?.reason, "not_shown");
+  assert.ok(
+    notShown.reply.startsWith(
+      "I found the failed run in Inngest (unconfirmed)."
+    )
+  );
+});
+
+test("a flagged reply comes back from Jev adjusted and ready to send", async () => {
+  const result = await checkGrounding(
+    { draft: "The fix is deployed.", evidence: "No deploy was checked." },
+    {
+      fetch: () =>
+        reply({
+          answers: {
+            done_0: { probability: 0.95, type: "boolean" },
+            shown_0: { probability: 0.1, type: "boolean" },
+          },
+          model: "typesafe-ai/jev",
+        }),
+      token: "t",
+    }
+  );
+  assert.equal(result.checked, true);
+  assert.equal(result.reply, "The fix is deployed (unconfirmed).");
+});
+
+test("a Jev failure or timeout sends the draft unchanged", async () => {
+  const results = await Promise.all(
+    [
+      () => reply({}, 503),
+      () => Promise.reject(new Error("The operation timed out.")),
+    ].map((fetch) =>
+      checkGrounding({ draft: DRAFT, evidence: "e" }, { fetch, token: "t" })
+    )
+  );
+  for (const result of results) {
+    assert.deepEqual(result, {
+      checked: false,
+      flagged: [],
+      reason: "jev_failed",
+      reply: DRAFT,
+    });
+  }
+});
+
+test("a cancelled turn is not mistaken for a Jev failure", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    checkGrounding(
+      { draft: DRAFT, evidence: "e" },
+      { signal: controller.signal, token: "t" }
+    )
+  );
+});
+
+test("grounding adjusts only the flagged occurrence and preserves literal reply text", () => {
+  for (const draft of [
+    "  Fixed. Fixed.\n",
+    "  Not yet Fixed. Fixed.\n",
+    "  Evidence mentions $& and $`. Fixed.\n",
+  ]) {
+    const claims = splitClaims(draft);
+    const result = resolveGrounding(draft, claims, {
+      done_0: no(),
+      done_1: yes(),
+      shown_0: yes(),
+      shown_1: no(),
+    });
+    assert.equal(result.reply, `${draft.slice(0, -7)}Fixed (unconfirmed).\n`);
+    assert.deepEqual(result.flagged, [
+      { claim: "Fixed.", reason: "not_shown" },
+    ]);
+  }
+  const draft = "Sent $& and $` and $' and $1.";
+  assert.equal(
+    resolveGrounding(draft, splitClaims(draft), { shown_0: no() }).reply,
+    "Sent $& and $` and $' and $1 (unconfirmed)."
+  );
+});
+
+test("a reply beyond the claim limit is sent unchanged without a partial success", async () => {
+  const draft = `${"Confirmed.\n".repeat(40)}Everything is deployed.`;
+  let asked = false;
+  const result = await checkGrounding(
+    { draft, evidence: "No deployment was checked." },
+    {
+      fetch: () => {
+        asked = true;
+        throw new Error("An oversized draft must not be partially checked.");
+      },
+      token: "t",
+    }
+  );
+  assert.equal(asked, false);
+  assert.deepEqual(result, {
+    checked: false,
+    flagged: [],
+    reason: "oversized",
+    reply: draft,
+  });
+});
+
+test("a reply at the claim limit is still checked in full", async () => {
+  const draft = `${"Confirmed.\n".repeat(39)}Everything is deployed.`;
+  let asked = false;
+  const result = await checkGrounding(
+    { draft, evidence: "No deployment was checked." },
+    {
+      fetch: (_url, init) => {
+        asked = true;
+        const { questions } = JSON.parse(init.body as string);
+        assert.equal(Object.keys(questions).length, 80);
+        return reply({
+          answers: Object.fromEntries(
+            Object.keys(questions).map((key) => [
+              key,
+              key === "shown_39" ? no() : yes(),
+            ])
+          ),
+          model: "typesafe-ai/jev",
+        });
+      },
+      token: "t",
+    }
+  );
+  assert.equal(asked, true);
+  assert.equal(result.checked, true);
+  assert.equal(
+    result.reply,
+    `${"Confirmed.\n".repeat(39)}Everything is deployed (unconfirmed).`
+  );
 });
