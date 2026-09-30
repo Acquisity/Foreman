@@ -21,6 +21,8 @@ export interface GroundingFlag {
 export interface GroundingResult {
   checked: boolean;
   flagged: GroundingFlag[];
+  /** Why an unchecked draft was not checked, for the ops log. */
+  reason?: "oversized" | "jev_failed";
   /** The reply to send: the draft with each flagged claim marked unconfirmed. */
   reply: string;
 }
@@ -108,7 +110,12 @@ export async function checkGrounding(
 ): Promise<GroundingResult> {
   const claims = splitClaims(input.draft);
   if (claims.length > MAX_CLAIMS) {
-    return { checked: false, flagged: [], reply: input.draft };
+    return {
+      checked: false,
+      flagged: [],
+      reason: "oversized",
+      reply: input.draft,
+    };
   }
   if (claims.length === 0) {
     return { checked: true, flagged: [], reply: input.draft };
@@ -127,6 +134,11 @@ export async function checkGrounding(
     if (opts?.signal?.aborted) {
       throw error;
     }
-    return { checked: false, flagged: [], reply: input.draft };
+    return {
+      checked: false,
+      flagged: [],
+      reason: "jev_failed",
+      reply: input.draft,
+    };
   }
 }

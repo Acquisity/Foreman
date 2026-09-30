@@ -600,7 +600,12 @@ test("a Jev failure or timeout sends the draft unchanged", async () => {
     )
   );
   for (const result of results) {
-    assert.deepEqual(result, { checked: false, flagged: [], reply: DRAFT });
+    assert.deepEqual(result, {
+      checked: false,
+      flagged: [],
+      reason: "jev_failed",
+      reply: DRAFT,
+    });
   }
 });
 
@@ -654,7 +659,12 @@ test("a reply beyond the claim limit is sent unchanged without a partial success
     }
   );
   assert.equal(asked, false);
-  assert.deepEqual(result, { checked: false, flagged: [], reply: draft });
+  assert.deepEqual(result, {
+    checked: false,
+    flagged: [],
+    reason: "oversized",
+    reply: draft,
+  });
 });
 
 test("a reply at the claim limit is still checked in full", async () => {

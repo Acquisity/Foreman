@@ -18,6 +18,7 @@ export default defineTool({
       outcome = result.flagged.length > 0 ? "flagged" : "clean";
     }
     logOpsEvent("jev.decision", {
+      ...(result.reason ? { code: result.reason } : {}),
       outcome,
       requests: result.flagged.length,
       sessionId: ctx.session.id,
