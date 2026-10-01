@@ -8,7 +8,7 @@ import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
 import type { FollowUpOutcome } from "../lib/jev-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
-import { relayedFollowUpOutcome } from "../lib/requester-reply.js";
+import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
 
 const credentials = connectLinearCredentials(
@@ -23,10 +23,29 @@ export const STATUS_ONLY_FOLLOW_UP =
   "Jev read this follow-up as only asking to move the ticket to a status. A person has already decided it: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
 
 /**
- * Judges a relayed Slack follow-up before the model runs. Any failure or a
- * slow answer dispatches the session as usual: a throw here would drop it.
+ * Runs a pre-model read inside Linear's response window. Any failure or a
+ * slow answer yields null, so the session dispatches as usual: a throw here
+ * would drop it.
  */
-const followUpOutcome = async (
+const withinGate = async <T>(
+  work: (signal: AbortSignal) => Promise<T | null>
+): Promise<T | null> => {
+  const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
+  const timedOut = new Promise<null>((resolve) =>
+    deadline.addEventListener("abort", () => resolve(null), { once: true })
+  );
+  try {
+    return await Promise.race([work(deadline), timedOut]);
+  } catch {
+    return null;
+  }
+};
+
+const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
+  event.agentSession.issueId ?? event.agentSession.issue?.id ?? undefined;
+
+/** Judges a relayed Slack follow-up before the model runs. */
+const followUpOutcome = (
   event: LinearAgentSessionEvent
 ): Promise<FollowUpOutcome | null> => {
   // A reply either opened its own session (legacy relay with a mention) or
@@ -35,27 +54,21 @@ const followUpOutcome = async (
   const commentId = prompted
     ? event.agentActivity?.sourceCommentId
     : event.action === "created" && event.agentSession.commentId;
-  const issue = event.agentSession.issueId ?? event.agentSession.issue?.id;
+  const issue = issueOf(event);
   if (!(issue && commentId)) {
-    return null;
+    return Promise.resolve(null);
   }
-  const deadline = AbortSignal.timeout(FOLLOW_UP_GATE_MS);
-  const timedOut = new Promise<null>((resolve) =>
-    deadline.addEventListener("abort", () => resolve(null), { once: true })
+  return withinGate((signal) =>
+    relayedFollowUpOutcome(issue, { commentId, prompted }, credentials, signal)
   );
-  try {
-    return await Promise.race([
-      relayedFollowUpOutcome(
-        issue,
-        { commentId, prompted },
-        credentials,
-        deadline
-      ),
-      timedOut,
-    ]);
-  } catch {
-    return null;
-  }
+};
+
+/** Names the intake requester before the model runs (ENG-14588). */
+const askFrom = (event: LinearAgentSessionEvent): Promise<string | null> => {
+  const issue = issueOf(event);
+  return issue
+    ? withinGate(() => readAskFrom(issue, credentials))
+    : Promise.resolve(null);
 };
 
 /**
@@ -70,15 +83,17 @@ export const onAgentSession = async (
   ctx: LinearSessionContext,
   event: LinearAgentSessionEvent
 ): Promise<LinearInboundResult> => {
-  const context = buildLinearContext(event);
-  if (context === null) {
+  if (event.action !== "created" && event.action !== "prompted") {
     return null;
   }
   // Every relayed Slack reply opens a session; one that needs nothing from
   // Foreman ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
-  const outcome = await followUpOutcome(event);
+  const [outcome, requester] = await Promise.all([
+    followUpOutcome(event),
+    askFrom(event),
+  ]);
   if (
     outcome === "skip" &&
     (await ctx.linear
@@ -105,6 +120,7 @@ export const onAgentSession = async (
     repositories.length === 1 && repository
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
+  const context = buildLinearContext(event, requester) ?? [];
   return {
     auth: withRepository,
     context:
