@@ -67,6 +67,10 @@ describe("withLinearStop", () => {
     assert.deepEqual(await deliver(stopBody, 401), { calls: [], posted: [] });
   });
 
+  it("acknowledges an unparseable verified body untouched", async () => {
+    assert.deepEqual(await deliver("not json", 200), { calls: [], posted: [] });
+  });
+
   it("leaves ordinary prompts to the queue", async () => {
     const prompt = stopBody.replace('"signal":"stop"', '"signal":null');
     assert.deepEqual(await deliver(prompt, 200), { calls: [], posted: [] });

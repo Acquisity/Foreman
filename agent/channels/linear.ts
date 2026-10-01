@@ -171,10 +171,16 @@ export const withLinearStop = (
             if (!response.ok) {
               return response;
             }
-            const event = parseLinearWebhookEvent({
-              body: await body,
-              headers: request.headers,
-            });
+            // eve acknowledges an unparseable body as ignored; so does this.
+            let event: ReturnType<typeof parseLinearWebhookEvent>;
+            try {
+              event = parseLinearWebhookEvent({
+                body: await body,
+                headers: request.headers,
+              });
+            } catch {
+              return response;
+            }
             if (event?.kind === "agent_session" && isStopSignal(event)) {
               const agentSessionId = event.agentSession.id;
               args.waitUntil(
