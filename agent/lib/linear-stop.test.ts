@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { POST } from "eve/channels";
-import type { LinearChannel } from "eve/channels/linear";
+import type {
+  LinearAgentSessionEvent,
+  LinearChannel,
+  LinearSessionContext,
+} from "eve/channels/linear";
+import { parseLinearWebhookEvent } from "eve/channels/linear";
 
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
-const { withLinearStop } = await import("../channels/linear.js");
+const { onAgentSession, withLinearStop } = await import(
+  "../channels/linear.js"
+);
 
 const stopBody = JSON.stringify({
   action: "prompted",
@@ -74,5 +81,20 @@ describe("withLinearStop", () => {
   it("leaves ordinary prompts to the queue", async () => {
     const prompt = stopBody.replace('"signal":"stop"', '"signal":null');
     assert.deepEqual(await deliver(prompt, 200), { calls: [], posted: [] });
+  });
+
+  it("keeps the Stop prompt from reaching the model", async () => {
+    const event = parseLinearWebhookEvent({
+      body: stopBody,
+      headers: new Headers(),
+    });
+    assert.equal(event?.kind, "agent_session");
+    assert.equal(
+      await onAgentSession(
+        {} as LinearSessionContext,
+        event as LinearAgentSessionEvent
+      ),
+      null
+    );
   });
 });
