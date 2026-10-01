@@ -6,7 +6,10 @@ import type {
   LinearChannel,
   LinearSessionContext,
 } from "eve/channels/linear";
-import { parseLinearWebhookEvent } from "eve/channels/linear";
+import {
+  linearContinuationToken,
+  parseLinearWebhookEvent,
+} from "eve/channels/linear";
 
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
 const { onAgentSession, withLinearStop } = await import(
@@ -48,7 +51,6 @@ const deliver = async (body: string, status: number, reset = "reset") => {
     }),
     waitUntil: (task: Promise<unknown>) => pending.push(task),
   };
-  // biome-ignore lint/suspicious/noExplicitAny: a minimal route harness.
   await (route as any).handler(
     new Request("http://x/linear", { body, method: "POST" }),
     args
@@ -60,7 +62,7 @@ const deliver = async (body: string, status: number, reset = "reset") => {
 describe("withLinearStop", () => {
   it("resets the exact session and confirms a verified Stop", async () => {
     assert.deepEqual(await deliver(stopBody, 200), {
-      calls: ["agent-session:s1"],
+      calls: [linearContinuationToken("s1")],
       posted: ["Stopped."],
     });
   });
