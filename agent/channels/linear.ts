@@ -1,10 +1,17 @@
 import { connectLinearCredentials } from "@vercel/connect/eve";
 import type {
   LinearAgentSessionEvent,
+  LinearChannel,
   LinearInboundResult,
   LinearSessionContext,
 } from "eve/channels/linear";
-import { defaultLinearAuth, linearChannel } from "eve/channels/linear";
+import {
+  createLinearAgentActivity,
+  defaultLinearAuth,
+  linearChannel,
+  linearContinuationToken,
+  parseLinearWebhookEvent,
+} from "eve/channels/linear";
 import type { FollowUpOutcome } from "../lib/jev-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
@@ -83,7 +90,12 @@ export const onAgentSession = async (
   ctx: LinearSessionContext,
   event: LinearAgentSessionEvent
 ): Promise<LinearInboundResult> => {
-  if (event.action !== "created" && event.action !== "prompted") {
+  // The Stop button is handled by the route (see withLinearStop), never the
+  // model.
+  if (
+    (event.action !== "created" && event.action !== "prompted") ||
+    isStopSignal(event)
+  ) {
     return null;
   }
   // Every relayed Slack reply opens a session; one that needs nothing from
@@ -128,6 +140,77 @@ export const onAgentSession = async (
   };
 };
 
+/** Whether a Linear event is the session's Stop button (ENG-14608). */
+export const isStopSignal = (event: LinearAgentSessionEvent): boolean =>
+  event.action === "prompted" && event.agentActivity?.signal === "stop";
+
+/**
+ * Retires the session a Linear Stop targets and confirms it in the session.
+ *
+ * @remarks
+ * eve's Linear channel delivers Stop as an ordinary prompt, which the queue
+ * policy holds until the running turn ends. The route therefore resets the
+ * exact session, as Slack's literal stop does: a reset, unlike a cancel, also
+ * keeps later child results from waking the root. The next prompt in the same
+ * Linear session starts a fresh eve session with the ticket context.
+ */
+export const withLinearStop = (
+  channel: LinearChannel,
+  post: typeof createLinearAgentActivity = createLinearAgentActivity
+): LinearChannel => ({
+  ...channel,
+  routes: channel.routes.map((route) =>
+    route.transport === "websocket"
+      ? route
+      : {
+          ...route,
+          handler: async (request, args) => {
+            const body = request.clone().text();
+            const response = await route.handler(request, args);
+            // Only a verified delivery is acknowledged with 200.
+            if (!response.ok) {
+              return response;
+            }
+            // eve acknowledges an unparseable body as ignored; so does this.
+            let event: ReturnType<typeof parseLinearWebhookEvent>;
+            try {
+              event = parseLinearWebhookEvent({
+                body: await body,
+                headers: request.headers,
+              });
+            } catch {
+              return response;
+            }
+            if (event?.kind === "agent_session" && isStopSignal(event)) {
+              const agentSessionId = event.agentSession.id;
+              args.waitUntil(
+                args
+                  .from(linearContinuationToken(agentSessionId))
+                  .reset({ reason: "Linear stop requested." })
+                  .then((result) =>
+                    post({
+                      activity: {
+                        agentSessionId,
+                        content: {
+                          body:
+                            result.status === "reset"
+                              ? "Stopped."
+                              : "Nothing was running.",
+                          type: "response",
+                        },
+                      },
+                      credentials,
+                    })
+                  )
+                  .catch(() => console.warn("Linear stop could not complete."))
+              );
+            }
+            return response;
+          },
+        }
+  ),
+});
+
 /**
  * Linear channel: Agent Sessions in, Agent Activities out, via Vercel Connect.
  *
@@ -136,11 +219,13 @@ export const onAgentSession = async (
  * Vercel OIDC signature. Only workspace members can open an Agent Session, so
  * workspace membership is the gate behind {@link stampTrusted}.
  */
-export default linearChannel({
-  credentials,
-  onAgentSession,
-  // One session per intake ticket: Slack replies are prompted into it, so a
-  // burst waits for the running turn and folds into the next one instead of
-  // cancelling an investigation. Linear's Stop button still interrupts.
-  turnPolicy: "queue",
-});
+export default withLinearStop(
+  linearChannel({
+    credentials,
+    onAgentSession,
+    // One session per intake ticket: Slack replies are prompted into it, so a
+    // burst waits for the running turn and folds into the next one instead of
+    // cancelling an investigation. Stop is intercepted by withLinearStop.
+    turnPolicy: "queue",
+  })
+);
