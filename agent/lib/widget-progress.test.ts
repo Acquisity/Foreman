@@ -37,6 +37,8 @@ test("parallel repeated checks stay running until all finish; replay is idempote
     reduce(result(3, "b", { success: false }))?.checks[0].status,
     "unavailable"
   );
+  // A replayed start never sets a finished check back to running.
+  assert.equal(reduce(start(1, ["a", "b"]))?.checks[0].status, "unavailable");
   assert.equal(JSON.stringify(first).includes("private"), false);
 });
 test("a read the framework marks failed or rejected shows as unavailable", () => {
