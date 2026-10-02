@@ -16,7 +16,10 @@ import { logOpsEvent } from "./ops-log.js";
  * untouched, which is the existing budgeted investigation.
  */
 
-const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
+/** TypeSafe's System One API through Vercel AI Gateway, billed to the company gateway key. */
+export const JEV_URL = "https://ai-gateway.vercel.sh/typesafe/v1/systemone";
+/** The gateway key; unset leaves every Jev decision to its existing fallback. */
+export const jevKey = () => process.env.AI_GATEWAY_API_KEY;
 const SELECTOR_TIMEOUT_MS = 3000;
 // A stalled model request previously waited ~300s, beyond the widget's
 // 170s investigation deadline. Leave time for a fresh request to recover.
@@ -334,7 +337,7 @@ export async function askJev(
   const timeout = AbortSignal.timeout(limit);
   try {
     const response = await ((opts.fetch ?? fetch) as unknown as FetchLike)(
-      TYPESAFE_URL,
+      JEV_URL,
       {
         body: JSON.stringify({ model: "jev-latest", questions, state }),
         headers: {
@@ -377,7 +380,7 @@ export async function handoffEligible(
   },
   opts: SelectorOptions = {}
 ): Promise<boolean> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     throw new Error("no_key");
   }
@@ -415,7 +418,7 @@ export async function isRefundTicket(
   signal: AbortSignal,
   opts: SelectorOptions = {}
 ): Promise<boolean> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     return false;
   }
@@ -450,7 +453,7 @@ export async function selectNextAction(
   },
   opts: SelectorOptions & { signal?: AbortSignal } = {}
 ): Promise<NextAction> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     throw new Error("no_key");
   }

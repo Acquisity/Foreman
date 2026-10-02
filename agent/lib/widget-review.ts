@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { logOpsEvent, type OpsLogger } from "./ops-log.js";
 import type { GateDeps } from "./widget-egress.js";
+import { JEV_URL, jevKey } from "./widget-next-action.js";
 
 const REVIEW_TIMEOUT_MS = 10_000;
 /** The judge's budget, JEV and the fallback together, when the caller gives no finish time. */
@@ -182,9 +183,9 @@ export async function reviewWidgetFindings(
     log?: OpsLogger;
   } = {}
 ): Promise<Verdict> {
-  const apiKey = options.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = options.apiKey ?? jevKey();
   if (!apiKey) {
-    throw new Error("Widget review requires TYPESAFE_API_KEY.");
+    throw new Error("Widget review requires AI_GATEWAY_API_KEY.");
   }
   const startedAt = Date.now();
   const { items, question, scope } = input;
@@ -254,23 +255,17 @@ export async function reviewWidgetFindings(
       ],
     ])
   );
-  const response = await (options.fetch ?? fetch)(
-    "https://api.typesafe.ai/v1/systemone",
-    {
-      body: JSON.stringify({ model: "jev-latest", questions, state }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      signal: input.signal
-        ? AbortSignal.any([
-            AbortSignal.timeout(REVIEW_TIMEOUT_MS),
-            input.signal,
-          ])
-        : AbortSignal.timeout(REVIEW_TIMEOUT_MS),
-    }
-  );
+  const response = await (options.fetch ?? fetch)(JEV_URL, {
+    body: JSON.stringify({ model: "jev-latest", questions, state }),
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    method: "POST",
+    signal: input.signal
+      ? AbortSignal.any([AbortSignal.timeout(REVIEW_TIMEOUT_MS), input.signal])
+      : AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Widget review HTTP ${response.status}.`);
   }

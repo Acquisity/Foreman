@@ -13,6 +13,7 @@ import {
   askJev,
   FRONT_DOOR_JEV_MS,
   fallbackReason,
+  jevKey,
   type SelectorOptions,
 } from "./widget-next-action.js";
 import {
@@ -310,7 +311,7 @@ export async function decideFromArticles(
   },
   opts: SelectorOptions = {}
 ): Promise<{ choice: KbDecision; confidence: number }> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     throw new Error("no_key");
   }
