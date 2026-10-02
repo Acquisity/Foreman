@@ -111,7 +111,7 @@ const toolCallsThisTurn = (withControl: Prompt) => {
 /**
  * One line per model call. The start is an absolute time because Vercel groups
  * a request's lines under one timestamp: the gap from one call's end to the
- * next call's start is the tool reads the first one asked for.
+ * next call's start bounds the time between calls, including tool reads.
  */
 const logModelCall = (
   sessionId: string | undefined,
@@ -168,47 +168,55 @@ export function widgetInvestigationMiddleware(
     // made 16. Calls past the budget are dropped before the SDK dispatches them.
     async wrapGenerate({ doGenerate, params }) {
       const startedAt = Date.now();
-      const generated = await doGenerate();
-      let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
-      const result = {
-        ...generated,
-        content: generated.content.filter((part) => {
-          if (part.type !== "tool-call" || !namedTool(part)) {
-            return true;
-          }
-          if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
-            return false;
-          }
-          left -= 1;
-          return left >= 0;
-        }),
-      };
-      let sawAllowedCall = false;
-      for (const part of result.content) {
-        if (part.type === "tool-call") {
-          if (!namedTool(part)) {
+      let keptTools: string[] = [];
+      try {
+        const generated = await doGenerate();
+        let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+        const result = {
+          ...generated,
+          content: generated.content.filter((part) => {
+            if (part.type !== "tool-call" || !namedTool(part)) {
+              return true;
+            }
+            if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
+              return false;
+            }
+            left -= 1;
+            return left >= 0;
+          }),
+        };
+        let sawAllowedCall = false;
+        for (const part of result.content) {
+          if (part.type === "tool-call") {
+            if (!namedTool(part)) {
+              throw new Error(BLOCKED);
+            }
+            sawAllowedCall = true;
+          } else if (part.type.startsWith("tool-")) {
             throw new Error(BLOCKED);
           }
-          sawAllowedCall = true;
-        } else if (part.type.startsWith("tool-")) {
+        }
+        if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
           throw new Error(BLOCKED);
         }
-      }
-      if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
-        throw new Error(BLOCKED);
-      }
-      logModelCall(
-        sessionId,
-        startedAt,
-        result.content.flatMap((part) =>
+        keptTools = result.content.flatMap((part) =>
           part.type === "tool-call" ? [part.toolName] : []
-        )
-      );
-      return result;
+        );
+        return result;
+      } finally {
+        logModelCall(sessionId, startedAt, keptTools);
+      }
     },
     async wrapStream({ doStream, params }) {
       const startedAt = Date.now();
-      const result = await doStream();
+      // Log setup failures too, before a readable stream exists.
+      let result: Awaited<ReturnType<typeof doStream>>;
+      try {
+        result = await doStream();
+      } catch (error) {
+        logModelCall(sessionId, startedAt, []);
+        throw error;
+      }
       const allowedCalls = new Set<string>();
       let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
       const admittedCalls = new Map<string, boolean>();
@@ -228,37 +236,62 @@ export function widgetInvestigationMiddleware(
         const { id, toolCallId } = part as { id?: string; toolCallId?: string };
         return toolCallId ?? id;
       };
+      let logged = false;
+      const complete = () => {
+        if (!logged) {
+          logged = true;
+          logModelCall(sessionId, startedAt, admittedTools);
+        }
+      };
+      const guarded = result.stream.pipeThrough(
+        new TransformStream({
+          transform: (part, controller) => {
+            assertAllowedStreamPart(part, allowedCalls);
+            if (part.type === "tool-input-start" || part.type === "tool-call") {
+              admit(String(callId(part)), part.toolName);
+            }
+            if (
+              part.type === "finish" &&
+              part.finishReason.unified === "tool-calls" &&
+              ![...admittedCalls.values()].includes(true)
+            ) {
+              throw new Error(BLOCKED);
+            }
+            if (part.type === "finish") {
+              complete();
+            }
+            const id = part.type.startsWith("tool-") ? callId(part) : undefined;
+            if (id !== undefined && admittedCalls.get(String(id)) === false) {
+              return;
+            }
+            controller.enqueue(part);
+          },
+        })
+      );
+      const reader = guarded.getReader();
       return {
         ...result,
-        stream: result.stream.pipeThrough(
-          new TransformStream({
-            transform: (part, controller) => {
-              assertAllowedStreamPart(part, allowedCalls);
-              if (
-                part.type === "tool-input-start" ||
-                part.type === "tool-call"
-              ) {
-                admit(String(callId(part)), part.toolName);
+        stream: new ReadableStream({
+          async cancel(reason) {
+            // Record cancellation before waiting for upstream cleanup.
+            complete();
+            await reader.cancel(reason);
+          },
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                complete();
+                controller.close();
+              } else {
+                controller.enqueue(value);
               }
-              if (part.type === "finish") {
-                if (
-                  part.finishReason.unified === "tool-calls" &&
-                  ![...admittedCalls.values()].includes(true)
-                ) {
-                  throw new Error(BLOCKED);
-                }
-                logModelCall(sessionId, startedAt, [...admittedTools]);
-              }
-              const id = part.type.startsWith("tool-")
-                ? callId(part)
-                : undefined;
-              if (id !== undefined && admittedCalls.get(String(id)) === false) {
-                return;
-              }
-              controller.enqueue(part);
-            },
-          })
-        ),
+            } catch (error) {
+              complete();
+              controller.error(error);
+            }
+          },
+        }),
       };
     },
   };

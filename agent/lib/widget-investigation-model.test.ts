@@ -178,7 +178,9 @@ describe("widget support investigation model boundary", () => {
 });
 
 for (const mode of ["generate", "stream"] as const) {
-  it(`${mode}: reserves the final two calls for article search and reading`, async () => {
+  it(`${mode}: reserves the final two calls for article search and reading`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
     const names = [
       "widget_outreach_health",
       "widget_help_article",
@@ -244,10 +246,13 @@ for (const mode of ["generate", "stream"] as const) {
       "widget_read_help_article",
     ]);
     assert.deepEqual(
-      base.doGenerateCalls[0].tools?.map((t) => t.name),
+      base.doGenerateCalls[0].tools?.map((entry) => entry.name),
       received
     );
     assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+    const logged = lines.map((line) => JSON.parse(line));
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].tool, received.join(","));
   });
 }
 
@@ -309,7 +314,7 @@ for (const mode of ["generate", "stream"] as const) {
     }
     assert.deepEqual(received, ["widget_file_ticket"]);
     assert.deepEqual(
-      base.doGenerateCalls[0].tools?.map((t) => t.name),
+      base.doGenerateCalls[0].tools?.map((entry) => entry.name),
       ["widget_file_ticket"]
     );
     const spent = await widgetInvestigationMiddleware().transformParams?.({
@@ -324,6 +329,11 @@ for (const mode of ["generate", "stream"] as const) {
   it(`${mode}: logs one timed line per model call naming the tools it kept`, async (t) => {
     const lines: string[] = [];
     t.mock.method(console, "info", (line: string) => lines.push(line));
+    let now = 1000;
+    t.mock.method(Date, "now", () => {
+      now += 25;
+      return now;
+    });
     const base = new MockLanguageModelV4({
       doGenerate: result("widget_inbox_health"),
     });
@@ -356,6 +366,92 @@ for (const mode of ["generate", "stream"] as const) {
     assert.equal(logged.length, 1);
     assert.equal(logged[0].sessionId, "wrun_test");
     assert.equal(logged[0].tool, "widget_inbox_health");
+    assert.equal(logged[0].message, "start=1025 ms=25");
+  });
+}
+
+for (const mode of ["generate", "stream"] as const) {
+  for (const failure of ["provider", "boundary"] as const) {
+    it(`${mode}: times a ${failure} failure without logging its contents`, async (t) => {
+      const lines: string[] = [];
+      t.mock.method(console, "info", (line: string) => lines.push(line));
+      const providerError = new Error("private provider failure");
+      const model = wrapLanguageModel({
+        middleware: [
+          widgetInvestigationMiddleware("wrun_failed"),
+          simulateStreamingMiddleware(),
+        ],
+        model: new MockLanguageModelV4({
+          doGenerate:
+            failure === "provider"
+              ? () => Promise.reject(providerError)
+              : result("private_forbidden_tool"),
+        }),
+      });
+      await assert.rejects(
+        async () => {
+          if (mode === "generate") {
+            await model.doGenerate({ prompt: [] });
+          } else {
+            const { stream } = await model.doStream({ prompt: [] });
+            for await (const _ of stream) {
+              // drain
+            }
+          }
+        },
+        failure === "provider" ? providerError : BLOCKED
+      );
+      const logged = lines.map((line) => JSON.parse(line));
+      assert.equal(logged.length, 1);
+      assert.equal(logged[0].event, "widget.investigation.model_call");
+      assert.equal(logged[0].sessionId, "wrun_failed");
+      assert.equal(logged[0].tool, null);
+      assert.match(logged[0].message, TIMED);
+      assert.equal(lines.join("").includes("private"), false);
+    });
+  }
+}
+
+for (const end of ["error", "cancel", "close"] as const) {
+  it(`stream: times ${end} without a finish part exactly once`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
+    const providerError = new Error("private stream failure");
+    let cancelled = false;
+    const model = wrapLanguageModel({
+      middleware: widgetInvestigationMiddleware("wrun_stream"),
+      model: new MockLanguageModelV4({
+        doStream: {
+          stream: new ReadableStream({
+            cancel() {
+              cancelled = true;
+            },
+            start(controller) {
+              if (end === "error") {
+                controller.error(providerError);
+              } else if (end === "close") {
+                controller.close();
+              }
+            },
+          }),
+        },
+      }),
+    });
+    const { stream } = await model.doStream({ prompt: [] });
+    const reader = stream.getReader();
+    if (end === "cancel") {
+      await reader.cancel();
+      assert.equal(cancelled, true);
+    } else if (end === "error") {
+      await assert.rejects(reader.read(), providerError);
+    } else {
+      assert.equal((await reader.read()).done, true);
+    }
+    const logged = lines.map((line) => JSON.parse(line));
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].event, "widget.investigation.model_call");
+    assert.equal(logged[0].tool, null);
     assert.match(logged[0].message, TIMED);
+    assert.equal(lines.join("").includes("private"), false);
   });
 }
