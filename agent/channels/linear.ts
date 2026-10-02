@@ -31,6 +31,20 @@ export const STATUS_ONLY_FOLLOW_UP =
   "Jev read this follow-up as only asking to move the ticket to a status. A person has already decided it: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
 
 /**
+ * Adds the status-only instruction to a triage session. A widget-feedback
+ * session keeps its own playbook, which forbids the route and reply that
+ * instruction asks for.
+ */
+export const withFollowUpOutcome = (
+  context: string[],
+  outcome: FollowUpOutcome | null,
+  widgetFeedback: boolean
+): string[] =>
+  outcome === "status" && !widgetFeedback
+    ? [...context, STATUS_ONLY_FOLLOW_UP]
+    : context;
+
+/**
  * Runs a pre-model read inside Linear's response window. Any failure or a
  * slow answer yields null, so the session dispatches as usual: a throw here
  * would drop it.
@@ -151,8 +165,7 @@ export const onAgentSession = async (
     buildLinearContext(event, requester, route ?? undefined) ?? [];
   return {
     auth: withRepository,
-    context:
-      outcome === "status" ? [...context, STATUS_ONLY_FOLLOW_UP] : context,
+    context: withFollowUpOutcome(context, outcome, Boolean(route)),
   };
 };
 

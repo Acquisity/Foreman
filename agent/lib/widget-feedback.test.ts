@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
+import {
+  STATUS_ONLY_FOLLOW_UP,
+  withFollowUpOutcome,
+} from "../channels/linear.js";
 import { buildLinearContext, LINEAR_TRIAGE_ROUTE } from "./linear-context.js";
 import {
   parseWidgetFeedbackMarker,
@@ -210,5 +214,17 @@ describe("widget-feedback skill", () => {
     ]) {
       assert.ok(skill.includes(`- ${cause}:`), cause);
     }
+  });
+});
+
+describe("widget-feedback follow-up outcome", () => {
+  it("keeps the status-only instruction off a widget-feedback session", () => {
+    assert.deepEqual(withFollowUpOutcome(["playbook"], "status", true), [
+      "playbook",
+    ]);
+    assert.deepEqual(withFollowUpOutcome(["triage"], "status", false), [
+      "triage",
+      STATUS_ONLY_FOLLOW_UP,
+    ]);
   });
 });
