@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
-import { acquisityOrigin, readContextBody } from "./fin-context.js";
+import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */

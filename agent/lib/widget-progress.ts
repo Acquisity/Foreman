@@ -4,6 +4,7 @@ import {
   askJev,
   FRONT_DOOR_JEV_MS,
   fallbackReason,
+  jevKey,
   type SelectorOptions,
 } from "./widget-next-action.js";
 
@@ -177,7 +178,7 @@ export async function planWidgetChecks(
   question: string,
   opts: SelectorOptions & { runId?: string; signal?: AbortSignal } = {}
 ): Promise<CheckId[]> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     return [];
   }

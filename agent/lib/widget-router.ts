@@ -4,6 +4,8 @@ import {
   askJev,
   FRONT_DOOR_JEV_MS,
   fallbackReason,
+  JEV_URL,
+  jevKey,
 } from "./widget-next-action.js";
 
 /**
@@ -15,13 +17,12 @@ import {
  * It never calls tools, never sees account data, and never writes the reply;
  * it only says which lane the message belongs in and how sure it is. A
  * missing key falls open to `investigate`, the investigation pipeline, so
- * removing `TYPESAFE_API_KEY` restores the old single-lane behavior exactly.
+ * removing `AI_GATEWAY_API_KEY` restores the old single-lane behavior exactly.
  * A Jev failure after its retry tries the help center first (`kb` at zero
  * confidence), and a help-center miss still goes on to the investigation. A confident `kb` decision is acted on by the
  * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
  */
 
-const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
 // The accepted question (4,000) with up to three screenshot readings (1,500
@@ -396,7 +397,7 @@ export async function routeWidgetMessage(
     signal?: AbortSignal;
   }
 ): Promise<WidgetRoute> {
-  const apiKey = opts?.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return FALLBACK;
   }
@@ -464,14 +465,14 @@ export async function asksForChange(
   conversation: string,
   opts?: { apiKey?: string; fetch?: FetchLike; signal?: AbortSignal }
 ): Promise<boolean> {
-  const apiKey = opts?.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return false;
   }
   const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
   const timeout = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
   try {
-    const response = await doFetch(TYPESAFE_URL, {
+    const response = await doFetch(JEV_URL, {
       body: JSON.stringify({
         model: TYPESAFE_MODEL,
         questions: { asks_for_action: QUESTIONS.asks_for_action },

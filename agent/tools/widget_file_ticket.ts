@@ -9,12 +9,12 @@ import {
   linearGraphql,
   type RelatedIssue,
 } from "#lib/linear-api.js";
+import {
+  confirmedIssue,
+  formatCustomerReport,
+} from "#lib/linear-ticket-report.js";
 import { isRefundTicket } from "#lib/widget-next-action.js";
 import { isWidgetSupport, requireWidgetContext } from "../lib/widget-scope.js";
-import {
-  confirmedFinIssue,
-  formatFinCustomerReport,
-} from "./file_fin_investigation_ticket.js";
 
 /** REFUND_TICKET.project (P-ENG-20, "Support") as the id Linear returns for an issue's project. */
 const SUPPORT_PROJECT_ID = "4534deb2-6bbc-4e30-ad38-48963f414d14";
@@ -102,14 +102,14 @@ const tool = defineTool({
       }
       const result = await createWidgetTicket(ctx, {
         refund,
-        report: formatFinCustomerReport(input.summary),
+        report: formatCustomerReport(input.summary),
         title: input.title,
       });
       if (!result.ok) {
         return { error: "Linear did not accept the ticket." };
       }
       try {
-        return { existing: false, refund, ...confirmedFinIssue(result.data) };
+        return { existing: false, refund, ...confirmedIssue(result.data) };
       } catch {
         return {
           error:
