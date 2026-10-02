@@ -16,6 +16,8 @@ const usage = {
 };
 const BLOCKED = /Support investigation capability is unavailable/;
 const TIMED = /^start=\d+ ms=\d+$/;
+// The mocked clock fixes the start; the duration depends on SDK clock reads.
+const TIMED_FROM_MOCK = /^start=1025 ms=[1-9]\d*$/;
 const toolCall = (toolName: string) => ({
   input: "{}",
   toolCallId: "call-1",
@@ -366,7 +368,7 @@ for (const mode of ["generate", "stream"] as const) {
     assert.equal(logged.length, 1);
     assert.equal(logged[0].sessionId, "wrun_test");
     assert.equal(logged[0].tool, "widget_inbox_health");
-    assert.equal(logged[0].message, "start=1025 ms=25");
+    assert.match(logged[0].message, TIMED_FROM_MOCK);
   });
 }
 
