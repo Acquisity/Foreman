@@ -400,6 +400,25 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes('("[redacted]")'));
   });
 
+  it("redacts an IPv6 host and a redis or mssql connection string whole", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          "postgres://app:pw1@[2001:db8::1]:5432/main, redis://:pw2@cache.test:6379 and mssql://sa:pw3@sql.test/db",
+      })
+    );
+    for (const leak of [
+      "pw1",
+      "2001:db8",
+      "pw2",
+      "cache.test",
+      "pw3",
+      "sql.test",
+    ]) {
+      assert.equal(record.message.includes(leak), false, leak);
+    }
+  });
+
   it("redacts only a bounded head of a long message", () => {
     const record = JSON.parse(
       formatOpsEvent("step.failed", {

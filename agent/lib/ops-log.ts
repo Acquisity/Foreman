@@ -48,7 +48,7 @@ const URL_QUERY_RE = /(https?:\/\/[^\s?]+)\?\S*/g;
 const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/g;
 // A database connection string carries its password in the userinfo, so the whole URI goes.
 const CONNECTION_STRING_RE =
-  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/[^\s"'()[\]{};,]+/gi;
+  /\b(?:postgres|postgresql|mysql|mysqlx|mongodb|redis|rediss|mssql)(?:\+srv)?:\/\/(?:[^\s"'()[\]{};,]|\[[^\s"'()[\]{};,]*\])+/gi;
 const redactSensitive = (value: string): string =>
   value
     .replace(CONNECTION_STRING_RE, "[redacted]")
