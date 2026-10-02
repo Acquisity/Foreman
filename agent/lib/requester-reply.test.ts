@@ -50,7 +50,7 @@ test("ignores comments outside the anchor thread", () => {
   assert.equal(planReply([anchor, session], FOREMAN).ok, true);
 });
 
-test("fails when the issue has no Slack thread", () => {
+test("fails when the issue has no requester thread", () => {
   assert.equal(
     planReply([{ ...anchor, body: "a normal comment" }], FOREMAN).ok,
     false
@@ -69,6 +69,45 @@ test("uses the earliest top-level anchor, not a later or nested lookalike", () =
     anchorId: "anchor",
     followUp: null,
     ok: true,
+  });
+});
+
+test("replies under the conversation whose note is waiting, not the earliest anchor", () => {
+  const support = (id: string, createdAt: string): ThreadComment => ({
+    body: `Support conversation connected in [Acquisity inbox](https://app/${id})`,
+    createdAt,
+    id,
+    parentId: null,
+    userId: "aaron",
+  });
+  const note = (
+    id: string,
+    parentId: string,
+    userId: string,
+    createdAt: string
+  ): ThreadComment => ({ body: "note", createdAt, id, parentId, userId });
+  const thread = [
+    anchor,
+    support("a", "2026-09-25T16:00:00Z"),
+    support("b", "2026-09-25T16:05:00Z"),
+    note("a1", "a", "aaron", "2026-09-25T16:10:00Z"),
+    note("a2", "a", FOREMAN, "2026-09-25T16:12:00Z"),
+    note("b1", "b", "aaron", "2026-09-25T16:20:00Z"),
+  ];
+  assert.deepEqual(planReply(thread, FOREMAN), {
+    anchorId: "b",
+    followUp: null,
+    ok: true,
+  });
+  const laterOnA = [
+    ...thread,
+    note("a3", "a", "aaron", "2026-09-25T16:30:00Z"),
+  ];
+  const plan = planReply(laterOnA, FOREMAN);
+  assert.equal(plan.ok && plan.anchorId, "a");
+  assert.deepEqual(plan.ok && plan.followUp, {
+    lastReply: "note",
+    replies: ["note"],
   });
 });
 
@@ -176,4 +215,36 @@ test("a prompted reply is judged against what arrived since the previous prompt"
     null,
     "only the receiver's prompt is judged this way"
   );
+});
+
+test("a support inbox note is judged like a Slack reply", () => {
+  const inbox: ThreadComment = {
+    ...anchor,
+    body: "Support conversation connected in [Acquisity inbox](https://app.acquisity.ai/dashboard/admin/support?conversation=c1)",
+  };
+  const note: ThreadComment = {
+    body: "**Dana** added a note in the support inbox:\n\nCan you check their domains?",
+    createdAt: "2026-09-26T10:01:00Z",
+    id: "n1",
+    parentId: "anchor",
+    userId: "aaron",
+  };
+  const prompt: ThreadComment = {
+    body: "**Dana** added a note in the support inbox.",
+    createdAt: "2026-09-26T10:01:01Z",
+    id: "p1",
+    parentId: "session",
+    userId: "aaron",
+  };
+  const thread = [inbox, note, prompt];
+  const plan = planReply(thread, FOREMAN);
+  assert.equal(plan.ok, true);
+  assert.deepEqual(relayedFollowUp(thread, plan, "n1"), {
+    lastReply: "",
+    replies: [note.body],
+  });
+  assert.deepEqual(promptedFollowUp(thread, plan, "p1"), {
+    lastReply: "",
+    replies: [note.body],
+  });
 });

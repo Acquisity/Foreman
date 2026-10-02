@@ -7,6 +7,7 @@ import { vercel } from "eve/sandbox/vercel";
 import { isFinInvestigation } from "#lib/fin-investigation-auth.js";
 import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
+import { isWidgetSupport } from "#lib/widget-scope.js";
 
 /**
  * Root agent sandbox configuration.
@@ -61,7 +62,7 @@ const backend = snapshotId
 export const sandboxSessionOptions = (
   initiator: Parameters<typeof isFinInvestigation>[0]
 ) =>
-  isFinInvestigation(initiator)
+  isFinInvestigation(initiator) || isWidgetSupport(initiator)
     ? { networkPolicy: "deny-all" as const }
     : undefined;
 

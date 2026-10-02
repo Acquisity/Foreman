@@ -31,17 +31,17 @@ const conversation = {
 const contact = { external_id: userId, id, workspace_id: "ls8uffkp" };
 
 function configure(context: TestContext, value: string | undefined = origin) {
-  const previous = process.env.ACQUISITY_FIN_ORIGIN;
+  const previous = process.env.ACQUISITY_ORIGIN;
   if (value === undefined) {
-    delete process.env.ACQUISITY_FIN_ORIGIN;
+    delete process.env.ACQUISITY_ORIGIN;
   } else {
-    process.env.ACQUISITY_FIN_ORIGIN = value;
+    process.env.ACQUISITY_ORIGIN = value;
   }
   context.after(() => {
     if (previous === undefined) {
-      delete process.env.ACQUISITY_FIN_ORIGIN;
+      delete process.env.ACQUISITY_ORIGIN;
     } else {
-      process.env.ACQUISITY_FIN_ORIGIN = previous;
+      process.env.ACQUISITY_ORIGIN = previous;
     }
   });
 }

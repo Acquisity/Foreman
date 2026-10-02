@@ -6,7 +6,9 @@ import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js"
 import { toolkitPolicyMatches } from "../agent/lib/executor/toolkit-policy.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
-const support = process.argv.includes("--support");
+const flagged = ["widget", "support"].find((flag) =>
+  process.argv.includes(`--${flag}`)
+);
 const manifestSchema = z.object({
   toolkit: z.object({
     connectionPolicies: z
@@ -17,23 +19,41 @@ const manifestSchema = z.object({
     slug: z.string(),
   }),
 });
-const manifest = manifestSchema.parse(
-  JSON.parse(
-    await readFile(
-      new URL(
-        support ? "support-toolkit-manifest.json" : "toolkit-manifest.json",
-        root
-      ),
-      "utf8"
+const readManifest = async (prefix: string) =>
+  manifestSchema.parse(
+    JSON.parse(
+      await readFile(new URL(`${prefix}toolkit-manifest.json`, root), "utf8")
     )
-  )
-);
+  );
+// The widget runs on the support toolkit (WIDGET_TOOLKIT), so that is the one
+// audited; the widget's own catalog only has to be selected inside it.
+const audited = flagged === "widget" ? "support" : flagged;
+const manifest = await readManifest(audited ? `${audited}-` : "");
 const bindings = z
   .record(z.string(), z.object({ path: z.string() }))
   .parse(
     JSON.parse(await readFile(new URL("operation-bindings.json", root), "utf8"))
   );
 let failures = 0;
+const widget = flagged === "widget" ? await readManifest("widget-") : null;
+for (const [provider, missing] of Object.entries(
+  widget?.toolkit.missing ?? {}
+)) {
+  if (missing.length) {
+    console.log(
+      `MISSING ${widget?.toolkit.slug} widget catalog: ${provider} (${missing.length} coverage gaps)`
+    );
+    failures += 1;
+  }
+}
+for (const path of widget?.toolkit.paths ?? []) {
+  if (!manifest.toolkit.paths.includes(path)) {
+    console.log(
+      `MISSING widget operation in ${manifest.toolkit.slug}: ${path}`
+    );
+    failures += 1;
+  }
+}
 for (const operation of REQUIRED_HELPER_OPERATIONS) {
   if (
     !(

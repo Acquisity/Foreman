@@ -13,6 +13,103 @@ export const organizationIdSchema = z.string().trim().toLowerCase().uuid();
 /** Rows per history list; hitting it sets the matching `truncated` flag. */
 export const HISTORY_LIMIT = 20;
 
+export const creditHistoryWindowSchema = z
+  .strictObject({
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  })
+  .refine(({ from, to }) => {
+    const duration = Date.parse(to) - Date.parse(from);
+    return duration > 0 && duration <= 93 * 24 * 60 * 60 * 1000;
+  }, "Credit history requires a positive window of at most 93 days; from inclusive, to exclusive.");
+export type CreditHistoryWindow = z.infer<typeof creditHistoryWindowSchema>;
+const historyTotal = z.object({
+  amount: z.coerce.number().int(),
+  entries: z.coerce.number().int().nonnegative(),
+  resource: z.string().max(64),
+});
+export const creditHistoryResultSchema = z.object({
+  available: z.boolean(),
+  completedManualGrants: z.array(historyTotal).max(50),
+  transactionTotals: z
+    .array(historyTotal.extend({ type: z.string().max(64) }))
+    .max(50),
+  truncated: z.boolean(),
+  window: creditHistoryWindowSchema,
+});
+export type CreditHistoryResult = z.infer<typeof creditHistoryResultSchema>;
+
+/** Group the complete requested window before limiting returned groups. The
+ * workspace predicate deliberately excludes other orgs sharing a billing account. */
+export function billingCreditHistoryQuery(
+  rawOrganizationId: string,
+  input: CreditHistoryWindow
+): string {
+  const organizationId = organizationIdSchema.parse(rawOrganizationId);
+  const window = creditHistoryWindowSchema.parse(input);
+  const from = new Date(window.from).toISOString();
+  const to = new Date(window.to).toISOString();
+  return `select
+    coalesce((select jsonb_agg(t) from (
+      select resource, type, sum(amount) as amount, count(*) as entries
+      from credit_transaction where organization_id = '${organizationId}'::uuid
+        and created_at >= '${from}'::timestamptz and created_at < '${to}'::timestamptz
+      group by resource, type order by resource, type limit 51
+    ) t), '[]'::jsonb) as "transactionTotals",
+    coalesce((select jsonb_agg(m) from (
+      select target_wallet as resource, sum(credits_amount) as amount, count(*) as entries
+      from manual_credit where organization_id = '${organizationId}'::uuid
+        and status = 'completed'
+        and completed_at >= '${from}'::timestamptz and completed_at < '${to}'::timestamptz
+      group by target_wallet order by target_wallet limit 51
+    ) m), '[]'::jsonb) as "completedManualGrants"`;
+}
+
+export async function readBillingCreditHistory(
+  organizationId: string,
+  input: CreditHistoryWindow,
+  run: (query: string) => Promise<string>
+): Promise<CreditHistoryResult> {
+  const window = creditHistoryWindowSchema.parse(input);
+  const query = billingCreditHistoryQuery(organizationId, window);
+  try {
+    const result = parseReadQueryResult(await run(query));
+    z.object({
+      success: z.literal(true).optional(),
+      truncated: z.literal(false).optional(),
+      warnings: z.array(z.unknown()).max(0).optional(),
+    }).parse(result.passthrough);
+    const [row] = z
+      .array(
+        z.object({
+          completedManualGrants: z.array(historyTotal).max(51),
+          transactionTotals: z
+            .array(historyTotal.extend({ type: z.string().max(64) }))
+            .max(51),
+        })
+      )
+      .length(1)
+      .parse(result.rows);
+    return {
+      available: true,
+      completedManualGrants: row.completedManualGrants.slice(0, 50),
+      transactionTotals: row.transactionTotals.slice(0, 50),
+      truncated:
+        row.completedManualGrants.length > 50 ||
+        row.transactionTotals.length > 50,
+      window,
+    };
+  } catch {
+    return {
+      available: false,
+      completedManualGrants: [],
+      transactionTotals: [],
+      truncated: false,
+      window,
+    };
+  }
+}
+
 /**
  * Four fixed statements, named columns only, read from
  * `packages/db/src/schema/{organization,billing,credit,manual-credit}.ts`.

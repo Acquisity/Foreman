@@ -437,6 +437,12 @@ test("a relayed reply reaches Jev as the speaker and their words, mentions as Fo
     "Aaron Fraga: @Foreman can u move this to done please"
   );
   assert.equal(followUpText("just text"), "Someone: just text");
+  assert.equal(
+    followUpText(
+      "**Dana** added a note in the support inbox:\n\nIs their domain verified?"
+    ),
+    "Dana: Is their domain verified?"
+  );
 });
 
 test("a reviewed Bug carries its hotlane route; a duplicate or non-Bug carries none", () => {
