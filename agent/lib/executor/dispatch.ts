@@ -31,8 +31,8 @@ export type ExecutorOutcome = Awaited<
 >;
 
 const FIN_INTERCOM_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const FIN_LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
-const FIN_LINEAR_MAX_BYTES = 64 * 1024;
+const LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+const LINEAR_TICKET_MAX_BYTES = 64 * 1024;
 const finLinearTicketInput = z.strictObject({
   assignee: z.literal("Aaron Fraga"),
   description: z.string().min(1).max(16_000),
@@ -126,7 +126,7 @@ export async function readWidgetOwnership(
   const path = operationPath("planetscale.readQuery");
   // Defense in depth: this app-principal read runs outside any eve session and
   // its policy/allowlist, so assert the binding still resolves to the expected
-  // planetscale read (mirrors readFinEvidence) before dispatching.
+  // planetscale read before dispatching.
   if (
     path !== "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
   ) {
@@ -172,7 +172,7 @@ function assertLaneOperation(
   // The widget lane's only write: a ticket whose scope block the server wrote.
   if (
     isWidgetSupport(ctx.session?.auth.initiator) &&
-    path === FIN_LINEAR_TICKET_PATH
+    path === LINEAR_TICKET_PATH
   ) {
     const scope = requireWidgetContext(ctx.session?.auth.initiator);
     const parsed = widgetLinearTicketInput.safeParse(input);
@@ -194,7 +194,7 @@ function assertLaneOperation(
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
   const parsed = finLinearTicketInput.safeParse(input);
   if (
-    path !== FIN_LINEAR_TICKET_PATH ||
+    path !== LINEAR_TICKET_PATH ||
     !parsed.success ||
     !parsed.data.description.endsWith(verifiedScopeBlock(scope))
   ) {
@@ -280,7 +280,7 @@ export async function createFinInvestigationTicket(
   const scope = requireFinInvestigationContext(ctx.session?.auth.initiator);
   return await invokeProvider(
     ctx,
-    FIN_LINEAR_TICKET_PATH,
+    LINEAR_TICKET_PATH,
     {
       assignee: "Aaron Fraga",
       description: `${input.report}\n\n${verifiedScopeBlock(scope)}`,
@@ -288,7 +288,7 @@ export async function createFinInvestigationTicket(
       title: input.title,
     },
     undefined,
-    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+    { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
   );
 }
 
@@ -300,7 +300,7 @@ export async function createWidgetTicket(
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   return await invokeProvider(
     ctx,
-    FIN_LINEAR_TICKET_PATH,
+    LINEAR_TICKET_PATH,
     {
       ...(input.refund
         ? { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] }
@@ -312,7 +312,7 @@ export async function createWidgetTicket(
       title: input.title,
     },
     undefined,
-    { maxBytes: FIN_LINEAR_MAX_BYTES, timeoutMs: 15_000 }
+    { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
   );
 }
 

@@ -18,13 +18,13 @@ const appContext = {
 };
 
 function configure(context: TestContext) {
-  const previous = process.env.ACQUISITY_FIN_ORIGIN;
-  process.env.ACQUISITY_FIN_ORIGIN = origin;
+  const previous = process.env.ACQUISITY_ORIGIN;
+  process.env.ACQUISITY_ORIGIN = origin;
   context.after(() => {
     if (previous === undefined) {
-      delete process.env.ACQUISITY_FIN_ORIGIN;
+      delete process.env.ACQUISITY_ORIGIN;
     } else {
-      process.env.ACQUISITY_FIN_ORIGIN = previous;
+      process.env.ACQUISITY_ORIGIN = previous;
     }
   });
 }
