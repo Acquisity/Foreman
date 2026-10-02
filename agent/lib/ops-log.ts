@@ -11,6 +11,8 @@ export const OPS_LOG_STRING_LIMIT = 200;
 export const OPS_LOG_LINE_LIMIT = 4000;
 
 const TRUNCATION_MARKER = "...";
+// Redaction runs on a bounded head of the message; the log keeps 200 characters anyway.
+const MESSAGE_SCAN_LIMIT = 1000;
 const OPS_FIELD_KEYS = [
   "code",
   "connection",
@@ -104,7 +106,7 @@ export const formatOpsEvent = (
         const raw = descriptor.value;
         record[key] =
           key === "message" && typeof raw === "string"
-            ? sanitizeValue(redactSensitive(raw))
+            ? sanitizeValue(redactSensitive(raw.slice(0, MESSAGE_SCAN_LIMIT)))
             : sanitizeValue(raw);
       }
     }

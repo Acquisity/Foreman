@@ -391,6 +391,16 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes('("[redacted]")'));
   });
 
+  it("redacts only a bounded head of a long message", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message: `see https://h.test/x?${"a".repeat(2000)} tail-after-the-cap`,
+      })
+    );
+    assert.ok(record.message.includes("?[redacted]"));
+    assert.equal(record.message.includes("tail-after-the-cap"), false);
+  });
+
   it("leaves an ordinary message and non-message fields untouched", () => {
     const record = JSON.parse(
       formatOpsEvent("session.completed", {
