@@ -58,6 +58,8 @@ const call = async (body: Record<string, unknown>) => {
       "x-acquisity-service-secret": env.FOREMAN_DIAGNOSTICS_SECRET,
     },
     method: "POST",
+    // A stalled request fails the probe instead of hanging past the poll deadline.
+    signal: AbortSignal.timeout(30_000),
   });
   return (await response.json()) as {
     decision?: string;
