@@ -803,18 +803,7 @@ export function widgetNextActionMiddleware(
       const plan = plans.get(params);
       // The unforced write-up can stall too. Bound each attempt and retry a
       // timed-out model request once. This never replays a tool execution.
-      // A call to a tool this step did not offer (the ask tool Jev withheld) is dropped.
       const unforced = async (input: Params) => {
-        const offered = new Set(input.tools?.map((tool) => tool.name));
-        const generated = await unforcedGenerate(input);
-        return {
-          ...generated,
-          content: generated.content.filter(
-            (part) => part.type !== "tool-call" || offered.has(part.toolName)
-          ),
-        };
-      };
-      const unforcedGenerate = async (input: Params) => {
         for (let attempt = 0; ; attempt += 1) {
           const timeout = AbortSignal.timeout(WRITE_CALL_TIMEOUT_MS);
           const abortSignal = input.abortSignal

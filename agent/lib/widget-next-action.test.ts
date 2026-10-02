@@ -227,32 +227,6 @@ describe("widget next-action selector", () => {
       type: "tool",
     });
   });
-  it("an unforced step cannot call the ask tool Jev did not offer", async () => {
-    const ask = {
-      description: "Record the question",
-      inputSchema: { type: "object" as const },
-      name: "widget_ask_customer",
-      type: "function" as const,
-    };
-    const batch = call("widget_billing_summary", {});
-    batch.content.push({
-      input: JSON.stringify({ question: "Which campaign?" }),
-      toolCallId: "ask",
-      toolName: "widget_ask_customer",
-      type: "tool-call" as const,
-    });
-    const { model, sent } = harness(
-      () => Promise.reject(new Error("jev down")),
-      batch
-    );
-    const out = await model.doGenerate({
-      prompt: prompt("Why was I charged?", []),
-      tools: [...TOOLS, ask],
-    });
-    assert.equal(sent().tools.includes("widget_ask_customer"), false);
-    assert.deepEqual(out.content, [batch.content[0]]);
-  });
-
   it("one selected read cannot dispatch twelve parameter variants or duplicates", async () => {
     const batch = call("widget_outreach_health", {});
     batch.content = Array.from({ length: 12 }, (_, n) => ({
