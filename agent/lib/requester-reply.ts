@@ -9,6 +9,7 @@ import {
   RELAY_HEADER,
   SLACK_PROMPT,
 } from "./jev-decisions.js";
+import { askFromName } from "./linear-context.js";
 
 /**
  * Replies to the requester in their Slack thread, as Foreman.
@@ -118,6 +119,28 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
     }
   }
 }`;
+
+const ASK_FROM_QUERY = `query AskFrom($id: String!) {
+  issue(id: $id) { attachments(first: 50) { nodes { title } } }
+}`;
+
+/** The intake requester from the issue's 'Ask from <name>' attachment, or null. */
+export async function readAskFrom(
+  issue: string,
+  credentials: LinearChannelCredentials
+): Promise<string | null> {
+  const result = await callLinearGraphQL<{
+    issue: { attachments: { nodes: { title: string }[] } } | null;
+  }>({
+    credentials,
+    query: ASK_FROM_QUERY,
+    queryName: "AskFrom",
+    variables: { id: issue },
+  });
+  return askFromName(
+    result.issue?.attachments.nodes.map((node) => node.title) ?? []
+  );
+}
 
 const REPLY_MUTATION = `mutation RequesterReply($input: CommentCreateInput!) {
   commentCreate(input: $input) { success comment { id url } }

@@ -26,6 +26,8 @@ Some in-scope bugs carry a `parentId`. That ticket is a customer report already 
 
 A bug with no `parentId` is a fresh bug. Give it the full investigation and a full block. A bug with a `parentId` is a customer report of its parent master. Do not run the full investigation and do not give it a full block; report it as a brief note, exactly as the Report format section shows.
 
+Jev confirms which one it is: for each in-scope bug, call `decide_prior_work` with its symptom as `report`, no candidates, and, when `parentId` is set, the parent master as `parent`. `known_issue` is a customer report of `knownIssue`; `fresh` is a fresh bug. A note that the report may not match its master goes in the brief note. On `decided: false`, key on `parentId` as above.
+
 To write the note, linear `get_issue` on the `parentId` for the master's title and `url`, and count the reports hanging off that master. The note links both tickets and says briefly what this customer hit. The root cause lives on the master, so the note does not restate or re-verify it.
 
 ## Feature to project mapping
