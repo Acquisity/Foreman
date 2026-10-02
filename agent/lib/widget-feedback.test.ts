@@ -165,6 +165,16 @@ describe("buildLinearContext with a route", () => {
     assert.deepEqual(buildLinearContext(event, null, route), [route]);
   });
 
+  it("gives a widget session none of triage's requester lines", () => {
+    const route = widgetFeedbackRoute(null);
+    const opened = {
+      ...event,
+      agentSession: { ...event.agentSession, creator: { id: "user-1", name: "Sam" } },
+    } as LinearAgentSessionEvent;
+    assert.deepEqual(buildLinearContext(opened, "Jane", route), [route]);
+    assert.deepEqual(buildLinearContext(opened, null, route), [route]);
+  });
+
   it("keeps triage when no route is given", () => {
     assert.deepEqual(buildLinearContext(event, null, undefined), [
       LINEAR_TRIAGE_ROUTE,

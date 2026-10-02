@@ -36,6 +36,10 @@ export function buildLinearContext(
     return null;
   }
   const context: string[] = [route];
+  // The requester lines below are triage's; another playbook replies to no one.
+  if (route !== LINEAR_TRIAGE_ROUTE) {
+    return context;
+  }
   // Naming the opener alongside the requester was not enough: the model
   // still greeted the opener (ENG-14406, ENG-14588), so it is left out here.
   if (askFrom) {
