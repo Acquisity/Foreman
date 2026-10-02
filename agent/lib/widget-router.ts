@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import {
+  askJev,
+  FRONT_DOOR_JEV_MS,
+  fallbackReason,
+} from "./widget-next-action.js";
 
 /**
  * Front-door intent router for the support widget, backed by TypeSafe's Jev
@@ -8,10 +13,11 @@ import { logOpsEvent } from "./ops-log.js";
  * @remarks
  * Runs on the raw customer message before the investigator session starts.
  * It never calls tools, never sees account data, and never writes the reply;
- * it only says which lane the message belongs in and how sure it is. Any
- * failure, including a missing key, falls open to `investigate`, which is
- * the investigation pipeline, so removing `TYPESAFE_API_KEY` restores the old
- * single-lane behavior exactly. A confident `kb` decision is acted on by the
+ * it only says which lane the message belongs in and how sure it is. A
+ * missing key falls open to `investigate`, the investigation pipeline, so
+ * removing `TYPESAFE_API_KEY` restores the old single-lane behavior exactly.
+ * A Jev failure after its retry tries the help center first (`kb` at zero
+ * confidence), and a help-center miss still goes on to the investigation. A confident `kb` decision is acted on by the
  * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
  */
 
@@ -228,10 +234,13 @@ const QUESTIONS = {
     type: "noul",
   },
   // "what about the limit?" and "nothing works!!" were investigated for two to
-  // three minutes before anyone asked what the customer meant.
+  // three minutes before anyone asked what the customer meant. Asking for "what
+  // actually went wrong" on every message scored a plain "what is the growth
+  // plan creator?" 0.61 and "what about the niche researcher?" after it 0.84,
+  // so a clear question got a clarifying one (2026-09-28).
   is_unclear: {
     instructions:
-      "Taking the earlier conversation into account, the customer's latest message still does not say which feature, page or thing it is about, or what actually went wrong, so a careful support person would have to ask what they mean before they could even start looking. A short follow-up whose subject is clear from the earlier turns is NOT this, and neither is a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there) or that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
+      "Taking the earlier conversation into account, a careful support person could not tell what the customer wants from the latest message: it does not say which feature, page or thing it is about, or it reports a problem without saying what went wrong, so they would have to ask what the customer means before they could even start. A question about a named feature or page (what it is, how it works, where it is) is NOT this, and neither is a short follow-up such as 'what about X?' or 'and X?' that asks the earlier question again about X, a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there), or one that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
     type: "noul",
   },
   lane: {
@@ -312,6 +321,8 @@ export interface WidgetRoute {
   confidence: number;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
+  /** Why Jev gave no route, for the log: a fixed code and the time it took. */
+  failure?: string;
   /** How likely the help center is the right lane, even when another lane won. */
   kbScore: number;
   lane: WidgetLane;
@@ -389,28 +400,19 @@ export async function routeWidgetMessage(
   if (!apiKey) {
     return FALLBACK;
   }
-  const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
-  const signal = opts?.signal
-    ? AbortSignal.any([opts.signal, AbortSignal.timeout(ROUTER_TIMEOUT_MS)])
-    : AbortSignal.timeout(ROUTER_TIMEOUT_MS);
+  const startedAt = Date.now();
   try {
-    const response = await doFetch(TYPESAFE_URL, {
-      body: JSON.stringify({
-        model: TYPESAFE_MODEL,
-        questions: QUESTIONS,
-        state: renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
-      }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      signal,
-    });
-    if (!response.ok) {
-      return FALLBACK;
-    }
-    const { answers } = responseSchema.parse(await response.json());
+    const response = await askJev(
+      QUESTIONS,
+      renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
+      apiKey,
+      {
+        fetch: opts?.fetch,
+        signal: opts?.signal,
+        timeoutMs: FRONT_DOOR_JEV_MS,
+      }
+    );
+    const { answers } = responseSchema.parse(response);
     const confidence = answers.lane.confidence ?? 0;
     const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
     const recording =
@@ -436,8 +438,14 @@ export async function routeWidgetMessage(
       ...(bug ? { bug } : {}),
       ...(recording ? { recording } : {}),
     };
-  } catch {
-    return FALLBACK;
+  } catch (error) {
+    // When unsure, answer from the help center (Aaron, 2026-09-28): a 529 sent
+    // "where can i buy more inboxes?" to an investigation.
+    return {
+      ...FALLBACK,
+      failure: `reason=${fallbackReason(error)} ms=${Date.now() - startedAt}`,
+      lane: "kb",
+    };
   }
 }
 
@@ -500,7 +508,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}`,
+    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

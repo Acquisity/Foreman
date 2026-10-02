@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
@@ -8,7 +9,12 @@ import {
 } from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
-import { askJev, type SelectorOptions } from "./widget-next-action.js";
+import {
+  askJev,
+  FRONT_DOOR_JEV_MS,
+  fallbackReason,
+  type SelectorOptions,
+} from "./widget-next-action.js";
 import {
   DECISION_CONTEXT,
   RECORDING_RULE,
@@ -45,6 +51,15 @@ const SEARCH_TIMEOUT_MS = 5000;
 // Article selection and answer generation are sequential model calls. Live
 // selection alone can take 15s; leave time for the grounded answer as well.
 const KB_TIMEOUT_MS = 45_000;
+/**
+ * gemini-3.5-flash through the gateway is bimodal, about 2s or a 15 to 20s
+ * stall (widget-screenshot.ts), and a failed call used to wait 2 then 4s for
+ * the SDK's unlogged retries: the help-center lane took 15 to 45s and chat
+ * replies timed out on "Delay was aborted" (2026-09-28). So a call still
+ * running after this is raced by a second identical one.
+ */
+export const HEDGE_AFTER_MS = 4000;
+
 const MAX_ANSWER_CHARS = 4000;
 const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
@@ -197,6 +212,10 @@ const answerSchema = z.object({
   // answer: grounded in the articles. chat: a reaction, thanks or small talk
   // that asks nothing. none: a question the articles do not cover.
   kind: z.enum(["answer", "chat", "none"]),
+  // The article numbers the answer uses, apart from its text: flash-lite wrote
+  // correct answers with no markers in about 1 in 30 runs, which were thrown
+  // away as ungrounded (2026-09-28).
+  sources: z.array(z.number().int()),
 });
 // For an accountLikely ask. "needs" comes first so it is decided before the answer.
 const guardedAnswerSchema = z.object({
@@ -210,7 +229,7 @@ const WHICH_PRODUCT =
   "When the customer's question could be about more than one product or charge and neither their message nor the earlier turns say which, ask which one they mean instead of answering for one of them. ";
 
 const kbPrompt = (ownAccountRule: string, whichProduct = WHICH_PRODUCT) =>
-  `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a concise, plain, warm reply in the second person that gives the customer enough information to understand or take the next step. A simple location question may need only one sentence; do not compress a procedure or a meaningful choice into one sentence just to be brief. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps, starting with how to reach the relevant page when the customer does not know where to go. When explaining choices such as roles, include the documented differences that matter to the decision. Include only details supported by the articles; do not add background, repeat known steps, or ask a follow-up when the request is already clear. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. ${ownAccountRule} You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). ${whichProduct}${TEXT_ONLY} Set kind to "answer" when you answer from the articles. Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. A timezone conversion is only a possible explanation, never proof of the customer's calendar configuration; if they say their settings match, accept that and do not repeat the hypothesis as a diagnosis. No sign-off, no em dashes.`;
+  `You answer a customer's product question in Acquisity's in-app support chat, using ONLY the numbered help-center articles you are given. Write a concise, plain, warm reply in the second person that gives the customer enough information to understand or take the next step. A simple location question may need only one sentence; do not compress a procedure or a meaningful choice into one sentence just to be brief. After each sentence or step that an article supports, add that article's number in square brackets, like [1] or [2]. Use only the numbers you were given. Never state anything the articles do not say, never invent menu names, links or settings, and do not include URLs. Give the steps themselves, as a short numbered list when there are several: never answer by only pointing the customer to an article, a section, or the help center. When the answer is a procedure to set something up, list its steps, starting with how to reach the relevant page when the customer does not know where to go. Give every step the article gives for that procedure, in order, and never fold several steps into one summary sentence. Keep every warning, requirement or lasting consequence the articles attach to what the customer is about to do, such as data being deleted for good or inboxes needing to warm up before they can send. When the next step depends on the customer's situation, such as which kind of inbox they bought, give each case the articles describe. When explaining choices such as roles, include the documented differences that matter to the decision. Include only details supported by the articles; do not add background, repeat known steps, or ask a follow-up when the request is already clear. When it is troubleshooting, meaning a series of things to check, give only the first one or two checks and ask what they see, so you can guide them from there. The message may include earlier turns: you are continuing that conversation, so never repeat steps or facts Support already gave, and when the customer reports what they saw or did, acknowledge it briefly, accept it, and give only the next step. Plain text only: no markdown, no asterisks, no headings. A numbered list is plain text: put each step on its own line, starting with its number and a full stop, such as "1. ". Cite once per step or paragraph, not after every sentence. When more than one article touches a point, cite the article whose own topic is the customer's latest message, not one that mentions it in passing. ${ownAccountRule} You cannot make changes to the customer's account and nobody will make them on their behalf: if they ask you to do something for them, apologise in one short sentence, say you are not able to make changes to their account, and give the steps from the articles so they can do it themselves. Never promise that a teammate, the team or you will do something or follow up. ${LATEST_SUBJECT} A rule or policy in an article applies only to the product that article is about: never apply the policy for one product or charge (for example domains or inboxes) to another (for example the subscription). ${whichProduct}${TEXT_ONLY} Set kind to "answer" when you answer from the articles, and list in sources the number of every article the answer uses; leave sources empty for "chat" and "none". Set kind to "chat" when the customer's latest message asks nothing and needs no lookup, such as a reaction, thanks, an acknowledgement, a greeting or small talk: reply in one or two short, friendly sentences like a person would, state no product facts, use no citation numbers, and leave the door open for another question. Set kind to "none" and leave answer empty only when the latest message is a question that none of the articles covers; ignore articles that are irrelevant. A timezone conversion is only a possible explanation, never proof of the customer's calendar configuration; if they say their settings match, accept that and do not repeat the hypothesis as a diagnosis. No sign-off, no em dashes.`;
 
 // The router's Jev cannot tell these apart from the message alone: "Google says
 // the app is blocked when I connect Email and Calendar" scored investigate 0.84
@@ -314,7 +333,7 @@ export async function decideFromArticles(
         conversation: input.question,
       }),
       apiKey,
-      { ...opts, signal: input.signal }
+      { ...opts, signal: input.signal, timeoutMs: FRONT_DOOR_JEV_MS }
     )
   );
   if (!(answers.kb.choice in criteria)) {
@@ -350,6 +369,63 @@ const chatSchema = z.object({ reply: z.string() });
 
 const CHAT_PROMPT = `You are Foreman, the support assistant in Acquisity's in-app chat. The customer's latest message asks nothing: it is a thank you, a reaction, an acknowledgement, a greeting or small talk. Reply the way a friendly person would, in one or two short sentences, continuing the conversation you are given. State no product facts and make no promises: never say you will look into, check, dig into or follow up on anything, because nothing is being looked into. If it fits, leave the door open for another question. Plain text, no sign-off, no em dashes. ${RECORDING_RULE}`;
 
+/** The failure as a fixed code: the error class and any HTTP status, never a body. */
+const modelFailure = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return "unknown";
+  }
+  const status = (error as { statusCode?: unknown }).statusCode;
+  return typeof status === "number" ? `${error.name}:${status}` : error.name;
+};
+
+/**
+ * One help-center model call, hedged like the screenshot read: a call still
+ * running after {@link HEDGE_AFTER_MS}, or one that fails, starts a second
+ * identical call, and the first to finish wins. Every failed try is logged
+ * with its reason, which the SDK's in-place retries used to hide.
+ */
+export async function hedged<T>(
+  step: string,
+  signal: AbortSignal,
+  call: (signal: AbortSignal) => Promise<T>,
+  hedgeAfterMs = HEDGE_AFTER_MS
+): Promise<T> {
+  const settled = new AbortController();
+  const scoped = AbortSignal.any([signal, settled.signal]);
+  const startedAt = Date.now();
+  const attempt = (n: number) =>
+    call(scoped).catch((error: unknown) => {
+      if (!settled.signal.aborted) {
+        logOpsEvent("widget.kb.model", {
+          message: `step=${step} attempt=${n} reason=${modelFailure(error)} ms=${Date.now() - startedAt}`,
+          outcome: "error",
+        });
+      }
+      throw error;
+    });
+  const primary = attempt(1);
+  const backup = (async () => {
+    await Promise.race([
+      sleep(hedgeAfterMs, undefined, { signal: scoped }),
+      // A failed primary starts the backup at once; a successful one never
+      // does, since the abort below ends the wait first.
+      primary.then(
+        () => new Promise<never>(() => undefined),
+        () => undefined
+      ),
+    ]);
+    return attempt(2);
+  })();
+  try {
+    return await Promise.any([primary, backup]);
+  } catch (error) {
+    // Both failed: surface the last reason, not "All promises were rejected".
+    throw error instanceof AggregateError ? error.errors.at(-1) : error;
+  } finally {
+    settled.abort();
+  }
+}
+
 /**
  * A short conversational reply to a message that asks nothing. No retrieval, no
  * tools, no account data, so like the rest of this lane there is nothing to
@@ -367,14 +443,20 @@ export async function replyToChat(
   const startedAt = Date.now();
   try {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      prompt: message,
-      schema: chatSchema,
-      system,
-    });
+    const { object } = await hedged(
+      "chat",
+      AbortSignal.timeout(CHAT_TIMEOUT_MS),
+      (abortSignal) =>
+        generateObject({
+          abortSignal,
+          maxRetries: 0,
+          model: gateway(model),
+          ...fastCallOptions(model),
+          prompt: message,
+          schema: chatSchema,
+          system,
+        })
+    );
     const reply = object.reply.replace(MARKER, "").trim();
     logOpsEvent("widget.kb.answer", {
       ...log,
@@ -446,7 +528,7 @@ export const defaultKbDeps: KbDeps = {
     recordingOffered,
     signal,
   }) {
-    const model = await resolveModel("kb");
+    const model = await resolveModel(images?.length ? "kbImages" : "kb");
     const input = JSON.stringify({
       articles: articles.map((article, index) => ({
         content: article.content,
@@ -456,17 +538,20 @@ export const defaultKbDeps: KbDeps = {
       question,
       recordingOffered: recordingOffered === true,
     });
-    const { object } = await generateObject({
-      abortSignal: signal,
-      messages: withImageParts(input, images),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      schema: accountLikely ? guardedAnswerSchema : answerSchema,
-      system: withImages(
-        `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
-        images
-      ),
-    });
+    const { object } = await hedged("generate", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        messages: withImageParts(input, images),
+        model: gateway(model),
+        ...fastCallOptions(model),
+        schema: accountLikely ? guardedAnswerSchema : answerSchema,
+        system: withImages(
+          `${writerPrompt(accountLikely, decided)}${cannotCheck ? ALREADY_SAID : ""}`,
+          images
+        ),
+      })
+    );
     return object;
   },
   images: loadImages,
@@ -499,14 +584,17 @@ export const defaultKbDeps: KbDeps = {
   },
   async rewrite(question, signal) {
     const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      model: gateway(model),
-      prompt: question,
-      ...fastCallOptions(model),
-      schema: rewriteSchema,
-      system: REWRITE_PROMPT,
-    });
+    const { object } = await hedged("rewrite", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        model: gateway(model),
+        prompt: question,
+        ...fastCallOptions(model),
+        schema: rewriteSchema,
+        system: REWRITE_PROMPT,
+      })
+    );
     return object;
   },
   // The help-center search is a public route, so this lane calls it directly
@@ -536,19 +624,22 @@ export const defaultKbDeps: KbDeps = {
       }));
   },
   async select({ images, index, question, signal }) {
-    const model = await resolveModel("kb");
-    const { object } = await generateObject({
-      abortSignal: signal,
-      // The listing comes first so the long, stable prefix can be cached.
-      messages: withImageParts(
-        `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
-        images
-      ),
-      model: gateway(model),
-      ...fastCallOptions(model),
-      schema: selectSchema,
-      system: SELECT_PROMPT,
-    });
+    const model = await resolveModel("kbSelect");
+    const { object } = await hedged("select", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        // The listing comes first so the long, stable prefix can be cached.
+        messages: withImageParts(
+          `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
+          images
+        ),
+        model: gateway(model),
+        ...fastCallOptions(model),
+        schema: selectSchema,
+        system: SELECT_PROMPT,
+      })
+    );
     return object;
   },
 };
@@ -784,12 +875,30 @@ type Decision = Awaited<ReturnType<typeof decideFromArticles>> | null;
 
 /** The written answer with its citations; null when it cites nothing, so is not grounded in the articles. */
 function grounded(
-  raw: { answer: string; kind: string },
+  raw: { answer: string; kind: string; sources?: number[] },
   articles: KbArticle[]
 ): KbAnswer | null {
-  const answer =
-    raw.kind === "answer" ? resolveCitations(raw.answer, articles) : null;
-  return answer?.message && answer.citations.length > 0 ? answer : null;
+  if (raw.kind !== "answer") {
+    return null;
+  }
+  const answer = resolveCitations(raw.answer, articles);
+  if (!answer.message || answer.citations.length > 0) {
+    return answer.message ? answer : null;
+  }
+  // No markers in the text: the listed sources ground it instead.
+  const listed = [...new Set(raw.sources ?? [])].filter(
+    (n) => articles[n - 1] !== undefined
+  );
+  return listed.length > 0
+    ? {
+        ...answer,
+        citations: listed.map((n, position) => ({
+          n: position + 1,
+          title: articles[n - 1].title.slice(0, 300),
+          url: articles[n - 1].url,
+        })),
+      }
+    : null;
 }
 
 /** In help-center mode an ask for a look is still answered from the articles. */
@@ -829,10 +938,11 @@ function withCannotCheck(
  */
 const SURE_ACCOUNT = 0.4;
 
-const decisionMark = (decided: Decision) =>
+/** A fallback names why Jev did not decide, such as `decide:fallback:timeout`. */
+const decisionMark = (decided: Decision, failure = "") =>
   decided
     ? `decide:${decided.choice}@${decided.confidence.toFixed(2)}`
-    : "decide:fallback";
+    : `decide:fallback${failure ? `:${failure}` : ""}`;
 
 /** What Jev's decision settles before anything is written; null leaves it to the writer. */
 function settledByDecision(
@@ -895,6 +1005,7 @@ export async function answerFromHelpCenter(
       (article) => helpArticleSlug(article.url) ?? article.url
     );
     mark("read");
+    let failure = "";
     const decided =
       (await deps
         .decide?.({
@@ -904,8 +1015,11 @@ export async function answerFromHelpCenter(
           question,
           signal,
         })
-        .catch(() => null)) ?? null;
-    mark(decisionMark(decided));
+        .catch((error: unknown) => {
+          failure = fallbackReason(error);
+          return null;
+        })) ?? null;
+    mark(decisionMark(decided, failure));
     const { cannotCheck, settled } = afterDecision(
       decided,
       articles.length,
