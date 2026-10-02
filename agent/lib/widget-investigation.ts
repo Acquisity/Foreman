@@ -266,15 +266,20 @@ export function filedTicketResult(result: unknown): FiledTicket | null {
 
 /**
  * The tool's own result outranks whatever the write-up or the model pass said
- * about a ticket. A filed refund ticket is the handoff to billing, so the
- * customer gets a reply saying so instead of a handoff to a person.
+ * about a ticket: with no filed ticket, a claimed one is dropped so the customer
+ * is never told one was filed. A filed refund ticket is the handoff to billing,
+ * so the customer gets a reply saying so instead of a handoff to a person.
  */
 const withFiledTicket = (
   ticket: FiledTicket | null | undefined,
   findings: WidgetFindings | null
 ): WidgetFindings | null => {
-  if (!(findings && ticket)) {
+  if (!findings) {
     return findings;
+  }
+  if (!ticket) {
+    const { ticket: _claimed, ...unfiled } = findings;
+    return unfiled;
   }
   const { refund, ...filed } = ticket;
   return {

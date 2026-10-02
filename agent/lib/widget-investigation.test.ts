@@ -1712,6 +1712,31 @@ test("a filed refund ticket is the handoff to billing, so the customer gets a re
   assert.equal(other?.needsHuman, true);
 });
 
+test("a ticket the model claims without a filed ticket result is dropped", async () => {
+  const { deps, gated, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      ticket: {
+        id: "ENG-15001",
+        url: "https://linear.app/acquisity/issue/ENG-15001/made-up",
+      },
+    });
+  await finishWidgetRun(
+    run,
+    "widget-session-claimed-ticket",
+    {
+      findings: null,
+      status: "completed",
+      text: "Filed ENG-15001.",
+      ticket: null,
+    },
+    deps
+  );
+  const [claimed] = gated as WidgetFindings[];
+  assert.equal(claimed?.ticket, undefined);
+});
+
 test("the ticket result carries whether Jev read it as a refund", async () => {
   const url = "https://linear.app/acquisity/issue/ENG-15000/refund";
   const outcome = await waitForWidgetInvestigation(
