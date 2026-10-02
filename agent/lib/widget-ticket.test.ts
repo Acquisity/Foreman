@@ -7,6 +7,7 @@ import {
   WIDGET_TICKET_OWNER,
   widgetScopeBlock,
 } from "./executor/dispatch.js";
+import { WIDGET_TOOLKIT } from "./executor/endpoint.js";
 import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { assertWidgetPath, WIDGET_TICKET_PATH } from "./widget-policy.js";
@@ -42,11 +43,19 @@ const withTransport = async (run: () => Promise<unknown>) => {
   return calls;
 };
 
+/** The write goes out on the widget toolkit with the session's token, never the shared catalog. */
+const assertWidgetWire = (call: unknown[] | undefined) => {
+  const wire = call?.[0] as { toolkit?: string; token?: string } | undefined;
+  assert.equal(wire?.toolkit, WIDGET_TOOLKIT);
+  assert.equal(wire?.token, "test-token");
+};
+
 test("the widget ticket is Aaron's, delegated to Foreman, with team, state and scope from the session", async () => {
   const [call] = await withTransport(() =>
     createWidgetTicket(ctx(), { report: "Report", title: "Inbox fails" })
   );
   assert.equal(call?.[1], WIDGET_TICKET_PATH);
+  assertWidgetWire(call);
   assert.deepEqual(call?.[2], {
     assignee: "Aaron Fraga",
     delegate: WIDGET_TICKET_OWNER.delegate,
@@ -66,6 +75,7 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
       title: "Refund request",
     })
   );
+  assertWidgetWire(call);
   assert.deepEqual(call?.[2], {
     assignee: "Aaron Fraga",
     delegate: WIDGET_TICKET_OWNER.delegate,
