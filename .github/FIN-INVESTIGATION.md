@@ -11,7 +11,7 @@ Customer investigations are a separate capability lane. The verified organizatio
 Set these only on the PR's Preview branch:
 
 ```text
-ACQUISITY_FIN_ORIGIN=https://app.acquisity.ai
+ACQUISITY_ORIGIN=https://app.acquisity.ai
 FIN_CONTEXT_ENABLED=true
 FIN_INVESTIGATION_ENABLED=true
 FOREMAN_SUPPORT_ENABLED=false

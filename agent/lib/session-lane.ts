@@ -6,6 +6,8 @@ import {
 } from "./fin-investigation-auth.js";
 import { isSupportAuth } from "./support/auth.js";
 import { SUPPORT_DISCOVERY, SUPPORT_PROMPT } from "./support/instructions.js";
+import { WIDGET_DISCOVERY, widgetInstructions } from "./widget-instructions.js";
+import { isWidgetSupport } from "./widget-scope.js";
 
 const customerInstructions = (auth: SessionAuthContext | null | undefined) => {
   const scope = finInvestigationContext(auth);
@@ -19,6 +21,15 @@ Only capabilities visible in this lane may be used. The bounded ticket operation
 
 /** Composition choices for a signed session lane; provider policy remains in Executor dispatch. */
 export function sessionLane(auth: SessionAuthContext | null | undefined) {
+  if (isWidgetSupport(auth)) {
+    return {
+      broadExecutor: false,
+      customer: true,
+      discovery: WIDGET_DISCOVERY,
+      instructions: widgetInstructions(auth),
+      repository: false,
+    };
+  }
   if (isFinInvestigation(auth)) {
     return {
       broadExecutor: false,

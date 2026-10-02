@@ -89,9 +89,12 @@ describe("Instantly subworkspace reads", () => {
       return json({
         items: [
           {
+            daily_limit: 150,
             id: "campaign-1",
             name: "Campaign",
+            not_sending_status: 3,
             provider_credentials: { password: "private" },
+            sequences: [{ body: "private copy" }],
             smtp_password: "private",
           },
         ],
@@ -107,7 +110,14 @@ describe("Instantly subworkspace reads", () => {
     );
 
     assert.deepEqual(result, {
-      items: [{ id: "campaign-1", name: "Campaign" }],
+      items: [
+        {
+          daily_limit: 150,
+          id: "campaign-1",
+          name: "Campaign",
+          not_sending_status: 3,
+        },
+      ],
       nextStartingAfter: "next-resource",
       resource: "campaigns",
       workspace: { id: WORKSPACE_ID, name: "Rick Livingston's Workspace" },

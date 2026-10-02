@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findHelpArticles } from "./help-center.js";
+import { findHelpArticles, getHelpArticleContent } from "./help-center.js";
 
 const HTTP_503 = /HTTP 503/u;
+const HTTP_500_RE = /HTTP 500/u;
 
 const hit = (n: number) => ({
   content: `<mark>Inbox</mark> ${n}`,
@@ -69,5 +70,107 @@ describe("find_help_article", () => {
       linkBaseUrl: "https://example.test",
     });
     assert.deepEqual(result, { articles: [] });
+  });
+});
+
+describe("get_help_article_content", () => {
+  const base = "https://app.acquisity.ai";
+  const reply = (body: unknown, status = 200) =>
+    Promise.resolve({
+      json: () => Promise.resolve(body),
+      ok: status >= 200 && status < 300,
+      status,
+    });
+
+  it("rejects a non-help-center url without fetching", async () => {
+    let called = false;
+    const result = await getHelpArticleContent("https://evil.example/docs/x", {
+      baseUrl: base,
+      fetch: () => {
+        called = true;
+        return reply({});
+      },
+    });
+    assert.equal(called, false);
+    assert.ok("error" in result);
+  });
+
+  it("rejects a same-origin non-docs path without fetching", async () => {
+    let called = false;
+    const result = await getHelpArticleContent(
+      "https://app.acquisity.ai/dashboard/x",
+      {
+        baseUrl: base,
+        fetch: () => {
+          called = true;
+          return reply({});
+        },
+      }
+    );
+    assert.equal(called, false);
+    assert.ok("error" in result);
+  });
+
+  it("fetches by slug and returns the article content", async () => {
+    let calledUrl = "";
+    const result = await getHelpArticleContent(
+      "https://app.acquisity.ai/docs/cold-email-agent/faq",
+      {
+        baseUrl: base,
+        fetch: (input) => {
+          calledUrl = input;
+          return reply({
+            content: "# FAQ\nbody",
+            title: "FAQ",
+            url: "/docs/cold-email-agent/faq",
+          });
+        },
+      }
+    );
+    assert.equal(
+      calledUrl,
+      "https://app.acquisity.ai/api/docs-content?id=cold-email-agent%2Ffaq"
+    );
+    assert.ok(!("error" in result));
+    if (!("error" in result)) {
+      assert.equal(result.content, "# FAQ\nbody");
+      assert.equal(result.title, "FAQ");
+      assert.equal(
+        result.url,
+        "https://app.acquisity.ai/docs/cold-email-agent/faq"
+      );
+    }
+  });
+
+  it("accepts a relative /docs url", async () => {
+    let calledUrl = "";
+    const result = await getHelpArticleContent("/docs/a/b", {
+      baseUrl: base,
+      fetch: (input) => {
+        calledUrl = input;
+        return reply({ content: "x", url: "/docs/a/b" });
+      },
+    });
+    assert.equal(
+      calledUrl,
+      "https://app.acquisity.ai/api/docs-content?id=a%2Fb"
+    );
+    assert.ok(!("error" in result));
+  });
+
+  it("maps 404 to a not-found error", async () => {
+    const result = await getHelpArticleContent(
+      "https://app.acquisity.ai/docs/missing",
+      { baseUrl: base, fetch: () => reply({ error: "not found" }, 404) }
+    );
+    assert.ok("error" in result);
+  });
+
+  it("returns an error on a non-2xx response rather than throwing", async () => {
+    const result = await getHelpArticleContent(
+      "https://app.acquisity.ai/docs/x",
+      { baseUrl: base, fetch: () => reply({}, 500) }
+    );
+    assert.ok("error" in result && HTTP_500_RE.test(result.error));
   });
 });
