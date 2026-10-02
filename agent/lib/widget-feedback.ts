@@ -37,7 +37,11 @@ export function parseWidgetFeedbackMarker(
   const orNull = (value: string | undefined) =>
     value && value !== "none" ? value : null;
   return {
-    at: orNull(at),
+    // A time that does not parse would point the log read at the wrong window.
+    at:
+      orNull(at) && !Number.isNaN(Date.parse(at as string))
+        ? (at as string)
+        : null,
     conversation,
     message: orNull(message),
     replay: orNull(replay),

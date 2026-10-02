@@ -169,7 +169,10 @@ describe("buildLinearContext with a route", () => {
     const route = widgetFeedbackRoute(null);
     const opened = {
       ...event,
-      agentSession: { ...event.agentSession, creator: { id: "user-1", name: "Sam" } },
+      agentSession: {
+        ...event.agentSession,
+        creator: { id: "user-1", name: "Sam" },
+      },
     } as LinearAgentSessionEvent;
     assert.deepEqual(buildLinearContext(opened, "Jane", route), [route]);
     assert.deepEqual(buildLinearContext(opened, null, route), [route]);
@@ -179,6 +182,17 @@ describe("buildLinearContext with a route", () => {
     assert.deepEqual(buildLinearContext(event, null, undefined), [
       LINEAR_TRIAGE_ROUTE,
     ]);
+  });
+});
+
+describe("widget-feedback marker time", () => {
+  it("drops a reported-at time that does not parse", () => {
+    assert.equal(
+      parseWidgetFeedbackMarker(
+        "<!-- chat-widget-feedback conversation=conv-1 message=msg-2 run=run-3 replay=none at=bad-date -->"
+      )?.at,
+      null
+    );
   });
 });
 
