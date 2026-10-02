@@ -85,7 +85,11 @@ test("a live read is GET-only, pinned to the configured team, and reports deploy
   }
 });
 
-test("a project outside the configured team, an unlinked project, a missing credential and a provider error each stay distinct", async () => {
+test("a project outside the configured team, an unlinked project, a missing credential and a provider error each stay distinct", async (t) => {
+  const codes: string[] = [];
+  t.mock.method(console, "warn", (line: string) =>
+    codes.push(JSON.parse(line).code)
+  );
   const seen: { init: RequestInit; url: string }[] = [];
   assert.deepEqual(
     await readVercelLive(
@@ -125,6 +129,15 @@ test("a project outside the configured team, an unlinked project, a missing cred
   assert.deepEqual(await readVercelLive(projectId, [], signal, down, env), {
     status: "unavailable",
   });
+  // The same "unavailable" status, told apart in the ops log.
+  assert.deepEqual(codes, [
+    "other_team",
+    "no_saved_project",
+    "not_configured",
+    "invalid_reference",
+    "vercel_404",
+    "vercel_500",
+  ]);
 });
 
 test("the build excerpt starts at the failure, drops colour codes, and is capped", () => {
