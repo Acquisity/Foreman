@@ -27,7 +27,9 @@ import { askFromName } from "./linear-context.js";
  * answer: every Slack reply wakes Foreman, and a bare mention, a thanks, or a
  * remark that asks nothing must not earn another message in the thread.
  */
-const ANCHOR_PATTERN = /^Slack thread connected in /u;
+// The Acquisity support inbox roots its notes the same way, in "Support
+// conversation connected in …", and imports Foreman's reply as a team note.
+const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
   body: string;
@@ -45,22 +47,33 @@ export function planReply(
   comments: readonly ThreadComment[],
   foremanUserId: string
 ): ReplyPlan {
-  // The receiver writes the anchor top-level at intake, before anyone else
-  // can comment, so the earliest top-level match is the real one.
-  const anchor = comments
+  const byTime = (a: ThreadComment, b: ThreadComment) =>
+    a.createdAt.localeCompare(b.createdAt);
+  const anchors = comments
     .filter((c) => c.parentId === null && ANCHOR_PATTERN.test(c.body.trim()))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .at(0);
+    .sort(byTime);
+  const lastIn = (anchorId: string) =>
+    comments
+      .filter((c) => c.parentId === anchorId)
+      .sort(byTime)
+      .at(-1);
+  // One issue can carry a Slack thread and several support conversations.
+  // The reply belongs to the one whose newest message is still unanswered;
+  // with none waiting, the earliest anchor is the intake's own.
+  const waiting = anchors
+    .map((a) => ({ anchor: a, last: lastIn(a.id) }))
+    .filter(({ last }) => last && last.userId !== foremanUserId)
+    .sort((a, b) => byTime(a.last as ThreadComment, b.last as ThreadComment))
+    .at(-1)?.anchor;
+  const anchor = waiting ?? anchors.at(0);
   if (!anchor) {
     return {
       error:
-        "This issue has no Slack thread (no 'Slack thread connected in' comment), so there is nobody to reply to there.",
+        "This issue has no requester thread (no 'Slack thread connected in' or 'Support conversation connected in' comment), so there is nobody to reply to there.",
       ok: false,
     };
   }
-  const thread = comments
-    .filter((c) => c.parentId === anchor.id)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
   if (thread.at(-1)?.userId === foremanUserId) {
     return {
       error:
