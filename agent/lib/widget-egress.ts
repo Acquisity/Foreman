@@ -717,7 +717,9 @@ export async function gate(
     // model and can introduce an identifier or internal artifact that was never
     // in the gated findings; the customer message must contain no foreign
     // identifier and no ticket reference at all.
-    const egress = await timed("scan", () =>
+    // Timed apart from the findings scan: one finish spent 27.7s in "scan" with
+    // no way to tell which of the two ownership reads was slow.
+    const egress = await timed("reply_scan", () =>
       deterministicTextReason(scope, message, deps.resolve, undefined, signal)
     );
     if (egress) {

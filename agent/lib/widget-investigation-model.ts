@@ -3,6 +3,7 @@ import {
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from "ai";
+import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 import {
   nextActionEnabled,
@@ -107,7 +108,25 @@ const toolCallsThisTurn = (withControl: Prompt) => {
     );
 };
 
-export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
+/**
+ * One line per model call. The start is an absolute time because Vercel groups
+ * a request's lines under one timestamp: the gap from one call's end to the
+ * next call's start bounds the time between calls, including tool reads.
+ */
+const logModelCall = (
+  sessionId: string | undefined,
+  startedAt: number,
+  tools: string[]
+) =>
+  logOpsEvent("widget.investigation.model_call", {
+    message: `start=${startedAt} ms=${Date.now() - startedAt}`,
+    sessionId,
+    tool: tools.join(",") || null,
+  });
+
+export function widgetInvestigationMiddleware(
+  sessionId?: string
+): LanguageModelMiddleware {
   return {
     specificationVersion: "v4",
     transformParams({ params }) {
@@ -148,42 +167,60 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
     // One step can ask for several calls at once: at 12 spent, a batch of four
     // made 16. Calls past the budget are dropped before the SDK dispatches them.
     async wrapGenerate({ doGenerate, params }) {
-      const generated = await doGenerate();
-      let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
-      const result = {
-        ...generated,
-        content: generated.content.filter((part) => {
-          if (part.type !== "tool-call" || !namedTool(part)) {
-            return true;
-          }
-          if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
-            return false;
-          }
-          left -= 1;
-          return left >= 0;
-        }),
-      };
-      let sawAllowedCall = false;
-      for (const part of result.content) {
-        if (part.type === "tool-call") {
-          if (!namedTool(part)) {
+      const startedAt = Date.now();
+      let keptTools: string[] = [];
+      try {
+        const generated = await doGenerate();
+        let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+        const result = {
+          ...generated,
+          content: generated.content.filter((part) => {
+            if (part.type !== "tool-call" || !namedTool(part)) {
+              return true;
+            }
+            if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
+              return false;
+            }
+            left -= 1;
+            return left >= 0;
+          }),
+        };
+        let sawAllowedCall = false;
+        for (const part of result.content) {
+          if (part.type === "tool-call") {
+            if (!namedTool(part)) {
+              throw new Error(BLOCKED);
+            }
+            sawAllowedCall = true;
+          } else if (part.type.startsWith("tool-")) {
             throw new Error(BLOCKED);
           }
-          sawAllowedCall = true;
-        } else if (part.type.startsWith("tool-")) {
+        }
+        if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
           throw new Error(BLOCKED);
         }
+        keptTools = result.content.flatMap((part) =>
+          part.type === "tool-call" ? [part.toolName] : []
+        );
+        return result;
+      } finally {
+        logModelCall(sessionId, startedAt, keptTools);
       }
-      if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
-        throw new Error(BLOCKED);
-      }
-      return result;
     },
     async wrapStream({ doStream, params }) {
-      const result = await doStream();
+      const startedAt = Date.now();
+      // Log setup failures too, before a readable stream exists.
+      let result: Awaited<ReturnType<typeof doStream>>;
+      try {
+        result = await doStream();
+      } catch (error) {
+        logModelCall(sessionId, startedAt, []);
+        throw error;
+      }
       const allowedCalls = new Set<string>();
       let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
       const admittedCalls = new Map<string, boolean>();
+      const admittedTools: string[] = [];
       const admit = (id: string, toolName: string) => {
         if (admittedCalls.has(id)) {
           return;
@@ -192,41 +229,69 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
         admittedCalls.set(id, keep);
         if (keep) {
           left -= 1;
+          admittedTools.push(toolName);
         }
       };
       const callId = (part: object) => {
         const { id, toolCallId } = part as { id?: string; toolCallId?: string };
         return toolCallId ?? id;
       };
+      let logged = false;
+      const complete = () => {
+        if (!logged) {
+          logged = true;
+          logModelCall(sessionId, startedAt, admittedTools);
+        }
+      };
+      const guarded = result.stream.pipeThrough(
+        new TransformStream({
+          transform: (part, controller) => {
+            assertAllowedStreamPart(part, allowedCalls);
+            if (part.type === "tool-input-start" || part.type === "tool-call") {
+              admit(String(callId(part)), part.toolName);
+            }
+            if (
+              part.type === "finish" &&
+              part.finishReason.unified === "tool-calls" &&
+              ![...admittedCalls.values()].includes(true)
+            ) {
+              throw new Error(BLOCKED);
+            }
+            if (part.type === "finish") {
+              complete();
+            }
+            const id = part.type.startsWith("tool-") ? callId(part) : undefined;
+            if (id !== undefined && admittedCalls.get(String(id)) === false) {
+              return;
+            }
+            controller.enqueue(part);
+          },
+        })
+      );
+      const reader = guarded.getReader();
       return {
         ...result,
-        stream: result.stream.pipeThrough(
-          new TransformStream({
-            transform: (part, controller) => {
-              assertAllowedStreamPart(part, allowedCalls);
-              if (
-                part.type === "tool-input-start" ||
-                part.type === "tool-call"
-              ) {
-                admit(String(callId(part)), part.toolName);
+        stream: new ReadableStream({
+          async cancel(reason) {
+            // Record cancellation before waiting for upstream cleanup.
+            complete();
+            await reader.cancel(reason);
+          },
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                complete();
+                controller.close();
+              } else {
+                controller.enqueue(value);
               }
-              if (
-                part.type === "finish" &&
-                part.finishReason.unified === "tool-calls" &&
-                ![...admittedCalls.values()].includes(true)
-              ) {
-                throw new Error(BLOCKED);
-              }
-              const id = part.type.startsWith("tool-")
-                ? callId(part)
-                : undefined;
-              if (id !== undefined && admittedCalls.get(String(id)) === false) {
-                return;
-              }
-              controller.enqueue(part);
-            },
-          })
-        ),
+            } catch (error) {
+              complete();
+              controller.error(error);
+            }
+          },
+        }),
       };
     },
   };
@@ -246,13 +311,13 @@ export const widgetInvestigationModel = (
   wrapLanguageModel({
     middleware: nextActionEnabled()
       ? [
-          widgetInvestigationMiddleware(),
+          widgetInvestigationMiddleware(sessionId),
           simulateStreamingMiddleware(),
           widgetNextActionMiddleware({
             sessionId,
             stepModel: stepsId ? ticketLinkedModel(stepsId) : undefined,
           }),
         ]
-      : widgetInvestigationMiddleware(),
+      : widgetInvestigationMiddleware(sessionId),
     model: ticketLinkedModel(id),
   });
