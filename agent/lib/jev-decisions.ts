@@ -22,10 +22,20 @@ import {
 export const BARS = {
   /** Below this, money versus product is unclear and the requester is asked. */
   askKind: 0.7,
+  /** Below this, an existing investigation is not reused. */
+  continuation: 0.6,
   /** A billing verdict below this is left to a person. */
   discretion: 0.7,
+  /** A done claim without near-certain evidence is flagged. */
+  doneClaim: 0.8,
   /** A duplicate closes the ticket, so it needs a near-certain match. */
   duplicate: 0.8,
+  /** Below this, staying quiet on a requester follow-up is not trusted. */
+  followUp: 0.6,
+  /** Below this, a claim the reply makes is flagged as not shown. */
+  grounded: 0.5,
+  /** Below this, a hotlane call goes to a person instead of the fast lane. */
+  incident: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
   /** Below this, the project is left unset and Aaron routes it. */
@@ -34,6 +44,8 @@ export const BARS = {
   rootCauseLabel: 0.6,
   /** Yes/no signals that only add a label or raise a floor. */
   signal: 0.5,
+  /** Below this, a follow-up is not trusted to be only a status move. */
+  statusOnly: 0.7,
   /** Below this, the claim is treated as unproven. */
   verdict: 0.6,
 } as const;
@@ -218,6 +230,8 @@ export type TriageDecision =
   | {
       assignee: "Aaron Fraga" | "area owner";
       classification: TriageClassification;
+      /** The incident-hotlane route, only for a Bug that is not a Duplicate. */
+      hotlane?: HotlaneDecision;
       needsCriticReview: boolean;
       notes: string[];
       outcome: "route";
@@ -249,6 +263,63 @@ const DUPLICATE_OUTCOMES = {
   stale_or_superseded: "the same area, but already fixed or decided",
 } as const;
 
+export const HOTLANE_ROUTES = {
+  hotlane:
+    "current evidence confirms at least one of: a core workflow blocked or materially impaired; data lost, corrupted, exposed, or written to the wrong tenant; permissions, authentication, security, or privacy controls failing; paid work silently skipped or false success reported; customers actively charged or financially harmed incorrectly; material revenue loss, uncontrolled provider-cost burn, or customer-trust harm needing immediate containment; a high-frequency failure on a core path; or no safe workaround for a material customer outcome",
+  needs_human_urgent:
+    "the evidence points at one of those high-risk conditions, but a critical evidence lane was unavailable, so it cannot be confirmed",
+  standard: "a confirmed defect that meets none of those conditions",
+} as const;
+
+const HOTLANE_IMPACTS = {
+  BLOCKED: "completely blocks the user's objective",
+  DATA_OR_SECURITY_RISK: "risks data loss, corruption, security, or privacy",
+  INCORRECT_RESULT: "produces materially incorrect results",
+  MATERIAL_BUSINESS_HARM:
+    "active revenue, provider-cost, or customer-trust harm",
+  MATERIALLY_IMPAIRED: "materially impairs the user's objective",
+  MONEY_IMPACT: "customers charged or financially harmed incorrectly",
+  NON_CORE: "cosmetic, inconvenient, or a non-core edge case",
+  SILENTLY_SKIPPED: "silently skips paid or expected work",
+} as const;
+
+export interface HotlaneDecision {
+  impact: keyof typeof HOTLANE_IMPACTS | "UNCONFIRMED";
+  notes: string[];
+  proposedLabel: "fast-lane" | "none";
+  route: "HOTLANE" | "NEEDS_HUMAN_URGENT" | "STANDARD_ENGINEERING";
+}
+
+/**
+ * Whether a Bug is an incident. Route by impact, never by report count; a
+ * hotlane call below the bar goes to a person rather than to routine work.
+ */
+export function resolveHotlane(answers: Answers): HotlaneDecision {
+  const notes: string[] = [];
+  const { choice, confidence } = choiceOf(answers.incident);
+  let route: HotlaneDecision["route"] = "STANDARD_ENGINEERING";
+  if (choice === "needs_human_urgent") {
+    route = "NEEDS_HUMAN_URGENT";
+  } else if (choice === "hotlane" && confidence >= BARS.incident) {
+    route = "HOTLANE";
+  } else if (choice === "hotlane") {
+    route = "NEEDS_HUMAN_URGENT";
+    notes.push(
+      "A hotlane condition was likely but not clear enough to confirm; a person confirms it."
+    );
+  }
+  return {
+    impact:
+      route === "NEEDS_HUMAN_URGENT"
+        ? "UNCONFIRMED"
+        : (choiceOf(answers.incident_impact)
+            .choice as keyof typeof HOTLANE_IMPACTS),
+    notes,
+    proposedLabel: route === "HOTLANE" ? "fast-lane" : "none",
+    route,
+  };
+}
+
 export function triageQuestions(
   input: TriageInput
 ): Record<string, JevQuestion> {
@@ -279,6 +350,18 @@ export function triageQuestions(
       instructions:
         "How severe is the impact, weighing blast radius, then frequency, then customer tier? A workaround does not reduce it.",
       type: "score",
+    },
+    incident: {
+      criteria: { ...HOTLANE_ROUTES },
+      instructions:
+        "If this is a Bug, does it need urgent handling? Judge by user and business impact on the objective the customer was pursuing, not by how many reports there are or how the reporter phrased it. One affected workspace is enough when a core function is blocked.",
+      type: "choice",
+    },
+    incident_impact: {
+      criteria: { ...HOTLANE_IMPACTS },
+      instructions:
+        "Which one impact best describes the failure on the user's objective?",
+      type: "choice",
     },
     money_blocker: {
       instructions:
@@ -491,11 +574,13 @@ export function resolveTriage(
   }
   const aaron =
     !projectSettled || input.identifier.toUpperCase().startsWith("SAN-");
+  const needsCriticReview = classification === "Bug" && path !== "Duplicate";
 
   return {
     assignee: aaron ? "Aaron Fraga" : "area owner",
     classification,
-    needsCriticReview: classification === "Bug" && path !== "Duplicate",
+    ...(needsCriticReview ? { hotlane: resolveHotlane(answers) } : {}),
+    needsCriticReview,
     notes,
     outcome: "route",
     path,
@@ -536,6 +621,131 @@ export async function decideTriage(
   };
   const answers = await askJev(triageQuestions(input), state, opts);
   return resolveTriage(input, answers);
+}
+
+// ---------------------------------------------------------------- prior work
+
+export interface PriorWorkInput {
+  /** Hits from find_related_issues worth comparing. */
+  candidates: { identifier: string; summary: string; title: string }[];
+  /** This ticket's existing investigation findings, when one exists. */
+  existingInvestigation?: string;
+  /** The master this ticket is already attached to, when it has one. */
+  parent?: { identifier: string; summary: string; title: string };
+  /** The testable claim or symptom. */
+  report: string;
+}
+
+export type CandidateMatch = keyof typeof DUPLICATE_OUTCOMES;
+
+export interface PriorWorkDecision {
+  candidates: { identifier: string; match: CandidateMatch }[];
+  /** The master or same-outcome candidate a known issue belongs to. */
+  knownIssue?: string;
+  notes: string[];
+  outcome: "continuation" | "fresh" | "known_issue";
+}
+
+export function priorWorkQuestions(
+  input: PriorWorkInput
+): Record<string, JevQuestion> {
+  const questions: Record<string, JevQuestion> = {};
+  if (input.existingInvestigation) {
+    questions.continuation = {
+      instructions:
+        "Does the existing investigation still answer this report: the same claim, with nothing new since that it does not cover?",
+      type: "boolean",
+    };
+  }
+  if (input.parent) {
+    questions.parent_match = {
+      instructions:
+        "Does this report describe the same symptom as the parent master ticket?",
+      type: "boolean",
+    };
+  }
+  input.candidates.forEach((_candidate, index) => {
+    questions[`candidate_${index}`] = {
+      criteria: { ...DUPLICATE_OUTCOMES },
+      instructions: `Compare this report with the candidate whose candidate field is ${index}. Judge by outcome, not keyword overlap: a shared component or error string is not enough.`,
+      type: "choice",
+    };
+  });
+  return questions;
+}
+
+/**
+ * Continuation, known issue, or fresh. An attached master is a fact, so it
+ * decides without Jev; Jev's view of the match only adds a note.
+ */
+export function resolvePriorWork(
+  input: PriorWorkInput,
+  answers: Answers
+): PriorWorkDecision {
+  const notes: string[] = [];
+  const matches = input.candidates.map((candidate, index) => {
+    const { choice, confidence } = choiceOf(answers[`candidate_${index}`]);
+    // A weak same-outcome call is related work, never a known issue.
+    const match: CandidateMatch =
+      choice === "same_outcome" && confidence < BARS.signal
+        ? "partial_or_adjacent"
+        : (choice as CandidateMatch);
+    return { confidence, identifier: candidate.identifier, match };
+  });
+  const candidates = matches.map(({ identifier, match }) => ({
+    identifier,
+    match,
+  }));
+  if (input.parent) {
+    if (probabilityOf(answers.parent_match) < BARS.signal) {
+      notes.push(
+        `This report may not match its master ${input.parent.identifier}; say so in its note.`
+      );
+    }
+    return {
+      candidates,
+      knownIssue: input.parent.identifier,
+      notes,
+      outcome: "known_issue",
+    };
+  }
+  if (
+    input.existingInvestigation &&
+    probabilityOf(answers.continuation) >= BARS.continuation
+  ) {
+    return { candidates, notes, outcome: "continuation" };
+  }
+  const same = matches
+    .filter((m) => m.match === "same_outcome")
+    .sort((a, b) => b.confidence - a.confidence)
+    .at(0);
+  return same
+    ? { candidates, knownIssue: same.identifier, notes, outcome: "known_issue" }
+    : { candidates, notes, outcome: "fresh" };
+}
+
+export async function decidePriorWork(
+  input: PriorWorkInput,
+  opts?: JevOptions
+): Promise<PriorWorkDecision> {
+  const questions = priorWorkQuestions(input);
+  const answers =
+    Object.keys(questions).length > 0
+      ? await askJev(
+          questions,
+          {
+            candidates: input.candidates.map((c, candidate) => ({
+              candidate,
+              ...c,
+            })),
+            existingInvestigation: input.existingInvestigation ?? null,
+            parent: input.parent ?? null,
+            report: input.report,
+          },
+          opts
+        )
+      : {};
+  return resolvePriorWork(input, answers);
 }
 
 // ---------------------------------------------------------------- billing
@@ -664,4 +874,117 @@ export async function decideBilling(
   };
   const answers = await askJev(billingQuestions(), state, opts);
   return resolveBilling(input, answers);
+}
+
+// ---------------------------------------------------------------- follow-up
+
+export const FOLLOW_UP_OUTCOMES = {
+  respond:
+    "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
+  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that settles nothing Foreman asked, an acknowledgement, thanks, or noise",
+} as const;
+/** status: the only ask is a ticket status move, so nothing is re-checked. */
+export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
+
+export interface FollowUpInput {
+  /** Replies since lastReply that Foreman already handled; context only. */
+  earlier?: string[];
+  /** Foreman's last message in the Slack thread. */
+  lastReply: string;
+  /** Everything said in the thread since, oldest first, as relayed. */
+  replies: string[];
+}
+
+export const followUpQuestions = (): Record<string, JevQuestion> => ({
+  follow_up: {
+    criteria: { ...FOLLOW_UP_OUTCOMES },
+    instructions:
+      "Foreman posted lastReply in a Slack thread shared by several people. Each reply is 'Name: text'. @Foreman is Foreman; @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
+    type: "choice",
+  },
+  status_only: {
+    instructions:
+      "Is the only thing the replies ask of Foreman to move the ticket to a status (done, complete, closed, cancelled), with no question for Foreman and no request to check, verify, or change anything else?",
+    type: "boolean",
+  },
+});
+
+/**
+ * Staying quiet needs a clear call; when unsure, the requester is answered.
+ * A clear status-only ask is answered without re-checking the work.
+ */
+export function resolveFollowUp(answers: Answers): FollowUpOutcome {
+  const { choice, confidence } = choiceOf(answers.follow_up);
+  if (choice === "skip" && confidence >= BARS.followUp) {
+    return "skip";
+  }
+  return answers.status_only &&
+    probabilityOf(answers.status_only) >= BARS.statusOnly
+    ? "status"
+    : "respond";
+}
+
+/**
+ * The receiver's prompt into a ticket's Foreman session: one line naming who
+ * replied in Slack. The reply itself is under the Slack thread comment.
+ */
+export const SLACK_PROMPT = /^\*\*([^*\n]{1,100})\*\* replied in Slack\.$/u;
+
+/** Foreman's bot user in the intake Slack workspace, as the receiver mentions it. */
+const FOREMAN_MENTION = /<@U0BQ5QMHM7D(?:\|[^>]*)?>/gu;
+const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
+// The Asks receiver heads each relayed reply with "<link> **Name** replied in
+// Slack:". The link always names Foreman, so it says nothing about who a
+// reply is for.
+export const RELAY_HEADER =
+  /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?replied in Slack:/u;
+
+/**
+ * Rewrites a relayed reply as "Name: text" with a mention of Foreman as
+ * @Foreman and every other Slack mention as @teammate, since Jev cannot
+ * resolve Slack ids. The receiver relays a reply that mentions the bot like
+ * any other, so "@Foreman move this to done" must not read as a hand-off.
+ */
+export const followUpText = (reply: string): string => {
+  const name = RELAY_HEADER.exec(reply)?.[1] ?? "Someone";
+  const text = reply
+    .replace(RELAY_HEADER, "")
+    .replace(FOREMAN_MENTION, "@Foreman")
+    .replace(SLACK_MENTION, "@teammate")
+    .trim();
+  return `${name}: ${text}`;
+};
+
+/**
+ * A reply that is only a mention is what wakes Foreman, not something said,
+ * so code skips it without asking Jev.
+ */
+export async function decideFollowUp(
+  input: FollowUpInput,
+  opts?: JevOptions
+): Promise<FollowUpOutcome> {
+  const said = (list: string[] = []) =>
+    list
+      .filter(
+        (reply) =>
+          reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !==
+          ""
+      )
+      .map(followUpText);
+  const replies = said(input.replies);
+  if (replies.length === 0) {
+    return "skip";
+  }
+  const earlier = said(input.earlier);
+  return resolveFollowUp(
+    await askJev(
+      followUpQuestions(),
+      {
+        lastReply: input.lastReply,
+        replies,
+        ...(earlier.length > 0 ? { earlier } : {}),
+      },
+      opts
+    )
+  );
 }

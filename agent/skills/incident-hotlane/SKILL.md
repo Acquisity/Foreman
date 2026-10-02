@@ -24,6 +24,8 @@ Do not infer impact from ticket count. Several reports can describe a low-impact
 
 ## Route
 
+Jev decides the route: take `route`, `impact`, and `proposedLabel` from the `hotlane` field `decide_triage` returned, and put its notes in `rationale`. A re-run of `decide_triage` replaces them. Apply the rules below yourself only when `decide_triage` answered `decided: false`, and say so in `rationale`.
+
 Propose `HOTLANE` when current evidence confirms any of:
 
 - a core workflow is blocked or materially impaired;

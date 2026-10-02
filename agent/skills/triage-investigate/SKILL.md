@@ -65,18 +65,16 @@ Purpose: avoid repeating settled work, spot continuations and duplicates, run th
 
 Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and current Linear state.
 
-### Check for an existing investigation
+### Check existing work
 
-Reuse existing investigations where current evidence supports them. Existing Duplicate state does not skip handling after Stage 4; explain which actions are already satisfied.
+A Duplicate still gets Stage 5; say what is done. `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit. Call `decide_prior_work` with the claim, prior findings, and hits in batches of at most 8. `continuation` reuses those findings, `known_issue` names the ticket, `fresh` starts over. Per hit `match`:
 
-### Check duplicates
+- `same_outcome`: a duplicate candidate that `decide_triage` settles in Stage 5.
+- `partial_or_adjacent`: relate, never close.
+- `stale_or_superseded`: point at the fix or decision.
+- `not_relevant`: move on.
 
-`find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit, then classify by outcome, not keyword overlap:
-
-- `SAME_OUTCOME`: same symptom and cause; a duplicate candidate that `decide_triage` settles in Stage 5.
-- `PARTIAL_OR_ADJACENT`: relate it, do not close it.
-- `STALE_OR_SUPERSEDED`: point at the fix or the decision.
-- `NOT_RELEVANT`: move on.
+On `decided: false`, judge by outcome, not keywords.
 
 ### Ask or proceed
 
