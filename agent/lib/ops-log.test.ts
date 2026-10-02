@@ -365,6 +365,15 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes("[redacted]"));
   });
 
+  it("redacts JWT-shaped tokens and long hex runs", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+    const hex = "0123456789abcdef0123456789abcdef";
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", { message: `token ${jwt} key ${hex}` })
+    );
+    assert.equal(record.message, "token [redacted] key [redacted]");
+  });
+
   it("redacts an opaque credential after an authorization scheme", () => {
     const record = JSON.parse(
       formatOpsEvent("step.failed", {
