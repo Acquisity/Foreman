@@ -292,7 +292,7 @@ const responseSchema = z.object({
     lane: z.object({
       choice: z.enum(WIDGET_LANES),
       confidence: z.number().min(0).max(1).optional(),
-      probabilities: z.record(z.string(), z.number()).optional(),
+      probabilities: z.record(z.string(), z.number().min(0).max(1)).optional(),
     }),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
