@@ -7,7 +7,9 @@ import {
   type FollowUpInput,
   type FollowUpOutcome,
   RELAY_HEADER,
+  SLACK_PROMPT,
 } from "./jev-decisions.js";
+import { askFromName } from "./linear-context.js";
 
 /**
  * Replies to the requester in their Slack thread, as Foreman.
@@ -105,6 +107,28 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
   }
 }`;
 
+const ASK_FROM_QUERY = `query AskFrom($id: String!) {
+  issue(id: $id) { attachments(first: 50) { nodes { title } } }
+}`;
+
+/** The intake requester from the issue's 'Ask from <name>' attachment, or null. */
+export async function readAskFrom(
+  issue: string,
+  credentials: LinearChannelCredentials
+): Promise<string | null> {
+  const result = await callLinearGraphQL<{
+    issue: { attachments: { nodes: { title: string }[] } } | null;
+  }>({
+    credentials,
+    query: ASK_FROM_QUERY,
+    queryName: "AskFrom",
+    variables: { id: issue },
+  });
+  return askFromName(
+    result.issue?.attachments.nodes.map((node) => node.title) ?? []
+  );
+}
+
 const REPLY_MUTATION = `mutation RequesterReply($input: CommentCreateInput!) {
   commentCreate(input: $input) { success comment { id url } }
 }`;
@@ -176,40 +200,105 @@ async function readThread(
 }
 
 /**
- * Whether a session opened by a relayed Slack reply needs nothing from
- * Foreman, decided before the model runs so a skip costs one read and one
- * Jev call instead of a full turn. Anything that is not a clear skip,
- * including a session opened by a person on the ticket, returns false.
+ * What a relayed Slack reply needs from Foreman, whether it opened a session
+ * or was prompted into the ticket's existing one, decided
+ * before the model runs so a skip costs one read and one Jev call instead of
+ * a full turn. A session opened by a person on the ticket returns null.
  */
-export async function followUpNeedsNothing(
+export async function relayedFollowUpOutcome(
   issue: string,
-  commentId: string,
+  trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
-): Promise<boolean> {
+): Promise<FollowUpOutcome | null> {
   const { comments, plan } = await readThread(issue, credentials);
-  const followUp = relayedFollowUp(comments, plan, commentId);
-  return (
-    followUp !== null && (await decideFollowUp(followUp, { signal })) === "skip"
-  );
+  const followUp = trigger.prompted
+    ? promptedFollowUp(comments, plan, trigger.commentId)
+    : relayedFollowUp(comments, plan, trigger.commentId);
+  if (followUp === null) {
+    return null;
+  }
+  const outcome = await decideFollowUp(followUp, { signal });
+  // Before Foreman has spoken there is nothing a reply could leave settled,
+  // so only a status move is acted on; anything else runs as before.
+  return followUp.lastReply === "" && outcome === "skip" ? null : outcome;
 }
 
-/** The follow-up to judge when a relayed Slack reply opened the session. */
+/**
+ * The follow-up to judge when a relayed Slack reply opened the session.
+ * Before Foreman has replied, lastReply is empty and every reply under the
+ * anchor is judged, so a close-out that lands first is still seen.
+ */
 export function relayedFollowUp(
   comments: readonly ThreadComment[],
   plan: ReplyPlan,
   commentId: string
 ): FollowUpInput | null {
+  if (!plan.ok) {
+    return null;
+  }
+  const followUp = plan.followUp ?? {
+    lastReply: "",
+    replies: comments
+      .filter((c) => c.parentId === plan.anchorId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((c) => c.body),
+  };
   const said = (body: string) => body.replace(RELAY_HEADER, "").trim();
   const trigger = comments.find((c) => c.id === commentId);
   // The receiver writes the copy under the anchor first; until it is there,
   // the thread does not include this reply and must not be judged without it.
   return trigger &&
     RELAY_HEADER.test(trigger.body) &&
-    plan.ok &&
-    plan.followUp?.replies.some((r) => said(r) === said(trigger.body))
-    ? plan.followUp
+    followUp.replies.some((r) => said(r) === said(trigger.body))
+    ? followUp
     : null;
+}
+
+/**
+ * The follow-up to judge when the receiver prompted the ticket's Foreman
+ * session. Replies that arrived before the session's previous prompt were
+ * already judged or handled, so they go to Jev as context only; judging them
+ * again let one old question wake every later reply in a burst (ENG-14396).
+ */
+export function promptedFollowUp(
+  comments: readonly ThreadComment[],
+  plan: ReplyPlan,
+  promptId: string
+): FollowUpInput | null {
+  const prompt = comments.find((c) => c.id === promptId);
+  if (!(plan.ok && prompt && SLACK_PROMPT.test(prompt.body.trim()))) {
+    return null;
+  }
+  const handledAt = comments
+    .filter(
+      (c) =>
+        c.parentId === prompt.parentId &&
+        c.id !== prompt.id &&
+        c.createdAt < prompt.createdAt &&
+        SLACK_PROMPT.test(c.body.trim())
+    )
+    .map((c) => c.createdAt)
+    .sort()
+    .at(-1);
+  const thread = comments
+    .filter((c) => c.parentId === plan.anchorId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const since = plan.followUp
+    ? thread.slice(thread.length - plan.followUp.replies.length)
+    : thread;
+  // A reply after this prompt belongs to the next prompt's judgment.
+  const eligible = since.filter((c) => c.createdAt <= prompt.createdAt);
+  const earlier = eligible.filter((c) => handledAt && c.createdAt <= handledAt);
+  const fresh = eligible.filter((c) => !earlier.includes(c));
+  if (fresh.length === 0) {
+    return null;
+  }
+  return {
+    lastReply: plan.followUp?.lastReply ?? "",
+    replies: fresh.map((c) => c.body),
+    ...(earlier.length > 0 ? { earlier: earlier.map((c) => c.body) } : {}),
+  };
 }
 
 export async function replyToRequester(

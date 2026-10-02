@@ -302,7 +302,13 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "listFolders",
       "listMembers",
     ],
-    "Jev decisions": ["classify_ask", "decide_triage", "decide_billing"],
+    "Jev decisions": [
+      "classify_ask",
+      "decide_prior_work",
+      "decide_triage",
+      "decide_billing",
+      "check_reply",
+    ],
     "Linear connection": [
       "list_issues",
       "get_issue",

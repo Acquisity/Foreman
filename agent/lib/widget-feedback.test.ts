@@ -158,11 +158,11 @@ describe("buildLinearContext with a route", () => {
 
   it("replaces triage with the widget route", () => {
     const route = widgetFeedbackRoute(null);
-    assert.deepEqual(buildLinearContext(event, route), [route]);
+    assert.deepEqual(buildLinearContext(event, null, route), [route]);
   });
 
   it("keeps triage when no route is given", () => {
-    assert.deepEqual(buildLinearContext(event, undefined), [
+    assert.deepEqual(buildLinearContext(event, null, undefined), [
       LINEAR_TRIAGE_ROUTE,
     ]);
   });
