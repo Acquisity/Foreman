@@ -42,6 +42,18 @@ test("HTTPS keeps the original TLS host, pins the address and stops after respon
   assert.equal(captured?.agent, false);
   assert.equal(captured?.headers, undefined);
   assert.equal(captured?.path, "/");
+  // Whatever name the connection looks up, it connects to the checked address.
+  const lookup = captured?.lookup as unknown as (...args: unknown[]) => void;
+  assert.equal(typeof lookup, "function");
+  const pinned = await new Promise<[unknown, unknown]>((resolve) => {
+    lookup(
+      "rebound.example.com",
+      {},
+      (_error: unknown, address: unknown, family: unknown) =>
+        resolve([address, family])
+    );
+  });
+  assert.deepEqual(pinned, ["76.76.21.21", 4]);
   assert.equal(result.redirectHostname, "127.0.0.1");
   assert.equal(JSON.stringify(result).includes("secret"), false);
   assert.equal(destroyed, true);
