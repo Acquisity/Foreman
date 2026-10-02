@@ -45,6 +45,8 @@ const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",
 ]);
+// A ticket the instructions require must stay possible after the last workspace read.
+const LATE_TOOLS = new Set([...ARTICLE_TOOLS, "widget_file_ticket"]);
 const MAX_WORKSPACE_CALLS = MAX_WIDGET_TOOL_CALLS - 2;
 const BLOCKED = "Support investigation capability is unavailable.";
 
@@ -118,7 +120,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
             (tool) =>
               typeof tool.name === "string" &&
               ALLOWED_TOOLS.has(tool.name) &&
-              (used < MAX_WORKSPACE_CALLS || ARTICLE_TOOLS.has(tool.name))
+              (used < MAX_WORKSPACE_CALLS || LATE_TOOLS.has(tool.name))
           );
       const toolChoice =
         spent ||
@@ -136,7 +138,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
                 note(
                   spent
                     ? "The investigation tool budget is exhausted. State the verified findings and limitations. Do not give product steps unless an applicable article was actually read. If no article supports a step, acknowledge that documentation could not be confirmed."
-                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions. Product steps require an article actually read; otherwise report findings and the documentation gap."
+                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions, or filing a ticket the instructions require. Product steps require an article actually read; otherwise report findings and the documentation gap."
                 ),
               ],
         toolChoice,
@@ -154,7 +156,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
           if (part.type !== "tool-call" || !namedTool(part)) {
             return true;
           }
-          if (left <= 2 && !ARTICLE_TOOLS.has(part.toolName)) {
+          if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
             return false;
           }
           left -= 1;
@@ -186,7 +188,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
         if (admittedCalls.has(id)) {
           return;
         }
-        const keep = left > 0 && (left > 2 || ARTICLE_TOOLS.has(toolName));
+        const keep = left > 0 && (left > 2 || LATE_TOOLS.has(toolName));
         admittedCalls.set(id, keep);
         if (keep) {
           left -= 1;
