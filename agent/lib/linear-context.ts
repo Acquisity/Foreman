@@ -23,14 +23,23 @@ export const askFromName = (titles: readonly string[]): string | null => {
   return null;
 };
 
+/**
+ * @param route - Replaces the triage line for a session whose issue has its
+ *   own playbook (widget feedback); omitted, the session gets today's triage.
+ */
 export function buildLinearContext(
   event: LinearAgentSessionEvent,
-  askFrom: string | null = null
+  askFrom: string | null = null,
+  route: string = LINEAR_TRIAGE_ROUTE
 ): string[] | null {
   if (event.action !== "created" && event.action !== "prompted") {
     return null;
   }
-  const context: string[] = [LINEAR_TRIAGE_ROUTE];
+  const context: string[] = [route];
+  // The requester lines below are triage's; another playbook replies to no one.
+  if (route !== LINEAR_TRIAGE_ROUTE) {
+    return context;
+  }
   // Naming the opener alongside the requester was not enough: the model
   // still greeted the opener (ENG-14406, ENG-14588), so it is left out here.
   if (askFrom) {

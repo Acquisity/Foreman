@@ -17,6 +17,7 @@ import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
+import { widgetFeedbackContext } from "../lib/widget-feedback.js";
 
 const credentials = connectLinearCredentials(
   process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent"
@@ -28,6 +29,20 @@ const FOLLOW_UP_GATE_MS = 7000;
 /** Tells the model a follow-up only asks for a status move (ENG-14387). */
 export const STATUS_ONLY_FOLLOW_UP =
   "Jev read this follow-up as only asking to move the ticket to a status. A person has already decided it: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
+
+/**
+ * Adds the status-only instruction to a triage session. A widget-feedback
+ * session keeps its own playbook, which forbids the route and reply that
+ * instruction asks for.
+ */
+export const withFollowUpOutcome = (
+  context: string[],
+  outcome: FollowUpOutcome | null,
+  widgetFeedback: boolean
+): string[] =>
+  outcome === "status" && !widgetFeedback
+    ? [...context, STATUS_ONLY_FOLLOW_UP]
+    : context;
 
 /**
  * Runs a pre-model read inside Linear's response window. Any failure or a
@@ -79,6 +94,19 @@ const askFrom = (event: LinearAgentSessionEvent): Promise<string | null> => {
 };
 
 /**
+ * The widget-feedback route when the issue sits in the chat widget project.
+ * A failed or slow read falls back to triage, the path every issue had before.
+ */
+const widgetRoute = (
+  event: LinearAgentSessionEvent
+): Promise<string | null> => {
+  const issue = issueOf(event);
+  return issue
+    ? withinGate(() => widgetFeedbackContext(issue, credentials))
+    : Promise.resolve(null);
+};
+
+/**
  * Dispatches one Linear Agent Session event.
  *
  * @remarks
@@ -102,9 +130,10 @@ export const onAgentSession = async (
   // Foreman ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
-  const [outcome, requester] = await Promise.all([
+  const [outcome, requester, route] = await Promise.all([
     followUpOutcome(event),
     askFrom(event),
+    widgetRoute(event),
   ]);
   if (
     outcome === "skip" &&
@@ -132,11 +161,11 @@ export const onAgentSession = async (
     repositories.length === 1 && repository
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
-  const context = buildLinearContext(event, requester) ?? [];
+  const context =
+    buildLinearContext(event, requester, route ?? undefined) ?? [];
   return {
     auth: withRepository,
-    context:
-      outcome === "status" ? [...context, STATUS_ONLY_FOLLOW_UP] : context,
+    context: withFollowUpOutcome(context, outcome, Boolean(route)),
   };
 };
 
