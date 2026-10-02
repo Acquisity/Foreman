@@ -47,11 +47,11 @@ const PROMPTS = [
 
 interface CallResult {
   decision?: string;
+  error?: string;
   findings?: unknown;
   message?: string | null;
   run_id?: string;
   status: string;
-  error?: string;
 }
 
 const call = async (body: Record<string, unknown>): Promise<CallResult> => {
