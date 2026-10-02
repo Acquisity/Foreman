@@ -9,10 +9,12 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 export const MODELS = {
   // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
-  // Support widget egress gate and composer: never investigates. On the same
-  // DeepSeek id as the orchestrator so it rides the working gateway routing;
-  // callers must apply gatewayRouting(id) since it is a deepseek/ model.
-  gate: "deepseek/deepseek-v4-pro-0813",
+  // Support widget backup answer reviewer (modelJudge), used whenever Jev is
+  // unsure of an item, which was every production review on 2026-10-02.
+  // Measured on ENG-14669, 8 cases x 3 runs: deepseek-v4-pro p50 32s, max 77s;
+  // this flash p50 10s, max 17s, and the only fast model that removed every
+  // planted unsafe sentence (flash-lite and haiku-4.5 kept a resume promise).
+  gate: "google/gemini-3.5-flash",
   // Support widget knowledge-base lane: one grounded answer over a few public
   // help articles, and the lane's short chat, clarify and explain replies.
   // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite
