@@ -15,6 +15,7 @@ const usage = {
   outputTokens: { reasoning: 0, text: 1, total: 1 },
 };
 const BLOCKED = /Support investigation capability is unavailable/;
+const TIMED = /^start=\d+ ms=\d+$/;
 const toolCall = (toolName: string) => ({
   input: "{}",
   toolCallId: "call-1",
@@ -316,5 +317,45 @@ for (const mode of ["generate", "stream"] as const) {
       type: "generate",
     } as never);
     assert.deepEqual((spent as { tools?: unknown[] }).tools, []);
+  });
+}
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: logs one timed line per model call naming the tools it kept`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
+    const base = new MockLanguageModelV4({
+      doGenerate: result("widget_inbox_health"),
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware("wrun_test"),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = {
+      prompt: [
+        {
+          content: [{ text: "Hi", type: "text" as const }],
+          role: "user" as const,
+        },
+      ],
+    };
+    if (mode === "generate") {
+      await model.doGenerate(params);
+    } else {
+      const { stream } = await model.doStream(params);
+      for await (const _ of stream) {
+        // drain
+      }
+    }
+    const logged = lines
+      .map((line) => JSON.parse(line))
+      .filter((line) => line.event === "widget.investigation.model_call");
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].sessionId, "wrun_test");
+    assert.equal(logged[0].tool, "widget_inbox_health");
+    assert.match(logged[0].message, TIMED);
   });
 }

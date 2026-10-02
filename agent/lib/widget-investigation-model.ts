@@ -3,6 +3,7 @@ import {
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from "ai";
+import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 import {
   nextActionEnabled,
@@ -107,7 +108,25 @@ const toolCallsThisTurn = (withControl: Prompt) => {
     );
 };
 
-export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
+/**
+ * One line per model call. The start is an absolute time because Vercel groups
+ * a request's lines under one timestamp: the gap from one call's end to the
+ * next call's start is the tool reads the first one asked for.
+ */
+const logModelCall = (
+  sessionId: string | undefined,
+  startedAt: number,
+  tools: string[]
+) =>
+  logOpsEvent("widget.investigation.model_call", {
+    message: `start=${startedAt} ms=${Date.now() - startedAt}`,
+    sessionId,
+    tool: tools.join(",") || null,
+  });
+
+export function widgetInvestigationMiddleware(
+  sessionId?: string
+): LanguageModelMiddleware {
   return {
     specificationVersion: "v4",
     transformParams({ params }) {
@@ -148,6 +167,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
     // One step can ask for several calls at once: at 12 spent, a batch of four
     // made 16. Calls past the budget are dropped before the SDK dispatches them.
     async wrapGenerate({ doGenerate, params }) {
+      const startedAt = Date.now();
       const generated = await doGenerate();
       let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
       const result = {
@@ -177,13 +197,22 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
       if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
         throw new Error(BLOCKED);
       }
+      logModelCall(
+        sessionId,
+        startedAt,
+        result.content.flatMap((part) =>
+          part.type === "tool-call" ? [part.toolName] : []
+        )
+      );
       return result;
     },
     async wrapStream({ doStream, params }) {
+      const startedAt = Date.now();
       const result = await doStream();
       const allowedCalls = new Set<string>();
       let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
       const admittedCalls = new Map<string, boolean>();
+      const admittedTools: string[] = [];
       const admit = (id: string, toolName: string) => {
         if (admittedCalls.has(id)) {
           return;
@@ -192,6 +221,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
         admittedCalls.set(id, keep);
         if (keep) {
           left -= 1;
+          admittedTools.push(toolName);
         }
       };
       const callId = (part: object) => {
@@ -210,12 +240,14 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
               ) {
                 admit(String(callId(part)), part.toolName);
               }
-              if (
-                part.type === "finish" &&
-                part.finishReason.unified === "tool-calls" &&
-                ![...admittedCalls.values()].includes(true)
-              ) {
-                throw new Error(BLOCKED);
+              if (part.type === "finish") {
+                if (
+                  part.finishReason.unified === "tool-calls" &&
+                  ![...admittedCalls.values()].includes(true)
+                ) {
+                  throw new Error(BLOCKED);
+                }
+                logModelCall(sessionId, startedAt, [...admittedTools]);
               }
               const id = part.type.startsWith("tool-")
                 ? callId(part)
@@ -246,13 +278,13 @@ export const widgetInvestigationModel = (
   wrapLanguageModel({
     middleware: nextActionEnabled()
       ? [
-          widgetInvestigationMiddleware(),
+          widgetInvestigationMiddleware(sessionId),
           simulateStreamingMiddleware(),
           widgetNextActionMiddleware({
             sessionId,
             stepModel: stepsId ? ticketLinkedModel(stepsId) : undefined,
           }),
         ]
-      : widgetInvestigationMiddleware(),
+      : widgetInvestigationMiddleware(sessionId),
     model: ticketLinkedModel(id),
   });
