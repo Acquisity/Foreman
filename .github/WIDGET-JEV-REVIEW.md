@@ -53,7 +53,7 @@ Numbered steps: the sentence splitter ended a sentence at a list marker, so "2."
 
 ## Fallback model (ENG-14669)
 
-Every production review on 2026-10-02 fell back: an answer has 7 to 13 items and one unsure item sends the whole answer to the fallback. The fallback moved from `deepseek/deepseek-v4-pro-0813` to `google/gemini-3.5-flash` (the `gate` slot, used only by the fallback reviewer). On 8 cases x 3 runs (the three production answers plus five with one planted unsafe sentence) both removed every unsafe sentence; DeepSeek took 32s median and 77s max, flash 10s and 17s. Flash removed more safe items, all of them raw tool field names that ENG-14665 stopped the extractor writing. flash-lite and claude-haiku-4.5 were faster but kept the production resume promise, and a single whole-answer Jev question could not tell that promise from a safe answer.
+Every production review on 2026-10-02 fell back: an answer has 7 to 13 items and one fallback-eligible unsure item (not a hard block such as `ownership_uncertain` or `foreign_not_removable`) sends the whole answer to the fallback. The fallback moved from `deepseek/deepseek-v4-pro-0813` to `google/gemini-3.5-flash` (the `gate` slot, used only by the fallback reviewer). On 8 cases x 3 runs (the three production answers plus five with one planted unsafe sentence) both removed every unsafe sentence; DeepSeek took 32s median and 77s max, flash 10s and 17s. Flash removed more safe items, all of them raw tool field names that ENG-14665 stopped the extractor writing. flash-lite and claude-haiku-4.5 were faster but kept the production resume promise, and a single whole-answer Jev question could not tell that promise from a safe answer.
 
 ## Keeping what is unconfirmed
 
