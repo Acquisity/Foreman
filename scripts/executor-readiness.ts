@@ -35,9 +35,18 @@ const bindings = z
     JSON.parse(await readFile(new URL("operation-bindings.json", root), "utf8"))
   );
 let failures = 0;
-const widgetPaths =
-  flagged === "widget" ? (await readManifest("widget-")).toolkit.paths : [];
-for (const path of widgetPaths) {
+const widget = flagged === "widget" ? await readManifest("widget-") : null;
+for (const [provider, missing] of Object.entries(
+  widget?.toolkit.missing ?? {}
+)) {
+  if (missing.length) {
+    console.log(
+      `MISSING ${widget?.toolkit.slug} widget catalog: ${provider} (${missing.length} coverage gaps)`
+    );
+    failures += 1;
+  }
+}
+for (const path of widget?.toolkit.paths ?? []) {
   if (!manifest.toolkit.paths.includes(path)) {
     console.log(
       `MISSING widget operation in ${manifest.toolkit.slug}: ${path}`
