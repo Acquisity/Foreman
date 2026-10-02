@@ -139,13 +139,21 @@ function dependencies(gateResult: GateResult = allowed) {
   return { deps, gated, run };
 }
 
+/** Like the app, every new message carries its own id unless the test pins one. */
+const withMessageId = (body: unknown) =>
+  typeof body === "object" &&
+  body !== null &&
+  !("action" in body && body.action !== "start") &&
+  !("message_id" in body)
+    ? { ...body, message_id: crypto.randomUUID() }
+    : body;
 const request = (
   body: unknown,
   authorization = "Bearer signed.user.identity",
   serviceSecret: string | null = SERVICE_SECRET
 ) =>
   new Request("https://foreman.example/internal/widget/message", {
-    body: typeof body === "string" ? body : JSON.stringify(body),
+    body: typeof body === "string" ? body : JSON.stringify(withMessageId(body)),
     headers: {
       authorization,
       "content-type": "application/json",
@@ -280,6 +288,7 @@ test("a valid conversation at every schema limit is read whole, not refused as t
       { length: 3 },
       (_, index) => `https://shots.example/${index}${"a".repeat(2025)}`
     ),
+    message_id: crypto.randomUUID(),
     question: `a${text(3998)}b`,
     screenshots: Array.from({ length: 3 }, () => `a${text(1498)}b`),
   });

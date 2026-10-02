@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
@@ -150,7 +149,7 @@ const inputSchema = z.discriminatedUnion("action", [
       .array(z.url({ protocol: /^https$/u }).max(MAX_IMAGE_URL_CHARS))
       .max(3)
       .optional(),
-    message_id: z.uuid().optional(),
+    message_id: z.uuid(),
     question: z.string().trim().min(1).max(4000),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
@@ -814,18 +813,6 @@ export async function finishWidgetRun(
   return deps.complete(run.id, result, findings, sessionId);
 }
 
-const requestKey = (input: Extract<WidgetInput, { action: "start" }>) =>
-  input.message_id ??
-  createHash("sha256")
-    .update(
-      JSON.stringify([
-        input.conversation_id,
-        withScreenshots(input),
-        ...(input.staff ? ["inbox"] : []),
-      ])
-    )
-    .digest("hex");
-
 /** Polls replay the turn; skip already persisted events before making a database call. */
 function recordRunProgress(
   run: WidgetRun,
@@ -947,7 +934,7 @@ async function claimOpenRun(
       );
     }
   }
-  return deps.claim(scope, requestKey(input), withScreenshots(input));
+  return deps.claim(scope, input.message_id, withScreenshots(input));
 }
 
 /** The reply to a confident help-center question nothing answered: a question back, never blank. */
