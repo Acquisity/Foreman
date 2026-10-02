@@ -378,6 +378,19 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes("basic plan"));
   });
 
+  it("redacts a database connection string whole", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          'connect failed ("postgres://app:hunter2@db.internal:5432/main") and mongodb+srv://u:pw@cluster.test/x',
+      })
+    );
+    assert.equal(record.message.includes("hunter2"), false);
+    assert.equal(record.message.includes("db.internal"), false);
+    assert.equal(record.message.includes("cluster.test"), false);
+    assert.ok(record.message.includes('("[redacted]")'));
+  });
+
   it("leaves an ordinary message and non-message fields untouched", () => {
     const record = JSON.parse(
       formatOpsEvent("session.completed", {

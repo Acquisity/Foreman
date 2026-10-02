@@ -44,8 +44,12 @@ const URL_QUERY_RE = /(https?:\/\/[^\s?]+)\?\S*/g;
 // An opaque credential after an auth scheme looks like nothing else here.
 // Scheme names as headers write them, and a credential-length value, so "basic plan" stays readable.
 const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/g;
+// A database connection string carries its password in the userinfo, so the whole URI goes.
+const CONNECTION_STRING_RE =
+  /\b(?:postgres|postgresql|mysql|mongodb)(?:\+srv)?:\/\/[^\s"'()[\]{};,]+/gi;
 const redactSensitive = (value: string): string =>
   value
+    .replace(CONNECTION_STRING_RE, "[redacted]")
     .replace(AUTH_SCHEME_RE, "$1 [redacted]")
     .replace(EMAIL_RE, "[email]")
     .replace(SECRET_RE, "[redacted]")
