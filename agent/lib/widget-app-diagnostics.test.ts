@@ -34,6 +34,10 @@ test("app diagnostics send trusted scope to a fixed origin and refuse redirects/
   const request = ((url, init) => {
     assert.equal(url, "https://app.test/api/internal/foreman/website");
     assert.equal(init?.redirect, "error");
+    assert.equal(init?.method, "POST");
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("authorization"), `Bearer ${"x".repeat(32)}`);
+    assert.equal(headers.get("content-type"), "application/json");
     assert.equal(
       JSON.parse(String(init?.body)).userId,
       verifiedWidgetContext.userId

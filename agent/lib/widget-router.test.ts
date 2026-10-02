@@ -296,7 +296,7 @@ describe("routeWidgetMessage", () => {
       assert.equal(route.confidence, 0);
       assert.equal(route.source, "fallback");
     }
-    // The log says why, as a fixed code, after the one retry the first two earn.
+    // The log says why, as a fixed code, after the one retry the 500 earns.
     assert.deepEqual(
       routes.map((route) => route.failure?.replace(TRAILING_MS, "")),
       ["reason=boom", "reason=http_500", "reason=invalid_output"]

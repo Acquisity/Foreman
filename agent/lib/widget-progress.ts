@@ -60,6 +60,7 @@ const eventSchema = z.object({
     result: z
       .object({
         callId: z.string(),
+        isError: z.boolean().optional(),
         kind: z.string(),
         output: z.unknown().optional(),
         toolName: z.string().optional(),
@@ -92,7 +93,12 @@ function groupedChecks(calls: Map<string, Check>): Check[] {
   return [...grouped].map(([id, status]) => ({ id, status }));
 }
 function failedResult(data: z.infer<typeof eventSchema>["data"]): boolean {
-  if (data.status === "failed" || data.result?.kind === "tool-error") {
+  // The framework's own markers first, as the ops hook reads them.
+  if (
+    data.result?.isError ||
+    data.status !== "completed" ||
+    data.result?.kind === "tool-error"
+  ) {
     return true;
   }
   const output = data.result?.output;

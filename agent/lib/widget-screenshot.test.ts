@@ -162,6 +162,7 @@ describe("screenshot readings beside the question", () => {
       withScreenshots({
         action: "start",
         conversation_id: ORG,
+        message_id: ORG,
         organization_id: ORG,
         question: "why is this failing?",
         screenshots: shots,

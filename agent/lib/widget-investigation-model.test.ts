@@ -249,3 +249,72 @@ for (const mode of ["generate", "stream"] as const) {
     assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
   });
 }
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: keeps the ticket tool after the workspace reads run out, until the budget is spent`, async () => {
+    const names = ["widget_outreach_health", "widget_file_ticket"];
+    const base = new MockLanguageModelV4({
+      doGenerate: {
+        ...result("x"),
+        content: names.map((name, n) => ({
+          ...toolCall(name),
+          toolCallId: `c${n}`,
+        })),
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = (used: number) => ({
+      prompt: [
+        {
+          content: [{ text: "Refund my last charge", type: "text" as const }],
+          role: "user" as const,
+        },
+        {
+          content: Array.from({ length: used }, (_, n) => ({
+            ...toolCall("widget_billing_summary"),
+            input: {},
+            toolCallId: `old${n}`,
+          })),
+          role: "assistant" as const,
+        },
+      ],
+      tools: names.map((name) => ({
+        inputSchema: { type: "object" },
+        name,
+        type: "function" as const,
+      })),
+    });
+    const received: string[] = [];
+    if (mode === "generate") {
+      const output = await model.doGenerate(params(12));
+      for (const part of output.content) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    } else {
+      const { stream } = await model.doStream(params(12));
+      for await (const part of stream) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    }
+    assert.deepEqual(received, ["widget_file_ticket"]);
+    assert.deepEqual(
+      base.doGenerateCalls[0].tools?.map((t) => t.name),
+      ["widget_file_ticket"]
+    );
+    const spent = await widgetInvestigationMiddleware().transformParams?.({
+      params: params(14),
+      type: "generate",
+    } as never);
+    assert.deepEqual((spent as { tools?: unknown[] }).tools, []);
+  });
+}

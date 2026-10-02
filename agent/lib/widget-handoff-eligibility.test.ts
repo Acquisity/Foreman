@@ -262,9 +262,14 @@ test("a necessary clarification with no facts is a reply, not a handoff", async 
 // Run d5822f74: Jev chose clarify in 359ms, then structuring and composing a
 // report around one question took 25 of the 34 finishing seconds.
 test("a post-tool clarify question is delivered without structuring or composing a report, and still passes the scan and the reviewer", async (t) => {
+  const previous = process.env.WIDGET_NEXT_ACTION;
   process.env.WIDGET_NEXT_ACTION = "jev";
   t.after(() => {
-    delete process.env.WIDGET_NEXT_ACTION;
+    if (previous === undefined) {
+      delete process.env.WIDGET_NEXT_ACTION;
+    } else {
+      process.env.WIDGET_NEXT_ACTION = previous;
+    }
   });
   const run: WidgetRun = {
     completed_at: null,

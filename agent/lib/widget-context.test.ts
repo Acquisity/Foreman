@@ -60,6 +60,20 @@ test("verifies the organization with the app and returns only the widget scope",
   assert.equal("intercomAppId" in result, false);
 });
 
+test("a teammate's request names the conversation for the app and is scoped as an inbox run", async (context) => {
+  configure(context);
+  const { request, requests } = requester(Response.json(appContext));
+  const result = await verifyWidgetContext(
+    { conversationId, organizationId, staff: true, userToken },
+    request
+  );
+  assert.deepEqual(JSON.parse(String(requests[0].init?.body)), {
+    conversationId,
+    organizationId,
+  });
+  assert.equal(result.source, "inbox");
+});
+
 test("rejects a denied, mismatched, or malformed verification", async (context) => {
   configure(context);
   for (const response of [
