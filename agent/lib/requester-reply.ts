@@ -367,7 +367,8 @@ export function directFollowUp(
     .trim();
   if (
     !(trigger.prompted || text.includes("@Foreman")) ||
-    text.replaceAll("@Foreman", "").trim() === ""
+    // Punctuation around a mention says nothing: "@Foreman," is still bare.
+    text.replaceAll("@Foreman", "").replace(/[\s\p{P}]/gu, "") === ""
   ) {
     return null;
   }

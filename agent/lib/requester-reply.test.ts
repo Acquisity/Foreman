@@ -331,3 +331,23 @@ test("leaves Foreman's own comments and relayed prompts to the other gates", () 
   assert.equal(prompted("f1"), null);
   assert.equal(prompted("missing"), null);
 });
+
+test("treats a mention with only punctuation around it as bare", () => {
+  for (const body of [
+    "@acquisityforeman1,",
+    "@acquisityforeman1!",
+    "@acquisityforeman1 ?",
+  ]) {
+    const comments = [
+      ...sessionThread,
+      said("b1", "aaron", "2026-10-02T20:09:00Z", body),
+    ];
+    for (const prompted of [true, false]) {
+      assert.equal(
+        directFollowUp(comments, foremanUser, { commentId: "b1", prompted }),
+        null,
+        body
+      );
+    }
+  }
+});
