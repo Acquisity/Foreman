@@ -28,7 +28,7 @@ export interface GateDeps {
     findings: ComposerInput;
     organizationName: string;
     question: string;
-    /** The app shows its screen recording card under this reply (the run's `request_recording`). */
+    /** The app shows its screen recording button under this reply (the run's `request_recording`). */
     recordingOffered: boolean;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
@@ -650,7 +650,7 @@ export async function gate(
    * runs under it, and once it passes the gate fails closed as gate_unavailable.
    */
   signal?: AbortSignal,
-  /** Whether the app shows its screen recording card under this reply. */
+  /** Whether the app shows its screen recording button under this reply. */
   recordingOffered = false,
   /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
   finishAt?: number
