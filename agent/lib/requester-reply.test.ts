@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  directFollowUp,
   planReply,
   promptedFollowUp,
   relayedFollowUp,
@@ -247,4 +248,106 @@ test("a support inbox note is judged like a Slack reply", () => {
     lastReply: "",
     replies: [note.body],
   });
+});
+
+const foremanUser = {
+  displayName: "acquisityforeman1",
+  id: FOREMAN,
+  url: "https://linear.app/acquisity/profiles/acquisityforeman1",
+};
+const said = (
+  id: string,
+  userId: string,
+  createdAt: string,
+  body: string,
+  parentId: string | null = "session"
+): ThreadComment => ({ body, createdAt, id, parentId, userId });
+const sessionThread = [
+  said(
+    "session",
+    "linear",
+    "2026-10-02T20:05:00Z",
+    "This thread is for an agent session with acquisityforeman1.",
+    null
+  ),
+  said("f1", FOREMAN, "2026-10-02T20:08:00Z", "Comment posted."),
+];
+
+test("judges a reply in a widget ticket's session thread against Foreman's last message", () => {
+  const thanks = said("p1", "aaron", "2026-10-02T20:09:00Z", "thanks");
+  assert.deepEqual(
+    directFollowUp([...sessionThread, thanks], foremanUser, {
+      commentId: "p1",
+      prompted: true,
+    }),
+    { lastReply: "Comment posted.", replies: ["thanks"] }
+  );
+});
+
+for (const mention of [`@${foremanUser.displayName}`, foremanUser.url]) {
+  for (const prompted of [false, true]) {
+    test(`normalizes ${mention} for a ${prompted ? "prompted" : "created"} event and dispatches a bare mention`, () => {
+      const thanks = said(
+        "m1",
+        "aaron",
+        "2026-10-02T20:09:00Z",
+        `thanks ${mention}`
+      );
+      const bare = said("m2", "aaron", "2026-10-02T20:10:00Z", mention);
+      const comments = [...sessionThread, thanks, bare];
+      assert.deepEqual(
+        directFollowUp(comments, foremanUser, { commentId: "m1", prompted }),
+        { lastReply: "Comment posted.", replies: ["thanks @Foreman"] }
+      );
+      assert.equal(
+        directFollowUp(comments, foremanUser, { commentId: "m2", prompted }),
+        null
+      );
+    });
+  }
+}
+
+test("leaves delegation alone", () => {
+  assert.equal(
+    directFollowUp(sessionThread, foremanUser, {
+      commentId: "session",
+      prompted: false,
+    }),
+    null
+  );
+});
+
+test("leaves Foreman's own comments and relayed prompts to the other gates", () => {
+  const prompt = said(
+    "p2",
+    "aaron",
+    "2026-10-02T20:09:00Z",
+    "**Aaron Fraga** added a note in the support inbox."
+  );
+  const comments = [...sessionThread, prompt];
+  const prompted = (commentId: string) =>
+    directFollowUp(comments, foremanUser, { commentId, prompted: true });
+  assert.equal(prompted("p2"), null);
+  assert.equal(prompted("f1"), null);
+  assert.equal(prompted("missing"), null);
+});
+
+test("treats a mention with only punctuation around it as bare", () => {
+  for (const body of [
+    "@acquisityforeman1,",
+    "@acquisityforeman1!",
+    "@acquisityforeman1 ?",
+  ]) {
+    const comments = [
+      ...sessionThread,
+      said("b1", "aaron", "2026-10-02T20:09:00Z", body),
+    ];
+    for (const prompted of [true, false]) {
+      assert.equal(
+        directFollowUp(comments, foremanUser, { commentId: "b1", prompted }),
+        null,
+        body
+      );
+    }
+  }
 });
