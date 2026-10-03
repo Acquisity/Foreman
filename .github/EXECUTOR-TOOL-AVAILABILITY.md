@@ -51,3 +51,16 @@ The live policy comparison must match the manifest exactly. Representative provi
 Imported the official [Vercel OpenAPI document](https://openapi.vercel.sh/) as `foreman_vercel_api`, using `https://api.vercel.com` and the owner-provided Foreman-scoped bearer credential. All 417 operations are installed. The shared `foreman` toolkit allows the connection and overrides it with 65 exact blocks: the installed delete, remove, and revoke operations, plus `projects.pauseProject`, `user.requestDelete`, both `edgeCache.dangerouslyDeleteBy*` operations, `vcr.clearRepositoryPermissions`, and `projects.batchRemoveProjectEnv`. The manifest records every blocked address and the 352 currently allowed addresses, bringing the selected company catalog to 1,072. Ordinary updates, deployment creation and deployment cancellation remain enabled as requested. Provider scope remains unchanged.
 
 Browser verification confirmed 65 blocked and 352 enabled operations. The owner-reported Foreman preview smoke test passed discovery, project metadata, deployment listing and build logs, with HTTP 200 and no writes. Runtime logs are discoverable but were not exercised in that test. This REST surface does not promise the hosted MCP's toolbar, documentation-search, or protected-URL helpers. The empty OAuth-only Vercel integration is retained but unused; callback approval is no longer required for the working REST connection.
+
+## Raindrop connection (2026-10-03)
+
+Raindrop (`https://mcp.raindrop.ai/mcp`, integration `raindrop`, org connection `foremanRaindrop`) holds evidence about how Acquisity's own AI features behaved: LLM events, traces, signals, issues, and cost. The `foreman` and `foreman-support` toolkits each mount `raindrop.org.foremanRaindrop.*` with 35 exact read approvals, recorded in both manifests, bringing them to 1,107 and 304 selected operations. The widget catalog carries no Raindrop operation. The other 23 installed tools fall to the default deny:
+
+| Group | Reason | Excluded operations |
+| --- | --- | --- |
+| Writes | Issue, dataset, annotation, memory, dashboard, experiment, signal, and feedback mutations; the surface is read-only. Dataset writes stay excluded until the eval capture step is built. | `annotate_items`, `close_signal_session`, `create_dashboard`, `create_dataset`, `create_experiment`, `create_memory`, `delete_memory`, `edit_dashboard`, `refine_signal`, `submit_feedback`, `update_dataset_members`, `update_issue`, `update_memory` |
+| Credential | Returns the ingest write key. | `get_write_key` |
+| Raindrop Triage agent | Starts or follows a Raindrop-side investigation. | `ask_agent_question`, `get_agent_conversation`, `get_agent_progress` |
+| Signal sessions | Start, read, or refine a signal-building session. | `get_signal_session`, `get_signal_session_code`, `get_signal_session_status`, `label_signal_batch`, `refine_signal_session`, `start_signal_session` |
+
+Verified through both toolkit endpoints at setup: 35 tools visible, `list_projects` returned data, and `get_write_key` returned `tool_blocked`.

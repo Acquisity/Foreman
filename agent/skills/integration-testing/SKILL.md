@@ -18,7 +18,7 @@ Default to read-only tests. Use a supplied test identifier when one is needed. O
 - Autumn and Stripe: make one catalog/account read and separately exercise the authored billing helper with a designated billing-account or Stripe identifier. A wrong identifier is distinct from unavailable credentials.
 - Inngest: a small health/list read, then find_function_runs for a supplied function/window when full helper coverage is requested. Preserve partial results when a trace is unavailable.
 - Help center: find_help_article with a short ordinary query; verify article filtering and an explicit advisory error on failure.
-- Sentry, Axiom, Exa, Intercom, Jam, Lucent, Modem, Neon, PostHog, Resend, OpenRouter, Vercel: discover and use one small read within the existing grant. OpenRouter inference and Vercel writes are separate attended tests.
+- Sentry, Axiom, Exa, Intercom, Jam, Lucent, Modem, Neon, PostHog, Raindrop, Resend, OpenRouter, Vercel: discover and use one small read within the existing grant. OpenRouter inference and Vercel writes are separate attended tests. Raindrop holds evidence about how Acquisity's own AI features behaved (LLM events, traces, signals, issues, cost); `list_projects` is its small read, and it has no writes to test.
 
 For workspace discovery pagination, pass the returned `nextStartingAfter` value as the next call's `startingAfter`, keeping the same search.
 
