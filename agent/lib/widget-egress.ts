@@ -345,7 +345,7 @@ export function redactableItems(findings: WidgetFindings): RedactableItem[] {
 
 // ponytail: a word list, not understanding. It misses a caveat phrased another
 // way (the reviewers' policy is the first defence) and can count a non-caveat,
-// which only costs an extra block. Upgrade path: a structured caveat flag on facts.
+// which only costs the stand-in sentence. Upgrade path: a structured caveat flag on facts.
 const CAVEAT =
   /\b(?:cannot|can(?:'|’)t|could(?: not|n(?:'|’)t)|unable|unknown|uncertain|unconfirmed|unverified|unavailable|not (?:be |been |yet )?(?:confirmed|verified|checked|established|settled|known|readable|available)|does not (?:establish|show|prove|mean))\b/iu;
 
@@ -353,7 +353,7 @@ const CAVEAT =
  * Looks at the answer that would remain, not at each deletion: findings that
  * said something was unconfirmed must still say so afterwards. Whoever asked
  * for the deletions, an answer stripped of its last caveat claims more than was
- * verified, so it is refused and the caller blocks.
+ * verified, so `removeItems` puts `UNCONFIRMED_FACT` in its place.
  */
 export const removesLastCaveat = (
   before: { text: string }[],
@@ -363,11 +363,22 @@ export const removesLastCaveat = (
   !kept.some((item) => CAVEAT.test(item.text));
 
 /**
+ * Stands in for the last caveat when a deletion takes it. Blocking there left
+ * the customer with no answer (4 of 222 benchmark runs), and restoring the item
+ * would show text a reviewer wanted gone. Fixed text, so no model writes it.
+ */
+const UNCONFIRMED_FACT: WidgetFindings["facts"][number] = {
+  claim: "Some details could not be confirmed.",
+  entityIds: [],
+  evidence: { ref: "", tool: "widget-gate" },
+};
+
+/**
  * Apply a rewrite by deletion only. The judge names item numbers and this
- * removes them, so a rewrite can drop content but can never add or reword any:
- * whatever survives is text the investigator wrote. Returns null when the
- * numbers are unusable or nothing would be left to tell the customer, and the
- * caller then blocks.
+ * removes them, so a rewrite can drop content but can never reword any: whatever
+ * survives is text the investigator wrote, plus `UNCONFIRMED_FACT` when the
+ * last caveat went. Returns null when the numbers are unusable or nothing would
+ * be left to tell the customer, and the caller then blocks.
  */
 export function removeItems(
   findings: WidgetFindings,
@@ -392,16 +403,15 @@ export function removeItems(
   const facts = findings.facts.filter((_fact, index) =>
     keptFacts.has(index + 1)
   );
-  if (
-    (facts.length === 0 && !recommendation) ||
-    removesLastCaveat(items, kept)
-  ) {
+  if (facts.length === 0 && !recommendation) {
     return null;
   }
   const { needsWrite, ...rest } = findings;
   return {
     ...rest,
-    facts,
+    facts: removesLastCaveat(items, kept)
+      ? [...facts, UNCONFIRMED_FACT]
+      : facts,
     recommendation,
     ...(needsWrite && kept.some((item) => item.kind === "needsWrite")
       ? { needsWrite }
@@ -567,18 +577,7 @@ function applyRewrite(
   findings: WidgetFindings,
   remove: number[]
 ): WidgetFindings | string {
-  const rewritten = removeItems(findings, remove);
-  if (rewritten) {
-    return rewritten;
-  }
-  const items = redactableItems(findings);
-  const drop = new Set(remove);
-  return removesLastCaveat(
-    items,
-    items.filter((item) => !drop.has(item.n))
-  )
-    ? "model_gate:removed_last_caveat"
-    : "model_gate:invalid_rewrite";
+  return removeItems(findings, remove) ?? "model_gate:invalid_rewrite";
 }
 
 const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
