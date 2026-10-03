@@ -10,6 +10,7 @@ import {
   SLACK_PROMPT,
 } from "./jev-decisions.js";
 import { askFromName } from "./linear-context.js";
+import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
 
 /**
  * Replies to the requester in their Slack thread, as Foreman.
@@ -110,9 +111,10 @@ async function followUpOutcome(
 }
 
 const THREAD_QUERY = `query RequesterThread($id: String!) {
-  viewer { id }
+  viewer { id displayName }
   issue(id: $id) {
     id
+    project { id }
     comments(first: 100) {
       pageInfo { hasNextPage }
       nodes { id body createdAt parent { id } user { id } }
@@ -159,8 +161,9 @@ interface ThreadResponse {
       }[];
     };
     id: string;
+    project: { id: string } | null;
   } | null;
-  viewer: { id: string };
+  viewer: { displayName: string; id: string };
 }
 
 interface ReplyResponse {
@@ -178,10 +181,22 @@ export type ReplyResult =
       reason: string;
     };
 
+/** Foreman's own Linear app user, as the thread read's viewer. */
+export interface ForemanUser {
+  displayName: string;
+  id: string;
+}
+
 async function readThread(
   issue: string,
   credentials: LinearChannelCredentials
-): Promise<{ comments: ThreadComment[]; issueId: string; plan: ReplyPlan }> {
+): Promise<{
+  comments: ThreadComment[];
+  foreman: ForemanUser;
+  issueId: string;
+  plan: ReplyPlan;
+  widgetFeedback: boolean;
+}> {
   const thread = await callLinearGraphQL<ThreadResponse>({
     credentials,
     query: THREAD_QUERY,
@@ -207,8 +222,10 @@ async function readThread(
   }));
   return {
     comments,
+    foreman: thread.viewer,
     issueId: thread.issue.id,
     plan: planReply(comments, thread.viewer.id),
+    widgetFeedback: thread.issue.project?.id === WIDGET_FEEDBACK_PROJECT_ID,
   };
 }
 
@@ -216,7 +233,8 @@ async function readThread(
  * What a relayed Slack reply needs from Foreman, whether it opened a session
  * or was prompted into the ticket's existing one, decided
  * before the model runs so a skip costs one read and one Jev call instead of
- * a full turn. A session opened by a person on the ticket returns null.
+ * a full turn. A person writing to Foreman directly is judged only on a chat
+ * widget ticket (ENG-14674); on every other ticket that returns null.
  */
 export async function relayedFollowUpOutcome(
   issue: string,
@@ -224,10 +242,15 @@ export async function relayedFollowUpOutcome(
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
 ): Promise<FollowUpOutcome | null> {
-  const { comments, plan } = await readThread(issue, credentials);
-  const followUp = trigger.prompted
-    ? promptedFollowUp(comments, plan, trigger.commentId)
-    : relayedFollowUp(comments, plan, trigger.commentId);
+  const { comments, foreman, plan, widgetFeedback } = await readThread(
+    issue,
+    credentials
+  );
+  const followUp =
+    (trigger.prompted
+      ? promptedFollowUp(comments, plan, trigger.commentId)
+      : relayedFollowUp(comments, plan, trigger.commentId)) ??
+    (widgetFeedback ? directFollowUp(comments, foreman, trigger) : null);
   if (followUp === null) {
     return null;
   }
@@ -311,6 +334,44 @@ export function promptedFollowUp(
     lastReply: plan.followUp?.lastReply ?? "",
     replies: fresh.map((c) => c.body),
     ...(earlier.length > 0 ? { earlier: earlier.map((c) => c.body) } : {}),
+  };
+}
+
+/**
+ * The follow-up to judge when a person wrote to Foreman directly on a chat
+ * widget ticket: a reply in a session thread, or a comment that mentions it.
+ * Only that one comment is judged, against the last thing Foreman said on the
+ * ticket. Delegation opens its session on Linear's own thread comment, which
+ * carries no mention and is never judged, and neither is a bare mention: both
+ * ask for the diagnosis itself.
+ */
+export function directFollowUp(
+  comments: readonly ThreadComment[],
+  foreman: ForemanUser,
+  trigger: { commentId: string; prompted: boolean }
+): FollowUpInput | null {
+  const comment = comments.find((c) => c.id === trigger.commentId);
+  const mention = `@${foreman.displayName}`;
+  if (
+    !comment ||
+    comment.userId === foreman.id ||
+    // A relayed reply or its prompt belongs to the requester-thread gate.
+    RELAY_HEADER.test(comment.body) ||
+    SLACK_PROMPT.test(comment.body.trim()) ||
+    !(trigger.prompted || comment.body.includes(mention))
+  ) {
+    return null;
+  }
+  if (comment.body.replaceAll(mention, "").trim() === "") {
+    return null;
+  }
+  const lastReply = comments
+    .filter((c) => c.userId === foreman.id && c.createdAt < comment.createdAt)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .at(-1);
+  return {
+    lastReply: lastReply?.body ?? "",
+    replies: [comment.body.replaceAll(mention, "@Foreman").trim()],
   };
 }
 
