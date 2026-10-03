@@ -1053,13 +1053,13 @@ async function explainPrevious(
   );
 }
 
-/** A bug report, or an explicit ask or offer to send a recording, gets the app's recording card. */
+/** A bug report, or an explicit ask or offer to send a recording, gets the app's recording button. */
 const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
   route.bug === true || route.recording === true || offersRecording(ask.latest);
 
 /**
- * Ask the app for its recording card when the turn wants one. True only once
- * the row says so: a failed write shows no card, and loses only the offer.
+ * Ask the app for its recording button when the turn wants one. True only once
+ * the row says so: a failed write shows no button, and loses only the offer.
  */
 async function offerRecording(
   run: WidgetRun,
@@ -1107,7 +1107,7 @@ async function answerFromKnowledgeBase(
   );
   const ids = { conversationId: scope.conversationId, runId: run.id };
   // Before any reply is written, so every lane's result carries the flag and
-  // every writer is told whether the card shows. A failed write only loses the
+  // every writer is told whether the button shows. A failed write only loses the
   // recording offer, never the reply.
   const recordingOffered = await offerRecording(run, route, asked, deps);
   const ask = { ...asked, recordingOffered };

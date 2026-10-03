@@ -73,7 +73,7 @@ export interface WidgetAsk {
   images?: string[];
   latest: string;
   /**
-   * Whether the app shows its screen recording card under this reply: the same
+   * Whether the app shows its screen recording button under this reply: the same
    * decision that sets `request_recording`. Absent until that decision is made.
    */
   recordingOffered?: boolean;
@@ -164,13 +164,13 @@ export function recentTurns(
   ];
 }
 
-/** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
+/** How every reply writer reads `recordingOffered`, so none of them guesses whether the button shows. */
 /** How the app words a message that is only a screenshot (Acquisity lib/support/foreman-reply.ts). */
 export const SCREENSHOT_ONLY =
   /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
 
 export const RECORDING_RULE =
-  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the recording option below is the way to send it. When it is false, never mention a recording option or card, and never say a recording is impossible.";
+  "They cannot attach video or other files here. recordingOffered says whether the app shows a small Record my screen button at the bottom of your reply. When it is true, mention the button only when a recording would actually help pin the problem down, such as when they ask or offer to send one or when their words do not show what went wrong, and then in a few words; otherwise say nothing about it, and never repeat a mention Support already made earlier in the conversation unless they ask or offer to send a recording again. This recording guidance takes precedence over general rules against repetition. You may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the Record my screen button on your reply is the way to send it. When it is false, never mention a recording option or button, and never say a recording is impossible.";
 
 /** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
 export const renderReplyAsk = (
@@ -264,7 +264,7 @@ const QUESTIONS = {
     type: "choice",
   },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only
-  // decides whether the app offers its recording card; the lanes ignore it.
+  // decides whether the app offers its recording button; the lanes ignore it.
   // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
   offers_recording: {
     instructions:
