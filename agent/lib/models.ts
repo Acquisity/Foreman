@@ -9,10 +9,12 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 export const MODELS = {
   // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
-  // Support widget egress gate and composer: never investigates. On the same
-  // DeepSeek id as the orchestrator so it rides the working gateway routing;
-  // callers must apply gatewayRouting(id) since it is a deepseek/ model.
-  gate: "deepseek/deepseek-v4-pro-0813",
+  // Support widget egress reviewer: never investigates, never composes. On 111
+  // real cases, two calls each (ENG-14669), gpt-5.6-sol with the same prompt let
+  // through 9 bad sentences of 222 against deepseek-v4-pro's 11, at p50 2.7s
+  // against 26 to 71s. Its 3 whole-answer blocks are retried with blocking off
+  // (`guardedJudge` in widget-egress.ts).
+  gate: "openai/gpt-5.6-sol",
   // Support widget knowledge-base lane: one grounded answer over a few public
   // help articles, and the lane's short chat, clarify and explain replies.
   // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite

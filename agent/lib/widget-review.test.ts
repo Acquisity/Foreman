@@ -408,7 +408,7 @@ const gateWith = (subject: WidgetFindings, judge: GateDeps["judge"]) => {
   }).then((result) => ({ result, shown }));
 };
 
-test("no reviewer, alone or combined, can delete the last statement of what is unconfirmed", async () => {
+test("deleting the last statement of what is unconfirmed leaves the fixed sentence in its place", async () => {
   const generation = twoItems(
     "No saved copy-review blocks were found in the last seven days.",
     "Model-call error telemetry was unavailable, so that part remains unknown."
@@ -423,11 +423,15 @@ test("no reviewer, alone or combined, can delete the last statement of what is u
     const direct = await gateWith(subject, () =>
       Promise.resolve({ decision: "rewrite", reason: "internal", remove: [2] })
     );
+    // The deleted caveat stays gone and the fixed sentence stands in for it.
     assert.deepEqual(
-      [direct.result.decision, direct.result.reason, direct.shown],
-      ["block", "model_gate:removed_last_caveat", undefined]
+      [direct.result.decision, direct.shown?.slice(0, 2)],
+      [
+        "rewrite",
+        [subject.facts[0]?.claim, "Some details could not be confirmed."],
+      ]
     );
-    // JEV unsure, the fallback deletes it: the combined set is refused too.
+    // JEV unsure, the fallback deletes it: the combined set gets it too.
     const viaFallback = await gateWith(subject, (data) =>
       reviewWidgetFindings(data, {
         apiKey: "test",
@@ -441,7 +445,11 @@ test("no reviewer, alone or combined, can delete the last statement of what is u
         log: () => undefined,
       })
     );
-    assert.equal(viaFallback.result.reason, "model_gate:removed_last_caveat");
+    assert.equal(viaFallback.result.decision, "rewrite");
+    assert.deepEqual(viaFallback.shown?.slice(0, 2), [
+      subject.facts[0]?.claim,
+      "Some details could not be confirmed.",
+    ]);
     // Kept, the product-job fact and its limit reach the customer word for word.
     const kept = await gateWith(subject, () =>
       Promise.resolve({ decision: "allow", reason: "ok" })
@@ -493,8 +501,12 @@ test("deletions spread across reviewers are judged by the answer that remains", 
       })
     );
   const both = await run([3]);
-  assert.equal(both.result.reason, "model_gate:removed_last_caveat");
-  assert.equal(both.result.findings.facts.length, 3);
+  assert.equal(both.result.decision, "rewrite");
+  assert.deepEqual(both.shown, [
+    payment.facts[0]?.claim,
+    "Some details could not be confirmed.",
+    "",
+  ]);
   // One statement of the uncertainty surviving is enough to answer.
   const one = await run([1]);
   assert.equal(one.result.decision, "rewrite");
