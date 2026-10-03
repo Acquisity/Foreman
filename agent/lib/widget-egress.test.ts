@@ -1032,9 +1032,14 @@ test("a block is asked once more with blocking off and that answer is applied as
   assert.equal(held.reason, "model_gate:foreign data");
 
   // A retry that fails keeps the first block instead of failing the gate.
-  const failing = await guardedJudge((retry) =>
-    retry ? Promise.reject(new Error("timeout")) : Promise.resolve(block)
-  );
+  const asked: boolean[] = [];
+  const failing = await guardedJudge((retry) => {
+    asked.push(retry);
+    return retry
+      ? Promise.reject(new Error("timeout"))
+      : Promise.resolve(block);
+  });
+  assert.deepEqual(asked, [false, true]);
   assert.deepEqual(failing, block);
 
   const still = guarded([block, { ...block, reason: "still internal" }]);
