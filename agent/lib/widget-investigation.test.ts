@@ -931,7 +931,7 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   );
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.request_recording, true);
-  // The writer is told the card shows, so it can point to it.
+  // The writer is told the button shows, so it can point to it.
   assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
 });
 
@@ -982,7 +982,7 @@ test("Jev's recording judgment asks the app for the card and tells the help-cent
   assert.equal(notAsked.offered, false);
 });
 
-test("every reply lane is told whether the recording card shows, and only a recorded offer says it does", async (t) => {
+test("every reply lane is told whether the recording button shows, and only a recorded offer says it does", async (t) => {
   enabled(t);
   const bugRoute = (bug: boolean) => () =>
     Promise.resolve({
@@ -1031,7 +1031,7 @@ test("every reply lane is told whether the recording card shows, and only a reco
   assert.equal(failed.offered, false);
 });
 
-test("the investigation composer is told whether the recording card shows", async () => {
+test("the investigation composer is told whether the recording button shows", async () => {
   const offered: boolean[] = [];
   for (const requested of [true, false]) {
     const { deps, run } = dependencies();
