@@ -445,6 +445,7 @@ test("deleting the last statement of what is unconfirmed leaves the fixed senten
         log: () => undefined,
       })
     );
+    assert.equal(viaFallback.result.decision, "rewrite");
     assert.deepEqual(viaFallback.shown?.slice(0, 2), [
       subject.facts[0]?.claim,
       "Some details could not be confirmed.",
@@ -500,6 +501,7 @@ test("deletions spread across reviewers are judged by the answer that remains", 
       })
     );
   const both = await run([3]);
+  assert.equal(both.result.decision, "rewrite");
   assert.deepEqual(both.shown, [
     payment.facts[0]?.claim,
     "Some details could not be confirmed.",
