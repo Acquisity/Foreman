@@ -66,12 +66,15 @@ const withinGate = async <T>(
 const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
   event.agentSession.issueId ?? event.agentSession.issue?.id ?? undefined;
 
-/** Judges a relayed Slack follow-up before the model runs. */
+/**
+ * Judges a follow-up before the model runs: a relayed Slack reply on any
+ * ticket, or a comment written to Foreman on a chat widget ticket.
+ */
 const followUpOutcome = (
   event: LinearAgentSessionEvent
 ): Promise<FollowUpOutcome | null> => {
-  // A reply either opened its own session (legacy relay with a mention) or
-  // was prompted into the ticket's existing one by the receiver.
+  // A reply either opened its own session (a mention) or was prompted into
+  // the ticket's existing one, by the receiver or by a person in its thread.
   const prompted = event.action === "prompted";
   const commentId = prompted
     ? event.agentActivity?.sourceCommentId
@@ -126,8 +129,9 @@ export const onAgentSession = async (
   ) {
     return null;
   }
-  // Every relayed Slack reply opens a session; one that needs nothing from
-  // Foreman ends here with a line in the session chat, never on the ticket.
+  // Every relayed Slack reply opens a session, and so does every comment in
+  // a widget ticket's session thread; one that needs nothing from Foreman
+  // ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
   const [outcome, requester, route] = await Promise.all([
