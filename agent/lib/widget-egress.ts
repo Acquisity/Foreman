@@ -442,7 +442,9 @@ const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app
 const verdictSchema = z.object({
   decision: z.enum(["allow", "rewrite", "block"]),
   reason: z.string().max(500),
-  remove: z.array(z.number().int()).max(60).optional(),
+  // Required, empty when nothing goes: a strict structured-output route rejects
+  // the whole request when a property is optional ("Missing 'remove'").
+  remove: z.array(z.number().int()).max(60),
 });
 
 type JudgeInput = Parameters<GateDeps["judge"]>[0];
