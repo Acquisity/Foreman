@@ -912,7 +912,7 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   const written: string[] = [];
   deps.answerChat = (message) => {
     written.push(message);
-    return Promise.resolve({ citations: [], message: "Use the card below." });
+    return Promise.resolve({ citations: [], message: "Use the button below." });
   };
   deps.requestRecording = () => {
     run.recording_requested = true;
@@ -935,7 +935,7 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
 });
 
-test("Jev's recording judgment asks the app for the card and tells the help-center writer", async (t) => {
+test("Jev's recording judgment asks the app for the button and tells the help-center writer", async (t) => {
   enabled(t);
   const answeredWith = async (recording: boolean) => {
     const { deps, run } = dependencies();
@@ -1023,7 +1023,7 @@ test("every reply lane is told whether the recording button shows, and only a re
   const notWanted = await answeredWith(false, () => Promise.resolve());
   assert.equal(notWanted.body.request_recording, undefined);
   assert.equal(notWanted.offered, false);
-  // A failed write shows no card, so the reply must not point to one.
+  // A failed write shows no button, so the reply must not point to one.
   const failed = await answeredWith(true, () =>
     Promise.reject(new Error("db"))
   );

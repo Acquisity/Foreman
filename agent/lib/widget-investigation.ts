@@ -1059,7 +1059,7 @@ const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
 
 /**
  * Ask the app for its recording button when the turn wants one. True only once
- * the row says so: a failed write shows no card, and loses only the offer.
+ * the row says so: a failed write shows no button, and loses only the offer.
  */
 async function offerRecording(
   run: WidgetRun,
