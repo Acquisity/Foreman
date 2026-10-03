@@ -986,7 +986,11 @@ test("a block is asked once more with blocking off and that answer is applied as
       });
     return { judge, retries };
   };
-  const block = { decision: "block" as const, reason: "internal detail" };
+  const block = {
+    decision: "block" as const,
+    reason: "internal detail",
+    remove: [2],
+  };
 
   const rewritten = guarded([
     block,
@@ -999,13 +1003,39 @@ test("a block is asked once more with blocking off and that answer is applied as
   assert.equal(result.findings.facts.length, 1);
   assert.match(result.message ?? "", RECONNECT);
 
-  // An "allow" on the retry is still applied as a rewrite: with nothing to remove it is unusable.
+  // The items the block named always go, whatever the retry removes.
   const allowed = guarded([block, { decision: "allow", reason: "fine" }]);
-  assert.equal(
-    (await gate(scope, question, twoFacts, deps({ judge: allowed.judge }).deps))
-      .reason,
-    "model_gate:invalid_rewrite"
+  const kept = await gate(
+    scope,
+    question,
+    twoFacts,
+    deps({ judge: allowed.judge }).deps
   );
+  assert.equal(kept.decision, "rewrite");
+  assert.equal(kept.findings.facts.length, 1);
+  const elsewhere = guarded([
+    block,
+    { decision: "rewrite", reason: "other", remove: [3] },
+  ]);
+  const both = await elsewhere.judge({} as never);
+  assert.deepEqual(both.remove, [2, 3]);
+
+  // A block that names no items cannot be checked against a retry: one ask, still a block.
+  const unnamed = guarded([{ decision: "block", reason: "foreign data" }]);
+  const held = await gate(
+    scope,
+    question,
+    twoFacts,
+    deps({ judge: unnamed.judge }).deps
+  );
+  assert.deepEqual(unnamed.retries, [false]);
+  assert.equal(held.reason, "model_gate:foreign data");
+
+  // A retry that fails keeps the first block instead of failing the gate.
+  const failing = await guardedJudge((retry) =>
+    retry ? Promise.reject(new Error("timeout")) : Promise.resolve(block)
+  );
+  assert.deepEqual(failing, block);
 
   const still = guarded([block, { ...block, reason: "still internal" }]);
   const blocked = await gate(

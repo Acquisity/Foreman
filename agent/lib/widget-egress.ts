@@ -420,7 +420,7 @@ Block when any fact or the recommendation discloses data belonging to a differen
 Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block. Naming Stripe for the customer's own billing, or Instantly for their own sending accounts, is not internal operations detail. Remove an item whose point is what another outside service (such as Autumn, Sentry, Axiom, Inngest, Vercel) shows or did; an item that merely names one while stating a fact about the customer's workspace can stay, because the reply writer drops the name.
 ${LIMITATION_POLICY}
 Also remove an item that tells the customer to buy again, place a new order or pay again while the findings leave the original payment or delivery unresolved, and an item that promises sending or other activity will resume.
-Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
+Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. When you block, also list in "remove" the numbers of the items that cause the block. The reason is one short sentence for internal staff.`;
 
 const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. Never add a product step the findings do not give. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give only the article-backed steps already present in the findings. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When the findings lack applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have reported this to the engineering team as a ticket, without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and say you will report it to engineering if that shows a fault on our side; this is the one allowed exception to the rule against promises, because it happens in this chat when they reply, not later. If confidence is low, say what is uncertain. The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the findings come from a screen recording the customer already sent, call it their screen recording, never name the service that made it or link to it, and do not ask for another one. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No greetings, no sign-off, no em dashes.`;
 
@@ -450,19 +450,26 @@ const NO_BLOCK = `Blocking is not available for this review: answer "rewrite" an
 /**
  * The reviewer must never leave the customer with no answer when removing items
  * would do: 3 of 222 benchmark calls blocked a whole answer over one or two
- * removable items. A block is asked once more with blocking off, under the same
- * deadline, and that answer is applied as a rewrite. One that still blocks, or
- * whose removals leave nothing (`applyRewrite` says so), blocks as before.
+ * removable items. A block that names the items causing it is asked once more
+ * with blocking off, and the retry's removals are added to those items, so the
+ * cause always goes. A block that names no items, a retry that still blocks or
+ * fails, or removals that leave nothing (`applyRewrite` says so) block as before.
  */
 export async function guardedJudge(
   ask: (retry: boolean) => Promise<Verdict>
 ): Promise<Verdict> {
   const first = await ask(false);
-  if (first.decision !== "block") {
+  if (first.decision !== "block" || !first.remove?.length) {
     return first;
   }
-  const retry = await ask(true);
-  return retry.decision === "block" ? retry : { ...retry, decision: "rewrite" };
+  const retry = await ask(true).catch(() => first);
+  return retry.decision === "block"
+    ? retry
+    : {
+        ...retry,
+        decision: "rewrite",
+        remove: [...new Set([...first.remove, ...(retry.remove ?? [])])],
+      };
 }
 
 /** The model reviewer. */
@@ -537,11 +544,16 @@ export const defaultGateDeps: GateDeps = {
     return text.trim();
   },
   judge: (input) => {
-    const signal = within(
-      judgeBudgetMs(input.finishAt, Date.now()),
-      input.signal
+    const startedAt = Date.now();
+    // Each ask gets what the finish has left less the composer's reserve, so a
+    // slow first answer does not leave the retry an already expired deadline.
+    return guardedJudge((retry) =>
+      modelJudge(
+        input,
+        within(judgeBudgetMs(input.finishAt, startedAt), input.signal),
+        retry
+      )
     );
-    return guardedJudge((retry) => modelJudge(input, signal, retry));
   },
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
