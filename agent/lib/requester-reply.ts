@@ -111,7 +111,7 @@ async function followUpOutcome(
 }
 
 const THREAD_QUERY = `query RequesterThread($id: String!) {
-  viewer { id displayName }
+  viewer { id displayName url }
   issue(id: $id) {
     id
     project { id }
@@ -163,7 +163,7 @@ interface ThreadResponse {
     id: string;
     project: { id: string } | null;
   } | null;
-  viewer: { displayName: string; id: string };
+  viewer: ForemanUser;
 }
 
 interface ReplyResponse {
@@ -185,6 +185,7 @@ export type ReplyResult =
 export interface ForemanUser {
   displayName: string;
   id: string;
+  url: string;
 }
 
 async function readThread(
@@ -351,18 +352,23 @@ export function directFollowUp(
   trigger: { commentId: string; prompted: boolean }
 ): FollowUpInput | null {
   const comment = comments.find((c) => c.id === trigger.commentId);
-  const mention = `@${foreman.displayName}`;
   if (
     !comment ||
     comment.userId === foreman.id ||
     // A relayed reply or its prompt belongs to the requester-thread gate.
     RELAY_HEADER.test(comment.body) ||
-    SLACK_PROMPT.test(comment.body.trim()) ||
-    !(trigger.prompted || comment.body.includes(mention))
+    SLACK_PROMPT.test(comment.body.trim())
   ) {
     return null;
   }
-  if (comment.body.replaceAll(mention, "").trim() === "") {
+  const text = comment.body
+    .replaceAll(`@${foreman.displayName}`, "@Foreman")
+    .replaceAll(foreman.url, "@Foreman")
+    .trim();
+  if (
+    !(trigger.prompted || text.includes("@Foreman")) ||
+    text.replaceAll("@Foreman", "").trim() === ""
+  ) {
     return null;
   }
   const lastReply = comments
@@ -371,7 +377,7 @@ export function directFollowUp(
     .at(-1);
   return {
     lastReply: lastReply?.body ?? "",
-    replies: [comment.body.replaceAll(mention, "@Foreman").trim()],
+    replies: [text],
   };
 }
 

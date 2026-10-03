@@ -250,7 +250,11 @@ test("a support inbox note is judged like a Slack reply", () => {
   });
 });
 
-const foremanUser = { displayName: "acquisityforeman1", id: FOREMAN };
+const foremanUser = {
+  displayName: "acquisityforeman1",
+  id: FOREMAN,
+  url: "https://linear.app/acquisity/profiles/acquisityforeman1",
+};
 const said = (
   id: string,
   userId: string,
@@ -280,30 +284,37 @@ test("judges a reply in a widget ticket's session thread against Foreman's last 
   );
 });
 
-test("judges a comment that mentions Foreman, and leaves delegation and a bare mention alone", () => {
-  const mention = said(
-    "m1",
-    "aaron",
-    "2026-10-02T20:09:00Z",
-    "thanks @acquisityforeman1",
+for (const mention of [`@${foremanUser.displayName}`, foremanUser.url]) {
+  for (const prompted of [false, true]) {
+    test(`normalizes ${mention} for a ${prompted ? "prompted" : "created"} event and dispatches a bare mention`, () => {
+      const thanks = said(
+        "m1",
+        "aaron",
+        "2026-10-02T20:09:00Z",
+        `thanks ${mention}`
+      );
+      const bare = said("m2", "aaron", "2026-10-02T20:10:00Z", mention);
+      const comments = [...sessionThread, thanks, bare];
+      assert.deepEqual(
+        directFollowUp(comments, foremanUser, { commentId: "m1", prompted }),
+        { lastReply: "Comment posted.", replies: ["thanks @Foreman"] }
+      );
+      assert.equal(
+        directFollowUp(comments, foremanUser, { commentId: "m2", prompted }),
+        null
+      );
+    });
+  }
+}
+
+test("leaves delegation alone", () => {
+  assert.equal(
+    directFollowUp(sessionThread, foremanUser, {
+      commentId: "session",
+      prompted: false,
+    }),
     null
   );
-  const bare = said(
-    "m2",
-    "aaron",
-    "2026-10-02T20:10:00Z",
-    "@acquisityforeman1",
-    null
-  );
-  const comments = [...sessionThread, mention, bare];
-  const created = (commentId: string) =>
-    directFollowUp(comments, foremanUser, { commentId, prompted: false });
-  assert.deepEqual(created("m1"), {
-    lastReply: "Comment posted.",
-    replies: ["thanks @Foreman"],
-  });
-  assert.equal(created("m2"), null);
-  assert.equal(created("session"), null);
 });
 
 test("leaves Foreman's own comments and relayed prompts to the other gates", () => {
