@@ -7,6 +7,7 @@ import {
   extractIdentifiers,
   type GateDeps,
   gate,
+  guardedJudge,
   redactableItems,
   removeItems,
   withoutTicketRefs,
@@ -963,4 +964,83 @@ test("the default judge gets what the finish has left less the composer's reserv
     12_345
   );
   assert.equal((calls.judge[0] as { finishAt?: number }).finishAt, 12_345);
+});
+
+test("a block is asked once more with blocking off and that answer is applied as a rewrite", async () => {
+  const twoFacts = findings({
+    facts: [
+      ...findings().facts,
+      {
+        claim: "An engineer saw a related error in the logging dashboard.",
+        entityIds: [],
+        evidence: { ref: "", tool: "investigation" },
+      },
+    ],
+  });
+  const guarded = (answers: Awaited<ReturnType<GateDeps["judge"]>>[]) => {
+    const retries: boolean[] = [];
+    const judge: GateDeps["judge"] = () =>
+      guardedJudge((retry) => {
+        retries.push(retry);
+        return Promise.resolve(answers[retries.length - 1]);
+      });
+    return { judge, retries };
+  };
+  const block = { decision: "block" as const, reason: "internal detail" };
+
+  const rewritten = guarded([
+    block,
+    { decision: "rewrite", reason: "dropped it", remove: [2] },
+  ]);
+  const { deps: d } = deps({ judge: rewritten.judge });
+  const result = await gate(scope, question, twoFacts, d);
+  assert.deepEqual(rewritten.retries, [false, true]);
+  assert.equal(result.decision, "rewrite");
+  assert.equal(result.findings.facts.length, 1);
+  assert.match(result.message ?? "", RECONNECT);
+
+  // An "allow" on the retry is still applied as a rewrite: with nothing to remove it is unusable.
+  const allowed = guarded([block, { decision: "allow", reason: "fine" }]);
+  assert.equal(
+    (await gate(scope, question, twoFacts, deps({ judge: allowed.judge }).deps))
+      .reason,
+    "model_gate:invalid_rewrite"
+  );
+
+  const still = guarded([block, { ...block, reason: "still internal" }]);
+  const blocked = await gate(
+    scope,
+    question,
+    twoFacts,
+    deps({ judge: still.judge }).deps
+  );
+  assert.deepEqual(still.retries, [false, true]);
+  assert.deepEqual(
+    [blocked.decision, blocked.reason, blocked.message],
+    ["block", "model_gate:still internal", null]
+  );
+
+  const nothing = guarded([
+    block,
+    { decision: "rewrite", reason: "all of it", remove: [1, 2, 3] },
+  ]);
+  const empty = await gate(
+    scope,
+    question,
+    twoFacts,
+    deps({ judge: nothing.judge }).deps
+  );
+  assert.deepEqual(
+    [empty.decision, empty.reason],
+    ["block", "model_gate:invalid_rewrite"]
+  );
+
+  // Not a block: one ask, verdict unchanged.
+  const fine = guarded([{ decision: "allow", reason: "in scope" }]);
+  assert.equal(
+    (await gate(scope, question, twoFacts, deps({ judge: fine.judge }).deps))
+      .decision,
+    "allow"
+  );
+  assert.deepEqual(fine.retries, [false]);
 });

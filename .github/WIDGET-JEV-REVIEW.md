@@ -4,7 +4,7 @@ The widget's logged `judge` time is the model review inside the egress gate. It 
 
 ## Wiring
 
-Set `WIDGET_REVIEWER=jev` in an isolated Preview to select JEV for every widget investigation that reaches model review. It calls Jev through Vercel AI Gateway with `AI_GATEWAY_API_KEY`. Unset preserves the current gate model. Direct Help Center answers use a separate path.
+Since ENG-14669 the egress gate reviews with the `gate` model alone and `WIDGET_REVIEWER` selects nothing; `widget-review.ts` stays in the tree until a later PR decides whether to delete it. The notes below describe the experiment as it ran. Setting `WIDGET_REVIEWER=jev` in an isolated Preview selected JEV for every widget investigation that reached model review. It called Jev through Vercel AI Gateway with `AI_GATEWAY_API_KEY`. Direct Help Center answers use a separate path.
 
 One request asks three separate questions about each numbered claim and recommendation sentence. Code derives the verdict and uses the existing deletion-only rewrite. Ownership scans before review and after composition, human-review flags, and the composer are unchanged.
 

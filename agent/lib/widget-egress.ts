@@ -8,11 +8,7 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import {
-  judgeBudgetMs,
-  LIMITATION_POLICY,
-  reviewWidgetFindings,
-} from "./widget-review.js";
+import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
 
@@ -440,6 +436,7 @@ const verdictSchema = z.object({
 });
 
 type JudgeInput = Parameters<GateDeps["judge"]>[0];
+type Verdict = Awaited<ReturnType<GateDeps["judge"]>>;
 
 /** A call's own deadline, cut short by the run's finish deadline when there is one. */
 const within = (ms: number, signal?: AbortSignal) =>
@@ -447,11 +444,33 @@ const within = (ms: number, signal?: AbortSignal) =>
     ? AbortSignal.any([AbortSignal.timeout(ms), signal])
     : AbortSignal.timeout(ms);
 
-/** The existing model reviewer; also the fallback for cases JEV is unsure about. */
+/** Appended to the judge prompt on the retry after a block; see `guardedJudge`. */
+const NO_BLOCK = `Blocking is not available for this review: answer "rewrite" and list in "remove" the number of every item you object to.`;
+
+/**
+ * The reviewer must never leave the customer with no answer when removing items
+ * would do: 3 of 222 benchmark calls blocked a whole answer over one or two
+ * removable items. A block is asked once more with blocking off, under the same
+ * deadline, and that answer is applied as a rewrite. One that still blocks, or
+ * whose removals leave nothing (`applyRewrite` says so), blocks as before.
+ */
+export async function guardedJudge(
+  ask: (retry: boolean) => Promise<Verdict>
+): Promise<Verdict> {
+  const first = await ask(false);
+  if (first.decision !== "block") {
+    return first;
+  }
+  const retry = await ask(true);
+  return retry.decision === "block" ? retry : { ...retry, decision: "rewrite" };
+}
+
+/** The model reviewer. */
 async function modelJudge(
   { findings, items, question, scope }: JudgeInput,
-  abortSignal?: AbortSignal
-): ReturnType<GateDeps["judge"]> {
+  abortSignal?: AbortSignal,
+  retry = false
+): Promise<Verdict> {
   const model = await resolveModel("gate");
   const { object } = await generateObject({
     abortSignal,
@@ -469,7 +488,7 @@ async function modelJudge(
       },
     }),
     schema: verdictSchema,
-    system: JUDGE_PROMPT,
+    system: retry ? `${JUDGE_PROMPT}\n${NO_BLOCK}` : JUDGE_PROMPT,
   });
   return object;
 }
@@ -517,13 +536,13 @@ export const defaultGateDeps: GateDeps = {
     });
     return text.trim();
   },
-  judge: (input) =>
-    process.env.WIDGET_REVIEWER === "jev"
-      ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(
-          input,
-          within(judgeBudgetMs(input.finishAt, Date.now()), input.signal)
-        ),
+  judge: (input) => {
+    const signal = within(
+      judgeBudgetMs(input.finishAt, Date.now()),
+      input.signal
+    );
+    return guardedJudge((retry) => modelJudge(input, signal, retry));
+  },
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
