@@ -31,7 +31,7 @@ const sources: Record<string, string> = {
 };
 
 const REMOVED_CONNECTION_CALL =
-  /\b(?:autumn|stripe|neon|instantly|axiom|intercom|inngest|jam|linear|lucent|modem|openrouter|planetscale|posthog|resend|sentry|vercel)__/u;
+  /\b(?:autumn|stripe|neon|instantly|axiom|intercom|inngest|jam|linear|lucent|modem|openrouter|planetscale|posthog|raindrop|resend|sentry|vercel)__/u;
 
 test("active instructions route company discovery through the shared Executor connection", () => {
   for (const [name, source] of Object.entries(sources)) {
