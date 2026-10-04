@@ -283,10 +283,10 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const originals = Array.from(replacements)
     .filter(([real, placeholder]) => real !== placeholder.toLowerCase())
     .map(([real]) => real);
-  if (originals.some((value) => value.length > MAX_LITERAL)) {
-    throw new Error("A value to replace is too long to be an identifier.");
-  }
-  const pattern = originals.length ? literalsPattern(originals) : null;
+  // A value too long for the alternation (a long name field) is still replaced as a
+  // whole field below; anywhere else it remains and findLeaks refuses the save.
+  const inline = originals.filter((value) => value.length <= MAX_LITERAL);
+  const pattern = inline.length ? literalsPattern(inline) : null;
   const scrubbed = pattern
     ? mapStrings(draft, (text, _key, isKey) =>
         isKey

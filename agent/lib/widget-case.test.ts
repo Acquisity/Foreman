@@ -270,3 +270,21 @@ test("the outside-call inventory documents the converter and both subprocess bou
   assert.ok(entry.includes("@workflow/cli@5.0.1 inspect"));
   assert.ok(entry.includes("Biome"));
 });
+
+test("a name too long to match inline is replaced as a whole field and fails closed elsewhere", () => {
+  const long = `Spring ${"Promo ".repeat(60)}`.trim();
+  const saved = JSON.parse(
+    serializeCase(scrubCase(rawCase({ campaignName: long }), scope))
+  ).cassette[0].output;
+  assert.match(saved.campaignName, NAME_PLACEHOLDER);
+  assert.throws(
+    () =>
+      serializeCase(
+        scrubCase(
+          rawCase({ campaignName: long }, `Why is ${long} late?`),
+          scope
+        )
+      ),
+    NOT_SAVED
+  );
+});
