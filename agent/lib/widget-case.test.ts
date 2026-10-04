@@ -21,6 +21,7 @@ const NAME_PLACEHOLDER = /^Name \d+$/;
 const EMAIL_PLACEHOLDER = /^person-\d+@domain-\d+\.example$/;
 const QUESTION_PLACEHOLDER = /^Why is Name \d+ not sending\?$/;
 const NOT_SAVED = /Case not saved/;
+const PHONE_PLACEHOLDER = /^Phone \d+$/;
 
 const rawCase = (
   output: unknown,
@@ -287,4 +288,48 @@ test("a name too long to match inline is replaced as a whole field and fails clo
       ),
     NOT_SAVED
   );
+});
+
+test("phone_number fields and numeric phones are replaced", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        rawCase({
+          phone_number: "+1 415 555 0199",
+          phoneNumber: 14_155_550_199,
+        }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.match(saved.phone_number, PHONE_PLACEHOLDER);
+  assert.match(saved.phoneNumber, PHONE_PLACEHOLDER);
+});
+
+test("data URIs with MIME parameters are dropped", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        rawCase({
+          icon: "data:image/svg+xml;charset=utf-8;base64,PHN2Zz48L3N2Zz4=",
+        }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.ok(!JSON.stringify(saved).includes("PHN2Zz"));
+});
+
+test("internal ticket refs and links are replaced", () => {
+  const text = serializeCase(
+    scrubCase(
+      rawCase({
+        ticket: "ENG-14665",
+        url: "https://linear.app/acquisity/issue/ENG-14665/spring-promo-not-sending",
+      }),
+      scope
+    )
+  );
+  assert.ok(!text.includes("ENG-14665"));
+  assert.ok(!text.includes("spring-promo"));
 });

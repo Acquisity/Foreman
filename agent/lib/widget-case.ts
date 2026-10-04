@@ -63,11 +63,11 @@ export interface ScrubbedCase {
 
 /** Keys whose string values name a person, company, campaign or workspace, or hold a phone number. */
 const NAME_KEY = /(?:name|workspace|company)$/i;
-const PHONE_KEY = /phone(?:number)?$/i;
+const PHONE_KEY = /phone(?:_?number)?$/i;
 /** An email is at most 320 characters; anything longer is not an identifier to map. */
 const MAX_LITERAL = 320;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
-const DATA_URI = /^data:[^;,]{1,100};base64,/;
+const DATA_URI = /^data:[^,]{1,200};base64,/;
 /** An AI SDK content part or attachment that carries bytes rather than text. */
 const BINARY_TYPE = /^(?:image|file|media)(?:-data|-url)?$/;
 const BINARY_MEDIA = /^(?:image|audio|video)\//;
@@ -95,9 +95,12 @@ const AUTHORED_REFERENCES = new Set([
   "account-settings.mdx",
   "the-growth-plan-creator-shows-an-application-error.mdx",
 ]);
+const LINEAR_REF = /^ENG-\d+$/;
+const isInternalLink = (value: string) =>
+  LINEAR_REF.test(value) || value.startsWith("http");
 const OPS_ID = /^(?:[a-z]+_[a-z0-9]+|01[0-9a-z]{24})$/;
 const PLACEHOLDER =
-  /^(?:person-\d+@domain-\d+\.example|domain-\d+\.example|00000000-0000-4000-8000-\d{12}|workspace-\d+)$/;
+  /^(?:person-\d+@domain-\d+\.example|(?:domain-\d+|internal)\.example|00000000-0000-4000-8000-\d{12}|workspace-\d+)$/;
 const FIXTURE_VALUES = new Set(
   Object.values(fixture).map((value) => value.toLowerCase())
 );
@@ -171,6 +174,10 @@ const mapStrings = (
     }
     if (dropBinary && isBinary(item, key)) {
       return DROPPED;
+    }
+    // A phone number stored as a number is still a phone number.
+    if (typeof item === "number" && PHONE_KEY.test(key)) {
+      return visit(String(item), key, false);
     }
     if (typeof item === "string") {
       const decoded = structuredText(item);
@@ -272,6 +279,15 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   for (const id of internal.filter((value) => OPS_ID.test(value))) {
     const prefix = id.includes("_") ? id.split("_")[0] : "ulid";
     add(id, () => `${prefix}_x${next("ops")}`);
+  }
+  // Internal ticket refs and internal links (a filed ticket's Linear URL) are not customer data,
+  // but a ticket URL's slug repeats the customer's wording, so neither is kept.
+  for (const value of internal.filter(isInternalLink)) {
+    add(value, () =>
+      LINEAR_REF.test(value)
+        ? `ENG-${next("ticket")}`
+        : `https://internal.example/${next("link")}`
+    );
   }
   for (const name of found.names) {
     add(name, () => `Name ${next("name")}`);
