@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
@@ -773,5 +781,78 @@ describe("widget replay", () => {
       names.filter((name) => GITHUB_TOOL_NAME.test(name)).length,
       GITHUB_TOOL_ALLOWLIST.length
     );
+  });
+});
+
+describe("recording replay request", () => {
+  it("restores recording context and admits its reader through Eve", {
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
+  }, async () => {
+    const { replayRecording } = await import("./widget-replay.js");
+    const { verifyWidgetContext } = await import("./widget-context.js");
+    const { widgetCaseSchema } = await import("./widget-case.js");
+    const { widgetAuth } = await import("./widget-scope.js");
+    const { verifiedWidgetContext: fixture } = await import(
+      "./widget.fixture.js"
+    );
+    const { resolveCompiledDynamicTools } = await import(
+      "./eve-dynamic-tools.js"
+    );
+    const recorded = widgetCaseSchema.parse(
+      JSON.parse(
+        readFileSync(
+          "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json",
+          "utf8"
+        )
+      )
+    );
+    assert.equal(replayRecording(recorded), undefined);
+    recorded.cassette.push({
+      ...recorded.cassette[0],
+      input: {},
+      output: { summary: "Recorded screen evidence." },
+      tool: "widget_read_recording",
+    });
+    const directory = mkdtempSync(join(tmpdir(), "widget-replay-recording-"));
+    const path = join(directory, "case.json");
+    const previous = process.env.WIDGET_REPLAY_CASE;
+    writeFileSync(path, JSON.stringify(recorded));
+    process.env.WIDGET_REPLAY_CASE = path;
+    try {
+      const request = { recording: replayRecording(recorded) };
+      assert.deepEqual(request.recording, { id: "replay-recording" });
+      const scope = await verifyWidgetContext(
+        {
+          conversationId: fixture.conversationId,
+          organizationId: fixture.organizationId,
+          userToken: "replay",
+        },
+        () => Promise.reject(new Error("app contacted"))
+      );
+      // The message route carries the recording reference into investigation scope.
+      const auth = widgetAuth({ ...scope, recordingId: request.recording?.id });
+      const manifest = readCompiledManifest(new URL("../../", import.meta.url));
+      const entry = manifest.dynamicTools.find(
+        (candidate) => candidate.sourceId === "tools/widget_read_recording.ts"
+      );
+      assert.ok(entry);
+      const tools = await resolveCompiledDynamicTools(entry, manifest.appRoot, {
+        auth,
+        id: "widget-replay:recording-request",
+      });
+      assert.deepEqual(
+        tools.map((tool) => tool.name),
+        ["widget_read_recording"]
+      );
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+      } else {
+        process.env.WIDGET_REPLAY_CASE = previous;
+      }
+      rmSync(directory, { force: true, recursive: true });
+    }
   });
 });

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
@@ -11,6 +13,7 @@ import {
   REPLAY_MISS,
   REPLAY_TICKET,
   replayable,
+  replayCase,
   replayRead,
 } from "./widget-replay.js";
 
@@ -131,11 +134,126 @@ test(
     const recordedId = "00000000-0000-4000-8000-000000000001";
     const invented = "99999999-9999-4999-8999-999999999999";
     const owned = await resolveOwnedIdentifiers(fixture, {
-      emails: [],
-      slugs: [fixture.organizationSlug, "someone-else"],
+      emails: ["person-1@domain-1.example", "erson-1@domain-1.example"],
+      slugs: [
+        fixture.organizationSlug,
+        "someone-else",
+        "fragas-workspace-wMUMT",
+      ],
       uuids: [recordedId, invented, fixture.organizationId],
     });
     assert.deepEqual([...owned.uuids], [recordedId, fixture.organizationId]);
-    assert.deepEqual([...owned.slugs], [fixture.organizationSlug]);
+    assert.deepEqual(
+      [...owned.slugs],
+      [fixture.organizationSlug.toLowerCase()]
+    );
+    assert.deepEqual([...owned.emails], ["person-1@domain-1.example"]);
+  })
+);
+
+test(
+  "lookup applies authored defaults to both sides and ignores object key order",
+  withCase(async () => {
+    const { widgetGenerationDiagnosticsInput } = await import(
+      "../tools/widget_generation_diagnostics.js"
+    );
+    const directory = mkdtempSync(join(tmpdir(), "widget-replay-input-"));
+    const path = join(directory, "case.json");
+    const [entry] = recorded.cassette;
+    const output = { recorded: true, status: "ok" };
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...recorded,
+        cassette: [
+          {
+            ...entry,
+            input: { agent: "copy-review" },
+            output,
+            tool: "widget_generation_diagnostics",
+          },
+          // A changed schema must make old inputs miss, never drop the tool.
+          {
+            ...entry,
+            input: { since: "obsolete-window" },
+            output,
+            tool: "widget_generation_diagnostics",
+          },
+        ],
+      })
+    );
+    process.env.WIDGET_REPLAY_CASE = path;
+    try {
+      const replayed = replayable(
+        "widget_generation_diagnostics",
+        defineTool({
+          description: "Diagnostics.",
+          execute: () => {
+            throw new Error("live provider called");
+          },
+          inputSchema: widgetGenerationDiagnosticsInput,
+        })
+      );
+      assert.deepEqual(
+        replayRead("widget_generation_diagnostics", { agent: "copy-review" }),
+        output
+      );
+      assert.deepEqual(
+        replayRead(
+          "widget_generation_diagnostics",
+          Object.fromEntries([
+            ["since", "7d"],
+            ["agent", "copy-review"],
+          ])
+        ),
+        output
+      );
+      assert.deepEqual(
+        await replayed.execute(
+          { agent: "copy-review", since: "7d" },
+          {} as never
+        ),
+        output
+      );
+      assert.deepEqual(
+        await replayed.execute(
+          { agent: "copy-review", since: "24h" },
+          {} as never
+        ),
+        REPLAY_MISS
+      );
+      // The inverse case must also hit: explicit default on disk, omitted at execution.
+      writeFileSync(
+        join(directory, "explicit.json"),
+        JSON.stringify({
+          ...recorded,
+          cassette: [
+            {
+              ...entry,
+              input: { agent: "copy-review", since: "7d" },
+              output,
+              tool: "widget_generation_diagnostics",
+            },
+          ],
+        })
+      );
+      process.env.WIDGET_REPLAY_CASE = join(directory, "explicit.json");
+      replayable(
+        "widget_generation_diagnostics",
+        defineTool({
+          description: "Diagnostics.",
+          execute: () => undefined,
+          inputSchema: widgetGenerationDiagnosticsInput,
+        })
+      );
+      assert.deepEqual(
+        replayRead("widget_generation_diagnostics", { agent: "copy-review" }),
+        output
+      );
+    } finally {
+      process.env.WIDGET_REPLAY_CASE = CASE;
+      replayCase();
+      rmSync(directory, { force: true, recursive: true });
+    }
   })
 );

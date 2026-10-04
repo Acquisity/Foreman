@@ -5,7 +5,7 @@ import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
 import { widgetCaseSchema } from "#lib/widget-case.js";
-import { REPLAY_TICKET } from "#lib/widget-replay.js";
+import { REPLAY_TICKET, replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
 
@@ -77,6 +77,7 @@ export default defineEval({
     let result = await post({
       ...toRequest(recorded.question),
       message_id: randomUUID(),
+      recording: replayRecording(recorded),
     });
     const runId = await t.require(
       result.run_id,

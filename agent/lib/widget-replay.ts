@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { scanIdentifiers } from "./widget-egress.js";
 import type {
   IdentifierCandidates,
   OwnedIdentifiers,
@@ -41,14 +42,48 @@ export const isReplayActive = () => {
   return Boolean(process.env.WIDGET_REPLAY_CASE);
 };
 
-let loaded: { case: WidgetCase; path: string } | undefined;
+const MAX_CASSETTE_CHARS = 1_048_576;
+let loaded:
+  | { case: WidgetCase; path: string; owned: OwnedIdentifiers }
+  | undefined;
+const reads = new Map<
+  string,
+  {
+    schema: z.ZodType;
+    outputs: Map<string, unknown>;
+  }
+>();
 export function replayCase(): WidgetCase {
   const path = process.env.WIDGET_REPLAY_CASE ?? "";
   if (loaded?.path !== path) {
+    const recorded = widgetCaseSchema.parse(
+      JSON.parse(readFileSync(path, "utf8"))
+    );
+    const text = JSON.stringify(recorded.cassette);
+    if (text.length > MAX_CASSETTE_CHARS) {
+      throw new Error("Replay cassette exceeds the identifier scan bound.");
+    }
+    const { candidates } = scanIdentifiers(text);
     loaded = {
-      case: widgetCaseSchema.parse(JSON.parse(readFileSync(path, "utf8"))),
+      case: recorded,
+      owned: {
+        domains: new Set(candidates.domains),
+        emails: new Set(candidates.emails),
+        slugs: new Set([
+          ...candidates.slugs,
+          fixture.organizationSlug.toLowerCase(),
+        ]),
+        uuids: new Set([
+          ...candidates.uuids,
+          fixture.organizationId,
+          fixture.userId,
+          fixture.partnerId,
+          fixture.conversationId,
+        ]),
+      },
       path,
     };
+    reads.clear();
   }
   return loaded.case;
 }
@@ -73,10 +108,17 @@ const lookupKey = (tool: string, input: unknown) =>
 
 /** The recorded output for this exact call, or the fixed miss result. */
 export function replayRead(tool: string, input: unknown): unknown {
-  const key = lookupKey(tool, input);
-  const hit = replayCase().cassette.find(
-    (entry) => lookupKey(entry.tool, entry.input) === key
-  );
+  const recorded = replayCase();
+  const prepared = reads.get(tool);
+  const key = lookupKey(tool, prepared ? prepared.schema.parse(input) : input);
+  if (prepared?.outputs.has(key)) {
+    return prepared.outputs.get(key);
+  }
+  const hit = prepared
+    ? undefined
+    : recorded.cassette.find(
+        (entry) => lookupKey(entry.tool, entry.input) === key
+      );
   if (hit) {
     return hit.output;
   }
@@ -96,6 +138,23 @@ export function replayable<T extends { description: string }>(
     return tool;
   }
   const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
+  const recorded = replayCase();
+  if (reads.get(name)?.schema !== inputSchema) {
+    const outputs = new Map<string, unknown>();
+    for (const entry of recorded.cassette.filter(
+      (candidate) => candidate.tool === name
+    )) {
+      const parsed = inputSchema.safeParse(entry.input);
+      if (!parsed.success) {
+        continue;
+      }
+      const key = lookupKey(name, parsed.data);
+      if (!outputs.has(key)) {
+        outputs.set(key, entry.output);
+      }
+    }
+    reads.set(name, { outputs, schema: inputSchema });
+  }
   return defineTool({
     description,
     // No outputSchema: the miss result must reach the model as it is.
@@ -127,14 +186,27 @@ export function replayContext(input: {
 export function replayOwnership(
   candidates: IdentifierCandidates
 ): OwnedIdentifiers {
-  const known =
-    `${JSON.stringify(replayCase().cassette)} ${Object.values(fixture).join(" ")}`.toLowerCase();
-  const owned = (values: string[] = []) =>
-    new Set(values.filter((value) => known.includes(value.toLowerCase())));
+  replayCase();
+  const known = loaded?.owned;
+  if (!known) {
+    throw new Error("Replay case is unavailable.");
+  }
+  const owned = (values: string[] | undefined, identifiers: Set<string>) =>
+    new Set(
+      (values ?? [])
+        .map((value) => value.toLowerCase())
+        .filter((value) => identifiers.has(value))
+    );
   return {
-    domains: owned(candidates.domains),
-    emails: owned(candidates.emails),
-    slugs: owned(candidates.slugs),
-    uuids: owned(candidates.uuids),
+    domains: owned(candidates.domains, known.domains),
+    emails: owned(candidates.emails, known.emails),
+    slugs: owned(candidates.slugs, known.slugs),
+    uuids: owned(candidates.uuids, known.uuids),
   };
 }
+
+/** Restore the route's recording reference when the case contains its reader. */
+export const replayRecording = (recorded: WidgetCase) =>
+  recorded.cassette.some((entry) => entry.tool === "widget_read_recording")
+    ? { id: "replay-recording" }
+    : undefined;
