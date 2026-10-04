@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import {
@@ -16,6 +17,7 @@ const scope: RunScope = {
   userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
 };
 const at = "2026-10-02T19:53:54.776Z";
+const NAME_PLACEHOLDER = /^Name \d+$/;
 const EMAIL_PLACEHOLDER = /^person-\d+@domain-\d+\.example$/;
 const QUESTION_PLACEHOLDER = /^Why is Name \d+ not sending\?$/;
 const NOT_SAVED = /Case not saved/;
@@ -137,4 +139,134 @@ test("a leftover scope name fails the save", () => {
   const scrubbed = scrubCase(rawCase(health), scope);
   scrubbed.case.question = "What is wrong with Northwind Growth?";
   assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});
+
+test("payload keys cannot exempt domains, and authored references survive absent fields", () => {
+  const scrubbed = scrubCase(
+    rawCase({
+      caveat:
+        "diagnostics.dailyMetrics covers the requested window; accounts.truncated and live.deployment.buildError are authored references",
+      domain: "shop.com",
+      shop: { com: 1 },
+    }),
+    scope
+  );
+  const output = scrubbed.case.cassette[0].output as {
+    domain: string;
+    caveat: string;
+  };
+  assert.equal(output.domain, "domain-1.example");
+  assert.equal(
+    output.caveat,
+    "diagnostics.dailyMetrics covers the requested window; accounts.truncated and live.deployment.buildError are authored references"
+  );
+  serializeCase(scrubbed);
+  output.domain = "shop.com";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});
+
+test("the original-value guard checks decoded strings and object keys without token boundaries", () => {
+  const scrubbed = scrubCase(
+    rawCase({}, "Northwind Growth_US is broken"),
+    scope
+  );
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+  const quotedScope = { ...scope, organizationName: 'Northwind "Growth"' };
+  const quoted = scrubCase(rawCase({}), quotedScope);
+  quoted.case.question = 'Why is Northwind "Growth" broken?';
+  assert.throws(() => serializeCase(quoted), NOT_SAVED);
+  quoted.case.question = "Why is this broken?";
+  quoted.case.cassette[0].output = { [quotedScope.organizationName]: 1 };
+  assert.throws(() => serializeCase(quoted), NOT_SAVED);
+});
+
+test("short known names are replaced, and remaining short-name prose fails closed", () => {
+  const scrubbed = scrubCase(
+    rawCase({ name: "Li" }, "Why is this broken?"),
+    scope
+  );
+  assert.deepEqual(scrubbed.case.cassette[0].output, { name: "Name 1" });
+  serializeCase(scrubbed);
+  scrubbed.case.question = "Li_US cannot sign in";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});
+
+test("recording JSON strings retain their type while names and phones are scrubbed", () => {
+  const scrubbed = scrubCase(
+    rawCase(
+      {
+        recording: JSON.stringify({
+          nested: JSON.stringify([{ name: "Q1" }]),
+          phone: "+1 415 555 0199",
+          senderName: "Jane Doe",
+        }),
+      },
+      "Why is this broken?"
+    ),
+    scope
+  );
+  const output = scrubbed.case.cassette[0].output as { recording: string };
+  assert.equal(typeof output.recording, "string");
+  const decoded = JSON.parse(output.recording);
+  assert.match(decoded.senderName, NAME_PLACEHOLDER);
+  assert.equal(decoded.phone, "Phone 1");
+  assert.match(JSON.parse(decoded.nested)[0].name, NAME_PLACEHOLDER);
+  assert.notEqual(JSON.parse(decoded.nested)[0].name, decoded.senderName);
+  const text = serializeCase(scrubbed);
+  assert.ok(!text.includes("Jane Doe"));
+  assert.ok(!text.includes("555 0199"));
+});
+
+test("MIME-typed images and long base64 data are dropped, including in JSON strings", () => {
+  const data = "A".repeat(128);
+  const scrubbed = scrubCase(
+    rawCase({
+      bytes: data,
+      data: "ok",
+      nested: JSON.stringify({
+        data,
+        screenshot: { data, mimeType: "image/png" },
+      }),
+      screenshot: { data: "iVBORw0KGgo", mimeType: "image/png" },
+      text: "ordinary text",
+    }),
+    scope
+  );
+  const text = serializeCase(scrubbed);
+  assert.ok(!text.includes("iVBORw0KGgo"));
+  assert.ok(!text.includes(data));
+  assert.ok(text.includes("ordinary text"));
+  assert.equal(
+    (scrubbed.case.cassette[0].output as { data: string }).data,
+    "ok"
+  );
+});
+
+test("email local parts and domains are independently consistent", () => {
+  const scrubbed = scrubCase(
+    rawCase({ emails: ["a@x.com", "a@y.com", "b@x.com"] }),
+    scope
+  );
+  assert.deepEqual(scrubbed.case.cassette[0].output, {
+    emails: [
+      "person-1@domain-1.example",
+      "person-1@domain-2.example",
+      "person-2@domain-1.example",
+    ],
+  });
+  serializeCase(scrubbed);
+});
+
+test("the outside-call inventory documents the converter and both subprocess bounds", () => {
+  const inventory = readFileSync(
+    new URL("../../.github/OUTSIDE-CALLS.md", import.meta.url),
+    "utf8"
+  );
+  const entry = inventory
+    .split("\n")
+    .find((line) => line.includes("scripts/widget-case-from-run.ts"));
+  assert.ok(entry);
+  assert.ok(entry.includes("180s per subprocess"));
+  assert.ok(entry.includes("@workflow/cli@5.0.1 inspect"));
+  assert.ok(entry.includes("Biome"));
 });

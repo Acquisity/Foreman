@@ -64,8 +64,6 @@ export interface ScrubbedCase {
 /** Keys whose string values name a person, company, campaign or workspace, or hold a phone number. */
 const NAME_KEY = /(?:name|workspace|company)$/i;
 const PHONE_KEY = /phone(?:number)?$/i;
-/** Shorter names are too generic to replace inside prose; longer values are prose, not names. */
-const NAME_LENGTH = { max: 200, min: 3 };
 /** An email is at most 320 characters; anything longer is not an identifier to map. */
 const MAX_LITERAL = 320;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
@@ -73,8 +71,30 @@ const DATA_URI = /^data:[^;,]{1,100};base64,/;
 /** An AI SDK content part or attachment that carries bytes rather than text. */
 const BINARY_TYPE = /^(?:image|file|media)(?:-data|-url)?$/;
 const BINARY_MEDIA = /^(?:image|audio|video)\//;
-/** Help-center paths name `.mdx` files, which the domain pattern also matches. */
-const DOC_FILE = /\.mdx$/;
+/** Fixed authored field references and help filenames also match the domain pattern. */
+const AUTHORED_REFERENCES = new Set([
+  "diagnostics.dailymetrics",
+  "accounts.truncated",
+  "accounts.available",
+  "accounts.detailstruncated",
+  "diagnostics.assignedinboxes.nextafterinboxid",
+  "live.status",
+  "live.deployment.builderror",
+  "live.domains",
+  "publiccheck.dns",
+  "fields.event",
+  "fields.organizationid",
+  "campaigns.mdx",
+  "where-is-the-bounce-protection-toggle-for-a-paused-campaign.mdx",
+  "managing-campaigns.mdx",
+  "campaign-states.mdx",
+  "how-do-i-pause-a-campaign-without-stopping-my-subscription-payments.mdx",
+  "what-do-the-account-statuses-mean.mdx",
+  "email-accounts.mdx",
+  "how-do-i-fix-an-account-with-an-error.mdx",
+  "account-settings.mdx",
+  "the-growth-plan-creator-shows-an-application-error.mdx",
+]);
 const OPS_ID = /^(?:[a-z]+_[a-z0-9]+|01[0-9a-z]{24})$/;
 const PLACEHOLDER =
   /^(?:person-\d+@domain-\d+\.example|domain-\d+\.example|00000000-0000-4000-8000-\d{12}|workspace-\d+)$/;
@@ -95,91 +115,89 @@ const literalsPattern = (values: string[]) =>
     "gi"
   );
 
-const mapStrings = (value: unknown, map: (text: string) => string): unknown => {
-  if (typeof value === "string") {
-    return map(value);
+const MAX_JSON_CHARS = 1_048_576;
+const MAX_NODES = 100_000;
+const MAX_DEPTH = 64;
+const BYTE_KEY = /^(?:bytes|data|base64|imageBase64|buffer)$/i;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const JSON_START = /^\s*[[{]/;
+
+const structuredText = (text: string): object | null => {
+  if (!JSON_START.test(text)) {
+    return null;
   }
-  if (Array.isArray(value)) {
-    return value.map((item) => mapStrings(item, map));
+  if (text.length > MAX_JSON_CHARS) {
+    throw new Error("Structured tool text exceeds the JSON safety bound.");
   }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, mapStrings(item, map)])
-    );
+  try {
+    const decoded: unknown = JSON.parse(text);
+    return decoded && typeof decoded === "object" ? decoded : null;
+  } catch {
+    // Non-JSON prose is still inspected as text.
+    return null;
   }
-  return value;
 };
 
-/** Images, files and base64 payloads are dropped whole; they are never scanned. */
-const dropBinary = (value: unknown): unknown => {
+// Drop data URIs, typed media, and >=128-character base64 strings under explicit byte/data keys.
+const isBinary = (value: unknown, key: string) => {
   if (typeof value === "string") {
-    return DATA_URI.test(value) ? DROPPED : value;
+    return (
+      DATA_URI.test(value) ||
+      (BYTE_KEY.test(key) && value.length >= 128 && BASE64.test(value))
+    );
   }
-  if (Array.isArray(value)) {
-    return value.map(dropBinary);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
   }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (
-      BINARY_TYPE.test(String(record.type ?? "")) ||
-      BINARY_MEDIA.test(String(record.mediaType ?? ""))
-    ) {
+  const record = value as Record<string, unknown>;
+  return (
+    BINARY_TYPE.test(String(record.type ?? "")) ||
+    BINARY_MEDIA.test(String(record.mediaType ?? "")) ||
+    BINARY_MEDIA.test(String(record.mimeType ?? ""))
+  );
+};
+
+/** One bounded traversal of decoded values and keys, preserving JSON-string output types. */
+const mapStrings = (
+  value: unknown,
+  visit: (text: string, key: string, isKey: boolean) => string,
+  dropBinary = false
+): unknown => {
+  let nodes = 0;
+  const walk = (item: unknown, key = "", depth = 0): unknown => {
+    nodes += 1;
+    if (nodes > MAX_NODES || depth > MAX_DEPTH) {
+      throw new Error("Case exceeds the traversal safety bound.");
+    }
+    if (dropBinary && isBinary(item, key)) {
       return DROPPED;
     }
-    return Object.fromEntries(
-      Object.entries(record).map(([key, item]) => [key, dropBinary(item)])
-    );
-  }
-  return value;
-};
-
-/** Every object key and every string under a name or phone key. */
-const walk = (
-  value: unknown,
-  keys: Set<string>,
-  found: { names: Set<string>; phones: Set<string> }
-) => {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      walk(item, keys, found);
-    }
-    return;
-  }
-  if (!value || typeof value !== "object") {
-    return;
-  }
-  for (const [key, item] of Object.entries(value)) {
-    keys.add(key.toLowerCase());
     if (typeof item === "string") {
-      if (PHONE_KEY.test(key)) {
-        found.phones.add(item);
-      } else if (
-        NAME_KEY.test(key) &&
-        item.length >= NAME_LENGTH.min &&
-        item.length <= NAME_LENGTH.max
-      ) {
-        found.names.add(item);
-      }
+      const decoded = structuredText(item);
+      return decoded
+        ? JSON.stringify(walk(decoded, key, depth + 1))
+        : visit(item, key, false);
     }
-    walk(item, keys, found);
-  }
+    if (Array.isArray(item)) {
+      return item.map((child) => walk(child, key, depth + 1));
+    }
+    if (item && typeof item === "object") {
+      return Object.fromEntries(
+        Object.entries(item).map(([field, child]) => [
+          visit(field, "", true),
+          walk(child, field, depth + 1),
+        ])
+      );
+    }
+    return item;
+  };
+  return walk(value);
 };
 
-const objectKeys = (value: unknown) => {
-  const keys = new Set<string>();
-  walk(value, keys, { names: new Set(), phones: new Set() });
-  return keys;
-};
-
-/** A dotted field reference such as `diagnostics.dailyMetrics` matches the domain pattern too. */
-const isFieldPath = (domain: string, keys: Set<string>) =>
-  domain.split(".").every((label) => keys.has(label));
-
-const isSafeIdentifier = (value: string, keys: Set<string>) =>
+const isSafeIdentifier = (value: string) =>
   PLACEHOLDER.test(value) ||
   FIXTURE_VALUES.has(value) ||
-  DOC_FILE.test(value) ||
-  isFieldPath(value, keys);
+  AUTHORED_REFERENCES.has(value);
 
 /**
  * Replace every customer identifier the egress scan finds, the run's own scope,
@@ -187,13 +205,20 @@ const isSafeIdentifier = (value: string, keys: Set<string>) =>
  * whole case. Pure: nothing touches disk.
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
-  const draft = dropBinary(raw) as WidgetCase;
-  const keys = new Set<string>();
   const found = { names: new Set<string>(), phones: new Set<string>() };
-  walk(
-    draft.cassette.map((call) => [call.input, call.output]),
-    keys,
-    found
+  const draft = mapStrings(
+    raw,
+    (text, key) => {
+      if (text) {
+        if (PHONE_KEY.test(key)) {
+          found.phones.add(text);
+        } else if (NAME_KEY.test(key)) {
+          found.names.add(text);
+        }
+      }
+      return text;
+    },
+    true
   );
   const replacements = new Map<string, string>([
     [scope.organizationName.toLowerCase(), fixture.organizationName],
@@ -220,13 +245,18 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   };
 
   const { candidates, internal } = scanIdentifiers(JSON.stringify(draft));
+  const localParts = new Map<string, string>();
   for (const email of candidates.emails) {
     const at = email.lastIndexOf("@");
     const host = domain(email.slice(at + 1));
-    add(email, () => `person-${next("person")}@${host}`);
+    const localPart = email.slice(0, at);
+    if (!localParts.has(localPart)) {
+      localParts.set(localPart, `person-${next("person")}`);
+    }
+    add(email, () => `${localParts.get(localPart)}@${host}`);
   }
   for (const value of candidates.domains ?? []) {
-    if (!(DOC_FILE.test(value) || isFieldPath(value, keys))) {
+    if (!isSafeIdentifier(value)) {
       domain(value);
     }
   }
@@ -258,11 +288,14 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   }
   const pattern = originals.length ? literalsPattern(originals) : null;
   const scrubbed = pattern
-    ? mapStrings(draft, (text) =>
-        text.replace(
-          pattern,
-          (match) => replacements.get(match.toLowerCase()) ?? match
-        )
+    ? mapStrings(draft, (text, _key, isKey) =>
+        isKey
+          ? text
+          : (replacements.get(text.toLowerCase()) ??
+            text.replace(
+              pattern,
+              (match) => replacements.get(match.toLowerCase()) ?? match
+            ))
       )
     : draft;
   return { case: widgetCaseSchema.parse(scrubbed), originals };
@@ -271,7 +304,6 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
 /** Everything identifier-shaped in a scrubbed case that is not a placeholder or a fixture value. */
 export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
   const text = JSON.stringify(scrubbed);
-  const keys = objectKeys(scrubbed);
   const { candidates, internal } = scanIdentifiers(text);
   const leaks = [
     ...candidates.emails,
@@ -279,9 +311,13 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
     ...candidates.slugs,
     ...(candidates.domains ?? []),
     ...internal.filter((value) => OPS_ID.test(value)),
-  ].filter((value) => !isSafeIdentifier(value, keys));
+  ].filter((value) => !isSafeIdentifier(value));
   if (originals.length) {
-    leaks.push(...(text.match(literalsPattern(originals)) ?? []));
+    mapStrings(scrubbed, (value) => {
+      const lower = value.toLowerCase();
+      leaks.push(...originals.filter((original) => lower.includes(original)));
+      return value;
+    });
   }
   return leaks;
 }
