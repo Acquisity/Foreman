@@ -54,6 +54,7 @@ const GATED_REPOSITORY_TOOLS = [
   "checkout_branch",
   "push_branch",
   "read_repository_knowledge",
+  "run_eval",
   "update_repository_knowledge",
 ];
 const SLACK_PRINCIPAL = /^slack:/u;
