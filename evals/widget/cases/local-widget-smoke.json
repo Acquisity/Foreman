@@ -159,9 +159,6 @@
     "lane": null,
     "role": "owner",
     "safety": [],
-    "tools": [
-      "widget_outreach_health",
-      "widget_ask_customer"
-    ]
+    "tools": ["widget_outreach_health", "widget_ask_customer"]
   }
 }

@@ -223,6 +223,10 @@ const text = serializeCase(scrubCase(raw, scope));
 const path = `evals/widget/cases/${name}.json`;
 await mkdir("evals/widget/cases", { recursive: true });
 await writeFile(path, text);
+// Biome owns formatting, so a new case passes `pnpm check` as written.
+await run("npx", ["biome", "format", "--write", path], {
+  timeout: CLI_DEADLINE_MS,
+});
 const largest = Math.max(
   0,
   ...cassette.map((c) => JSON.stringify(c.output).length)
