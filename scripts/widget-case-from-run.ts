@@ -170,6 +170,9 @@ if (auth.issuer !== WIDGET_SUPPORT_ISSUER) {
   throw new Error(`${runId} is not a widget support run.`);
 }
 const context = z.object(widgetContextSchema.shape).parse(auth.attributes);
+if (context.source !== "widget") {
+  throw new Error(`${runId} is a team inbox run, not a customer widget run.`);
+}
 const scope: RunScope = context;
 
 const question = events.find((e) => e.type === "message.received")?.data
@@ -226,7 +229,14 @@ const raw: WidgetCase = {
 const text = serializeCase(scrubCase(raw, scope));
 const path = `evals/widget/cases/${name}.json`;
 await mkdir("evals/widget/cases", { recursive: true });
-await writeFile(path, text);
+// Never overwrite: an existing case may hold human-filled expectations.
+await writeFile(path, text, { flag: "wx" }).catch(
+  (error: NodeJS.ErrnoException) => {
+    throw error.code === "EEXIST"
+      ? new Error(`${path} already exists. Delete it first to regenerate.`)
+      : error;
+  }
+);
 // Biome owns formatting, so a new case passes `pnpm check` as written.
 await run("npx", ["biome", "format", "--write", path], {
   timeout: CLI_DEADLINE_MS,
