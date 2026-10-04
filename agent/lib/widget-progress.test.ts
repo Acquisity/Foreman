@@ -15,8 +15,17 @@ const start = (sequence: number, ids: string[]) => ({
   },
   type: "actions.requested",
 });
-const result = (sequence: number, callId: string, output: unknown) => ({
-  data: { result: { callId, kind: "tool-result", output }, sequence },
+const result = (
+  sequence: number,
+  callId: string,
+  output: unknown,
+  framework: { isError?: boolean; status?: string } = {}
+) => ({
+  data: {
+    result: { callId, isError: framework.isError, kind: "tool-result", output },
+    sequence,
+    status: framework.status ?? "completed",
+  },
   type: "action.result",
 });
 test("parallel repeated checks stay running until all finish; replay is idempotent", () => {
@@ -28,7 +37,19 @@ test("parallel repeated checks stay running until all finish; replay is idempote
     reduce(result(3, "b", { success: false }))?.checks[0].status,
     "unavailable"
   );
+  // A replayed start never sets a finished check back to running.
+  assert.equal(reduce(start(1, ["a", "b"]))?.checks[0].status, "unavailable");
   assert.equal(JSON.stringify(first).includes("private"), false);
+});
+test("a read the framework marks failed or rejected shows as unavailable", () => {
+  for (const framework of [{ isError: true }, { status: "rejected" }]) {
+    const reduce = progressFromEvents();
+    reduce(start(1, ["a"]));
+    assert.equal(
+      reduce(result(2, "a", {}, framework))?.checks[0].status,
+      "unavailable"
+    );
+  }
 });
 test("unknown tools and arbitrary output never become customer-facing labels or findings", () => {
   const reduce = progressFromEvents();

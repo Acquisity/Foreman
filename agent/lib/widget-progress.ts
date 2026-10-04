@@ -4,6 +4,7 @@ import {
   askJev,
   FRONT_DOOR_JEV_MS,
   fallbackReason,
+  jevKey,
   type SelectorOptions,
 } from "./widget-next-action.js";
 
@@ -59,6 +60,7 @@ const eventSchema = z.object({
     result: z
       .object({
         callId: z.string(),
+        isError: z.boolean().optional(),
         kind: z.string(),
         output: z.unknown().optional(),
         toolName: z.string().optional(),
@@ -91,7 +93,12 @@ function groupedChecks(calls: Map<string, Check>): Check[] {
   return [...grouped].map(([id, status]) => ({ id, status }));
 }
 function failedResult(data: z.infer<typeof eventSchema>["data"]): boolean {
-  if (data.status === "failed" || data.result?.kind === "tool-error") {
+  // The framework's own markers first, as the ops hook reads them.
+  if (
+    data.result?.isError ||
+    data.status !== "completed" ||
+    data.result?.kind === "tool-error"
+  ) {
     return true;
   }
   const output = data.result?.output;
@@ -177,7 +184,7 @@ export async function planWidgetChecks(
   question: string,
   opts: SelectorOptions & { runId?: string; signal?: AbortSignal } = {}
 ): Promise<CheckId[]> {
-  const apiKey = opts.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts.apiKey ?? jevKey();
   if (!apiKey) {
     return [];
   }

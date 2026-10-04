@@ -139,13 +139,21 @@ function dependencies(gateResult: GateResult = allowed) {
   return { deps, gated, run };
 }
 
+/** Like the app, every new message carries its own id unless the test pins one. */
+const withMessageId = (body: unknown) =>
+  typeof body === "object" &&
+  body !== null &&
+  !("action" in body && body.action !== "start") &&
+  !("message_id" in body)
+    ? { ...body, message_id: crypto.randomUUID() }
+    : body;
 const request = (
   body: unknown,
   authorization = "Bearer signed.user.identity",
   serviceSecret: string | null = SERVICE_SECRET
 ) =>
   new Request("https://foreman.example/internal/widget/message", {
-    body: typeof body === "string" ? body : JSON.stringify(body),
+    body: typeof body === "string" ? body : JSON.stringify(withMessageId(body)),
     headers: {
       authorization,
       "content-type": "application/json",
@@ -280,6 +288,7 @@ test("a valid conversation at every schema limit is read whole, not refused as t
       { length: 3 },
       (_, index) => `https://shots.example/${index}${"a".repeat(2025)}`
     ),
+    message_id: crypto.randomUUID(),
     question: `a${text(3998)}b`,
     screenshots: Array.from({ length: 3 }, () => `a${text(1498)}b`),
   });
@@ -903,7 +912,7 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   const written: string[] = [];
   deps.answerChat = (message) => {
     written.push(message);
-    return Promise.resolve({ citations: [], message: "Use the card below." });
+    return Promise.resolve({ citations: [], message: "Use the button below." });
   };
   deps.requestRecording = () => {
     run.recording_requested = true;
@@ -922,11 +931,11 @@ test("an offer to send a screen recording asks the app for one without a bug sco
   );
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.request_recording, true);
-  // The writer is told the card shows, so it can point to it.
+  // The writer is told the button shows, so it can point to it.
   assert.ok(written.at(-1)?.endsWith("recordingOffered: true"));
 });
 
-test("Jev's recording judgment asks the app for the card and tells the help-center writer", async (t) => {
+test("Jev's recording judgment asks the app for the button and tells the help-center writer", async (t) => {
   enabled(t);
   const answeredWith = async (recording: boolean) => {
     const { deps, run } = dependencies();
@@ -973,7 +982,7 @@ test("Jev's recording judgment asks the app for the card and tells the help-cent
   assert.equal(notAsked.offered, false);
 });
 
-test("every reply lane is told whether the recording card shows, and only a recorded offer says it does", async (t) => {
+test("every reply lane is told whether the recording button shows, and only a recorded offer says it does", async (t) => {
   enabled(t);
   const bugRoute = (bug: boolean) => () =>
     Promise.resolve({
@@ -1014,7 +1023,7 @@ test("every reply lane is told whether the recording card shows, and only a reco
   const notWanted = await answeredWith(false, () => Promise.resolve());
   assert.equal(notWanted.body.request_recording, undefined);
   assert.equal(notWanted.offered, false);
-  // A failed write shows no card, so the reply must not point to one.
+  // A failed write shows no button, so the reply must not point to one.
   const failed = await answeredWith(true, () =>
     Promise.reject(new Error("db"))
   );
@@ -1022,7 +1031,7 @@ test("every reply lane is told whether the recording card shows, and only a reco
   assert.equal(failed.offered, false);
 });
 
-test("the investigation composer is told whether the recording card shows", async () => {
+test("the investigation composer is told whether the recording button shows", async () => {
   const offered: boolean[] = [];
   for (const requested of [true, false]) {
     const { deps, run } = dependencies();
@@ -1710,6 +1719,31 @@ test("a filed refund ticket is the handoff to billing, so the customer gets a re
   // The findings contract carries only the ticket's id and url.
   assert.deepEqual(refunded?.ticket, { id: "ENG-15000", url });
   assert.equal(other?.needsHuman, true);
+});
+
+test("a ticket the model claims without a filed ticket result is dropped", async () => {
+  const { deps, gated, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      ticket: {
+        id: "ENG-15001",
+        url: "https://linear.app/acquisity/issue/ENG-15001/made-up",
+      },
+    });
+  await finishWidgetRun(
+    run,
+    "widget-session-claimed-ticket",
+    {
+      findings: null,
+      status: "completed",
+      text: "Filed ENG-15001.",
+      ticket: null,
+    },
+    deps
+  );
+  const [claimed] = gated as WidgetFindings[];
+  assert.equal(claimed?.ticket, undefined);
 });
 
 test("the ticket result carries whether Jev read it as a refund", async () => {

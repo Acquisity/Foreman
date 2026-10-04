@@ -65,18 +65,16 @@ Purpose: avoid repeating settled work, spot continuations and duplicates, run th
 
 Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and current Linear state.
 
-### Check for an existing investigation
+### Check existing work
 
-Reuse existing investigations where current evidence supports them. Existing Duplicate state does not skip handling after Stage 4; explain which actions are already satisfied.
+A Duplicate still gets Stage 5; say what is done. `find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit. Call `decide_prior_work` with the claim, prior findings, and hits in batches of at most 8. `continuation` reuses those findings, `known_issue` names the ticket, `fresh` starts over. Per hit `match`:
 
-### Check duplicates
+- `same_outcome`: a duplicate candidate that `decide_triage` settles in Stage 5.
+- `partial_or_adjacent`: relate, never close.
+- `stale_or_superseded`: point at the fix or decision.
+- `not_relevant`: move on.
 
-`find_related_issues` with `scope: "duplicates"` and 2 to 4 phrasings (user outcome, error text, feature names); it searches every team, closed and archived included. Read every hit, then classify by outcome, not keyword overlap:
-
-- `SAME_OUTCOME`: same symptom and cause; a duplicate candidate that `decide_triage` settles in Stage 5.
-- `PARTIAL_OR_ADJACENT`: relate it, do not close it.
-- `STALE_OR_SUPERSEDED`: point at the fix or the decision.
-- `NOT_RELEVANT`: move on.
+On `decided: false`, judge by outcome, not keywords.
 
 ### Ask or proceed
 
@@ -123,12 +121,13 @@ Results are sanitized past investigations: no customer identity, no production r
 Pick the lanes the symptom points at; naming one not applicable is an answer, guessing is not. Search each system on the axis it uses: identity (the Stage 2 org id, user id, or email, never a display name), symptom (the product's own words for the behavior), or time (the window the claim names). One empty search closes nothing; vary the axis. A lane you could not search is `Could not run`, not evidence of absence.
 
 - Background work: AI SDR runs, syncs, scrapes, imports, provisioning. `find_function_runs` with the function slug; `latestTrace.steps` shows the step that broke.
-- Errors, crashes, stack traces: Sentry `search_issues`, then the nested `get_issue_details` read for stacktrace and first/last seen, using the catalog discovery instructions.
+- Errors, crashes, stack traces: Sentry `search_issues`, then the nested `get_issue_details` read for stacktrace and first/last seen.
 - Anything the other lanes do not carry: Axiom `queryDataset` with APL (<https://axiom.co/docs/apl/introduction>); `listDatasets` and `getDatasetFields` first for real names; metrics via `queryMetrics`.
-- Email delivery, bounces, spam placement: discover Resend `list_emails`, `get_email`, `list_logs`, and `list_suppressions` through Executor and inspect their current schemas.
-- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces in search pages. A cap error is `Could not run`, never a complete list. Use partial-name `search` for discovery; before `read_instantly_subworkspace`, the selected name must resolve exactly once or fail closed. Follow `nextStartingAfter` as `startingAfter` until null. This lane does not replace PlanetScale as current production truth. Zero search matches do not prove absent provisioning; unresolved provider state stays `unverified`.
+- Email delivery, bounces, spam placement: Resend `list_emails`, `get_email`, `list_logs`, and `list_suppressions`; inspect their schemas.
+- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces in search pages. A cap error is `Could not run`, never a complete list. Use partial-name `search` for discovery; before `read_instantly_subworkspace`, the selected name must resolve exactly once or fail closed. Follow `nextStartingAfter` as `startingAfter` until null. Zero search matches do not prove absent provisioning; unresolved provider state stays `unverified`.
 - What the user actually did: read the ticket's Jam link when present. PostHog `persons_list` on the Stage 2 email or distinct id, then session recordings via the catalog. Lucent searches symptoms, never customer names.
-- Deployment or edge failures: discover `getRuntimeLogs` in the Vercel `foreman_vercel_api` namespace and inspect its schema, then query around the reported time.
+- How Acquisity's own AI features behaved: Raindrop `search_events`, then `get_event` and `get_trace`; `list_signals` and `list_issues` for patterns, `query_cost` for spend.
+- Deployment or edge failures: Vercel `getRuntimeLogs` in `foreman_vercel_api`; inspect its schema, then query around the reported time.
 - The conversation behind the report, and whether others hit it: Intercom. A conversation link goes straight to `fetch`, which accepts a URL; otherwise `search_contacts` on the Stage 2 email, `search_conversations` with `contact_ids`, `get_conversation` for the thread; `get_contact` returns the profile only and is not a step on this path. `search` prefixes ids (`contact_<uuid>`); `contact_ids` wants them raw: strip the prefix or the filter matches nothing. Others hit: `search` with a DSL query like `object_type:conversations q:"campaign stopped sending"`, not `search_conversations`, which filters structured fields and has no free-text. Modem `search_modem` for feedback beyond support threads.
 
 ### Record the lanes

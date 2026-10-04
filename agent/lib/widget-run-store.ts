@@ -11,7 +11,7 @@ import {
   widgetContextSchema,
 } from "./widget-scope.js";
 
-/** Match Fin: a pending result stays readable for two hours, then the reference is dead. */
+/** A pending result stays readable for two hours, then the reference is dead. */
 export const WIDGET_RESULT_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 export const widgetOutcomeSchema = z.object({

@@ -8,11 +8,7 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import {
-  judgeBudgetMs,
-  LIMITATION_POLICY,
-  reviewWidgetFindings,
-} from "./widget-review.js";
+import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
 
@@ -32,7 +28,7 @@ export interface GateDeps {
     findings: ComposerInput;
     organizationName: string;
     question: string;
-    /** The app shows its screen recording card under this reply (the run's `request_recording`). */
+    /** The app shows its screen recording button under this reply (the run's `request_recording`). */
     recordingOffered: boolean;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
@@ -349,7 +345,7 @@ export function redactableItems(findings: WidgetFindings): RedactableItem[] {
 
 // ponytail: a word list, not understanding. It misses a caveat phrased another
 // way (the reviewers' policy is the first defence) and can count a non-caveat,
-// which only costs an extra block. Upgrade path: a structured caveat flag on facts.
+// which only costs the stand-in sentence. Upgrade path: a structured caveat flag on facts.
 const CAVEAT =
   /\b(?:cannot|can(?:'|’)t|could(?: not|n(?:'|’)t)|unable|unknown|uncertain|unconfirmed|unverified|unavailable|not (?:be |been |yet )?(?:confirmed|verified|checked|established|settled|known|readable|available)|does not (?:establish|show|prove|mean))\b/iu;
 
@@ -357,7 +353,7 @@ const CAVEAT =
  * Looks at the answer that would remain, not at each deletion: findings that
  * said something was unconfirmed must still say so afterwards. Whoever asked
  * for the deletions, an answer stripped of its last caveat claims more than was
- * verified, so it is refused and the caller blocks.
+ * verified, so `removeItems` puts `UNCONFIRMED_FACT` in its place.
  */
 export const removesLastCaveat = (
   before: { text: string }[],
@@ -367,11 +363,22 @@ export const removesLastCaveat = (
   !kept.some((item) => CAVEAT.test(item.text));
 
 /**
+ * Stands in for the last caveat when a deletion takes it. Blocking there left
+ * the customer with no answer (4 of 222 benchmark runs), and restoring the item
+ * would show text a reviewer wanted gone. Fixed text, so no model writes it.
+ */
+const UNCONFIRMED_FACT: WidgetFindings["facts"][number] = {
+  claim: "Some details could not be confirmed.",
+  entityIds: [],
+  evidence: { ref: "", tool: "widget-gate" },
+};
+
+/**
  * Apply a rewrite by deletion only. The judge names item numbers and this
- * removes them, so a rewrite can drop content but can never add or reword any:
- * whatever survives is text the investigator wrote. Returns null when the
- * numbers are unusable or nothing would be left to tell the customer, and the
- * caller then blocks.
+ * removes them, so a rewrite can drop content but can never reword any: whatever
+ * survives is text the investigator wrote, plus `UNCONFIRMED_FACT` when the
+ * last caveat went. Returns null when the numbers are unusable or nothing would
+ * be left to tell the customer, and the caller then blocks.
  */
 export function removeItems(
   findings: WidgetFindings,
@@ -396,16 +403,15 @@ export function removeItems(
   const facts = findings.facts.filter((_fact, index) =>
     keptFacts.has(index + 1)
   );
-  if (
-    (facts.length === 0 && !recommendation) ||
-    removesLastCaveat(items, kept)
-  ) {
+  if (facts.length === 0 && !recommendation) {
     return null;
   }
   const { needsWrite, ...rest } = findings;
   return {
     ...rest,
-    facts,
+    facts: removesLastCaveat(items, kept)
+      ? [...facts, UNCONFIRMED_FACT]
+      : facts,
     recommendation,
     ...(needsWrite && kept.some((item) => item.kind === "needsWrite")
       ? { needsWrite }
@@ -421,10 +427,10 @@ export function removeItems(
 // details and internal operations detail are all still stopped.
 const JUDGE_PROMPT = `You are the egress gate between an internal investigator and a customer of Acquisity. You receive the verified customer scope, the customer's question, and the investigator's findings. Decide whether the findings can be shown to this customer.
 Block when any fact or the recommendation discloses data belonging to a different workspace or customer, personal details of an individual who is not part of the verified workspace (another customer, another user's account, an Acquisity employee), or internal operations detail (systems, dashboards, logs, employees, deployments, error traces, tickets other than findings.ticket).
-Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block. Naming Stripe for the customer's own billing, or Instantly for their own sending accounts, is not internal operations detail. Remove an item whose point is what another outside service (such as Autumn, Sentry, Axiom, Inngest, Vercel) shows or did; an item that merely names one while stating a fact about the customer's workspace can stay, because the reply writer drops the name.
+Everything inside the verified workspace is the customer's own data and is safe to show them: their campaigns, lead lists, leads, inboxes, domains, settings and members, and the names of those things. A campaign, list or inbox is often named after a person or a company; such a name is the customer's own label, not data about another person, so never block or rewrite because of it. Naming another workspace that the customer named in their own question, only to say it was not looked up or to tell the customer to switch to it and ask from there, discloses nothing about it: never block or remove an item for that. A workspace the customer did not name is still another workspace's data. Evidence references are often empty because a separate step reformats the investigator's write-up; an empty reference is never a reason to block. Naming Stripe for the customer's own billing, or Instantly for their own sending accounts, is not internal operations detail. Remove an item whose point is what another outside service (such as Autumn, Sentry, Axiom, Inngest, Vercel) shows or did; an item that merely names one while stating a fact about the customer's workspace can stay, because the reply writer drops the name.
 ${LIMITATION_POLICY}
 Also remove an item that tells the customer to buy again, place a new order or pay again while the findings leave the original payment or delivery unresolved, and an item that promises sending or other activity will resume.
-Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. The reason is one short sentence for internal staff.`;
+Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. When you block, also list in "remove" the numbers of the items that cause the block. The reason is one short sentence for internal staff.`;
 
 const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. Never add a product step the findings do not give. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give only the article-backed steps already present in the findings. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When the findings lack applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have reported this to the engineering team as a ticket, without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and say you will report it to engineering if that shows a fault on our side; this is the one allowed exception to the rule against promises, because it happens in this chat when they reply, not later. If confidence is low, say what is uncertain. The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the findings come from a screen recording the customer already sent, call it their screen recording, never name the service that made it or link to it, and do not ask for another one. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No greetings, no sign-off, no em dashes.`;
 
@@ -436,10 +442,13 @@ const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app
 const verdictSchema = z.object({
   decision: z.enum(["allow", "rewrite", "block"]),
   reason: z.string().max(500),
-  remove: z.array(z.number().int()).max(60).optional(),
+  // Required, empty when nothing goes: a strict structured-output route rejects
+  // the whole request when a property is optional ("Missing 'remove'").
+  remove: z.array(z.number().int()).max(60),
 });
 
 type JudgeInput = Parameters<GateDeps["judge"]>[0];
+type Verdict = Awaited<ReturnType<GateDeps["judge"]>>;
 
 /** A call's own deadline, cut short by the run's finish deadline when there is one. */
 const within = (ms: number, signal?: AbortSignal) =>
@@ -447,11 +456,40 @@ const within = (ms: number, signal?: AbortSignal) =>
     ? AbortSignal.any([AbortSignal.timeout(ms), signal])
     : AbortSignal.timeout(ms);
 
-/** The existing model reviewer; also the fallback for cases JEV is unsure about. */
+/** Appended to the judge prompt on the retry after a block; see `guardedJudge`. */
+const NO_BLOCK = `Blocking is not available for this review: answer "rewrite" and list in "remove" the number of every item you object to.`;
+
+/**
+ * The reviewer must never leave the customer with no answer when removing items
+ * would do: 3 of 222 benchmark calls blocked a whole answer over one or two
+ * removable items. A block that names the items causing it is asked once more
+ * with blocking off, and the retry's removals are added to those items, so the
+ * cause always goes. A block that names no items, a retry that still blocks or
+ * fails, or removals that leave nothing (`applyRewrite` says so) block as before.
+ */
+export async function guardedJudge(
+  ask: (retry: boolean) => Promise<Verdict>
+): Promise<Verdict> {
+  const first = await ask(false);
+  if (first.decision !== "block" || !first.remove?.length) {
+    return first;
+  }
+  const retry = await ask(true).catch(() => first);
+  return retry.decision === "block"
+    ? retry
+    : {
+        ...retry,
+        decision: "rewrite",
+        remove: [...new Set([...first.remove, ...(retry.remove ?? [])])],
+      };
+}
+
+/** The model reviewer. */
 async function modelJudge(
   { findings, items, question, scope }: JudgeInput,
-  abortSignal?: AbortSignal
-): ReturnType<GateDeps["judge"]> {
+  abortSignal?: AbortSignal,
+  retry = false
+): Promise<Verdict> {
   const model = await resolveModel("gate");
   const { object } = await generateObject({
     abortSignal,
@@ -469,7 +507,7 @@ async function modelJudge(
       },
     }),
     schema: verdictSchema,
-    system: JUDGE_PROMPT,
+    system: retry ? `${JUDGE_PROMPT}\n${NO_BLOCK}` : JUDGE_PROMPT,
   });
   return object;
 }
@@ -517,13 +555,18 @@ export const defaultGateDeps: GateDeps = {
     });
     return text.trim();
   },
-  judge: (input) =>
-    process.env.WIDGET_REVIEWER === "jev"
-      ? reviewWidgetFindings(input, { fallback: modelJudge })
-      : modelJudge(
-          input,
-          within(judgeBudgetMs(input.finishAt, Date.now()), input.signal)
-        ),
+  judge: (input) => {
+    const startedAt = Date.now();
+    // Each ask gets what the finish has left less the composer's reserve, so a
+    // slow first answer does not leave the retry an already expired deadline.
+    return guardedJudge((retry) =>
+      modelJudge(
+        input,
+        within(judgeBudgetMs(input.finishAt, startedAt), input.signal),
+        retry
+      )
+    );
+  },
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
@@ -536,18 +579,7 @@ function applyRewrite(
   findings: WidgetFindings,
   remove: number[]
 ): WidgetFindings | string {
-  const rewritten = removeItems(findings, remove);
-  if (rewritten) {
-    return rewritten;
-  }
-  const items = redactableItems(findings);
-  const drop = new Set(remove);
-  return removesLastCaveat(
-    items,
-    items.filter((item) => !drop.has(item.n))
-  )
-    ? "model_gate:removed_last_caveat"
-    : "model_gate:invalid_rewrite";
+  return removeItems(findings, remove) ?? "model_gate:invalid_rewrite";
 }
 
 const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
@@ -618,7 +650,7 @@ export async function gate(
    * runs under it, and once it passes the gate fails closed as gate_unavailable.
    */
   signal?: AbortSignal,
-  /** Whether the app shows its screen recording card under this reply. */
+  /** Whether the app shows its screen recording button under this reply. */
   recordingOffered = false,
   /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
   finishAt?: number
@@ -717,7 +749,9 @@ export async function gate(
     // model and can introduce an identifier or internal artifact that was never
     // in the gated findings; the customer message must contain no foreign
     // identifier and no ticket reference at all.
-    const egress = await timed("scan", () =>
+    // Timed apart from the findings scan: one finish spent 27.7s in "scan" with
+    // no way to tell which of the two ownership reads was slow.
+    const egress = await timed("reply_scan", () =>
       deterministicTextReason(scope, message, deps.resolve, undefined, signal)
     );
     if (egress) {

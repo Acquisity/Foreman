@@ -45,28 +45,37 @@ const PROMPTS = [
   "Why did my last payment fail?",
 ];
 
-const call = async (body: Record<string, unknown>) => {
-  const response = await fetch(`${env.FOREMAN}/internal/widget/message`, {
-    body: JSON.stringify({
-      conversation_id: env.CONV,
-      organization_id: env.ORG,
-      ...body,
-    }),
-    headers: {
-      authorization: `Bearer ${env.JWT}`,
-      "content-type": "application/json",
-      "x-acquisity-service-secret": env.FOREMAN_DIAGNOSTICS_SECRET,
-    },
-    method: "POST",
-  });
-  return (await response.json()) as {
-    decision?: string;
-    findings?: unknown;
-    message?: string | null;
-    run_id?: string;
-    status: string;
-    error?: string;
-  };
+interface CallResult {
+  decision?: string;
+  error?: string;
+  findings?: unknown;
+  message?: string | null;
+  run_id?: string;
+  status: string;
+}
+
+const call = async (body: Record<string, unknown>): Promise<CallResult> => {
+  // A stalled or failed request is one failed prompt; the rest still run.
+  try {
+    const response = await fetch(`${env.FOREMAN}/internal/widget/message`, {
+      body: JSON.stringify({
+        conversation_id: env.CONV,
+        organization_id: env.ORG,
+        ...body,
+      }),
+      headers: {
+        authorization: `Bearer ${env.JWT}`,
+        "content-type": "application/json",
+        "x-acquisity-service-secret": env.FOREMAN_DIAGNOSTICS_SECRET,
+      },
+      method: "POST",
+      // A stalled request fails the probe instead of hanging past the poll deadline.
+      signal: AbortSignal.timeout(30_000),
+    });
+    return (await response.json()) as CallResult;
+  } catch (error) {
+    return { error: (error as Error).name, status: "request_failed" };
+  }
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

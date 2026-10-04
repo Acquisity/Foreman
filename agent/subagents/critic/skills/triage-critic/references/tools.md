@@ -24,6 +24,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | Intercom conversations and contacts | Executor: intercom | app, shared | root allowlist, reads only |
 | Inngest runs, traces, functions | Executor: inngest | app, shared | root allowlist, reads only |
 | Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |
+| Raindrop AI feature events, traces, signals, issues, cost | Executor: raindrop | app, shared | root allowlist, reads only |
 | Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
 | Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
 | Vercel projects, deployments and logs | Executor: foreman_vercel_api | app, shared | Foreman-scoped credential; shared catalog; use reads only |

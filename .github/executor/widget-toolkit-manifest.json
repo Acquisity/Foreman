@@ -2,7 +2,7 @@
   "version": 1,
   "executorVersion": "1.6.8",
   "toolkit": {
-    "slug": "foreman-widget",
+    "slug": "foreman-support",
     "name": "Foreman widget support",
     "owner": "user",
     "paths": [

@@ -11,6 +11,8 @@ export const OPS_LOG_STRING_LIMIT = 200;
 export const OPS_LOG_LINE_LIMIT = 4000;
 
 const TRUNCATION_MARKER = "...";
+// Redaction runs on a bounded head of the message; the log keeps 200 characters anyway.
+const MESSAGE_SCAN_LIMIT = 1000;
 const OPS_FIELD_KEYS = [
   "code",
   "connection",
@@ -44,8 +46,12 @@ const URL_QUERY_RE = /(https?:\/\/[^\s?]+)\?\S*/g;
 // An opaque credential after an auth scheme looks like nothing else here.
 // Scheme names as headers write them, and a credential-length value, so "basic plan" stays readable.
 const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/g;
+// A database connection string carries its password in the userinfo, so the whole URI goes.
+const CONNECTION_STRING_RE =
+  /\b(?:postgres|postgresql|mysql|mysqlx|mongodb|redis|rediss|mssql)(?:\+srv)?:\/\/(?:[^\s"'()[\]{};,]|\[[^\s"'()[\]{};,]*\])+/gi;
 const redactSensitive = (value: string): string =>
   value
+    .replace(CONNECTION_STRING_RE, "[redacted]")
     .replace(AUTH_SCHEME_RE, "$1 [redacted]")
     .replace(EMAIL_RE, "[email]")
     .replace(SECRET_RE, "[redacted]")
@@ -100,7 +106,7 @@ export const formatOpsEvent = (
         const raw = descriptor.value;
         record[key] =
           key === "message" && typeof raw === "string"
-            ? sanitizeValue(redactSensitive(raw))
+            ? sanitizeValue(redactSensitive(raw.slice(0, MESSAGE_SCAN_LIMIT)))
             : sanitizeValue(raw);
       }
     }

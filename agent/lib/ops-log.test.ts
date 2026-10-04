@@ -365,6 +365,15 @@ describe("formatOpsEvent message redaction", () => {
     assert.ok(record.message.includes("[redacted]"));
   });
 
+  it("redacts JWT-shaped tokens and long hex runs", () => {
+    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+    const hex = "0123456789abcdef0123456789abcdef";
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", { message: `token ${jwt} key ${hex}` })
+    );
+    assert.equal(record.message, "token [redacted] key [redacted]");
+  });
+
   it("redacts an opaque credential after an authorization scheme", () => {
     const record = JSON.parse(
       formatOpsEvent("step.failed", {
@@ -376,6 +385,48 @@ describe("formatOpsEvent message redaction", () => {
     assert.equal(record.message.includes("dXNlcjpwYXNz"), false);
     assert.ok(record.message.includes("Bearer [redacted]"));
     assert.ok(record.message.includes("basic plan"));
+  });
+
+  it("redacts a database connection string whole", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          'connect failed ("postgres://app:hunter2@db.internal:5432/main") and mongodb+srv://u:pw@cluster.test/x',
+      })
+    );
+    assert.equal(record.message.includes("hunter2"), false);
+    assert.equal(record.message.includes("db.internal"), false);
+    assert.equal(record.message.includes("cluster.test"), false);
+    assert.ok(record.message.includes('("[redacted]")'));
+  });
+
+  it("redacts an IPv6 host and a redis or mssql connection string whole", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message:
+          "postgres://app:pw1@[2001:db8::1]:5432/main, redis://:pw2@cache.test:6379 and mssql://sa:pw3@sql.test/db",
+      })
+    );
+    for (const leak of [
+      "pw1",
+      "2001:db8",
+      "pw2",
+      "cache.test",
+      "pw3",
+      "sql.test",
+    ]) {
+      assert.equal(record.message.includes(leak), false, leak);
+    }
+  });
+
+  it("redacts only a bounded head of a long message", () => {
+    const record = JSON.parse(
+      formatOpsEvent("step.failed", {
+        message: `see https://h.test/x?${"a".repeat(2000)} tail-after-the-cap`,
+      })
+    );
+    assert.ok(record.message.includes("?[redacted]"));
+    assert.equal(record.message.includes("tail-after-the-cap"), false);
   });
 
   it("leaves an ordinary message and non-message fields untouched", () => {

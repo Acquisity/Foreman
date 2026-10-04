@@ -3,6 +3,7 @@ import {
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from "ai";
+import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
 import {
   nextActionEnabled,
@@ -45,6 +46,8 @@ const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",
 ]);
+// A ticket the instructions require must stay possible after the last workspace read.
+const LATE_TOOLS = new Set([...ARTICLE_TOOLS, "widget_file_ticket"]);
 const MAX_WORKSPACE_CALLS = MAX_WIDGET_TOOL_CALLS - 2;
 const BLOCKED = "Support investigation capability is unavailable.";
 
@@ -105,7 +108,25 @@ const toolCallsThisTurn = (withControl: Prompt) => {
     );
 };
 
-export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
+/**
+ * One line per model call. The start is an absolute time because Vercel groups
+ * a request's lines under one timestamp: the gap from one call's end to the
+ * next call's start bounds the time between calls, including tool reads.
+ */
+const logModelCall = (
+  sessionId: string | undefined,
+  startedAt: number,
+  tools: string[]
+) =>
+  logOpsEvent("widget.investigation.model_call", {
+    message: `start=${startedAt} ms=${Date.now() - startedAt}`,
+    sessionId,
+    tool: tools.join(",") || null,
+  });
+
+export function widgetInvestigationMiddleware(
+  sessionId?: string
+): LanguageModelMiddleware {
   return {
     specificationVersion: "v4",
     transformParams({ params }) {
@@ -118,7 +139,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
             (tool) =>
               typeof tool.name === "string" &&
               ALLOWED_TOOLS.has(tool.name) &&
-              (used < MAX_WORKSPACE_CALLS || ARTICLE_TOOLS.has(tool.name))
+              (used < MAX_WORKSPACE_CALLS || LATE_TOOLS.has(tool.name))
           );
       const toolChoice =
         spent ||
@@ -136,7 +157,7 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
                 note(
                   spent
                     ? "The investigation tool budget is exhausted. State the verified findings and limitations. Do not give product steps unless an applicable article was actually read. If no article supports a step, acknowledge that documentation could not be confirmed."
-                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions. Product steps require an article actually read; otherwise report findings and the documentation gap."
+                    : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions, or filing a ticket the instructions require. Product steps require an article actually read; otherwise report findings and the documentation gap."
                 ),
               ],
         toolChoice,
@@ -146,85 +167,131 @@ export function widgetInvestigationMiddleware(): LanguageModelMiddleware {
     // One step can ask for several calls at once: at 12 spent, a batch of four
     // made 16. Calls past the budget are dropped before the SDK dispatches them.
     async wrapGenerate({ doGenerate, params }) {
-      const generated = await doGenerate();
-      let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
-      const result = {
-        ...generated,
-        content: generated.content.filter((part) => {
-          if (part.type !== "tool-call" || !namedTool(part)) {
-            return true;
-          }
-          if (left <= 2 && !ARTICLE_TOOLS.has(part.toolName)) {
-            return false;
-          }
-          left -= 1;
-          return left >= 0;
-        }),
-      };
-      let sawAllowedCall = false;
-      for (const part of result.content) {
-        if (part.type === "tool-call") {
-          if (!namedTool(part)) {
+      const startedAt = Date.now();
+      let keptTools: string[] = [];
+      try {
+        const generated = await doGenerate();
+        let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
+        const result = {
+          ...generated,
+          content: generated.content.filter((part) => {
+            if (part.type !== "tool-call" || !namedTool(part)) {
+              return true;
+            }
+            if (left <= 2 && !LATE_TOOLS.has(part.toolName)) {
+              return false;
+            }
+            left -= 1;
+            return left >= 0;
+          }),
+        };
+        let sawAllowedCall = false;
+        for (const part of result.content) {
+          if (part.type === "tool-call") {
+            if (!namedTool(part)) {
+              throw new Error(BLOCKED);
+            }
+            sawAllowedCall = true;
+          } else if (part.type.startsWith("tool-")) {
             throw new Error(BLOCKED);
           }
-          sawAllowedCall = true;
-        } else if (part.type.startsWith("tool-")) {
+        }
+        if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
           throw new Error(BLOCKED);
         }
+        keptTools = result.content.flatMap((part) =>
+          part.type === "tool-call" ? [part.toolName] : []
+        );
+        return result;
+      } finally {
+        logModelCall(sessionId, startedAt, keptTools);
       }
-      if (result.finishReason.unified === "tool-calls" && !sawAllowedCall) {
-        throw new Error(BLOCKED);
-      }
-      return result;
     },
     async wrapStream({ doStream, params }) {
-      const result = await doStream();
+      const startedAt = Date.now();
+      // Log setup failures too, before a readable stream exists.
+      let result: Awaited<ReturnType<typeof doStream>>;
+      try {
+        result = await doStream();
+      } catch (error) {
+        logModelCall(sessionId, startedAt, []);
+        throw error;
+      }
       const allowedCalls = new Set<string>();
       let left = MAX_WIDGET_TOOL_CALLS - toolCallsThisTurn(params.prompt);
       const admittedCalls = new Map<string, boolean>();
+      const admittedTools: string[] = [];
       const admit = (id: string, toolName: string) => {
         if (admittedCalls.has(id)) {
           return;
         }
-        const keep = left > 0 && (left > 2 || ARTICLE_TOOLS.has(toolName));
+        const keep = left > 0 && (left > 2 || LATE_TOOLS.has(toolName));
         admittedCalls.set(id, keep);
         if (keep) {
           left -= 1;
+          admittedTools.push(toolName);
         }
       };
       const callId = (part: object) => {
         const { id, toolCallId } = part as { id?: string; toolCallId?: string };
         return toolCallId ?? id;
       };
+      let logged = false;
+      const complete = () => {
+        if (!logged) {
+          logged = true;
+          logModelCall(sessionId, startedAt, admittedTools);
+        }
+      };
+      const guarded = result.stream.pipeThrough(
+        new TransformStream({
+          transform: (part, controller) => {
+            assertAllowedStreamPart(part, allowedCalls);
+            if (part.type === "tool-input-start" || part.type === "tool-call") {
+              admit(String(callId(part)), part.toolName);
+            }
+            if (
+              part.type === "finish" &&
+              part.finishReason.unified === "tool-calls" &&
+              ![...admittedCalls.values()].includes(true)
+            ) {
+              throw new Error(BLOCKED);
+            }
+            if (part.type === "finish") {
+              complete();
+            }
+            const id = part.type.startsWith("tool-") ? callId(part) : undefined;
+            if (id !== undefined && admittedCalls.get(String(id)) === false) {
+              return;
+            }
+            controller.enqueue(part);
+          },
+        })
+      );
+      const reader = guarded.getReader();
       return {
         ...result,
-        stream: result.stream.pipeThrough(
-          new TransformStream({
-            transform: (part, controller) => {
-              assertAllowedStreamPart(part, allowedCalls);
-              if (
-                part.type === "tool-input-start" ||
-                part.type === "tool-call"
-              ) {
-                admit(String(callId(part)), part.toolName);
+        stream: new ReadableStream({
+          async cancel(reason) {
+            // Record cancellation before waiting for upstream cleanup.
+            complete();
+            await reader.cancel(reason);
+          },
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                complete();
+                controller.close();
+              } else {
+                controller.enqueue(value);
               }
-              if (
-                part.type === "finish" &&
-                part.finishReason.unified === "tool-calls" &&
-                ![...admittedCalls.values()].includes(true)
-              ) {
-                throw new Error(BLOCKED);
-              }
-              const id = part.type.startsWith("tool-")
-                ? callId(part)
-                : undefined;
-              if (id !== undefined && admittedCalls.get(String(id)) === false) {
-                return;
-              }
-              controller.enqueue(part);
-            },
-          })
-        ),
+            } catch (error) {
+              complete();
+              controller.error(error);
+            }
+          },
+        }),
       };
     },
   };
@@ -244,13 +311,13 @@ export const widgetInvestigationModel = (
   wrapLanguageModel({
     middleware: nextActionEnabled()
       ? [
-          widgetInvestigationMiddleware(),
+          widgetInvestigationMiddleware(sessionId),
           simulateStreamingMiddleware(),
           widgetNextActionMiddleware({
             sessionId,
             stepModel: stepsId ? ticketLinkedModel(stepsId) : undefined,
           }),
         ]
-      : widgetInvestigationMiddleware(),
+      : widgetInvestigationMiddleware(sessionId),
     model: ticketLinkedModel(id),
   });

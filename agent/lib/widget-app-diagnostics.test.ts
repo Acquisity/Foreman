@@ -14,14 +14,14 @@ const ctx = {
 };
 test("app diagnostics send trusted scope to a fixed origin and refuse redirects/oversized replies", async (t) => {
   const before = {
-    origin: process.env.ACQUISITY_FIN_ORIGIN,
+    origin: process.env.ACQUISITY_ORIGIN,
     secret: process.env.FOREMAN_DIAGNOSTICS_SECRET,
   };
-  process.env.ACQUISITY_FIN_ORIGIN = "https://app.test";
+  process.env.ACQUISITY_ORIGIN = "https://app.test";
   process.env.FOREMAN_DIAGNOSTICS_SECRET = "x".repeat(32);
   t.after(() => {
     for (const [key, value] of [
-      ["ACQUISITY_FIN_ORIGIN", before.origin],
+      ["ACQUISITY_ORIGIN", before.origin],
       ["FOREMAN_DIAGNOSTICS_SECRET", before.secret],
     ]) {
       if (value === undefined) {
@@ -34,6 +34,10 @@ test("app diagnostics send trusted scope to a fixed origin and refuse redirects/
   const request = ((url, init) => {
     assert.equal(url, "https://app.test/api/internal/foreman/website");
     assert.equal(init?.redirect, "error");
+    assert.equal(init?.method, "POST");
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("authorization"), `Bearer ${"x".repeat(32)}`);
+    assert.equal(headers.get("content-type"), "application/json");
     assert.equal(
       JSON.parse(String(init?.body)).userId,
       verifiedWidgetContext.userId

@@ -4,6 +4,8 @@ import {
   askJev,
   FRONT_DOOR_JEV_MS,
   fallbackReason,
+  JEV_URL,
+  jevKey,
 } from "./widget-next-action.js";
 
 /**
@@ -15,19 +17,18 @@ import {
  * It never calls tools, never sees account data, and never writes the reply;
  * it only says which lane the message belongs in and how sure it is. A
  * missing key falls open to `investigate`, the investigation pipeline, so
- * removing `TYPESAFE_API_KEY` restores the old single-lane behavior exactly.
+ * removing `AI_GATEWAY_API_KEY` restores the old single-lane behavior exactly.
  * A Jev failure after its retry tries the help center first (`kb` at zero
  * confidence), and a help-center miss still goes on to the investigation. A confident `kb` decision is acted on by the
  * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
  */
 
-const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const TYPESAFE_MODEL = "jev-latest";
 const ROUTER_TIMEOUT_MS = 5000;
 // The accepted question (4,000) with up to three screenshot readings (1,500
-// each) plus the full history budget and its labels fit inside this, so the cap
+// each) plus the full history budget and its labels (16,230 at most) fit inside this, so the cap
 // never cuts anything; the latest message leads regardless.
-const MAX_STATE_CHARS = 16_000;
+const MAX_STATE_CHARS = 17_000;
 
 /** Below this, an explicit ask for a person was not what the customer wrote. */
 export const HUMAN_REQUEST_SCORE = 0.8;
@@ -72,7 +73,7 @@ export interface WidgetAsk {
   images?: string[];
   latest: string;
   /**
-   * Whether the app shows its screen recording card under this reply: the same
+   * Whether the app shows its screen recording button under this reply: the same
    * decision that sets `request_recording`. Absent until that decision is made.
    */
   recordingOffered?: boolean;
@@ -163,13 +164,13 @@ export function recentTurns(
   ];
 }
 
-/** How every reply writer reads `recordingOffered`, so none of them guesses whether the card shows. */
+/** How every reply writer reads `recordingOffered`, so none of them guesses whether the button shows. */
 /** How the app words a message that is only a screenshot (Acquisity lib/support/foreman-reply.ts). */
 export const SCREENSHOT_ONLY =
   /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
 
 export const RECORDING_RULE =
-  "They cannot attach video or other files here. recordingOffered says whether the app shows a screen recording option directly below your reply. When it is true, say in a few words that they can use the recording option below; you may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the recording option below is the way to send it. When it is false, never mention a recording option or card, and never say a recording is impossible.";
+  "They cannot attach video or other files here. recordingOffered says whether the app shows a small Record my screen button at the bottom of your reply. When it is true, mention the button only when a recording would actually help pin the problem down, such as when they ask or offer to send one or when their words do not show what went wrong, and then in a few words; otherwise say nothing about it, and never repeat a mention Support already made earlier in the conversation unless they ask or offer to send a recording again. This recording guidance takes precedence over general rules against repetition. You may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the Record my screen button on your reply is the way to send it. When it is false, never mention a recording option or button, and never say a recording is impossible.";
 
 /** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
 export const renderReplyAsk = (
@@ -263,7 +264,7 @@ const QUESTIONS = {
     type: "choice",
   },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only
-  // decides whether the app offers its recording card; the lanes ignore it.
+  // decides whether the app offers its recording button; the lanes ignore it.
   // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
   offers_recording: {
     instructions:
@@ -291,7 +292,7 @@ const responseSchema = z.object({
     lane: z.object({
       choice: z.enum(WIDGET_LANES),
       confidence: z.number().min(0).max(1).optional(),
-      probabilities: z.record(z.string(), z.number()).optional(),
+      probabilities: z.record(z.string(), z.number().min(0).max(1)).optional(),
     }),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
@@ -396,7 +397,7 @@ export async function routeWidgetMessage(
     signal?: AbortSignal;
   }
 ): Promise<WidgetRoute> {
-  const apiKey = opts?.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return FALLBACK;
   }
@@ -464,14 +465,14 @@ export async function asksForChange(
   conversation: string,
   opts?: { apiKey?: string; fetch?: FetchLike; signal?: AbortSignal }
 ): Promise<boolean> {
-  const apiKey = opts?.apiKey ?? process.env.TYPESAFE_API_KEY;
+  const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return false;
   }
   const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
   const timeout = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
   try {
-    const response = await doFetch(TYPESAFE_URL, {
+    const response = await doFetch(JEV_URL, {
       body: JSON.stringify({
         model: TYPESAFE_MODEL,
         questions: { asks_for_action: QUESTIONS.asks_for_action },

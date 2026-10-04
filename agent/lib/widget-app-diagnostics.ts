@@ -1,5 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import { acquisityOrigin } from "./fin-context.js";
+import { acquisityOrigin } from "./acquisity-origin.js";
 import { requireWidgetContext } from "./widget-scope.js";
 
 /** Fixed read-only app routes; all authority comes from the verified chat. */

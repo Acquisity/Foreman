@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-const { buildLinearContext, LINEAR_TRIAGE_ROUTE } = await import(
+const { askFromName, buildLinearContext, LINEAR_TRIAGE_ROUTE } = await import(
   "./linear-context.js"
 );
 
@@ -75,5 +75,40 @@ describe("buildLinearContext", () => {
           line.includes("'Ask from <name>' link, that person is the requester")
       )
     );
+  });
+
+  it("names the 'Ask from' requester and never the session opener", () => {
+    const context = buildLinearContext(
+      makeEvent({
+        action: "prompted",
+        issue: { id: "issue-1" },
+        requester: { displayName: "Aaron Fraga", id: "user-1" },
+      }),
+      "Jordan Ago"
+    );
+    assert.ok(context);
+    const lines = context.slice(1);
+    assert.ok(
+      lines.some((line) => line.startsWith("The requester is Jordan Ago"))
+    );
+    assert.ok(!lines.some((line) => line.includes("Aaron Fraga")));
+  });
+});
+
+describe("askFromName", () => {
+  it("reads the name from the first 'Ask from' attachment", () => {
+    assert.equal(
+      askFromName([
+        "Slack thread",
+        " Ask from Andrea Estifano ",
+        "Ask from Other",
+      ]),
+      "Andrea Estifano"
+    );
+  });
+
+  it("returns null without an 'Ask from' attachment", () => {
+    assert.equal(askFromName([]), null);
+    assert.equal(askFromName(["Support conversation", "Ask from "]), null);
   });
 });

@@ -15,6 +15,9 @@ const usage = {
   outputTokens: { reasoning: 0, text: 1, total: 1 },
 };
 const BLOCKED = /Support investigation capability is unavailable/;
+const TIMED = /^start=\d+ ms=\d+$/;
+// The mocked clock fixes the start; the duration depends on SDK clock reads.
+const TIMED_FROM_MOCK = /^start=1025 ms=[1-9]\d*$/;
 const toolCall = (toolName: string) => ({
   input: "{}",
   toolCallId: "call-1",
@@ -177,7 +180,9 @@ describe("widget support investigation model boundary", () => {
 });
 
 for (const mode of ["generate", "stream"] as const) {
-  it(`${mode}: reserves the final two calls for article search and reading`, async () => {
+  it(`${mode}: reserves the final two calls for article search and reading`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
     const names = [
       "widget_outreach_health",
       "widget_help_article",
@@ -243,9 +248,212 @@ for (const mode of ["generate", "stream"] as const) {
       "widget_read_help_article",
     ]);
     assert.deepEqual(
-      base.doGenerateCalls[0].tools?.map((t) => t.name),
+      base.doGenerateCalls[0].tools?.map((entry) => entry.name),
       received
     );
     assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+    const logged = lines.map((line) => JSON.parse(line));
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].tool, received.join(","));
+  });
+}
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: keeps the ticket tool after the workspace reads run out, until the budget is spent`, async () => {
+    const names = ["widget_outreach_health", "widget_file_ticket"];
+    const base = new MockLanguageModelV4({
+      doGenerate: {
+        ...result("x"),
+        content: names.map((name, n) => ({
+          ...toolCall(name),
+          toolCallId: `c${n}`,
+        })),
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = (used: number) => ({
+      prompt: [
+        {
+          content: [{ text: "Refund my last charge", type: "text" as const }],
+          role: "user" as const,
+        },
+        {
+          content: Array.from({ length: used }, (_, n) => ({
+            ...toolCall("widget_billing_summary"),
+            input: {},
+            toolCallId: `old${n}`,
+          })),
+          role: "assistant" as const,
+        },
+      ],
+      tools: names.map((name) => ({
+        inputSchema: { type: "object" },
+        name,
+        type: "function" as const,
+      })),
+    });
+    const received: string[] = [];
+    if (mode === "generate") {
+      const output = await model.doGenerate(params(12));
+      for (const part of output.content) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    } else {
+      const { stream } = await model.doStream(params(12));
+      for await (const part of stream) {
+        if (part.type === "tool-call") {
+          received.push(part.toolName);
+        }
+      }
+    }
+    assert.deepEqual(received, ["widget_file_ticket"]);
+    assert.deepEqual(
+      base.doGenerateCalls[0].tools?.map((entry) => entry.name),
+      ["widget_file_ticket"]
+    );
+    const spent = await widgetInvestigationMiddleware().transformParams?.({
+      params: params(14),
+      type: "generate",
+    } as never);
+    assert.deepEqual((spent as { tools?: unknown[] }).tools, []);
+  });
+}
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: logs one timed line per model call naming the tools it kept`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
+    let now = 1000;
+    t.mock.method(Date, "now", () => {
+      now += 25;
+      return now;
+    });
+    const base = new MockLanguageModelV4({
+      doGenerate: result("widget_inbox_health"),
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware("wrun_test"),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = {
+      prompt: [
+        {
+          content: [{ text: "Hi", type: "text" as const }],
+          role: "user" as const,
+        },
+      ],
+    };
+    if (mode === "generate") {
+      await model.doGenerate(params);
+    } else {
+      const { stream } = await model.doStream(params);
+      for await (const _ of stream) {
+        // drain
+      }
+    }
+    const logged = lines
+      .map((line) => JSON.parse(line))
+      .filter((line) => line.event === "widget.investigation.model_call");
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].sessionId, "wrun_test");
+    assert.equal(logged[0].tool, "widget_inbox_health");
+    assert.match(logged[0].message, TIMED_FROM_MOCK);
+  });
+}
+
+for (const mode of ["generate", "stream"] as const) {
+  for (const failure of ["provider", "boundary"] as const) {
+    it(`${mode}: times a ${failure} failure without logging its contents`, async (t) => {
+      const lines: string[] = [];
+      t.mock.method(console, "info", (line: string) => lines.push(line));
+      const providerError = new Error("private provider failure");
+      const model = wrapLanguageModel({
+        middleware: [
+          widgetInvestigationMiddleware("wrun_failed"),
+          simulateStreamingMiddleware(),
+        ],
+        model: new MockLanguageModelV4({
+          doGenerate:
+            failure === "provider"
+              ? () => Promise.reject(providerError)
+              : result("private_forbidden_tool"),
+        }),
+      });
+      await assert.rejects(
+        async () => {
+          if (mode === "generate") {
+            await model.doGenerate({ prompt: [] });
+          } else {
+            const { stream } = await model.doStream({ prompt: [] });
+            for await (const _ of stream) {
+              // drain
+            }
+          }
+        },
+        failure === "provider" ? providerError : BLOCKED
+      );
+      const logged = lines.map((line) => JSON.parse(line));
+      assert.equal(logged.length, 1);
+      assert.equal(logged[0].event, "widget.investigation.model_call");
+      assert.equal(logged[0].sessionId, "wrun_failed");
+      assert.equal(logged[0].tool, null);
+      assert.match(logged[0].message, TIMED);
+      assert.equal(lines.join("").includes("private"), false);
+    });
+  }
+}
+
+for (const end of ["error", "cancel", "close"] as const) {
+  it(`stream: times ${end} without a finish part exactly once`, async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: string) => lines.push(line));
+    const providerError = new Error("private stream failure");
+    let cancelled = false;
+    const model = wrapLanguageModel({
+      middleware: widgetInvestigationMiddleware("wrun_stream"),
+      model: new MockLanguageModelV4({
+        doStream: {
+          stream: new ReadableStream({
+            cancel() {
+              cancelled = true;
+            },
+            start(controller) {
+              if (end === "error") {
+                controller.error(providerError);
+              } else if (end === "close") {
+                controller.close();
+              }
+            },
+          }),
+        },
+      }),
+    });
+    const { stream } = await model.doStream({ prompt: [] });
+    const reader = stream.getReader();
+    if (end === "cancel") {
+      await reader.cancel();
+      assert.equal(cancelled, true);
+    } else if (end === "error") {
+      await assert.rejects(reader.read(), providerError);
+    } else {
+      assert.equal((await reader.read()).done, true);
+    }
+    const logged = lines.map((line) => JSON.parse(line));
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].event, "widget.investigation.model_call");
+    assert.equal(logged[0].tool, null);
+    assert.match(logged[0].message, TIMED);
+    assert.equal(lines.join("").includes("private"), false);
   });
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import { readFinIntercom } from "./executor/dispatch.js";
-import { acquisityOrigin, verifyFinContext } from "./fin-context.js";
+import { verifyFinContext } from "./fin-context.js";
 
 const origin = "https://pr-13763-acquisity.vercel.app";
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -31,17 +31,17 @@ const conversation = {
 const contact = { external_id: userId, id, workspace_id: "ls8uffkp" };
 
 function configure(context: TestContext, value: string | undefined = origin) {
-  const previous = process.env.ACQUISITY_FIN_ORIGIN;
+  const previous = process.env.ACQUISITY_ORIGIN;
   if (value === undefined) {
-    delete process.env.ACQUISITY_FIN_ORIGIN;
+    delete process.env.ACQUISITY_ORIGIN;
   } else {
-    process.env.ACQUISITY_FIN_ORIGIN = value;
+    process.env.ACQUISITY_ORIGIN = value;
   }
   context.after(() => {
     if (previous === undefined) {
-      delete process.env.ACQUISITY_FIN_ORIGIN;
+      delete process.env.ACQUISITY_ORIGIN;
     } else {
-      process.env.ACQUISITY_FIN_ORIGIN = previous;
+      process.env.ACQUISITY_ORIGIN = previous;
     }
   });
 }
@@ -308,28 +308,4 @@ test("fixed route reader refuses arbitrary operations and identifiers before aut
   await assert.rejects(
     readFinIntercom("get_contact", "../other", AbortSignal.timeout(1000))
   );
-});
-
-for (const value of ["http://localhost:3939", "http://127.0.0.1:3939"]) {
-  test(`accepts local http origin ${value} outside production only`, (context) => {
-    const previousEnv = process.env.NODE_ENV;
-    context.after(() => {
-      process.env.NODE_ENV = previousEnv;
-    });
-    process.env.NODE_ENV = "development";
-    configure(context, value);
-    assert.equal(acquisityOrigin(), value);
-    process.env.NODE_ENV = "production";
-    assert.throws(() => acquisityOrigin());
-  });
-}
-
-test("never accepts a non-loopback http origin", (context) => {
-  const previousEnv = process.env.NODE_ENV;
-  context.after(() => {
-    process.env.NODE_ENV = previousEnv;
-  });
-  process.env.NODE_ENV = "development";
-  configure(context, "http://app.acquisity.ai");
-  assert.throws(() => acquisityOrigin());
 });
