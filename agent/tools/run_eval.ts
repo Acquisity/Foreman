@@ -5,7 +5,7 @@ import { z } from "zod";
 import { summarizeEval } from "#lib/eval-summary.js";
 import { resolveToken } from "#lib/jev.js";
 import { logOpsEvent } from "#lib/ops-log.js";
-import { readPreparedRepository } from "#lib/repository.js";
+import { readPreparedRepository, repositoryFromAuth } from "#lib/repository.js";
 import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
 import { isTrusted, isUnattended } from "#lib/trust.js";
@@ -108,13 +108,24 @@ export const runPreparedEval = async (
     return refuse("invalid_filter", `"${filter}" is not a valid eval filter.`);
   }
   const sandbox = await ctx.getSandbox();
-  let worktree: string;
+  let prepared: Awaited<ReturnType<typeof readPreparedRepository>>;
   try {
-    ({ worktree } = await readPreparedRepository(sandbox));
+    prepared = await readPreparedRepository(sandbox);
   } catch (error) {
     return refuse(
       "no_repository",
       error instanceof Error ? error.message : String(error)
+    );
+  }
+  // Same hard gate as push_branch: a signed GitHub session runs only its own repository.
+  const authoritative = repositoryFromAuth(current);
+  if (
+    authoritative?.source === "github-webhook" &&
+    authoritative.slug.toLowerCase() !== prepared.slug.toLowerCase()
+  ) {
+    return refuse(
+      "repository_binding",
+      `This signed GitHub session is bound to ${authoritative.slug} and cannot run evals in ${prepared.slug}.`
     );
   }
   try {
@@ -122,7 +133,8 @@ export const runPreparedEval = async (
     const result = await boundedRun(
       sandbox,
       {
-        command: `cd '${worktree}' && timeout -k 10s 570s bash -c 'set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval${filter ? ` '${filter}'` : ""} 2>&1`,
+        // stdout carries only the JSON report; stderr stays separate so late logs cannot replace it.
+        command: `cd '${prepared.worktree}' && timeout -k 10s 570s bash -c 'set -a; . ./.env.example; set +a; AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval${filter ? ` '${filter}'` : ""}`,
       },
       EVAL_TIMEOUT_MS
     );
