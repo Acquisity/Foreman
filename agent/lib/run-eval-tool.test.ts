@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { SessionAuthContext } from "eve/context";
+import type { SessionAuthContext, SessionParent } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
 import {
   fakeSandbox,
@@ -17,8 +17,15 @@ const { gatewayPolicy, runEvalTool, runPreparedEval } = await import(
 );
 
 const WORKTREE = "/workspace/repo";
-const SMOKE_COMMAND = `cd '${WORKTREE}' && set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm eval 'smoke' 2>&1`;
+const SMOKE_COMMAND = `cd '${WORKTREE}' && timeout -k 10s 570s bash -c 'set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval 'smoke' 2>&1`;
 const THREW = /sandbox gone/u;
+const SMOKE_REPORT = JSON.stringify({
+  failed: 0,
+  passed: 1,
+  results: [{ assertions: [], id: "smoke", verdict: "passed" }],
+  scored: 0,
+  skipped: 0,
+});
 
 const baseAuth: SessionAuthContext = {
   attributes: {},
@@ -33,10 +40,14 @@ const run = async (
   current: SessionAuthContext | null,
   {
     prepared = true,
-    result = () => ok("smoke ✓ passed\n1 passed, 0 failed"),
+    result = () => ok(SMOKE_REPORT),
+    parent,
+    resetFailures = 0,
   }: {
     prepared?: boolean;
     result?: (options: RunOptions) => Promise<RunResult>;
+    parent?: SessionParent;
+    resetFailures?: number;
   } = {}
 ) => {
   const { commands, policies, sandbox } = fakeSandbox(result);
@@ -53,23 +64,40 @@ const run = async (
       ),
   });
   const warnings: string[] = [];
+  const errors: string[] = [];
   const original = console.warn;
+  const originalError = console.error;
   console.warn = (line: unknown) => {
     warnings.push(String(line));
+  };
+  console.error = (line: unknown) => {
+    errors.push(String(line));
+  };
+  const setPolicy = sandbox.setNetworkPolicy;
+  let resets = 0;
+  sandbox.setNetworkPolicy = async (policy) => {
+    await setPolicy(policy);
+    if (policy === "allow-all") {
+      resets += 1;
+      if (resets <= resetFailures) {
+        throw new Error("policy reset failed");
+      }
+    }
   };
   let brokered = 0;
   const context = {
     getSandbox: () => Promise.resolve(sandbox as SandboxSession),
-    session: { auth: { current } },
+    session: { auth: { current }, parent },
   };
   try {
     const outcome = await runPreparedEval(filter, context, (s) => {
       brokered += 1;
       return s.setNetworkPolicy(gatewayPolicy("real"));
     }).catch((error: unknown) => ({ thrown: error }));
-    return { brokered, commands, outcome, policies, warnings };
+    return { brokered, commands, errors, outcome, policies, warnings };
   } finally {
     console.warn = original;
+    console.error = originalError;
   }
 };
 
@@ -84,7 +112,8 @@ describe("run_eval", () => {
       exitCode: 0,
       firstError: null,
       success: true,
-      summary: "smoke ✓ passed\n1 passed, 0 failed",
+      summary:
+        "smoke: passed\nResults: 1 passed, 0 failed, 0 scored, 0 skipped (1 total)",
     });
     assert.deepEqual(
       commands.map((options) => options.command),
@@ -101,15 +130,29 @@ describe("run_eval", () => {
         Promise.resolve({
           exitCode: 1,
           stderr: "",
-          stdout: "booting\nError: MODEL_CALL_FAILED\nsmoke failed",
+          stdout: JSON.stringify({
+            failed: 1,
+            passed: 0,
+            results: [
+              {
+                assertions: [],
+                error: "MODEL_CALL_FAILED",
+                id: "smoke",
+                verdict: "failed",
+              },
+            ],
+            scored: 0,
+            skipped: 0,
+          }),
         }),
     });
 
     assert.deepEqual(outcome, {
       exitCode: 1,
-      firstError: "Error: MODEL_CALL_FAILED",
+      firstError: "MODEL_CALL_FAILED",
       success: false,
-      summary: "booting\nError: MODEL_CALL_FAILED\nsmoke failed",
+      summary:
+        "smoke: failed\nResults: 0 passed, 1 failed, 0 scored, 0 skipped (1 total)",
     });
   });
 
@@ -119,6 +162,75 @@ describe("run_eval", () => {
     });
 
     assert.match(String((outcome as { thrown: Error }).thrown), THREW);
+    assert.deepEqual(policies, [gatewayPolicy("real"), "allow-all"]);
+  });
+
+  it("retries a rejected policy reset once", async () => {
+    const { errors, outcome, policies } = await run("smoke", trusted, {
+      resetFailures: 1,
+    });
+    assert.equal((outcome as { success: boolean }).success, true);
+    assert.deepEqual(policies, [
+      gatewayPolicy("real"),
+      "allow-all",
+      "allow-all",
+    ]);
+    assert.deepEqual(errors, []);
+  });
+
+  it("logs one bounded error and throws when both policy resets fail", async () => {
+    const { errors, outcome, policies } = await run("smoke", trusted, {
+      resetFailures: 2,
+    });
+    assert.equal(
+      String((outcome as { thrown: Error }).thrown),
+      "Error: policy reset failed"
+    );
+    assert.deepEqual(policies, [
+      gatewayPolicy("real"),
+      "allow-all",
+      "allow-all",
+    ]);
+    assert.equal(errors.length, 1);
+    assert.ok(errors[0].includes("ai-gateway.vercel.sh"));
+    assert.ok(errors[0].includes("gateway_transform_stuck"));
+    assert.equal(errors[0].includes("\n"), false);
+    assert.ok(errors[0].length <= 4000);
+  });
+
+  it("refuses child sessions without opening a credential window", async () => {
+    const { brokered, commands, outcome, policies, warnings } = await run(
+      "smoke",
+      trusted,
+      {
+        parent: {
+          callId: "agent-call",
+          rootSessionId: "root",
+          sessionId: "root",
+          turn: { id: "parent-turn", sequence: 1 },
+        },
+      }
+    );
+    assert.deepEqual(outcome, {
+      error: "Only the root session may run evals.",
+      success: false,
+    });
+    assert.equal(brokered, 0);
+    assert.deepEqual(commands, []);
+    assert.deepEqual(policies, []);
+    assert.equal(warnings.length, 1);
+  });
+
+  it("restores the policy after the shell timeout", async () => {
+    const { outcome, policies } = await run("smoke", trusted, {
+      result: () => Promise.resolve({ exitCode: 124, stderr: "", stdout: "" }),
+    });
+    assert.deepEqual(outcome, {
+      exitCode: 124,
+      firstError: "Eval command exceeded its shell timeout.",
+      success: false,
+      summary: "Eval command exceeded its shell timeout.",
+    });
     assert.deepEqual(policies, [gatewayPolicy("real"), "allow-all"]);
   });
 

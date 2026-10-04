@@ -1,7 +1,8 @@
-import type { SessionAuthContext } from "eve/context";
+import type { SessionAuthContext, SessionParent } from "eve/context";
 import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
 import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
+import { summarizeEval } from "#lib/eval-summary.js";
 import { resolveToken } from "#lib/jev.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { readPreparedRepository } from "#lib/repository.js";
@@ -11,17 +12,14 @@ import { isTrusted, isUnattended } from "#lib/trust.js";
 
 /**
  * One eval run: the subject's dev server boot, its build, and the selected
- * evals against a live model. Ten minutes covers a cold build plus a handful of
- * evals and still returns before eve's 800s Vercel invocation ceiling.
+ * evals against a live model. The shell sends TERM to its process group after
+ * 570s, then KILL after 10s, ahead of this 600s outer deadline. Eve 0.54.2 does
+ * not propagate cancellation after command creation; see EVE-PROPOSALS.md.
  */
 export const EVAL_TIMEOUT_MS = 600_000;
 
 /** Eval ids and directory prefixes, e.g. `smoke` or `routing/direct-scratch-repository`. */
 const FILTER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._/-]*[A-Za-z0-9])?$/;
-
-const SUMMARY_CHARS = 4000;
-const ERROR_CHARS = 500;
-const ERROR_LINE = /error/iu;
 
 /**
  * Brokers the gateway credential onto egress to the gateway only. The
@@ -44,6 +42,27 @@ const brokerGatewayToken: GatewayBroker = async (sandbox) => {
   await sandbox.setNetworkPolicy(gatewayPolicy(await resolveToken()));
 };
 
+const restorePolicy = async (sandbox: SandboxSession) => {
+  try {
+    await sandbox.setNetworkPolicy("allow-all");
+  } catch {
+    try {
+      await sandbox.setNetworkPolicy("allow-all");
+    } catch (error) {
+      logOpsEvent(
+        "run_eval.cleanup_failed",
+        {
+          code: "gateway_transform_stuck",
+          message:
+            "Could not remove the ai-gateway.vercel.sh credential transform after two attempts.",
+        },
+        console.error
+      );
+      throw error;
+    }
+  }
+};
+
 const refuse = (code: string, error: string) => {
   logOpsEvent("run_eval.refused", { code, message: error }, console.warn);
   return { error, success: false as const };
@@ -52,6 +71,7 @@ const refuse = (code: string, error: string) => {
 interface EvalContext {
   getSandbox: () => Promise<SandboxSession>;
   session: {
+    parent?: SessionParent;
     auth: {
       current: SessionAuthContext | null;
       initiator?: SessionAuthContext | null;
@@ -62,12 +82,18 @@ interface EvalContext {
 /**
  * Runs `pnpm eval` in the prepared repository with a placeholder gateway key
  * in the command env and the real credential injected at the firewall.
+ * Children are refused because native delegates share the root firewall.
+ * Root parallel calls can still overlap another broker's window; no lease is
+ * provided by this tool. See EVE-PROPOSALS.md for this accepted limitation.
  */
 export const runPreparedEval = async (
   filter: string | undefined,
   ctx: EvalContext,
   broker: GatewayBroker = brokerGatewayToken
 ) => {
+  if (ctx.session.parent) {
+    return refuse("child_session", "Only the root session may run evals.");
+  }
   const { current, initiator } = ctx.session.auth;
   if (isUnattended(current) || isUnattended(initiator ?? null)) {
     return refuse("unattended", "Unattended runs may not run evals.");
@@ -96,23 +122,13 @@ export const runPreparedEval = async (
     const result = await boundedRun(
       sandbox,
       {
-        command: `cd '${worktree}' && set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm eval${filter ? ` '${filter}'` : ""} 2>&1`,
+        command: `cd '${worktree}' && timeout -k 10s 570s bash -c 'set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval${filter ? ` '${filter}'` : ""} 2>&1`,
       },
       EVAL_TIMEOUT_MS
     );
-    const output = String(result.stdout || result.stderr);
-    const firstError =
-      result.exitCode === 0
-        ? undefined
-        : output.split("\n").find((line) => ERROR_LINE.test(line));
-    return {
-      exitCode: result.exitCode,
-      firstError: firstError?.trim().slice(0, ERROR_CHARS) ?? null,
-      success: result.exitCode === 0,
-      summary: output.trim().slice(-SUMMARY_CHARS),
-    };
+    return summarizeEval(result.exitCode, String(result.stdout));
   } finally {
-    await sandbox.setNetworkPolicy("allow-all");
+    await restorePolicy(sandbox);
   }
 };
 
