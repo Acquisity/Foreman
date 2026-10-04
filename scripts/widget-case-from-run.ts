@@ -116,6 +116,10 @@ if (target === "production") {
     "Its workspace is only known after decrypting. Decrypting is an audit-logged key retrieval."
   );
   if (!process.argv.includes("--yes")) {
+    if (!stdin.isTTY) {
+      console.error("Not decrypted: pass --yes when stdin is not a terminal.");
+      process.exit(1);
+    }
     const prompt = createInterface({ input: stdin, output: stdout });
     const answer = await prompt.question("Decrypt this production run? [y/N] ");
     prompt.close();
