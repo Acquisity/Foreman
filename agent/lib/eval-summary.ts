@@ -37,6 +37,12 @@ const diagnostic = (value: string) =>
     .trim()
     .slice(0, ERROR_CHARS);
 
+// 124 is timeout's own exit; 137 is any SIGKILL (timeout's grace kill or out of memory).
+const NO_REPORT_ERRORS: Record<number, string> = {
+  124: "Eval command exceeded its shell timeout.",
+  137: "Eval command was killed (shell timeout grace period or out of memory).",
+};
+
 /** Projects eve eval --json, excluding logs, environment, traces and metadata. */
 export const summarizeEval = (exitCode: number, stdout: string) => {
   // pnpm and dev-server output can precede the final, pretty-printed JSON.
@@ -58,9 +64,8 @@ export const summarizeEval = (exitCode: number, stdout: string) => {
   }
   if (!report) {
     const error =
-      exitCode === 124 || exitCode === 137
-        ? "Eval command exceeded its shell timeout."
-        : `Eval command exited ${exitCode} without a valid JSON report.`;
+      NO_REPORT_ERRORS[exitCode] ??
+      `Eval command exited ${exitCode} without a valid JSON report.`;
     return { exitCode, firstError: error, success: false, summary: error };
   }
   const failure = report.results.find(

@@ -41,18 +41,18 @@ describe("eval summary", () => {
   it("retains the first failed gate without requiring the word error", () => {
     const data = report(true);
     data.results.push(
-      ...Array.from({ length: 200 }, (_, index) => ({
+      ...Array.from({ length: 300 }, (_, index) => ({
         assertions: [],
         id: `later/${index}`,
         verdict: "passed",
       }))
     );
-    data.passed = 200;
+    data.passed = 300;
     const result = summarizeEval(1, JSON.stringify(data, null, 2));
     assert.equal(result.firstError, "Expected tool was not called");
     assert.ok(result.summary.startsWith("smoke: failed\n"));
-    assert.ok(result.summary.endsWith("(201 total)"));
-    assert.ok(result.summary.length <= 4000);
+    assert.ok(result.summary.endsWith("(301 total)"));
+    assert.equal(result.summary.length, 4000);
     assert.equal(result.success, false);
   });
 
@@ -82,13 +82,19 @@ describe("eval summary", () => {
     );
   });
 
-  for (const exitCode of [124, 137]) {
-    it(`reports timeout exit ${exitCode} without returning raw output`, () => {
+  for (const [exitCode, message] of [
+    [124, "Eval command exceeded its shell timeout."],
+    [
+      137,
+      "Eval command was killed (shell timeout grace period or out of memory).",
+    ],
+  ] as const) {
+    it(`reports exit ${exitCode} without returning raw output`, () => {
       assert.deepEqual(summarizeEval(exitCode, "PRIVATE_VALUE=hidden"), {
         exitCode,
-        firstError: "Eval command exceeded its shell timeout.",
+        firstError: message,
         success: false,
-        summary: "Eval command exceeded its shell timeout.",
+        summary: message,
       });
     });
   }
