@@ -9,7 +9,7 @@ import {
   type RunOptions,
   type RunResult,
 } from "./prepare-repository-fixtures.js";
-import { REPOSITORY_MARKER } from "./repository.js";
+import { REPOSITORY_MARKER, stampRepository } from "./repository.js";
 import { stampTrusted, stampUnattended } from "./trust.js";
 
 const { gatewayPolicy, runEvalTool, runPreparedEval } = await import(
@@ -17,8 +17,9 @@ const { gatewayPolicy, runEvalTool, runPreparedEval } = await import(
 );
 
 const WORKTREE = "/workspace/repo";
-const SMOKE_COMMAND = `cd '${WORKTREE}' && timeout -k 10s 570s bash -c 'set -a && . ./.env.example && set +a && AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval 'smoke' 2>&1`;
+const SMOKE_COMMAND = `cd '${WORKTREE}' && timeout -k 10s 570s bash -c 'set -a; . ./.env.example; set +a; AI_GATEWAY_API_KEY=placeholder pnpm --silent eval --json "$@"' run_eval 'smoke'`;
 const THREW = /sandbox gone/u;
+const WINDOW_FAILED = /gateway token unavailable/u;
 const SMOKE_REPORT = JSON.stringify({
   failed: 0,
   passed: 1,
@@ -43,7 +44,9 @@ const run = async (
     result = () => ok(SMOKE_REPORT),
     parent,
     resetFailures = 0,
+    brokerFails = false,
   }: {
+    brokerFails?: boolean;
     prepared?: boolean;
     result?: (options: RunOptions) => Promise<RunResult>;
     parent?: SessionParent;
@@ -92,7 +95,9 @@ const run = async (
   try {
     const outcome = await runPreparedEval(filter, context, (s) => {
       brokered += 1;
-      return s.setNetworkPolicy(gatewayPolicy("real"));
+      return brokerFails
+        ? Promise.reject(new Error("gateway token unavailable"))
+        : s.setNetworkPolicy(gatewayPolicy("real"));
     }).catch((error: unknown) => ({ thrown: error }));
     return { brokered, commands, errors, outcome, policies, warnings };
   } finally {
@@ -239,17 +244,37 @@ describe("run_eval", () => {
     string | undefined,
     SessionAuthContext | null,
     boolean,
+    string,
   ];
   const refusals: Refusal[] = [
-    ["untrusted", "smoke", baseAuth, true],
-    ["no auth", "smoke", null, true],
-    ["unattended", "smoke", stampUnattended(trusted), true],
-    ["shell metacharacters", "smoke; env", trusted, true],
-    ["quote", "smoke'", trusted, true],
-    ["traversal", "../etc", trusted, true],
-    ["no repository prepared", "smoke", trusted, false],
+    ["untrusted", "smoke", baseAuth, true, "limited to trusted callers"],
+    ["no auth", "smoke", null, true, "limited to trusted callers"],
+    ["unattended", "smoke", stampUnattended(trusted), true, "Unattended runs"],
+    [
+      "shell metacharacters",
+      "smoke; env",
+      trusted,
+      true,
+      "not a valid eval filter",
+    ],
+    ["quote", "smoke'", trusted, true, "not a valid eval filter"],
+    ["traversal", "../etc", trusted, true, "not a valid eval filter"],
+    [
+      "no repository prepared",
+      "smoke",
+      trusted,
+      false,
+      "No repository has been prepared",
+    ],
+    [
+      "a signed session bound to another repository",
+      "smoke",
+      stampRepository(trusted, "Acquisity/Other", "github-webhook"),
+      true,
+      "is bound to Acquisity/Other",
+    ],
   ];
-  for (const [name, filter, auth, prepared] of refusals) {
+  for (const [name, filter, auth, prepared, reason] of refusals) {
     it(`refuses ${name} without a credential window`, async () => {
       const { brokered, commands, outcome, policies, warnings } = await run(
         filter,
@@ -258,6 +283,7 @@ describe("run_eval", () => {
       );
 
       assert.equal((outcome as { success: boolean }).success, false);
+      assert.ok((outcome as { error: string }).error.includes(reason));
       assert.equal(brokered, 0);
       assert.deepEqual(commands, []);
       assert.deepEqual(policies, []);
@@ -265,6 +291,15 @@ describe("run_eval", () => {
       assert.equal(warnings[0].includes("\n"), false);
     });
   }
+
+  it("restores the policy and rethrows when opening the window fails", async () => {
+    const { commands, outcome, policies } = await run("smoke", trusted, {
+      brokerFails: true,
+    });
+    assert.match(String((outcome as { thrown: Error }).thrown), WINDOW_FAILED);
+    assert.deepEqual(commands, []);
+    assert.deepEqual(policies, ["allow-all"]);
+  });
 
   it("validates the input schema", () => {
     const schema = runEvalTool.inputSchema as unknown as {
