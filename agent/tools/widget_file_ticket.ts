@@ -14,6 +14,7 @@ import {
   formatCustomerReport,
 } from "#lib/linear-ticket-report.js";
 import { isRefundTicket } from "#lib/widget-next-action.js";
+import { replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport, requireWidgetContext } from "../lib/widget-scope.js";
 
 /** REFUND_TICKET.project (P-ENG-20, "Support") as the id Linear returns for an issue's project. */
@@ -151,6 +152,8 @@ const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
+      isWidgetSupport(ctx.session.auth.initiator)
+        ? replayable("widget_file_ticket", tool)
+        : null,
   },
 });

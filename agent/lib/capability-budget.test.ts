@@ -711,3 +711,67 @@ describe("capability report", () => {
     );
   });
 });
+
+describe("widget replay", () => {
+  it("admits every widget tool and the GitHub surface unchanged under replay", {
+    skip: HAS_COMPILED_MANIFEST
+      ? false
+      : "run pnpm validate to compile the repository manifest first",
+  }, async () => {
+    const { resolveCompiledDynamicTools } = await import(
+      "./eve-dynamic-tools.js"
+    );
+    const { widgetAuth } = await import("./widget-scope.js");
+    const { verifiedWidgetContext } = await import("./widget.fixture.js");
+    const manifest = readCompiledManifest(new URL("../../", import.meta.url));
+    // A recording follow-up, so the recording reader is offered too.
+    const widget = widgetAuth({
+      ...verifiedWidgetContext,
+      recordingId: "replay-recording",
+    });
+    const repository = laneAuth("repository-interactive");
+    // Fresh session ids per pass: resolutions are cached per session.
+    const resolveAll = async (pass: string) =>
+      (
+        await Promise.all(
+          manifest.dynamicTools
+            .filter(
+              (entry) =>
+                entry.sourceId.startsWith("tools/widget_") ||
+                entry.sourceId.startsWith("ext-override:github:")
+            )
+            .map((entry) =>
+              resolveCompiledDynamicTools(entry, manifest.appRoot, {
+                auth: entry.sourceId.startsWith("tools/") ? widget : repository,
+                id: `widget-replay:${pass}:${entry.sourceId}`,
+              })
+            )
+        )
+      )
+        .flat()
+        .sort((left, right) => left.name.localeCompare(right.name));
+    const live = await resolveAll("live");
+    process.env.WIDGET_REPLAY_CASE =
+      "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
+    try {
+      // Eve's own admission drops a tool whose callbacks are not stamped, so
+      // an identical list proves every inline replay execute was admitted.
+      assert.deepEqual(await resolveAll("replay"), live);
+    } finally {
+      Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+    }
+    const names = live.map((tool) => tool.name);
+    for (const name of [
+      "widget_file_ticket",
+      "widget_inbox_health",
+      "widget_read_help_article",
+      "widget_read_recording",
+    ]) {
+      assert.ok(names.includes(name), `${name} admitted`);
+    }
+    assert.equal(
+      names.filter((name) => GITHUB_TOOL_NAME.test(name)).length,
+      GITHUB_TOOL_ALLOWLIST.length
+    );
+  });
+});
