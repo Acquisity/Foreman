@@ -233,26 +233,28 @@ async function judgeClaims(
     return;
   }
   const claims = claimsFor(recorded);
+  let verdicts: Awaited<ReturnType<typeof judgeAnswer>>;
   try {
-    const verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
-    const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
-    saveRecord(REVIEW_DIR, reviewedSample(name, recorded, answer, verdicts));
-    t.log(`judge review: ${REVIEW_DIR}/review.md`);
-    for (const verdict of verdicts) {
-      t.log(`judge ${verdict.id}: ${verdict.verdict} (${verdict.reason})`);
-      t.check(
-        verdict.verdict,
-        satisfies((value) => value === "yes", `judge: ${verdict.id}`)
-      )
-        .label(`judge ${verdict.id}`)
-        .soft();
-    }
+    verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
   } catch (error) {
     t.log(`judge failed: ${String(error).slice(0, 300)}`);
     t.check(
       null,
       satisfies(() => false, "the claims judge answered")
     ).soft();
+    return;
+  }
+  const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
+  saveRecord(REVIEW_DIR, reviewedSample(name, recorded, answer, verdicts));
+  t.log(`judge review: ${REVIEW_DIR}/review.md`);
+  for (const verdict of verdicts) {
+    t.log(`judge ${verdict.id}: ${verdict.verdict} (${verdict.reason})`);
+    t.check(
+      verdict.verdict,
+      satisfies((value) => value === "yes", `judge: ${verdict.id}`)
+    )
+      .label(`judge ${verdict.id}`)
+      .soft();
   }
 }
 
