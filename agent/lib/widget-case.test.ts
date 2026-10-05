@@ -350,11 +350,17 @@ test("an id joined to a domain with hyphens is replaced inside the composite", (
   assert.ok(text.includes(".example-inboxes"));
 });
 
+const billing = (output: unknown): WidgetCase => {
+  const raw = rawCase(output);
+  raw.cassette[0].tool = "widget_billing_summary";
+  return raw;
+};
+
 test("billing catalog names are product labels, not customer names", () => {
   const saved = JSON.parse(
     serializeCase(
       scrubCase(
-        rawCase({
+        billing({
           balances: {
             domains: { feature: { id: "domains", name: "Domains" } },
             website_credit: {
@@ -384,5 +390,39 @@ test("a name inside a fixture value is not a leak, but the name elsewhere still 
   };
   serializeCase(scrubbed);
   scrubbed.case.question = "Aaron Fraga cannot sign in";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});
+
+test("a catalog spelling used as a name elsewhere, or outside billing, is still replaced", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        billing({
+          campaign: { name: "Domains" },
+          feature: { id: "domains", name: "Domains" },
+        }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.match(saved.campaign.name, NAME_PLACEHOLDER);
+  assert.match(saved.feature.name, NAME_PLACEHOLDER);
+  const other = JSON.parse(
+    serializeCase(
+      scrubCase(rawCase({ company: { id: "acme", name: "Acme" } }), scope)
+    )
+  ).cassette[0].output;
+  assert.match(other.company.name, NAME_PLACEHOLDER);
+});
+
+test("a fixture value masks an original only as a whole word", () => {
+  const scrubbed = scrubCase(
+    rawCase({ sender: { name: "Aaron Fraga" } }, "Why is this broken?"),
+    scope
+  );
+  scrubbed.case.cassette[0].output = {
+    note: `${fixture.organizationName}s`,
+    sender: { name: "Name 1" },
+  };
   assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
 });

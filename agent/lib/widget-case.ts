@@ -111,6 +111,44 @@ const DROPPED = "[binary content dropped]";
 const literal = (value: string) => value.replace(REGEX_SPECIAL, "\\$&");
 
 /**
+ * Names of billing catalog entries ({ id: "website_credit", name: "Website Credit" })
+ * in widget_billing_summary results, counted per spelling. Only these objects are
+ * product labels; the same spelling anywhere else is still a name to replace.
+ */
+const billingCatalogNames = (raw: WidgetCase) => {
+  const counts = new Map<string, number>();
+  const walk = (item: unknown, depth: number): void => {
+    if (depth > MAX_DEPTH || !item || typeof item !== "object") {
+      return;
+    }
+    if (Array.isArray(item)) {
+      for (const child of item) {
+        walk(child, depth + 1);
+      }
+      return;
+    }
+    const { id, name } = item as Record<string, unknown>;
+    if (
+      typeof id === "string" &&
+      typeof name === "string" &&
+      CATALOG_ID.test(id) &&
+      name.toLowerCase().replaceAll(" ", "_") === id
+    ) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    for (const child of Object.values(item)) {
+      walk(child, depth + 1);
+    }
+  };
+  for (const call of raw.cassette) {
+    if (call.tool === "widget_billing_summary") {
+      walk(call.output, 0);
+    }
+  }
+  return counts;
+};
+
+/**
  * One bounded alternation of escaped literals, matched as whole words: a hyphen
  * ends a word, so an id joined to another ("<uuid>-<domain>-inboxes") is still
  * replaced, while a short value inside a longer word is not.
@@ -219,21 +257,17 @@ const isSafeIdentifier = (value: string) =>
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const found = {
-    catalogIds: new Set<string>(),
-    names: new Set<string>(),
+    names: new Map<string, number>(),
     phones: new Set<string>(),
   };
   const draft = mapStrings(
     raw,
     (text, key) => {
       if (text) {
-        if (key === "id" && CATALOG_ID.test(text)) {
-          found.catalogIds.add(text);
-        }
         if (PHONE_KEY.test(key)) {
           found.phones.add(text);
         } else if (NAME_KEY.test(key)) {
-          found.names.add(text);
+          found.names.set(text, (found.names.get(text) ?? 0) + 1);
         }
       }
       return text;
@@ -302,8 +336,10 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
         : `https://internal.example/${next("link")}`
     );
   }
-  for (const name of found.names) {
-    if (found.catalogIds.has(name.toLowerCase().replaceAll(" ", "_"))) {
+  const catalogNames = billingCatalogNames(raw);
+  for (const [name, count] of found.names) {
+    // Kept only when every occurrence is a billing catalog label.
+    if (catalogNames.get(name) === count) {
       continue;
     }
     add(name, () => `Name ${next("name")}`);
@@ -353,7 +389,10 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
           let rest = lower;
           for (const fixed of FIXTURE_VALUES) {
             if (fixed.includes(original)) {
-              rest = rest.replaceAll(fixed, "\0");
+              rest = rest.replace(
+                new RegExp(`(?<![a-z0-9_])${literal(fixed)}(?![a-z0-9_])`, "g"),
+                "\0"
+              );
             }
           }
           return rest.includes(original);
