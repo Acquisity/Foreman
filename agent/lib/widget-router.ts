@@ -331,7 +331,8 @@ export interface WidgetRoute {
   recording?: boolean;
   /** The customer asked for a refund, which an investigation files as a ticket. */
   refund?: boolean;
-  source: "jev" | "fallback";
+  /** `rule` is a bare request for a person, handed off without asking Jev. */
+  source: "jev" | "fallback" | "rule";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
   /** How likely the message cannot be helped without first asking what it means. */
@@ -389,6 +390,77 @@ function ticketRoute(
   };
 }
 
+const NON_WORD = /[^a-z']+/u;
+const PERSON_WORDS = new Set([
+  "agent",
+  "human",
+  "operator",
+  "person",
+  "rep",
+  "representative",
+]);
+// Every other word a bare request for a person may use. A word outside this
+// list (a feature, a question word, "my") means the message asks about
+// something else, so "AI SDR agent" or "my agent is not sending" never match.
+const FILLER_WORDS = new Set([
+  "a",
+  "actual",
+  "an",
+  "can",
+  "chat",
+  "connect",
+  "could",
+  "customer",
+  "get",
+  "give",
+  "i",
+  "i'd",
+  "i'm",
+  "id",
+  "im",
+  "like",
+  "live",
+  "looking",
+  "me",
+  "need",
+  "now",
+  "please",
+  "pls",
+  "real",
+  "service",
+  "someone",
+  "somebody",
+  "speak",
+  "support",
+  "talk",
+  "the",
+  "to",
+  "want",
+  "with",
+  "would",
+]);
+
+/**
+ * The latest message is only a request for a person, such as "Human agent" or
+ * "talk to a real person please". Jev scored a first-message "Human agent" 0.73
+ * asks_for_human and it was asked a clarifying question instead (ENG-14736).
+ */
+export const asksOnlyForPerson = (message: string): boolean => {
+  const text = message.trim().toLowerCase();
+  if (text.length > 60) {
+    return false;
+  }
+  const words = text.split(NON_WORD).filter(Boolean);
+  const real = words.some((word) => word === "real" || word === "live");
+  return (
+    words.some(
+      (word) =>
+        PERSON_WORDS.has(word) ||
+        (real && (word === "someone" || word === "somebody"))
+    ) && words.every((word) => PERSON_WORDS.has(word) || FILLER_WORDS.has(word))
+  );
+};
+
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
   opts?: {
@@ -400,6 +472,15 @@ export async function routeWidgetMessage(
   const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return FALLBACK;
+  }
+  if (asksOnlyForPerson(toAsk(ask).latest)) {
+    return {
+      ...FALLBACK,
+      asksForHuman: 1,
+      confidence: 1,
+      lane: "human",
+      source: "rule",
+    };
   }
   const startedAt = Date.now();
   try {

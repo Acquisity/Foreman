@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   asksForChange,
   DECISION_CONTEXT,
+  HUMAN_REQUEST_SCORE,
   offersRecording,
   renderAsk,
   routeWidgetMessage,
@@ -253,6 +254,61 @@ describe("routeWidgetMessage", () => {
         }),
     });
     assert.equal(agreed.lane, "human");
+  });
+
+  it("hands off a bare request for a person without asking Jev", async () => {
+    const bare = [
+      "Human agent",
+      "human",
+      "agent",
+      "live agent",
+      "real person",
+      "a human please",
+      "talk to a human",
+      "speak to an agent",
+      "I want a human",
+      "representative",
+      "support agent please",
+      "operator",
+      "Human agent!",
+      "I want to talk to someone real now.",
+    ];
+    const routes = await Promise.all(
+      bare.map((message) =>
+        routeWidgetMessage(message, {
+          apiKey: "test-key",
+          fetch: () => assert.fail(`called Jev for ${message}`),
+        })
+      )
+    );
+    for (const [i, route] of routes.entries()) {
+      assert.equal(route.lane, "human", bare[i]);
+      assert.equal(route.source, "rule", bare[i]);
+      assert.ok(route.asksForHuman >= HUMAN_REQUEST_SCORE, bare[i]);
+    }
+    const asks = [
+      "AI SDR agent",
+      "how do I set up my agent",
+      "agent settings",
+      "is the human-like reply setting on?",
+      "my agent is not sending",
+      "can you open a ticket for this bug",
+      "talk to someone",
+    ];
+    const called: string[] = [];
+    const jevRoutes = await Promise.all(
+      asks.map((message) =>
+        routeWidgetMessage(message, {
+          apiKey: "test-key",
+          fetch: () => {
+            called.push(message);
+            return Promise.resolve(jevReply("kb", 0.9));
+          },
+        })
+      )
+    );
+    assert.equal(new Set(called).size, asks.length);
+    assert.ok(jevRoutes.every((route) => route.source === "jev"));
   });
 
   it("falls open to investigate without a key and never calls out", async () => {
