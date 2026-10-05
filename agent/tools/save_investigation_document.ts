@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
+import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
   DOCUMENT_MAX_CHARS,
@@ -40,7 +41,7 @@ export const hasCardNumber = (text: string) =>
 const IBAN = /\b[A-Za-z]{2}\d{2}(?:[ -]?[A-Za-z0-9]){11,30}\b/u;
 
 export default defineTool({
-  approval: () => "not-applicable",
+  approval: questionsOnlyPolicy,
   description:
     "Create or rewrite the one issue-scoped investigation document for a ticket: lane triage writes `Triage investigation`, lane billing writes `Billing investigation`. " +
     "Send the whole document each time; the first call creates it and later calls replace its content, never a second document. " +

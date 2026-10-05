@@ -1,5 +1,9 @@
 import { defineMcpClientConnection } from "eve/connections";
 import { isFinInvestigation } from "../fin-investigation-auth.js";
+import {
+  isQuestionsOnlySession,
+  QUESTIONS_ONLY_REASON,
+} from "../github/approval.js";
 import { sessionLane } from "../session-lane.js";
 import { executorAuth } from "./auth.js";
 import { toolkitUrl } from "./endpoint.js";
@@ -14,6 +18,11 @@ export const executorConnection = () =>
             "Customer investigations cannot use raw Executor. Use an authored workspace-scoped evidence tool.",
           type: "denied",
         };
+      }
+      // A questions-only Slack session never reaches Linear writes; one execute
+      // call can run any company operation, so the whole gateway is denied.
+      if (isQuestionsOnlySession(ctx.session.auth)) {
+        return { reason: QUESTIONS_ONLY_REASON, type: "denied" };
       }
       if (!sessionLane(ctx.session.auth.initiator).broadExecutor) {
         return {
