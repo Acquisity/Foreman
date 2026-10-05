@@ -37,7 +37,7 @@ export const widgetCaseSchema = z.strictObject({
     workspace: z.string().min(1),
   }),
   source: z.strictObject({
-    // Null for a hand-written front-door case: that reply has no session, so no workflow run.
+    // Null for a hand-written front-door case: it has no recorded source run. Replay still starts a run.
     runId: z
       .string()
       .regex(/^wrun_[0-9A-Z]{26}$/)
