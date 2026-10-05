@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { gateway, generateObject } from "ai";
+import { gateway, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import type { WidgetCase } from "./widget-case.js";
+import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
@@ -25,19 +25,55 @@ export interface Verdict {
   verdict: "yes" | "no";
 }
 
-/** One judged case as the eval writes it; the review page and the gold file read these. */
-export interface JudgeRecord {
-  answer: string;
-  case: string;
-  judgedAt: string;
-  model: string;
-  verdicts: (Verdict & { claim: string })[];
-}
+const verdictSchema = z.strictObject({
+  id: z.string().min(1),
+  reason: z.string(),
+  verdict: z.enum(["yes", "no"]),
+});
 
-export interface GoldEntry {
-  answer: string;
-  case: string;
-  claims: { claim: string; expected: "yes" | "no"; id: string }[];
+/** The exact reviewed sample, including the scrubbed case snapshot and its source. */
+export const judgeRecordSchema = z
+  .strictObject({
+    answer: z.string().min(1),
+    case: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+    judgedAt: z.iso.datetime(),
+    model: z.string().min(1),
+    recorded: widgetCaseSchema,
+    verdicts: z
+      .array(verdictSchema.extend({ claim: z.string().min(1) }))
+      .min(1),
+  })
+  .superRefine((record, ctx) => {
+    if (
+      new Set(record.verdicts.map((v) => v.id)).size !== record.verdicts.length
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Duplicate reviewed claim ids.",
+      });
+    }
+  });
+export type JudgeRecord = z.infer<typeof judgeRecordSchema>;
+
+/** Build the sample once; review, export and calibration consume this same record. */
+export function reviewedSample(
+  name: string,
+  recorded: WidgetCase,
+  answer: string,
+  verdicts: Verdict[]
+): JudgeRecord {
+  const claims = claimsFor(recorded);
+  return judgeRecordSchema.parse({
+    answer,
+    case: name,
+    judgedAt: new Date().toISOString(),
+    model: JUDGE_MODEL,
+    recorded,
+    verdicts: parseVerdicts(claims, { verdicts }).map((v, n) => ({
+      ...v,
+      claim: claims[n]?.text,
+    })),
+  });
 }
 
 const SHARED: Claim[] = [
@@ -65,10 +101,10 @@ export function claimsFor(recorded: WidgetCase): Claim[] {
   return [
     {
       id: "cause",
-      // An unset cause is judged against the tool results instead of skipped.
+      // Null means no authored cause, not a label saying no cause was found.
       text: cause
         ? `The message names the expected cause (${cause}), or says plainly that it could not find one when that is what the case expects.`
-        : "The message names the cause the tool results support, or says plainly that it could not find one when they support none.",
+        : "The answer draws the conclusion warranted by the question and tool results, including a justified clarifying question when the subject is ambiguous or explicit uncertainty when a cause cannot be established.",
     },
     ...SHARED,
     ...(limited ? [LIMITED] : []),
@@ -82,15 +118,9 @@ For each claim, answer yes only when the claim holds for the answer, and no othe
 Internal jargon means words a customer would not know: raw field names, status codes, database or vendor names, ticket ids, or tool names.
 Return exactly one verdict per claim id, in the order given.`;
 
-const judgeSchema = z.object({
-  verdicts: z.array(
-    z.object({
-      id: z.string(),
-      reason: z.string(),
-      verdict: z.enum(["yes", "no"]),
-    })
-  ),
-});
+const judgeSchema = z.strictObject({ verdicts: z.array(verdictSchema) });
+
+export const JUDGE_TIMEOUT_MS = 60_000;
 
 const MAX_REASON = 240;
 
@@ -121,11 +151,15 @@ export async function judgeAnswer(
   recorded: WidgetCase,
   answer: string,
   claims: Claim[],
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  model: LanguageModel = gateway(JUDGE_MODEL)
 ): Promise<Verdict[]> {
+  const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
   const { object } = await generateObject({
-    abortSignal,
-    model: gateway(JUDGE_MODEL),
+    abortSignal: abortSignal
+      ? AbortSignal.any([abortSignal, deadline])
+      : deadline,
+    model,
     prompt: JSON.stringify({
       answer,
       claims,
@@ -151,10 +185,15 @@ export const readRecords = (dir: string): JudgeRecord[] =>
   readdirSync(`${dir}/records`)
     .filter((file) => file.endsWith(".json"))
     .sort()
-    .map((file) => JSON.parse(readFileSync(`${dir}/records/${file}`, "utf8")));
+    .map((file) =>
+      judgeRecordSchema.parse(
+        JSON.parse(readFileSync(`${dir}/records/${file}`, "utf8"))
+      )
+    );
 
 /** Save one case's record and regenerate the run's review page from every record so far. */
-export function saveRecord(dir: string, record: JudgeRecord) {
+export function saveRecord(dir: string, input: JudgeRecord) {
+  const record = judgeRecordSchema.parse(input);
   mkdirSync(`${dir}/records`, { recursive: true });
   writeFileSync(
     `${dir}/records/${record.case}.json`,
@@ -167,8 +206,16 @@ const cell = (text: string) =>
   text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
 
 /** The review page: each case's answer, then one row per claim with an empty mark column. */
+const codeBlock = (text: string, language = "text") => {
+  const fence = "`".repeat(
+    Math.max(3, ...(text.match(/`+/g) ?? []).map((run) => run.length + 1))
+  );
+  return `${fence}${language}\n${text}\n${fence}`;
+};
+
 export function renderReview(records: JudgeRecord[]): string {
-  const sections = records.map((record) => {
+  const sections = records.map((input) => {
+    const record = judgeRecordSchema.parse(input);
     const rows = record.verdicts.map(
       (verdict) =>
         `| ${record.case}#${verdict.id} | ${cell(verdict.claim)} | ${verdict.verdict} | ${cell(verdict.reason)} |  |`
@@ -178,9 +225,30 @@ export function renderReview(records: JudgeRecord[]): string {
       "",
       `Judged ${record.judgedAt} by ${record.model}.`,
       "",
-      "```text",
-      record.answer.replace(/```/g, "'''"),
-      "```",
+      `Role: ${record.recorded.scope.role}. Authored cause: ${record.recorded.expectations.cause ?? "unset (not a no-cause label)"}.`,
+      "",
+      "Question:",
+      codeBlock(record.recorded.question),
+      "",
+      "<details>",
+      "<summary>Scrubbed cassette evidence and source</summary>",
+      "",
+      codeBlock(
+        JSON.stringify(
+          {
+            cassette: record.recorded.cassette,
+            source: record.recorded.source,
+          },
+          null,
+          2
+        ),
+        "json"
+      ),
+      "",
+      "</details>",
+      "",
+      "Answer:",
+      codeBlock(record.answer),
       "",
       "| key | claim | verdict | reason | mark |",
       "| --- | --- | --- | --- | --- |",
@@ -216,89 +284,4 @@ export function parseMarks(review: string): Map<string, boolean> {
     marks.set(match[1] as string, mark === "right");
   }
   return marks;
-}
-
-/** A marked verdict becomes its expected answer: kept when right, flipped when wrong. */
-export function toGold(
-  records: JudgeRecord[],
-  marks: Map<string, boolean>
-): GoldEntry[] {
-  return records.flatMap((record) => {
-    const claims = record.verdicts.flatMap((verdict) => {
-      const right = marks.get(`${record.case}#${verdict.id}`);
-      if (right === undefined) {
-        return [];
-      }
-      const flipped = verdict.verdict === "yes" ? "no" : "yes";
-      return [
-        {
-          claim: verdict.claim,
-          expected: right ? verdict.verdict : flipped,
-          id: verdict.id,
-        },
-      ];
-    });
-    return claims.length
-      ? [{ answer: record.answer, case: record.case, claims }]
-      : [];
-  });
-}
-
-/** New entries replace a case's old entry; other cases stay. */
-export const mergeGold = (old: GoldEntry[], next: GoldEntry[]) => [
-  ...old.filter((entry) => !next.some((item) => item.case === entry.case)),
-  ...next,
-];
-
-export interface ClaimScore {
-  /** Verdicts matching gold, over gold labels whose claim wording is unchanged. */
-  agreement: { agree: number; total: number };
-  /** Verdicts that differ between the two runs. */
-  flips: { flipped: number; total: number };
-  /** Gold labels skipped because the claim was reworded since labelling. */
-  stale: number;
-}
-
-/**
- * Per-claim agreement of two judge runs with the gold file, and their flip
- * rate. Each run maps `case` to its verdicts for the gold answer.
- */
-export function scoreAgainstGold(
-  gold: GoldEntry[],
-  first: Map<string, (Verdict & { claim: string })[]>,
-  second: Map<string, (Verdict & { claim: string })[]>
-): Map<string, ClaimScore> {
-  const scores = new Map<string, ClaimScore>();
-  const score = (id: string) => {
-    let entry = scores.get(id);
-    if (!entry) {
-      entry = {
-        agreement: { agree: 0, total: 0 },
-        flips: { flipped: 0, total: 0 },
-        stale: 0,
-      };
-      scores.set(id, entry);
-    }
-    return entry;
-  };
-  for (const entry of gold) {
-    for (const label of entry.claims) {
-      const runs = [first, second].map((run) =>
-        run.get(entry.case)?.find((verdict) => verdict.id === label.id)
-      );
-      const [a, b] = runs;
-      if (!(a && b) || a.claim !== label.claim || b.claim !== label.claim) {
-        score(label.id).stale += 1;
-        continue;
-      }
-      const target = score(label.id);
-      for (const verdict of runs) {
-        target.agreement.total += 1;
-        target.agreement.agree += verdict?.verdict === label.expected ? 1 : 0;
-      }
-      target.flips.total += 1;
-      target.flips.flipped += a.verdict === b.verdict ? 0 : 1;
-    }
-  }
-  return scores;
 }

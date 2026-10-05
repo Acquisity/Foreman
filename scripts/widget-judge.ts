@@ -10,22 +10,27 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
 import {
   claimsFor,
-  type GoldEntry,
   JUDGE_MODEL,
   JUDGE_OUTPUT,
+  type JudgeRecord,
   judgeAnswer,
-  mergeGold,
   parseMarks,
   readRecords,
   renderReview,
-  scoreAgainstGold,
-  toGold,
-  type Verdict,
+  reviewedSample,
 } from "../agent/lib/widget-judge.js";
 
+import {
+  calibrated,
+  type GoldEntry,
+  goldSchema,
+  mergeGold,
+  scoreAgainstGold,
+  toGold,
+  writeGold,
+} from "../agent/lib/widget-judge-calibration.js";
+
 const GOLD = "evals/widget/judge-gold.json";
-const AGREEMENT_BAR = 0.9;
-const FLIP_BAR = 0.05;
 
 const latestRun = () => {
   const runs = existsSync(JUDGE_OUTPUT) ? readdirSync(JUDGE_OUTPUT).sort() : [];
@@ -36,23 +41,24 @@ const latestRun = () => {
 };
 
 const readGold = (): GoldEntry[] =>
-  existsSync(GOLD) ? JSON.parse(readFileSync(GOLD, "utf8")) : [];
+  goldSchema.parse(
+    existsSync(GOLD) ? JSON.parse(readFileSync(GOLD, "utf8")) : []
+  );
 
 async function judgeGold(gold: GoldEntry[]) {
-  const run = new Map<string, (Verdict & { claim: string })[]>();
-  for (const entry of gold) {
-    const recorded = widgetCaseSchema.parse(
-      JSON.parse(readFileSync(`evals/widget/cases/${entry.case}.json`, "utf8"))
+  const run = new Map<string, JudgeRecord>();
+  for (const { sample } of gold) {
+    // Keep the reviewed question/evidence fixed, but use today's authored claims.
+    const { expectations } = widgetCaseSchema.parse(
+      JSON.parse(readFileSync(`evals/widget/cases/${sample.case}.json`, "utf8"))
     );
+    const recorded = { ...sample.recorded, expectations };
     const claims = claimsFor(recorded);
     // biome-ignore lint/performance/noAwaitInLoops: one judge call at a time keeps the run cheap to stop.
-    const verdicts = await judgeAnswer(recorded, entry.answer, claims);
+    const verdicts = await judgeAnswer(recorded, sample.answer, claims);
     run.set(
-      entry.case,
-      verdicts.map((verdict, n) => ({
-        ...verdict,
-        claim: claims[n]?.text ?? "",
-      }))
+      sample.case,
+      reviewedSample(sample.case, recorded, sample.answer, verdicts)
     );
   }
   return run;
@@ -77,10 +83,7 @@ async function main() {
       (sum, record) => sum + record.verdicts.length,
       0
     );
-    writeFileSync(
-      GOLD,
-      `${JSON.stringify(mergeGold(readGold(), next), null, 2)}\n`
-    );
+    writeGold(GOLD, mergeGold(readGold(), next));
     console.log(
       `${GOLD}: ${marks.size} of ${rows} rows marked, ${next.length} case(s) written.`
     );
@@ -88,7 +91,7 @@ async function main() {
   }
   if (command === "rerun") {
     const gold = readGold();
-    if (!gold.length) {
+    if (!gold.some((entry) => entry.labels.length)) {
       throw new Error(`${GOLD} has no labels yet.`);
     }
     const scores = scoreAgainstGold(
@@ -96,17 +99,15 @@ async function main() {
       await judgeGold(gold),
       await judgeGold(gold)
     );
-    let under = false;
+    let under = scores.size === 0;
     console.log(`judge ${JUDGE_MODEL}, two runs against ${GOLD}`);
     for (const [id, score] of scores) {
       const { agree, total } = score.agreement;
       const { flipped, total: pairs } = score.flips;
-      const low =
-        total > 0 &&
-        (agree / total < AGREEMENT_BAR || flipped / pairs > FLIP_BAR);
+      const low = !calibrated(score);
       under ||= low;
       console.log(
-        `${low ? "UNDER" : "ok   "} ${id}: agreement ${percent(agree, total)} (${agree}/${total}), flips ${percent(flipped, pairs)} (${flipped}/${pairs})${score.stale ? `, ${score.stale} stale label(s): claim reworded since labelling` : ""}`
+        `${low ? "UNDER" : "ok   "} ${id}: agreement ${percent(agree, total)} (${agree}/${total}), flips ${percent(flipped, pairs)} (${flipped}/${pairs}), coverage ${score.coverage.measured}/${score.coverage.required} (stale ${score.coverage.stale}, missing ${score.coverage.missing}, unlabelled ${score.coverage.unlabelled})`
       );
     }
     process.exitCode = under ? 1 : 0;

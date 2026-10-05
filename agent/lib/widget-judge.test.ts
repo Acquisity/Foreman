@@ -1,22 +1,38 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
+import { MockLanguageModelV4 } from "ai/test";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   claimsFor,
-  type GoldEntry,
+  JUDGE_TIMEOUT_MS,
   type JudgeRecord,
-  mergeGold,
+  judgeAnswer,
+  judgeRecordSchema,
   parseMarks,
   parseVerdicts,
   readRecords,
   renderReview,
+  reviewedSample,
   saveRecord,
+} from "./widget-judge.js";
+
+import {
+  calibrated,
+  type GoldEntry,
+  goldSchema,
+  mergeGold,
   scoreAgainstGold,
   toGold,
-  type Verdict,
-} from "./widget-judge.js";
+  writeGold,
+} from "./widget-judge-calibration.js";
+
+const GOLD_REFUSAL = /Gold not saved/;
+const present = <T>(value: T | undefined): T => {
+  assert.ok(value !== undefined);
+  return value;
+};
 
 const CAUSE_TEXT = /two inboxes disconnected/;
 const CAUSE_ROW = /\| a#cause \| .* \| yes \| a \\\| b \| {2}\|/;
@@ -86,6 +102,7 @@ const record = (name: string, values: ("yes" | "no")[]): JudgeRecord => ({
   case: name,
   judgedAt: "2026-10-04T00:00:00.000Z",
   model: "test/model",
+  recorded,
   verdicts: claims.map((c, n) => ({
     ...verdict(c.id, values[n]),
     claim: c.text,
@@ -110,11 +127,11 @@ test("the review page has one markable row per claim and round-trips marks into 
     ]
   );
   const gold = toGold(records, marks);
-  assert.deepEqual(gold[0]?.claims, [
+  assert.deepEqual(gold[0]?.labels, [
     { claim: claims[0]?.text, expected: "yes", id: "cause" },
     { claim: claims[1]?.text, expected: "yes", id: "actions" },
   ]);
-  assert.equal(gold[0]?.answer, records[0].answer);
+  assert.equal(gold[0]?.sample.answer, records[0].answer);
   assert.throws(() => parseMarks(review.replace(CAUSE_MARK, "$1 maybe |")));
 });
 
@@ -130,72 +147,259 @@ test("saveRecord writes the record and regenerates the review", () => {
   assert.ok(review.indexOf("## a") < review.indexOf("## b"));
 });
 
-test("mergeGold replaces a relabelled case and keeps the rest", () => {
-  const entry = (name: string, expected: "yes" | "no"): GoldEntry => ({
-    answer: "x",
-    case: name,
-    claims: [{ claim: "c", expected, id: "cause" }],
+const labelled = (sample: JudgeRecord): GoldEntry =>
+  present(
+    toGold(
+      [sample],
+      new Map(sample.verdicts.map((v) => [`${sample.case}#${v.id}`, true]))
+    )[0]
+  );
+const run = (...samples: JudgeRecord[]) =>
+  new Map(samples.map((sample) => [sample.case, sample]));
+const allYes = (name: string) =>
+  record(name, ["yes", "yes", "yes", "yes", "yes"]);
+
+test("mergeGold replaces a relabelled sample and keeps the rest", () => {
+  const old = [labelled(allYes("a")), labelled(allYes("b"))];
+  const next = labelled(record("a", ["no", "yes", "yes", "yes", "yes"]));
+  assert.deepEqual(mergeGold(old, [next]), [old[1], next]);
+});
+
+test("complete gold scoring counts agreement and flips per shared claim", () => {
+  const a = allYes("a");
+  const b = record("a", ["yes", "no", "yes", "yes", "yes"]);
+  const scores = scoreAgainstGold([labelled(a)], run(a), run(b));
+  const cause = present(scores.get("cause"));
+  assert.deepEqual(cause.agreement, { agree: 2, total: 2 });
+  assert.deepEqual(cause.flips, { flipped: 0, total: 1 });
+  assert.ok(calibrated(cause));
+  const actions = present(scores.get("actions"));
+  assert.deepEqual(actions.agreement, { agree: 1, total: 2 });
+  assert.deepEqual(actions.flips, { flipped: 1, total: 1 });
+  assert.equal(calibrated(actions), false);
+});
+
+test("fully stale labels fail calibration with zero measured coverage", () => {
+  const current = allYes("a");
+  const old = {
+    ...current,
+    verdicts: current.verdicts.map((v) => ({ ...v, claim: `Old: ${v.claim}` })),
+  };
+  const scores = scoreAgainstGold([labelled(old)], run(current), run(current));
+  for (const score of scores.values()) {
+    assert.deepEqual(score.coverage, {
+      measured: 0,
+      missing: 0,
+      required: 1,
+      stale: 1,
+      unlabelled: 0,
+    });
+    assert.equal(score.agreement.total, 0);
+    assert.equal(calibrated(score), false);
+  }
+});
+
+test("partly stale labels cannot hide behind measured perfect agreement", () => {
+  const a = allYes("a");
+  const b = allYes("b");
+  const old = {
+    ...b,
+    verdicts: b.verdicts.map((v) =>
+      v.id === "cause" ? { ...v, claim: "Old cause" } : v
+    ),
+  };
+  const scores = scoreAgainstGold(
+    [labelled(a), labelled(old)],
+    run(a, b),
+    run(a, b)
+  );
+  const cause = present(scores.get("cause"));
+  assert.deepEqual(cause.agreement, { agree: 2, total: 2 });
+  assert.deepEqual(cause.coverage, {
+    measured: 1,
+    missing: 0,
+    required: 2,
+    stale: 1,
+    unlabelled: 0,
   });
-  assert.deepEqual(
-    mergeGold([entry("a", "yes"), entry("b", "yes")], [entry("a", "no")]),
-    [entry("b", "yes"), entry("a", "no")]
+  assert.equal(calibrated(cause), false);
+  assert.ok(calibrated(present(scores.get("actions"))));
+});
+
+test("missing verdicts, removed claims, and unlabelled required claims fail calibration", () => {
+  const a = allYes("a");
+  const missing = {
+    ...a,
+    verdicts: a.verdicts.filter((v) => v.id !== "cause"),
+  };
+  const score = present(
+    scoreAgainstGold([labelled(a)], run(missing), run(a)).get("cause")
+  );
+  assert.equal(score.coverage.missing, 1);
+  assert.equal(calibrated(score), false);
+  const partial = {
+    ...labelled(a),
+    labels: labelled(a).labels.filter((v) => v.id !== "facts"),
+  };
+  const unlabelled = present(
+    scoreAgainstGold([partial], run(a), run(a)).get("facts")
+  );
+  assert.equal(unlabelled.coverage.unlabelled, 1);
+  assert.equal(calibrated(unlabelled), false);
+  const removed = {
+    ...labelled(a),
+    labels: [
+      ...labelled(a).labels,
+      { claim: "gone", expected: "yes" as const, id: "removed" },
+    ],
+  };
+  assert.equal(
+    scoreAgainstGold([removed], run(a), run(a)).get("removed")?.coverage.stale,
+    1
   );
 });
 
-test("gold scoring counts agreement per claim, flips between runs, and stale wording", () => {
-  const gold: GoldEntry[] = [
-    {
-      answer: "x",
-      case: "a",
-      claims: [
-        { claim: "C1", expected: "yes", id: "cause" },
-        { claim: "S1", expected: "no", id: "steps" },
-        { claim: "old wording", expected: "yes", id: "jargon" },
-      ],
-    },
-  ];
-  const run = (values: {
-    cause: "yes" | "no";
-    steps: "yes" | "no";
-  }): Map<string, (Verdict & { claim: string })[]> =>
-    new Map([
-      [
-        "a",
-        [
-          {
-            claim: "C1",
-            id: "cause",
-            reason: "",
-            verdict: values.cause,
-          },
-          {
-            claim: "S1",
-            id: "steps",
-            reason: "",
-            verdict: values.steps,
-          },
-          { claim: "J1", id: "jargon", reason: "", verdict: "yes" },
-        ],
-      ],
-    ]);
-  const scores = scoreAgainstGold(
-    gold,
-    run({ cause: "yes", steps: "no" }),
-    run({ cause: "yes", steps: "yes" })
+test("entirely unmarked cases remain in gold and fail coverage", () => {
+  const a = allYes("a");
+  const b = allYes("b");
+  const gold = toGold(
+    [a, b],
+    new Map(a.verdicts.map((v) => [`a#${v.id}`, true]))
   );
-  assert.deepEqual(scores.get("cause"), {
-    agreement: { agree: 2, total: 2 },
-    flips: { flipped: 0, total: 1 },
-    stale: 0,
-  });
-  assert.deepEqual(scores.get("steps"), {
-    agreement: { agree: 1, total: 2 },
-    flips: { flipped: 1, total: 1 },
-    stale: 0,
-  });
-  assert.deepEqual(scores.get("jargon"), {
-    agreement: { agree: 0, total: 0 },
-    flips: { flipped: 0, total: 0 },
-    stale: 1,
-  });
+  assert.equal(gold.length, 2);
+  assert.deepEqual(gold[1]?.labels, []);
+  const scores = scoreAgainstGold(gold, run(a, b), run(a, b));
+  for (const score of scores.values()) {
+    assert.equal(score.coverage.unlabelled, 1);
+    assert.equal(calibrated(score), false);
+  }
 });
+
+test("case-specific claims have independent bars while shared claims aggregate", () => {
+  const custom = (name: string, text: string, value: "yes" | "no") => {
+    const example = withRole("owner", { claims: [text] });
+    return reviewedSample(
+      name,
+      example,
+      "An answer.",
+      claimsFor(example).map((c) =>
+        verdict(c.id, c.id === "case-1" ? value : "yes")
+      )
+    );
+  };
+  const a = custom("a", "Names paused campaign", "yes");
+  const b = custom("b", "Cites help article", "yes");
+  const wrong = custom("b", "Cites help article", "no");
+  const scores = scoreAgainstGold(
+    [labelled(a), labelled(b)],
+    run(a, wrong),
+    run(a, wrong)
+  );
+  assert.ok(calibrated(present(scores.get("a#case-1"))));
+  assert.equal(calibrated(present(scores.get("b#case-1"))), false);
+  assert.equal(scores.get("cause")?.coverage.measured, 2);
+  assert.equal(scores.has("case-1"), false);
+});
+
+test("unset cause allows justified clarification and uncertainty, not an expected absent cause", () => {
+  const text = claimsFor(withRole("owner", { cause: null }))[0]?.text ?? "";
+  assert.ok(text.includes("justified clarifying question"));
+  assert.ok(text.includes("explicit uncertainty"));
+  assert.ok(text.includes("question and tool results"));
+  assert.ok(!text.includes("when they support none"));
+});
+
+test("review carries question, role, expectation, source and collapsible evidence with exact answer lines", () => {
+  const sample = {
+    ...allYes("a"),
+    answer: "Step one.\nStep two with ``` literal fence.",
+  };
+  const review = renderReview([sample]);
+  for (const text of [
+    recorded.question,
+    "Role: owner",
+    "Authored cause: unset",
+    "<details>",
+    "widget_outreach_health",
+    recorded.source.runId,
+    sample.answer,
+  ]) {
+    assert.ok(review.includes(text), text);
+  }
+  assert.ok(review.includes("````text"));
+  assert.deepEqual(judgeRecordSchema.parse(sample), sample);
+  assert.throws(() =>
+    judgeRecordSchema.parse({ ...sample, recorded: undefined })
+  );
+  assert.throws(() =>
+    goldSchema.parse([
+      {
+        ...labelled(sample),
+        labels: [{ claim: "x", expected: "yes", id: "unknown" }],
+      },
+    ])
+  );
+});
+
+test("gold export refuses a private answer before writing any file or replacing existing gold", () => {
+  const dir = mkdtempSync(`${tmpdir()}/judge-gold-`);
+  const path = `${dir}/gold.json`;
+  const safe = labelled(allYes("safe"));
+  const unsafe = labelled({
+    ...allYes("unsafe"),
+    answer: "Contact secret-person@private-customer.example for details.",
+  });
+  assert.throws(() => writeGold(path, [safe, unsafe]), GOLD_REFUSAL);
+  assert.equal(existsSync(path), false);
+  writeFileSync(path, "previous gold");
+  assert.throws(() => writeGold(path, [unsafe]), GOLD_REFUSAL);
+  assert.equal(readFileSync(path, "utf8"), "previous gold");
+  writeGold(path, [safe]);
+  assert.deepEqual(goldSchema.parse(JSON.parse(readFileSync(path, "utf8"))), [
+    safe,
+  ]);
+});
+
+for (const cancellation of ["deadline", "caller"] as const) {
+  test(`judgeAnswer cancels the mocked provider on ${cancellation}`, async (t) => {
+    const deadline = new AbortController();
+    const caller = new AbortController();
+    t.mock.method(AbortSignal, "timeout", (ms: number) => {
+      assert.equal(ms, JUDGE_TIMEOUT_MS);
+      return deadline.signal;
+    });
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const model = new MockLanguageModelV4({
+      doGenerate: ({ abortSignal }) =>
+        new Promise((_resolve, reject) => {
+          assert.ok(abortSignal);
+          abortSignal.addEventListener(
+            "abort",
+            () => reject(abortSignal.reason),
+            { once: true }
+          );
+          started();
+        }),
+    });
+    const pending = judgeAnswer(
+      recorded,
+      "An answer.",
+      claims,
+      cancellation === "caller" ? caller.signal : undefined,
+      model
+    );
+    const rejected = assert.rejects(
+      pending,
+      (error: unknown) => error instanceof Error && error.name === "AbortError"
+    );
+    await ready;
+    (cancellation === "deadline" ? deadline : caller).abort(
+      new DOMException("Cancelled", "AbortError")
+    );
+    await rejected;
+    assert.equal(model.doGenerateCalls.length, 1);
+  });
+}

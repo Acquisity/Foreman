@@ -12,9 +12,9 @@ import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
 import { answeredLane, gradeRun, stepUsage } from "#lib/widget-graders.js";
 import {
   claimsFor,
-  JUDGE_MODEL,
   JUDGE_OUTPUT,
   judgeAnswer,
+  reviewedSample,
   saveRecord,
 } from "#lib/widget-judge.js";
 import { REPLAY_TICKET, replayRecording } from "#lib/widget-replay.js";
@@ -236,16 +236,7 @@ async function judgeClaims(
   try {
     const verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
     const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
-    saveRecord(REVIEW_DIR, {
-      answer,
-      case: name,
-      judgedAt: new Date().toISOString(),
-      model: JUDGE_MODEL,
-      verdicts: verdicts.map((verdict, n) => ({
-        ...verdict,
-        claim: claims[n]?.text ?? "",
-      })),
-    });
+    saveRecord(REVIEW_DIR, reviewedSample(name, recorded, answer, verdicts));
     t.log(`judge review: ${REVIEW_DIR}/review.md`);
     for (const verdict of verdicts) {
       t.log(`judge ${verdict.id}: ${verdict.verdict} (${verdict.reason})`);
