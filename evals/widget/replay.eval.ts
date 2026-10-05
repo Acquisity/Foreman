@@ -68,6 +68,12 @@ export default readdirSync("evals/widget/cases")
           return;
         }
         const path = `evals/widget/cases/${file}`;
+        // The legacy single-case fallback replays only the case it names.
+        const legacy = process.env.WIDGET_REPLAY_CASE;
+        if (process.env.WIDGET_REPLAY !== "1" && legacy && legacy !== path) {
+          t.skip(`WIDGET_REPLAY_CASE selects ${legacy}.`);
+          return;
+        }
         const recorded = widgetCaseSchema.parse(
           JSON.parse(readFileSync(path, "utf8"))
         );
