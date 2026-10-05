@@ -52,14 +52,32 @@ const defaultToken = async (): Promise<string> =>
     ).botToken
   );
 
-/** Reads one Slack user's name and email. Any failure returns unknown. */
-export async function lookupSlackRequester(
+/**
+ * Reads one Slack user's name and email. Any failure returns unknown, and the
+ * whole lookup, token resolution included, finishes within the deadline so a
+ * slow dependency cannot hold up dispatch.
+ */
+export function lookupSlackRequester(
   userId: string | undefined,
   deps: SlackRequesterDeps = {}
 ): Promise<SlackRequester> {
   if (!(userId && SLACK_USER_ID.test(userId))) {
-    return { status: "unknown" };
+    return Promise.resolve({ status: "unknown" });
   }
+  const deadline = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
+  const timedOut = new Promise<SlackRequester>((resolve) => {
+    deadline.addEventListener("abort", () => resolve({ status: "unknown" }), {
+      once: true,
+    });
+  });
+  return Promise.race([readSlackRequester(userId, deps, deadline), timedOut]);
+}
+
+async function readSlackRequester(
+  userId: string,
+  deps: SlackRequesterDeps,
+  signal: AbortSignal
+): Promise<SlackRequester> {
   try {
     const token = await (deps.token ?? defaultToken)();
     const response = await (deps.fetchImpl ?? fetch)(
@@ -72,7 +90,7 @@ export async function lookupSlackRequester(
         },
         method: "POST",
         redirect: "error",
-        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+        signal,
       }
     );
     if (!response.ok) {
