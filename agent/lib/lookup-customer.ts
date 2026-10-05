@@ -128,7 +128,13 @@ export async function lookupCustomer(
 
   const [first] = parsed;
   if (!first) {
-    return EMPTY;
+    // A cut-off empty read proves nothing about whether the user exists.
+    return upstreamTruncated
+      ? {
+          ...EMPTY,
+          error: "The identity read was truncated before any row; retry it.",
+        }
+      : EMPTY;
   }
 
   const memberships = parsed.flatMap((row) =>
