@@ -7,7 +7,9 @@ import {
   type GradedRun,
   gradeRun,
   stepUsage,
+  unrecordedReads,
 } from "./widget-graders.js";
+import { REPLAY_MISS, REPLAY_TICKET } from "./widget-replay.js";
 
 const recorded = widgetCaseSchema.parse(
   JSON.parse(
@@ -286,5 +288,31 @@ test("missing step usage is distinguishable from reported zero tokens", () => {
       { ...event, data: { usage: { inputTokens: 0, outputTokens: 0 } } },
     ]).usageReported,
     1
+  );
+});
+
+test("a run is scored only when every read came from the cassette", () => {
+  const recordedCalls = recorded.cassette.map((entry) => ({
+    output: entry.output,
+    toolName: entry.tool,
+  }));
+  const controls = [
+    { output: REPLAY_TICKET, toolName: "widget_file_ticket" },
+    { output: { asked: "Which campaign?" }, toolName: "widget_ask_customer" },
+  ];
+  assert.deepEqual(
+    unrecordedReads([...recordedCalls, ...controls], recorded),
+    []
+  );
+  assert.deepEqual(
+    unrecordedReads(
+      [
+        ...recordedCalls,
+        { output: REPLAY_MISS, toolName: "widget_sdr_thread_status" },
+        { output: { status: "ok" }, toolName: "widget_job_failures" },
+      ],
+      recorded
+    ),
+    ["widget_sdr_thread_status", "widget_job_failures"]
   );
 });

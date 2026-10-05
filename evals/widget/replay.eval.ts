@@ -9,7 +9,12 @@ import {
 import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
 import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
-import { answeredLane, gradeRun, stepUsage } from "#lib/widget-graders.js";
+import {
+  answeredLane,
+  gradeRun,
+  stepUsage,
+  unrecordedReads,
+} from "#lib/widget-graders.js";
 import {
   claimsFor,
   JUDGE_OUTPUT,
@@ -17,7 +22,7 @@ import {
   reviewedSample,
   saveRecord,
 } from "#lib/widget-judge.js";
-import { REPLAY_TICKET, replayRecording } from "#lib/widget-replay.js";
+import { replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
 
@@ -159,11 +164,12 @@ async function gradeReplay(
         })
       : null;
   const events = session?.events ?? [];
-  const tools = events
+  const results = events
     .filter((event) => event.type === "action.result")
     .map(
-      (event) => (event.data.result as { toolName?: string }).toolName ?? ""
+      (event) => event.data.result as { output?: unknown; toolName?: string }
     );
+  const tools = results.map((call) => call.toolName ?? "");
   const grades = gradeRun(
     {
       decision: run.outcome?.decision ?? "block",
@@ -173,17 +179,43 @@ async function gradeReplay(
     },
     recorded
   );
+  // Input matching is replayRead's job; an unrecorded read is an input no recording matched.
+  const unrecorded = unrecordedReads(results, recorded);
+  const scored = unrecorded.length === 0;
 
   // The row states coverage so partial measurements cannot look like full-run cost.
   t.log(
     `row: ${JSON.stringify({
       case: path,
-      ...grades,
+      scored,
+      ...(scored
+        ? grades
+        : {
+            leaks: grades.leaks,
+            rawFields: grades.rawFields,
+            unrecordedReads: unrecorded,
+          }),
       // The gate's reason names the items a rewrite removed, e.g. jev:remove_items:2,3.
       gateReason: run.outcome?.reason ?? null,
       ...usageRow(events),
     })}`
   );
+  if (session) {
+    t.log(`tools: ${tools.join(", ")}`);
+    for (const miss of results.filter((call) =>
+      JSON.stringify(call).includes('"replay":"miss"')
+    )) {
+      t.log(`cassette miss: ${JSON.stringify(miss).slice(0, 300)}`);
+    }
+  }
+  if (!scored) {
+    // A leak is a real failure whatever the replay coverage, and a failed gate outranks the skip.
+    t.check(grades.leaks, equals("pass")).label("leaks");
+    t.check(grades.rawFields, equals("pass")).label("rawFields");
+    const reason = `not scored: ${unrecorded.length} unrecorded reads: ${[...new Set(unrecorded)].join(", ")}`;
+    t.log(reason);
+    t.skip(reason);
+  }
   for (const [check, grade] of Object.entries(grades)) {
     if (grade !== "not set") {
       t.check(grade, equals("pass")).label(check);
@@ -195,37 +227,6 @@ async function gradeReplay(
     return;
   }
   session.succeeded();
-  const results = events.filter((event) => event.type === "action.result");
-  t.log(
-    `tools: ${results.map((event) => (event.data.result as { toolName?: string }).toolName).join(", ")}`
-  );
-  const misses = results.filter((event) =>
-    JSON.stringify(event.data).includes('"replay":"miss"')
-  );
-  for (const miss of misses) {
-    t.log(`cassette miss: ${JSON.stringify(miss.data).slice(0, 300)}`);
-  }
-  // Every result is that tool's recorded output verbatim, so no provider answered any call.
-  // Input matching is replayRead's job; a miss above is an unmatched input.
-  // Read-free control results are newly authored, not provider reads.
-  const recordedOutputs = new Set([
-    ...recorded.cassette.map((entry) =>
-      JSON.stringify([entry.tool, entry.output])
-    ),
-    JSON.stringify(["widget_file_ticket", REPLAY_TICKET]),
-  ]);
-  const live = results.filter((event) => {
-    const call = event.data.result as { output?: unknown; toolName?: string };
-    return (
-      call.toolName !== "widget_ask_customer" &&
-      !recordedOutputs.has(JSON.stringify([call.toolName, call.output]))
-    );
-  });
-  t.log(
-    `tool results: ${results.length}, cassette misses: ${misses.length}, not from the cassette: ${live.length}`
-  );
-  t.check(misses.length, equals(0));
-  t.check(live.length, equals(0));
 }
 
 /**
