@@ -25,6 +25,7 @@ import {
 import { isIntakeOnly, isQuestionsOnly } from "./trust.js";
 
 const MIGRATION = "C0BQM9V6P47";
+const SANDBOX = "C0C6DM2MB39";
 const WORKSPACE_ID = new RegExp(QUESTIONS_ONLY_WORKSPACE.id, "u");
 const WORKSPACE_NAME = /AI Acquisition Sales Team/u;
 const NO_LINEAR_WORK = /Do not create or change Linear issues/u;
@@ -33,6 +34,7 @@ const TEXT_IS_NOT_IDENTITY = /never the requester's identity/u;
 const INTAKE_LINEAR_WRITES = /create or update Linear records/u;
 const GENERIC_NEW_ISSUE = /Create exactly one unassigned Linear issue/u;
 const REP_EMAIL = /rep@example\.com/u;
+const KEEP_IT_QUICK = /aim to reply within about five minutes/u;
 const GENERAL_HELP_ONLY = /return no user-specific or record-specific data/u;
 
 const slackAuth: SessionAuthContext = {
@@ -64,7 +66,7 @@ describe("questions-only channel", () => {
   it("maps the migration channel to the questions-only workflow", () => {
     assert.equal(QUESTIONS_ONLY_CHANNELS.has(MIGRATION), true);
     // The private sandbox twin runs the same path for Preview testing.
-    assert.equal(SLACK_INTAKE_WORKFLOWS.C0C6DM2MB39?.mode, "questions-only");
+    assert.equal(SLACK_INTAKE_WORKFLOWS[SANDBOX]?.mode, "questions-only");
     assert.equal(SLACK_INTAKE_WORKFLOWS[MIGRATION]?.mode, "questions-only");
     assert.deepEqual(resolveSlackIntakeWorkflow(MIGRATION)?.skills, [
       "clarify-with-requester",
@@ -90,6 +92,7 @@ describe("questions-only channel", () => {
     assert.match(context, NO_LINEAR_WORK);
     assert.match(context, FORM_COMMAND);
     assert.match(context, TEXT_IS_NOT_IDENTITY);
+    assert.match(context, KEEP_IT_QUICK);
     assert.doesNotMatch(context, INTAKE_LINEAR_WRITES);
     assert.doesNotMatch(context, GENERIC_NEW_ISSUE);
   });

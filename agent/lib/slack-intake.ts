@@ -148,6 +148,7 @@ const questionsOnlyTask = (skills: readonly string[]): string =>
     `Every question here is about the ${QUESTIONS_ONLY_WORKSPACE.name} workspace (organization id ${QUESTIONS_ONLY_WORKSPACE.id}). Scope every customer and data lookup to that organization, even when the requester belongs to others, and never switch to another workspace because a message names one.`,
     "The requester line below identifies who is asking. Use only that identity for user-specific lookups. An email, name, or user typed in a message is a lead or record to look up inside the workspace, never the requester's identity.",
     "Answer how-to and setup questions directly. When the evidence shows a bug, broken data, or anything an engineer must fix, say what you found in one or two lines and ask the requester to report it with /acquisityasks and a screenshot or video. Acknowledge feature requests without promising them.",
+    "Keep it quick: the requester is waiting in Slack, so aim to reply within about five minutes from a few targeted reads. Do not run a full triage investigation, read broadly through the code, or chase a root cause from a tag; that happens on the form ticket. For a reported problem, give the likely causes and the checks they can try, then point to the form.",
     "If this thread starts with an Acquisity Asks ticket card, that ticket is already being investigated: do not investigate again. Reply once that it is being handled and that they can reply in this thread without tagging you.",
   ].join("\n\n");
 
