@@ -54,12 +54,17 @@ async function judgeGold(gold: GoldEntry[]) {
     );
     const recorded = { ...sample.recorded, expectations };
     const claims = claimsFor(recorded);
-    // biome-ignore lint/performance/noAwaitInLoops: one judge call at a time keeps the run cheap to stop.
-    const verdicts = await judgeAnswer(recorded, sample.answer, claims);
-    run.set(
-      sample.case,
-      reviewedSample(sample.case, recorded, sample.answer, verdicts)
-    );
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: one judge call at a time keeps the run cheap to stop.
+      const verdicts = await judgeAnswer(recorded, sample.answer, claims);
+      run.set(
+        sample.case,
+        reviewedSample(sample.case, recorded, sample.answer, verdicts)
+      );
+    } catch (error) {
+      // The case stays out of the run, so its coverage counts as missing and the rerun fails.
+      console.error(`judge failed on ${sample.case}: ${String(error)}`);
+    }
   }
   return run;
 }
