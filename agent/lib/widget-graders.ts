@@ -4,7 +4,7 @@ import { scanIdentifiers } from "./widget-egress.js";
 
 // Stripe is visible under Manage billing; Instantly is fine on the legacy plan only, so set ALLOW_INSTANTLY=1 for a legacy org.
 export const VENDOR_WORDS = new RegExp(
-  `\\b(autumn|sentry|axiom|inngest|vercel|planetscale|neon|upstash|resend|posthog${process.env.ALLOW_INSTANTLY ? "" : "|instantly"})\\b`,
+  `\\b(autumn|sentry|axiom|inngest|vercel|planetscale|neon|upstash|resend|posthog${process.env.ALLOW_INSTANTLY === "1" ? "" : "|instantly"})\\b`,
   "gi"
 );
 
