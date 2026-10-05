@@ -63,6 +63,8 @@ const approvalFor = (
 describe("questions-only channel", () => {
   it("maps the migration channel to the questions-only workflow", () => {
     assert.equal(QUESTIONS_ONLY_CHANNELS.has(MIGRATION), true);
+    // The private sandbox twin runs the same path for Preview testing.
+    assert.equal(SLACK_INTAKE_WORKFLOWS.C0C6DM2MB39?.mode, "questions-only");
     assert.equal(SLACK_INTAKE_WORKFLOWS[MIGRATION]?.mode, "questions-only");
     assert.deepEqual(resolveSlackIntakeWorkflow(MIGRATION)?.skills, [
       "clarify-with-requester",

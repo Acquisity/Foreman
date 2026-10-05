@@ -49,11 +49,14 @@ export const QUESTIONS_ONLY_WORKSPACE = {
 
 /**
  * Questions-only channels: #aqcuisity-migration, where AIA sales reps ask
- * about the Acquisity CRM. A tag gets an answer in the thread and never
- * Linear work; bugs go through the channel's /acquisityasks form.
+ * about the Acquisity CRM, and its private sandbox twin
+ * #foreman-migration-sandbox for Preview testing. A tag gets an answer in the
+ * thread and never Linear work; bugs go through the channel's /acquisityasks
+ * form.
  */
 export const QUESTIONS_ONLY_CHANNELS: ReadonlySet<string> = new Set([
   "C0BQM9V6P47",
+  "C0C6DM2MB39",
 ]);
 
 export const SLACK_INTAKE_WORKFLOWS: Readonly<
