@@ -46,6 +46,12 @@ test("leak scan does not read a file extension as a domain", () => {
       .leaks,
     "fail"
   );
+  // .zip is a real top-level domain, so a bare .zip name still needs ownership.
+  assert.equal(
+    gradeRun(run({ message: "Download tenant-data.zip first." }), recorded)
+      .leaks,
+    "fail"
+  );
 });
 
 test("unset expectations report not set, never pass", () => {
