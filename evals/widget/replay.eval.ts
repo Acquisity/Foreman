@@ -5,6 +5,7 @@ import { defineEval } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
 import { widgetCaseSchema } from "#lib/widget-case.js";
+import { answeredLane, gradeRun, stepUsage } from "#lib/widget-graders.js";
 import { REPLAY_TICKET, replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
@@ -47,6 +48,7 @@ function toRequest(question: string) {
 export default defineEval({
   description:
     "Replays the case WIDGET_REPLAY_CASE names through the widget message route with live models and recorded tool results.",
+  tags: ["widget"],
   async test(t) {
     const path = process.env.WIDGET_REPLAY_CASE;
     if (!path) {
@@ -101,17 +103,61 @@ export default defineEval({
       )
     );
     const run = await readWidgetRun(String(runId));
-    if (!run.session_id) {
+    const lane = answeredLane(run);
+    const session =
+      lane === "investigate" && run.session_id
+        ? await t.target.attachSession(run.session_id, {
+            startIndex: run.stream_index,
+          })
+        : null;
+    const events = session?.events ?? [];
+    const tools = events
+      .filter((event) => event.type === "action.result")
+      .map(
+        (event) => (event.data.result as { toolName?: string }).toolName ?? ""
+      );
+    const grades = gradeRun(
+      {
+        decision: run.outcome?.decision ?? "block",
+        lane,
+        message: run.outcome?.message ?? null,
+        tools,
+      },
+      recorded
+    );
+    const usage = stepUsage(events);
+    const at = events.map((event) => Date.parse(event.meta.at));
+    const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+    // One row per case. Usage covers the investigator's model steps only: the router, help-center, gate and composer calls run outside the session stream.
+    t.log(
+      `row: ${JSON.stringify({
+        case: path,
+        ...grades,
+        cost: usage.priced
+          ? `$${usage.costUsd.toFixed(4)} (${usage.priced}/${usage.steps} steps priced)`
+          : "not reported",
+        investigation: at.length
+          ? seconds(Math.max(...at) - Math.min(...at))
+          : "none",
+        model: seconds(usage.modelMs),
+        steps: usage.steps,
+        tokens: `${usage.inputTokens} in / ${usage.outputTokens} out`,
+        total: run.completed_at
+          ? seconds(run.completed_at.getTime() - run.created_at.getTime())
+          : "unfinished",
+      })}`
+    );
+    for (const [check, grade] of Object.entries(grades)) {
+      if (grade !== "not set") {
+        t.check(grade, equals("pass")).label(check);
+      }
+    }
+    if (!session) {
       t.log("No investigation session: the front door answered.");
       return;
     }
-    const session = await t.target.attachSession(run.session_id, {
-      startIndex: run.stream_index,
-    });
     session.succeeded();
-    const results = session.events.filter(
-      (event) => event.type === "action.result"
-    );
+    const results = events.filter((event) => event.type === "action.result");
     t.log(
       `tools: ${results.map((event) => (event.data.result as { toolName?: string }).toolName).join(", ")}`
     );

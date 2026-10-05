@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { extractIdentifiers } from "../agent/lib/widget-egress.js";
+import { VENDOR_WORDS } from "../agent/lib/widget-graders.js";
 
 const required = [
   "FOREMAN",
@@ -79,12 +80,6 @@ const call = async (body: Record<string, unknown>): Promise<CallResult> => {
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Stripe is visible under Manage billing; Instantly is fine on the legacy plan only, so set ALLOW_INSTANTLY=1 for a legacy org.
-const VENDOR_WORDS = new RegExp(
-  `\\b(autumn|sentry|axiom|inngest|vercel|planetscale|neon|upstash|resend|posthog${process.env.ALLOW_INSTANTLY ? "" : "|instantly"})\\b`,
-  "gi"
-);
 
 const leaks = (message: string) => {
   const { candidates, internal } = extractIdentifiers({
