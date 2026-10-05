@@ -77,6 +77,12 @@ export default readdirSync("evals/widget/cases")
           return;
         }
         const path = `evals/widget/cases/${file}`;
+        // The legacy single-case fallback replays only the case it names.
+        const legacy = process.env.WIDGET_REPLAY_CASE;
+        if (process.env.WIDGET_REPLAY !== "1" && legacy && legacy !== path) {
+          t.skip(`WIDGET_REPLAY_CASE selects ${legacy}.`);
+          return;
+        }
         const recorded = widgetCaseSchema.parse(
           JSON.parse(readFileSync(path, "utf8"))
         );
@@ -199,19 +205,22 @@ async function gradeReplay(
   for (const miss of misses) {
     t.log(`cassette miss: ${JSON.stringify(miss.data).slice(0, 300)}`);
   }
+  // Every result is that tool's recorded output verbatim, so no provider answered any call.
+  // Input matching is replayRead's job; a miss above is an unmatched input.
   // Read-free control results are newly authored, not provider reads.
   const recordedOutputs = new Set([
-    ...recorded.cassette.map((entry) => JSON.stringify(entry.output)),
-    JSON.stringify(REPLAY_TICKET),
+    ...recorded.cassette.map((entry) =>
+      JSON.stringify([entry.tool, entry.output])
+    ),
+    JSON.stringify(["widget_file_ticket", REPLAY_TICKET]),
   ]);
-  const live = results.filter(
-    (event) =>
-      (event.data.result as { toolName?: string }).toolName !==
-        "widget_ask_customer" &&
-      !recordedOutputs.has(
-        JSON.stringify((event.data.result as { output?: unknown }).output)
-      )
-  );
+  const live = results.filter((event) => {
+    const call = event.data.result as { output?: unknown; toolName?: string };
+    return (
+      call.toolName !== "widget_ask_customer" &&
+      !recordedOutputs.has(JSON.stringify([call.toolName, call.output]))
+    );
+  });
   t.log(
     `tool results: ${results.length}, cassette misses: ${misses.length}, not from the cassette: ${live.length}`
   );
@@ -273,9 +282,6 @@ function usageRow(events: readonly EveEvalStreamEvent[]) {
     steps: usage.steps,
     tokens: usage.usageReported
       ? `${usage.inputTokens} in / ${usage.outputTokens} out (${usage.usageReported}/${usage.steps} steps reported)`
-      : "not available",
-    total: at.length
-      ? seconds(Math.max(...at) - Math.min(...at))
       : "not available",
     usageCoverage:
       "Investigator session only; router, help-center, extractor, gate and composer calls are not counted.",

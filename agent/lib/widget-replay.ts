@@ -10,8 +10,8 @@ import type {
   OwnedIdentifiers,
 } from "./widget-evidence.js";
 import {
+  requireWidgetContext,
   type WidgetContext,
-  widgetContext,
   widgetContextSchema,
 } from "./widget-scope.js";
 
@@ -71,7 +71,7 @@ export function replayCase(caseId?: string): WidgetCase {
   return widgetCaseSchema.parse(JSON.parse(text));
 }
 
-/** Inputs compare with object keys sorted at every depth and undefined fields dropped. */
+/** Inputs compare with object keys sorted at every depth and null or undefined fields dropped, so `{}` and `{ id: null }` are one call. */
 const normalize = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map(normalize);
@@ -79,7 +79,7 @@ const normalize = (value: unknown): unknown => {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .filter(([, child]) => child !== undefined)
+        .filter(([, child]) => child !== undefined && child !== null)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, child]) => [key, normalize(child)])
     );
@@ -128,14 +128,17 @@ export function replayable<T extends { description: string }>(
   }
   const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
   schemas.set(name, inputSchema);
+  // Only inline callbacks here: eve drops a tool whose forwarded authored
+  // callback (such as its approval) is not stamped at this call site.
   return defineTool({
     description,
     // No outputSchema: the miss result must reach the model as it is.
+    // Stricter than the authored issuer-only approval: a widget session without a verified scope reads nothing.
     execute: (input, ctx) =>
       replayRead(
         name,
         input,
-        widgetContext(ctx.session?.auth.initiator)?.replayCaseId
+        requireWidgetContext(ctx.session?.auth.initiator).replayCaseId
       ),
     inputSchema,
   }) as unknown as T;

@@ -16,13 +16,17 @@ import {
   replayCase,
   replayRead,
 } from "./widget-replay.js";
-import { widgetAuth } from "./widget-scope.js";
+import { WIDGET_SUPPORT_ISSUER, widgetAuth } from "./widget-scope.js";
 
 const CASE = "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
 const recorded = JSON.parse(readFileSync(CASE, "utf8"));
 const PRODUCTION = /not allowed on production/;
 const FIXTURE_ONLY = /fixture workspace only/;
 const INVALID_CASE = /Invalid replay case id/;
+const SCOPE_UNAVAILABLE = /verified support scope is unavailable/;
+const widgetCtx = {
+  session: { auth: { initiator: widgetAuth(fixture) } },
+} as never;
 
 const withCase = (run: () => Promise<void> | void) => async () => {
   process.env.WIDGET_REPLAY_CASE = CASE;
@@ -56,6 +60,8 @@ test(
   withCase(() => {
     const [first] = recorded.cassette;
     assert.deepEqual(replayRead(first.tool, first.input), first.output);
+    // Recorded with campaignId: null; an omitted field is the same call.
+    assert.deepEqual(replayRead(first.tool, {}), first.output);
     const health = recorded.cassette.find(
       (entry: { tool: string }) => entry.tool === "widget_inbox_health"
     );
@@ -96,8 +102,20 @@ test(
     assert.notEqual(replayed, tool);
     assert.equal(replayed.description, tool.description);
     assert.deepEqual(
-      await replayed.execute({}, {} as never),
+      await replayed.execute({}, widgetCtx),
       recorded.cassette[2].output
+    );
+    // An issuer without a verified scope reads nothing, as in the authored tool.
+    await assert.rejects(
+      async () =>
+        await replayed.execute({}, {
+          session: {
+            auth: {
+              initiator: { attributes: {}, issuer: WIDGET_SUPPORT_ISSUER },
+            },
+          },
+        } as never),
+      SCOPE_UNAVAILABLE
     );
     Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
     assert.equal(replayable("widget_inbox_health", tool), tool);
@@ -217,14 +235,14 @@ test(
       assert.deepEqual(
         await replayed.execute(
           { agent: "copy-review", since: "7d" },
-          {} as never
+          widgetCtx
         ),
         output
       );
       assert.deepEqual(
         await replayed.execute(
           { agent: "copy-review", since: "24h" },
-          {} as never
+          widgetCtx
         ),
         REPLAY_MISS
       );
@@ -309,6 +327,21 @@ test("request-selected cases stay isolated through session auth and ownership", 
           entry.output
         );
       })
+    );
+    // Only the paused-campaign cassette contains this id, so a wrong case cannot own it.
+    const onlyInPaused = "00000000-0000-4000-8000-000000000004";
+    const owned = await Promise.all(
+      scopes.map((scope) =>
+        resolveOwnedIdentifiers(scope, {
+          emails: [],
+          slugs: [],
+          uuids: [onlyInPaused],
+        })
+      )
+    );
+    assert.deepEqual(
+      owned.map((identifiers) => identifiers.uuids.has(onlyInPaused)),
+      [false, true]
     );
     await assert.rejects(
       verifyWidgetContext({
