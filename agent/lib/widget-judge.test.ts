@@ -45,7 +45,12 @@ const smoke = widgetCaseSchema.parse(
 // The tests set their own expectations, so editing the case file cannot break them.
 const recorded: WidgetCase = {
   ...smoke,
-  expectations: { ...smoke.expectations, cause: null, claims: [] },
+  expectations: {
+    ...smoke.expectations,
+    cause: null,
+    claims: [],
+    foreignIdentifiers: [],
+  },
 };
 const withRole = (
   role: WidgetCase["scope"]["role"],
@@ -343,7 +348,7 @@ test("review carries question, role, expectation, source and collapsible evidenc
     "Authored cause: unset",
     "<details>",
     "widget_outreach_health",
-    recorded.source.runId ?? "no source run id",
+    recorded.source.runId ?? `"runId": null`,
     sample.answer,
   ]) {
     assert.ok(review.includes(text), text);
