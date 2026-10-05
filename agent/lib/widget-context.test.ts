@@ -17,16 +17,27 @@ const appContext = {
   verifiedAt: verifiedWidgetContext.verifiedAt,
 };
 
-function configure(context: TestContext) {
-  const previous = process.env.ACQUISITY_ORIGIN;
-  process.env.ACQUISITY_ORIGIN = origin;
+function setEnv(context: TestContext, name: string, value?: string) {
+  const previous = process.env[name];
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
   context.after(() => {
     if (previous === undefined) {
-      delete process.env.ACQUISITY_ORIGIN;
+      delete process.env[name];
     } else {
-      process.env.ACQUISITY_ORIGIN = previous;
+      process.env[name] = previous;
     }
   });
+}
+
+// Every test here exercises the app path, so an inherited replay flag must not divert it.
+function configure(context: TestContext) {
+  setEnv(context, "ACQUISITY_ORIGIN", origin);
+  setEnv(context, "WIDGET_REPLAY");
+  setEnv(context, "WIDGET_REPLAY_CASE");
 }
 
 const requester = (response: Response) => {
