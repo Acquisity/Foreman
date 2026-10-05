@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
-import { scanIdentifiers } from "./widget-egress.js";
+import { PUBLIC_HOSTS, scanIdentifiers } from "./widget-egress.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 /**
@@ -261,8 +261,35 @@ const mapStrings = (
   return walk(value);
 };
 
+const OWN_DOMAIN_PERSON = /^person-\d+@(.+)$/;
+
+/** A screen recording is titled "<recorder's name> · <workspace name>", often inside a JSON-encoded string. */
+const recorderNames = (draft: unknown, organizationName: string) =>
+  Array.from(
+    JSON.stringify(draft).matchAll(
+      new RegExp(
+        `(?<=")([^"\\\\·]{1,80}) · ${literal(organizationName)}(?=\\\\?")`,
+        "gi"
+      )
+    ),
+    ([, recorder]) => recorder
+  );
+
+const countOf = (values: string[]) => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return counts;
+};
+
+/** Our own domain stays: replacing it would also rewrite every help-center link. */
+const ownDomain = (host: string, replace: (host: string) => string) =>
+  PUBLIC_HOSTS.has(host.toLowerCase()) ? host : replace(host);
+
 const isSafeIdentifier = (value: string) =>
   PLACEHOLDER.test(value) ||
+  PUBLIC_HOSTS.has(value.match(OWN_DOMAIN_PERSON)?.[1] ?? "") ||
   FIXTURE_VALUES.has(value) ||
   AUTHORED_REFERENCES.has(value);
 
@@ -273,7 +300,7 @@ const isSafeIdentifier = (value: string) =>
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const found = {
-    names: new Map<string, number>(),
+    names: countOf(recorderNames(raw, scope.organizationName)),
     phones: new Set<string>(),
   };
   const draft = mapStrings(
@@ -318,7 +345,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const localParts = new Map<string, string>();
   for (const email of candidates.emails) {
     const at = email.lastIndexOf("@");
-    const host = domain(email.slice(at + 1));
+    const host = ownDomain(email.slice(at + 1), domain);
     const localPart = email.slice(0, at);
     if (!localParts.has(localPart)) {
       localParts.set(localPart, `person-${next("person")}`);

@@ -79,7 +79,7 @@ const INTERNAL_HOSTS = [
   "useautumn.com",
   "intercom.com",
 ];
-const PUBLIC_HOSTS = new Set([
+export const PUBLIC_HOSTS = new Set([
   "acquisity.ai",
   "app.acquisity.ai",
   "help.acquisity.ai",

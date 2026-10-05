@@ -258,6 +258,35 @@ test("email local parts and domains are independently consistent", () => {
   serializeCase(scrubbed);
 });
 
+test("an email at our own domain keeps the domain, so help links survive", () => {
+  const scrubbed = scrubCase(
+    rawCase({
+      emails: ["jane@acquisity.ai"],
+      url: "https://app.acquisity.ai/docs/faq",
+    }),
+    scope
+  );
+  assert.deepEqual(scrubbed.case.cassette[0].output, {
+    emails: ["person-1@acquisity.ai"],
+    url: "https://app.acquisity.ai/docs/faq",
+  });
+  serializeCase(scrubbed);
+});
+
+test("a recording title's recorder name is replaced everywhere, even JSON-encoded", () => {
+  const title = `Jo Recorder · ${scope.organizationName}`;
+  const scrubbed = scrubCase(
+    rawCase({
+      note: "Jo Recorder clicked Save",
+      recording: JSON.stringify({ title }),
+    }),
+    scope
+  );
+  const text = serializeCase(scrubbed);
+  assert.ok(!text.includes("Jo Recorder"));
+  assert.ok(text.includes(`Name 1 · ${fixture.organizationName}`));
+});
+
 test("the outside-call inventory documents the converter and both subprocess bounds", () => {
   const inventory = readFileSync(
     new URL("../../.github/OUTSIDE-CALLS.md", import.meta.url),
