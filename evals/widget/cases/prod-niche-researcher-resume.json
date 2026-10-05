@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says there is no option to upload a resume.",
+      "Says to type past jobs, industries and skills into the text boxes in Step 1 of the Niche Researcher.",
+      "Does not ask which page or feature the customer means."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "How do I upload my resume into the Niche Researcher?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

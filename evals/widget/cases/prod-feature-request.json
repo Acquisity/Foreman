@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Treats this as a feature request: files it, or points the customer to the Feedback button in the chat widget.",
+      "Does not ask which page or feature the customer means.",
+      "Does not claim the features already exist."
+    ],
+    "fileTicket": null,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 2
+  },
+  "question": "Please add demo-link support on AI SDR booking replies, don't flag redirect auto-replies as do-not-contact, and make the To field editable. I'm asking you to add these as features.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

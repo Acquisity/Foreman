@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains the trade-off between keeping the preset sender name and using the customer's own name.",
+      "Says the sending email address stays the same either way.",
+      "Does not ask which page or feature the customer means."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "Is there an advantage one way or the other: leaving the default name on my pre-warmed inboxes as the sender, or changing it to my name?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}
