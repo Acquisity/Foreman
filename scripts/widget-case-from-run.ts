@@ -1,7 +1,7 @@
 /**
  * Turn one widget run's session stream into a scrubbed eval case.
  *
- * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--yes]
+ * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name>
  *
  * Reads the run with the workflow CLI (local runs from `.eve/.workflow-data`),
  * pairs each tool call with its result, replaces every customer identifier, and
@@ -11,8 +11,6 @@
  */
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { stdin, stdout } from "node:process";
-import { createInterface } from "node:readline/promises";
 import { promisify } from "node:util";
 import { z } from "zod";
 import {
@@ -45,7 +43,7 @@ if (
   )
 ) {
   console.error(
-    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--yes]"
+    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name>"
   );
   process.exit(2);
 }
@@ -105,30 +103,6 @@ const runRecord = z.object({
   createdAt: z.string(),
   input: z.unknown(),
 });
-
-if (target === "production") {
-  // The run metadata is readable without a key; its scope is not.
-  const meta = runRecord.parse(JSON.parse(await cli(["run", runId])));
-  console.log(
-    `Run ${runId}, created ${meta.createdAt}, trigger ${meta.attributes?.["$eve.trigger"] ?? "unknown"}.`
-  );
-  console.log(
-    "Its workspace is only known after decrypting. Decrypting is an audit-logged key retrieval."
-  );
-  if (!process.argv.includes("--yes")) {
-    if (!stdin.isTTY) {
-      console.error("Not decrypted: pass --yes when stdin is not a terminal.");
-      process.exit(1);
-    }
-    const prompt = createInterface({ input: stdin, output: stdout });
-    const answer = await prompt.question("Decrypt this production run? [y/N] ");
-    prompt.close();
-    if (answer.trim().toLowerCase() !== "y") {
-      console.error("Not decrypted.");
-      process.exit(1);
-    }
-  }
-}
 
 const streams = z
   .array(z.object({ streamId: z.string() }))
