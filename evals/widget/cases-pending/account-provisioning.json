@@ -117,10 +117,10 @@
             },
             "subscriptions": [
               {
-                "id": "cus_prod_3EoAf36mCyhLGFXfX5Qp5aTJQqz",
+                "id": "cus_prod_x2",
                 "plan": {
                   "id": "legacy_pro",
-                  "internal_id": "prod_x2",
+                  "internal_id": "prod_x3",
                   "name": "Legacy Pro",
                   "description": null,
                   "group": null,
@@ -132,14 +132,14 @@
                   "price": {
                     "amount": 129,
                     "interval": "month",
-                    "price_id": "pr_3BUQoOJmPTbcOdp2h0rW1kgFCyb",
+                    "price_id": "pr_x4",
                     "display": {
                       "primary_text": "$129",
                       "secondary_text": "per month"
                     },
                     "processors": {
                       "stripe": {
-                        "price_id": "price_x3"
+                        "price_id": "price_x5"
                       }
                     }
                   },
@@ -156,7 +156,7 @@
                       "display": {
                         "primary_text": "10,000 credits"
                       },
-                      "entitlement_id": "ent_3BUQoM5puFldBh67QoXirNwGajV"
+                      "entitlement_id": "ent_x6"
                     },
                     {
                       "feature_id": "website_credit",
@@ -170,12 +170,12 @@
                       "display": {
                         "primary_text": "500 website credits"
                       },
-                      "entitlement_id": "ent_8d8d9988fcbc3e4e82e05b67a31d7d0635a6df7bc0ef6a808bf32b219a524608"
+                      "entitlement_id": "ent_x7"
                     }
                   ],
                   "processors": {
                     "stripe": {
-                      "product_id": "prod_x4"
+                      "product_id": "prod_x8"
                     }
                   },
                   "created_at": 1774541342738,
@@ -207,7 +207,7 @@
                 "id": "domain-2.example",
                 "plan": {
                   "id": "website_domain",
-                  "internal_id": "prod_x5",
+                  "internal_id": "prod_x9",
                   "name": "Website Domain",
                   "description": null,
                   "group": null,
@@ -219,14 +219,14 @@
                   "price": {
                     "amount": 15.19,
                     "interval": "year",
-                    "price_id": "pr_3IT8mgqoMCPYj1DzcpEgI3GoJsm",
+                    "price_id": "pr_x10",
                     "display": {
                       "primary_text": "$15.19",
                       "secondary_text": "per year"
                     },
                     "processors": {
                       "stripe": {
-                        "price_id": "price_x6"
+                        "price_id": "price_x11"
                       }
                     }
                   },
@@ -245,7 +245,7 @@
                         "max_purchase": null,
                         "processors": {
                           "stripe": {
-                            "price_id": "price_x7"
+                            "price_id": "price_x12"
                           }
                         }
                       },
@@ -256,8 +256,8 @@
                         "on_increase": "prorate_immediately",
                         "on_decrease": "prorate_immediately"
                       },
-                      "entitlement_id": "ent_3BTk72uvn6aVrgu1lY1VmZP2Cyp",
-                      "price_id": "pr_3BTk70W6r6nCxCMqDlxBy69j4nk"
+                      "entitlement_id": "ent_x13",
+                      "price_id": "pr_x14"
                     },
                     {
                       "feature_id": "website_domain_purchase",
@@ -269,12 +269,12 @@
                       "display": {
                         "primary_text": "Website Domain Purchase"
                       },
-                      "entitlement_id": "ent_3BTkCvxLn8U3lTJLMvhlQEgwXnG"
+                      "entitlement_id": "ent_x15"
                     }
                   ],
                   "processors": {
                     "stripe": {
-                      "product_id": "prod_x8"
+                      "product_id": "prod_x16"
                     }
                   },
                   "created_at": 1772838133738,
@@ -306,7 +306,7 @@
                 "id": "domain-3.example-inboxes",
                 "plan": {
                   "id": "inbox",
-                  "internal_id": "prod_x9",
+                  "internal_id": "prod_x17",
                   "name": "Inbox",
                   "description": null,
                   "group": null,
@@ -331,7 +331,7 @@
                         "max_purchase": null,
                         "processors": {
                           "stripe": {
-                            "price_id": "price_x10"
+                            "price_id": "price_x18"
                           }
                         }
                       },
@@ -342,13 +342,13 @@
                         "on_increase": "prorate_immediately",
                         "on_decrease": "prorate_immediately"
                       },
-                      "entitlement_id": "ent_35xhVznNvpHYLQbMCwJOpZcjbY9",
-                      "price_id": "pr_35xhVykxrjbj4VlzGv43as9gThA"
+                      "entitlement_id": "ent_x19",
+                      "price_id": "pr_x20"
                     }
                   ],
                   "processors": {
                     "stripe": {
-                      "product_id": "prod_x11"
+                      "product_id": "prod_x21"
                     }
                   },
                   "created_at": 1764029160966,
@@ -380,7 +380,7 @@
                 "id": "domain-3.example",
                 "plan": {
                   "id": "domain",
-                  "internal_id": "prod_x12",
+                  "internal_id": "prod_x22",
                   "name": "Domain",
                   "description": null,
                   "group": null,
@@ -405,7 +405,7 @@
                         "max_purchase": null,
                         "processors": {
                           "stripe": {
-                            "price_id": "price_x13"
+                            "price_id": "price_x23"
                           }
                         }
                       },
@@ -416,13 +416,13 @@
                         "on_increase": "prorate_immediately",
                         "on_decrease": "prorate_immediately"
                       },
-                      "entitlement_id": "ent_35xhWl0lGdQUZCjgyJ4OgJ9J7yk",
-                      "price_id": "pr_35xhWjKZAfKCWngcKXbFJENxLni"
+                      "entitlement_id": "ent_x24",
+                      "price_id": "pr_x25"
                     }
                   ],
                   "processors": {
                     "stripe": {
-                      "product_id": "prod_x14"
+                      "product_id": "prod_x26"
                     }
                   },
                   "created_at": 1764029047554,
@@ -455,7 +455,7 @@
               {
                 "plan": {
                   "id": "1000_credits",
-                  "internal_id": "prod_x15",
+                  "internal_id": "prod_x27",
                   "name": "Name 1",
                   "description": null,
                   "group": null,
@@ -467,14 +467,14 @@
                   "price": {
                     "amount": 10,
                     "interval": "one_off",
-                    "price_id": "pr_35skj6xGqQ4jAZD8TVtsFMvoxOS",
+                    "price_id": "pr_x28",
                     "display": {
                       "primary_text": "$10",
                       "secondary_text": "one-off"
                     },
                     "processors": {
                       "stripe": {
-                        "price_id": "price_x16"
+                        "price_id": "price_x29"
                       }
                     }
                   },
@@ -491,12 +491,12 @@
                       "display": {
                         "primary_text": "Name 1"
                       },
-                      "entitlement_id": "ent_35skj9Py9uliEMLLQZJig501Q09"
+                      "entitlement_id": "ent_x30"
                     }
                   ],
                   "processors": {
                     "stripe": {
-                      "product_id": "prod_x17"
+                      "product_id": "prod_x31"
                     }
                   },
                   "created_at": 1763906298127,
@@ -523,7 +523,7 @@
                 "feature_id": "credits",
                 "feature": {
                   "id": "credits",
-                  "internal_id": "fe_35skj1OlDnD5iPdKB8Pdak4DoiD",
+                  "internal_id": "fe_x32",
                   "name": "Credits",
                   "type": "metered",
                   "consumable": true,
@@ -543,7 +543,7 @@
                 "next_reset_at": null,
                 "breakdown": [
                   {
-                    "id": "cus_ent_3EoAexPHk7VjT5mU4Y3STjhx4Di",
+                    "id": "cus_ent_x33",
                     "plan_id": "legacy_pro",
                     "included_grant": 10000,
                     "prepaid_grant": 0,
@@ -559,7 +559,7 @@
                     "source": "customer"
                   },
                   {
-                    "id": "cus_ent_37X7BOVAoBTCU2zn0JXiAgZRuOH",
+                    "id": "cus_ent_x34",
                     "plan_id": "1000_credits",
                     "included_grant": 1000,
                     "prepaid_grant": 0,
@@ -580,7 +580,7 @@
                 "feature_id": "website_credit",
                 "feature": {
                   "id": "website_credit",
-                  "internal_id": "fe_3B7qrRkKbUxPDJUHcm8CYe4AbyT",
+                  "internal_id": "fe_x35",
                   "name": "Website Credit",
                   "type": "metered",
                   "consumable": true,
@@ -606,7 +606,7 @@
                 "next_reset_at": null,
                 "breakdown": [
                   {
-                    "id": "cus_ent_3FBHwOvsaWJbY8Vwr19vhdgn9kS",
+                    "id": "cus_ent_x36",
                     "plan_id": "legacy_pro",
                     "included_grant": 500,
                     "prepaid_grant": 0,
@@ -627,7 +627,7 @@
                 "feature_id": "inboxes",
                 "feature": {
                   "id": "inboxes",
-                  "internal_id": "fe_35skiw6oJv1MwTFoinDiWuCCJKC",
+                  "internal_id": "fe_x37",
                   "name": "Inboxes",
                   "type": "metered",
                   "consumable": false,
@@ -647,7 +647,7 @@
                 "next_reset_at": null,
                 "breakdown": [
                   {
-                    "id": "cus_ent_3EoBsA47KEeb0uYPp6J07cKJUhv",
+                    "id": "cus_ent_x38",
                     "plan_id": "inbox",
                     "included_grant": 0,
                     "prepaid_grant": 3,
@@ -670,7 +670,7 @@
                 "feature_id": "domains",
                 "feature": {
                   "id": "domains",
-                  "internal_id": "fe_35skj0dt2OH9oC3rtsaqyZWL8IT",
+                  "internal_id": "fe_x39",
                   "name": "Domains",
                   "type": "metered",
                   "consumable": false,
@@ -690,7 +690,7 @@
                 "next_reset_at": null,
                 "breakdown": [
                   {
-                    "id": "cus_ent_3EoBs8IvGcWEiNT11lG87LhTMHs",
+                    "id": "cus_ent_x40",
                     "plan_id": "domain",
                     "included_grant": 0,
                     "prepaid_grant": 1,
@@ -708,7 +708,7 @@
                     "source": "customer"
                   },
                   {
-                    "id": "cus_ent_3IT8mjKXw82nTsh0LryprGpOLQw",
+                    "id": "cus_ent_x41",
                     "plan_id": "website_domain",
                     "included_grant": 0,
                     "prepaid_grant": 0,
@@ -730,13 +730,13 @@
             },
             "flags": {
               "website_domain_purchase": {
-                "id": "cus_ent_3IT8mf3PllkKMyQS87YOLFsI481",
+                "id": "cus_ent_x42",
                 "plan_id": "website_domain",
                 "expires_at": null,
                 "feature_id": "website_domain_purchase",
                 "feature": {
                   "id": "website_domain_purchase",
-                  "internal_id": "fe_3ATzffGAE4iLHKpkVp1jWJRJ0Bk",
+                  "internal_id": "fe_x43",
                   "name": "Website Domain Purchase",
                   "type": "boolean",
                   "consumable": false,
@@ -803,7 +803,7 @@
             "createdAt": "2026-08-26T20:49:23.000Z",
             "currency": "usd",
             "description": "Subscription creation",
-            "id": "py_3U8nl6GPuqjknq340bXfe4ab",
+            "id": "py_x44",
             "refunded": false,
             "status": "succeeded"
           },
@@ -813,7 +813,7 @@
             "createdAt": "2026-06-01T22:24:59.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3TdeGRGPuqjknq340B82D2Ox",
+            "id": "py_x45",
             "refunded": true,
             "status": "succeeded"
           },
@@ -823,7 +823,7 @@
             "createdAt": "2026-05-01T22:25:07.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3TSPUaGPuqjknq340U9tfDva",
+            "id": "py_x46",
             "refunded": false,
             "status": "succeeded"
           },
@@ -833,7 +833,7 @@
             "createdAt": "2026-04-01T22:24:48.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3THXBoGPuqjknq3404OQizLQ",
+            "id": "py_x47",
             "refunded": false,
             "status": "succeeded"
           },
@@ -843,7 +843,7 @@
             "createdAt": "2026-03-01T22:25:28.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3T6IQTGPuqjknq3416JbIl1Q",
+            "id": "py_x48",
             "refunded": false,
             "status": "succeeded"
           },
@@ -853,7 +853,7 @@
             "createdAt": "2026-02-01T22:26:27.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3Sw964GPuqjknq3418QOcZ73",
+            "id": "py_x49",
             "refunded": false,
             "status": "succeeded"
           },
@@ -863,7 +863,7 @@
             "createdAt": "2026-01-01T22:23:47.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3SkuHUGPuqjknq341Zdc2x0K",
+            "id": "py_x50",
             "refunded": false,
             "status": "succeeded"
           },
@@ -873,7 +873,7 @@
             "createdAt": "2025-12-29T19:43:44.000Z",
             "currency": "usd",
             "description": "Payment for Invoice",
-            "id": "py_3SjmLwGPuqjknq341OivAKwb",
+            "id": "py_x51",
             "refunded": false,
             "status": "succeeded"
           },
@@ -883,7 +883,7 @@
             "createdAt": "2025-12-01T21:22:54.000Z",
             "currency": "usd",
             "description": "Subscription creation",
-            "id": "py_3SZeYZGPuqjknq340z0FEDus",
+            "id": "py_x52",
             "refunded": false,
             "status": "succeeded"
           }
@@ -899,7 +899,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 12900,
-            "id": "in_x18",
+            "id": "in_x53",
             "lines": [
               {
                 "amountCents": 12900,
@@ -926,7 +926,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 1,
             "discountCents": 0,
-            "id": "in_x19",
+            "id": "in_x54",
             "lines": [
               {
                 "amountCents": 1,
@@ -953,7 +953,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 2400,
-            "id": "in_x20",
+            "id": "in_x55",
             "lines": [
               {
                 "amountCents": 2400,
@@ -980,7 +980,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 12900,
-            "id": "in_x21",
+            "id": "in_x56",
             "lines": [
               {
                 "amountCents": 12900,
@@ -1007,7 +1007,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 81,
             "discountCents": 0,
-            "id": "in_x22",
+            "id": "in_x57",
             "lines": [
               {
                 "amountCents": 0,
@@ -1042,7 +1042,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 2400,
-            "id": "in_x23",
+            "id": "in_x58",
             "lines": [
               {
                 "amountCents": 2400,
@@ -1069,7 +1069,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 12900,
-            "id": "in_x24",
+            "id": "in_x59",
             "lines": [
               {
                 "amountCents": 12900,
@@ -1096,7 +1096,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 2400,
-            "id": "in_x25",
+            "id": "in_x60",
             "lines": [
               {
                 "amountCents": 2400,
@@ -1123,7 +1123,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 12900,
-            "id": "in_x26",
+            "id": "in_x61",
             "lines": [
               {
                 "amountCents": 12900,
@@ -1150,7 +1150,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 4200,
-            "id": "in_x27",
+            "id": "in_x62",
             "lines": [
               {
                 "amountCents": 1800,
@@ -1185,7 +1185,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": -81,
             "discountCents": 10483,
-            "id": "in_x28",
+            "id": "in_x63",
             "lines": [
               {
                 "amountCents": -81,
@@ -1220,7 +1220,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x29",
+            "id": "in_x64",
             "lines": [
               {
                 "amountCents": 100,
@@ -1247,7 +1247,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x30",
+            "id": "in_x65",
             "lines": [
               {
                 "amountCents": 100,
@@ -1274,7 +1274,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x31",
+            "id": "in_x66",
             "lines": [
               {
                 "amountCents": 100,
@@ -1301,7 +1301,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x32",
+            "id": "in_x67",
             "lines": [
               {
                 "amountCents": 100,
@@ -1328,7 +1328,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x33",
+            "id": "in_x68",
             "lines": [
               {
                 "amountCents": 100,
@@ -1355,7 +1355,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x34",
+            "id": "in_x69",
             "lines": [
               {
                 "amountCents": 100,
@@ -1382,7 +1382,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x35",
+            "id": "in_x70",
             "lines": [
               {
                 "amountCents": 1000,
@@ -1409,7 +1409,7 @@
             "currency": "usd",
             "customerBalanceAppliedCents": 0,
             "discountCents": 0,
-            "id": "in_x36",
+            "id": "in_x71",
             "lines": [
               {
                 "amountCents": 100,
@@ -1434,7 +1434,7 @@
             "createdAt": "2026-06-01T22:24:59.000Z",
             "currency": "usd",
             "description": "Subscription update",
-            "id": "py_3TdeGRGPuqjknq340B82D2Ox",
+            "id": "py_x45",
             "refunded": true,
             "status": "succeeded"
           }
@@ -1449,21 +1449,21 @@
           {
             "cancelAtPeriodEnd": false,
             "currentPeriodEnd": null,
-            "id": "sub_x37",
+            "id": "sub_x72",
             "status": "active",
             "trialEnd": null
           },
           {
             "cancelAtPeriodEnd": false,
             "currentPeriodEnd": null,
-            "id": "sub_x38",
+            "id": "sub_x73",
             "status": "active",
             "trialEnd": null
           },
           {
             "cancelAtPeriodEnd": false,
             "currentPeriodEnd": null,
-            "id": "sub_x39",
+            "id": "sub_x74",
             "status": "active",
             "trialEnd": null
           }
@@ -1502,15 +1502,17 @@
     }
   ],
   "expectations": {
-    "cause": "Nothing is provisioned: one order was cancelled and the completed order has no active domains or inboxes.",
+    "cause": "One order was cancelled. The completed order records provisioningStartedAt and counters of one domain and three inboxes provisioned, but no active domains or inboxes remain and one domain failed. Payment attribution to that order and delivery are unresolved, requiring billing review.",
     "claims": [
-      "Says no domains or inboxes are active.",
-      "Says one provisioning order was cancelled.",
-      "Does not mention internal databases, logs or diagnostic tools."
+      "Preserves the recorded provisioning start and nonzero counters; does not say provisioning never happened.",
+      "Says one order was cancelled and no domains or inboxes are active.",
+      "Keeps payment attribution and delivery unresolved for billing review.",
+      "Does not recommend buying again, paying again or placing a new order.",
+      "The run has no customer-visible message because current policy requires a billing-review handoff."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
-    "gateVerdict": "allow",
+    "gateVerdict": "block",
     "lane": "investigate",
     "toolBudget": 5
   },

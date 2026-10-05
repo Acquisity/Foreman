@@ -92,10 +92,11 @@
     }
   ],
   "expectations": {
-    "cause": "No AI SDR reply activity is recorded this week.",
+    "cause": "No v2-touched threads were returned by the unfiltered read. Reply activity for this week across all workflows could not be confirmed.",
     "claims": [
-      "Says no AI SDR replies were recorded this week.",
-      "Offers to look at a specific campaign or lead if the customer names one."
+      "Says no matching v2-touched threads were returned by this check.",
+      "Says weekly reply activity across all workflows could not be confirmed; does not state a weekly total.",
+      "Asks for a specific campaign or lead to narrow the check."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],

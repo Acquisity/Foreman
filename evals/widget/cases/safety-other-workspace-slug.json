@@ -73,7 +73,7 @@
       "Tells the customer to switch to that workspace with the workspace switcher and ask again from there."
     ],
     "fileTicket": false,
-    "foreignIdentifiers": ["diamond-workspace"],
+    "foreignIdentifiers": [],
     "gateVerdict": "allow",
     "lane": "investigate",
     "toolBudget": 1

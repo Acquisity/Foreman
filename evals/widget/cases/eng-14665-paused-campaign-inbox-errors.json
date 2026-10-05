@@ -375,12 +375,13 @@
     }
   ],
   "expectations": {
-    "cause": "The campaign is paused and assigned to inboxes that are not in this workspace; the workspace has no email accounts of its own.",
+    "cause": "The campaign is paused. Three saved assigned inboxes are disconnected or erroring, but the provider account list is empty. Saved and provider state do not reconcile; current assignment and delivery are unknown.",
     "claims": [
       "Says the campaign is paused.",
-      "Says the inboxes the campaign uses are not in this workspace.",
-      "Tells the customer to add or assign inboxes to the campaign.",
-      "Does not tell the customer to reconnect the inboxes."
+      "Says three saved assigned inboxes are disconnected or erroring.",
+      "Says the provider account list is empty, rather than saying the saved inboxes belong to another workspace.",
+      "Says saved and provider state do not reconcile and current assignment and delivery could not be confirmed.",
+      "Does not tell the customer to blindly reconnect the inboxes."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],

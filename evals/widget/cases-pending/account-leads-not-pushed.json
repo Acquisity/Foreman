@@ -175,10 +175,11 @@
     }
   ],
   "expectations": {
-    "cause": "Nothing is stuck: all stored leads are already in campaigns and the counts reconcile.",
+    "cause": "Workspace-level declared scrape totals reconcile with persisted scrape leads. The outcome for the customer's specific campaign is unconfirmed.",
     "claims": [
-      "Says the leads are already in campaigns with no missing leads, or asks which campaign the customer means.",
-      "Does not claim a lead import or scrape failed."
+      "States only the bounded workspace reconciliation, without claiming every campaign or import is complete.",
+      "Asks which campaign the customer means.",
+      "Does not claim a lead import or scrape failed, or that nothing is stuck."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],

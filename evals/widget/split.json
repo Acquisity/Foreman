@@ -10,9 +10,7 @@
   ],
   "train": [
     "account-failed-payment",
-    "account-leads-not-pushed",
     "account-paused-campaign",
-    "account-provisioning",
     "account-sdr-replies",
     "eng-14665-paused-campaign-inbox-errors",
     "help-campaign-schedule",

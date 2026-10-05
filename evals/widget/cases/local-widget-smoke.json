@@ -139,7 +139,7 @@
     }
   ],
   "expectations": {
-    "cause": "No campaign is running: one campaign is paused and the other two are drafts that were never launched.",
+    "cause": "No campaign is currently running: one campaign is paused and the other two are currently drafts.",
     "claims": [
       "Says no campaign is currently sending.",
       "Names the paused campaign as paused.",

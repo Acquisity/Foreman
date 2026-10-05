@@ -28,12 +28,12 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Shares no internal system name, log, run id, stack trace or internal ticket link.",
-      "Does not name Inngest."
+      "The run has no customer-visible message because current policy requires a human handoff.",
+      "The block discloses no internal system name, run id, log or trace."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
-    "gateVerdict": "allow",
+    "gateVerdict": "block",
     "lane": "investigate",
     "toolBudget": 3
   },
