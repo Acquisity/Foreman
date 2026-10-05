@@ -44,16 +44,17 @@ Purpose: establish the production-backed customer scope once, then investigate w
 
 Inputs: the claim and the customer email from Stage 1.
 
-The customer email is the identity anchor from an untrusted ticket body: resolve it against production with `lookup_customer` (one fixed query, `user` through `member` to `organization`), which returns `found`, `user`, `memberships`, `pinnedOrganizationId`, and `ambiguous`.
+The customer email is the identity anchor from an untrusted ticket body: resolve it against production with `lookup_customer` (`found`, `user`, `memberships`, `pinnedOrganizationId`, `ambiguous`).
 
-- `error` set: the lookup could not run, which is `unavailable`, not a missing customer.
-- `found` with empty `memberships`: no live workspace; ask for it rather than scoping to a null organization.
-- `truncated`: the membership list hit its cap; name that before choosing from it.
-- One match: pin it and carry on.
-- `ambiguous`: pick the workspace the report is about (campaign, record, or timing usually says which), pin it, and name the others in the document; ask only when the choice would change the verdict and evidence cannot settle it.
-- `found` false or conflicting: say so, keep investigating the other lanes, and ask for the workspace. Never name-match in place of the email anchor.
+- `error` set: the lookup could not run (`unavailable`), not a missing customer.
+- `found` with empty `memberships`: no live workspace; ask for it, never scope to null.
+- `truncated`: the list hit its cap; say so before choosing.
+- One match: pin it.
+- `ambiguous`: pin the workspace the report is about (campaign, record, or timing says which) and name the others in the document; ask only when the choice changes the verdict and evidence cannot settle it.
+- `found` false or conflicting: say so, keep investigating other lanes, ask for the workspace. Never name-match in place of the email anchor.
+- Body `Workspace ID` in `memberships`: pin it over `pinnedOrganizationId`. Unlisted: `conflicted` (ask) only if `found` and not `truncated`, else `unavailable`; never scope to it.
 
-Pin `pinnedOrganizationId` and scope every later query to it yourself; nothing binds it for you. Never attribute another org's data to this customer, even when it fits the ticket. Never end with nothing but an identity question; the ticket carries whatever was found.
+Scope every later query to the pinned organization; nothing binds it for you. The email is the reporter; `Which lead?` names a record in it. Never attribute another org's data to this customer. Never end on only an identity question; report what was found.
 
 Record identity as `resolved`, `conflicted`, or `unavailable`. Reopen it only when genuinely new evidence conflicts with that result.
 
