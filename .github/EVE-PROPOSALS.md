@@ -98,6 +98,6 @@ Proposal: let the agent set the task delivery policy per session or per channel 
 
 Checked against Eve 0.54.2 for ENG-14746. The public `t.skip(reason)` rejects calls after session activity or recorded assertions with "skip() must be called before sending messages or recording assertions." Replay coverage is known only after the investigator runs, so a post-run skip cannot preserve the leak and raw-field gates.
 
-Foreman keeps those safety gates and records one tracked-only `.soft()` assertion without a threshold, named "replay coverage", stating the unrecorded tools. Uncovered rows carry `scored: false` and `unrecordedReads`; behavior grading and the claims judge do not run, and loop measurements exclude those rows. Eve's verdict reflects safety checks, not a fully covered replay pass.
+Foreman keeps those safety gates and records one tracked-only `.soft()` assertion without a threshold, named "replay coverage", stating the unrecorded tools. Uncovered rows carry `scored: false` and `unrecordedReads`; behavior checks are computed but are not asserted or counted, the claims judge does not run, and loop measurements exclude those rows. Eve's verdict reflects safety checks, not a fully covered replay pass.
 
 Proposal: support a public post-activity not-scored result that retains failed safety gates and excludes uncovered runs from grading totals.
