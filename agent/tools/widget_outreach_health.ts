@@ -124,6 +124,7 @@ const dailyMetrics = z.object({
   emailsOpened: count,
   emailsSent: count,
   meetingsScheduled: count,
+  newLeadsContacted: count.nullable(),
   repliesReceived: count,
   updatedAt: timestamp,
 });
@@ -155,7 +156,13 @@ const campaignDiagnostics = z
         unsubscribes: count,
       })
       .nullable(),
+    sequenceStepDelays: z.array(count.nullable()).max(20).nullable(),
     startDate: dateStr,
+    stepSends: z
+      .array(
+        z.object({ sent: count, snapshotAt: timestamp.nullable(), step: count })
+      )
+      .max(20),
   })
   .nullable();
 const campaignHealth = z.object({
@@ -237,12 +244,24 @@ export function buildWidgetOutreachHealthQuery(
       select cm.date, cm.emails_sent as "emailsSent", cm.emails_delivered as "emailsDelivered",
         cm.emails_opened as "emailsOpened", cm.emails_bounced as "emailsBounced",
         cm.replies_received as "repliesReceived", cm.meetings_scheduled as "meetingsScheduled",
-        cm.updated_at as "updatedAt"
+        cm.new_leads_contacted_count as "newLeadsContacted", cm.updated_at as "updatedAt"
       from outreach_campaign_metrics cm
       where cm.organization_id = c.organization_id and cm.campaign_id = c.id
         and cm.date >= (${startDate})::text and cm.date <= (${endDate})::text
       order by cm.date limit 31
     ) d), '[]'::jsonb),
+    'stepSends', coalesce((select jsonb_agg(to_jsonb(s) order by s.step) from (
+      select sv.step::int as step, sum(sv.sent) as sent, max(sv.snapshot_at) as "snapshotAt"
+      from outreach_campaign_step_variant_metrics sv
+      where sv.organization_id = c.organization_id and sv.campaign_id = c.id
+        and sv.step ~ '^[0-9]{1,4}$' and sv.sent is not null
+      group by sv.step::int order by 1 limit 20
+    ) s), '[]'::jsonb),
+    'sequenceStepDelays', (select jsonb_agg(case when (st.value->>'delay') ~ '^[0-9]{1,6}$'
+        then to_jsonb((st.value->>'delay')::int) else null end order by st.n)
+      from jsonb_array_elements(case when jsonb_typeof(c.settings->'sequences'->0->'steps') = 'array'
+        then c.settings->'sequences'->0->'steps' else '[]'::jsonb end) with ordinality st(value, n)
+      where st.n <= 20),
     'overview', (select jsonb_build_object(
       'emailsSent', co.emails_sent_count, 'opens', co.open_count,
       'replies', co.reply_count, 'bounces', co.bounced_count,
@@ -426,6 +445,7 @@ export function parseWidgetOutreachHealthEvidence(
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+      "diagnostics.stepSends counts saved cumulative sends per sequence step (step 0 is the first email); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has never sent a follow-up. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
       "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes.",
     ],
     inboxes: result.inboxes,
@@ -601,7 +621,7 @@ export async function readWidgetOutreachHealth(
 
 const tool = defineTool({
   description:
-    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), and campaign-specific inbox assignments. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. This also fetches live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), campaign-specific inbox assignments, saved sends per sequence step and each step's configured delay in days; use those step figures for 'follow-ups are not sending' or 'only step 1 sends' questions. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. This also fetches live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetOutreachHealth(ctx, input),
   inputSchema: widgetOutreachHealthInput,

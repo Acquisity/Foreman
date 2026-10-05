@@ -503,7 +503,9 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
           dailyMetrics: [],
           endDate: "2026-09-30",
           overview: null,
+          sequenceStepDelays: null,
           startDate: "2026-09-01",
+          stepSends: [],
         },
       },
     ]),
@@ -524,4 +526,77 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
   assert.ok(
     result.caveats.some((text) => text.includes("Neither is dispatch history"))
   );
+});
+
+test("per-step sends, first-touch counts and step delays are read only for the org-scoped selected campaign", () => {
+  // Live 2026-10-05: a campaign sent only step 0 for two weeks and the widget
+  // answered from one prospect thread because no tool returned step sends.
+  const listed = buildWidgetOutreachHealthQuery(scope, {});
+  for (const text of [
+    "outreach_campaign_step_variant_metrics",
+    "new_leads_contacted_count",
+    "'sequences'",
+  ]) {
+    assert.equal(listed.includes(text), false, text);
+  }
+  const query = buildWidgetOutreachHealthQuery(scope, { campaignId });
+  for (const required of [
+    "from outreach_campaign_step_variant_metrics sv",
+    "sv.organization_id = c.organization_id and sv.campaign_id = c.id",
+    "sv.step ~ '^[0-9]{1,4}$'",
+    'cm.new_leads_contacted_count as "newLeadsContacted"',
+    "jsonb_typeof(c.settings->'sequences'->0->'steps') = 'array'",
+    "join authorized a on a.id = c.organization_id",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+});
+
+test("step sends, first-touch counts and step delays round-trip through the output schema", () => {
+  const diagnostics = {
+    assignedInboxes: {
+      accounts: [],
+      configuredCount: null,
+      healthyCount: 0,
+      matchedCount: 0,
+      nextAfterInboxId: null,
+    },
+    dailyMetrics: [
+      {
+        date: "2026-09-23",
+        emailsBounced: 0,
+        emailsDelivered: 109,
+        emailsOpened: 0,
+        emailsSent: 109,
+        meetingsScheduled: 0,
+        newLeadsContacted: 109,
+        repliesReceived: 0,
+        updatedAt: observedAt,
+      },
+    ],
+    endDate: "2026-09-30",
+    overview: null,
+    sequenceStepDelays: [2, 2, 3],
+    startDate: "2026-09-23",
+    stepSends: [{ sent: 1003, snapshotAt: observedAt, step: 0 }],
+  };
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([{ ...row, diagnostics }]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved diagnostics");
+  }
+  assert.deepEqual(result.campaigns[0].diagnostics, diagnostics);
+  assert.ok(result.caveats.length <= 6);
+  assert.ok(
+    result.caveats.some((text) => text.includes("never sent a follow-up"))
+  );
+
+  const list = parseWidgetOutreachHealthEvidence(envelope([row]), scope);
+  if (list.status !== "ok") {
+    assert.fail("Expected ok evidence");
+  }
+  assert.equal(list.campaigns[0].diagnostics, null);
 });
