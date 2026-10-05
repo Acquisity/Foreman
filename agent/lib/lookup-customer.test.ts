@@ -67,6 +67,7 @@ describe("lookup_customer", () => {
     );
     assert.equal(empty.found, false);
     assert.ok(empty.error, "an empty cut-off read is unavailable, not a miss");
+    assert.equal(empty.truncated, true);
 
     const complete = await lookupCustomer("ada@example.com", () =>
       Promise.resolve(JSON.stringify({ rows: [row("org1")], truncated: false }))

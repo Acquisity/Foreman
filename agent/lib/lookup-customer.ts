@@ -133,6 +133,7 @@ export async function lookupCustomer(
       ? {
           ...EMPTY,
           error: "The identity read was truncated before any row; retry it.",
+          truncated: true,
         }
       : EMPTY;
   }
