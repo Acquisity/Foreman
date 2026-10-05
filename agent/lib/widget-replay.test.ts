@@ -105,7 +105,9 @@ test(
       async () =>
         await replayed.execute({}, {
           session: {
-            auth: { initiator: { attributes: {}, issuer: WIDGET_SUPPORT_ISSUER } },
+            auth: {
+              initiator: { attributes: {}, issuer: WIDGET_SUPPORT_ISSUER },
+            },
           },
         } as never),
       SCOPE_UNAVAILABLE
