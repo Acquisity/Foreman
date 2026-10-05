@@ -47,6 +47,28 @@ describe("lookup_customer", () => {
     assert.equal(result.memberships[0]?.role, "owner");
   });
 
+  it("treats the read tool's own truncation as a partial list", async () => {
+    const result = await lookupCustomer("ada@example.com", () =>
+      Promise.resolve(JSON.stringify({ rows: [row("org1")], truncated: true }))
+    );
+    assert.equal(result.truncated, true);
+    assert.equal(
+      result.pinnedOrganizationId,
+      null,
+      "one returned row is not one membership"
+    );
+    assert.deepEqual(
+      result.memberships.map((m) => m.organizationId),
+      ["org1"]
+    );
+
+    const complete = await lookupCustomer("ada@example.com", () =>
+      Promise.resolve(JSON.stringify({ rows: [row("org1")], truncated: false }))
+    );
+    assert.equal(complete.truncated, false);
+    assert.equal(complete.pinnedOrganizationId, "org1");
+  });
+
   it("marks two memberships ambiguous with no pin", async () => {
     const result = await lookupCustomer("ada@example.com", () =>
       Promise.resolve(JSON.stringify({ rows: [row("org1"), row("org2")] }))
