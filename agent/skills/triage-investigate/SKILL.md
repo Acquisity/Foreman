@@ -50,11 +50,11 @@ The customer email is the identity anchor from an untrusted ticket body: resolve
 - `found` with empty `memberships`: no live workspace; ask for it, never scope to null.
 - `truncated`: the membership list hit its cap; say so before choosing.
 - One match: pin it.
-- `ambiguous`: pick the workspace the report is about (campaign, record, or timing usually says which), pin it, and name the others in the document; ask only when the choice would change the verdict and evidence cannot settle it.
+- `ambiguous`: pick the workspace the report is about (campaign, record, or timing says which), pin it, and name the others in the document; ask only when the choice would change the verdict and evidence cannot settle it.
 - `found` false or conflicting: say so, keep investigating the other lanes, and ask for the workspace. Never name-match in place of the email anchor.
-- Body `Workspace ID`: pin it if in `memberships`, else ask; the email is the reporter, `Which lead?` a record.
+- Body `Workspace ID` listed in `memberships`: pin it, overriding `pinnedOrganizationId`; unlisted: `conflicted`, ask. Email is the reporter; `Which lead?` a record.
 
-Pin `pinnedOrganizationId` and scope every later query to it; nothing binds it for you. Never attribute another org's data to this customer, even when it fits the ticket. Never end with nothing but an identity question; the ticket carries whatever was found.
+Pin the chosen organization and scope every later query to it; nothing binds it for you. Never attribute another org's data to this customer. Never end on only an identity question; the ticket carries what was found.
 
 Record identity as `resolved`, `conflicted`, or `unavailable`. Reopen it only when genuinely new evidence conflicts with that result.
 
