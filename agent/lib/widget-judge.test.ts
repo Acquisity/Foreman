@@ -39,9 +39,19 @@ const CAUSE_ROW = /\| a#cause \| .* \| yes \| a \\\| b \| {2}\|/;
 const CAUSE_MARK = /(\| a#cause \|.*\|) {2}\|/;
 const ACTIONS_MARK = /(\| a#actions \|.*\|) {2}\|/;
 
-const recorded = widgetCaseSchema.parse(
+const smoke = widgetCaseSchema.parse(
   JSON.parse(readFileSync("evals/widget/cases/local-widget-smoke.json", "utf8"))
 );
+// The tests set their own expectations, so editing the case file cannot break them.
+const recorded: WidgetCase = {
+  ...smoke,
+  expectations: {
+    ...smoke.expectations,
+    cause: null,
+    claims: [],
+    foreignIdentifiers: [],
+  },
+};
 const withRole = (
   role: WidgetCase["scope"]["role"],
   expectations: Partial<WidgetCase["expectations"]> = {}
@@ -338,7 +348,7 @@ test("review carries question, role, expectation, source and collapsible evidenc
     "Authored cause: unset",
     "<details>",
     "widget_outreach_health",
-    recorded.source.runId,
+    recorded.source.runId ?? `"runId": null`,
     sample.answer,
   ]) {
     assert.ok(review.includes(text), text);
