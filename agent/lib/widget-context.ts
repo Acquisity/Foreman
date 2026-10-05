@@ -35,12 +35,17 @@ export async function verifyWidgetContext(
     // The token belongs to a support teammate, not the customer. The app then
     // checks the teammate and returns the conversation's customer as the scope.
     staff?: boolean;
+    replayCaseId?: string | null;
   },
   request: typeof fetch = fetch
 ): Promise<WidgetContext> {
   const parsed = inputSchema.parse(input);
   if (isReplayActive()) {
-    return replayContext({ ...parsed, staff: input.staff });
+    return replayContext({
+      ...parsed,
+      replayCaseId: input.replayCaseId ?? undefined,
+      staff: input.staff,
+    });
   }
   const origin = acquisityOrigin();
   const signal = input.signal
