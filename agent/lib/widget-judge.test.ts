@@ -104,21 +104,22 @@ test("parseVerdicts rejects missing, duplicate, unknown and non yes/no verdicts"
   );
 });
 
-const record = (name: string, values: ("yes" | "no")[]): JudgeRecord => ({
+/** Every claim yes except the indexes in `no`, so a new shared claim needs no test edits. */
+const record = (name: string, no: number[] = []): JudgeRecord => ({
   answer: "Reconnect the inbox.\nThen resume | the campaign.",
   case: name,
   judgedAt: "2026-10-04T00:00:00.000Z",
   model: "test/model",
   recorded,
   verdicts: claims.map((c, n) => ({
-    ...verdict(c.id, values[n]),
+    ...verdict(c.id, no.includes(n) ? "no" : "yes"),
     claim: c.text,
     reason: "a | b",
   })),
 });
 
 test("the review page has one markable row per claim and round-trips marks into gold", () => {
-  const records = [record("a", ["yes", "no", "yes", "yes", "yes"])];
+  const records = [record("a", [1])];
   const review = renderReview(records);
   assert.match(review, CAUSE_ROW);
   assert.equal(parseMarks(review).size, 0);
@@ -144,8 +145,8 @@ test("the review page has one markable row per claim and round-trips marks into 
 
 test("saveRecord writes the record and regenerates the review", () => {
   const dir = mkdtempSync(`${tmpdir()}/judge-`);
-  saveRecord(dir, record("b", ["yes", "yes", "yes", "yes", "yes"]));
-  saveRecord(dir, record("a", ["yes", "yes", "yes", "yes", "yes"]));
+  saveRecord(dir, record("b"));
+  saveRecord(dir, record("a"));
   assert.deepEqual(
     readRecords(dir).map((r) => r.case),
     ["a", "b"]
@@ -163,12 +164,11 @@ const labelled = (sample: JudgeRecord): GoldEntry =>
   );
 const run = (...samples: JudgeRecord[]) =>
   new Map(samples.map((sample) => [sample.case, sample]));
-const allYes = (name: string) =>
-  record(name, ["yes", "yes", "yes", "yes", "yes"]);
+const allYes = (name: string) => record(name);
 
 test("mergeGold replaces a relabelled sample and keeps the rest", () => {
   const old = [labelled(allYes("a")), labelled(allYes("b"))];
-  const next = labelled(record("a", ["no", "yes", "yes", "yes", "yes"]));
+  const next = labelled(record("a", [0]));
   assert.deepEqual(mergeGold(old, [next]), [old[1], next]);
   const unmarked = toGold([allYes("a"), allYes("c")], new Map());
   assert.deepEqual(mergeGold(old, unmarked), [...old, unmarked[1]]);
@@ -184,7 +184,7 @@ test("marks on unknown or repeated rows are refused", () => {
 
 test("complete gold scoring counts agreement and flips per shared claim", () => {
   const a = allYes("a");
-  const b = record("a", ["yes", "no", "yes", "yes", "yes"]);
+  const b = record("a", [1]);
   const scores = scoreAgainstGold([labelled(a)], run(a), run(b));
   const cause = present(scores.get("cause"));
   assert.deepEqual(cause.agreement, { agree: 2, total: 2 });
