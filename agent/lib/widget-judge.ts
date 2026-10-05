@@ -87,6 +87,11 @@ const SHARED: Claim[] = [
   },
   { id: "steps", text: "Steps are one per line." },
   { id: "jargon", text: "The message uses no internal jargon." },
+  // Aaron, 2026-10-05: unrequested "what I could not check" lines are verbosity.
+  {
+    id: "caveats",
+    text: "The message mentions something that could not be checked only when the customer asked about that thing.",
+  },
 ];
 const LIMITED: Claim = {
   id: "member",

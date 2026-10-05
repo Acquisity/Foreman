@@ -53,7 +53,14 @@ const withRole = (
 
 test("shared claims cover every answered case; the member claim only member and client", () => {
   const owner = claimsFor(withRole("owner")).map((claim) => claim.id);
-  assert.deepEqual(owner, ["cause", "actions", "facts", "steps", "jargon"]);
+  assert.deepEqual(owner, [
+    "cause",
+    "actions",
+    "facts",
+    "steps",
+    "jargon",
+    "caveats",
+  ]);
   assert.ok(claimsFor(withRole("member")).some((c) => c.id === "member"));
   assert.ok(claimsFor(withRole("client")).some((c) => c.id === "member"));
   assert.ok(!claimsFor(withRole("admin")).some((c) => c.id === "member"));
