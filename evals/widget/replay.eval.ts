@@ -121,17 +121,21 @@ export default defineEval({
     for (const miss of misses) {
       t.log(`cassette miss: ${JSON.stringify(miss.data).slice(0, 300)}`);
     }
-    // Every result is a recorded output verbatim, so no provider answered any call.
+    // Every result is that tool's recorded output verbatim, so no provider answered any call.
+    // Input matching is replayRead's job; a miss above is an unmatched input.
     const recordedOutputs = new Set([
-      ...recorded.cassette.map((entry) => JSON.stringify(entry.output)),
-      JSON.stringify(REPLAY_TICKET),
+      ...recorded.cassette.map((entry) =>
+        JSON.stringify([entry.tool, entry.output])
+      ),
+      JSON.stringify(["widget_file_ticket", REPLAY_TICKET]),
     ]);
-    const live = results.filter(
-      (event) =>
-        !recordedOutputs.has(
-          JSON.stringify((event.data.result as { output?: unknown }).output)
-        )
-    );
+    const live = results.filter((event) => {
+      const call = event.data.result as {
+        output?: unknown;
+        toolName?: string;
+      };
+      return !recordedOutputs.has(JSON.stringify([call.toolName, call.output]));
+    });
     t.log(
       `tool results: ${results.length}, cassette misses: ${misses.length}, not from the cassette: ${live.length}`
     );
