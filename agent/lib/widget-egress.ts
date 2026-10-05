@@ -98,9 +98,12 @@ const DOMAIN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 const TRAILING_DOT = /\.$/u;
 const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 // A website fix names the file that broke ("calendar.tsx", "next.config.js"). These
-// endings are not registrable domains, so such a name is never another tenant's
-// domain; treating it as one deleted the fix from the reply.
+// endings are not registrable domains; an ordinary source name must not delete
+// the fix from the reply. A common domain followed by a source ending still needs ownership.
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mjs|cjs|s?css|json|html?)$/u;
+// Only these common TLDs qualify a source-file stem; "next.config" is not a domain.
+const SOURCE_STEM_TLD =
+  /\.(?:com|net|org|io|ai|co|us|uk|ca|de|app|dev|biz|info|me)$/u;
 // Help articles name upload and export formats ("Choose a .CSV file"). None of these
 // endings is a top-level domain, but a domain-shaped stem ("other-company.com.pdf")
 // still names a domain, so that stem is checked in place of the file name.
@@ -168,12 +171,15 @@ function classifyDomains(
     }
   }
   for (const match of uniqueLower(text.match(DOMAIN))) {
-    const domain = match.replace(DOCUMENT_FILE, "");
+    const source = SOURCE_FILE.test(match);
+    const domain = match.replace(source ? SOURCE_FILE : DOCUMENT_FILE, "");
+    if (source && !SOURCE_STEM_TLD.test(domain)) {
+      continue;
+    }
     if (domain !== match && !DOMAIN_HOST.test(domain)) {
       continue;
     }
     const covered =
-      SOURCE_FILE.test(domain) ||
       PUBLIC_HOSTS.has(domain) ||
       emailDomains.has(domain) ||
       // Only a url's own host is checked there: a domain elsewhere in a url is not.

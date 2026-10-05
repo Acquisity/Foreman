@@ -10,6 +10,7 @@ import {
   guardedJudge,
   redactableItems,
   removeItems,
+  scanIdentifiers,
   withoutTicketRefs,
 } from "./widget-egress.js";
 import { buildOwnershipQuery } from "./widget-evidence.js";
@@ -1078,4 +1079,65 @@ test("a block is asked once more with blocking off and that answer is applied as
     "allow"
   );
   assert.deepEqual(fine.retries, [false]);
+});
+
+test("stacked source and document extensions retain domain ownership checks", () => {
+  for (const [file, domain] of [
+    ["other-company.com.js.pdf", "other-company.com.js"],
+    ["other-company.com.html.csv", "other-company.com.html"],
+    ["tenant-data.zip.ts.png", "tenant-data.zip.ts"],
+    ["other-company.com.json", "other-company.com"],
+    ["other-company.com.html", "other-company.com"],
+    ["other-company.com.js", "other-company.com"],
+  ]) {
+    assert.deepEqual(scanIdentifiers(file).candidates.domains, [domain]);
+  }
+  assert.deepEqual(
+    scanIdentifiers(
+      "a.CSV report.pdf next.config.js vite.config.ts calendar.tsx package.json"
+    ).candidates.domains,
+    []
+  );
+});
+
+test("the live gate blocks stacked extensions in composed replies and removes them from findings", async () => {
+  for (const file of [
+    "other-company.com.js.pdf",
+    "other-company.com.html.csv",
+    "tenant-data.zip.ts.png",
+    "other-company.com.json",
+    "other-company.com.html",
+    "other-company.com.js",
+  ]) {
+    const domain = file.slice(0, file.lastIndexOf("."));
+    // biome-ignore lint/performance/noAwaitInLoops: each file needs an independent gate run.
+    const composed = await gate(
+      scope,
+      question,
+      findings(),
+      deps({ compose: () => Promise.resolve(`Open ${file}.`) }).deps
+    );
+    assert.equal(composed.decision, "block");
+    assert.equal(composed.reason, `composed:foreign_identifier:${domain}`);
+    assert.equal(composed.message, null);
+    const { calls, deps: d } = deps();
+    const initial = await gate(
+      scope,
+      question,
+      findings({ recommendation: `Reconnect the inbox. Open ${file}.` }),
+      d
+    );
+    assert.equal(initial.decision, "allow");
+    assert.equal(JSON.stringify(calls.compose).includes(file), false);
+  }
+  const text =
+    "Open a.CSV or report.pdf and fix next.config.js or calendar.tsx.";
+  const allowed = await gate(
+    scope,
+    question,
+    findings({ recommendation: text }),
+    deps({ compose: () => Promise.resolve(text) }).deps
+  );
+  assert.equal(allowed.decision, "allow");
+  assert.equal(allowed.message, text);
 });

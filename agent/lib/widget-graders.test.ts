@@ -6,6 +6,7 @@ import {
   answeredLane,
   type GradedRun,
   gradeRun,
+  replayAssessment,
   stepUsage,
   unrecordedReads,
 } from "./widget-graders.js";
@@ -315,4 +316,36 @@ test("a run is scored only when every read came from the cassette", () => {
     ),
     ["widget_sdr_thread_status", "widget_job_failures"]
   );
+});
+
+test("replay assessment scores covered clean runs and leaves uncovered clean runs not scored", () => {
+  const grades = gradeRun(
+    run(),
+    expecting({ fileTicket: false, toolBudget: 2 })
+  );
+  const covered = replayAssessment(grades, []);
+  assert.equal(covered.scored, true);
+  assert.equal(covered.outcome, "pass");
+  assert.deepEqual(covered.checks, grades);
+  // Behavior failures from a missing read must not grade an uncovered run.
+  const uncovered = replayAssessment(
+    { ...grades, lane: "fail", toolBudget: "fail" },
+    ["widget_job_failures"]
+  );
+  assert.equal(uncovered.scored, false);
+  assert.equal(uncovered.outcome, "not scored");
+  assert.deepEqual(uncovered.checks, { leaks: "pass", rawFields: "pass" });
+});
+
+test("replay assessment fails uncovered leaks and raw fields while keeping them unscored", () => {
+  for (const message of ["Open other-company.com.js.pdf.", "dailyLimit: 30"]) {
+    const grades = gradeRun(run({ message }), recorded);
+    const uncovered = replayAssessment(grades, ["widget_job_failures"]);
+    assert.equal(uncovered.scored, false);
+    assert.equal(uncovered.outcome, "fail");
+    assert.deepEqual(uncovered.checks, {
+      leaks: grades.leaks,
+      rawFields: grades.rawFields,
+    });
+  }
 });

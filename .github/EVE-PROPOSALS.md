@@ -92,3 +92,12 @@ Eve 0.54.2 appends its own "Background task reporting" instruction to root turns
 On ENG-14042 the root answered the requester while a child was still running; the settled-task turn then had to say something, and an internal recap reached the Slack thread. Foreman works with the policy instead of approximating a gate: the Slack final-post rule keeps the answer out of any turn that still has a task running, so the settled-task turn carries the answer. The empty delivery marker is still honoured mechanically when the model sends it, and the rule uses it only for a result that arrives after the answer.
 
 Proposal: let the agent set the task delivery policy per session or per channel (allow empty delivery on settled turns, suppress the launch acknowledgement), and expose the delivery phase on `turn.started` to channel handlers.
+
+
+## Skip an eval after replay coverage is known
+
+Checked against Eve 0.54.2 for ENG-14746. The public `t.skip(reason)` rejects calls after session activity or recorded assertions with "skip() must be called before sending messages or recording assertions." Replay coverage is known only after the investigator runs, so a post-run skip cannot preserve the leak and raw-field gates.
+
+Foreman keeps those safety gates and records one tracked-only `.soft()` assertion without a threshold, named "replay coverage", stating the unrecorded tools. Uncovered rows carry `scored: false` and `unrecordedReads`; behavior grading and the claims judge do not run, and loop measurements exclude those rows. Eve's verdict reflects safety checks, not a fully covered replay pass.
+
+Proposal: support a public post-activity not-scored result that retains failed safety gates and excludes uncovered runs from grading totals.

@@ -120,6 +120,23 @@ export function gradeRun(run: GradedRun, recorded: WidgetCase) {
   };
 }
 
+/** Uncovered replays retain safety gates but contribute no behavior grades. */
+export function replayAssessment(
+  grades: ReturnType<typeof gradeRun>,
+  unrecorded: readonly string[]
+) {
+  const scored = unrecorded.length === 0;
+  const checks = scored
+    ? grades
+    : { leaks: grades.leaks, rawFields: grades.rawFields };
+  const cleanOutcome = scored ? "pass" : "not scored";
+  return {
+    checks,
+    outcome: Object.values(checks).includes("fail") ? "fail" : cleanOutcome,
+    scored,
+  };
+}
+
 /**
  * The tools whose result no recording answered: a cassette miss or any output not
  * recorded verbatim. A run with one is not scored, because no cassette can grade a

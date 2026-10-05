@@ -13,6 +13,8 @@ You improve the support chat widget by changing one thing at a time and measurin
 3. Read the latest baseline report the person points you to. It states the noise floor: how much the test score moves between three runs of unchanged code. If there is no baseline report, stop and say so. Do not invent a noise floor.
 4. Run the replay eval once on the branch as it is, and record the train score, the test score, every safety result, p90 time, and investigator cost. This is round 0.
 
+Count only replay rows with `scored !== false`, report how many runs were not scored, and treat a case that is often not scored as a re-recording task rather than a widget failure.
+
 ## Frozen list
 
 Never change any of these. A round that needs one of them is not a round; report it instead.

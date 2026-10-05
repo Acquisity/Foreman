@@ -4,7 +4,7 @@
 
 Cases use scrubbed recorded tool results, except the hand-authored help-center cases, whose source run is null. Expectations describe the intended product behavior and are not changed just to match an observed replay. Tool budgets count investigator tool results, including customer clarification, and do not count front-door help-center reads. A budget of one permits one tool call; it does not require zero provider reads.
 
-A run whose investigator made a read no recording answers (a cassette miss, or any result not recorded verbatim) is not scored: the eval logs "not scored: N unrecorded reads: <tools>", the row carries `scored: false` and the tool names, and eve reports the case as skipped. Its leak and raw-field checks still run and still fail it, because a leak is a real failure whatever the replay coverage. A case that is often not scored should move to `cases-pending/` for re-recording.
+A run whose investigator made a read no recording answers (a cassette miss, or any result not recorded verbatim) is not scored: the eval logs "not scored: N unrecorded reads: <tools>", the row carries `scored: false` and the tool names, and a tracked-only soft assertion named "replay coverage" states the unrecorded tools. Eve 0.54.2 rejects skipping after activity, so its verdict reflects the safety gates only; The loop counts only rows with `scored !== false`. Behavior checks and the claims judge do not run for uncovered replays. Its leak and raw-field checks still run and still fail it, because a leak is a real failure whatever the replay coverage. A case that is often not scored should move to `cases-pending/` for re-recording.
 
 ## Decisions awaiting Aaron
 

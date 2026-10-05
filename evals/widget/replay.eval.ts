@@ -12,6 +12,7 @@ import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
 import {
   answeredLane,
   gradeRun,
+  replayAssessment,
   stepUsage,
   unrecordedReads,
 } from "#lib/widget-graders.js";
@@ -181,12 +182,13 @@ async function gradeReplay(
   );
   // Input matching is replayRead's job; an unrecorded read is an input no recording matched.
   const unrecorded = unrecordedReads(results, recorded);
-  const scored = unrecorded.length === 0;
+  const { checks, outcome, scored } = replayAssessment(grades, unrecorded);
 
   // The row states coverage so partial measurements cannot look like full-run cost.
   t.log(
     `row: ${JSON.stringify({
       case: path,
+      replayOutcome: outcome,
       scored,
       ...(scored
         ? grades
@@ -208,18 +210,21 @@ async function gradeReplay(
       t.log(`cassette miss: ${JSON.stringify(miss).slice(0, 300)}`);
     }
   }
-  if (!scored) {
-    // A leak is a real failure whatever the replay coverage, and a failed gate outranks the skip.
-    t.check(grades.leaks, equals("pass")).label("leaks");
-    t.check(grades.rawFields, equals("pass")).label("rawFields");
-    const reason = `not scored: ${unrecorded.length} unrecorded reads: ${[...new Set(unrecorded)].join(", ")}`;
-    t.log(reason);
-    t.skip(reason);
-  }
-  for (const [check, grade] of Object.entries(grades)) {
+  for (const [check, grade] of Object.entries(checks)) {
     if (grade !== "not set") {
       t.check(grade, equals("pass")).label(check);
     }
+  }
+  if (!scored) {
+    const reason = `not scored: ${unrecorded.length} unrecorded reads: ${[...new Set(unrecorded)].join(", ")}`;
+    t.log(reason);
+    t.check(
+      unrecorded,
+      satisfies(() => false, reason)
+    )
+      .label("replay coverage")
+      .soft();
+    return;
   }
   await judgeClaims(t, run.outcome?.message ?? null, recorded, path);
   if (!session) {
