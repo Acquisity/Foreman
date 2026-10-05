@@ -163,6 +163,16 @@ test("mergeGold replaces a relabelled sample and keeps the rest", () => {
   const old = [labelled(allYes("a")), labelled(allYes("b"))];
   const next = labelled(record("a", ["no", "yes", "yes", "yes", "yes"]));
   assert.deepEqual(mergeGold(old, [next]), [old[1], next]);
+  const unmarked = toGold([allYes("a"), allYes("c")], new Map());
+  assert.deepEqual(mergeGold(old, unmarked), [...old, unmarked[1]]);
+});
+
+test("marks on unknown or repeated rows are refused", () => {
+  const records = [allYes("a")];
+  assert.throws(() => toGold(records, new Map([["a#typo", true]])));
+  const review = renderReview(records).replace(CAUSE_MARK, "$1 right |");
+  const row = review.split("\n").find((line) => line.startsWith("| a#cause"));
+  assert.throws(() => parseMarks(`${review}\n${row}`));
 });
 
 test("complete gold scoring counts agreement and flips per shared claim", () => {

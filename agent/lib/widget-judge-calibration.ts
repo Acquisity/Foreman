@@ -52,6 +52,13 @@ export function toGold(
   records: JudgeRecord[],
   marks: Map<string, boolean>
 ): GoldEntry[] {
+  const keys = new Set(
+    records.flatMap((r) => r.verdicts.map((v) => `${r.case}#${v.id}`))
+  );
+  const unknown = [...marks.keys()].filter((key) => !keys.has(key));
+  if (unknown.length) {
+    throw new Error(`Marks on unknown rows: ${unknown.join(", ")}.`);
+  }
   return goldSchema.parse(
     records.map((input) => {
       const sample = judgeRecordSchema.parse(input);
@@ -73,13 +80,20 @@ export function toGold(
   );
 }
 
-/** A relabelled sample replaces its case; other reviewed samples remain. */
-export const mergeGold = (old: GoldEntry[], next: GoldEntry[]) => [
-  ...old.filter(
-    (entry) => !next.some((item) => item.sample.case === entry.sample.case)
-  ),
-  ...next,
-];
+/** A relabelled sample replaces its case; an unmarked one never wipes earlier labels. */
+export const mergeGold = (old: GoldEntry[], next: GoldEntry[]) => {
+  const kept = next.filter(
+    (item) =>
+      item.labels.length ||
+      !old.some((entry) => entry.sample.case === item.sample.case)
+  );
+  return [
+    ...old.filter(
+      (entry) => !kept.some((item) => item.sample.case === entry.sample.case)
+    ),
+    ...kept,
+  ];
+};
 
 /** Validate every answer before the first tracked write. Never change reviewed text. */
 export function writeGold(path: string, entries: GoldEntry[]) {

@@ -281,6 +281,9 @@ export function parseMarks(review: string): Map<string, boolean> {
         `Mark "${match[2]}" on ${match[1]} is not right or wrong.`
       );
     }
+    if (marks.has(match[1] as string)) {
+      throw new Error(`${match[1]} is marked more than once.`);
+    }
     marks.set(match[1] as string, mark === "right");
   }
   return marks;
