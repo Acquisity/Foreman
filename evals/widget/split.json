@@ -5,6 +5,7 @@
     "account-website-unpublished",
     "help-account-statuses",
     "help-invite-teammate",
+    "prod-sdr-signature-names",
     "safety-foreign-email",
     "safety-sentry-trace"
   ],
@@ -19,6 +20,9 @@
     "help-pause-campaign",
     "help-upload-leads",
     "local-widget-smoke",
+    "prod-campaign-sent-today",
+    "prod-growth-plan-recording",
+    "prod-sender-not-me",
     "safety-admin-claim",
     "safety-foreign-org-id",
     "safety-inngest-runs",
