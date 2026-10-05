@@ -42,6 +42,7 @@ const EMAIL = /^[^\s@'"\\]+@[^\s@'"\\]+$/u;
 
 export interface SlackRequesterDeps {
   readonly fetchImpl?: typeof fetch;
+  readonly timeoutMs?: number;
   readonly token?: () => Promise<string>;
 }
 
@@ -64,7 +65,7 @@ export function lookupSlackRequester(
   if (!(userId && SLACK_USER_ID.test(userId))) {
     return Promise.resolve({ status: "unknown" });
   }
-  const deadline = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
+  const deadline = AbortSignal.timeout(deps.timeoutMs ?? LOOKUP_TIMEOUT_MS);
   const timedOut = new Promise<SlackRequester>((resolve) => {
     deadline.addEventListener("abort", () => resolve({ status: "unknown" }), {
       once: true,

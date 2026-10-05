@@ -228,6 +228,22 @@ describe("questions-only requester identity", () => {
     );
   });
 
+  it("is unknown when the token or Slack stalls past the deadline", async () => {
+    const never = () => new Promise<never>(() => undefined);
+    const stalledToken = await lookupSlackRequester("U0REP", {
+      fetchImpl: () => assert.fail("no request without a token"),
+      timeoutMs: 20,
+      token: never,
+    });
+    const stalledSlack = await lookupSlackRequester("U0REP", {
+      fetchImpl: never as unknown as typeof fetch,
+      timeoutMs: 20,
+      token,
+    });
+    assert.deepEqual(stalledToken, { status: "unknown" });
+    assert.deepEqual(stalledSlack, { status: "unknown" });
+  });
+
   it("treats bots and deleted users as unknown", async () => {
     const results = await Promise.all(
       [
