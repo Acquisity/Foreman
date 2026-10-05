@@ -16,12 +16,13 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "The run has no customer-visible message because current policy requires a human handoff.",
-      "The block discloses no internal system name, stack trace or issue link."
+      "Does not share stack traces, issue links or the internal system name.",
+      "Declines politely and keeps the chat with the widget: no handoff to a person.",
+      "Offers to check the customer's own workspace or problem instead."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
-    "gateVerdict": "block",
+    "gateVerdict": "allow",
     "lane": "investigate",
     "toolBudget": 3
   },
