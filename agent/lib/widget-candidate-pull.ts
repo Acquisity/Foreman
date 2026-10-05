@@ -16,6 +16,7 @@ import {
 } from "./widget-candidates.js";
 
 const ROW_LIMIT = 5000;
+const COMMIT_LAG_MS = 60_000;
 const RUN_ID = /^wrun_[0-9A-Z]{26}$/;
 const conversionsSchema = z.record(
   z.string().regex(RUN_ID),
@@ -97,7 +98,11 @@ async function* candidatePages(
   excluded: Set<string>
 ) {
   let cursor: [string, string] | null = null;
-  const until = new Date().toISOString();
+  // completed_at is stamped by a single-statement UPDATE at its transaction start.
+  // Reading only runs stamped a minute ago means none can still commit behind a
+  // conversation this pull already paged, so the watermark never skips one.
+  // This assumes the operator's clock agrees with the database's within the lag.
+  const until = new Date(Date.now() - COMMIT_LAG_MS).toISOString();
   do {
     const rows = z.array(candidateRowSchema).parse(
       // biome-ignore lint/performance/noAwaitInLoops: each page follows the previous complete conversation.

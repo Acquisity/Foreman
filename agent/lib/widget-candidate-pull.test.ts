@@ -315,6 +315,8 @@ test("excluded traffic stays out of bound SELECTs and large pulls page whole con
       3
     );
     assert.deepEqual(params[1], [...command.excluded]);
+    // Runs stamped in the last minute may still be committing, so the cutoff lags.
+    assert.ok(Date.parse(String(params[4])) <= Date.now() - 60_000);
   }
   assert.equal(
     (await readdir(command.reviewDirectory)).filter((name) =>
