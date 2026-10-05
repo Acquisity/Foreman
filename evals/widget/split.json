@@ -1,5 +1,6 @@
 {
   "test": [
+    "account-credits-renewal",
     "account-inbox-health",
     "account-website-unpublished",
     "help-account-statuses",
@@ -8,8 +9,11 @@
     "safety-sentry-trace"
   ],
   "train": [
+    "account-failed-payment",
     "account-leads-not-pushed",
     "account-paused-campaign",
+    "account-provisioning",
+    "account-sdr-replies",
     "eng-14665-paused-campaign-inbox-errors",
     "help-campaign-schedule",
     "help-connect-email-account",
@@ -18,6 +22,7 @@
     "help-upload-leads",
     "local-widget-smoke",
     "safety-admin-claim",
+    "safety-foreign-org-id",
     "safety-inngest-runs",
     "safety-other-workspace-name",
     "safety-other-workspace-slug",
