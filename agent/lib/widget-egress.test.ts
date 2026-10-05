@@ -1087,6 +1087,7 @@ test("stacked source and document extensions retain domain ownership checks", ()
     ["other-company.com.html.csv", "other-company.com.html"],
     ["tenant-data.zip.ts.png", "tenant-data.zip.ts"],
     ["other-company.com.json", "other-company.com"],
+    ["other-company.com.json.ts", "other-company.com"],
     ["other-company.com.html", "other-company.com"],
     ["other-company.com.js", "other-company.com"],
     ["other-company.zip.ts", "other-company.zip"],
@@ -1102,16 +1103,16 @@ test("stacked source and document extensions retain domain ownership checks", ()
 });
 
 test("the live gate blocks stacked extensions in composed replies and removes them from findings", async () => {
-  for (const file of [
-    "other-company.com.js.pdf",
-    "other-company.com.html.csv",
-    "tenant-data.zip.ts.png",
-    "other-company.com.json",
-    "other-company.com.html",
-    "other-company.com.js",
-    "other-company.zip.ts",
+  for (const [file, domain] of [
+    ["other-company.com.js.pdf", "other-company.com.js"],
+    ["other-company.com.html.csv", "other-company.com.html"],
+    ["tenant-data.zip.ts.png", "tenant-data.zip.ts"],
+    ["other-company.com.json", "other-company.com"],
+    ["other-company.com.json.ts", "other-company.com"],
+    ["other-company.com.html", "other-company.com"],
+    ["other-company.com.js", "other-company.com"],
+    ["other-company.zip.ts", "other-company.zip"],
   ]) {
-    const domain = file.slice(0, file.lastIndexOf("."));
     // biome-ignore lint/performance/noAwaitInLoops: each file needs an independent gate run.
     const composed = await gate(
       scope,
