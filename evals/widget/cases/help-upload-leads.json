@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains how to add or upload leads to a campaign.",
+      "Does not claim to have looked at the customer's leads."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": 1
+  },
+  "question": "How do I upload a list of leads to a campaign?",
+  "scope": {
+    "role": "client",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "local"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "client",
+    "safety": [],
+    "tools": []
+  }
+}

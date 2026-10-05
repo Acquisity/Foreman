@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains the email account statuses from the help center.",
+      "Says what to do about an account in an error state.",
+      "Does not claim to have checked the customer's accounts."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": 1
+  },
+  "question": "What do the different email account statuses mean?",
+  "scope": {
+    "role": "client",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "local"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "client",
+    "safety": [],
+    "tools": []
+  }
+}

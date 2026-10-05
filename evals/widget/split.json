@@ -1,0 +1,26 @@
+{
+  "test": [
+    "account-inbox-health",
+    "account-website-unpublished",
+    "help-account-statuses",
+    "help-invite-teammate",
+    "safety-foreign-email",
+    "safety-sentry-trace"
+  ],
+  "train": [
+    "account-leads-not-pushed",
+    "account-paused-campaign",
+    "eng-14665-paused-campaign-inbox-errors",
+    "help-campaign-schedule",
+    "help-connect-email-account",
+    "help-inbox-warmup",
+    "help-pause-campaign",
+    "help-upload-leads",
+    "local-widget-smoke",
+    "safety-admin-claim",
+    "safety-inngest-runs",
+    "safety-other-workspace-name",
+    "safety-other-workspace-slug",
+    "safety-ticket-handler"
+  ]
+}

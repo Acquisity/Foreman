@@ -115,13 +115,13 @@
           "totalSendingAccounts": 3
         },
         "nextAfter": null,
-        "observedAt": "2026-10-02T19:54:25.135Z",
+        "observedAt": "2026-10-05T00:42:49.809Z",
         "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
         "status": "ok",
         "workspace": "Aaron Fraga's Workspace"
       },
-      "requestedAt": "2026-10-02T19:53:54.776Z",
-      "resultAt": "2026-10-02T19:54:26.903Z",
+      "requestedAt": "2026-10-05T00:42:58.125Z",
+      "resultAt": "2026-10-05T00:43:00.577Z",
       "status": "completed",
       "tool": "widget_outreach_health"
     },
@@ -160,9 +160,9 @@
                 "nextAfterInboxId": null
               },
               "dailyMetrics": [],
-              "endDate": "2026-10-02",
+              "endDate": "2026-10-05",
               "overview": null,
-              "startDate": "2026-09-26"
+              "startDate": "2026-09-29"
             },
             "id": "00000000-0000-4000-8000-000000000001",
             "leadsNotPushedCount": 0,
@@ -171,7 +171,7 @@
               "campaignDailyLimit": 105,
               "notSendingReason": null,
               "notSendingReasonCode": null,
-              "observedAt": "2026-10-02T19:54:45.202Z",
+              "observedAt": "2026-10-05T00:43:21.732Z",
               "statusCode": 2,
               "updatedAt": "2026-08-14T13:51:54.930Z"
             },
@@ -212,13 +212,13 @@
           "totalSendingAccounts": 3
         },
         "nextAfter": null,
-        "observedAt": "2026-10-02T19:54:31.003Z",
+        "observedAt": "2026-10-05T00:42:54.458Z",
         "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
         "status": "ok",
         "workspace": "Aaron Fraga's Workspace"
       },
-      "requestedAt": "2026-10-02T19:54:29.277Z",
-      "resultAt": "2026-10-02T19:54:45.203Z",
+      "requestedAt": "2026-10-05T00:43:02.899Z",
+      "resultAt": "2026-10-05T00:43:21.732Z",
       "status": "completed",
       "tool": "widget_outreach_health"
     },
@@ -253,7 +253,7 @@
           "isActive": true,
           "updatedAt": "2026-06-07T12:17:50.389Z"
         },
-        "observedAt": "2026-10-02T19:54:48.527Z",
+        "observedAt": "2026-10-05T00:43:14.287Z",
         "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
         "status": "ok",
         "webhook": {
@@ -264,14 +264,14 @@
         },
         "workspace": "Aaron Fraga's Workspace"
       },
-      "requestedAt": "2026-10-02T19:54:46.979Z",
-      "resultAt": "2026-10-02T19:55:01.451Z",
+      "requestedAt": "2026-10-05T00:43:22.939Z",
+      "resultAt": "2026-10-05T00:43:41.854Z",
       "status": "completed",
       "tool": "widget_inbox_health"
     },
     {
       "input": {
-        "query": "campaign paused not sending"
+        "query": "resume paused campaign"
       },
       "output": {
         "articles": [
@@ -286,11 +286,6 @@
             "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign"
           },
           {
-            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
-            "title": "Managing Campaigns",
-            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
-          },
-          {
             "path": "apps/web/content/docs/cold-email-agent/concepts/campaign-states.mdx",
             "title": "Campaign states",
             "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/campaign-states"
@@ -299,17 +294,22 @@
             "path": "apps/web/content/docs/cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments.mdx",
             "title": "How do I pause a campaign without stopping my subscription payments?",
             "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
+            "title": "Managing Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
           }
         ]
       },
-      "requestedAt": "2026-10-02T19:55:06.023Z",
-      "resultAt": "2026-10-02T19:55:06.935Z",
+      "requestedAt": "2026-10-05T00:43:46.455Z",
+      "resultAt": "2026-10-05T00:43:47.667Z",
       "status": "completed",
       "tool": "widget_help_article"
     },
     {
       "input": {
-        "query": "sending account connection error"
+        "query": "sending account connection error fix"
       },
       "output": {
         "articles": [
@@ -319,45 +319,31 @@
             "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
           },
           {
-            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
-            "title": "Email Accounts & Domains",
-            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
-          },
-          {
             "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error.mdx",
             "title": "How do I fix an account with an error?",
             "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
           },
           {
-            "path": "apps/web/content/docs/account-settings.mdx",
-            "title": "Manage Your Personal Account",
-            "url": "https://app.acquisity.ai/docs/account-settings"
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
           },
           {
-            "path": "apps/web/content/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error.mdx",
-            "title": "The Growth Plan Creator shows an Application Error?",
-            "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error"
+            "path": "apps/web/content/docs/account-settings/faq/domain-2.example",
+            "title": "Can I buy a single domain instead of the fixed bundle?",
+            "url": "https://app.acquisity.ai/docs/account-settings/faq/can-i-buy-a-single-domain-instead-of-the-fixed-bundle"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-3.example",
+            "title": "DFY warmup & reconnect errors",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors"
           }
         ]
       },
-      "requestedAt": "2026-10-02T19:55:06.026Z",
-      "resultAt": "2026-10-02T19:55:06.997Z",
+      "requestedAt": "2026-10-05T00:43:46.457Z",
+      "resultAt": "2026-10-05T00:43:48.309Z",
       "status": "completed",
       "tool": "widget_help_article"
-    },
-    {
-      "input": {
-        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
-      },
-      "output": {
-        "content": "Click on the account to open its settings, then click **Reconnect**. This triggers a re-authentication process (OAuth reconnect). It can take up to 48 hours to fully resolve.\n\n## Related\n\n- [DFY warmup & reconnect errors](/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors)\n- [What do the account statuses mean?](/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)",
-        "title": "How do I fix an account with an error?",
-        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
-      },
-      "requestedAt": "2026-10-02T19:55:09.518Z",
-      "resultAt": "2026-10-02T19:55:09.603Z",
-      "status": "completed",
-      "tool": "widget_read_help_article"
     },
     {
       "input": {
@@ -368,8 +354,22 @@
         "title": "Campaign states",
         "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/campaign-states"
       },
-      "requestedAt": "2026-10-02T19:55:09.531Z",
-      "resultAt": "2026-10-02T19:55:09.600Z",
+      "requestedAt": "2026-10-05T00:43:50.304Z",
+      "resultAt": "2026-10-05T00:43:50.472Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "output": {
+        "content": "Click on the account to open its settings, then click **Reconnect**. This triggers a re-authentication process (OAuth reconnect). It can take up to 48 hours to fully resolve.\n\n## Related\n\n- [DFY warmup & reconnect errors](/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors)\n- [What do the account statuses mean?](/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)",
+        "title": "How do I fix an account with an error?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "requestedAt": "2026-10-05T00:43:50.305Z",
+      "resultAt": "2026-10-05T00:43:50.465Z",
       "status": "completed",
       "tool": "widget_read_help_article"
     }
@@ -388,14 +388,14 @@
     "lane": "investigate",
     "toolBudget": 8
   },
-  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ncan you look into why my Name 1 campaign isnt sending?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how can i add more inboxes in my campaign?\nSupport: To add more inboxes to your campaign, go to your campaign, click Options, and use the Add or remove accounts button in the Email accounts section to change your sending pool.",
+  "question": "Why isn't my Name 1 campaign sending?",
   "scope": {
     "role": "owner",
     "workspace": "aaron-fragas-workspace-wMUMT"
   },
   "source": {
-    "runId": "wrun_41M3Z2W85E0GVAF25PYS9Z5GAX",
-    "target": "production"
+    "runId": "wrun_01M44R7108N9V77SSPE3NKMNB5",
+    "target": "local"
   },
   "tags": {
     "lane": "investigate",
