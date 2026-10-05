@@ -101,6 +101,15 @@ const LINEAR_REF = /^ENG-\d+$/;
 const isInternalLink = (value: string) =>
   LINEAR_REF.test(value) || value.startsWith("http");
 const OPS_ID = /^(?:[a-z]+_[a-z0-9]+|01[0-9a-z]{24})$/;
+/**
+ * Provider record ids the egress scan does not know (billing: cus_prod_..., cus_ent_...,
+ * py_..., pr_..., fe_..., ent_...): a short lowercase prefix, then an opaque tail of 10+
+ * characters with a digit or capital, so snake_case words never match. Input is bounded
+ * by the traversal; the pattern has no nested quantifiers. A case's own source run id
+ * (wrun_...) is deliberate provenance and stays.
+ */
+const PROVIDER_ID =
+  /(?<![A-Za-z0-9_])(?!wrun_)[a-z]{2,5}(?:_[a-z]{2,6})?_(?=[A-Za-z0-9]{0,63}[0-9A-Z])[A-Za-z0-9]{10,64}(?![A-Za-z0-9_])/g;
 const PLACEHOLDER =
   /^(?:person-\d+@domain-\d+\.example|(?:domain-\d+|internal)\.example|00000000-0000-4000-8000-\d{12}|workspace-\d+)$/;
 const FIXTURE_VALUES = new Set(
@@ -323,8 +332,12 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   for (const slug of candidates.slugs) {
     add(slug, () => `workspace-${next("workspace")}`);
   }
-  for (const id of internal.filter((value) => OPS_ID.test(value))) {
-    const prefix = id.includes("_") ? id.split("_")[0] : "ulid";
+  const opaqueIds = new Set([
+    ...(JSON.stringify(draft).match(PROVIDER_ID) ?? []),
+    ...internal.filter((value) => OPS_ID.test(value)),
+  ]);
+  for (const id of opaqueIds) {
+    const prefix = id.includes("_") ? id.slice(0, id.lastIndexOf("_")) : "ulid";
     add(id, () => `${prefix}_x${next("ops")}`);
   }
   // Internal ticket refs and internal links (a filed ticket's Linear URL) are not customer data,
@@ -379,6 +392,7 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
     ...candidates.slugs,
     ...(candidates.domains ?? []),
     ...internal.filter((value) => OPS_ID.test(value)),
+    ...(text.match(PROVIDER_ID) ?? []),
   ].filter((value) => !isSafeIdentifier(value));
   if (originals.length) {
     mapStrings(scrubbed, (value) => {

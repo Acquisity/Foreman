@@ -426,3 +426,25 @@ test("a fixture value masks an original only as a whole word", () => {
   };
   assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
 });
+
+test("provider record ids are replaced consistently and never saved", () => {
+  const payment = "py_3FakePaymentABC123";
+  const entitlement = "cus_ent_9xQfakeEntitlement42";
+  const text = serializeCase(
+    scrubCase(
+      billing({
+        entitlements: [{ feature_id: "website_credit", id: entitlement }],
+        payments: [{ again: payment, id: payment }],
+      }),
+      scope
+    )
+  );
+  assert.ok(!text.includes(payment));
+  assert.ok(!text.includes(entitlement));
+  assert.ok(text.includes("website_credit"));
+  const saved = JSON.parse(text).cassette[0].output;
+  assert.equal(saved.payments[0].id, saved.payments[0].again);
+  const leaked = scrubCase(rawCase({ ok: true }, "Why?"), scope);
+  leaked.case.question = `Refund ${payment}`;
+  assert.throws(() => serializeCase(leaked), NOT_SAVED);
+});
