@@ -62,6 +62,7 @@ const WRITE_TOOL_NAMES = new Set([
   "save_user_preferences",
   "clear_user_preferences",
   "rebuild_warm_snapshot",
+  "run_eval",
   "bash",
   "write_file",
 ]);

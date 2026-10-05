@@ -70,6 +70,7 @@ const GATED_TOOLS = [
   "checkout_branch",
   "push_branch",
   "read_repository_knowledge",
+  "run_eval",
   "update_repository_knowledge",
 ];
 

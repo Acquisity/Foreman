@@ -61,7 +61,8 @@ export interface JevOptions {
   token?: string;
 }
 
-const resolveToken = async (): Promise<string> =>
+/** The gateway credential the server process authenticates with. */
+export const resolveToken = async (): Promise<string> =>
   process.env.AI_GATEWAY_API_KEY || (await getVercelOidcToken());
 
 /** Rejects when `signal` aborts first, so a stalled step still ends in time. */
