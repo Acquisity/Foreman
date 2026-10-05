@@ -82,6 +82,10 @@ const ORDINARY_SLACK_CATALOG_CEILING = 0.75;
 // The repository root, so a fixture's dynamic tool resolves through the same
 // bundled module map the repository's own manifest does.
 const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const REPLAY_CASE = join(
+  APP_ROOT,
+  "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json"
+);
 
 const APPLICATION_OWNER = { kind: "application" } as const;
 const BROWSER_OWNER = {
@@ -758,15 +762,20 @@ describe("widget replay", () => {
       )
         .flat()
         .sort((left, right) => left.name.localeCompare(right.name));
+    const previous = process.env.WIDGET_REPLAY_CASE;
+    Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
     const live = await resolveAll("live");
-    process.env.WIDGET_REPLAY_CASE =
-      "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
+    process.env.WIDGET_REPLAY_CASE = REPLAY_CASE;
     try {
       // Eve's own admission drops a tool whose callbacks are not stamped, so
       // an identical list proves every inline replay execute was admitted.
       assert.deepEqual(await resolveAll("replay"), live);
     } finally {
-      Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+      if (previous === undefined) {
+        Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+      } else {
+        process.env.WIDGET_REPLAY_CASE = previous;
+      }
     }
     const names = live.map((tool) => tool.name);
     for (const name of [
@@ -801,12 +810,7 @@ describe("recording replay request", () => {
       "./eve-dynamic-tools.js"
     );
     const recorded = widgetCaseSchema.parse(
-      JSON.parse(
-        readFileSync(
-          "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json",
-          "utf8"
-        )
-      )
+      JSON.parse(readFileSync(REPLAY_CASE, "utf8"))
     );
     assert.equal(replayRecording(recorded), undefined);
     recorded.cassette.push({
