@@ -229,3 +229,15 @@ test("rows parse from Postgres shapes and the review carries question, answer, s
   assert.match(review, ANSWER);
   assert.match(review, new RegExp(`- kb_miss: ${missed.id}`));
 });
+
+test("a carriage return in customer text stays inside the quote", () => {
+  const review = renderReview(
+    flagConversations(
+      [{ ...withReason("kb_miss"), question: "Hi\r## Spoofed\r\nthere" }],
+      { excluded: none, isNew: all }
+    ),
+    "2026-10-05T20:00:00.000Z"
+  );
+  assert.ok(review.includes("> Hi\n> ## Spoofed\n> there"));
+  assert.ok(!review.includes("\r"));
+});

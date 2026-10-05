@@ -218,10 +218,11 @@ export function nextPullState(
 export const pendingCaseName = (sessionId: string) =>
   `candidate-${sessionId.toLowerCase().replace("_", "-")}`;
 
+const LINE_BREAK = /\r\n?|\n/;
 const quote = (text: string) =>
   text
     .trim()
-    .split("\n")
+    .split(LINE_BREAK)
     .map((line) => `> ${line}`)
     .join("\n");
 
