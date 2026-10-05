@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
+import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
 
@@ -8,7 +9,7 @@ const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
 
 export default defineTool({
-  approval: () => "not-applicable",
+  approval: questionsOnlyPolicy,
   description:
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +

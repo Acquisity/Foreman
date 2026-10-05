@@ -121,6 +121,40 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
 }
 
 /**
+ * Auth attribute marking a Slack session from a questions-only channel.
+ *
+ * @remarks
+ * Stamped by the Slack channel at dispatch, alongside the intake-only stamp.
+ * A tag in those channels gets an answer in the thread and never Linear work:
+ * `questionsOnlyPolicy` in `agent/lib/github/approval.ts` denies the raw
+ * Executor gateway and the Linear-writing root tools, and the typed Executor
+ * client refuses Linear mutations, so the boundary never depends on the model
+ * honoring injected instructions. Bugs go through the channel's intake form.
+ */
+export const QUESTIONS_ONLY_ATTRIBUTE = "questionsOnly";
+
+/**
+ * Returns a copy of `auth` carrying the {@link QUESTIONS_ONLY_ATTRIBUTE} stamp.
+ */
+export function stampQuestionsOnly(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [QUESTIONS_ONLY_ATTRIBUTE]: "true" },
+  };
+}
+
+/**
+ * Whether the dispatching channel marked this session questions-only.
+ */
+export function isQuestionsOnly(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[QUESTIONS_ONLY_ATTRIBUTE] === "true";
+}
+
+/**
  * Auth attribute marking a session authorized to read and write investigation
  * memory.
  *

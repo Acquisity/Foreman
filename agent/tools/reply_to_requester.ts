@@ -1,11 +1,12 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
+import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { replyToRequester } from "#lib/requester-reply.js";
 
 export default defineTool({
-  approval: () => "not-applicable",
+  approval: questionsOnlyPolicy,
   description:
     "Reply to the requester in the thread behind an intake ticket (a Slack thread, or the support team's notes on an Acquisity inbox conversation), as Acquisity Foreman. Use it only in a Linear session; in a Slack conversation, answer in the thread directly instead. Post exactly one message: your answer, or your questions when you need more from them. " +
     "It refuses a second post until the requester replies, and fails when the issue has no requester thread. On a follow-up, Jev decides whether their reply needs an answer; posted false with an outcome means it posted nothing, so follow its reason and do not post the message anywhere else. Never put the investigation itself here; that belongs in the document.",
