@@ -591,7 +591,9 @@ test("step sends, first-touch counts and step delays round-trip through the outp
   assert.deepEqual(result.campaigns[0].diagnostics, diagnostics);
   assert.ok(result.caveats.length <= 6);
   assert.ok(
-    result.caveats.some((text) => text.includes("no saved numeric-step evidence of follow-up sends"))
+    result.caveats.some((text) =>
+      text.includes("no saved numeric-step evidence of follow-up sends")
+    )
   );
 
   const list = parseWidgetOutreachHealthEvidence(envelope([row]), scope);
