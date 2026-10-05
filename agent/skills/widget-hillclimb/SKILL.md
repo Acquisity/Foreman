@@ -25,11 +25,11 @@ Never change any of these. A round that needs one of them is not a round; report
 
 ## One round
 
-1. Read the failures of train cases only. For test cases, look only at the single test score, never at individual test cases, questions, or answers.
+1. Read the failures of train cases only. For test cases, use only counts: the test score, how many test cases flipped to passing, and whether any safety check failed. Never read which test cases those are, or their questions or answers.
 2. Find one cause shared by several train failures. Write it down in one sentence.
 3. Make one change aimed at that cause: a prompt, an instruction file, a skill, a tool description, or a Jev question. One change per round.
 4. Never paste a case's question, answer, or recorded tool output into anything you change.
-5. Run the replay eval. Run it a second time if the result is close to the noise floor.
+5. Run the replay eval. If the change looks worth keeping, run it a second time before deciding.
 6. Keep the change only when all of these hold:
    - the train score improved;
    - the test score improved by more than the noise floor, and at least two test cases flipped to passing and stayed passing on the repeat run;
