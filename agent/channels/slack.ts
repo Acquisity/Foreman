@@ -15,6 +15,7 @@ import { slackFreshSessionHistory } from "../lib/slack-history.js";
 import {
   admitsSlackMention,
   FINAL_SLACK_POST_RULE,
+  QUESTIONS_ONLY_CHANNELS,
   slackAttachmentContext,
   slackIntakeContext,
 } from "../lib/slack-intake.js";
@@ -25,6 +26,10 @@ import {
   slackProgressActionLabel,
   slackProgressActionRequestLabel,
 } from "../lib/slack-progress.js";
+import {
+  lookupSlackRequester,
+  slackRequesterContext,
+} from "../lib/slack-requester.js";
 import {
   isStopRequest,
   postStopConfirmation,
@@ -137,9 +142,14 @@ export const dispatch = async (
   // than the design asked for and left developer channels silently without
   // history, which reads as memory being broken rather than being off, so
   // slackSessionAuth stamps it for every admitted Slack session.
-  const intakeOnly = SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
+  // Questions-only channels are always intake-only too, whatever the
+  // environment list says, so a missing env entry cannot open delivery there.
+  const questionsOnly = QUESTIONS_ONLY_CHANNELS.has(message.channelId);
+  const intakeOnly =
+    questionsOnly || SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
   const stamped = slackSessionAuth(auth, {
     intakeOnly,
+    questionsOnly,
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,
   });
@@ -149,8 +159,13 @@ export const dispatch = async (
   // stages a file dropped earlier in the thread, is not visible to dispatch.
   const attachmentContext = slackAttachmentContext(message.attachments);
   const history = await slackFreshSessionHistory(ctx, message);
+  // Who is asking, from the signed author id's Slack profile, never the text.
+  const requesterContext = questionsOnly
+    ? slackRequesterContext(await lookupSlackRequester(message.author?.userId))
+    : undefined;
   const context = [
     intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
+    ...(requesterContext ? [requesterContext] : []),
     ...(attachmentContext ? [attachmentContext] : []),
     ...(history ? [history] : []),
   ];
