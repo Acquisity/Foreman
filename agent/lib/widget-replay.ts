@@ -92,7 +92,7 @@ export function replayCase(): WidgetCase {
   return loaded.case;
 }
 
-/** Inputs compare with object keys sorted at every depth and undefined fields dropped. */
+/** Inputs compare with object keys sorted at every depth and null or undefined fields dropped, so `{}` and `{ id: null }` are one call. */
 const normalize = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map(normalize);
@@ -100,7 +100,7 @@ const normalize = (value: unknown): unknown => {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .filter(([, child]) => child !== undefined)
+        .filter(([, child]) => child !== undefined && child !== null)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, child]) => [key, normalize(child)])
     );

@@ -55,6 +55,8 @@ test(
   withCase(() => {
     const [first] = recorded.cassette;
     assert.deepEqual(replayRead(first.tool, first.input), first.output);
+    // Recorded with campaignId: null; an omitted field is the same call.
+    assert.deepEqual(replayRead(first.tool, {}), first.output);
     const health = recorded.cassette.find(
       (entry: { tool: string }) => entry.tool === "widget_inbox_health"
     );
