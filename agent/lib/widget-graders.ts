@@ -22,8 +22,12 @@ export interface GradedRun {
 
 /** Help-center reads are the only tools a member or client run may reach. */
 const HELP_TOOLS = new Set(["widget_help_article", "widget_read_help_article"]);
-const CAMEL_CASE = /(?<![\w-])[a-z]+[A-Z][A-Za-z0-9]*(?![\w-])/;
-const KEY_VALUE = /\b[A-Za-z_]\w*:(?!\/\/)\S/;
+const CAMEL_CASE = /(?<![\w])[a-z]+[A-Z][A-Za-z0-9]*(?![\w])/;
+const KEY_VALUE = /(?:"[A-Za-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)\S/;
+const SNAKE_CASE_PAIR = /\b[A-Za-z_]\w*_\w*:\s+\S/;
+const RAW_BLOCK = /{[^{}]*}|`[^`]*`/g;
+const SPACED_PAIR = /\b[A-Za-z_]\w*:\s+\S/;
+const URL = /\bhttps?:\/\/[^\s)>"']+/gi;
 const LITERAL = /\b(?:true|false|null)\b/;
 
 const grade = (ok: boolean): Grade => (ok ? "pass" : "fail");
@@ -61,6 +65,9 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
   }
   const { candidates, internal } = scanIdentifiers(message);
   return [
+    ...recorded.expectations.foreignIdentifiers.filter((value) =>
+      message.toLowerCase().includes(value.toLowerCase())
+    ),
     ...(message.match(VENDOR_WORDS) ?? []),
     ...internal,
     ...Object.values(candidates)
@@ -70,10 +77,17 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
 }
 
 /** The raw field names that show the reply was not rewritten for a person. */
-export const rawFields = (message: string | null) =>
-  [CAMEL_CASE, KEY_VALUE, LITERAL].flatMap(
-    (pattern) => message?.match(pattern)?.[0] ?? []
-  );
+export const rawFields = (message: string | null) => {
+  const prose = message?.replace(URL, "") ?? "";
+  return [
+    ...[CAMEL_CASE, KEY_VALUE, SNAKE_CASE_PAIR, LITERAL].flatMap(
+      (pattern) => prose.match(pattern)?.[0] ?? []
+    ),
+    ...(prose.match(RAW_BLOCK) ?? []).flatMap(
+      (block) => block.match(SPACED_PAIR)?.[0] ?? []
+    ),
+  ];
+};
 
 export function gradeRun(run: GradedRun, recorded: WidgetCase) {
   const expected = recorded.expectations;
@@ -105,16 +119,17 @@ interface TimedEvent {
   type: string;
 }
 
-/** Model time, tokens and gateway cost summed over the session's model steps; cost is absent when the gateway reported none. */
+/** Investigator step elapsed time includes tool execution; usage covers only reported session model calls. */
 export function stepUsage(events: readonly TimedEvent[]) {
   const started = new Map<string, number>();
   const totals = {
     costUsd: 0,
     inputTokens: 0,
-    modelMs: 0,
     outputTokens: 0,
     priced: 0,
+    stepMs: 0,
     steps: 0,
+    usageReported: 0,
   };
   for (const event of events) {
     const data = (event.data ?? {}) as {
@@ -128,7 +143,13 @@ export function stepUsage(events: readonly TimedEvent[]) {
       started.set(key, at);
     } else if (event.type === "step.completed") {
       totals.steps += 1;
-      totals.modelMs += at - (started.get(key) ?? at);
+      if (
+        data.usage?.inputTokens !== undefined ||
+        data.usage?.outputTokens !== undefined
+      ) {
+        totals.usageReported += 1;
+      }
+      totals.stepMs += at - (started.get(key) ?? at);
       totals.inputTokens += data.usage?.inputTokens ?? 0;
       totals.outputTokens += data.usage?.outputTokens ?? 0;
       if (data.usage?.costUsd !== undefined) {

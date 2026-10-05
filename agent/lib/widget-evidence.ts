@@ -143,7 +143,7 @@ export async function resolveOwnedIdentifiers(
   signal: AbortSignal = AbortSignal.timeout(50_000)
 ): Promise<OwnedIdentifiers> {
   if (isReplayActive()) {
-    return replayOwnership(candidates);
+    return replayOwnership(candidates, scope.replayCaseId);
   }
   const query = buildOwnershipQuery(scope, candidates);
   const data = await readWidgetOwnership(query, signal);

@@ -17,6 +17,11 @@ const shape = {
     .string()
     .regex(/^[A-Za-z0-9_-]{1,200}$/)
     .optional(),
+  // Only the replay identity verifier stamps this, never the production app.
+  replayCaseId: z
+    .string()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/)
+    .optional(),
   role: z.enum(["owner", "admin", "member", "client"]),
   // "inbox" marks a run a teammate started from the support inbox: its result is
   // team-only and it never becomes context for a customer reply.
@@ -77,6 +82,7 @@ export function sameWidgetOwner(a: WidgetContext, b: WidgetContext) {
     a.organizationId === b.organizationId &&
     a.conversationId === b.conversationId &&
     a.role === b.role &&
+    a.replayCaseId === b.replayCaseId &&
     a.partnerId === b.partnerId &&
     a.organizationSlug === b.organizationSlug
   );

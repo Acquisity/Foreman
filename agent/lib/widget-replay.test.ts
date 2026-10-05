@@ -16,11 +16,13 @@ import {
   replayCase,
   replayRead,
 } from "./widget-replay.js";
+import { widgetAuth } from "./widget-scope.js";
 
 const CASE = "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
 const recorded = JSON.parse(readFileSync(CASE, "utf8"));
 const PRODUCTION = /not allowed on production/;
 const FIXTURE_ONLY = /fixture workspace only/;
+const INVALID_CASE = /Invalid replay case id/;
 
 const withCase = (run: () => Promise<void> | void) => async () => {
   process.env.WIDGET_REPLAY_CASE = CASE;
@@ -43,6 +45,10 @@ test("refuses the replay flag on production only", () => {
   );
   assertReplayAllowed({ VERCEL_ENV: "preview", WIDGET_REPLAY_CASE: CASE });
   assertReplayAllowed({ VERCEL_ENV: "production" });
+  assert.throws(
+    () => assertReplayAllowed({ VERCEL_ENV: "production", WIDGET_REPLAY: "1" }),
+    PRODUCTION
+  );
 });
 
 test(
@@ -257,3 +263,63 @@ test(
     }
   })
 );
+
+test("request-selected cases stay isolated through session auth and ownership", async () => {
+  process.env.WIDGET_REPLAY = "1";
+  try {
+    const ids = [
+      "local-widget-smoke",
+      "eng-14665-paused-campaign-inbox-errors",
+    ];
+    const scopes = await Promise.all(
+      ids.map((replayCaseId) =>
+        verifyWidgetContext(
+          {
+            conversationId: fixture.conversationId,
+            organizationId: fixture.organizationId,
+            replayCaseId,
+            userToken: "replay",
+          },
+          () => Promise.reject(new Error("app contacted"))
+        )
+      )
+    );
+    const replayed = replayable(
+      "widget_outreach_health",
+      defineTool({
+        description: "Live read.",
+        execute: () => {
+          throw new Error("live provider called");
+        },
+        inputSchema: z.strictObject({ campaignId: z.string().nullable() }),
+      })
+    );
+    await Promise.all(
+      scopes.map(async (scope, index) => {
+        assert.equal(scope.replayCaseId, ids[index]);
+        const entry = replayCase(ids[index]).cassette.find(
+          (call) => call.tool === "widget_outreach_health"
+        );
+        assert.ok(entry);
+        assert.deepEqual(
+          await replayed.execute(
+            entry.input as never,
+            { session: { auth: { initiator: widgetAuth(scope) } } } as never
+          ),
+          entry.output
+        );
+      })
+    );
+    await assert.rejects(
+      verifyWidgetContext({
+        conversationId: fixture.conversationId,
+        organizationId: fixture.organizationId,
+        replayCaseId: "../../secret",
+        userToken: "replay",
+      }),
+      INVALID_CASE
+    );
+  } finally {
+    Reflect.deleteProperty(process.env, "WIDGET_REPLAY");
+  }
+});

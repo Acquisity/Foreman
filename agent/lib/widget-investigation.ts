@@ -1530,6 +1530,7 @@ export async function receiveWidgetMessage(
     scope = await verifyContext({
       conversationId: input.conversation_id,
       organizationId: input.organization_id,
+      replayCaseId: request.headers.get("x-widget-replay-case"),
       signal: request.signal,
       staff: input.staff,
       userToken,

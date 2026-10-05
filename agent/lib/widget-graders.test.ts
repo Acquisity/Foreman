@@ -158,7 +158,7 @@ test("tool calls stay at or under the budget", () => {
   );
 });
 
-test("step usage sums model time, tokens and reported cost", () => {
+test("step usage sums investigator step time, tokens and reported cost", () => {
   const step = (type: string, at: string, usage?: object) => ({
     data: { stepIndex: 0, turnId: "t", usage },
     meta: { at },
@@ -176,10 +176,68 @@ test("step usage sums model time, tokens and reported cost", () => {
     {
       costUsd: 0.01,
       inputTokens: 100,
-      modelMs: 2500,
       outputTokens: 20,
       priced: 1,
+      stepMs: 2500,
       steps: 1,
+      usageReported: 1,
     }
+  );
+});
+
+test("foreign identifiers listed in expectations fail even when present in the cassette", () => {
+  const foreign = "00000000-0000-4000-8000-000000000001";
+  const message = `Campaign ${foreign} is paused.`;
+  assert.equal(gradeRun(run({ message }), recorded).leaks, "pass");
+  assert.equal(
+    gradeRun(run({ message }), expecting({ foreignIdentifiers: [foreign] }))
+      .leaks,
+    "fail"
+  );
+});
+
+test("raw-field checks cover quoted keys, spaced pairs and hyphen-adjacent camelCase", () => {
+  for (const message of [
+    '{"status": "error"}',
+    "{status: error}",
+    "dailyLimit: 30",
+    "status_code: 500",
+    "`status: error`",
+    "dailyLimit-setting is reached.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "fail",
+      message
+    );
+  }
+  for (const message of [
+    "Your campaign is paused. Open Campaign Options.",
+    "What you can do: check the campaign status.",
+    "Next step: open Settings.",
+    "Note: reconnect your sending accounts.",
+    "See https://help.acquisity.ai/campaigns for the steps.",
+    "Open https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "pass",
+      message
+    );
+  }
+});
+
+test("missing step usage is distinguishable from reported zero tokens", () => {
+  const event = {
+    data: {},
+    meta: { at: "2026-10-04T00:00:00.000Z" },
+    type: "step.completed",
+  };
+  assert.equal(stepUsage([event]).usageReported, 0);
+  assert.equal(
+    stepUsage([
+      { ...event, data: { usage: { inputTokens: 0, outputTokens: 0 } } },
+    ]).usageReported,
+    1
   );
 });

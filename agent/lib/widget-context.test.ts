@@ -109,3 +109,20 @@ test("caller-authored identifiers never reach the app", async (context) => {
   );
   assert.equal(requests.length, 0);
 });
+
+test("the replay case selector is ignored when replay is disabled", async (context) => {
+  configure(context);
+  const { request, requests } = requester(
+    Response.json({ ...appContext, replayCaseId: "local-widget-smoke" })
+  );
+  const scope = await verifyWidgetContext(
+    { conversationId, organizationId, replayCaseId: "../../secret", userToken },
+    request
+  );
+  assert.equal(requests.length, 1);
+  assert.equal(scope.replayCaseId, undefined);
+  assert.equal(
+    "replayCaseId" in JSON.parse(String(requests[0].init?.body)),
+    false
+  );
+});
