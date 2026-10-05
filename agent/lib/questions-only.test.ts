@@ -34,6 +34,7 @@ const TEXT_IS_NOT_IDENTITY = /never the requester's identity/u;
 const INTAKE_LINEAR_WRITES = /create or update Linear records/u;
 const GENERIC_NEW_ISSUE = /Create exactly one unassigned Linear issue/u;
 const REP_EMAIL = /rep@example\.com/u;
+const CODE_OVER_HELP_CENTER = /help center covers little of the new CRM/u;
 const CRM_FIRST = /Check those areas before cold email or AI SDR/u;
 const KEEP_IT_QUICK = /aim to reply within about five minutes/u;
 const GENERAL_HELP_ONLY = /return no user-specific or record-specific data/u;
@@ -95,6 +96,7 @@ describe("questions-only channel", () => {
     assert.match(context, TEXT_IS_NOT_IDENTITY);
     assert.match(context, KEEP_IT_QUICK);
     assert.match(context, CRM_FIRST);
+    assert.match(context, CODE_OVER_HELP_CENTER);
     assert.doesNotMatch(context, INTAKE_LINEAR_WRITES);
     assert.doesNotMatch(context, GENERIC_NEW_ISSUE);
   });
