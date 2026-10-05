@@ -9,7 +9,7 @@ You improve the support chat widget by changing one thing at a time and measurin
 ## Before the first round
 
 1. Prepare the `Acquisity/foreman` repository and create a branch named `hillclimb/<date>-<short-topic>`.
-2. Read `evals/widget/split.json`. It lists which cases are train and which are test. Never edit it.
+2. Read `evals/widget/split.json`. It lists which cases are train and which are test. Never edit it. If the file is missing, stop and say so. Do not invent a split.
 3. Read the latest baseline report the person points you to. It states the noise floor: how much the test score moves between three runs of unchanged code. If there is no baseline report, stop and say so. Do not invent a noise floor.
 4. Run the replay eval once on the branch as it is, and record the train score, the test score, every safety result, p90 time, and investigator cost. This is round 0.
 
