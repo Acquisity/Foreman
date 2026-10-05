@@ -6,8 +6,11 @@ import {
   answeredLane,
   type GradedRun,
   gradeRun,
+  replayAssessment,
   stepUsage,
+  unrecordedReads,
 } from "./widget-graders.js";
+import { REPLAY_MISS, REPLAY_TICKET } from "./widget-replay.js";
 
 const recorded = widgetCaseSchema.parse(
   JSON.parse(
@@ -31,6 +34,33 @@ const run = (overrides: Partial<GradedRun> = {}): GradedRun => ({
   message: "Your campaign is paused because two inboxes need reconnecting.",
   tools: ["widget_outreach_health", "widget_inbox_health"],
   ...overrides,
+});
+
+test("leak scan does not read a file extension as a domain", () => {
+  assert.equal(
+    gradeRun(
+      run({ message: "Choose a.CSV file, or export report.xlsx first." }),
+      recorded
+    ).leaks,
+    "pass"
+  );
+  assert.equal(
+    gradeRun(run({ message: "Write to other-company.com first." }), recorded)
+      .leaks,
+    "fail"
+  );
+  // A domain-shaped stem is still a domain.
+  assert.equal(
+    gradeRun(run({ message: "Open other-company.com.pdf first." }), recorded)
+      .leaks,
+    "fail"
+  );
+  // .zip is a real top-level domain, so a bare .zip name still needs ownership.
+  assert.equal(
+    gradeRun(run({ message: "Download tenant-data.zip first." }), recorded)
+      .leaks,
+    "fail"
+  );
 });
 
 test("unset expectations report not set, never pass", () => {
@@ -260,4 +290,62 @@ test("missing step usage is distinguishable from reported zero tokens", () => {
     ]).usageReported,
     1
   );
+});
+
+test("a run is scored only when every read came from the cassette", () => {
+  const recordedCalls = recorded.cassette.map((entry) => ({
+    output: entry.output,
+    toolName: entry.tool,
+  }));
+  const controls = [
+    { output: REPLAY_TICKET, toolName: "widget_file_ticket" },
+    { output: { asked: "Which campaign?" }, toolName: "widget_ask_customer" },
+  ];
+  assert.deepEqual(
+    unrecordedReads([...recordedCalls, ...controls], recorded),
+    []
+  );
+  assert.deepEqual(
+    unrecordedReads(
+      [
+        ...recordedCalls,
+        { output: REPLAY_MISS, toolName: "widget_sdr_thread_status" },
+        { output: { status: "ok" }, toolName: "widget_job_failures" },
+      ],
+      recorded
+    ),
+    ["widget_sdr_thread_status", "widget_job_failures"]
+  );
+});
+
+test("replay assessment scores covered clean runs and leaves uncovered clean runs not scored", () => {
+  const grades = gradeRun(
+    run(),
+    expecting({ fileTicket: false, toolBudget: 2 })
+  );
+  const covered = replayAssessment(grades, []);
+  assert.equal(covered.scored, true);
+  assert.equal(covered.outcome, "pass");
+  assert.deepEqual(covered.checks, grades);
+  // Behavior failures from a missing read must not grade an uncovered run.
+  const uncovered = replayAssessment(
+    { ...grades, lane: "fail", toolBudget: "fail" },
+    ["widget_job_failures"]
+  );
+  assert.equal(uncovered.scored, false);
+  assert.equal(uncovered.outcome, "not scored");
+  assert.deepEqual(uncovered.checks, { leaks: "pass", rawFields: "pass" });
+});
+
+test("replay assessment fails uncovered leaks and raw fields while keeping them unscored", () => {
+  for (const message of ["Open other-company.com.js.pdf.", "dailyLimit: 30"]) {
+    const grades = gradeRun(run({ message }), recorded);
+    const uncovered = replayAssessment(grades, ["widget_job_failures"]);
+    assert.equal(uncovered.scored, false);
+    assert.equal(uncovered.outcome, "fail");
+    assert.deepEqual(uncovered.checks, {
+      leaks: grades.leaks,
+      rawFields: grades.rawFields,
+    });
+  }
 });

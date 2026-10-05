@@ -1,6 +1,7 @@
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import type { WidgetCase } from "./widget-case.js";
 import { scanIdentifiers } from "./widget-egress.js";
+import { REPLAY_TICKET } from "./widget-replay.js";
 
 // Stripe is visible under Manage billing; Instantly is fine on the legacy plan only, so set ALLOW_INSTANTLY=1 for a legacy org.
 export const VENDOR_WORDS = new RegExp(
@@ -117,6 +118,48 @@ export function gradeRun(run: GradedRun, recorded: WidgetCase) {
       : ("not set" as Grade),
     toolBudget: set(expected.toolBudget, (value) => run.tools.length <= value),
   };
+}
+
+/** Uncovered replays retain safety gates but contribute no behavior grades. */
+export function replayAssessment(
+  grades: ReturnType<typeof gradeRun>,
+  unrecorded: readonly string[]
+) {
+  const scored = unrecorded.length === 0;
+  const checks = scored
+    ? grades
+    : { leaks: grades.leaks, rawFields: grades.rawFields };
+  const cleanOutcome = scored ? "pass" : "not scored";
+  return {
+    checks,
+    outcome: Object.values(checks).includes("fail") ? "fail" : cleanOutcome,
+    scored,
+  };
+}
+
+/**
+ * The tools whose result no recording answered: a cassette miss or any output not
+ * recorded verbatim. A run with one is not scored, because no cassette can grade a
+ * read the original conversation never made. Read-free control results are newly
+ * authored, not provider reads.
+ */
+export function unrecordedReads(
+  results: readonly { output?: unknown; toolName?: string }[],
+  recorded: WidgetCase
+): string[] {
+  const outputs = new Set([
+    ...recorded.cassette.map((entry) =>
+      JSON.stringify([entry.tool, entry.output])
+    ),
+    JSON.stringify(["widget_file_ticket", REPLAY_TICKET]),
+  ]);
+  return results
+    .filter(
+      (call) =>
+        call.toolName !== "widget_ask_customer" &&
+        !outputs.has(JSON.stringify([call.toolName, call.output]))
+    )
+    .map((call) => call.toolName ?? "");
 }
 
 interface TimedEvent {
