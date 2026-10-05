@@ -45,7 +45,12 @@ const smoke = widgetCaseSchema.parse(
 // The tests set their own expectations, so editing the case file cannot break them.
 const recorded: WidgetCase = {
   ...smoke,
-  expectations: { ...smoke.expectations, cause: null, claims: [] },
+  expectations: {
+    ...smoke.expectations,
+    cause: null,
+    claims: [],
+    foreignIdentifiers: [],
+  },
 };
 const withRole = (
   role: WidgetCase["scope"]["role"],
