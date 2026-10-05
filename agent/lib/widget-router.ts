@@ -390,55 +390,10 @@ function ticketRoute(
   };
 }
 
-const NON_WORD = /[^a-z']+/u;
-const PERSON_WORDS = new Set([
-  "agent",
-  "human",
-  "operator",
-  "person",
-  "rep",
-  "representative",
-]);
-// Every other word a bare request for a person may use. A word outside this
-// list (a feature, a question word, "my") means the message asks about
-// something else, so "AI SDR agent" or "my agent is not sending" never match.
-const FILLER_WORDS = new Set([
-  "a",
-  "actual",
-  "an",
-  "can",
-  "chat",
-  "connect",
-  "could",
-  "customer",
-  "get",
-  "give",
-  "i",
-  "i'd",
-  "i'm",
-  "id",
-  "im",
-  "like",
-  "live",
-  "looking",
-  "me",
-  "need",
-  "now",
-  "please",
-  "pls",
-  "real",
-  "service",
-  "someone",
-  "somebody",
-  "speak",
-  "support",
-  "talk",
-  "the",
-  "to",
-  "want",
-  "with",
-  "would",
-]);
+const PERSON_REQUEST =
+  /^(?:(?:i (?:want|need|would like)(?: to)?|i'd like(?: to)?|can i|could i|let me|please|(?:can you )?connect me (?:to|with)|get me|give me) )?(?:(?:talk|speak|chat) (?:to|with) )?(?:(?:a|an|the|some) )?(?:(?:(?:real|live|actual) )?(?:human(?: agent)?|person|agent|support agent|customer service agent|representative|rep|operator)|(?:someone|somebody) (?:real|live)|(?:real|live) (?:someone|somebody))(?: (?:please|pls|now))*$/u;
+const TRAILING_REQUEST_PUNCTUATION = /[.!?]+$/u;
+const REQUEST_GREETING = /^(?:hi|hello)(?:, ?| )/u;
 
 /**
  * The latest message is only a request for a person, such as "Human agent" or
@@ -450,15 +405,13 @@ export const asksOnlyForPerson = (message: string): boolean => {
   if (text.length > 60) {
     return false;
   }
-  const words = text.split(NON_WORD).filter(Boolean);
-  const real = words.some((word) => word === "real" || word === "live");
-  return (
-    words.some(
-      (word) =>
-        PERSON_WORDS.has(word) ||
-        (real && (word === "someone" || word === "somebody"))
-    ) && words.every((word) => PERSON_WORDS.has(word) || FILLER_WORDS.has(word))
-  );
+  const normalized = text
+    .replace(/[‘’]/gu, "'")
+    .replace(/\s+/gu, " ")
+    .replace(TRAILING_REQUEST_PUNCTUATION, "")
+    .trim()
+    .replace(REQUEST_GREETING, "");
+  return PERSON_REQUEST.test(normalized);
 };
 
 export async function routeWidgetMessage(

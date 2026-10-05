@@ -272,6 +272,14 @@ describe("routeWidgetMessage", () => {
       "operator",
       "Human agent!",
       "I want to talk to someone real now.",
+      "can you connect me to a human",
+      "I’d like a human please",
+      "Hello, human agent please!",
+      "hi real person",
+      "human\nagent please",
+      "could I speak with a representative pls now",
+      "connect me with a live someone",
+      "customer service agent",
     ];
     const routes = await Promise.all(
       bare.map((message) =>
@@ -294,6 +302,13 @@ describe("routeWidgetMessage", () => {
       "my agent is not sending",
       "can you open a ticket for this bug",
       "talk to someone",
+      "agent id?",
+      "I want an agent to talk like a human",
+      "human-like agent",
+      "agent 123",
+      "agent 🤖",
+      "human, agent",
+      `human${" ".repeat(60)}please`,
     ];
     const called: string[] = [];
     const jevRoutes = await Promise.all(
@@ -309,6 +324,27 @@ describe("routeWidgetMessage", () => {
     );
     assert.equal(new Set(called).size, asks.length);
     assert.ok(jevRoutes.every((route) => route.source === "jev"));
+  });
+
+  it("asks Jev about a numbered agent in a structured follow-up", async () => {
+    let called = false;
+    const route = await routeWidgetMessage(
+      {
+        latest: "agent 123",
+        screenshots: ["AI SDR agent settings"],
+        turns: [{ role: "assistant", text: "Which agent is affected?" }],
+      },
+      {
+        apiKey: "test-key",
+        fetch: () => {
+          called = true;
+          return Promise.resolve(jevReply("kb", 0.9));
+        },
+      }
+    );
+    assert.equal(called, true);
+    assert.equal(route.source, "jev");
+    assert.equal(route.lane, "kb");
   });
 
   it("falls open to investigate without a key and never calls out", async () => {
