@@ -88,8 +88,28 @@ const normalize = (value: unknown): unknown => {
 };
 const lookupKey = (tool: string, input: unknown) =>
   JSON.stringify([tool, normalize(input)]);
+/**
+ * Free-text search fields the model rewords on every run. A call that differs from a
+ * recording of the same tool only in these replays that recording; every other field
+ * (ids, dates, urls) must still match exactly.
+ */
+const FREE_TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  widget_help_article: ["query"],
+  widget_known_issues: ["query"],
+};
+const withoutFreeText = (tool: string, input: unknown) => {
+  const fields = Object.hasOwn(FREE_TEXT_FIELDS, tool)
+    ? FREE_TEXT_FIELDS[tool]
+    : undefined;
+  if (!(fields && input && typeof input === "object")) {
+    return input;
+  }
+  return Object.fromEntries(
+    Object.entries(input).filter(([key]) => !fields.includes(key))
+  );
+};
 
-/** The recorded output for this exact call, or the fixed miss result. */
+/** The recorded output for this exact call, else for the same call with reworded free text, else the fixed miss result. */
 export function replayRead(
   tool: string,
   input: unknown,
@@ -97,17 +117,29 @@ export function replayRead(
 ): unknown {
   const recorded = replayCase(caseId);
   const schema = schemas.get(tool);
-  const key = lookupKey(tool, schema ? schema.parse(input) : input);
-  const hit = recorded.cassette.find((entry) => {
+  const parsedInput = schema ? schema.parse(input) : input;
+  const recordings = recorded.cassette.flatMap((entry) => {
     if (entry.tool !== tool) {
-      return false;
+      return [];
     }
     const parsed = schema?.safeParse(entry.input);
-    return (
-      (!parsed || parsed.success) &&
-      lookupKey(entry.tool, parsed ? parsed.data : entry.input) === key
-    );
+    if (parsed && !parsed.success) {
+      return [];
+    }
+    return [
+      { input: parsed ? parsed.data : entry.input, output: entry.output },
+    ];
   });
+  const key = lookupKey(tool, parsedInput);
+  const looseKey = lookupKey(tool, withoutFreeText(tool, parsedInput));
+  const hit =
+    recordings.find((entry) => lookupKey(tool, entry.input) === key) ??
+    (Object.hasOwn(FREE_TEXT_FIELDS, tool)
+      ? recordings.find(
+          (entry) =>
+            lookupKey(tool, withoutFreeText(tool, entry.input)) === looseKey
+        )
+      : undefined);
   if (hit) {
     return hit.output;
   }
