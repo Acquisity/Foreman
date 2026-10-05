@@ -275,12 +275,10 @@ const recorderNames = (draft: unknown, organizationName: string) =>
     ([, recorder]) => recorder
   );
 
-const countOf = (values: string[]) => {
-  const counts = new Map<string, number>();
+const countInto = (counts: Map<string, number>, values: string[]) => {
   for (const value of values) {
     counts.set(value, (counts.get(value) ?? 0) + 1);
   }
-  return counts;
 };
 
 /** Our own domain stays: replacing it would also rewrite every help-center link. */
@@ -300,7 +298,7 @@ const isSafeIdentifier = (value: string) =>
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const found = {
-    names: countOf(recorderNames(raw, scope.organizationName)),
+    names: new Map<string, number>(),
     phones: new Set<string>(),
   };
   const draft = mapStrings(
@@ -317,6 +315,8 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     },
     true
   );
+  // After the first pass, so dropped media is never serialized.
+  countInto(found.names, recorderNames(draft, scope.organizationName));
   const replacements = new Map<string, string>([
     [scope.organizationName.toLowerCase(), fixture.organizationName],
     [scope.organizationSlug.toLowerCase(), fixture.organizationSlug],
