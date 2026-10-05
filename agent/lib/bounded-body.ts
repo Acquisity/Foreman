@@ -5,7 +5,7 @@
  * pending read rejects, and the caller treats the request as unreadable.
  */
 export async function readRequestBody(
-  request: Request,
+  request: Pick<Request, "body">,
   timeoutMs = 10_000,
   maxChars = 8192
 ) {

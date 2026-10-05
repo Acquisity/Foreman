@@ -309,9 +309,30 @@ describe("routeTicket", () => {
 });
 
 describe("route_ticket tool", () => {
-  it("never requires an approval card", async () => {
+  it("never requires an approval card, and denies questions-only sessions", async () => {
     const { approval } = tool;
-    const status = await (approval as () => unknown)();
-    assert.equal(status, "not-applicable");
+    const approve = approval as (ctx: unknown) => unknown;
+    const auth = (attributes: Record<string, string>) => ({
+      attributes,
+      authenticator: "slack",
+      principalId: "user:1",
+      principalType: "user",
+    });
+    const ordinary = auth({});
+    assert.equal(
+      await approve({
+        session: { auth: { current: ordinary, initiator: ordinary } },
+      }),
+      "not-applicable"
+    );
+    const questions = auth({ questionsOnly: "true" });
+    assert.equal(
+      (
+        (await approve({
+          session: { auth: { current: questions, initiator: questions } },
+        })) as { type: string }
+      ).type,
+      "denied"
+    );
   });
 });

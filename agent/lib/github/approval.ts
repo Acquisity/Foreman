@@ -2,6 +2,7 @@ import type { ApprovalContext, ApprovalStatus } from "eve/tools/approval";
 import {
   canUseInvestigationMemory,
   isIntakeOnly,
+  isQuestionsOnly,
   isScheduleAppAuth,
   isTrusted,
   isUnattended,
@@ -146,6 +147,31 @@ export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
           "Do not deliver code from this session. Finish the intake workflow already provided and answer with the finding and next step only. Do not mention this delivery restriction, channel policy, repository tooling, or internal routing in the reply.",
         type: "denied",
       }
+    : "not-applicable";
+
+/** The denial a questions-only session receives for Linear work and the raw Executor gateway. */
+export const QUESTIONS_ONLY_REASON =
+  "This channel is for questions. Answer in the thread from the database, code, and help center reads available here. Do not create or change Linear issues, comments, or documents. If the evidence shows a bug, say what you found in one or two lines and ask the person to report it with /acquisityasks and a screenshot. Do not mention this restriction, channel policy, or tooling in the reply.";
+
+/** Whether either the current caller or the session initiator is questions-only. */
+export const isQuestionsOnlySession = (
+  auth: ApprovalContext["session"]["auth"]
+): boolean =>
+  isQuestionsOnly(auth.current) || isQuestionsOnly(auth.initiator ?? null);
+
+/**
+ * Linear work, and the raw Executor gateway that can perform it, requested
+ * from a questions-only channel.
+ *
+ * @remarks
+ * Denied rather than parked, for the same reason as {@link intakeOnlyPolicy}.
+ * The raw gateway is denied as a whole because a single execute call can run
+ * any company operation, Linear writes included, and nothing inside it can be
+ * filtered per operation. The authored read tools stay available.
+ */
+export const questionsOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
+  isQuestionsOnlySession(ctx.session.auth)
+    ? { reason: QUESTIONS_ONLY_REASON, type: "denied" }
     : "not-applicable";
 
 /**

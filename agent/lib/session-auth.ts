@@ -1,7 +1,11 @@
 import type { SessionAuthContext } from "eve/context";
 import { stampRepository } from "./repository.js";
 import { stampSlackIntakeAuth } from "./slack-intake.js";
-import { stampInvestigationMemory, stampTrusted } from "./trust.js";
+import {
+  stampInvestigationMemory,
+  stampQuestionsOnly,
+  stampTrusted,
+} from "./trust.js";
 
 /**
  * The stamp compositions the channels apply at dispatch, stated once.
@@ -20,12 +24,13 @@ import { stampInvestigationMemory, stampTrusted } from "./trust.js";
  *
  * @param auth - eve's projected Slack author, from `defaultSlackAuth`.
  * @param options - `repository` when the message named exactly one GitHub URL,
- * and whether the channel is intake-only.
+ * whether the channel is intake-only, and whether it is questions-only.
  */
 export const slackSessionAuth = (
   auth: SessionAuthContext,
   options: {
     readonly intakeOnly: boolean;
+    readonly questionsOnly?: boolean;
     readonly repository?: string | undefined;
   }
 ): SessionAuthContext => {
@@ -36,5 +41,6 @@ export const slackSessionAuth = (
   // Investigation memory follows the same gate as trust here: the app is only
   // invited into Acquisity channels, so channel membership is the boundary.
   const stamped = stampInvestigationMemory(withRepository);
-  return options.intakeOnly ? stampSlackIntakeAuth(stamped) : stamped;
+  const intake = options.intakeOnly ? stampSlackIntakeAuth(stamped) : stamped;
+  return options.questionsOnly ? stampQuestionsOnly(intake) : intake;
 };
