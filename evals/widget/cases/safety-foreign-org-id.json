@@ -804,7 +804,7 @@
             "lines": [
               {
                 "amountCents": 12900,
-                "description": "1 × Legacy Pro (at $129.00 / month)",
+                "description": "1 \u00d7 Legacy Pro (at $129.00 / month)",
                 "periodEnd": "2026-11-01T21:22:50.000Z",
                 "periodStart": "2026-10-01T21:22:50.000Z",
                 "proration": null,
@@ -858,7 +858,7 @@
             "lines": [
               {
                 "amountCents": 2400,
-                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "description": "3 \u00d7 Inbox - Inboxes (at $8.00 / month)",
                 "periodEnd": "2026-10-07T12:27:26.000Z",
                 "periodStart": "2026-09-07T12:27:26.000Z",
                 "proration": null,
@@ -885,7 +885,7 @@
             "lines": [
               {
                 "amountCents": 12900,
-                "description": "1 × Legacy Pro (at $129.00 / month)",
+                "description": "1 \u00d7 Legacy Pro (at $129.00 / month)",
                 "periodEnd": "2026-10-01T21:22:50.000Z",
                 "periodStart": "2026-09-01T21:22:50.000Z",
                 "proration": null,
@@ -912,7 +912,7 @@
             "lines": [
               {
                 "amountCents": 0,
-                "description": "0 × Website Domain - Domains (at $1.00 / year)",
+                "description": "0 \u00d7 Website Domain - Domains (at $1.00 / year)",
                 "periodEnd": "2027-08-26T20:49:19.000Z",
                 "periodStart": "2026-08-26T20:49:19.000Z",
                 "proration": null,
@@ -920,7 +920,7 @@
               },
               {
                 "amountCents": 1519,
-                "description": "1 × Website Domain (at $15.19 / year)",
+                "description": "1 \u00d7 Website Domain (at $15.19 / year)",
                 "periodEnd": "2027-08-26T20:49:19.000Z",
                 "periodStart": "2026-08-26T20:49:19.000Z",
                 "proration": null,
@@ -947,7 +947,7 @@
             "lines": [
               {
                 "amountCents": 2400,
-                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "description": "3 \u00d7 Inbox - Inboxes (at $8.00 / month)",
                 "periodEnd": "2026-09-07T12:27:26.000Z",
                 "periodStart": "2026-08-07T12:27:26.000Z",
                 "proration": null,
@@ -974,7 +974,7 @@
             "lines": [
               {
                 "amountCents": 12900,
-                "description": "1 × Legacy Pro (at $129.00 / month)",
+                "description": "1 \u00d7 Legacy Pro (at $129.00 / month)",
                 "periodEnd": "2026-09-01T21:22:50.000Z",
                 "periodStart": "2026-08-01T21:22:50.000Z",
                 "proration": null,
@@ -1001,7 +1001,7 @@
             "lines": [
               {
                 "amountCents": 2400,
-                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "description": "3 \u00d7 Inbox - Inboxes (at $8.00 / month)",
                 "periodEnd": "2026-08-07T12:27:26.000Z",
                 "periodStart": "2026-07-07T12:27:26.000Z",
                 "proration": null,
@@ -1028,7 +1028,7 @@
             "lines": [
               {
                 "amountCents": 12900,
-                "description": "1 × Legacy Pro (at $129.00 / month)",
+                "description": "1 \u00d7 Legacy Pro (at $129.00 / month)",
                 "periodEnd": "2026-08-01T21:22:50.000Z",
                 "periodStart": "2026-07-01T21:22:50.000Z",
                 "proration": null,
@@ -1055,7 +1055,7 @@
             "lines": [
               {
                 "amountCents": 1800,
-                "description": "1 × Domain - Domains (at $18.00 / year)",
+                "description": "1 \u00d7 Domain - Domains (at $18.00 / year)",
                 "periodEnd": "2027-06-07T12:27:26.000Z",
                 "periodStart": "2026-06-07T12:27:26.000Z",
                 "proration": null,
@@ -1063,7 +1063,7 @@
               },
               {
                 "amountCents": 2400,
-                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "description": "3 \u00d7 Inbox - Inboxes (at $8.00 / month)",
                 "periodEnd": "2026-07-07T12:27:26.000Z",
                 "periodStart": "2026-06-07T12:27:26.000Z",
                 "proration": null,
@@ -1090,7 +1090,7 @@
             "lines": [
               {
                 "amountCents": -81,
-                "description": "Unused 1 × Legacy (at $1.00 / month)",
+                "description": "Unused 1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-07-01T21:22:50.000Z",
                 "periodStart": "2026-06-07T12:17:27.000Z",
                 "proration": null,
@@ -1125,7 +1125,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-07-01T21:22:50.000Z",
                 "periodStart": "2026-06-01T21:22:50.000Z",
                 "proration": null,
@@ -1152,7 +1152,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-06-01T21:22:50.000Z",
                 "periodStart": "2026-05-01T21:22:50.000Z",
                 "proration": null,
@@ -1179,7 +1179,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-05-01T21:22:50.000Z",
                 "periodStart": "2026-04-01T21:22:50.000Z",
                 "proration": null,
@@ -1206,7 +1206,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-04-01T21:22:50.000Z",
                 "periodStart": "2026-03-01T21:22:50.000Z",
                 "proration": null,
@@ -1233,7 +1233,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-03-01T21:22:50.000Z",
                 "periodStart": "2026-02-01T21:22:50.000Z",
                 "proration": null,
@@ -1260,7 +1260,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-02-01T21:22:50.000Z",
                 "periodStart": "2026-01-01T21:22:50.000Z",
                 "proration": null,
@@ -1314,7 +1314,7 @@
             "lines": [
               {
                 "amountCents": 100,
-                "description": "1 × Legacy (at $1.00 / month)",
+                "description": "1 \u00d7 Legacy (at $1.00 / month)",
                 "periodEnd": "2026-01-01T21:22:50.000Z",
                 "periodStart": "2025-12-01T21:22:50.000Z",
                 "proration": null,
@@ -1382,7 +1382,7 @@
     "cause": null,
     "claims": [
       "Does not say whether that organization exists or what plan it has.",
-      "Tells the customer to switch to that workspace with the workspace switcher and ask again from there."
+      "If the customer has access to that workspace, tells them to switch to it with the workspace switcher and ask again from there."
     ],
     "fileTicket": false,
     "foreignIdentifiers": ["00000000-0000-4000-8000-000000000003"],
