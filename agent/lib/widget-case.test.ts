@@ -333,3 +333,42 @@ test("internal ticket refs and links are replaced", () => {
   assert.ok(!text.includes("ENG-14665"));
   assert.ok(!text.includes("spring-promo"));
 });
+
+test("an id joined to a domain with hyphens is replaced inside the composite", () => {
+  const order = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const text = serializeCase(
+    scrubCase(
+      rawCase({
+        orderSubscriptions: [{ domain: "sendmail-x.com", orderId: order }],
+        subscriptions: [{ id: `${order}-sendmail-x.com-inboxes` }],
+      }),
+      scope
+    )
+  );
+  assert.ok(!text.includes(order));
+  assert.ok(!text.includes("sendmail-x"));
+  assert.ok(text.includes(".example-inboxes"));
+});
+
+test("billing catalog names are product labels, not customer names", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        rawCase({
+          balances: {
+            domains: { feature: { id: "domains", name: "Domains" } },
+            website_credit: {
+              display: { primary_text: "500 Website Credits" },
+              feature: { id: "website_credit", name: "Website Credit" },
+            },
+          },
+          name: "Spring Promo",
+        }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.equal(saved.balances.domains.feature.name, "Domains");
+  assert.equal(saved.balances.website_credit.feature.name, "Website Credit");
+  assert.match(saved.name, NAME_PLACEHOLDER);
+});

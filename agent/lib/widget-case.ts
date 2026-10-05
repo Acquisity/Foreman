@@ -64,6 +64,8 @@ export interface ScrubbedCase {
 /** Keys whose string values name a person, company, campaign or workspace, or hold a phone number. */
 const NAME_KEY = /(?:name|workspace|company)$/i;
 const PHONE_KEY = /phone(?:_?number)?$/i;
+/** A catalog entry's own id ("website_credit"): a name spelling one ("Website Credit") labels a product, not a customer. */
+const CATALOG_ID = /^[a-z_]+$/;
 /** An email is at most 320 characters; anything longer is not an identifier to map. */
 const MAX_LITERAL = 320;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
@@ -108,13 +110,17 @@ const DROPPED = "[binary content dropped]";
 
 const literal = (value: string) => value.replace(REGEX_SPECIAL, "\\$&");
 
-/** One bounded alternation of escaped literals, matched only as whole tokens. */
+/**
+ * One bounded alternation of escaped literals, matched as whole words: a hyphen
+ * ends a word, so an id joined to another ("<uuid>-<domain>-inboxes") is still
+ * replaced, while a short value inside a longer word is not.
+ */
 const literalsPattern = (values: string[]) =>
   new RegExp(
-    `(?<![A-Za-z0-9_-])(?:${[...values]
+    `(?<![A-Za-z0-9_])(?:${[...values]
       .sort((a, b) => b.length - a.length)
       .map(literal)
-      .join("|")})(?![A-Za-z0-9_-])`,
+      .join("|")})(?![A-Za-z0-9_])`,
     "gi"
   );
 
@@ -212,11 +218,18 @@ const isSafeIdentifier = (value: string) =>
  * whole case. Pure: nothing touches disk.
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
-  const found = { names: new Set<string>(), phones: new Set<string>() };
+  const found = {
+    catalogIds: new Set<string>(),
+    names: new Set<string>(),
+    phones: new Set<string>(),
+  };
   const draft = mapStrings(
     raw,
     (text, key) => {
       if (text) {
+        if (key === "id" && CATALOG_ID.test(text)) {
+          found.catalogIds.add(text);
+        }
         if (PHONE_KEY.test(key)) {
           found.phones.add(text);
         } else if (NAME_KEY.test(key)) {
@@ -290,6 +303,9 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     );
   }
   for (const name of found.names) {
+    if (found.catalogIds.has(name.toLowerCase().replaceAll(" ", "_"))) {
+      continue;
+    }
     add(name, () => `Name ${next("name")}`);
   }
   for (const phone of found.phones) {
