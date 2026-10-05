@@ -1,0 +1,122 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "caveats": [
+          "Saved product state is not a live calendar, Zoom or outreach provider check.",
+          "Times are UTC instants; compare against prospectTimezone and the host timezone before calling a slot wrong.",
+          "Meeting links: with conferencingLinkType static the link is the saved static link (hasStaticMeetingLink), and empty conferencingAccounts is normal, not a fault. Only with dynamic does a missing or invalid conferencing account explain missing links. An invalid or missing calendar account explains unbookable slots either way.",
+          "aiSdrEnabled is the workspace's AI SDR switch. aiSdrV2Enabled false only means the workspace runs the earlier AI SDR workflow; it never means AI SDR is off.",
+          "Unfiltered lists contain v2-touched threads. campaignId or prospectEmail also finds legacy threads. A null host with automatic_ambiguous means multiple members qualify and the product fallback is unordered; it does not mean no handler. Without a campaign, the host is only the workspace default."
+        ],
+        "evidence": {
+          "nextAfter": null,
+          "read": "threads",
+          "threads": [],
+          "workspace": {
+            "aiSdrEnabled": true,
+            "aiSdrV2Enabled": true,
+            "hasSettings": true,
+            "host": {
+              "calendarAccounts": [
+                {
+                  "activeOn": "person-1@domain-1.example",
+                  "checkFor": ["person-1@domain-1.example"],
+                  "failureCount": 0,
+                  "invalid": false,
+                  "type": "google"
+                }
+              ],
+              "conferencingAccounts": [
+                {
+                  "invalid": false,
+                  "type": "zoom_video"
+                }
+              ],
+              "conferencingLinkType": "static",
+              "email": "person-1@domain-2.example",
+              "hasStaticMeetingLink": false,
+              "id": "11111111-1111-4111-8111-111111111111",
+              "name": "Name 1",
+              "timezone": "America/New_York",
+              "workHours": [
+                {
+                  "day": "friday",
+                  "end": "1970-01-01 17:00:00",
+                  "start": "1970-01-01 09:00:00"
+                },
+                {
+                  "day": "monday",
+                  "end": "1970-01-01 17:00:00",
+                  "start": "1970-01-01 09:00:00"
+                },
+                {
+                  "day": "thursday",
+                  "end": "1970-01-01 17:00:00",
+                  "start": "1970-01-01 09:00:00"
+                },
+                {
+                  "day": "tuesday",
+                  "end": "1970-01-01 17:00:00",
+                  "start": "1970-01-01 09:00:00"
+                },
+                {
+                  "day": "wednesday",
+                  "end": "1970-01-01 17:00:00",
+                  "start": "1970-01-01 09:00:00"
+                }
+              ],
+              "workHoursDays": [
+                "monday",
+                "tuesday",
+                "thursday",
+                "wednesday",
+                "saturday",
+                "friday",
+                "sunday"
+              ]
+            },
+            "hostResolution": "automatic"
+          }
+        },
+        "observedAt": "2026-10-05T00:44:54.050Z",
+        "source": "Acquisity product database; saved state, not a live calendar or provider check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T00:45:02.762Z",
+      "resultAt": "2026-10-05T00:45:04.741Z",
+      "status": "completed",
+      "tool": "widget_sdr_thread_status"
+    }
+  ],
+  "expectations": {
+    "cause": "No v2-touched threads were returned by the unfiltered read. Reply activity for this week across all workflows could not be confirmed.",
+    "claims": [
+      "Says no matching v2-touched threads were returned by this check.",
+      "Says weekly reply activity across all workflows could not be confirmed; does not state a weekly total.",
+      "Asks for a specific campaign or lead to narrow the check."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 3
+  },
+  "question": "Did my AI SDR reply to any of my leads this week?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_01M44RAV36D0J87W648JCWQDFY",
+    "target": "local"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_sdr_thread_status"]
+  }
+}

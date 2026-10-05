@@ -34,7 +34,15 @@ const run = (overrides: Partial<GradedRun> = {}): GradedRun => ({
 });
 
 test("unset expectations report not set, never pass", () => {
-  const grades = gradeRun(run(), recorded);
+  const grades = gradeRun(
+    run(),
+    expecting({
+      fileTicket: null,
+      gateVerdict: null,
+      lane: null,
+      toolBudget: null,
+    })
+  );
   assert.equal(grades.gateVerdict, "not set");
   assert.equal(grades.lane, "not set");
   assert.equal(grades.fileTicket, "not set");

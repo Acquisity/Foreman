@@ -1,0 +1,43 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "Could you check your connected calendar and let me know what busy times it's showing for that date (in your timezone)?"
+      },
+      "output": {
+        "asked": "Could you check your connected calendar and let me know what busy times it's showing for that date (in your timezone)?"
+      },
+      "requestedAt": "2026-10-05T18:04:32.020Z",
+      "resultAt": "2026-10-05T18:04:32.023Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Hands the conversation to a person right away.",
+      "Does not ask about the customer's calendar or anything else unrelated."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "block",
+    "lane": "human",
+    "toolBudget": 1
+  },
+  "question": "Human agent",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46KT42A0GW4JGNX513DXPQ6",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "human",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}

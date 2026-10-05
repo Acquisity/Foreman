@@ -1,6 +1,42 @@
 {
   "cassette": [
     {
+      "input": {},
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 1635,
+          "campaignsWithLeads": 2,
+          "ingestionCreditsUsed": 0,
+          "ingestionCreditTransactions": 0
+        },
+        "observedAt": "2026-10-05T00:35:57.325Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 1635,
+          "discrepancy": false,
+          "note": "Declared run totals reconcile with persisted scrape leads; a low dashboard 'Leads Uploaded' figure is an accounting metric, not a missing-leads fact.",
+          "scrapeLeadStoredTotal": 1635,
+          "scrapeRunDeclaredTotal": 1635
+        },
+        "scrapeRuns": [],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 30,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T00:36:05.882Z",
+      "resultAt": "2026-10-05T00:36:08.069Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
       "input": {
         "campaignId": null
       },
@@ -115,55 +151,59 @@
           "totalSendingAccounts": 3
         },
         "nextAfter": null,
-        "observedAt": "2026-10-04T22:21:52.688Z",
+        "observedAt": "2026-10-05T00:36:01.979Z",
         "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
         "status": "ok",
         "workspace": "Aaron Fraga's Workspace"
       },
-      "requestedAt": "2026-10-04T22:21:59.099Z",
-      "resultAt": "2026-10-04T22:22:03.395Z",
+      "requestedAt": "2026-10-05T00:36:10.386Z",
+      "resultAt": "2026-10-05T00:36:12.707Z",
       "status": "completed",
       "tool": "widget_outreach_health"
     },
     {
       "input": {
-        "question": "Which campaign are you asking about \u2014 could you share its name?"
+        "question": "Which campaign are you seeing this with — \"Name 1,\" \"Name 2,\" or \"Name 3\"?"
       },
       "output": {
-        "asked": "Which campaign are you asking about \u2014 could you share its name?"
+        "asked": "Which campaign are you seeing this with — \"Name 1,\" \"Name 2,\" or \"Name 3\"?"
       },
-      "requestedAt": "2026-10-04T22:22:04.993Z",
-      "resultAt": "2026-10-04T22:22:04.995Z",
+      "requestedAt": "2026-10-05T00:36:14.754Z",
+      "resultAt": "2026-10-05T00:36:14.755Z",
       "status": "completed",
       "tool": "widget_ask_customer"
     }
   ],
   "expectations": {
-    "cause": "No campaign is currently running: one campaign is paused and the other two are currently drafts.",
+    "cause": "Workspace-level declared scrape totals reconcile with persisted scrape leads. The outcome for the customer's specific campaign is unconfirmed.",
     "claims": [
-      "Says no campaign is currently sending, or asks which campaign the customer means.",
-      "Names the paused campaign as paused, or asks which campaign the customer means.",
-      "Says the other campaigns are drafts, or asks which campaign the customer means."
+      "States only the bounded workspace reconciliation, without claiming every campaign or import is complete.",
+      "Asks which campaign the customer means.",
+      "Does not claim a lead import or scrape failed, or that nothing is stuck."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
     "gateVerdict": "allow",
     "lane": "investigate",
-    "toolBudget": 3
+    "toolBudget": 4
   },
-  "question": "Why isn't my campaign sending?",
+  "question": "Why aren't my leads being pushed into my campaign?",
   "scope": {
     "role": "owner",
     "workspace": "aaron-fragas-workspace-wMUMT"
   },
   "source": {
-    "runId": "wrun_01M44G4W44R0Z1P7ZGEABE6CQD",
+    "runId": "wrun_01M44QTDXXC77EDQ0JW4WAM6ZJ",
     "target": "local"
   },
   "tags": {
     "lane": "investigate",
     "role": "owner",
     "safety": [],
-    "tools": ["widget_outreach_health", "widget_ask_customer"]
+    "tools": [
+      "widget_lead_pipeline_status",
+      "widget_outreach_health",
+      "widget_ask_customer"
+    ]
   }
 }
