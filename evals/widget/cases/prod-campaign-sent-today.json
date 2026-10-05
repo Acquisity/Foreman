@@ -1,0 +1,668 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 1,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-02",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-01",
+                "emailsSent": 72
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 3000,
+            "updatedAt": "2026-10-01T15:32:43.5+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 251
+              },
+              {
+                "date": "2026-10-03",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 144
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 1600,
+            "updatedAt": "2026-10-02T20:25:13.862+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 18,
+          "totalSendingAccounts": 18
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-05T16:30:03.142Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T16:30:00.469Z",
+      "resultAt": "2026-10-05T16:30:03.708Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000002"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [
+                  {
+                    "connected": true,
+                    "email": "person-1@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000003",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-2@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000004",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-3@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000005",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-4@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000006",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-5@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000007",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-6@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000008",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-7@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000009",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-8@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000010",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-9@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000011",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-10@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000012",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-11@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000013",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-12@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000014",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-13@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000015",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-14@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000016",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-15@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000017",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-16@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000018",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-17@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000019",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-18@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000020",
+                    "status": "active"
+                  }
+                ],
+                "configuredCount": 18,
+                "healthyCount": 18,
+                "matchedCount": 18,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [
+                {
+                  "date": "2026-10-02",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 144,
+                  "emailsOpened": 0,
+                  "emailsSent": 144,
+                  "meetingsScheduled": 0,
+                  "repliesReceived": 1,
+                  "updatedAt": "2026-10-05T16:27:56.73502+00:00"
+                },
+                {
+                  "date": "2026-10-03",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 0,
+                  "emailsOpened": 0,
+                  "emailsSent": 0,
+                  "meetingsScheduled": 0,
+                  "repliesReceived": 4,
+                  "updatedAt": "2026-10-05T16:27:56.73502+00:00"
+                },
+                {
+                  "date": "2026-10-05",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 251,
+                  "emailsOpened": 0,
+                  "emailsSent": 251,
+                  "meetingsScheduled": 0,
+                  "repliesReceived": 7,
+                  "updatedAt": "2026-10-05T16:27:56.73502+00:00"
+                }
+              ],
+              "endDate": "2026-10-05",
+              "overview": {
+                "bounces": 2,
+                "emailsSent": 395,
+                "meetingsBooked": 1,
+                "opens": 0,
+                "replies": 12,
+                "snapshotAt": "2026-10-05T16:27:56.75+00:00",
+                "unsubscribes": 0
+              },
+              "startDate": "2026-09-29"
+            },
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": true,
+              "campaignDailyLimit": 315,
+              "notSendingReason": null,
+              "notSendingReasonCode": null,
+              "observedAt": "2026-10-05T16:30:23.832Z",
+              "statusCode": 1,
+              "updatedAt": "2026-10-05T13:08:27.640Z"
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 251
+              },
+              {
+                "date": "2026-10-03",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 144
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 1600,
+            "updatedAt": "2026-10-02T20:25:13.862+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 18,
+          "totalSendingAccounts": 18
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-05T16:30:07.370Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T16:30:05.455Z",
+      "resultAt": "2026-10-05T16:30:23.833Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-18@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T16:12:57.373Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-7@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T16:10:00.340Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-15@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T16:07:33.271Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-13@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T16:01:37.759Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-10@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:59:07.801Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-11@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:56:32.400Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-16@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:52:08.885Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-2@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:49:47.406Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-1@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:47:26.596Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-14@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:42:51.670Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-4@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:40:25.117Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-8@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:37:57.961Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-3@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:31:19.639Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-17@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:28:51.054Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-6@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:26:28.119Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-9@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:21:51.995Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-5@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:14:53.068Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-12@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-08-12T15:01:47.804Z",
+              "warmupStatus": 1
+            }
+          ],
+          "detailsTruncated": false,
+          "error": 0,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 18,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 18,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": false,
+          "isActive": true,
+          "updatedAt": "2026-08-12T14:24:35.851Z"
+        },
+        "observedAt": "2026-10-05T16:30:28.128Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-10-05T16:28:34.540Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 522,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T16:30:26.368Z",
+      "resultAt": "2026-10-05T16:30:59.919Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains that prewarmed inboxes come with preset sender names, so emails going out under other people's names is expected and not a fault.",
+      "Says the sender name can be changed on each inbox, and that this changes the name emails are signed with but not the sending address.",
+      "Does not say the sending email address itself will change."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 3
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nName 2 went out today\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: The mails are being sent from someone other than me. Is this a strategy or is there something wring that needs to be corrected\nSupport: Could you share the sender name or email address shown on one of those emails, and roughly when it was sent? That'll help me pin down which sending account it's coming from.\nCustomer: Every single email in my SDR Inbox has a different persons name in the email signature. They were all sent last Thursday, Friday or today. Here's just a few of the names: Sender One, Sender Two, Sender Three, Sender Four, Sender Five, Sender Six\nSupport: Which campaign are these emails going out under? Knowing the campaign name will help me check the sending accounts tied to it.\nCustomer: Podcast | Marketing Agencies | US | Leadership | AIA Created. This was Last thursday or Friday\nSupport: The sender name on your campaign emails comes from the inbox display name attached to the campaign rather than the sequence, which is why different names are showing up. To make sure emails send from your name, you can update each inbox by following these steps.\n\n1. Go to Cold Email Agent and click Email Accounts.\n2. Click the row of the inbox your campaign sends from.\n3. In the settings panel that opens on the right, edit the First Name and Last Name fields to your name.\n4. Click Save.\n\nYou will need to repeat this for each inbox if you manage multiple accounts.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46ED25Y0GRRBH40Z5F0335V",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_outreach_health", "widget_inbox_health"]
+  }
+}

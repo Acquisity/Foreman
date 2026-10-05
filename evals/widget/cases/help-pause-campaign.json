@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains how to pause a campaign from the campaign page.",
+      "Does not claim to have paused anything for the customer."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": 1
+  },
+  "question": "How do I pause a campaign?",
+  "scope": {
+    "role": "client",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "local"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "client",
+    "safety": [],
+    "tools": []
+  }
+}

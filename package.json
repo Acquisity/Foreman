@@ -25,7 +25,8 @@
     "typecheck": "tsc",
     "validate": "tsx scripts/executor-linear-specs.ts --check && pnpm run check && pnpm run typecheck && eve info && pnpm run test",
     "verify:built-github": "tsx scripts/verify-built-github.mjs",
-    "widget:case": "tsx scripts/widget-case-from-run.ts"
+    "widget:case": "tsx scripts/widget-case-from-run.ts",
+    "widget:judge": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-judge.ts"
   },
   "dependencies": {
     "@agent-browser/eve": "0.37.1",

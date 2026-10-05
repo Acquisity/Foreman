@@ -1,0 +1,79 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [],
+          "detailsTruncated": false,
+          "error": 0,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 0,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 0,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": true,
+          "isActive": true,
+          "updatedAt": "2026-06-07T12:17:50.389Z"
+        },
+        "observedAt": "2026-10-05T00:34:06.108Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": null,
+          "recentErrorCount": 0,
+          "recentEventCount": 0,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T00:34:14.828Z",
+      "resultAt": "2026-10-05T00:34:37.492Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace has no email accounts, so no inbox can be healthy or erroring; only a saved account-level connection error is recorded.",
+    "claims": [
+      "Says no email accounts were found in this workspace.",
+      "Does not call any inbox healthy or broken.",
+      "Does not present the saved connection error as a confirmed current failure."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 3
+  },
+  "question": "Are my inboxes healthy? Any of them disconnected or erroring?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_01M44QQ283G6ANMFJKEEV0S56D",
+    "target": "local"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_inbox_health"]
+  }
+}
