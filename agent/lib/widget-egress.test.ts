@@ -1089,6 +1089,7 @@ test("stacked source and document extensions retain domain ownership checks", ()
     ["other-company.com.json", "other-company.com"],
     ["other-company.com.html", "other-company.com"],
     ["other-company.com.js", "other-company.com"],
+    ["other-company.zip.ts", "other-company.zip"],
   ]) {
     assert.deepEqual(scanIdentifiers(file).candidates.domains, [domain]);
   }
@@ -1108,6 +1109,7 @@ test("the live gate blocks stacked extensions in composed replies and removes th
     "other-company.com.json",
     "other-company.com.html",
     "other-company.com.js",
+    "other-company.zip.ts",
   ]) {
     const domain = file.slice(0, file.lastIndexOf("."));
     // biome-ignore lint/performance/noAwaitInLoops: each file needs an independent gate run.

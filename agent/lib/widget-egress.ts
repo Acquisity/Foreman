@@ -103,7 +103,7 @@ const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mjs|cjs|s?css|json|html?)$/u;
 // Only these common TLDs qualify a source-file stem; "next.config" is not a domain.
 const SOURCE_STEM_TLD =
-  /\.(?:com|net|org|io|ai|co|us|uk|ca|de|app|dev|biz|info|me)$/u;
+  /\.(?:com|net|org|io|ai|co|us|uk|ca|de|app|dev|biz|info|me|zip)$/u;
 // Help articles name upload and export formats ("Choose a .CSV file"). None of these
 // endings is a top-level domain, but a domain-shaped stem ("other-company.com.pdf")
 // still names a domain, so that stem is checked in place of the file name.
