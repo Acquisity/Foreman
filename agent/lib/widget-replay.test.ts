@@ -310,6 +310,17 @@ test("request-selected cases stay isolated through session auth and ownership", 
         );
       })
     );
+    // Only the paused-campaign cassette contains this id, so a wrong case cannot own it.
+    const onlyInPaused = "00000000-0000-4000-8000-000000000004";
+    const owned = await Promise.all(
+      scopes.map((scope) =>
+        resolveOwnedIdentifiers(scope, { uuids: [onlyInPaused] })
+      )
+    );
+    assert.deepEqual(
+      owned.map((identifiers) => identifiers.uuids.has(onlyInPaused)),
+      [false, true]
+    );
     await assert.rejects(
       verifyWidgetContext({
         conversationId: fixture.conversationId,
