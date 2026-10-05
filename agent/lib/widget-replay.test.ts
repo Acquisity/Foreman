@@ -314,7 +314,11 @@ test("request-selected cases stay isolated through session auth and ownership", 
     const onlyInPaused = "00000000-0000-4000-8000-000000000004";
     const owned = await Promise.all(
       scopes.map((scope) =>
-        resolveOwnedIdentifiers(scope, { uuids: [onlyInPaused] })
+        resolveOwnedIdentifiers(scope, {
+          emails: [],
+          slugs: [],
+          uuids: [onlyInPaused],
+        })
       )
     );
     assert.deepEqual(
