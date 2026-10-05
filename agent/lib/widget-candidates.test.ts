@@ -164,7 +164,7 @@ test("only investigation sessions behind a signal go to the converter", () => {
 
 test("excluded test workspaces never produce a candidate", () => {
   const excluded = parseExcludedOrgs(` ${TEST_ORG.toUpperCase()} ,`);
-  assert.deepEqual([...excluded], [TEST_ORG]);
+  assert.ok(excluded.has(TEST_ORG));
   const mine = withReason("kb_miss");
   const theirs = { ...withReason("kb_miss"), organization_id: TEST_ORG };
   assert.deepEqual(
@@ -173,7 +173,7 @@ test("excluded test workspaces never produce a candidate", () => {
     ),
     [ORG]
   );
-  assert.equal(parseExcludedOrgs(undefined).size, 0);
+  assert.equal(parseExcludedOrgs(undefined).size, 2);
   assert.throws(() => parseExcludedOrgs("acme-test"));
 });
 

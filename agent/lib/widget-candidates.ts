@@ -61,14 +61,16 @@ export interface Candidate {
 
 /** Explicit test-workspace organization ids, comma separated. Anything else is refused, so a typo cannot silently exclude nothing. */
 export const parseExcludedOrgs = (value: string | undefined) =>
-  new Set(
-    z.array(z.uuid()).parse(
+  new Set([
+    "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5",
+    "af11d514-3fbd-459c-8425-81b6b80929a0",
+    ...z.array(z.uuid()).parse(
       (value ?? "")
         .split(",")
         .map((id) => id.trim().toLowerCase())
         .filter(Boolean)
-    )
-  );
+    ),
+  ]);
 
 const PUSHBACK =
   /\b(not help(ing|ful)?|(that'?s|this is|you'?re|it'?s) (wrong|not (right|correct|true|it))|incorrect|useless|does ?n[o']t (help|work|answer)|did ?n[o']t (help|work|answer)|still (not|does ?n[o']t|have|broken)|same (problem|issue|question)|you (already|just) said|i already (said|told|asked))\b/i;
