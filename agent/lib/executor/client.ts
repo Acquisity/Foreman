@@ -3,6 +3,7 @@ import {
   LINEAR_OPERATIONS,
   type LinearOperation,
 } from "../linear-operations.js";
+import { isQuestionsOnly } from "../trust.js";
 import { operationPath } from "./bindings.js";
 import type { ExecutorOutcome } from "./dispatch.js";
 import { invokeProvider, type ProviderContext } from "./dispatch.js";
@@ -15,9 +16,27 @@ import { ExecutorError } from "./transport.js";
 
 const linearInput = z.object({ variables: z.record(z.string(), z.unknown()) });
 
+/**
+ * Questions-only Slack sessions read Linear but never write it, whichever
+ * authored helper asks; refused before any binding or dispatch.
+ */
+function assertLinearWriteAllowed(ctx: ProviderContext, operation: string) {
+  const document = operation.startsWith("linear.")
+    ? LINEAR_OPERATIONS[operation.slice(7) as LinearOperation]?.document
+    : undefined;
+  if (
+    document?.trimStart().startsWith("mutation") &&
+    (isQuestionsOnly(ctx.session?.auth.current) ||
+      isQuestionsOnly(ctx.session?.auth.initiator))
+  ) {
+    throw new ExecutorError("questions_only", 403, { dispatched: false });
+  }
+}
+
 /** Typed arguments cross one transport boundary; no simulated provider HTTP request. */
 export function executorClient(ctx: ProviderContext): ProviderClient {
   return async (request, options = {}) => {
+    assertLinearWriteAllowed(ctx, request.operation);
     const path = operationPath(request.operation);
     const input = request.operation.startsWith("linear.")
       ? {
