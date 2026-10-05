@@ -10,6 +10,13 @@ import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
 import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
 import { answeredLane, gradeRun, stepUsage } from "#lib/widget-graders.js";
+import {
+  claimsFor,
+  JUDGE_MODEL,
+  JUDGE_OUTPUT,
+  judgeAnswer,
+  saveRecord,
+} from "#lib/widget-judge.js";
 import { REPLAY_TICKET, replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
@@ -19,6 +26,8 @@ const EARLIER = "\n\nEARLIER TURNS (";
 const TURN = /^(Customer|Support): /u;
 const POLL_MS = 3000;
 const DEADLINE_MS = 300_000;
+/** One review directory per eval invocation, shared by every case in it. */
+const REVIEW_DIR = `${JUDGE_OUTPUT}/${new Date().toISOString().replace(/[:.]/g, "-")}`;
 
 /** A recorded question is the router's rendering; split it back into the message and its earlier turns. */
 function toRequest(question: string) {
@@ -174,6 +183,7 @@ async function gradeReplay(
       t.check(grade, equals("pass")).label(check);
     }
   }
+  await judgeClaims(t, run.outcome?.message ?? null, recorded, path);
   if (!session) {
     t.log("No investigation session: the front door answered.");
     return;
@@ -207,6 +217,52 @@ async function gradeReplay(
   );
   t.check(misses.length, equals(0));
   t.check(live.length, equals(0));
+}
+
+/**
+ * One judge call per answered case. Verdicts are soft until Aaron's gold
+ * labels show at least 90 percent agreement per claim (ENG-14686).
+ */
+async function judgeClaims(
+  t: EveEvalContext,
+  answer: string | null,
+  recorded: WidgetCase,
+  path: string
+) {
+  if (!answer) {
+    return;
+  }
+  const claims = claimsFor(recorded);
+  try {
+    const verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
+    const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
+    saveRecord(REVIEW_DIR, {
+      answer,
+      case: name,
+      judgedAt: new Date().toISOString(),
+      model: JUDGE_MODEL,
+      verdicts: verdicts.map((verdict, n) => ({
+        ...verdict,
+        claim: claims[n]?.text ?? "",
+      })),
+    });
+    t.log(`judge review: ${REVIEW_DIR}/review.md`);
+    for (const verdict of verdicts) {
+      t.log(`judge ${verdict.id}: ${verdict.verdict} (${verdict.reason})`);
+      t.check(
+        verdict.verdict,
+        satisfies((value) => value === "yes", `judge: ${verdict.id}`)
+      )
+        .label(`judge ${verdict.id}`)
+        .soft();
+    }
+  } catch (error) {
+    t.log(`judge failed: ${String(error).slice(0, 300)}`);
+    t.check(
+      null,
+      satisfies(() => false, "the claims judge answered")
+    ).soft();
+  }
 }
 
 function usageRow(events: readonly EveEvalStreamEvent[]) {
