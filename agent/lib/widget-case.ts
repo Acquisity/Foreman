@@ -127,6 +127,13 @@ const literal = (value: string) => value.replace(REGEX_SPECIAL, "\\$&");
 const billingCatalogNames = (raw: WidgetCase) => {
   const counts = new Map<string, number>();
   const walk = (item: unknown, depth: number): void => {
+    if (typeof item === "string") {
+      const decoded = structuredText(item);
+      if (decoded) {
+        walk(decoded, depth + 1);
+      }
+      return;
+    }
     if (depth > MAX_DEPTH || !item || typeof item !== "object") {
       return;
     }

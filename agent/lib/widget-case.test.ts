@@ -448,3 +448,17 @@ test("provider record ids are replaced consistently and never saved", () => {
   leaked.case.question = `Refund ${payment}`;
   assert.throws(() => serializeCase(leaked), NOT_SAVED);
 });
+
+test("catalog labels inside JSON-encoded billing output are kept too", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        billing(
+          JSON.stringify({ feature: { id: "domains", name: "Domains" } })
+        ),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.equal(JSON.parse(saved).feature.name, "Domains");
+});
