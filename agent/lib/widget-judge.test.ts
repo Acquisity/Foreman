@@ -343,7 +343,7 @@ test("review carries question, role, expectation, source and collapsible evidenc
     "Authored cause: unset",
     "<details>",
     "widget_outreach_health",
-    recorded.source.runId ?? "no source run id",
+    recorded.source.runId ?? `"runId": null`,
     sample.answer,
   ]) {
     assert.ok(review.includes(text), text);
