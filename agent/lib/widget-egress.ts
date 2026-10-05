@@ -108,17 +108,22 @@ const SOURCE_STEM_TLD =
 // endings is a top-level domain, but a domain-shaped stem ("other-company.com.pdf")
 // still names a domain, so that stem is checked in place of the file name.
 const DOCUMENT_FILE = /\.(?:csv|xlsx?|pdf|txt|png|jpe?g|gif|docx?)$/u;
-/** The name a file name may hide, or null for a plain code file such as next.config.js. */
+/**
+ * The name a file name may hide, so ownership is checked against the real domain
+ * ("workspace.com.js.pdf" is workspace.com), or null for a plain code file such as
+ * next.config.js.
+ */
 const fileStem = (match: string): string | null => {
-  if (!SOURCE_FILE.test(match)) {
-    return match.replace(DOCUMENT_FILE, "");
-  }
+  const document = match.replace(DOCUMENT_FILE, "");
   // Stacked code endings ("other-company.com.json.ts") still hide a domain stem.
-  let stem = match;
+  let stem = document;
   while (SOURCE_FILE.test(stem)) {
     stem = stem.replace(SOURCE_FILE, "");
   }
-  return SOURCE_STEM_TLD.test(stem) ? stem : null;
+  if (stem === document || SOURCE_STEM_TLD.test(stem)) {
+    return stem;
+  }
+  return document === match ? null : document;
 };
 const WORKSPACE_PATH = /\/dashboard\/([^/\s?#]+)/g;
 const STACK_TRACE = /\n\s+at\s+\S.*:\d+(?::\d+)?\)?/;

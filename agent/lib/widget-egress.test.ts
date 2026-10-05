@@ -637,6 +637,8 @@ test("a website's custom domain and the workspace's billing account are owned; t
       }).deps
     );
   assert.equal((await answer(ownedDomain)).decision, "allow");
+  // A file named after the owned domain is checked as that domain, so it is allowed.
+  assert.equal((await answer(`${ownedDomain}.js.pdf`)).decision, "allow");
   const foreign = await answer("other-tenant-site.com");
   assert.equal(foreign.decision, "block");
   assert.equal(foreign.reason, "foreign_identifier:other-tenant-site.com");
@@ -1083,9 +1085,9 @@ test("a block is asked once more with blocking off and that answer is applied as
 
 test("stacked source and document extensions retain domain ownership checks", () => {
   for (const [file, domain] of [
-    ["other-company.com.js.pdf", "other-company.com.js"],
-    ["other-company.com.html.csv", "other-company.com.html"],
-    ["tenant-data.zip.ts.png", "tenant-data.zip.ts"],
+    ["other-company.com.js.pdf", "other-company.com"],
+    ["other-company.com.html.csv", "other-company.com"],
+    ["tenant-data.zip.ts.png", "tenant-data.zip"],
     ["other-company.com.json", "other-company.com"],
     ["other-company.com.json.ts", "other-company.com"],
     ["other-company.com.html", "other-company.com"],
@@ -1104,9 +1106,9 @@ test("stacked source and document extensions retain domain ownership checks", ()
 
 test("the live gate blocks stacked extensions in composed replies and removes them from findings", async () => {
   for (const [file, domain] of [
-    ["other-company.com.js.pdf", "other-company.com.js"],
-    ["other-company.com.html.csv", "other-company.com.html"],
-    ["tenant-data.zip.ts.png", "tenant-data.zip.ts"],
+    ["other-company.com.js.pdf", "other-company.com"],
+    ["other-company.com.html.csv", "other-company.com"],
+    ["tenant-data.zip.ts.png", "tenant-data.zip"],
     ["other-company.com.json", "other-company.com"],
     ["other-company.com.json.ts", "other-company.com"],
     ["other-company.com.html", "other-company.com"],
