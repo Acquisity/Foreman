@@ -231,9 +231,6 @@ function usageRow(events: readonly EveEvalStreamEvent[]) {
     tokens: usage.usageReported
       ? `${usage.inputTokens} in / ${usage.outputTokens} out (${usage.usageReported}/${usage.steps} steps reported)`
       : "not available",
-    total: at.length
-      ? seconds(Math.max(...at) - Math.min(...at))
-      : "not available",
     usageCoverage:
       "Investigator session only; router, help-center, extractor, gate and composer calls are not counted.",
   };
