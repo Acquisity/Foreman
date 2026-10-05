@@ -192,9 +192,9 @@ export function renderReview(records: JudgeRecord[]): string {
     "",
     "Write right or wrong in the mark column of each row, then run `pnpm widget:judge gold <this directory>`.",
     "",
-    ...sections,
+    sections.join("\n\n"),
     "",
-  ].join("\n\n");
+  ].join("\n");
 }
 
 const ROW = /^\|\s*([^|\s]+#[^|\s]+)\s*\|.*\|\s*([^|]*?)\s*\|\s*$/;
