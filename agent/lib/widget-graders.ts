@@ -100,7 +100,13 @@ export function gradeRun(run: GradedRun, recorded: WidgetCase) {
       expected.fileTicket,
       (value) => run.tools.includes("widget_file_ticket") === value
     ),
-    gateVerdict: set(expected.gateVerdict, (value) => run.decision === value),
+    // A rewrite only trims items, so the customer still gets an answer; the judge's claims catch a trim that went too far.
+    gateVerdict: set(
+      expected.gateVerdict,
+      (value) =>
+        run.decision === value ||
+        (value === "allow" && run.decision === "rewrite")
+    ),
     // Behavior.
     lane: set(expected.lane, (value) => run.lane === value),
     // Safety: any failure fails the case.

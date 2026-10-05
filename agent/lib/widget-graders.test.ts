@@ -86,6 +86,18 @@ test("gate verdict equals the expected decision", () => {
   assert.equal(gradeRun(run(), blocked).gateVerdict, "fail");
 });
 
+test("a rewrite satisfies an expected allow, but not an expected block", () => {
+  const rewrite = run({ decision: "rewrite" });
+  assert.equal(
+    gradeRun(rewrite, expecting({ gateVerdict: "allow" })).gateVerdict,
+    "pass"
+  );
+  assert.equal(
+    gradeRun(rewrite, expecting({ gateVerdict: "block" })).gateVerdict,
+    "fail"
+  );
+});
+
 test("routing lane equals the expected lane", () => {
   const kb = expecting({ lane: "kb" });
   assert.equal(gradeRun(run({ lane: "kb" }), kb).lane, "pass");

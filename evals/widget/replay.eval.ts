@@ -164,6 +164,8 @@ async function gradeReplay(
     `row: ${JSON.stringify({
       case: path,
       ...grades,
+      // The gate's reason names the items a rewrite removed, e.g. jev:remove_items:2,3.
+      gateReason: run.outcome?.reason ?? null,
       ...usageRow(events),
     })}`
   );
