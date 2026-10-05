@@ -9,7 +9,11 @@ import type {
   IdentifierCandidates,
   OwnedIdentifiers,
 } from "./widget-evidence.js";
-import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
+import {
+  requireWidgetContext,
+  type WidgetContext,
+  widgetContextSchema,
+} from "./widget-scope.js";
 
 /**
  * Eval replay: with WIDGET_REPLAY_CASE naming a case file, every widget read
@@ -137,7 +141,10 @@ export function replayable<T extends { description: string }>(
   if (!isReplayActive()) {
     return tool;
   }
-  const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
+  const { approval, description, inputSchema } = tool as T & {
+    approval?: Parameters<typeof defineTool>[0]["approval"];
+    inputSchema: z.ZodType;
+  };
   const recorded = replayCase();
   if (reads.get(name)?.schema !== inputSchema) {
     const outputs = new Map<string, unknown>();
@@ -156,9 +163,14 @@ export function replayable<T extends { description: string }>(
     reads.set(name, { outputs, schema: inputSchema });
   }
   return defineTool({
+    approval,
     description,
     // No outputSchema: the miss result must reach the model as it is.
-    execute: (input) => replayRead(name, input),
+    execute: (input, ctx) => {
+      // The authored tool's scope check, so a malformed widget session reads nothing.
+      requireWidgetContext(ctx.session.auth.initiator);
+      return replayRead(name, input);
+    },
     inputSchema,
   }) as unknown as T;
 }
