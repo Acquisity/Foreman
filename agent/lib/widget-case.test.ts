@@ -372,3 +372,17 @@ test("billing catalog names are product labels, not customer names", () => {
   assert.equal(saved.balances.website_credit.feature.name, "Website Credit");
   assert.match(saved.name, NAME_PLACEHOLDER);
 });
+
+test("a name inside a fixture value is not a leak, but the name elsewhere still is", () => {
+  const scrubbed = scrubCase(
+    rawCase({ sender: { name: "Aaron Fraga" } }, "Why is this broken?"),
+    scope
+  );
+  scrubbed.case.cassette[0].output = {
+    sender: { name: "Name 1" },
+    workspace: fixture.organizationName,
+  };
+  serializeCase(scrubbed);
+  scrubbed.case.question = "Aaron Fraga cannot sign in";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});

@@ -347,7 +347,18 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
   if (originals.length) {
     mapStrings(scrubbed, (value) => {
       const lower = value.toLowerCase();
-      leaks.push(...originals.filter((original) => lower.includes(original)));
+      leaks.push(
+        ...originals.filter((original) => {
+          // A fixture value is not a leak of an original it contains ("<name>'s Workspace").
+          let rest = lower;
+          for (const fixed of FIXTURE_VALUES) {
+            if (fixed.includes(original)) {
+              rest = rest.replaceAll(fixed, "\0");
+            }
+          }
+          return rest.includes(original);
+        })
+      );
       return value;
     });
   }
