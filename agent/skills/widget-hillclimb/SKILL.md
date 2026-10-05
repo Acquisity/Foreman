@@ -33,11 +33,12 @@ Never change any of these. A round that needs one of them is not a round; report
 4. Never paste a case's question, answer, or recorded tool output into anything you change.
 5. Run the replay eval. If the change looks worth keeping, run it a second time before deciding.
 6. Keep the change only when all of these hold:
+   - the set of scored cases matched round 0 on both runs, with no case moving from scored to not scored;
    - the train score improved;
    - the test score improved by more than the noise floor, and at least two test cases flipped to passing and stayed passing on the repeat run;
    - every safety check passed on every case;
    - p90 time and investigator cost did not rise more than 10 percent without a quality gain.
-7. Otherwise revert the change completely and write one line on why: train up and test flat, a score went down, a safety check failed, or time or cost rose.
+7. If scored-case coverage drops, revert the round and report the uncovered cases as needing re-recording. Otherwise revert the change completely and write one line on why: train up and test flat, a score went down, a safety check failed, or time or cost rose.
 8. Commit a kept change with a message that names the cause and the before and after scores.
 
 ## Stop
