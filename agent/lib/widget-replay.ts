@@ -141,10 +141,7 @@ export function replayable<T extends { description: string }>(
   if (!isReplayActive()) {
     return tool;
   }
-  const { approval, description, inputSchema } = tool as T & {
-    approval?: Parameters<typeof defineTool>[0]["approval"];
-    inputSchema: z.ZodType;
-  };
+  const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
   const recorded = replayCase();
   if (reads.get(name)?.schema !== inputSchema) {
     const outputs = new Map<string, unknown>();
@@ -162,12 +159,13 @@ export function replayable<T extends { description: string }>(
     }
     reads.set(name, { outputs, schema: inputSchema });
   }
+  // Only inline callbacks here: eve drops a tool whose forwarded authored
+  // callback (such as its approval) is not stamped at this call site.
   return defineTool({
-    approval,
     description,
     // No outputSchema: the miss result must reach the model as it is.
     execute: (input, ctx) => {
-      // The authored tool's scope check, so a malformed widget session reads nothing.
+      // Stricter than the authored issuer-only approval: a widget session without a verified scope reads nothing.
       requireWidgetContext(ctx.session.auth.initiator);
       return replayRead(name, input);
     },
