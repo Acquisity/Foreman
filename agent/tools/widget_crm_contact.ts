@@ -113,7 +113,7 @@ const contactRow = z.object({
 });
 const rowSchema = z.object({
   authorized: z.boolean(),
-  email_matches: z.array(contactRow).nullable(),
+  email_matches: z.array(contactRow),
   name_matches: z.array(contactRow).nullable(),
   workspace: z.string().nullable(),
 });
@@ -145,7 +145,17 @@ export async function readWidgetCrmContact(
       throw new Error("Evidence provider unavailable.");
     }
     const [result] = z
-      .object({ rows: z.array(rowSchema).min(1) })
+      .object({
+        rows: z
+          .array(
+            rowSchema.extend({
+              name_matches: input.name ? z.array(contactRow) : z.null(),
+            })
+          )
+          .length(1),
+        success: z.literal(true),
+        warnings: z.array(z.unknown()).max(0).optional(),
+      })
       .parse(providerData(provided.data)).rows;
     if (!(result.authorized && result.workspace)) {
       return {
@@ -153,7 +163,7 @@ export async function readWidgetCrmContact(
         status: "denied",
       };
     }
-    const emailRows = result.email_matches ?? [];
+    const emailRows = result.email_matches;
     const nameRows = result.name_matches;
     return {
       caveats: [
@@ -195,7 +205,7 @@ const tool = defineTool({
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
     "Read this workspace's live CRM people (contacts) that already carry an exact email address, matched case-insensitively, and optionally the people whose display name contains a given fragment, with the emails saved on each. " +
-    "Use it when a CRM field edit did not save, cleared, or reverted, or when the customer asks whether an address already belongs to another person. " +
+    "Use it when a CRM email edit did not save, cleared, or reverted, or when the customer asks whether an address already belongs to another person. Pass the attempted email address and, when known, the person's name as the optional name fragment. If the attempted email address is not in the conversation, ask for it. " +
     "Returns at most 10 people with 10 emails each, with truncation flags. Deleted or merged people, companies and leads are not read. unavailable means the records could not be read, distinct from an empty result.",
   execute: (input, ctx) => readWidgetCrmContact(ctx, input),
   inputSchema: widgetCrmContactInput,

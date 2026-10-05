@@ -6,6 +6,7 @@ import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import { widgetInstructions } from "#lib/widget-instructions.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetCrmContactQuery,
@@ -214,4 +215,48 @@ test("non-widget session is refused before dispatch", async (t) => {
   } as unknown as ProviderContext;
   await assert.rejects(() => readWidgetCrmContact(finCtx, { email: "a@b.co" }));
   assert.equal(call.mock.callCount(), 0);
+});
+
+test("failed or incomplete CRM evidence returns unavailable", async (t) => {
+  t.mock.method(console, "warn", () => undefined);
+  const row = {
+    authorized: true,
+    email_matches: [],
+    name_matches: null,
+    workspace: "Test Workspace",
+  };
+  for (const [response, name] of [
+    [{ rows: [row], success: false }, undefined],
+    [{ rows: [row], success: true, warnings: ["Incomplete read"] }, undefined],
+    [{ rows: [row, row], success: true }, undefined],
+    [{ rows: [{ ...row, email_matches: null }], success: true }, undefined],
+    [{ rows: [row], success: true }, "Person"],
+    [{ rows: [{ ...row, name_matches: [] }], success: true }, undefined],
+  ] as const) {
+    t.mock.method(executorTransport, "call", async () => ({
+      data: { structuredContent: response },
+      ok: true,
+    }));
+    // biome-ignore lint/performance/noAwaitInLoops: Each case replaces the shared transport mock and must finish before the next.
+    const result = await readWidgetCrmContact(ctx, { email: "a@b.co", name });
+    assert.equal(result.status, "unavailable");
+  }
+});
+
+test("CRM email edit instructions use the attempted email address as the selector", () => {
+  const instructions = widgetInstructions(widgetAuth(scope));
+  assert.ok(
+    instructions.includes("CRM email edit did not save, cleared, or reverted")
+  );
+  assert.ok(
+    instructions.includes("widget_crm_contact with the attempted email address")
+  );
+  assert.ok(
+    instructions.includes("person's name as the optional name fragment")
+  );
+  assert.ok(
+    instructions.includes(
+      "If the attempted email address is not in the conversation, ask for it"
+    )
+  );
 });
