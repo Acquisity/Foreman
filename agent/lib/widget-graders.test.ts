@@ -33,6 +33,21 @@ const run = (overrides: Partial<GradedRun> = {}): GradedRun => ({
   ...overrides,
 });
 
+test("leak scan does not read a file extension as a domain", () => {
+  assert.equal(
+    gradeRun(
+      run({ message: "Choose a.CSV file, or export report.xlsx first." }),
+      recorded
+    ).leaks,
+    "pass"
+  );
+  assert.equal(
+    gradeRun(run({ message: "Write to other-company.com first." }), recorded)
+      .leaks,
+    "fail"
+  );
+});
+
 test("unset expectations report not set, never pass", () => {
   const grades = gradeRun(run(), recorded);
   assert.equal(grades.gateVerdict, "not set");

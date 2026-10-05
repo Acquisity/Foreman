@@ -99,8 +99,10 @@ const TRAILING_DOT = /\.$/u;
 const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 // A website fix names the file that broke ("calendar.tsx", "next.config.js"). These
 // endings are not registrable domains, so such a name is never another tenant's
-// domain; treating it as one deleted the fix from the reply.
-const SOURCE_FILE = /\.(?:tsx?|jsx?|mjs|cjs|s?css|json|html?)$/u;
+// domain; treating it as one deleted the fix from the reply. Help articles name
+// upload and export formats ("Choose a .CSV file") the same way.
+const SOURCE_FILE =
+  /\.(?:tsx?|jsx?|mjs|cjs|s?css|json|html?|csv|xlsx?|pdf|txt|png|jpe?g|gif|zip|docx?)$/u;
 const WORKSPACE_PATH = /\/dashboard\/([^/\s?#]+)/g;
 const STACK_TRACE = /\n\s+at\s+\S.*:\d+(?::\d+)?\)?/;
 const LINEAR_REF = /\bENG-\d+\b/g;
