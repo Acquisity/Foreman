@@ -236,7 +236,8 @@
     "claims": [
       "Says no sending connection is configured for this workspace, from saved state, and does not claim to have counted its sending accounts.",
       "Explains how to get email accounts to send from (pre-warmed inboxes or done-for-you setup), based on the help center.",
-      "Does not name the outside email provider behind sending accounts."
+      "Does not name the outside email provider behind sending accounts.",
+      "Addresses the grayed-out Email Accounts and New Campaign controls, or says the evidence cannot show how to reopen the setup."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
