@@ -103,7 +103,7 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Says where the Zoom or meeting link is set up for AI SDR bookings, based on the help center.",
+      "Says where a Zoom account connection is set up when the help center supports it, or says this could not be confirmed. The location of a meeting link alone does not answer it.",
       "Says whether a Zoom account is connected for bookings from the saved settings, or that it could not be confirmed.",
       "Does not name a connected email it did not see in a result.",
       "Does not change anything or claim to have changed anything."
