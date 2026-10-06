@@ -19,6 +19,7 @@ import {
   callPlanetscaleReadQuery,
   parseReadQueryResult,
 } from "#lib/planetscale.js";
+import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
   type WidgetContext,
@@ -738,6 +739,8 @@ const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
+      isWidgetSupport(ctx.session.auth.initiator)
+        ? replayable("widget_billing_summary", tool)
+        : null,
   },
 });

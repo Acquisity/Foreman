@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says the AI SDR does not send its own reminder email.",
+      "Says the reminder comes from the calendar invite itself, such as the calendar's email reminder before the event.",
+      "Does not ask which page or feature the customer means."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "Is there an automatic email reminder that goes out to the prospect before a call the AI SDR booked?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -1,0 +1,412 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 1685,
+            "updatedAt": "2026-09-17T19:37:48.809+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "draft",
+            "totalLeads": 500,
+            "updatedAt": "2026-09-13T15:03:17.257+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 3",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "draft",
+            "totalLeads": 0,
+            "updatedAt": "2026-07-03T14:40:50.192+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 3
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-02T19:54:25.135Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-02T19:53:54.776Z",
+      "resultAt": "2026-10-02T19:54:26.903Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000001"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [
+                  {
+                    "connected": false,
+                    "email": "person-1@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000004",
+                    "status": "error"
+                  },
+                  {
+                    "connected": false,
+                    "email": "person-2@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000005",
+                    "status": "error"
+                  },
+                  {
+                    "connected": false,
+                    "email": "person-3@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000006",
+                    "status": "error"
+                  }
+                ],
+                "configuredCount": 3,
+                "healthyCount": 0,
+                "matchedCount": 3,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [],
+              "endDate": "2026-10-02",
+              "overview": null,
+              "startDate": "2026-09-26"
+            },
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": true,
+              "campaignDailyLimit": 105,
+              "notSendingReason": null,
+              "notSendingReasonCode": null,
+              "observedAt": "2026-10-02T19:54:45.202Z",
+              "statusCode": 2,
+              "updatedAt": "2026-08-14T13:51:54.930Z"
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 1685,
+            "updatedAt": "2026-09-17T19:37:48.809+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 3
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-02T19:54:31.003Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-02T19:54:29.277Z",
+      "resultAt": "2026-10-02T19:54:45.203Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [],
+          "detailsTruncated": false,
+          "error": 0,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 0,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 0,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": true,
+          "isActive": true,
+          "updatedAt": "2026-06-07T12:17:50.389Z"
+        },
+        "observedAt": "2026-10-02T19:54:48.527Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": null,
+          "recentErrorCount": 0,
+          "recentEventCount": 0,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-02T19:54:46.979Z",
+      "resultAt": "2026-10-02T19:55:01.451Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "query": "campaign paused not sending"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign.mdx",
+            "title": "Where is the bounce protection toggle for a paused campaign?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
+            "title": "Managing Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/concepts/campaign-states.mdx",
+            "title": "Campaign states",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/campaign-states"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments.mdx",
+            "title": "How do I pause a campaign without stopping my subscription payments?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-02T19:55:06.023Z",
+      "resultAt": "2026-10-02T19:55:06.935Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "query": "sending account connection error"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean.mdx",
+            "title": "What do the account statuses mean?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error.mdx",
+            "title": "How do I fix an account with an error?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+          },
+          {
+            "path": "apps/web/content/docs/account-settings.mdx",
+            "title": "Manage Your Personal Account",
+            "url": "https://app.acquisity.ai/docs/account-settings"
+          },
+          {
+            "path": "apps/web/content/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error.mdx",
+            "title": "The Growth Plan Creator shows an Application Error?",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-02T19:55:06.026Z",
+      "resultAt": "2026-10-02T19:55:06.997Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "output": {
+        "content": "Click on the account to open its settings, then click **Reconnect**. This triggers a re-authentication process (OAuth reconnect). It can take up to 48 hours to fully resolve.\n\n## Related\n\n- [DFY warmup & reconnect errors](/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors)\n- [What do the account statuses mean?](/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)",
+        "title": "How do I fix an account with an error?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "requestedAt": "2026-10-02T19:55:09.518Z",
+      "resultAt": "2026-10-02T19:55:09.603Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/campaign-states"
+      },
+      "output": {
+        "content": "Every campaign has a **status** that tells you what it's doing \u2014 or why it's not doing anything. Status appears as a coloured badge on the Campaigns list and at the top of each campaign's detail page.\n\nThis page explains each status, what the system is actually doing in that state, and \u2014 critically \u2014 what to do when you see the ones that worry people.\n\n## The six statuses\n\n| Status | What it means | Is it sending? |\n|---|---|---|\n| **Draft** | The campaign is not sending yet. It may be unfinished, or fully set up and waiting for you to launch it. | No |\n| **Active** | Normal running state. | Yes, during the configured hours |\n| **Paused** | You stopped it, bounce protection stopped it, or the agent paused it while starting an enabled replacement campaign. All data is preserved. | No |\n| **Completed** | Every lead has reached the last [step](^ \"step\") of the sequence. | No \u2014 the campaign is done |\n| **Archived** | Hidden from the default Campaigns list. | No |\n| **[Attention Needed](^ \"attention-needed\")** | Something needs you to look at it. | Sometimes \u2014 depends on the reason |\n\nThe two that confuse people most are **Completed** and **Attention Needed**. Both look like errors to new users, and neither actually is.\n\n## Draft\n\nYou started the [new campaign wizard](/docs/cold-email-agent/campaigns/create-a-campaign) and the campaign is not sending yet. It may be an unfinished wizard draft, or it may be a fully created campaign waiting for a final launch review.\n\n**What the system is doing:** nothing. The campaign shell exists but isn't sending.\n\n**What to do:** open the campaign. If the wizard resumes, finish the remaining steps and click **Create Campaign**. If the campaign detail page opens with a **Launch campaign** button, review **Leads**, **Sequences**, and **Options**, then launch only when you're ready for emails to start. Delete the draft only if you've changed your mind.\n\n## Active\n\nNormal running state. The campaign is sending emails on its configured schedule, the AI is watching performance, and replies are flowing into the inbox.\n\n**One thing to know:** \"Active\" doesn't mean \"sending right now\" \u2014 it means \"allowed to send during its configured hours.\" If you set a campaign to send Monday\u2013Friday, 9am\u20135pm, and look at it on a Sunday at midnight, it'll be Active but not sending. That's normal.\n\nFor a campaign to actually send *right now*, three things need to be true:\n1. Status is Active.\n2. Current time is within the campaign's sending window (see [Options tab](/docs/cold-email-agent/campaigns/managing-campaigns/options)).\n3. The sending [inboxes](/docs/cold-email-agent/email-accounts) are also Active (not Paused, Error, or Warmup).\n\n## Paused\n\nYou paused the campaign, bounce protection paused it, or the agent paused it while starting an enabled replacement campaign. The agent does not pause a campaign by itself. Sending stops immediately. All data, settings, and progress are preserved.\n\n**What the system is doing:**\n- \u2705 Remembering where each lead is in the sequence.\n- \u2705 Still receiving replies for already-sent emails (they still flow to the inbox).\n- \u274c Not sending new emails.\n- \u274c Not touching your [billing](/docs/cold-email-agent/settings/billing).\n\n**To resume:** click **Resume campaign**. The campaign picks up exactly where it left off.\n\n<Callout type=\"warn\" title=\"Pausing a campaign \u2260 pausing your subscription\">\nThe most common \"gotcha\" on this status: pausing a campaign **does not** stop your [inbox](^ \"pre-warmed-inboxes\") or subscription charges. They continue separately. See [billing](/docs/cold-email-agent/settings/billing) if you need to pause charges too.\n</Callout>\n\n## Completed\n\nEvery lead in the campaign has been through the entire [sequence](^ \"sequence\"). There's nothing more queued for the current set of leads.\n\nThis is the state that most confuses users, who often say *\"Why can't I send this email?\"* when looking at a Completed campaign. The answer is: **the campaign finished its sequence for everyone in it. That's the right outcome, not an error.**\n\n**What the system is doing:**\n- \u2705 Preserving all the data \u2014 you can see analytics, review replies, export leads.\n- \u2705 Still receiving replies for already-sent emails.\n- \u274c Not re-sending the same emails to the same leads (the platform tracks which step each lead received; it won't duplicate).\n\n**If you still want to reach the people in a Completed campaign:**\n\n- **Click Resume campaign in the header.** Resume is available on Completed campaigns. Add new eligible leads from the **Leads** tab via **Import Leads** (CSV) or **Add Leads \u2192 Lead Database**, and they'll go through the sequence from step 1. Existing leads won't get re-emailed.\n- **Duplicate the campaign.** Use Duplicate Campaign from the three-dots menu on the Campaigns list to start fresh with new copy.\n- **Start a new campaign with a fresh eligible list.** Duplicate, blocklist, and unsubscribe rules still apply, so the system may skip people already used in other non-archived campaigns.\n\n## Archived\n\nHidden from the default Campaigns list view so it doesn't clutter your screen. You can still find archived campaigns from the **Status** filter on the Campaigns list.\n\n**What the system is doing:**\n- \u2705 Preserving everything exactly as it was.\n- \u274c Not sending.\n\nUseful for keeping old records around without distracting yourself. If you need to work from an archived campaign again and there is no restore action visible, duplicate it or contact support.\n\n## Attention Needed\n\n**This is the one that looks scariest and is actually the most routine.** The name sounds like \"something is broken\" \u2014 but it really just means *\"I need you to look at this before I can keep going.\"*\n\n**Common reasons a campaign moves to Attention Needed:**\n\n| Reason | What actually happened | What to do |\n|---|---|---|\n| [Bounce rate](^ \"bounce-rate\") too high | Bounce protection paused the campaign to protect your sender reputation | Review the list quality, remove bad addresses, then resume |\n| Provider safety state | The outreach provider reported a state that needs review before sending continues | Open the campaign and read the status reason before resuming |\n| AI campaign management flagged the campaign | Performance or deliverability metrics need attention; this may appear as a recommendation rather than a status change | Open the campaign's AI Agent tab and read the Key Finding |\n| Inbox or domain issue | An inbox or domain used by the campaign has a health/authentication problem | See [health & troubleshooting](/docs/cold-email-agent/email-accounts/health-and-troubleshooting) |\n\n**What to do:** open the campaign and read the status reason or the latest AI Agent entry. If the issue is bounce protection, clicking **Resume campaign** shows a confirmation dialog before sending can continue.\n\nAttention Needed is not an error state. It's a **safety pause** \u2014 the system saw something that warranted a human eye before continuing, so it stopped itself.\n\n## How transitions happen\n\nMost transitions are triggered by you \u2014 clicking **Launch campaign**, Pause, Resume, or Archive. A few happen automatically:\n\n- **Draft \u2192 Active** when you click **Launch campaign**, or when auto-launch was enabled during setup and finalization completes.\n- **Active \u2192 Completed** when the last lead finishes the last step.\n- **Active \u2192 Attention Needed** when the system detects a problem (automatic safety pause).\n- **Active \u2192 Paused** when AI campaign management pauses it as part of an enabled replacement-campaign action.\n\nNo automatic transition from Attention Needed \u2192 Active. You always confirm before the campaign resumes.\n\n## You'll know your campaigns are in good shape when\u2026\n\n- Most of them are **Active** (green) during working hours.\n- Occasional **Paused** entries are ones you paused deliberately.\n- Occasional **Completed** entries are campaigns that finished successfully \u2014 good, not bad.\n- **Attention Needed** is rare and each instance is resolvable in a few minutes.\n- You never have **Error** states lingering (those should all be at the inbox level, not campaign level \u2014 see the [Email Accounts status states](/docs/cold-email-agent/email-accounts/health-and-troubleshooting)).\n\n## If something's not right\n\n### The campaign is stuck in Draft but I thought I launched\n\nOpen the campaign. If the wizard resumes, click through to the remaining step and create the campaign. If the campaign detail page opens with a **Launch campaign** button, setup already finished \u2014 the campaign is waiting for you to review and launch it.\n\n### The campaign is Paused but I never paused it\n\nIf AI campaign management started an enabled replacement campaign, the agent may have paused the old campaign as part of that paired action. Open the AI Agent tab and look for the replacement-campaign entry.\n\nOtherwise, check bounce protection and ask team members who have access. The agent does not pause a campaign as a standalone action.\n\n### \"Completed\" but I still have leads to email\n\nThe campaign ran through its sequence with everyone. To keep reaching those same leads, duplicate the campaign \u2014 this creates a fresh copy ready to run. See [duplicate a campaign](/docs/cold-email-agent/faq/campaigns/how-do-i-duplicate-an-existing-campaign).\n\n### \"Attention Needed\" with no banner explaining why\n\nRefresh the page. If the banner still isn't showing, open the AI Agent tab \u2014 the most recent entry should explain the condition. If there's no AI Agent entry and no banner, something's out of sync \u2014 [contact support](/docs/support) with the campaign name.\n\n### I can resume a Paused campaign but nothing starts sending\n\nCheck:\n- Current time is within the configured sending hours.\n- The sending inboxes are Active and have green flame icons.\n- There are leads still mid-sequence (if everyone's already completed the sequence, Resume reopens the campaign but nothing sends until you add new leads).\n\n## Related\n\n- [Options tab](/docs/cold-email-agent/campaigns/managing-campaigns/options) \u2014 where to change sending schedules, AI campaign management, and other per-campaign settings\n- [AI Agent tab](/docs/cold-email-agent/campaigns/managing-campaigns/ai-agent) \u2014 where the system explains why it paused or flagged a campaign\n- [Bounce protection](/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign) \u2014 the most common cause of Attention Needed\n- [Billing](/docs/cold-email-agent/settings/billing) \u2014 why pausing a campaign doesn't change your bill",
+        "title": "Campaign states",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/campaign-states"
+      },
+      "requestedAt": "2026-10-02T19:55:09.531Z",
+      "resultAt": "2026-10-02T19:55:09.600Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The campaign is paused. Three saved assigned inboxes are disconnected or erroring, but the provider account list is empty.",
+    "claims": [
+      "Says the campaign is paused.",
+      "Says three saved assigned inboxes are disconnected or erroring.",
+      "Says the provider account list is empty, rather than saying the saved inboxes belong to another workspace.",
+      "Does not claim the campaign is sending or will resume.",
+      "Does not tell the customer to blindly reconnect the inboxes."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 8
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ncan you look into why my Name 1 campaign isnt sending?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how can i add more inboxes in my campaign?\nSupport: To add more inboxes to your campaign, go to your campaign, click Options, and use the Add or remove accounts button in the Email accounts section to change your sending pool.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M3Z2W85E0GVAF25PYS9Z5GAX",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_outreach_health",
+      "widget_inbox_health",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

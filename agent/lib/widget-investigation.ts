@@ -150,6 +150,8 @@ const inputSchema = z.discriminatedUnion("action", [
       .max(3)
       .optional(),
     message_id: z.uuid(),
+    // The customer's explicit "Investigate my workspace" toggle.
+    mode: z.literal("investigate").optional(),
     question: z.string().trim().min(1).max(4000),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
@@ -1430,10 +1432,12 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
-  // A teammate asked for an investigation, or the customer sent the recording
-  // an earlier reply asked for: no help-center or handoff front door.
+  // A teammate asked for an investigation, or an owner or admin turned on
+  // "Investigate my workspace" or sent the recording an earlier reply asked
+  // for: no help-center or handoff front door.
   const answered =
-    input.staff || (input.recording && !helpCenterOnly)
+    input.staff ||
+    ((input.recording || input.mode === "investigate") && !helpCenterOnly)
       ? null
       : await answerFromKnowledgeBase(
           run,
@@ -1530,6 +1534,7 @@ export async function receiveWidgetMessage(
     scope = await verifyContext({
       conversationId: input.conversation_id,
       organizationId: input.organization_id,
+      replayCaseId: request.headers.get("x-widget-replay-case"),
       signal: request.signal,
       staff: input.staff,
       userToken,

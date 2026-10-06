@@ -6,6 +6,7 @@ import {
   type ProviderContext,
 } from "../lib/executor/dispatch.js";
 import { RECORDING_READS } from "../lib/widget-policy.js";
+import { replayable } from "../lib/widget-replay.js";
 import {
   isWidgetSupport,
   requireWidgetContext,
@@ -83,6 +84,8 @@ const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      widgetContext(ctx.session.auth.initiator)?.recordingId ? tool : null,
+      widgetContext(ctx.session.auth.initiator)?.recordingId
+        ? replayable("widget_read_recording", tool)
+        : null,
   },
 });

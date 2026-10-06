@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Points to relevant Acquisity tools such as Growth Plan Creator, Market Researcher and Offer Creator.",
+      "Suggests using the AI Consultant to work through the idea.",
+      "Does not ask which page or feature the customer means."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "Do we have any tools I could recommend to a consultant in the procurement industry that he could offer his clients?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

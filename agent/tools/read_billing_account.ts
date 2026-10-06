@@ -22,7 +22,7 @@ export default defineTool({
   },
   inputSchema: z.object({
     organizationId: organizationIdSchema.describe(
-      "The pinnedOrganizationId from lookup_customer."
+      "The organization identity resolution pinned from lookup_customer: pinnedOrganizationId, or the listed membership the investigation selected."
     ),
   }),
   outputSchema: billingAccountResultSchema,

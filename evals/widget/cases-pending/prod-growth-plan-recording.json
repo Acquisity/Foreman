@@ -1,0 +1,154 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "consoleErrors": "{\"total\":0,\"returned\":0,\"hasMore\":false,\"nextCursor\":null,\"events\":[]}",
+        "details": "{\"jamId\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"video\",\"teamId\":\"00000000-0000-4000-8000-000000000002\",\"origin\":\"recording_link\",\"author\":{\"id\":\"00000000-0000-4000-8000-000000000003\",\"name\":\"Aaron Fraga\",\"email\":\"person-1@acquisity.ai\"},\"description\":\"\",\"duration\":35542,\"systemInfo\":{\"browser\":{\"name\":\"Chrome\",\"version\":\"154.0.8037.92\"},\"os\":{\"name\":\"Windows (x86)\",\"version\":\"11\"},\"screenDimensions\":{\"height\":1271,\"width\":2560},\"extension\":{},\"jamClient\":{\"version\":\"jam-recording-links-0.1.0\"},\"battery\":{\"level\":1,\"charging\":true},\"connection\":{\"rttMs\":50,\"saveData\":false,\"downlinkMbps\":10,\"effectiveType\":\"4g\"}},\"createdAt\":\"2026-10-05T16:55:05.656Z\",\"updatedAt\":\"2026-10-05T16:55:05.656Z\",\"integrations\":[],\"title\":\"Customer Name \u00b7 Aaron Fraga's Workspace\",\"folder\":null,\"comments\":[],\"metadata\":{\"country\":\"CA\",\"isIncognito\":false,\"hasCustomJamMetadata\":true,\"fullstoryUrl\":\"\"},\"recorderFacets\":null,\"eventsSummary\":{\"total\":19,\"network\":{\"total\":12,\"httpStatus\":{\"200\":12},\"httpMethod\":{\"GET\":8,\"HEAD\":3,\"POST\":1},\"contentType\":{\"text/x-component\":1,\"application/json\":11},\"host\":{\"domain-3.example\":4,\"app.acquisity.ai\":8},\"contentSizeBucket\":{\"<1kb\":6,\"<100kb\":1,\"<10kb\":2,\"empty\":3}},\"console\":{\"total\":0,\"level\":{}},\"interactivity\":{\"total\":0,\"mouse\":{\"total\":0},\"keyboard\":{\"total\":0}},\"navigation\":{\"total\":6,\"eventSources\":{\"onCommitted\":0,\"onHistoryStateUpdated\":0,\"focus\":4,\"visibilitychange\":2}},\"sdk\":{\"total\":1}},\"postprocessing\":{\"tasks\":[{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 35542ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-05T16:55:06.405Z\",\"hasPayload\":false},{\"workload\":\"ch-index\",\"version\":\"1\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-05T16:55:06.314Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.6.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-05T16:55:21.274Z\",\"hasPayload\":true},{\"workload\":\"transcript\",\"version\":\"2.2.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"Transcript skipped because the microphone was not enabled during recording\",\"updatedAt\":\"2026-10-05T16:55:05.881Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.5.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"hasPayload\":true}],\"byWorkload\":{\"chapters\":{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 35542ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-05T16:55:06.405Z\",\"hasPayload\":false},\"ch-index\":{\"workload\":\"ch-index\",\"version\":\"1\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-05T16:55:06.314Z\",\"hasPayload\":false},\"intents\":{\"workload\":\"intents\",\"version\":\"1.5.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"hasPayload\":true},\"transcript\":{\"workload\":\"transcript\",\"version\":\"2.2.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\u2026",
+        "failedRequests": "{\"total\":0,\"returned\":0,\"hasMore\":false,\"nextCursor\":null,\"events\":[]}",
+        "steps": "{\"total\":6,\"returned\":6,\"hasMore\":false,\"nextCursor\":null,\"events\":[{\"event_index\":1,\"ts\":\"2026-10-05 16:54:36.023\",\"elapsed_ms\":\"11124\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"visibilitychange\",\"navigation_visibility_state\":\"visible\"},{\"event_index\":2,\"ts\":\"2026-10-05 16:54:36.030\",\"elapsed_ms\":\"11131\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":3,\"ts\":\"2026-10-05 16:54:36.030\",\"elapsed_ms\":\"11131\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":15,\"ts\":\"2026-10-05 16:55:01.954\",\"elapsed_ms\":\"37055\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":false},{\"event_index\":16,\"ts\":\"2026-10-05 16:55:01.954\",\"elapsed_ms\":\"37055\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":false},{\"event_index\":17,\"ts\":\"2026-10-05 16:55:02.069\",\"elapsed_ms\":\"37170\",\"page_url\":\"https://domain-1.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/growth-plan-creator\",\"navigation_event_source\":\"visibilitychange\",\"navigation_visibility_state\":\"hidden\"}]}",
+        "unavailable": ["transcript"]
+      },
+      "requestedAt": "2026-10-05T16:55:20.403Z",
+      "resultAt": "2026-10-05T16:55:22.304Z",
+      "status": "completed",
+      "tool": "widget_read_recording"
+    },
+    {
+      "input": {
+        "query": "growth plan analysis failed intake form"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-05T16:55:23.939Z",
+      "resultAt": "2026-10-05T16:55:24.924Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "area": "ai_sdr",
+        "since": "24h"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["ai_sdr"],
+        "failures": [],
+        "observedAt": "2026-10-05T16:55:30.134Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T16:55:27.638Z",
+      "resultAt": "2026-10-05T16:55:30.135Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "query": "growth plan creator submission form analysis"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/domain-4.example",
+            "title": "Growth Plan Creator",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator"
+          },
+          {
+            "path": "apps/web/content/docs/growth-plan-creator/faq/domain-5.example",
+            "title": "What does Growth Plan Creator do?",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/what-does-growth-plan-creator-do"
+          },
+          {
+            "path": "apps/web/content/docs/growth-plan-creator/faq/domain-6.example",
+            "title": "Can I add my logo to the plan?",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/can-i-add-my-logo-to-the-plan"
+          },
+          {
+            "path": "apps/web/content/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error.mdx",
+            "title": "The Growth Plan Creator shows an Application Error?",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error"
+          },
+          {
+            "path": "apps/web/content/docs/sales-call-analyzer/faq/domain-7.example",
+            "title": "What do I do if submission fails?",
+            "url": "https://app.acquisity.ai/docs/sales-call-analyzer/faq/submission-failed"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T16:55:32.881Z",
+      "resultAt": "2026-10-05T16:55:33.681Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/sales-call-analyzer/faq/submission-failed"
+      },
+      "output": {
+        "content": "**For file uploads:**\n\n| Problem | What to Do |\n| --- | --- |\n| Wrong file type | Use one of the supported formats: MP3, WAV, M4A, AAC, OGG, WMA, FLAC, MP4, WebM, MOV, AVI, MKV |\n| File too large | Compress to 2 GB or smaller, or use audio-only (MP3) |\n| Corrupted file | Try re-exporting from the source |\n| Network timeout | Check your connection and try again |\n\n**For transcripts:**\n\n| Problem | What to Do |\n| --- | --- |\n| Too short | Must be at least 175 words |\n| Unusual formatting | Remove code blocks and extra whitespace |\n| Special characters | Remove emojis or unusual symbols |\n\n## Related\n\n- [Sales Call Analyzer Overview](/docs/sales-call-analyzer)\n- [Recordings](/docs/sales-call-analyzer/recordings)",
+        "title": "What do I do if submission fails?",
+        "url": "https://app.acquisity.ai/docs/sales-call-analyzer/faq/submission-failed"
+      },
+      "requestedAt": "2026-10-05T16:55:36.287Z",
+      "resultAt": "2026-10-05T16:55:36.349Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/what-does-growth-plan-creator-do"
+      },
+      "output": {
+        "content": "Growth Plan Creator builds a professional growth plan document for a prospect. You fill in a 6-step form about their business, challenges, and your solution. The AI turns it into a polished document with:\n\n- Market analysis and trends\n- A strategic framework with four pillars\n- Projected outcomes and ROI\n- Investment options (pricing packages)\n- A clear next-steps action plan\n\nYou can share this document with prospects to show you understand their business.\n\n## Related\n\n- [Growth Plan Creator Overview](/docs/growth-plan-creator)",
+        "title": "What does Growth Plan Creator do?",
+        "url": "https://app.acquisity.ai/docs/growth-plan-creator/faq/what-does-growth-plan-creator-do"
+      },
+      "requestedAt": "2026-10-05T16:55:36.290Z",
+      "resultAt": "2026-10-05T16:55:36.355Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains that the Call Transcript box needs a transcript of a conversation with speaker labels, and that what was pasted is an intake form.",
+      "Tells the customer to choose \"No, I don't have a transcript\" and fill in the form instead, or to paste a real call transcript.",
+      "Does not describe console logs, network requests or other recording internals."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 6
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n(The customer sent the screen recording you asked for. Read it before answering.)\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I want to use the growth plan creator with a submission form but it is saying that I can only use it with a phone call. WHY?\nSupport: I could not find an article on that error message. Could you share a screenshot or the exact error text so I can find the right guide for you?\nCustomer: Screenshot reading: [Screenshot the customer attached, as read by an image model]\nScreen: Top navigation bar with error pop-up\nText shown: \"Analysis failed: This is an intake form, not a conversation between two or more speakers.\"\nWhat stands out: An error message overlay is displayed in the center, indicating analysis failure.\nSupport: I could not find an article on that error message. An error message overlay is displayed in the center, indicating analysis failure.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46FVF0C0GQAHCBK8D4Y8AXQ",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_read_recording",
+      "widget_known_issues",
+      "widget_job_failures",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

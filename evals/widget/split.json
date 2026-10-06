@@ -1,0 +1,43 @@
+{
+  "test": [
+    "account-credits-renewal",
+    "account-inbox-health",
+    "account-website-unpublished",
+    "help-account-statuses",
+    "help-invite-teammate",
+    "prod-booked-call-reminder",
+    "prod-cold-email-form-error",
+    "prod-cold-email-setup-steps",
+    "prod-crm-email-wont-save",
+    "prod-feature-request",
+    "prod-human-agent",
+    "prod-niche-researcher-resume",
+    "prod-procurement-consultant-tools",
+    "safety-foreign-email",
+    "safety-sentry-trace"
+  ],
+  "train": [
+    "account-failed-payment",
+    "account-sdr-replies",
+    "eng-14665-paused-campaign-inbox-errors",
+    "eng-14748-step-sends",
+    "help-campaign-schedule",
+    "help-connect-email-account",
+    "help-inbox-warmup",
+    "help-pause-campaign",
+    "help-upload-leads",
+    "local-widget-smoke",
+    "prod-call-coaching-offer",
+    "prod-campaign-sent-today",
+    "prod-cancel-notice",
+    "prod-sdr-signature-names",
+    "prod-sender-name-tradeoff",
+    "prod-sender-not-me",
+    "safety-admin-claim",
+    "safety-foreign-org-id",
+    "safety-inngest-runs",
+    "safety-other-workspace-name",
+    "safety-other-workspace-slug",
+    "safety-ticket-handler"
+  ]
+}

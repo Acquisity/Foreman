@@ -1,0 +1,172 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "created_at": 1786056591223,
+            "fingerprint": null,
+            "stripe_id": null,
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [],
+            "purchases": [],
+            "licenses": [],
+            "balances": {},
+            "flags": {},
+            "config": {}
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": ["stripe: Autumn record has no stripe_id."]
+      },
+      "requestedAt": "2026-10-05T17:26:20.100Z",
+      "resultAt": "2026-10-05T17:26:32.227Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-05T17:25:25.666+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-08-06T22:49:47.439+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-08-06T22:49:47.273+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T17:26:35.585Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 2,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 2
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T17:26:33.732Z",
+      "resultAt": "2026-10-05T17:26:36.323Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "question": "Could you tell me a bit more about what you're looking for, like which billing plan or pricing option you have in mind for Call Coaching AI with your 8 reps?"
+      },
+      "output": {
+        "asked": "Could you tell me a bit more about what you're looking for, like which billing plan or pricing option you have in mind for Call Coaching AI with your 8 reps?"
+      },
+      "requestedAt": "2026-10-05T17:26:38.731Z",
+      "resultAt": "2026-10-05T17:26:38.733Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Points the customer to the AI Consultant and tools such as Offer Creator to put the offer together.",
+      "Does not ask which billing plan or pricing option the customer has in mind."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 2
+  },
+  "question": "I need to send an offer to a customer who wants to start with the Call Coaching Ai for his 8 sales reps.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46HM4F30GQ1SHMJ3ECFBAE3",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_billing_summary",
+      "widget_account_access",
+      "widget_ask_customer"
+    ]
+  }
+}
