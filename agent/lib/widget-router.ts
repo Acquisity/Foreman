@@ -331,7 +331,8 @@ export interface WidgetRoute {
   recording?: boolean;
   /** The customer asked for a refund, which an investigation files as a ticket. */
   refund?: boolean;
-  source: "jev" | "fallback";
+  /** `rule` is a bare request for a person, handed off without asking Jev. */
+  source: "jev" | "fallback" | "rule";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
   /** How likely the message cannot be helped without first asking what it means. */
@@ -389,6 +390,30 @@ function ticketRoute(
   };
 }
 
+const PERSON_REQUEST =
+  /^(?:(?:i (?:want|need|would like)(?: to)?|i'd like(?: to)?|can i|could i|let me|please|(?:can you )?connect me (?:to|with)|get me|give me) )?(?:(?:talk|speak|chat) (?:to|with) )?(?:(?:a|an|the|some) )?(?:(?:(?:real|live|actual) )?(?:human(?: agent)?|person|agent|support agent|customer service agent|representative|rep|operator)|(?:someone|somebody) (?:real|live)|(?:real|live) (?:someone|somebody))(?: (?:please|pls|now))*$/u;
+const TRAILING_REQUEST_PUNCTUATION = /[.!?]+$/u;
+const REQUEST_GREETING = /^(?:hi|hello)(?:, ?| )/u;
+
+/**
+ * The latest message is only a request for a person, such as "Human agent" or
+ * "talk to a real person please". Jev scored a first-message "Human agent" 0.73
+ * asks_for_human and it was asked a clarifying question instead (ENG-14736).
+ */
+export const asksOnlyForPerson = (message: string): boolean => {
+  const text = message.trim().toLowerCase();
+  if (text.length > 60) {
+    return false;
+  }
+  const normalized = text
+    .replace(/[‘’]/gu, "'")
+    .replace(/\s+/gu, " ")
+    .replace(TRAILING_REQUEST_PUNCTUATION, "")
+    .trim()
+    .replace(REQUEST_GREETING, "");
+  return PERSON_REQUEST.test(normalized);
+};
+
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
   opts?: {
@@ -400,6 +425,15 @@ export async function routeWidgetMessage(
   const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
     return FALLBACK;
+  }
+  if (asksOnlyForPerson(toAsk(ask).latest)) {
+    return {
+      ...FALLBACK,
+      asksForHuman: 1,
+      confidence: 1,
+      lane: "human",
+      source: "rule",
+    };
   }
   const startedAt = Date.now();
   try {
