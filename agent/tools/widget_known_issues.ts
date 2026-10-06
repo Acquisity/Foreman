@@ -3,7 +3,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { replayable } from "#lib/widget-replay.js";
+import { liveCase, replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
 const MAX_ISSUES = 5;
@@ -24,11 +24,16 @@ type KnownIssue = z.infer<typeof knownIssueSchema>;
  * identifier/title/status only — no descriptions, assignees, or labels that
  * might carry customer names, since this feeds a customer-facing agent.
  * Open issues sort ahead of closed ones, ties broken by recency, before the
- * result is capped.
+ * result is capped. `before` drops issues created after that moment: a live
+ * replay must not find the ticket filed from the conversation it replays.
  */
 export async function searchKnownIssues(
   query: string,
-  opts: { client: ReturnType<typeof executorClient>; signal: AbortSignal },
+  opts: {
+    before?: string;
+    client: ReturnType<typeof executorClient>;
+    signal: AbortSignal;
+  },
   search: typeof findRelatedIssues = findRelatedIssues
 ): Promise<{ error?: string; issues: KnownIssue[] }> {
   try {
@@ -36,7 +41,8 @@ export async function searchKnownIssues(
       { phrases: [query], scope: "masters", windowed: false },
       opts
     );
-    const issues = [...result.issues]
+    const issues = result.issues
+      .filter((issue) => !opts.before || issue.createdAt < opts.before)
       .sort((a, b) => {
         const aClosed = CLOSED_STATE_TYPES.has(a.stateType) ? 1 : 0;
         const bClosed = CLOSED_STATE_TYPES.has(b.stateType) ? 1 : 0;
@@ -77,6 +83,7 @@ const tool = defineTool({
       throw new Error("Support widget identity required.");
     }
     return searchKnownIssues(query, {
+      before: liveCase()?.at,
       client: executorClient(ctx),
       signal: ctx.abortSignal,
     });

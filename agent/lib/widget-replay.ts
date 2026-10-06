@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { defineTool } from "eve/tools";
-import type { z } from "zod";
+import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
@@ -35,7 +36,9 @@ export const REPLAY_TICKET = Object.freeze({
 /** Throws when the replay flag is set on a production deployment. */
 export function assertReplayAllowed(env: NodeJS.ProcessEnv = process.env) {
   if (
-    (env.WIDGET_REPLAY === "1" || env.WIDGET_REPLAY_CASE) &&
+    (env.WIDGET_REPLAY === "1" ||
+      env.WIDGET_REPLAY_CASE ||
+      env.WIDGET_LIVE_CASE) &&
     env.VERCEL_ENV === "production"
   ) {
     throw new Error("Widget replay is not allowed on production.");
@@ -50,6 +53,54 @@ export const isReplayActive = () => {
     process.env.WIDGET_REPLAY === "1" || Boolean(process.env.WIDGET_REPLAY_CASE)
   );
 };
+
+/**
+ * Live replay: WIDGET_LIVE_CASE names a gitignored file under .eve/widget-live/
+ * holding one production run's real question and verified scope, written by
+ * `pnpm widget:case --live`. The route answers identity from that scope, every
+ * read hits production live, and widget_file_ticket files nothing. Never on production.
+ */
+export const LIVE_DIR = ".eve/widget-live";
+const liveCaseSchema = z.object({
+  // When the customer asked: later Linear issues are hidden from the replay.
+  at: z.iso.datetime(),
+  context: widgetContextSchema,
+  question: z.string().min(1),
+  runId: z.string(),
+});
+export type LiveCase = z.infer<typeof liveCaseSchema> & { name: string };
+export function liveCase(): LiveCase | null {
+  const path = process.env.WIDGET_LIVE_CASE;
+  if (!path) {
+    return null;
+  }
+  assertReplayAllowed();
+  if (dirname(path) !== LIVE_DIR || !path.endsWith(".json")) {
+    throw new Error(`WIDGET_LIVE_CASE must be a file in ${LIVE_DIR}.`);
+  }
+  return {
+    ...liveCaseSchema.parse(JSON.parse(readFileSync(path, "utf8"))),
+    name: basename(path, ".json"),
+  };
+}
+
+/** The live run's verified scope in place of the app's token check. */
+export function liveContext(
+  live: LiveCase,
+  input: { conversationId: string; organizationId: string; staff?: boolean }
+): WidgetContext {
+  if (input.organizationId !== live.context.organizationId) {
+    throw new Error("Live replay serves the recorded run's workspace only.");
+  }
+  return Object.freeze(
+    widgetContextSchema.parse({
+      ...live.context,
+      conversationId: input.conversationId,
+      source: input.staff ? "inbox" : "widget",
+      verifiedAt: new Date().toISOString(),
+    })
+  );
+}
 
 const MAX_CASSETTE_CHARS = 1_048_576;
 const schemas = new Map<string, z.ZodType>();
@@ -155,10 +206,17 @@ export function replayable<T extends { description: string }>(
   name: string,
   tool: T
 ): T {
-  if (!isReplayActive()) {
-    return tool;
-  }
   const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
+  if (!isReplayActive()) {
+    // Live replay reads production but never files a real ticket.
+    return name === "widget_file_ticket" && liveCase()
+      ? (defineTool({
+          description,
+          execute: () => REPLAY_TICKET,
+          inputSchema,
+        }) as unknown as T)
+      : tool;
+  }
   schemas.set(name, inputSchema);
   // Only inline callbacks here: eve drops a tool whose forwarded authored
   // callback (such as its approval) is not stamped at this call site.

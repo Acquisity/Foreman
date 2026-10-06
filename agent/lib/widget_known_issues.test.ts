@@ -143,3 +143,17 @@ describe("widget_known_issues tool", () => {
     assert.deepEqual(parse("  query  ").data, { query: "query" });
   });
 });
+
+describe("searchKnownIssues before", () => {
+  it("hides issues created after the replayed moment", async () => {
+    const result = await searchKnownIssues(
+      "growth plan",
+      { ...opts, before: "2026-09-05T00:00:00.000Z" },
+      (input) => mockFindRelatedIssues(input.phrases)
+    );
+    assert.deepEqual(
+      result.issues.map((issue) => issue.identifier),
+      ["ENG-1200"]
+    );
+  });
+});

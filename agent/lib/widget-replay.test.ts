@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -10,6 +16,7 @@ import { verifyWidgetContext } from "./widget-context.js";
 import { resolveOwnedIdentifiers } from "./widget-evidence.js";
 import {
   assertReplayAllowed,
+  LIVE_DIR,
   REPLAY_MISS,
   REPLAY_TICKET,
   replayable,
@@ -22,6 +29,8 @@ const CASE = "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
 const recorded = JSON.parse(readFileSync(CASE, "utf8"));
 const PRODUCTION = /not allowed on production/;
 const FIXTURE_ONLY = /fixture workspace only/;
+const LIVE_WORKSPACE_ONLY = /recorded run's workspace only/;
+const LIVE_DIR_ONLY = /must be a file in/;
 const INVALID_CASE = /Invalid replay case id/;
 const SCOPE_UNAVAILABLE = /verified support scope is unavailable/;
 const widgetCtx = {
@@ -415,5 +424,72 @@ test("a reworded search replays its recording; a different record still misses",
   } finally {
     Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
     rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("live replay answers from the recorded run's real scope, reads live and never files a ticket", async () => {
+  const path = `${LIVE_DIR}/test-live-${process.pid}.json`;
+  mkdirSync(LIVE_DIR, { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify({
+      at: "2026-10-05T17:29:22.000Z",
+      context: fixture,
+      question: "Q",
+      runId: "wrun_x",
+    })
+  );
+  process.env.WIDGET_LIVE_CASE = path;
+  try {
+    assert.throws(
+      () =>
+        assertReplayAllowed({
+          VERCEL_ENV: "production",
+          WIDGET_LIVE_CASE: path,
+        }),
+      PRODUCTION
+    );
+    const scope = await verifyWidgetContext({
+      conversationId: "00000000-0000-4000-8000-0000000000aa",
+      organizationId: fixture.organizationId,
+      userToken: "live",
+    });
+    assert.equal(scope.organizationId, fixture.organizationId);
+    assert.equal(scope.conversationId, "00000000-0000-4000-8000-0000000000aa");
+    await assert.rejects(
+      verifyWidgetContext({
+        conversationId: "00000000-0000-4000-8000-0000000000aa",
+        organizationId: "00000000-0000-4000-8000-0000000000bb",
+        userToken: "live",
+      }),
+      LIVE_WORKSPACE_ONLY
+    );
+    const authored = defineTool({
+      description: "d",
+      execute: () => ({ live: true }),
+      inputSchema: z.object({}),
+    });
+    assert.equal(replayable("widget_known_issues", authored), authored);
+    const ticket = replayable("widget_file_ticket", authored);
+    assert.notEqual(ticket, authored);
+    assert.deepEqual(
+      await (ticket as { execute: (...args: unknown[]) => unknown }).execute(
+        {},
+        widgetCtx
+      ),
+      REPLAY_TICKET
+    );
+    process.env.WIDGET_LIVE_CASE = "evals/widget/cases/x.json";
+    await assert.rejects(
+      verifyWidgetContext({
+        conversationId: "00000000-0000-4000-8000-0000000000aa",
+        organizationId: fixture.organizationId,
+        userToken: "live",
+      }),
+      LIVE_DIR_ONLY
+    );
+  } finally {
+    Reflect.deleteProperty(process.env, "WIDGET_LIVE_CASE");
+    rmSync(path, { force: true });
   }
 });

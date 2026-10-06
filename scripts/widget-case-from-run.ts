@@ -1,13 +1,17 @@
 /**
  * Turn one widget run's session stream into a scrubbed eval case.
  *
- * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>]
+ * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>] [--live]
  *
  * Reads the run with the workflow CLI (local runs from `.eve/.workflow-data`),
  * pairs each tool call with its result, replaces every customer identifier, and
  * writes `evals/widget/cases/<short-name>.json` only when the leak check passes.
  * It only reads: nothing is written to Vercel, a database or Linear. Raw stream
  * data stays in memory and is never written to disk.
+ *
+ * With --live it writes nothing to evals/: it saves the run's real question and
+ * verified scope, unscrubbed, to the gitignored .eve/widget-live/<short-name>.json
+ * (owner-only), for a live replay of that conversation against production reads.
  */
 import { execFile } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
@@ -20,6 +24,7 @@ import {
   serializeCase,
   type WidgetCase,
 } from "../agent/lib/widget-case.js";
+import { LIVE_DIR } from "../agent/lib/widget-replay.js";
 import {
   WIDGET_SUPPORT_ISSUER,
   widgetContextSchema,
@@ -38,7 +43,10 @@ const {
   values,
 } = parseArgs({
   allowPositionals: true,
-  options: { "output-dir": { default: "evals/widget/cases", type: "string" } },
+  options: {
+    live: { default: false, type: "boolean" },
+    "output-dir": { default: "evals/widget/cases", type: "string" },
+  },
 });
 const outputDirectory = values["output-dir"];
 
@@ -52,7 +60,7 @@ if (
   )
 ) {
   console.error(
-    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>]"
+    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>] [--live]"
   );
   process.exit(2);
 }
@@ -138,7 +146,9 @@ if (!events.length) {
 }
 
 // The verified widget scope is the session auth eve keeps in the run input.
-const { input } = runRecord.parse(JSON.parse(await cli(["run", runId], true)));
+const { createdAt, input } = runRecord.parse(
+  JSON.parse(await cli(["run", runId], true))
+);
 const auth = z
   .tuple([
     z.object({
@@ -162,6 +172,21 @@ const question = events.find((e) => e.type === "message.received")?.data
   ?.message;
 if (!question) {
   throw new Error(`${runId} has no customer message.`);
+}
+if (values.live) {
+  const path = join(LIVE_DIR, `${name}.json`);
+  await mkdir(LIVE_DIR, { recursive: true });
+  await writeFile(
+    path,
+    JSON.stringify({ at: createdAt, context, question, runId }),
+    {
+      mode: 0o600,
+    }
+  );
+  console.log(
+    `Wrote ${path} for a live replay (raw customer data, gitignored).`
+  );
+  process.exit(0);
 }
 const results = new Map(
   events
