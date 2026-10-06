@@ -2641,3 +2641,85 @@ test("a member's recording still takes the help-center front door, and a malform
   );
   assert.equal(refused.status, 400);
 });
+
+test("an owner or admin who turns on Investigate my workspace skips the front door and starts an investigation", async (t) => {
+  enabled(t);
+  const investigated = async (role: "owner" | "admin") => {
+    const { deps } = dependencies();
+    deps.route = () => assert.fail("must not route an explicit investigation");
+    let sent = false;
+    const response = await receiveWidgetMessage(
+      request({ ...start, mode: "investigate" }),
+      {
+        from: () => ({
+          send: () => {
+            sent = true;
+            return Promise.resolve(completedSession());
+          },
+        }),
+        waitUntil: () => undefined,
+      } as unknown as Pick<RouteHandlerArgs, "from" | "waitUntil">,
+      200,
+      () => Promise.resolve({ ...scope, role }),
+      deps
+    );
+    return response.status === 200 && sent;
+  };
+  assert.deepEqual(
+    await Promise.all([investigated("owner"), investigated("admin")]),
+    [true, true]
+  );
+});
+
+test("Investigate my workspace from a member, or an owner the live database no longer backs, gets a help-center answer, and an unknown mode is refused", async (t) => {
+  enabled(t);
+  const member = dependencies();
+  let routed = false;
+  const { route } = member.deps;
+  member.deps.route = (...args) => {
+    routed = true;
+    return route(...args);
+  };
+  member.deps.answerKb = () => Promise.resolve(kbAnswer);
+  const memberResponse = await receiveWidgetMessage(
+    request({ ...start, mode: "investigate" }),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" as const }),
+    member.deps
+  );
+  assert.equal(routed, true);
+  assert.equal(
+    ((await memberResponse.json()) as Record<string, unknown>).message,
+    kbAnswer.message
+  );
+
+  const denied = dependencies();
+  denied.deps.verifyAccess = () => Promise.reject(new WorkspaceAccessDenied());
+  const asks: WidgetAsk[] = [];
+  denied.deps.answerKb = (ask) => {
+    asks.push(ask as WidgetAsk);
+    return Promise.resolve(kbAnswer);
+  };
+  const deniedResponse = await receiveWidgetMessage(
+    request({ ...start, mode: "investigate" }),
+    noWork(),
+    200,
+    verify,
+    denied.deps
+  );
+  assert.equal(deniedResponse.status, 200);
+  assert.equal(
+    ((await deniedResponse.json()) as Record<string, unknown>).message,
+    kbAnswer.message
+  );
+  assert.equal(asks.at(-1)?.cannotLook, true);
+  const refused = await receiveWidgetMessage(
+    request({ ...start, mode: "kb" }),
+    noWork(),
+    1,
+    () => assert.fail("must not verify"),
+    denied.deps
+  );
+  assert.equal(refused.status, 400);
+});
