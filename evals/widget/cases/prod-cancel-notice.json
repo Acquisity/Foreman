@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Hands the conversation to a person.",
+      "Does not ask which page the customer is on."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "block",
+    "lane": "human",
+    "toolBudget": 1
+  },
+  "question": "In the terms of use, it says you need 30 days notice to cancel. How do I send my notice?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

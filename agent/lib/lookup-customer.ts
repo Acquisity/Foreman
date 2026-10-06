@@ -110,10 +110,14 @@ export async function lookupCustomer(
   run: (query: string) => Promise<string>
 ): Promise<LookupCustomerResult> {
   let parsed: z.infer<typeof rowSchema>[];
+  // The read tool can cap rows below the query's own limit and says so in a
+  // top-level `truncated`; either cap means the membership list is partial.
+  let upstreamTruncated = false;
   try {
-    const { rows } = parseReadQueryResult(
+    const { passthrough, rows } = parseReadQueryResult(
       await run(buildLookupCustomerQuery(email))
     );
+    upstreamTruncated = passthrough.truncated === true;
     parsed = rows.map((row) => rowSchema.parse(row));
   } catch (error) {
     return {
@@ -124,7 +128,14 @@ export async function lookupCustomer(
 
   const [first] = parsed;
   if (!first) {
-    return EMPTY;
+    // A cut-off empty read proves nothing about whether the user exists.
+    return upstreamTruncated
+      ? {
+          ...EMPTY,
+          error: "The identity read was truncated before any row; retry it.",
+          truncated: true,
+        }
+      : EMPTY;
   }
 
   const memberships = parsed.flatMap((row) =>
@@ -144,7 +155,9 @@ export async function lookupCustomer(
   // The same email can exist once per partner, so one user row per email is
   // not guaranteed; a pin needs exactly one user and exactly one membership.
   const userCount = new Set(parsed.map((row) => row.user_id)).size;
-  const single = userCount === 1 && memberships.length === 1;
+  const truncated = upstreamTruncated || parsed.length >= MEMBERSHIP_LIMIT;
+  // A partial list cannot prove there is only one membership.
+  const single = !truncated && userCount === 1 && memberships.length === 1;
   return {
     ambiguous: userCount > 1 || memberships.length > 1,
     found: true,
@@ -152,7 +165,7 @@ export async function lookupCustomer(
     pinnedOrganizationId: single
       ? (memberships[0]?.organizationId ?? null)
       : null,
-    truncated: parsed.length >= MEMBERSHIP_LIMIT,
+    truncated,
     user: {
       createdAt: first.user_created_at ?? null,
       email: first.email,

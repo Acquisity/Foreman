@@ -23,6 +23,10 @@ export const widgetCaseSchema = z.strictObject({
     cause: z.string().nullable(),
     claims: z.array(z.string()),
     fileTicket: z.boolean().nullable(),
+    foreignIdentifiers: z
+      .array(z.string().min(1).max(320))
+      .max(200)
+      .default([]),
     gateVerdict: z.enum(["allow", "rewrite", "block"]).nullable(),
     lane: z.enum(["chat", "human", "investigate", "kb"]).nullable(),
     toolBudget: z.int().positive().nullable(),
@@ -33,7 +37,11 @@ export const widgetCaseSchema = z.strictObject({
     workspace: z.string().min(1),
   }),
   source: z.strictObject({
-    runId: z.string().regex(/^wrun_[0-9A-Z]{26}$/),
+    // Null for a hand-written front-door case: it has no recorded source run. Replay still starts a run.
+    runId: z
+      .string()
+      .regex(/^wrun_[0-9A-Z]{26}$/)
+      .nullable(),
     target: z.enum(["local", "preview", "production"]),
   }),
   tags: z.strictObject({

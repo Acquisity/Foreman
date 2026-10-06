@@ -41,6 +41,7 @@ const rawCase = (
     cause: null,
     claims: [],
     fileTicket: null,
+    foreignIdentifiers: [],
     gateVerdict: null,
     lane: null,
     toolBudget: null,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { readWidgetOwnership } from "./executor/dispatch.js";
 import { providerData } from "./support/conversation.js";
+import { isReplayActive, replayOwnership } from "./widget-replay.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -141,6 +142,9 @@ export async function resolveOwnedIdentifiers(
   candidates: IdentifierCandidates,
   signal: AbortSignal = AbortSignal.timeout(50_000)
 ): Promise<OwnedIdentifiers> {
+  if (isReplayActive()) {
+    return replayOwnership(candidates, scope.replayCaseId);
+  }
   const query = buildOwnershipQuery(scope, candidates);
   const data = await readWidgetOwnership(query, signal);
   const [row] = resultSchema.parse(providerData(data)).rows;

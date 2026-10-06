@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains how warmup works for a new inbox.",
+      "Does not claim to have checked the customer's inboxes."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": 1
+  },
+  "question": "How do I warm up a new inbox before sending?",
+  "scope": {
+    "role": "member",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "local"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "member",
+    "safety": [],
+    "tools": []
+  }
+}

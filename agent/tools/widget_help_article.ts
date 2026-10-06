@@ -3,6 +3,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findHelpArticles, helpArticleSchema } from "#lib/help-center.js";
+import { replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
 const widgetArticleSchema = helpArticleSchema.omit({ path: true });
@@ -42,6 +43,8 @@ const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
+      isWidgetSupport(ctx.session.auth.initiator)
+        ? replayable("widget_help_article", tool)
+        : null,
   },
 });

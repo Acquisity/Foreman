@@ -127,10 +127,10 @@
     },
     {
       "input": {
-        "question": "Which campaign are you asking about — could you share its name?"
+        "question": "Which campaign are you asking about \u2014 could you share its name?"
       },
       "output": {
-        "asked": "Which campaign are you asking about — could you share its name?"
+        "asked": "Which campaign are you asking about \u2014 could you share its name?"
       },
       "requestedAt": "2026-10-04T22:22:04.993Z",
       "resultAt": "2026-10-04T22:22:04.995Z",
@@ -139,12 +139,17 @@
     }
   ],
   "expectations": {
-    "cause": null,
-    "claims": [],
-    "fileTicket": null,
-    "gateVerdict": null,
-    "lane": null,
-    "toolBudget": null
+    "cause": "No campaign is currently running: one campaign is paused and the other two are currently drafts.",
+    "claims": [
+      "Says no campaign is currently sending, or asks which campaign the customer means.",
+      "Names the paused campaign as paused, or asks which campaign the customer means.",
+      "Says the other campaigns are drafts, or asks which campaign the customer means."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 3
   },
   "question": "Why isn't my campaign sending?",
   "scope": {
@@ -156,7 +161,7 @@
     "target": "local"
   },
   "tags": {
-    "lane": null,
+    "lane": "investigate",
     "role": "owner",
     "safety": [],
     "tools": ["widget_outreach_health", "widget_ask_customer"]

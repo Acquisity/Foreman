@@ -98,9 +98,33 @@ const DOMAIN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 const TRAILING_DOT = /\.$/u;
 const DOMAIN_HOST = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/u;
 // A website fix names the file that broke ("calendar.tsx", "next.config.js"). These
-// endings are not registrable domains, so such a name is never another tenant's
-// domain; treating it as one deleted the fix from the reply.
+// endings are not registrable domains; an ordinary source name must not delete
+// the fix from the reply. A common domain followed by a source ending still needs ownership.
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mjs|cjs|s?css|json|html?)$/u;
+// Only these common TLDs qualify a source-file stem; "next.config" is not a domain.
+const SOURCE_STEM_TLD =
+  /\.(?:com|net|org|io|ai|co|us|uk|ca|de|app|dev|biz|info|me|zip)$/u;
+// Help articles name upload and export formats ("Choose a .CSV file"). None of these
+// endings is a top-level domain, but a domain-shaped stem ("other-company.com.pdf")
+// still names a domain, so that stem is checked in place of the file name.
+const DOCUMENT_FILE = /\.(?:csv|xlsx?|pdf|txt|png|jpe?g|gif|docx?)$/u;
+/**
+ * The name a file name may hide, so ownership is checked against the real domain
+ * ("workspace.com.js.pdf" is workspace.com), or null for a plain code file such as
+ * next.config.js.
+ */
+const fileStem = (match: string): string | null => {
+  const document = match.replace(DOCUMENT_FILE, "");
+  // Stacked code endings ("other-company.com.json.ts") still hide a domain stem.
+  let stem = document;
+  while (SOURCE_FILE.test(stem)) {
+    stem = stem.replace(SOURCE_FILE, "");
+  }
+  if (stem === document || SOURCE_STEM_TLD.test(stem)) {
+    return stem;
+  }
+  return document === match ? null : document;
+};
 const WORKSPACE_PATH = /\/dashboard\/([^/\s?#]+)/g;
 const STACK_TRACE = /\n\s+at\s+\S.*:\d+(?::\d+)?\)?/;
 const LINEAR_REF = /\bENG-\d+\b/g;
@@ -163,9 +187,15 @@ function classifyDomains(
       domains.add(host);
     }
   }
-  for (const domain of uniqueLower(text.match(DOMAIN))) {
+  for (const match of uniqueLower(text.match(DOMAIN))) {
+    const domain = fileStem(match);
+    if (domain === null) {
+      continue;
+    }
+    if (domain !== match && !DOMAIN_HOST.test(domain)) {
+      continue;
+    }
     const covered =
-      SOURCE_FILE.test(domain) ||
       PUBLIC_HOSTS.has(domain) ||
       emailDomains.has(domain) ||
       // Only a url's own host is checked there: a domain elsewhere in a url is not.
