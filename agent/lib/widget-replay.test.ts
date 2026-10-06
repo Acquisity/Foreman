@@ -29,6 +29,8 @@ const CASE = "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json";
 const recorded = JSON.parse(readFileSync(CASE, "utf8"));
 const PRODUCTION = /not allowed on production/;
 const FIXTURE_ONLY = /fixture workspace only/;
+const LIVE_WORKSPACE_ONLY = /recorded run's workspace only/;
+const LIVE_DIR_ONLY = /must be a file in/;
 const INVALID_CASE = /Invalid replay case id/;
 const SCOPE_UNAVAILABLE = /verified support scope is unavailable/;
 const widgetCtx = {
@@ -455,7 +457,7 @@ test("live replay answers from the recorded run's real scope, reads live and nev
         organizationId: "00000000-0000-4000-8000-0000000000bb",
         userToken: "live",
       }),
-      /recorded run's workspace only/
+      LIVE_WORKSPACE_ONLY
     );
     const authored = defineTool({
       description: "d",
@@ -479,7 +481,7 @@ test("live replay answers from the recorded run's real scope, reads live and nev
         organizationId: fixture.organizationId,
         userToken: "live",
       }),
-      /must be a file in/
+      LIVE_DIR_ONLY
     );
   } finally {
     Reflect.deleteProperty(process.env, "WIDGET_LIVE_CASE");
