@@ -1,7 +1,7 @@
 /**
  * Turn one widget run's session stream into a scrubbed eval case.
  *
- * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name>
+ * Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>]
  *
  * Reads the run with the workflow CLI (local runs from `.eve/.workflow-data`),
  * pairs each tool call with its result, replaces every customer identifier, and
@@ -10,8 +10,9 @@
  * data stays in memory and is never written to disk.
  */
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { parseArgs, promisify } from "node:util";
 import { z } from "zod";
 import {
   type RunScope,
@@ -32,7 +33,15 @@ type Target = (typeof TARGETS)[number];
 // ENG-14702: decrypt can hang, so every CLI call has a deadline.
 const CLI_DEADLINE_MS = 180_000;
 
-const [runId, target, name] = process.argv.slice(2);
+const {
+  positionals: [runId, target, name],
+  values,
+} = parseArgs({
+  allowPositionals: true,
+  options: { "output-dir": { default: "evals/widget/cases", type: "string" } },
+});
+const outputDirectory = values["output-dir"];
+
 if (
   !(
     runId &&
@@ -43,7 +52,7 @@ if (
   )
 ) {
   console.error(
-    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name>"
+    "Usage: pnpm widget:case <wrun_id> <local|preview|production> <short-name> [--output-dir <directory>]"
   );
   process.exit(2);
 }
@@ -201,9 +210,18 @@ const raw: WidgetCase = {
     tools: [...new Set(cassette.map((call) => call.tool))],
   },
 };
-const text = serializeCase(scrubCase(raw, scope));
-const path = `evals/widget/cases/${name}.json`;
-await mkdir("evals/widget/cases", { recursive: true });
+let text: string;
+try {
+  text = serializeCase(scrubCase(raw, scope));
+} catch (error) {
+  if (error instanceof Error && error.message.startsWith("Case not saved:")) {
+    console.error("Case conversion refused by leak check.");
+    process.exit(3);
+  }
+  throw error;
+}
+const path = join(outputDirectory, `${name}.json`);
+await mkdir(outputDirectory, { recursive: true });
 // Never overwrite: an existing case may hold human-filled expectations.
 await writeFile(path, text, { flag: "wx" }).catch(
   (error: NodeJS.ErrnoException) => {
@@ -215,6 +233,10 @@ await writeFile(path, text, { flag: "wx" }).catch(
 // Biome owns formatting, so a new case passes `pnpm check` as written.
 await run("npx", ["biome", "format", "--write", path], {
   timeout: CLI_DEADLINE_MS,
+}).catch(async () => {
+  await rm(path, { force: true });
+  console.error("Case formatting failed.");
+  process.exit(4);
 });
 const largest = Math.max(
   0,

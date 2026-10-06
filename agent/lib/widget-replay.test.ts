@@ -356,3 +356,64 @@ test("request-selected cases stay isolated through session auth and ownership", 
     Reflect.deleteProperty(process.env, "WIDGET_REPLAY");
   }
 });
+
+test("a reworded search replays its recording; a different record still misses", () => {
+  const directory = mkdtempSync(join(tmpdir(), "widget-replay-search-"));
+  const path = join(directory, "case.json");
+  const [entry] = recorded.cassette;
+  const first = { issues: [{ title: "first" }] };
+  const second = { issues: [{ title: "second" }] };
+  const article = { content: "Steps.", url: "https://help.example/a" };
+  writeFileSync(
+    path,
+    JSON.stringify({
+      ...recorded,
+      cassette: [
+        {
+          ...entry,
+          input: { query: "CRM email won't save" },
+          output: first,
+          tool: "widget_known_issues",
+        },
+        {
+          ...entry,
+          input: { query: "cold email form error" },
+          output: second,
+          tool: "widget_known_issues",
+        },
+        {
+          ...entry,
+          input: { url: "https://help.example/a" },
+          output: article,
+          tool: "widget_read_help_article",
+        },
+      ],
+    })
+  );
+  process.env.WIDGET_REPLAY_CASE = path;
+  try {
+    assert.deepEqual(
+      replayRead("widget_known_issues", { query: "cold email form error" }),
+      second
+    );
+    assert.deepEqual(
+      replayRead("widget_known_issues", { query: "email not saving in CRM" }),
+      first
+    );
+    assert.deepEqual(
+      replayRead("widget_read_help_article", { url: "https://help.example/a" }),
+      article
+    );
+    assert.deepEqual(
+      replayRead("widget_read_help_article", { url: "https://help.example/b" }),
+      REPLAY_MISS
+    );
+    assert.deepEqual(
+      replayRead("widget_help_article", { query: "csv import" }),
+      REPLAY_MISS
+    );
+  } finally {
+    Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
