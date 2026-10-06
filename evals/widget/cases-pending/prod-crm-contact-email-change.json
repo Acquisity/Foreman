@@ -122,7 +122,7 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Says the checks it could run found no recorded error or known issue for this, and that the cause of the failed save is still unknown.",
+      "Says no known issue matched and that the cause of the failed save could not be checked.",
       "Asks for the exact error text or a screenshot of what happens on save, or gives help-center steps for editing a contact's email.",
       "Does not claim to have changed the contact or the paused AI SDR conversation."
     ],
