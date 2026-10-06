@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
-import { isReplayActive, replayContext } from "./widget-replay.js";
+import {
+  isReplayActive,
+  liveCase,
+  liveContext,
+  replayContext,
+} from "./widget-replay.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
@@ -40,6 +45,10 @@ export async function verifyWidgetContext(
   request: typeof fetch = fetch
 ): Promise<WidgetContext> {
   const parsed = inputSchema.parse(input);
+  const live = liveCase();
+  if (live) {
+    return liveContext(live, { ...parsed, staff: input.staff });
+  }
   if (isReplayActive()) {
     return replayContext({
       ...parsed,

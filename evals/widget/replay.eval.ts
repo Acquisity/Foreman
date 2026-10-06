@@ -23,7 +23,11 @@ import {
   reviewedSample,
   saveRecord,
 } from "#lib/widget-judge.js";
-import { replayRecording } from "#lib/widget-replay.js";
+import {
+  type LiveCase,
+  liveCase,
+  replayRecording,
+} from "#lib/widget-replay.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
 
@@ -65,6 +69,7 @@ function toRequest(question: string) {
 }
 
 // WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
+// WIDGET_LIVE_CASE instead replays one case's real production conversation with live reads.
 export default readdirSync("evals/widget/cases")
   .filter((file) => file.endsWith(".json"))
   .sort()
@@ -73,9 +78,15 @@ export default readdirSync("evals/widget/cases")
       description: `Replay ${file} through the widget route with live models and recorded tool results.`,
       tags: ["widget"],
       async test(t) {
+        const live = liveCase();
+        if (live && file !== `${live.name}.json`) {
+          t.skip(`WIDGET_LIVE_CASE selects ${live.name}.`);
+          return;
+        }
         if (
           process.env.WIDGET_REPLAY !== "1" &&
-          !process.env.WIDGET_REPLAY_CASE
+          !process.env.WIDGET_REPLAY_CASE &&
+          !live
         ) {
           t.skip(
             "Enable WIDGET_REPLAY=1 on the eval target to replay widget cases."
@@ -94,16 +105,18 @@ export default readdirSync("evals/widget/cases")
         );
         const scope = {
           conversation_id: randomUUID(),
-          organization_id: fixture.organizationId,
+          organization_id: live
+            ? live.context.organizationId
+            : fixture.organizationId,
         };
         const post = async (body: object) => {
           const response = await t.target.fetch("/internal/widget/message", {
             body: JSON.stringify({ ...scope, ...body }),
             headers: {
-              // Any token: replay answers identity from the case's fixture scope.
+              // Any token: replay answers identity from the case's fixture or live scope.
               authorization: "Bearer replay",
               "content-type": "application/json",
-              "x-widget-replay-case": file.slice(0, -5),
+              ...(live ? {} : { "x-widget-replay-case": file.slice(0, -5) }),
               [SERVICE_SECRET_HEADER]:
                 process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "",
             },
@@ -113,9 +126,9 @@ export default readdirSync("evals/widget/cases")
           return (await response.json()) as Record<string, unknown>;
         };
         let result = await post({
-          ...toRequest(recorded.question),
+          ...toRequest(live ? live.question : recorded.question),
           message_id: randomUUID(),
-          recording: replayRecording(recorded),
+          recording: live ? undefined : replayRecording(recorded),
         });
         const runId = await t.require(
           result.run_id,
@@ -145,7 +158,8 @@ export default readdirSync("evals/widget/cases")
           t,
           await readWidgetRun(String(runId)),
           recorded,
-          path
+          path,
+          live
         );
       },
     })
@@ -154,8 +168,9 @@ export default readdirSync("evals/widget/cases")
 async function gradeReplay(
   t: EveEvalContext,
   run: WidgetRun,
-  recorded: WidgetCase,
-  path: string
+  authored: WidgetCase,
+  path: string,
+  live: LiveCase | null = null
 ) {
   const lane = answeredLane(run);
   const session =
@@ -171,6 +186,33 @@ async function gradeReplay(
       (event) => event.data.result as { output?: unknown; toolName?: string }
     );
   const tools = results.map((call) => call.toolName ?? "");
+  // Live: the authored expectations, graded against the real question and the reads this run made.
+  const recorded: WidgetCase = live
+    ? {
+        ...authored,
+        cassette: events.flatMap((event) => {
+          if (event.type !== "action.result") {
+            return [];
+          }
+          const result = event.data.result as {
+            input?: unknown;
+            output?: unknown;
+            toolName?: string;
+          };
+          return [
+            {
+              input: result.input ?? null,
+              output: result.output ?? null,
+              requestedAt: event.meta.at,
+              resultAt: event.meta.at,
+              status: "completed",
+              tool: result.toolName ?? "",
+            },
+          ];
+        }),
+        question: live.question,
+      }
+    : authored;
   const grades = gradeRun(
     {
       decision: run.outcome?.decision ?? "block",
@@ -181,13 +223,14 @@ async function gradeReplay(
     recorded
   );
   // Input matching is replayRead's job; an unrecorded read is an input no recording matched.
-  const unrecorded = unrecordedReads(results, recorded);
+  const unrecorded = live ? [] : unrecordedReads(results, recorded);
   const { checks, outcome, scored } = replayAssessment(grades, unrecorded);
 
   // The row states coverage so partial measurements cannot look like full-run cost.
   t.log(
     `row: ${JSON.stringify({
       case: path,
+      live: Boolean(live),
       replayOutcome: outcome,
       scored,
       ...(scored
