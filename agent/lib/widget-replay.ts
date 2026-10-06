@@ -62,6 +62,8 @@ export const isReplayActive = () => {
  */
 export const LIVE_DIR = ".eve/widget-live";
 const liveCaseSchema = z.object({
+  // When the customer asked: later Linear issues are hidden from the replay.
+  at: z.iso.datetime(),
   context: widgetContextSchema,
   question: z.string().min(1),
   runId: z.string(),

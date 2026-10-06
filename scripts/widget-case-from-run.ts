@@ -146,7 +146,9 @@ if (!events.length) {
 }
 
 // The verified widget scope is the session auth eve keeps in the run input.
-const { input } = runRecord.parse(JSON.parse(await cli(["run", runId], true)));
+const { createdAt, input } = runRecord.parse(
+  JSON.parse(await cli(["run", runId], true))
+);
 const auth = z
   .tuple([
     z.object({
@@ -174,9 +176,13 @@ if (!question) {
 if (values.live) {
   const path = join(LIVE_DIR, `${name}.json`);
   await mkdir(LIVE_DIR, { recursive: true });
-  await writeFile(path, JSON.stringify({ context, question, runId }), {
-    mode: 0o600,
-  });
+  await writeFile(
+    path,
+    JSON.stringify({ at: createdAt, context, question, runId }),
+    {
+      mode: 0o600,
+    }
+  );
   console.log(
     `Wrote ${path} for a live replay (raw customer data, gitignored).`
   );

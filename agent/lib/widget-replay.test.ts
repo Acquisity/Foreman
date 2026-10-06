@@ -432,7 +432,12 @@ test("live replay answers from the recorded run's real scope, reads live and nev
   mkdirSync(LIVE_DIR, { recursive: true });
   writeFileSync(
     path,
-    JSON.stringify({ context: fixture, question: "Q", runId: "wrun_x" })
+    JSON.stringify({
+      at: "2026-10-05T17:29:22.000Z",
+      context: fixture,
+      question: "Q",
+      runId: "wrun_x",
+    })
   );
   process.env.WIDGET_LIVE_CASE = path;
   try {
