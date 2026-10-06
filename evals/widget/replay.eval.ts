@@ -68,6 +68,17 @@ function toRequest(question: string) {
   return { history, question: latest };
 }
 
+/** The case's message; a live run resends the real question and the recording the customer attached. */
+const firstMessage = (recorded: WidgetCase, live: LiveCase | null) =>
+  live
+    ? {
+        ...toRequest(live.question),
+        recording: live.context.recordingId
+          ? { id: live.context.recordingId }
+          : undefined,
+      }
+    : { ...toRequest(recorded.question), recording: replayRecording(recorded) };
+
 // WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
 // WIDGET_LIVE_CASE instead replays one case's real production conversation with live reads.
 export default readdirSync("evals/widget/cases")
@@ -126,12 +137,8 @@ export default readdirSync("evals/widget/cases")
           return (await response.json()) as Record<string, unknown>;
         };
         let result = await post({
-          ...toRequest(live ? live.question : recorded.question),
+          ...firstMessage(recorded, live),
           message_id: randomUUID(),
-          // A live run resends the recording the customer attached to that message.
-          recording: live
-            ? live.context.recordingId && { id: live.context.recordingId }
-            : replayRecording(recorded),
         });
         const runId = await t.require(
           result.run_id,
