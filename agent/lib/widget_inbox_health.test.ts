@@ -169,6 +169,13 @@ test("no connection is reported distinctly from an unreadable connection", async
 test("recent failed reconnect attempts reach the result without OAuth secrets", async (t) => {
   const query = buildWidgetInboxHealthQuery(scope);
   assert.ok(query.includes("from cea_oauth_sessions s join authorized a"));
+  for (const required of [
+    "interval '7 days'",
+    "order by s.created_at desc limit 25",
+    "left(s.error, 200)",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
   for (const forbidden of [
     "instantly_auth_url",
     "instantly_session_id",
