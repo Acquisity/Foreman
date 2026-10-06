@@ -128,7 +128,10 @@ export default readdirSync("evals/widget/cases")
         let result = await post({
           ...toRequest(live ? live.question : recorded.question),
           message_id: randomUUID(),
-          recording: live ? undefined : replayRecording(recorded),
+          // A live run resends the recording the customer attached to that message.
+          recording: live
+            ? live.context.recordingId && { id: live.context.recordingId }
+            : replayRecording(recorded),
         });
         const runId = await t.require(
           result.run_id,
