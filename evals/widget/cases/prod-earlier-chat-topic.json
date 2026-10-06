@@ -16,7 +16,7 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Says the recent messages in this chat do not mention an AI Audit, and says what they did cover, such as the procurement workflow audit question.",
+      "Says the earlier turns before the latest message do not mention an AI Audit, and says what they did cover, such as the procurement workflow audit question.",
       "Does not claim to see conversations outside this chat."
     ],
     "fileTicket": false,
