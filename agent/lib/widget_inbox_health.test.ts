@@ -58,6 +58,7 @@ const baseRow = (overrides: Record<string, unknown> = {}) => ({
   observedAt,
   recentWebhookErrorCount: 0,
   recentWebhookEventCount: 0,
+  reconnectAttempts: [],
   webhookRegisteredCount: 0,
   workspaceId: null,
   ...overrides,
@@ -162,6 +163,41 @@ test("no connection is reported distinctly from an unreadable connection", async
   assert.equal(result.accounts.available, false);
   if (result.accounts.available === false) {
     assert.match(result.accounts.reason, NO_CONNECTION);
+  }
+});
+
+test("recent failed reconnect attempts reach the result without OAuth secrets", async (t) => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  assert.ok(query.includes("from cea_oauth_sessions s join authorized a"));
+  for (const forbidden of [
+    "instantly_auth_url",
+    "instantly_session_id",
+    "instantly_client_id",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  const failed = {
+    completedAt: null,
+    createdAt: "2026-10-06T03:15:52.000+00:00",
+    email: "sender@example.test",
+    error:
+      "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailbox",
+    status: "failed",
+  };
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(baseRow({ reconnectAttempts: [failed] })),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.deepEqual(result.reconnectAttempts, [failed]);
   }
 });
 

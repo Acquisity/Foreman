@@ -44,6 +44,10 @@ const RECENT_ACTIVITY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const INITIAL_WARMUP_DAYS = 14;
 /** Done-for-you inboxes in initial warmup read from the product database. */
 const INITIAL_WARMUP_LIMIT = 1000;
+/** The customer's own mailbox reconnect attempts, newest first. */
+const RECONNECT_WINDOW_DAYS = 7;
+const RECONNECT_LIMIT = 25;
+const RECONNECT_ERROR_CHARS = 200;
 
 export const widgetInboxHealthInput = z.strictObject({});
 export type WidgetInboxHealthInput = z.infer<typeof widgetInboxHealthInput>;
@@ -70,6 +74,14 @@ const staleSyncAccount = z.object({
   lastUsedAt: timestamp.nullable(),
   status: z.number().nullable(),
 });
+const reconnectAttempt = z.object({
+  completedAt: timestamp.nullable(),
+  createdAt: timestamp,
+  email: z.string().max(320).nullable(),
+  error: z.string().max(RECONNECT_ERROR_CHARS).nullable(),
+  status: z.string().max(32),
+});
+const reconnectAttempts = z.array(reconnectAttempt).max(RECONNECT_LIMIT);
 const accountDetail = z.object({
   bucket: z.enum([
     "error",
@@ -113,6 +125,7 @@ export const widgetInboxHealthOutput = z.union([
     caveats: z.array(z.string()).max(6),
     connection: connection.nullable(),
     observedAt: timestamp,
+    reconnectAttempts,
     source: z.literal(
       "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections"
     ),
@@ -166,7 +179,14 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
       select lower(mi.email) as email from mail_inbox mi join authorized a on a.id = mi.organization_id
       where mi.mailbox_type = 'dfy'
         and mi.created_at > current_timestamp - interval '${INITIAL_WARMUP_DAYS} days'
-      order by mi.created_at desc limit ${INITIAL_WARMUP_LIMIT + 1}) w) as "initialWarmupEmails"`;
+      order by mi.created_at desc limit ${INITIAL_WARMUP_LIMIT + 1}) w) as "initialWarmupEmails",
+    (select coalesce(jsonb_agg(r order by r."createdAt" desc), '[]'::jsonb) from (
+      select s.email, s.status, left(s.error, ${RECONNECT_ERROR_CHARS}) as error,
+        s.created_at as "createdAt", s.completed_at as "completedAt"
+      from cea_oauth_sessions s join authorized a on a.id = s.organization_id
+      where s.deleted_at is null
+        and s.created_at > current_timestamp - interval '${RECONNECT_WINDOW_DAYS} days'
+      order by s.created_at desc limit ${RECONNECT_LIMIT}) r) as "reconnectAttempts"`;
 }
 
 const dbRow = z.object({
@@ -182,6 +202,7 @@ const dbRow = z.object({
   observedAt: timestamp,
   recentWebhookErrorCount: z.number().int().nonnegative(),
   recentWebhookEventCount: z.number().int().nonnegative(),
+  reconnectAttempts,
   webhookRegisteredCount: z.number().int().nonnegative(),
   workspaceId: z.string().min(1).max(200).nullable(),
 });
@@ -465,6 +486,7 @@ export async function readWidgetInboxHealth(
       caveats: CAVEATS,
       connection: null,
       observedAt: row.observedAt,
+      reconnectAttempts: row.reconnectAttempts,
       source:
         "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
       status: "ok",
@@ -482,6 +504,7 @@ export async function readWidgetInboxHealth(
       updatedAt: row.connectionUpdatedAt ?? row.observedAt,
     },
     observedAt: row.observedAt,
+    reconnectAttempts: row.reconnectAttempts,
     source:
       "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
     status: "ok",
@@ -496,7 +519,7 @@ export async function readWidgetInboxHealth(
 }
 
 const tool = defineTool({
-  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. reconnectAttempts lists this workspace's own mailbox reconnect attempts from the last ${RECONNECT_WINDOW_DAYS} days, newest first (at most ${RECONNECT_LIMIT}: email, status, error, created and completed times); when the recent attempts failed, the customer already tried reconnecting and it did not work. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,
