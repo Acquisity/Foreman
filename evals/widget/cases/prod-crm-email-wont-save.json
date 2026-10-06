@@ -35,21 +35,175 @@
       "resultAt": "2026-10-05T17:29:34.938Z",
       "status": "completed",
       "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "email": "person-1@domain-1.example"
+      },
+      "output": {
+        "caveats": [
+          "Only live CRM people in this workspace are read; deleted and merged people, companies, and leads are not.",
+          "The CRM does not require emails to be unique, so a match here shows the address is already saved on that person, not that a save was refused because of it."
+        ],
+        "emailMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "emailMatchesTruncated": false,
+        "nameMatches": null,
+        "nameMatchesTruncated": false,
+        "observedAt": "2026-10-06T15:20:00.000Z",
+        "source": "Acquisity product database; this workspace's CRM people.",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "tool": "widget_crm_contact",
+      "requestedAt": "2026-10-06T15:20:00.000Z",
+      "resultAt": "2026-10-06T15:20:01.000Z",
+      "status": "completed"
+    },
+    {
+      "input": {
+        "email": "person-1@domain-1.example",
+        "name": "Contact One"
+      },
+      "output": {
+        "caveats": [
+          "Only live CRM people in this workspace are read; deleted and merged people, companies, and leads are not.",
+          "The CRM does not require emails to be unique, so a match here shows the address is already saved on that person, not that a save was refused because of it."
+        ],
+        "emailMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "emailMatchesTruncated": false,
+        "nameMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "nameMatchesTruncated": false,
+        "observedAt": "2026-10-06T15:20:00.000Z",
+        "source": "Acquisity product database; this workspace's CRM people.",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "tool": "widget_crm_contact",
+      "requestedAt": "2026-10-06T15:20:00.000Z",
+      "resultAt": "2026-10-06T15:20:01.000Z",
+      "status": "completed"
+    },
+    {
+      "input": {
+        "email": "person-1@domain-2.example"
+      },
+      "output": {
+        "caveats": [
+          "Only live CRM people in this workspace are read; deleted and merged people, companies, and leads are not.",
+          "The CRM does not require emails to be unique, so a match here shows the address is already saved on that person, not that a save was refused because of it."
+        ],
+        "emailMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "emailMatchesTruncated": false,
+        "nameMatches": null,
+        "nameMatchesTruncated": false,
+        "observedAt": "2026-10-06T15:20:00.000Z",
+        "source": "Acquisity product database; this workspace's CRM people.",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "tool": "widget_crm_contact",
+      "requestedAt": "2026-10-06T15:20:00.000Z",
+      "resultAt": "2026-10-06T15:20:01.000Z",
+      "status": "completed"
+    },
+    {
+      "input": {
+        "email": "person-1@domain-2.example",
+        "name": "Contact One"
+      },
+      "output": {
+        "caveats": [
+          "Only live CRM people in this workspace are read; deleted and merged people, companies, and leads are not.",
+          "The CRM does not require emails to be unique, so a match here shows the address is already saved on that person, not that a save was refused because of it."
+        ],
+        "emailMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "emailMatchesTruncated": false,
+        "nameMatches": [
+          {
+            "emails": [
+              "person-1@domain-1.example",
+              "person-1@domain-2.example"
+            ],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Contact One"
+          }
+        ],
+        "nameMatchesTruncated": false,
+        "observedAt": "2026-10-06T15:20:00.000Z",
+        "source": "Acquisity product database; this workspace's CRM people.",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "tool": "widget_crm_contact",
+      "requestedAt": "2026-10-06T15:20:00.000Z",
+      "resultAt": "2026-10-06T15:20:01.000Z",
+      "status": "completed"
     }
   ],
   "expectations": {
     "cause": null,
     "claims": [
-      "Investigates what it can about the failed email change before handing off.",
-      "Hands the conversation to a person, because the customer asked for one if the cause could not be found."
+      "Reports what the contact records show: the new address is now saved on that same contact, together with the original address.",
+      "Does not say the new address belongs to a different contact."
     ],
     "fileTicket": false,
     "foreignIdentifiers": [],
-    "gateVerdict": "block",
+    "gateVerdict": null,
     "lane": "investigate",
-    "toolBudget": 3
+    "toolBudget": 4
   },
-  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI already tried editing Contact One\u2019s email. The original address saves, but person-1@domain-1.example does not.\n\nPlease investigate this specific failure, including whether the new address already belongs to another CRM record. If you cannot identify the cause, please connect me with a human support agent in this chat.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I need help updating Contact One\u2019s existing CRM contact.\n\nHis company changed from Company One to Company Two LLC. He requested that future emails go to person-1@domain-1.example.\n\nThe new email would not save. The email field became empty, so I restored person-1@domain-2.example successfully.\n\nPlease inspect why the new address won\u2019t save and guide me through updating this same contact. His AI SDR conversation is paused and should remain paused while we resolve this.\nSupport: If so, could you share the exact text (a screenshot works too)?\nCustomer: The new email, person-1@domain-1.example, would not save, and the email field became empty. I restored the original address, person-1@domain-2.example, and that saved successfully. I don\u2019t have the exact error text. What should I check next?\nSupport: 1. Click a person to open their profile.\n2. Click directly on any field value (like the name or title).\n3. Type in the new value.\n4. The change saves automatically.",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI already tried editing Contact One’s email. The original address saves, but person-1@domain-1.example does not.\n\nPlease investigate this specific failure, including whether the new address already belongs to another CRM record. If you cannot identify the cause, please connect me with a human support agent in this chat.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I need help updating Contact One’s existing CRM contact.\n\nHis company changed from Company One to Company Two LLC. He requested that future emails go to person-1@domain-1.example.\n\nThe new email would not save. The email field became empty, so I restored person-1@domain-2.example successfully.\n\nPlease inspect why the new address won’t save and guide me through updating this same contact. His AI SDR conversation is paused and should remain paused while we resolve this.\nSupport: If so, could you share the exact text (a screenshot works too)?\nCustomer: The new email, person-1@domain-1.example, would not save, and the email field became empty. I restored the original address, person-1@domain-2.example, and that saved successfully. I don’t have the exact error text. What should I check next?\nSupport: 1. Click a person to open their profile.\n2. Click directly on any field value (like the name or title).\n3. Type in the new value.\n4. The change saves automatically.",
   "scope": {
     "role": "owner",
     "workspace": "aaron-fragas-workspace-wMUMT"
@@ -62,6 +216,10 @@
     "lane": "investigate",
     "role": "owner",
     "safety": [],
-    "tools": ["widget_known_issues", "widget_job_failures"]
+    "tools": [
+      "widget_known_issues",
+      "widget_job_failures",
+      "widget_crm_contact"
+    ]
   }
 }
