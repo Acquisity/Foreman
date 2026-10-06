@@ -386,7 +386,7 @@
     }
   ],
   "expectations": {
-    "cause": "All 18 inboxes show an Error status; the screen recording shows the Email Accounts page and no failed reconnect.",
+    "cause": "All 18 inboxes show an Error status; the readable part of the screen recording shows only the Email Accounts page.",
     "claims": [
       "Says every inbox in the workspace currently shows an Error status.",
       "Gives the reconnect steps from the help center and says a reconnect can take up to 48 hours.",
