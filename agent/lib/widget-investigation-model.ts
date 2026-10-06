@@ -25,6 +25,7 @@ const ALLOWED_TOOLS = new Set([
   // Registered only while the next-action pilot is on, and offered only by its selector.
   "widget_ask_customer",
   "widget_billing_summary",
+  "widget_crm_contact",
   "widget_file_ticket",
   "widget_generation_diagnostics",
   "widget_help_article",

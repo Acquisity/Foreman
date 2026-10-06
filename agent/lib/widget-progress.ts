@@ -40,6 +40,8 @@ export type CheckId = WidgetProgress["checks"][number]["id"];
 const checks: Record<string, CheckId> = {
   widget_account_access: "account",
   widget_billing_summary: "billing",
+  // Acquisity's progress enum is fixed; CRM people sit with leads.
+  widget_crm_contact: "leads",
   widget_generation_diagnostics: "generation",
   widget_help_article: "guides",
   widget_inbox_health: "inboxes",
