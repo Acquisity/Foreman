@@ -532,11 +532,7 @@
                 "snapshotAt": "2026-10-05T19:29:05.212+00:00",
                 "unsubscribes": 0
               },
-              "sequenceStepDelays": [
-                2,
-                2,
-                3
-              ],
+              "sequenceStepDelays": [2, 2, 3],
               "startDate": "2026-09-29",
               "stepSends": [
                 {
@@ -826,9 +822,7 @@
           "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
           "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
         ],
-        "coveredAreas": [
-          "ai_sdr"
-        ],
+        "coveredAreas": ["ai_sdr"],
         "failures": [],
         "observedAt": "2026-10-05T19:31:05.373Z",
         "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
