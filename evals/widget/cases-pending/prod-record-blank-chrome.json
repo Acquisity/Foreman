@@ -28,7 +28,7 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Does not ask again whether the tab stays blank, since the customer already described it.",
+      "Does not ask again which browser is used or what the tab shows now, since the customer already said.",
       "Reports the blank recording page as a fault to engineering.",
       "Offers a way to continue without the recording, such as pasting a screenshot."
     ],
