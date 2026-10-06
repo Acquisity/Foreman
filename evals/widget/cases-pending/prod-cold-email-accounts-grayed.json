@@ -1,0 +1,267 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": false,
+          "reason": "No Instantly connection is configured for this organization."
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": null,
+        "observedAt": "2026-10-05T17:09:09.328Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": null,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T17:09:07.168Z",
+      "resultAt": "2026-10-05T17:09:11.263Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-09-28T03:33:56.616+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-10-05T06:33:54.818+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-08-18T18:27:51.45+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T17:09:14.524Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T17:09:12.662Z",
+      "resultAt": "2026-10-05T17:09:15.016Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "query": "connect sending provider email accounts setup"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/white-label-partners/faq/domain-1.example",
+            "title": "Domain Provider Setup",
+            "url": "https://app.acquisity.ai/docs/white-label-partners/faq/domain-providers"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/domain-2.example",
+            "title": "Setup",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/setup"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean.mdx",
+            "title": "What do the account statuses mean?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-3.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T17:09:18.589Z",
+      "resultAt": "2026-10-05T17:09:19.437Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "query": "Email Accounts grayed out unlock campaign"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-3.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-4.example",
+            "title": "Can I move email accounts between workspaces?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-move-email-accounts-between-workspaces"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
+            "title": "Managing Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T17:09:18.590Z",
+      "resultAt": "2026-10-05T17:09:19.499Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+      },
+      "output": {
+        "content": "<div className=\"mb-6\">\n  <InlineSearchBar placeholder=\"Search questions...\" />\n</div>\n\n<QuestionList>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from\">How do I get email accounts to send from?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-are-pre-warmed-inboxes\">What are pre-warmed inboxes?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-much-do-inboxes-cost\">How much do inboxes cost?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need\">How many email accounts do I need?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit\">Can I set a per-inbox daily sending limit?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-distribute-volume-across-multiple-inboxes-and-campaigns\">How do I distribute volume across multiple inboxes and campaigns safely?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-temporarily-holdpause-my-email-accounts-while-im-away\">Can I temporarily hold/pause my email accounts while I'm away?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-move-email-accounts-between-workspaces\">Can I move email accounts between workspaces?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/my-pre-warmed-inboxes-dont-appear-after-purchase-how-long-does-provisioning-take\">My pre-warmed inboxes don't appear after purchase — how long does provisioning take?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/my-inbox-warmup-shows-0-emails-and-no-health-score-how-do-i-initialize-it\">My inbox warmup shows 0 emails and no health score — how do I initialize it?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-is-the-warmup-period\">What is the warmup period?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-does-the-health-score-mean\">What does the health score mean?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean\">What do the account statuses mean?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error\">How do I fix an account with an error?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-replace-burntspam-flagged-outreach-inboxes\">How do I replace burnt/spam-flagged outreach inboxes?</QuestionItem>\n</QuestionList>\n\n<Callout>\nFor the full setup guides, see the [Email Accounts section](/docs/cold-email-agent/email-accounts) — [buying inboxes](/docs/cold-email-agent/email-accounts/buying-inboxes), [domain provisioning](/docs/cold-email-agent/email-accounts/domain-provisioning), [warmup](/docs/cold-email-agent/email-accounts/warmup), and [health & troubleshooting](/docs/cold-email-agent/email-accounts/health-and-troubleshooting).\n</Callout>",
+        "title": "Email Accounts & Domains",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+      },
+      "requestedAt": "2026-10-05T17:09:21.949Z",
+      "resultAt": "2026-10-05T17:09:22.035Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    },
+    {
+      "input": {
+        "query": "how do I get email accounts to send from"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/domain-5.example",
+            "title": "Getting Started",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/getting-started"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-3.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-6.example",
+            "title": "How do I get email accounts to send from?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/domain-7.example",
+            "title": "Email Templates",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/email-templates"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T17:09:23.956Z",
+      "resultAt": "2026-10-05T17:09:24.331Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from"
+      },
+      "output": {
+        "content": "There are two options:\n\n1. **Buy pre-warmed inboxes** — Ready to send from day one. 3 inboxes per domain, aged 4+ weeks. This is the fastest way to start.\n2. **Done-For-You (DFY) setup** — Professional accounts created for you on an available outreach domain you choose during setup, but they need about 2 weeks of warmup before sending.\n\n## Related\n\n- [Email Accounts](/docs/cold-email-agent/email-accounts)\n- [Buying inboxes](/docs/cold-email-agent/email-accounts/buying-inboxes)",
+        "title": "How do I get email accounts to send from?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from"
+      },
+      "requestedAt": "2026-10-05T17:09:26.256Z",
+      "resultAt": "2026-10-05T17:09:26.312Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "No sending connection is set up for this workspace yet, so it has no sending accounts.",
+    "claims": [
+      "Says no sending connection or sending accounts are set up in this workspace yet, from saved state.",
+      "Explains how to get email accounts to send from (pre-warmed inboxes or done-for-you setup), based on the help center.",
+      "Does not name the outside email provider behind sending accounts."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 5
+  },
+  "question": "I'm continuing the cold email agent setup for Aaron Fraga's Workspace the Email accounts section is grayed out, and New Campaign is also not Clickable.I briefly saw a Connect provider button during setup, but after the window closed,  it disappeared and does not come back after refreshing. Could you please tell me how to reopen the sending-provider setup or unlock Email Accounts? Also , please let me know if the sending provider is already configured on my account.\nThank you!",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46GMPJQ0GNKEVC1XDR35S90",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_inbox_health",
+      "widget_account_access",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

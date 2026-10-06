@@ -1,0 +1,131 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-05T16:58:24.192+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-03-06T15:36:16.806+00:00",
+          "partnerEligible": true,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-03-06T15:36:14.848+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T20:41:58.922Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": true,
+          "reason": "eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 2,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 2
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T20:41:56.632Z",
+      "resultAt": "2026-10-05T20:41:59.346Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "query": "sidebar missing not visible"
+      },
+      "output": {
+        "issues": [
+          {
+            "identifier": "ENG-1",
+            "status": "Todo",
+            "title": "Help center sends customers to a Feedback link that is no longer in the sidebar"
+          },
+          {
+            "identifier": "ENG-2",
+            "status": "Todo",
+            "title": "PR 3 — CSV upload wizard redesign (Upload, Map, Review, progress, banner)"
+          },
+          {
+            "identifier": "ENG-3",
+            "status": "Duplicate",
+            "title": "Sales Call Analyzer missing from sidebar navigation"
+          },
+          {
+            "identifier": "ENG-4",
+            "status": "Done",
+            "title": "Rework the client role: app-visible via partner enablement, admin/billing-safe by default"
+          },
+          {
+            "identifier": "ENG-5",
+            "status": "Done",
+            "title": "Seed the tech-wiz consultant mode via an idempotent migration"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T20:42:01.869Z",
+      "resultAt": "2026-10-05T20:42:04.218Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Accepts that the customer is the workspace owner and does not tell them to ask an owner or admin about their role.",
+      "Asks what is missing from the sidebar or what they see instead, or gives a help-center step to bring the sidebar back.",
+      "Does not repeat the ad blocker or chat bubble steps."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 2
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI am the workspace owner\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: How do I get my sidebar back o?\nSupport: 1. Open your ad blocker or extension menu.\n2. Disable it for this site or add the Acquisity domain to the allowlist.\n3. Refresh the page.\n4. The chat bubble should reappear. If you do not see it, use Feedback in the bottom-left sidebar to open the same support chat.\nCustomer: I am on my workspace and want to get my sidebar back\nSupport: 1. Confirm that you opened the correct workspace.\n2. Ask a workspace owner or admin to check your role.\n3. If this is a white-label portal, ask the partner owner which features are enabled.\n4. Contact support if the workspace should include the tool but it is still missing.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46WT9AH0GQYKR70070QW4YR",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_account_access", "widget_known_issues"]
+  }
+}
