@@ -1,0 +1,43 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "I don't see an \"AI Audit\" conversation in our chat history today. Could you tell me a bit more about what you're referring to, or where you saw that?"
+      },
+      "output": {
+        "asked": "I don't see an \"AI Audit\" conversation in our chat history today. Could you tell me a bit more about what you're referring to, or where you saw that?"
+      },
+      "requestedAt": "2026-10-05T20:24:41.414Z",
+      "resultAt": "2026-10-05T20:24:41.415Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says the recent messages in this chat do not mention an AI Audit, and says what they did cover, such as the procurement workflow audit question.",
+      "Does not claim to see conversations outside this chat."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nDid I have a conversation woth you about AI Audit today\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Do we have any tools that I could recommend to a consultant in the procurement arena that he could recommend to his clients?\nSupport: I could not find a help-center article for that, so could you tell me which feature or page it is about?\nCustomer: That is not helping. Just wondering if we have anything we can provide to a consultant customers in the procurement industry.\nSupport: I could not find a help-center article for that, so could you tell me which feature or page it is about?\nCustomer: How do I go about a procurement workflow  audit for a possible new client?\nSupport: I could not find a help-center article for that, so could you tell me which feature or page it is about?\nCustomer: What do I do with an add that I created in AI Ad writer?\nSupport: You can copy and paste your scripts into your ad platform of choice, as there is no direct connection to ad platforms.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46VTS430GNRYNWVBKP33XRZ",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}

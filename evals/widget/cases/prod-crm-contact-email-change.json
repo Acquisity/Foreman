@@ -1,0 +1,155 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "query": "email field won't save becomes empty"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-05T17:25:58.493Z",
+      "resultAt": "2026-10-05T17:26:01.128Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "area": "ai_sdr",
+        "since": "24h"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["ai_sdr"],
+        "failures": [],
+        "observedAt": "2026-10-05T17:26:05.674Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T17:26:03.729Z",
+      "resultAt": "2026-10-05T17:26:05.674Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-03T18:02:21.385+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-02-09T16:58:06.04+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2025-11-12T14:35:01.14+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T17:26:09.575Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "reset",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [
+          {
+            "createdAt": "2026-07-13T10:00:45.47+00:00",
+            "email": "person-1@domain-1.example",
+            "expired": true,
+            "expiresAt": "2026-07-15T10:00:45.47+00:00",
+            "role": "member",
+            "status": "pending"
+          }
+        ],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T17:26:07.763Z",
+      "resultAt": "2026-10-05T17:26:10.125Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "question": "When you tried saving person-2@domain-2.example and the field went blank, did you see any error message pop up or appear near the field? If so, could you share the exact text (a screenshot works too)?"
+      },
+      "output": {
+        "asked": "When you tried saving person-2@domain-2.example and the field went blank, did you see any error message pop up or appear near the field? If so, could you share the exact text (a screenshot works too)?"
+      },
+      "requestedAt": "2026-10-05T17:26:12.920Z",
+      "resultAt": "2026-10-05T17:26:12.921Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says no recorded error or known issue explains why the new email address would not save.",
+      "Asks for the exact error text or a screenshot of what happens on save, or gives help-center steps for editing a contact's email.",
+      "Does not claim to have changed the contact or the paused AI SDR conversation."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 4
+  },
+  "question": "I need help updating Contact One’s existing CRM contact.\n\nHis company changed from Company One to Company Two. He requested that future emails go to person-2@domain-2.example.\n\nThe new email would not save. The email field became empty, so I restored person-2@domain-3.example successfully.\n\nPlease inspect why the new address won’t save and guide me through updating this same contact. His AI SDR conversation is paused and should remain paused while we resolve this.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46HKHAZ0GZJF4T876TJ4TP5",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_known_issues",
+      "widget_job_failures",
+      "widget_account_access",
+      "widget_ask_customer"
+    ]
+  }
+}

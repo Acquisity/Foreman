@@ -1,0 +1,69 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "query": "Record my screen button not working"
+      },
+      "output": {
+        "issues": [
+          {
+            "identifier": "ENG-1",
+            "status": "Done",
+            "title": "Suggest duplicate people, companies and deals to review"
+          },
+          {
+            "identifier": "ENG-2",
+            "status": "Done",
+            "title": "Make merging people safe and undoable"
+          },
+          {
+            "identifier": "ENG-3",
+            "status": "Done",
+            "title": "Scheduled messages in Conversations: Scheduled folder, edit or retry, remind if no reply, better Schedule send"
+          },
+          {
+            "identifier": "ENG-4",
+            "status": "Done",
+            "title": "Insert data dropdown scrolling with a mouse isn't working"
+          },
+          {
+            "identifier": "ENG-5",
+            "status": "Done",
+            "title": "Manual campaign sync does not update last sync time"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T13:21:52.882Z",
+      "resultAt": "2026-10-06T13:21:55.097Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Asks what happens when the Record my screen button is clicked, or offers pasting a screenshot instead.",
+      "Does not claim the recording button is broken for everyone."
+    ],
+    "fileTicket": null,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 2
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nthe Record My Screen button does not work for me.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: How do I handle the reply from the Contact One email?  The message says \"He asked you to loop in another contact. The AI can't switch contacts on its own yet, so it's waiting for you to confirm.\"  I have tried all three buttons and then clicked the \"resume AI SDR\" button, but it always escalates for human direction.\nSupport: I could not find an article for that in our help center. Could you please paste a screenshot or the exact error text so I can find the right guide?\nCustomer: Contact One referred you to someone else\nPaused · about 18 hr ago\nHe asked you to loop in another contact. The AI can't switch contacts on its own yet, so it's waiting for you to confirm.\nSupport: I still cannot find a guide for that, but you can use the Record my screen button below to show me.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M48P1ASR0GSM56R6EXT585EG",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_known_issues"]
+  }
+}
