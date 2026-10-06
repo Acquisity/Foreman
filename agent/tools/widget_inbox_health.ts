@@ -184,8 +184,7 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
       select s.email, s.status, left(s.error, ${RECONNECT_ERROR_CHARS}) as error,
         s.created_at as "createdAt", s.completed_at as "completedAt"
       from cea_oauth_sessions s join authorized a on a.id = s.organization_id
-      where s.deleted_at is null
-        and s.created_at > current_timestamp - interval '${RECONNECT_WINDOW_DAYS} days'
+      where s.created_at > current_timestamp - interval '${RECONNECT_WINDOW_DAYS} days'
       order by s.created_at desc limit ${RECONNECT_LIMIT}) r) as "reconnectAttempts"`;
 }
 
