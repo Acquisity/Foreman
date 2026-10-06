@@ -232,9 +232,9 @@
     }
   ],
   "expectations": {
-    "cause": "No sending connection is set up for this workspace yet, so it has no sending accounts.",
+    "cause": "No sending connection is configured for this workspace, so the live sending-account check could not run.",
     "claims": [
-      "Says no sending connection or sending accounts are set up in this workspace yet, from saved state.",
+      "Says no sending connection is configured for this workspace, from saved state, and does not claim to have counted its sending accounts.",
       "Explains how to get email accounts to send from (pre-warmed inboxes or done-for-you setup), based on the help center.",
       "Does not name the outside email provider behind sending accounts."
     ],
