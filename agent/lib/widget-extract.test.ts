@@ -10,7 +10,7 @@ import {
 import type { WidgetFindings } from "./widget-findings.js";
 
 const FAILED_STEP_RULE =
-  /already tried the documented step and it failed[^)]*never tells them to repeat that step or wait it out/;
+  /also true when the customer already tried the documented step and it failed[^)]*never tells them to repeat that step or wait it out/;
 
 // What the small model returns: the lenient extraction shape.
 const lenient = {
