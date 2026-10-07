@@ -12,6 +12,7 @@ import {
   REPLY_PROMPT,
   renderTranscript,
   resolveCitations,
+  SELECT_PROMPT,
   stepsOnOwnLines,
 } from "./widget-kb.js";
 
@@ -241,7 +242,7 @@ test("articles are picked from the title index, with keyword search only as the 
     new URL(read[0]).pathname,
     "/docs/cold-email-agent/email-accounts/buying-inboxes"
   );
-  assert.equal(result?.citations[0].title, "Buying inboxes");
+  assert.equal(result.citations[0].title, "Buying inboxes");
 
   // An empty pick, or a failing one, falls back to keyword search.
   for (const select of [
@@ -254,7 +255,7 @@ test("articles are picked from the title index, with keyword search only as the 
       index: () => Promise.resolve(index),
       select,
     });
-    assert.equal(fallback?.citations[0].title, "Setup");
+    assert.equal(fallback.citations[0].title, "Setup");
   }
 });
 
@@ -314,7 +315,7 @@ for (const [latest, screenshots] of [
     const [fresh, carried] = [articles[2].url, articles[0].url];
     assert.deepEqual(given, [[fresh, carried]]);
     assert.deepEqual(
-      result?.citations.map((c) => c.url),
+      result.citations.map((c) => c.url),
       [articles[0].url]
     );
   });
@@ -342,7 +343,7 @@ test("a new subject outweighs the previous citation: the fresh article is read f
     }
   );
   assert.deepEqual(
-    result?.citations.map((c) => c.url),
+    result.citations.map((c) => c.url),
     [widgetMissing.url]
   );
 });
@@ -508,7 +509,7 @@ test("the selector and the writer look at the screenshots; without them, a load 
     loaded.push(urls);
     return Promise.resolve([image]);
   });
-  assert.equal(answered?.message, "Click Email Accounts.");
+  assert.equal(answered.message, "Click Email Accounts.");
   assert.deepEqual(loaded, [ask.images]);
   await run(() => Promise.reject(new Error("r2 down")));
   await run(undefined);
@@ -660,10 +661,43 @@ test("article picking and text answers run on flash-lite, and an answer with scr
   );
 });
 
-test("the writer never says a person or a queue will pick the message up", () => {
+test("only requests for advice or review use AI Consultant articles", () => {
+  for (const prompt of [REPLY_PROMPT, SELECT_PROMPT]) {
+    assert.ok(
+      prompt.includes(
+        "only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance"
+      )
+    );
+  }
+  assert.ok(REPLY_PROMPT.includes("otherwise do not mention it"));
+  assert.ok(SELECT_PROMPT.includes("otherwise do not select them"));
+});
+
+test("a bare screenshot asks for a goal, while a screenshot follow-up gets the next step", () => {
   assert.ok(
     REPLY_PROMPT.includes(
-      "never say or suggest that a person, a teammate, the support team or a queue will see, pick up or follow up on this message"
+      "When a screenshot arrives with no question and no earlier customer goal, ask one short question about what they want to do"
+    )
+  );
+  assert.ok(
+    REPLY_PROMPT.includes("never infer a task from the page or a warning")
+  );
+  assert.ok(
+    REPLY_PROMPT.includes(
+      "when it continues an earlier stated goal, give the next step toward that goal"
+    )
+  );
+});
+
+test("neither Foreman nor people promise action, and the customer starts the workspace look", () => {
+  assert.ok(
+    REPLY_PROMPT.includes(
+      "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message"
+    )
+  );
+  assert.ok(
+    REPLY_PROMPT.includes(
+      "they can tap it and send their message again to start a look into their workspace"
     )
   );
 });
