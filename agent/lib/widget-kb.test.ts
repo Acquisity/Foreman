@@ -9,6 +9,7 @@ import {
   type KbDeps,
   loadImages,
   mergeHits,
+  REPLY_PROMPT,
   renderTranscript,
   resolveCitations,
   stepsOnOwnLines,
@@ -656,5 +657,13 @@ test("article picking and text answers run on flash-lite, and an answer with scr
       })
     ),
     ["google/gemini-3.5-flash"]
+  );
+});
+
+test("the writer never says a person or a queue will pick the message up", () => {
+  assert.ok(
+    REPLY_PROMPT.includes(
+      "never say or suggest that a person, a teammate, the support team or a queue will see, pick up or follow up on this message"
+    )
   );
 });

@@ -31,8 +31,13 @@ const ROUTER_TIMEOUT_MS = 5000;
 // never cuts anything; the latest message leads regardless.
 const MAX_STATE_CHARS = 17_000;
 
-/** Below this, an explicit ask for a person was not what the customer wrote. */
-export const HUMAN_REQUEST_SCORE = 0.8;
+/**
+ * Below this, an explicit ask for a person was not what the customer wrote.
+ * Measured 2026-10-07, five Jev runs each: explicit asks scored 0.71 to 0.97
+ * ("Human agent" 0.71 to 0.73, which never handed off at 0.8), and messages
+ * that only mention a person scored 0.11 to 0.45.
+ */
+export const HUMAN_REQUEST_SCORE = 0.6;
 /** At or above this, the customer asked for a ticket. */
 const TICKET_REQUEST = 0.5;
 /** At or above this, the customer asked for a refund. */

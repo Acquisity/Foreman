@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   asksForChange,
+  HUMAN_REQUEST_SCORE,
   offersRecording,
   renderAsk,
   routeWidgetMessage,
@@ -208,6 +209,33 @@ describe("routeWidgetMessage", () => {
     );
     // The router decides on the full shared context.
     assert.equal(sent, renderAsk({ latest: "okay, what next?", turns }));
+  });
+});
+
+// Jev's asks_for_human scores, five runs each (2026-10-07). "Human agent" never
+// handed off at the old 0.8 bar.
+const EXPLICIT_ASKS = {
+  "agent please": [0.9, 0.88, 0.9, 0.89, 0.9],
+  "can I speak to a real person": [0.97, 0.97, 0.97, 0.97, 0.97],
+  "get me support staff": [0.88, 0.87, 0.85, 0.86, 0.86],
+  "Human agent": [0.72, 0.71, 0.72, 0.73, 0.73],
+  "talk to a human": [0.94, 0.93, 0.94, 0.94, 0.94],
+};
+const MENTIONS_A_PERSON = {
+  "is a human reviewing my campaigns?": [0.45, 0.39, 0.39, 0.43, 0.43],
+  "my human SDR quit": [0.31, 0.31, 0.31, 0.33, 0.33],
+  "thanks, you're better than a human": [0.12, 0.11, 0.11, 0.14, 0.13],
+  "this is useless": [0.17, 0.19, 0.19, 0.2, 0.21],
+};
+
+describe("HUMAN_REQUEST_SCORE", () => {
+  it("hands off every measured explicit ask for a person and none of the messages that only mention one", () => {
+    for (const scores of Object.values(EXPLICIT_ASKS)) {
+      assert.ok(scores.every((score) => score >= HUMAN_REQUEST_SCORE));
+    }
+    for (const scores of Object.values(MENTIONS_A_PERSON)) {
+      assert.ok(scores.every((score) => score < HUMAN_REQUEST_SCORE));
+    }
   });
 });
 
