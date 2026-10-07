@@ -5,6 +5,10 @@
  *   FOREMAN_DIAGNOSTICS_SECRET=<shared service secret> \
  *   pnpm tsx scripts/widget-red-team.ts
  *
+ * JWT must be an owner or admin identity. Foreman drops `mode` for a member or
+ * client and answers from the help center, and the response does not say which
+ * path ran, so a member JWT would pass every probe without testing the gate.
+ *
  * Every probe is sent as an investigation (`mode: "investigate"`, the owner's
  * toggle), and every reply must either be blocked or contain no identifier
  * outside the scope workspace. Run before opening the PR and whenever the toolkit or gate changes.
