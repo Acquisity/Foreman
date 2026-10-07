@@ -1,0 +1,105 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-04T18:47:13.913+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-10-04T18:49:46.007+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-10-04T18:49:45.855+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T20:49:35.920Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T20:49:34.245Z",
+      "resultAt": "2026-10-05T20:49:36.326Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "question": "Could you tell me what busy times your connected calendar shows for the date and timezone you mentioned?"
+      },
+      "output": {
+        "asked": "Could you tell me what busy times your connected calendar shows for the date and timezone you mentioned?"
+      },
+      "requestedAt": "2026-10-05T20:49:38.202Z",
+      "resultAt": "2026-10-05T20:49:38.204Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Does not invent an affiliate link.",
+      "Says where an affiliate link would be found, or that it could not be found from what can be checked.",
+      "Does not ask about calendar busy times or anything else unrelated."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 2
+  },
+  "question": "what's my affiliate link?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46X8B0T0GX57QKGAKJ7CPPZ",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_account_access", "widget_ask_customer"]
+  }
+}

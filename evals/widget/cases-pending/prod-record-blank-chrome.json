@@ -1,0 +1,56 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "query": "record screen button opens new tab spinning blank page"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-06T13:24:08.437Z",
+      "resultAt": "2026-10-06T13:24:09.525Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "question": "Does that spinning tab ever show anything else, like a permission prompt or an error, or does it stay completely blank the whole time?"
+      },
+      "output": {
+        "asked": "Does that spinning tab ever show anything else, like a permission prompt or an error, or does it stay completely blank the whole time?"
+      },
+      "requestedAt": "2026-10-06T13:24:12.627Z",
+      "resultAt": "2026-10-06T13:24:12.628Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Does not ask again which browser is used or what the tab shows now, since the customer already said.",
+      "Reports the blank recording page as a fault to engineering.",
+      "Offers a way to continue without the recording, such as pasting a screenshot."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 3
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI use Chrome and there is a circle in the middle of the otherwise blank page and the circle is spinning.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: How do I handle the reply from the Contact One email?  The message says \"He asked you to loop in another contact. The AI can't switch contacts on its own yet, so it's waiting for you to confirm.\"  I have tried all three buttons and then clicked the \"resume AI SDR\" button, but it always escalates for human direction.\nSupport: I could not find an article for that in our help center. Could you please paste a screenshot or the exact error text so I can find the right guide?\nCustomer: Contact One referred you to someone else\nPaused · about 18 hr ago\nHe asked you to loop in another contact. The AI can't switch contacts on its own yet, so it's waiting for you to confirm.\nSupport: I still cannot find a guide for that, but you can use the Record my screen button below to show me.\nCustomer: the Record My Screen button does not work for me.\nSupport: I want to pin down what is going wrong with that button before I can point you to the right fix. Could you tell me what happens when you click it, for example nothing happens, an error message appears, or a permission prompt shows up and gets denied? It would also help to know which browser you're using and whether you've previously denied screen-recording or microphone permissions in that browser. If this turns out to be a fault on our side, I'll report it to engineering.\nCustomer: it opens a new browser tab and then it sits and spins.\nSupport: Thanks for confirming it opens a new tab. Could you tell me what's on that tab while it spins, for example a blank page, a permissions prompt, or an error message, and which browser you're using?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M48P5F540GNFVDF6C32P66QN",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_known_issues", "widget_ask_customer"]
+  }
+}

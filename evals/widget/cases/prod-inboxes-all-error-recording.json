@@ -1,0 +1,424 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "consoleErrors": "{\"total\":0,\"returned\":0,\"hasMore\":false,\"nextCursor\":null,\"events\":[]}",
+        "details": "{\"jamId\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"video\",\"teamId\":\"00000000-0000-4000-8000-000000000002\",\"origin\":\"recording_link\",\"author\":{\"id\":\"00000000-0000-4000-8000-000000000003\",\"name\":\"Aaron Fraga\",\"email\":\"person-1@acquisity.ai\"},\"description\":\"\",\"duration\":40083,\"systemInfo\":{\"browser\":{\"name\":\"Chrome\",\"version\":\"154.0.8037.93\"},\"os\":{\"name\":\"Windows (x86)\",\"version\":\"10 2004/20H2/21H1/21H2\"},\"screenDimensions\":{\"height\":1039,\"width\":1920},\"extension\":{},\"jamClient\":{\"version\":\"jam-recording-links-0.1.0\"},\"battery\":{\"level\":1,\"charging\":true},\"connection\":{\"rttMs\":0,\"saveData\":false,\"downlinkMbps\":10,\"effectiveType\":\"4g\"}},\"createdAt\":\"2026-10-06T03:09:37.026Z\",\"updatedAt\":\"2026-10-06T03:09:37.026Z\",\"integrations\":[],\"title\":\"Name 1 · Aaron Fraga's Workspace\",\"folder\":null,\"comments\":[{\"id\":\"00000000-0000-4000-8000-000000000004\",\"author\":{\"id\":\"00000000-0000-4000-8000-000000000003\",\"name\":\"Aaron Fraga\"},\"message\":\"all inboxes are frozen in error state\",\"playbackRelativeTimestamp\":null,\"createdAt\":\"2026-10-06T03:09:37.026Z\",\"updatedAt\":\"2026-10-06T03:09:37.026Z\"}],\"metadata\":{\"country\":\"US\",\"isIncognito\":false,\"hasCustomJamMetadata\":true,\"fullstoryUrl\":\"\"},\"recorderFacets\":null,\"eventsSummary\":{\"total\":93,\"network\":{\"total\":50,\"httpStatus\":{\"200\":46,\"403\":1},\"httpMethod\":{\"GET\":39,\"HEAD\":5,\"POST\":5},\"contentType\":{\"text/x-component\":27,\"text/plain\":1,\"application/json\":19},\"host\":{\"domain-10.example\":4,\"domain-8.example\":1,\"app.acquisity.ai\":43,\"domain-11.example\":2},\"contentSizeBucket\":{\"<1kb\":20,\"<100kb\":9,\"<10kb\":13,\"empty\":8}},\"console\":{\"total\":0,\"level\":{}},\"interactivity\":{\"total\":10,\"mouse\":{\"total\":10,\"click\":10},\"keyboard\":{\"total\":0}},\"navigation\":{\"total\":31,\"eventSources\":{\"onCommitted\":0,\"onHistoryStateUpdated\":1,\"focus\":28,\"visibilitychange\":2}},\"sdk\":{\"total\":2}},\"postprocessing\":{\"tasks\":[{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 40083ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-06T03:09:38.023Z\",\"hasPayload\":false},{\"workload\":\"ch-index\",\"version\":\"1\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-06T03:09:37.949Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.6.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-06T03:09:50.016Z\",\"hasPayload\":true},{\"workload\":\"transcript\",\"version\":\"2.2.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"Transcript skipped because the microphone was not enabled during recording\",\"updatedAt\":\"2026-10-06T03:09:37.736Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.5.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"hasPayload\":true}],\"byWorkload\":{\"chapters\":{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 40083ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-06T03:09:38.023Z\",\"hasPayload\":false},\"ch-index\":{\"workload\":\"ch-i…",
+        "failedRequests": "{\"total\":1,\"returned\":1,\"hasMore\":false,\"nextCursor\":null,\"events\":[{\"event_index\":35,\"ts\":\"2026-10-06 03:08:32.446\",\"elapsed_ms\":\"9589\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"network\",\"is_error\":false,\"network_url\":\"https://domain-8.example/api/client/available\",\"network_host\":\"domain-8.example\",\"network_path\":\"/api/client/available\",\"network_method\":\"POST\",\"network_status\":403,\"network_status_class\":\"4xx\",\"network_status_text\":\"\",\"network_duration_ms\":315.800048828125,\"network_response_mime\":\"text/plain\",\"network_initiator\":\"fetch\",\"network_is_xhr_or_fetch\":true,\"network_error_present\":true,\"network_error_category\":\"client\",\"network_error_message\":\"Forbidden\",\"network_is_graphql\":false,\"network_request_body\":\"{\\\"currentValues\\\":{\\\"url\\\":\\\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\\\",\\\"query\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"screenWidth\\\":1920,\\\"screenHeight\\\":1039,\\\"language\\\":\\\"en-US\\\",\\\"languageOverride\\\":{},\\\"userId\\\":\\\"user_id::11111111-1111-4111-8111-111111111111\\\",\\\"identityHash\\\":{},\\\"timeZone\\\":\\\"America/New_York\\\"}}\",\"network_request_body_size\":\"332\",\"network_response_body\":\"Forbidden\",\"network_response_body_size\":\"9\",\"network_request_body_truncated\":false,\"network_response_body_truncated\":false,\"websocket_data_truncated\":false}]}",
+        "steps": "{\"total\":41,\"returned\":41,\"hasMore\":false,\"nextCursor\":null,\"events\":[{\"event_index\":1,\"ts\":\"2026-10-06 03:08:25.744\",\"elapsed_ms\":\"2887\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts?ask-ai=visible\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\",\"navigation_event_source\":\"visibilitychange\",\"navigation_visibility_state\":\"visible\"},{\"event_index\":2,\"ts\":\"2026-10-06 03:08:26.296\",\"elapsed_ms\":\"3439\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts?ask-ai=visible\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":3,\"ts\":\"2026-10-06 03:08:26.297\",\"elapsed_ms\":\"3440\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts?ask-ai=visible\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":12,\"ts\":\"2026-10-06 03:08:28.349\",\"elapsed_ms\":\"5492\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts?ask-ai=visible\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":false},{\"event_index\":13,\"ts\":\"2026-10-06 03:08:28.350\",\"elapsed_ms\":\"5493\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts?ask-ai=visible\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/email-accounts\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":14,\"ts\":\"2026-10-06 03:08:28.354\",\"elapsed_ms\":\"5497\",\"page_url\":\"https://domain-7.example/capture\",\"event_type\":\"interactivity\",\"interactivity_device\":\"mouse\",\"interactivity_action\":\"click\",\"interactivity_target_tag\":\"span\",\"interactivity_target_class\":\"relative ml-2 min-w-0 flex-1 truncate transition-[opacity,translate] duration-180 ease-settle motion-reduce:transition-none\",\"interactivity_target_text\":\"Cold Email Agent\",\"interactivity_target_selector\":\"domain-12.example-[opacity,translate].duration-18…",
+        "unavailable": ["transcript"]
+      },
+      "requestedAt": "2026-10-06T03:09:53.307Z",
+      "resultAt": "2026-10-06T03:09:55.285Z",
+      "status": "completed",
+      "tool": "widget_read_recording"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-2@domain-1.example",
+              "errorCode": "EMESSAGE",
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-3@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-4@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-5@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-6@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-7@domain-4.example",
+              "errorCode": "EMESSAGE",
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-8@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-9@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-10@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-7@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-11@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-12@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-13@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-14@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-15@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-16@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-17@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-18@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:30:08.867Z",
+              "warmupStatus": 1
+            }
+          ],
+          "detailsTruncated": false,
+          "error": 18,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 0,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 18,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": false,
+          "isActive": true,
+          "updatedAt": "2026-06-27T05:05:26.381Z"
+        },
+        "observedAt": "2026-10-06T03:09:58.587Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-09-20T14:36:32.056Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 0,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T03:09:56.661Z",
+      "resultAt": "2026-10-06T03:10:37.468Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "area": "provisioning",
+        "since": "7d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["provisioning"],
+        "failures": [],
+        "observedAt": "2026-10-06T03:10:44.373Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T03:10:42.337Z",
+      "resultAt": "2026-10-06T03:10:44.374Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "query": "email accounts frozen error status reconnect"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-06T03:10:46.362Z",
+      "resultAt": "2026-10-06T03:10:48.467Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "query": "email account error status reconnect"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-13.example",
+            "title": "DFY warmup & reconnect errors",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean.mdx",
+            "title": "What do the account statuses mean?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error.mdx",
+            "title": "How do I fix an account with an error?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-14.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T03:10:54.269Z",
+      "resultAt": "2026-10-06T03:10:55.298Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "output": {
+        "content": "Click on the account to open its settings, then click **Reconnect**. This triggers a re-authentication process (OAuth reconnect). It can take up to 48 hours to fully resolve.\n\n## Related\n\n- [DFY warmup & reconnect errors](/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors)\n- [What do the account statuses mean?](/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)",
+        "title": "How do I fix an account with an error?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "requestedAt": "2026-10-06T03:10:57.748Z",
+      "resultAt": "2026-10-06T03:10:57.830Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "All 18 inboxes show an Error status; the readable part of the screen recording shows only the Email Accounts page.",
+    "claims": [
+      "Says every inbox in the workspace currently shows an Error status.",
+      "Gives the reconnect steps from the help center and says a reconnect can take up to 48 hours.",
+      "Says to contact support with the inbox addresses if an inbox is still in Error 48 hours after reconnecting.",
+      "Does not promise that reconnecting will fix the inboxes."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 6
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n(The customer sent the screen recording you asked for. Read it before answering.)\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: All of my email accounts are frozin in error status.  I need them fixed\nSupport: 1. Click the row of the errored inbox.\n2. Click Reconnect.\n3. Complete the re-authorisation.\n4. Watch for a toast confirming the reconnect was initiated.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M47K0PSS0GPF5K6TYVPJCX6Q",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_read_recording",
+      "widget_inbox_health",
+      "widget_job_failures",
+      "widget_known_issues",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

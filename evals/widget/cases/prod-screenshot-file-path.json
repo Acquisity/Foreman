@@ -1,0 +1,43 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "Could you tell me what busy times are showing on your connected calendar for that day? That will help me figure out the free windows."
+      },
+      "output": {
+        "asked": "Could you tell me what busy times are showing on your connected calendar for that day? That will help me figure out the free windows."
+      },
+      "requestedAt": "2026-10-05T18:49:42.784Z",
+      "resultAt": "2026-10-05T18:49:42.786Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says the message is a file path on the customer's computer, not an attached image, and asks them to attach the screenshot or describe what they need help with.",
+      "Does not ask about calendar busy times or anything else unrelated."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": 1
+  },
+  "question": "/Users/customer/Desktop/Screenshot 2026-10-05 at 2.48.12 PM.png",
+  "scope": {
+    "role": "admin",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46PCVWM0GSDF9JAHVX5RVCB",
+    "target": "production"
+  },
+  "tags": {
+    "lane": null,
+    "role": "admin",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}
