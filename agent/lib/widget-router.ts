@@ -18,7 +18,7 @@ import {
  * longer picks a lane (ENG-14841): only the customer's explicit "Investigate my
  * workspace" (`mode: "investigate"`), a teammate or an owner's recording starts
  * an investigation, so a message without one always ends at the front door in a
- * help-center answer, a question back, a one-line chat reply or, when the
+ * fixed refund or ticket redirect, the one help-center writer or, when the
  * customer asks for a person, a handoff. A missing key or a Jev failure scores
  * everything zero, which is a help-center answer. Inside an investigation the
  * same call decides whether the app offers its screen recording button.
@@ -37,8 +37,6 @@ export const HUMAN_REQUEST_SCORE = 0.8;
 const TICKET_REQUEST = 0.5;
 /** At or above this, the customer asked for a refund. */
 const REFUND_REQUEST = 0.5;
-/** At or above this, the message is small talk and gets a one-line reply. */
-const CHAT_SCORE = 0.6;
 /** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
 const BUG_REPORT = 0.7;
 /** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
@@ -50,21 +48,8 @@ const RECORDING_REQUEST = 0.5;
  * such as "that" or "what next?". A bare string is a message with no context.
  */
 export interface WidgetAsk {
-  /**
-   * The help-center lane answers only what an article fully resolves, and says
-   * so when the message is an incomplete fragment, instead of answering an
-   * account question generically. Nothing sets it since the router stopped
-   * picking lanes (ENG-14841).
-   */
-  accountLikely?: boolean;
   /** Help-center articles the previous reply cited: hints, validated before use. */
   activeArticles?: { title: string; url: string }[];
-  /**
-   * Help-center mode (not an owner or admin): nothing will look at this
-   * account, so an ask for a look is answered from the articles, with a plain
-   * "not something I can do" first, instead of stepping aside.
-   */
-  cannotLook?: boolean;
   /**
    * Short-lived links to those screenshots themselves. The help-center lane
    * looks at them: from a reading alone it answered a warning on the screen
@@ -93,8 +78,6 @@ export interface ContextBudget {
   turnChars: number;
   turns: number;
 }
-/** A one-line front-door reply needs only what "it" or "that" points at. */
-const REPLY_CONTEXT: ContextBudget = { chars: 1600, turnChars: 400, turns: 4 };
 /**
  * What the router, the investigator and the selector all read. Acquisity sends
  * at most the last 8 customer-visible messages at 2,000 characters each, so this
@@ -165,30 +148,13 @@ export function recentTurns(
   ];
 }
 
-/** How every reply writer reads `recordingOffered`, so none of them guesses whether the button shows. */
-/** How the app words a message that is only a screenshot (Acquisity lib/support/foreman-reply.ts). */
-export const SCREENSHOT_ONLY =
-  /^\(The customer sent [^)]*with no message\.[^)]*\)$/u;
-
 export const RECORDING_RULE =
   "They cannot attach video or other files here. recordingOffered says whether the app shows a small Record my screen button at the bottom of your reply. When it is true, mention the button only when a recording would actually help pin the problem down, such as when they ask or offer to send one or when their words do not show what went wrong, and then in a few words; otherwise say nothing about it, and never repeat a mention Support already made earlier in the conversation unless they ask or offer to send a recording again. This recording guidance takes precedence over general rules against repetition. You may still ask for the one detail you need. When it is true, never send them anywhere else to record, send or report the problem, such as another recording tool, a feedback form, email or another chat button, even when an article says to: they are already in the support chat, and the Record my screen button on your reply is the way to send it. When it is false, never mention a recording option or button, and never say a recording is impossible.";
 
-/** A reply writer's plain-text input: the ask, then `recordingOffered` once it is decided. */
-export const renderReplyAsk = (
-  input: string | WidgetAsk,
-  budget: ContextBudget = REPLY_CONTEXT
-): string => {
-  const ask = toAsk(input);
-  const text = renderAsk(ask, budget);
-  return ask.recordingOffered === undefined
-    ? text
-    : `${text}\n\nrecordingOffered: ${ask.recordingOffered}`;
-};
-
-/** The ask as a front-door reply reads it; the router passes the full decision budget. */
+/** The ask as the router reads it. */
 export const renderAsk = (
   input: string | WidgetAsk,
-  budget: ContextBudget = REPLY_CONTEXT
+  budget: ContextBudget = DECISION_CONTEXT
 ): string => {
   const ask = toAsk(input);
   return renderConversation(ask.latest, ask.turns, budget, ask.screenshots);
@@ -222,30 +188,6 @@ const QUESTIONS = {
       "The customer asks for a ticket to be opened, filed, raised or escalated to engineering or the technical team, or asks to report a bug.",
     type: "noul",
   },
-  // Asked in the same request as the rest, so it costs no extra call. "And what
-  // about campaign B?" continues the conversation and still needs a look.
-  explains_previous: {
-    instructions:
-      "The customer's latest message only asks what Support's previous answer means: to explain, confirm, reword or spell out the implication of something that answer already said. It can be answered from that answer's own words with nothing looked up. A request to check again, to check something else, for the current status, or about anything the previous answer did not cover is NOT this.",
-    type: "noul",
-  },
-  // Without this a plain "thank you" after an account conversation was
-  // investigated: minutes of work to answer nothing.
-  is_chat: {
-    instructions:
-      "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account. A message that answers a question Support just asked, such as confirming a name, a date or a detail ('it is the right name', 'yes, that one'), is NOT this: it continues that request.",
-    type: "noul",
-  },
-  // "what about the limit?" and "nothing works!!" were investigated for two to
-  // three minutes before anyone asked what the customer meant. Asking for "what
-  // actually went wrong" on every message scored a plain "what is the growth
-  // plan creator?" 0.61 and "what about the niche researcher?" after it 0.84,
-  // so a clear question got a clarifying one (2026-09-28).
-  is_unclear: {
-    instructions:
-      "Taking the earlier conversation into account, a careful support person could not tell what the customer wants from the latest message: it does not say which feature, page or thing it is about, or it reports a problem without saying what went wrong, so they would have to ask what the customer means before they could even start. A question about a named feature or page (what it is, how it works, where it is) is NOT this, and neither is a short follow-up such as 'what about X?' or 'and X?' that asks the earlier question again about X, a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there), or one that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
-    type: "noul",
-  },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only
   // decides whether an investigation offers the app's recording button.
   // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
@@ -268,9 +210,6 @@ const responseSchema = z.object({
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
-    explains_previous: z.object({ noul: z.number().min(0).max(1) }).optional(),
-    is_chat: z.object({ noul: z.number().min(0).max(1) }).optional(),
-    is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
@@ -280,10 +219,6 @@ export interface WidgetRoute {
   asksForHuman: number;
   /** The customer is reporting a bug, so an investigation offers a screen recording. */
   bug?: boolean;
-  /** The message is small talk: a thank you, a greeting, a reaction. */
-  chat?: boolean;
-  /** How likely the latest message only asks what the previous reply meant. */
-  explainsPrevious?: number;
   /** Why Jev gave no route, for the log: a fixed code and the time it took. */
   failure?: string;
   /** The customer asks or offers to send a screen recording, so an investigation offers one. */
@@ -293,8 +228,6 @@ export interface WidgetRoute {
   source: "jev" | "fallback";
   /** The customer asked for a ticket, which only an investigation can file. */
   ticket?: boolean;
-  /** How likely the message cannot be helped without first asking what it means. */
-  unclear?: number;
 }
 
 /** Everything scored zero: a help-center answer, never an investigation or a handoff. */
@@ -339,11 +272,8 @@ export async function routeWidgetMessage(
       (score ?? 0) >= bar;
     return {
       asksForHuman: answers.asks_for_human.noul,
-      explainsPrevious: answers.explains_previous?.noul ?? 0,
       source: "jev",
-      unclear: answers.is_unclear?.noul ?? 0,
       ...(flag(answers.reports_bug?.noul, BUG_REPORT) ? { bug: true } : {}),
-      ...(flag(answers.is_chat?.noul, CHAT_SCORE) ? { chat: true } : {}),
       ...(flag(answers.offers_recording?.noul, RECORDING_REQUEST)
         ? { recording: true }
         : {}),
@@ -421,7 +351,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.source,
-    message: `human=${route.asksForHuman.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.chat ? " chat" : ""}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
+    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

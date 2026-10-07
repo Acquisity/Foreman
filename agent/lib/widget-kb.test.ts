@@ -3,9 +3,6 @@ import { test } from "node:test";
 import {
   activeArticleHits,
   answerFromHelpCenter,
-  CANNOT_CHECK,
-  CANNOT_CHECK_ALONE,
-  decideFromArticles,
   defaultKbDeps,
   hedged,
   indexLine,
@@ -13,12 +10,11 @@ import {
   loadImages,
   mergeHits,
   renderTranscript,
-  replyToChat,
   resolveCitations,
   stepsOnOwnLines,
 } from "./widget-kb.js";
 
-const DECIDE_TIMEOUT_MARK = / decide:fallback:timeout=\d+ /;
+const TRY_AGAIN = /try your message again/u;
 const GENERATE_529 =
   /^step=generate attempt=1 reason=AI_APICallError:529 ms=\d+$/;
 
@@ -117,7 +113,7 @@ test("a grounded answer is returned with the urls of the searched articles only"
   const result = await answerFromHelpCenter(
     "how do i set up my ai sdr?",
     log,
-    deps({ answer: "Connect your calendar [1].", kind: "answer", sources: [] })
+    deps({ reply: "Connect your calendar [1].", sources: [] })
   );
   assert.deepEqual(result, {
     citations: [{ n: 1, title: "Setup", url: articles[0].url }],
@@ -125,16 +121,28 @@ test("a grounded answer is returned with the urls of the searched articles only"
   });
 });
 
-test("no hits, an unanswerable question, and an uncited answer fall back to null", async () => {
-  const cases: KbDeps[] = [
-    deps({ answer: "x [1]", kind: "answer", sources: [] }, []),
-    deps({ answer: "", kind: "none", sources: [] }),
-    deps({ answer: "Just trust me.", kind: "answer", sources: [] }),
-  ];
-  for (const kbDeps of cases) {
+test("a reply that cites nothing is delivered as written, with or without articles", async () => {
+  for (const hits of [[], articles]) {
     // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
-    assert.equal(await answerFromHelpCenter("q", log, kbDeps), null);
+    const result = await answerFromHelpCenter(
+      "q",
+      log,
+      deps({ reply: "I'm not sure. Which page are you on?", sources: [] }, hits)
+    );
+    assert.deepEqual(result, {
+      citations: [],
+      message: "I'm not sure. Which page are you on?",
+    });
   }
+});
+
+test("an empty reply is a technical failure: the customer is asked to send it again", async () => {
+  const result = await answerFromHelpCenter(
+    "q",
+    log,
+    deps({ reply: " [1] ", sources: [] }, [])
+  );
+  assert.match(result.message, TRY_AGAIN);
 });
 
 test("an answer without markers is kept when it lists its sources, and only real ones", async () => {
@@ -142,8 +150,7 @@ test("an answer without markers is kept when it lists its sources, and only real
     "q",
     log,
     deps({
-      answer: "Connect your calendar.",
-      kind: "answer",
+      reply: "Connect your calendar.",
       sources: [1, 1, 9],
     })
   );
@@ -151,13 +158,13 @@ test("an answer without markers is kept when it lists its sources, and only real
     citations: [{ n: 1, title: "Setup", url: articles[0].url }],
     message: "Connect your calendar.",
   });
-  assert.equal(
+  assert.deepEqual(
     await answerFromHelpCenter(
       "q",
       log,
-      deps({ answer: "Just trust me.", kind: "answer", sources: [9] })
+      deps({ reply: "Just trust me.", sources: [9] })
     ),
-    null
+    { citations: [], message: "Just trust me." }
   );
 });
 
@@ -179,7 +186,7 @@ test("hits from several queries merge by agreement and rank, capped at four", ()
 
 test("the message is searched as keyword queries, and as itself when the rewrite fails", async () => {
   const searched: string[] = [];
-  const base = deps({ answer: "Do this [1].", kind: "answer", sources: [] });
+  const base = deps({ reply: "Do this [1].", sources: [] });
   const recording: KbDeps = {
     ...base,
     rewrite: () =>
@@ -210,8 +217,7 @@ test("articles are picked from the title index, with keyword search only as the 
   ];
   const read: string[] = [];
   const base = deps({
-    answer: "Open Add New Inboxes [1].",
-    kind: "answer",
+    reply: "Open Add New Inboxes [1].",
     sources: [],
   });
   const picking: KbDeps = {
@@ -257,8 +263,7 @@ test("a reaction gets a short conversational reply with no citations, not an inv
     log,
     deps(
       {
-        answer: "Glad that helps! Anything else you want to set up? [1]",
-        kind: "chat",
+        reply: "Glad that helps! Anything else you want to set up? [1]",
         sources: [],
       },
       []
@@ -271,8 +276,7 @@ test("a reaction gets a short conversational reply with no citations, not an inv
 });
 
 const grounded = {
-  answer: "Next, set your hours [1].",
-  kind: "answer",
+  reply: "Next, set your hours [1].",
   sources: [],
 };
 
@@ -286,9 +290,8 @@ for (const [latest, screenshots] of [
   ],
   ["?", ["Screen: All Campaigns"]],
 ] as const) {
-  test(`every message reads the articles the previous reply cited alongside a fresh retrieval, and Jev decides with both: ${latest}`, async () => {
+  test(`every message reads the articles the previous reply cited alongside a fresh retrieval: ${latest}`, async () => {
     const given: string[][] = [];
-    const decided: string[][] = [];
     const result = await answerFromHelpCenter(
       {
         activeArticles: [articles[0]],
@@ -298,15 +301,10 @@ for (const [latest, screenshots] of [
       log,
       {
         ...deps(null, [articles[2]]),
-        decide: ({ articles: read }) => {
-          decided.push(read.map((a) => a.url));
-          return Promise.resolve({ choice: "answer", confidence: 0.9 });
-        },
         generate: ({ articles: read }) => {
           given.push(read.map((a) => a.url));
           return Promise.resolve({
-            answer: "Set your hours [2].",
-            kind: "answer",
+            reply: "Set your hours [2].",
             sources: [],
           });
         },
@@ -314,7 +312,6 @@ for (const [latest, screenshots] of [
     );
     const [fresh, carried] = [articles[2].url, articles[0].url];
     assert.deepEqual(given, [[fresh, carried]]);
-    assert.deepEqual(decided, given);
     assert.deepEqual(
       result?.citations.map((c) => c.url),
       [articles[0].url]
@@ -337,8 +334,7 @@ test("a new subject outweighs the previous citation: the fresh article is read f
         // The fresh hit always leads, so the model is never left with only the old article.
         assert.equal(read[0].url, widgetMissing.url);
         return Promise.resolve({
-          answer: "Check your ad blocker [1].",
-          kind: "answer",
+          reply: "Check your ad blocker [1].",
           sources: [],
         });
       },
@@ -402,211 +398,26 @@ test("a timeout or error reports a technical failure instead of a missing guide"
   });
 });
 
-test("an account-likely ask decides what the message needs first: a fragment is unclear, an account question steps aside, a documented fix is answered", async () => {
-  const told: (boolean | undefined)[] = [];
-  const lane = (needs: string | undefined): KbDeps => ({
-    ...deps(null),
-    generate: ({ accountLikely }) => {
-      told.push(accountLikely);
-      // A model that answers anyway must not get past "needs".
-      return Promise.resolve({
-        answer: "Do this [1].",
-        kind: "answer",
-        needs,
-        sources: [],
-      });
-    },
-  });
-  const guarded = (latest: string, needs: string) =>
-    answerFromHelpCenter({ accountLikely: true, latest }, log, lane(needs));
-  assert.deepEqual(await guarded("and my dashboard totals", "unclear"), {
-    citations: [],
-    message: "",
-    unclear: true,
-  });
-  assert.equal(
-    await guarded("why is my campaign not sending?", "account"),
-    null
-  );
-  assert.deepEqual(
-    (
-      await guarded("Google says the app is blocked", "articles")
-    )?.citations.map((c) => c.url),
-    [articles[0].url]
-  );
-  // An ordinary ask has no such field and is answered as before.
-  assert.ok(
-    await answerFromHelpCenter("how do i connect?", log, lane(undefined))
-  );
-  assert.deepEqual(told, [true, true, true, undefined]);
-});
-
-test("Jev decides what the articles can do and the writer only writes when Jev says answer", async () => {
-  const written: { accountLikely?: boolean; decided?: boolean }[] = [];
-  const lane = (choice: string): KbDeps => ({
-    ...deps(null),
-    decide: () => Promise.resolve({ choice, confidence: 0.9 } as never),
-    generate: ({ accountLikely, decided }) => {
-      written.push({ accountLikely, decided });
-      return Promise.resolve({
-        answer: "Do this [1].",
-        kind: "answer",
-        sources: [],
-      });
-    },
-  });
-  const ask = (choice: string) =>
-    answerFromHelpCenter(
-      { accountLikely: true, latest: "why is my campaign not sending?" },
-      log,
-      lane(choice)
-    );
-  const unclear = { citations: [], message: "", unclear: true };
-  assert.deepEqual(await ask("unclear"), unclear);
-  assert.deepEqual(await ask("which_product"), unclear);
-  assert.equal(await ask("account"), null);
-  assert.equal(await ask("not_covered"), null);
-  assert.deepEqual(written, []);
-  assert.deepEqual(
-    (await ask("answer"))?.citations.map((c) => c.url),
-    [articles[0].url]
-  );
-  // Jev already stepped past "needs", so the writer is not asked it again.
-  assert.deepEqual(written, [{ accountLikely: undefined, decided: true }]);
-});
-
-test("an unsure account pick is answered from the articles; only a sure one steps aside", async () => {
-  let writes = 0;
-  const lane = (confidence: number): KbDeps => ({
-    ...deps(null),
-    decide: () => Promise.resolve({ choice: "account", confidence }),
-    generate: () => {
-      writes += 1;
-      return Promise.resolve({
-        answer: "Do this [1].",
-        kind: "answer",
-        sources: [],
-      });
-    },
-  });
-  const ask = { accountLikely: true, latest: "why was I charged twice?" };
-  assert.ok(await answerFromHelpCenter(ask, log, lane(0.35)));
-  assert.equal(writes, 1);
-  assert.equal(await answerFromHelpCenter(ask, log, lane(0.9)), null);
-  assert.equal(writes, 1);
-});
-
-test("a failed Jev decision leaves the call to the writer, as before", async () => {
-  const written: (boolean | undefined)[] = [];
-  const answer = await answerFromHelpCenter(
-    { accountLikely: true, latest: "why is my campaign not sending?" },
+test("the writer is told who is asking, from the verified scope", async () => {
+  const told: unknown[] = [];
+  const customer = {
+    canInvestigate: false,
+    role: "member",
+    workspace: "Trivox AI",
+  };
+  await answerFromHelpCenter(
+    "q",
     log,
     {
       ...deps(null),
-      decide: () => Promise.reject(new Error("timeout")),
-      generate: ({ accountLikely, decided }) => {
-        written.push(accountLikely, decided);
-        return Promise.resolve({
-          answer: "",
-          kind: "none",
-          needs: "account",
-          sources: [],
-        });
+      generate: (input) => {
+        told.push(input.customer);
+        return Promise.resolve({ reply: "Hi.", sources: [] });
       },
-    }
-  );
-  assert.equal(answer, null);
-  assert.deepEqual(written, [true, false]);
-});
-
-test("the Jev decision offers account and unclear only on an account-likely ask, and refuses anything off the menu", async () => {
-  const offered: string[][] = [];
-  const jev = (choice: string) => (_url: string, init: { body: string }) => {
-    offered.push(Object.keys(JSON.parse(init.body).questions.kb.criteria));
-    return Promise.resolve({
-      json: () =>
-        Promise.resolve({ answers: { kb: { choice, confidence: 0.9 } } }),
-      ok: true,
-      status: 200,
-    });
-  };
-  const input = (accountLikely: boolean) => ({
-    accountLikely,
-    articles: [{ content: "body", title: "Setup", url: articles[0].url }],
-    question: "how do i connect?",
-    signal: AbortSignal.timeout(1000),
-  });
-  assert.deepEqual(
-    await decideFromArticles(input(true), {
-      apiKey: "k",
-      fetch: jev("account"),
-    }),
-    { choice: "account", confidence: 0.9 }
-  );
-  await assert.rejects(
-    decideFromArticles(input(false), { apiKey: "k", fetch: jev("account") }),
-    { message: "invalid_choice" }
-  );
-  assert.deepEqual(offered, [
-    ["answer", "not_covered", "which_product", "account", "unclear"],
-    ["answer", "not_covered", "which_product"],
-  ]);
-  await assert.rejects(decideFromArticles(input(false), { apiKey: "" }), {
-    message: "no_key",
-  });
-});
-
-test("help-center mode answers an ask for a look from the articles, saying first that it cannot check", async () => {
-  const lane = (answer: unknown): KbDeps => ({
-    ...deps(null),
-    decide: () => Promise.resolve({ choice: "account", confidence: 0.9 }),
-    generate: () => Promise.resolve(answer),
-  });
-  const ask = { cannotLook: true, latest: "what campaigns do you see?" };
-  const answered = await answerFromHelpCenter(
-    ask,
-    log,
-    lane({ answer: "Open Campaigns [1].", kind: "answer", sources: [] })
-  );
-  assert.ok(answered?.message.startsWith(CANNOT_CHECK));
-  assert.deepEqual(
-    answered?.citations.map((c) => c.url),
-    [articles[0].url]
-  );
-  // The writer's own "I can't access your account" is not said twice.
-  const told: unknown[] = [];
-  const twice = await answerFromHelpCenter(ask, log, {
-    ...lane(null),
-    generate: (input) => {
-      told.push(input.cannotCheck);
-      return Promise.resolve({
-        answer:
-          "I am not able to access or view your account. Open Campaigns [1].",
-        kind: "answer",
-        sources: [],
-      });
     },
-  });
-  assert.equal(twice?.message, `${CANNOT_CHECK}\n\nOpen Campaigns.`);
-  assert.deepEqual(told, [true]);
-  // Nothing in the articles: the plain line alone, never a silent miss.
-  assert.deepEqual(
-    await answerFromHelpCenter(
-      ask,
-      log,
-      lane({ answer: "", kind: "none", sources: [] })
-    ),
-    { citations: [], message: CANNOT_CHECK_ALONE }
+    customer
   );
-  // Full mode steps aside for the investigation instead, and never says it.
-  assert.equal(
-    await answerFromHelpCenter(
-      { accountLikely: true, latest: "what campaigns do you see?" },
-      log,
-      lane({ answer: "Open Campaigns [1].", kind: "answer", sources: [] })
-    ),
-    null
-  );
+  assert.deepEqual(told, [customer]);
 });
 test("each answer logs which articles it read and which it cited", async (t) => {
   const lines: string[] = [];
@@ -614,7 +425,7 @@ test("each answer logs which articles it read and which it cited", async (t) => 
   await answerFromHelpCenter(
     "how do i set up ai sdr?",
     log,
-    deps({ answer: "Open setup [2].", kind: "answer", sources: [] })
+    deps({ reply: "Open setup [2].", sources: [] })
   );
   const logged = lines
     .map((line) => JSON.parse(line))
@@ -644,16 +455,11 @@ test("every stage reads the conversation as a transcript, latest message last wi
   assert.equal(renderTranscript(ask), transcript);
   const seen: string[] = [];
   const base = deps({
-    answer: "Click Add New Inboxes [1].",
-    kind: "answer",
+    reply: "Click Add New Inboxes [1].",
     sources: [],
   });
   await answerFromHelpCenter(ask, log, {
     ...base,
-    decide: ({ question }) => {
-      seen.push(question);
-      return Promise.resolve({ choice: "answer", confidence: 1 });
-    },
     generate: (input) => {
       seen.push(input.question);
       return base.generate(input);
@@ -663,7 +469,7 @@ test("every stage reads the conversation as a transcript, latest message last wi
       return base.rewrite(question, signal);
     },
   });
-  assert.deepEqual(seen, [transcript, transcript, transcript]);
+  assert.deepEqual(seen, [transcript, transcript]);
 });
 
 test("the selector and the writer look at the screenshots; without them, a load failure or no loader, they read text only", async () => {
@@ -678,8 +484,7 @@ test("the selector and the writer look at the screenshots; without them, a load 
     const record: { select?: number; generate?: number } = {};
     seen.push(record);
     const base = deps({
-      answer: "Click Email Accounts [1].",
-      kind: "answer",
+      reply: "Click Email Accounts [1].",
       sources: [],
     });
     return await answerFromHelpCenter(ask, log, {
@@ -744,20 +549,6 @@ test("a screenshot link loads as an image only when it answers with image bytes"
   );
   // A redirect would leave the signed storage link for somewhere else.
   assert.ok(requested.every((init) => init.redirect === "error"));
-});
-
-test("a Jev decision that fails logs why in the answer's step marks", async (t) => {
-  const lines: string[] = [];
-  t.mock.method(console, "info", (line: string) => lines.push(line));
-  const timeout = new DOMException("slow", "TimeoutError");
-  await answerFromHelpCenter("how do i set up ai sdr?", log, {
-    ...deps({ answer: "Open setup [2].", kind: "answer", sources: [] }),
-    decide: () => Promise.reject(timeout),
-  });
-  const done = lines
-    .map((line) => JSON.parse(line))
-    .find((line) => line.outcome === "ok");
-  assert.match(done?.message, DECIDE_TIMEOUT_MARK);
 });
 
 test("a stalled help-center model call is raced by a second one, and every failed try is logged", async (t) => {
@@ -866,7 +657,4 @@ test("article picking and text answers run on flash-lite, and an answer with scr
     ),
     ["google/gemini-3.5-flash"]
   );
-  assert.deepEqual(await used(() => replyToChat("thanks", log)), [
-    "google/gemini-3.5-flash-lite",
-  ]);
 });

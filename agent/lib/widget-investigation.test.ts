@@ -9,6 +9,7 @@ import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
   finishWidgetRun,
+  INVESTIGATE_REDIRECT,
   REFUND_REDIRECT,
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
@@ -17,11 +18,7 @@ import {
   widgetRunResponse,
   withHistory,
 } from "./widget-investigation.js";
-import {
-  INVESTIGATE_HINT_FALLBACK,
-  INVESTIGATE_HINT_PROMPT,
-  type KbAnswer,
-} from "./widget-kb.js";
+import type { KbAnswer, KbCustomer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
 import type { WidgetAsk } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
@@ -85,7 +82,6 @@ function dependencies(gateResult: GateResult = allowed) {
   };
   const gated: unknown[] = [];
   const deps: WidgetDependencies = {
-    answerChat: () => assert.fail("must not reply as small talk"),
     answerKb: () => assert.fail("must not answer from the help center"),
     attach: (_id, sessionId, streamIndex) => {
       run.session_id = sessionId;
@@ -446,9 +442,9 @@ test("an owner or admin scope the live database no longer backs is answered in h
   enabled(t);
   const { deps, gated, run } = dependencies();
   deps.verifyAccess = () => Promise.reject(new WorkspaceAccessDenied());
-  const asks: WidgetAsk[] = [];
-  deps.answerKb = (ask) => {
-    asks.push(ask as WidgetAsk);
+  const customers: (KbCustomer | undefined)[] = [];
+  deps.answerKb = (_ask, _log, _deps, customer) => {
+    customers.push(customer);
     return Promise.resolve(kbAnswer);
   };
   const response = await receiveWidgetMessage(
@@ -463,7 +459,7 @@ test("an owner or admin scope the live database no longer backs is answered in h
   assert.equal(body.message, kbAnswer.message);
   assert.deepEqual(gated, []);
   assert.equal(run.outcome?.reason, "kb");
-  assert.equal(asks.at(-1)?.cannotLook, true);
+  assert.equal(customers.at(-1)?.canInvestigate, false);
 });
 
 test("a follow-up sent while an earlier message is still running is told to wait, never handed that run's answer", async (t) => {
@@ -693,9 +689,9 @@ test("a member or client is answered in help-center mode, never investigated", a
     const { deps, gated, run } = dependencies();
     deps.verifyAccess = () =>
       assert.fail("must not check investigation access");
-    const asks: WidgetAsk[] = [];
-    deps.answerKb = (ask) => {
-      asks.push(ask as WidgetAsk);
+    const customers: (KbCustomer | undefined)[] = [];
+    deps.answerKb = (_ask, _log, _deps, customer) => {
+      customers.push(customer);
       return Promise.resolve(kbAnswer);
     };
     // biome-ignore lint/performance/noAwaitInLoops: one role at a time keeps failures readable.
@@ -712,7 +708,11 @@ test("a member or client is answered in help-center mode, never investigated", a
     assert.equal(body.message, kbAnswer.message);
     assert.deepEqual(gated, []);
     assert.equal(run.outcome?.reason, "kb");
-    assert.equal(asks.at(-1)?.cannotLook, true);
+    assert.deepEqual(customers.at(-1), {
+      canInvestigate: false,
+      role,
+      workspace: scope.organizationName,
+    });
   }
 
   const refund = dependencies();
@@ -735,23 +735,6 @@ test("a member or client is answered in help-center mode, never investigated", a
     REFUND_REDIRECT
   );
   assert.equal(refund.run.outcome?.reason, "refund_redirect");
-
-  const miss = dependencies();
-  miss.deps.answerKb = () => Promise.resolve(null);
-  miss.deps.answerChat = () =>
-    Promise.resolve({ citations: [], message: "Which feature is this about?" });
-  const missed = await receiveWidgetMessage(
-    request(start),
-    noWork(),
-    200,
-    () => Promise.resolve({ ...scope, role: "client" }),
-    miss.deps
-  );
-  assert.equal(
-    ((await missed.json()) as Record<string, unknown>).message,
-    "Which feature is this about?"
-  );
-  assert.equal(miss.run.outcome?.reason, "kb_miss");
 
   const kb = dependencies();
   kb.deps.route = () =>
@@ -788,17 +771,12 @@ test("a member or client is answered in help-center mode, never investigated", a
   assert.equal(human.run.outcome?.reason, "asked_for_human");
 });
 
-test("a thank you gets a sentence back, and is answered from the help center if that reply cannot be written", async (t) => {
+test("a reply that cites nothing is delivered as the answer, with no gate and no session", async (t) => {
   enabled(t);
-  const chatRoute = () =>
-    Promise.resolve({
-      asksForHuman: 0,
-      chat: true,
-      source: "jev" as const,
-    });
   const { deps, gated, run } = dependencies();
-  deps.route = chatRoute;
-  deps.answerChat = () =>
+  deps.route = () =>
+    Promise.resolve({ asksForHuman: 0, bug: true, source: "jev" as const });
+  deps.answerKb = () =>
     Promise.resolve({ citations: [], message: "You're welcome!" });
   const response = await receiveWidgetMessage(
     request({ ...start, message_id: "cccccccc-3333-4333-8333-cccccccccccc" }),
@@ -810,22 +788,8 @@ test("a thank you gets a sentence back, and is answered from the help center if 
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.message, "You're welcome!");
   assert.equal(body.citations, undefined);
-  assert.equal(run.outcome?.reason, "chat");
+  assert.equal(run.outcome?.reason, "kb");
   assert.deepEqual(gated, []);
-
-  const failing = dependencies();
-  failing.deps.route = chatRoute;
-  failing.deps.answerChat = () => Promise.resolve(null);
-  failing.deps.answerKb = () => Promise.resolve(kbAnswer);
-  await receiveWidgetMessage(
-    request({ ...start, message_id: "dddddddd-4444-4444-8444-dddddddddddd" }),
-    noWork(),
-    200,
-    verify,
-    failing.deps
-  );
-  assert.deepEqual(failing.gated, []);
-  assert.equal(failing.run.outcome?.message, kbAnswer.message);
 });
 
 test("a message without the toggle never offers a screen recording, whatever Jev reads", async (t) => {
@@ -1018,47 +982,42 @@ test("a message without the toggle is answered from the help center, whether Jev
   }
 });
 
-test("an owner or admin's help-center miss, refund or ticket request points to the magnifying glass, never an investigation", async (t) => {
+test("an owner or admin's refund or ticket request points to the magnifying glass; a member's never does, and everything else reaches the one writer", async (t) => {
   enabled(t);
   const refund = () =>
     Promise.resolve({ asksForHuman: 0, refund: true, source: "jev" as const });
   const ticket = () =>
     Promise.resolve({ asksForHuman: 0, source: "jev" as const, ticket: true });
-  for (const [route, written] of [
-    [kbRoute, "Tap the magnifying glass."],
-    // Jev down: still the help center, and its miss still points to the toggle.
-    [jevDown, "Tap the magnifying glass."],
-    [refund, "Tap the magnifying glass."],
-    [ticket, null],
+  for (const [role, route, message, reason] of [
+    ["owner", refund, INVESTIGATE_REDIRECT, "investigate_redirect"],
+    ["admin", ticket, INVESTIGATE_REDIRECT, "investigate_redirect"],
+    ["member", refund, REFUND_REDIRECT, "refund_redirect"],
+    ["member", ticket, kbAnswer.message, "kb"],
+    ["owner", kbRoute, kbAnswer.message, "kb"],
+    ["owner", jevDown, kbAnswer.message, "kb"],
   ] as const) {
     const { deps, gated, run } = dependencies();
     deps.route = route;
-    let tried = false;
-    deps.answerKb = () => {
-      tried = true;
-      return Promise.resolve(null);
-    };
-    const prompts: (string | undefined)[] = [];
-    deps.answerChat = (_message, _log, system) => {
-      prompts.push(system);
-      return Promise.resolve(
-        written ? { citations: [], message: written } : null
-      );
+    const customers: (KbCustomer | undefined)[] = [];
+    deps.answerKb = (_ask, _log, _deps, customer) => {
+      customers.push(customer);
+      return Promise.resolve(kbAnswer);
     };
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const response = await receiveWidgetMessage(
       request({ ...start, message_id: crypto.randomUUID() }),
       noWork(),
       200,
-      verify,
+      () => Promise.resolve({ ...scope, role }),
       deps
     );
     const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.message, written ?? INVESTIGATE_HINT_FALLBACK);
-    assert.deepEqual(prompts, [INVESTIGATE_HINT_PROMPT]);
-    // A refund or a ticket needs a look, so no article is tried for it.
-    assert.equal(tried, route === kbRoute || route === jevDown);
-    assert.equal(run.outcome?.reason, "kb_miss");
+    assert.equal(body.message, message);
+    assert.equal(run.outcome?.reason, reason);
+    assert.deepEqual(
+      customers.map((customer) => customer?.canInvestigate),
+      reason === "kb" ? [role !== "member"] : []
+    );
     assert.deepEqual(gated, []);
   }
 });
@@ -1101,10 +1060,6 @@ test('a follow-up reaches the router and the fast lane with the earlier turns, s
   }
 });
 
-const kbBase = {
-  asksForHuman: 0,
-  source: "jev" as const,
-};
 const cited = [
   { title: "Setup", url: "https://app.acquisity.ai/docs/ai-sdr/setup" },
 ];
@@ -1176,88 +1131,6 @@ test("malformed citation history is dropped, not a reason to refuse the message"
   );
   assert.equal(response.status, 200);
   assert.deepEqual((got as { activeArticles: unknown }).activeArticles, []);
-});
-
-test("a confident help-center question that misses gets a clarifying reply: no investigation, no handoff, never blank", async (t) => {
-  enabled(t);
-  for (const clarify of [
-    () =>
-      Promise.resolve({
-        citations: [],
-        message: "Which feature is this about?",
-      }),
-    () => Promise.resolve(null),
-    () => Promise.reject(new Error("timeout")),
-  ]) {
-    const { deps, gated, run } = dependencies();
-    deps.route = kbRoute;
-    deps.answerKb = () => Promise.resolve(null);
-    deps.answerChat = clarify;
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    const response = await receiveWidgetMessage(
-      request({ ...start, message_id: crypto.randomUUID() }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.decision, "allow");
-    assert.equal(body.status, "completed");
-    assert.ok(typeof body.message === "string" && body.message.length > 0);
-    assert.equal(body.citations, undefined);
-    assert.equal(body.findings, undefined);
-    assert.equal(run.outcome?.reason, "kb_miss");
-    assert.equal(run.session_id, null);
-    assert.deepEqual(gated, []);
-  }
-});
-
-test("the replies written at the front door read the latest message first with four bounded turns, never the full transcript", async (t) => {
-  enabled(t);
-  const history = Array.from({ length: 8 }, (_, n) => ({
-    role: n % 2 ? ("assistant" as const) : ("customer" as const),
-    text: `turn ${n} about growth plans`,
-  }));
-  const chatRoute = () =>
-    Promise.resolve({
-      ...kbBase,
-      chat: true,
-    });
-  const unclearRoute = () =>
-    Promise.resolve({
-      ...kbBase,
-      unclear: 0.95,
-    });
-  for (const route of [kbRoute, chatRoute, unclearRoute]) {
-    const { deps } = dependencies();
-    deps.route = route;
-    deps.answerKb = () => Promise.resolve(null);
-    let prompt = "";
-    deps.answerChat = (message) => {
-      prompt = message;
-      return Promise.resolve({ citations: [], message: "ok" });
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    await receiveWidgetMessage(
-      request({
-        ...start,
-        history,
-        message_id: crypto.randomUUID(),
-        question: "how do i pause a campaign?",
-      }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    assert.ok(prompt.startsWith("LATEST CUSTOMER MESSAGE"));
-    assert.ok(
-      prompt.indexOf("how do i pause a campaign?") < prompt.indexOf("turn 4")
-    );
-    assert.ok(prompt.includes("turn 7"));
-    assert.ok(!prompt.includes("turn 3"), "only four earlier turns ride along");
-  }
 });
 
 test("a blocked investigation returns the raw findings and no customer message", async (t) => {
@@ -1719,74 +1592,6 @@ test("an overdue run with no answer is force-finished for a human, not left hang
   assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
 });
 
-test("an unclear message gets one clarifying question instead of an investigation", async (t) => {
-  enabled(t);
-  const { deps, gated, run } = dependencies();
-  deps.route = () =>
-    Promise.resolve({
-      asksForHuman: 0,
-      source: "jev" as const,
-      unclear: 0.93,
-    });
-  let system: string | undefined;
-  deps.answerChat = (_message, _log, prompt) => {
-    system = prompt;
-    return Promise.resolve({
-      citations: [],
-      message: "Which limit do you mean?",
-    });
-  };
-  const response = await receiveWidgetMessage(
-    request({ ...start, message_id: "eeeeeeee-5555-4555-8555-eeeeeeeeeeee" }),
-    noWork(),
-    200,
-    verify,
-    deps
-  );
-  const body = (await response.json()) as Record<string, unknown>;
-  assert.equal(body.message, "Which limit do you mean?");
-  assert.equal(run.outcome?.reason, "clarify");
-  assert.ok(system && system !== undefined);
-  assert.deepEqual(gated, []);
-});
-
-test("a screenshot sent before the customer has said anything gets a question back, even on a confident help-center route", async (t) => {
-  enabled(t);
-  const bare = {
-    ...start,
-    question: "(The customer sent only the screenshot below, with no message.)",
-    screenshots: ["[Screenshot] Screen: AI SDR Inbox"],
-  };
-  for (const [history, reason] of [
-    [undefined, "clarify"],
-    // Only the greeting before it: the customer still has not asked anything.
-    [
-      [{ role: "assistant", text: "Hey! What can I help you with?" }],
-      "clarify",
-    ],
-    // After their own question, the screenshot continues it.
-    [[{ role: "customer", text: "can i buy more inboxes?" }], "kb"],
-  ] as const) {
-    const { deps, run } = dependencies();
-    deps.route = kbRoute;
-    deps.answerKb = () => Promise.resolve(kbAnswer);
-    deps.answerChat = () =>
-      Promise.resolve({
-        citations: [],
-        message: "I can see your AI SDR Inbox. What can I help you with there?",
-      });
-    // biome-ignore lint/performance/noAwaitInLoops: cases share nothing and are tiny.
-    await receiveWidgetMessage(
-      request({ ...bare, ...(history ? { history } : {}) }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    assert.equal(run.outcome?.reason, reason);
-  }
-});
-
 test("a teammate's inbox run skips the front door, verifies as staff, and keeps its own session", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();
@@ -1834,31 +1639,10 @@ test("a teammate's inbox run skips the front door, verifies as staff, and keeps 
   assert.equal(read.status, 503);
 });
 
-// Router scores are the ones production logged for these turns (2026-09-20,
-// conversations a78ebd97 and 869b6831); both turns were investigated, blocked
-// at the gate and left the thread in human takeover.
-const loggedRoute = (latest: string) => {
-  const base = {
-    asksForHuman: 0.02,
-    source: "jev" as const,
-  };
-  if (latest.startsWith("Now Google says")) {
-    return {
-      ...base,
-      unclear: 0.46,
-    };
-  }
-  if (latest === "and my dashboard totals") {
-    return {
-      ...base,
-      unclear: 0.66,
-    };
-  }
-  if (latest === "okay thanks") {
-    return { ...base, chat: true };
-  }
-  return base;
-};
+// Both turns were investigated under lane routing (2026-09-20, conversations
+// a78ebd97 and 869b6831), blocked at the gate and left the thread in human
+// takeover. The router no longer picks a writer, so every turn reaches one.
+const loggedRoute = { asksForHuman: 0.02, source: "jev" as const };
 
 const docs = (slug: string) => `https://app.acquisity.ai/docs/${slug}`;
 const GOOGLE_BLOCKED =
@@ -1868,13 +1652,13 @@ const DASHBOARD_TOTALS =
 const SDR_KB =
   "ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app";
 
-/** What the lane reports for a message that does not yet say what is wanted. */
+/** A message that does not yet say what is wanted: the writer asks. */
 const FRAGMENT = "fragment";
 
 /** Replay one persistent conversation through the front door, turn by turn. */
 async function replayThread(
   turns: string[],
-  article: (latest: string) => string | null
+  article: (latest: string) => string
 ) {
   const history: {
     citations?: { title: string; url: string }[];
@@ -1884,24 +1668,18 @@ async function replayThread(
   const seen: { cited: string[]; message: unknown; reason?: string }[] = [];
   for (const latest of turns) {
     const { deps, gated, run } = dependencies();
-    deps.route = (ask) =>
-      Promise.resolve(loggedRoute(typeof ask === "string" ? ask : ask.latest));
+    deps.route = () => Promise.resolve(loggedRoute);
     deps.answerKb = (ask) => {
       const slug = article(typeof ask === "string" ? ask : ask.latest);
-      if (slug === FRAGMENT) {
-        return Promise.resolve({ citations: [], message: "", unclear: true });
-      }
       return Promise.resolve(
-        slug
-          ? {
+        slug === FRAGMENT
+          ? { citations: [], message: "Which totals do you mean?" }
+          : {
               citations: [{ n: 1, title: slug, url: docs(slug) }],
               message: `From ${slug}.`,
             }
-          : null
       );
     };
-    deps.answerChat = () =>
-      Promise.resolve({ citations: [], message: "Which totals do you mean?" });
     // biome-ignore lint/performance/noAwaitInLoops: turns of one thread run in order.
     const response = await receiveWidgetMessage(
       request({
@@ -1961,7 +1739,7 @@ test("thread: a Google blocked-app question after a password-reset thread is ans
   assert.ok(seen.every((turn) => typeof turn.message === "string"));
 });
 
-test("thread: an incomplete fragment gets a clarifying question, its completion the dashboard article, and a jump to the AI SDR knowledge base a fresh one", async (t) => {
+test("thread: an incomplete fragment gets the writer's question, its completion the dashboard article, and a jump to the AI SDR knowledge base a fresh one", async (t) => {
   enabled(t);
   const seen = await replayThread(
     [
@@ -1984,55 +1762,37 @@ test("thread: an incomplete fragment gets a clarifying question, its completion 
         : "auth/reset";
     }
   );
-  assert.equal(seen[2].reason, "clarify");
+  assert.equal(seen[2].message, "Which totals do you mean?");
+  assert.ok(seen.every((turn) => turn.reason === "kb"));
   assert.deepEqual(seen[3].cited, [docs(DASHBOARD_TOTALS)]);
   assert.deepEqual(seen[5].cited, [docs(SDR_KB)]);
   assert.ok(seen.every((turn) => typeof turn.message === "string"));
 });
 
-// Unclear scores production logged on FRESH threads (2026-09-20, build
-// fc818fd): both were investigated under lane routing.
-const freshRoute = (unclear: number) => () =>
-  Promise.resolve({
-    asksForHuman: 0.04,
-    source: "jev" as const,
-    unclear,
-  });
+// Both were investigated under lane routing on FRESH threads (2026-09-20, build fc818fd).
+const freshRoute = () =>
+  Promise.resolve({ asksForHuman: 0.04, source: "jev" as const });
 
-test("fresh thread: a documented how-to is answered from its article, and a bare fragment is asked what it means, neither touching the account", async (t) => {
+test("fresh thread: a documented how-to is answered from its article, and a bare fragment gets the writer's question, neither touching the account", async (t) => {
   enabled(t);
   const google = {
     citations: [{ n: 1, title: "Google", url: docs(GOOGLE_BLOCKED) }],
     message: "Choose Advanced, then continue.",
   };
-  for (const [asked, route, lane, reason, message] of [
+  for (const [asked, lane] of [
     [
       "Now Google says the app is blocked when I connect Email and Calendar.",
-      freshRoute(0.34),
       google,
-      "kb",
-      google.message,
     ],
     [
       "and my dashboard totals",
-      freshRoute(0.71),
-      { citations: [], message: "", unclear: true as const },
-      "clarify",
-      "Which totals do you mean?",
+      { citations: [], message: "Which totals do you mean?" },
     ],
   ] as const) {
     const { deps, gated, run } = dependencies();
-    deps.route = route;
-    let got: { accountLikely?: boolean } | undefined;
-    deps.answerKb = (ask) => {
-      got = typeof ask === "string" ? {} : ask;
-      return Promise.resolve<KbAnswer>({
-        ...lane,
-        citations: [...lane.citations],
-      });
-    };
-    deps.answerChat = () =>
-      Promise.resolve({ citations: [], message: "Which totals do you mean?" });
+    deps.route = freshRoute;
+    deps.answerKb = () =>
+      Promise.resolve<KbAnswer>({ ...lane, citations: [...lane.citations] });
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const response = await receiveWidgetMessage(
       request({ ...start, message_id: crypto.randomUUID(), question: asked }),
@@ -2042,9 +1802,8 @@ test("fresh thread: a documented how-to is answered from its article, and a bare
       deps
     );
     const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(got?.accountLikely, undefined);
-    assert.equal(body.message, message);
-    assert.equal(run.outcome?.reason, reason);
+    assert.equal(body.message, lane.message);
+    assert.equal(run.outcome?.reason, "kb");
     assert.deepEqual(gated, []);
   }
 });
@@ -2053,7 +1812,7 @@ test("an account question is investigated only with the toggle, and then with no
   enabled(t);
   for (const toggled of [false, true]) {
     const { deps, gated } = dependencies();
-    deps.route = freshRoute(0.57);
+    deps.route = freshRoute;
     let asked = false;
     deps.answerKb = () => {
       asked = true;
@@ -2080,24 +1839,6 @@ test("an account question is investigated only with the toggle, and then with no
   }
 });
 
-const explainRoute = (explainsPrevious: number) => () =>
-  Promise.resolve({
-    asksForAction: 0,
-    asksForHuman: 0,
-    asksOwnData: 0.9,
-    confidence: 0.95,
-    explainsPrevious,
-    kbScore: 0,
-    lane: "investigate" as const,
-    source: "jev" as const,
-  });
-const generationHistory = [
-  { role: "customer" as const, text: "any generation errors lately?" },
-  {
-    role: "assistant" as const,
-    text: "No blocked decisions were recorded in the last 7 days. Live error monitoring could not be checked.",
-  },
-];
 const startedSessions = () => {
   const sends: string[] = [];
   const args = {
@@ -2112,141 +1853,6 @@ const startedSessions = () => {
   };
   return { args, sends };
 };
-
-// Live c2a648c: "Does that mean none happened, or just none were recorded?" took
-// a 22s help-center miss and then a second generation investigation.
-test("a question about what the previous reply meant is answered from that reply, with no help-center detour and no new investigation", async (t) => {
-  enabled(t);
-  const { deps, run } = dependencies();
-  deps.route = explainRoute(0.92);
-  const prompts: (string | undefined)[] = [];
-  let read = "";
-  deps.answerChat = (message, _log, system) => {
-    read = message;
-    prompts.push(system);
-    return Promise.resolve({
-      citations: [],
-      message:
-        "Only that none were recorded; live errors could not be checked.",
-    });
-  };
-  const response = await receiveWidgetMessage(
-    request({
-      ...start,
-      history: generationHistory,
-      question: "Does that mean none happened, or just none were recorded?",
-    }),
-    noWork(),
-    200,
-    verify,
-    deps
-  );
-  const body = await response.json();
-  assert.equal(body.message.startsWith("Only that none were recorded"), true);
-  assert.equal(run.outcome?.reason, "explain");
-  assert.equal(prompts.length, 1);
-  // The writer is shown the whole previous reply, not a 400-character cut of it.
-  assert.equal(
-    read.includes("Live error monitoring could not be checked."),
-    true
-  );
-});
-
-test("a follow-up that wants fresh evidence, or that the writer cannot answer from the previous reply, goes on to the help center, not an investigation", async (t) => {
-  enabled(t);
-  for (const [score, reply] of [
-    [0.3, "unused"],
-    [0.92, null],
-  ] as const) {
-    const { deps, run } = dependencies();
-    deps.route = explainRoute(score);
-    deps.answerChat = () =>
-      Promise.resolve(reply ? { citations: [], message: reply } : null);
-    deps.answerKb = () => Promise.resolve(kbAnswer);
-    const { args, sends } = startedSessions();
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run, in order.
-    await receiveWidgetMessage(
-      request({
-        ...start,
-        history: generationHistory,
-        message_id: `9999999${score === 0.3 ? 1 : 2}-9999-4999-8999-999999999999`,
-        question: "can you check again for today?",
-      }),
-      args,
-      200,
-      verify,
-      deps
-    );
-    assert.equal(sends.length, 0);
-    assert.equal(run.outcome?.reason, "kb");
-  }
-});
-
-test("with no previous reply in the supplied history there is nothing to explain, so the help center answers", async (t) => {
-  enabled(t);
-  const { deps, run } = dependencies();
-  deps.route = explainRoute(0.95);
-  deps.answerChat = () => assert.fail("nothing to explain from");
-  deps.answerKb = () => Promise.resolve(kbAnswer);
-  const { args, sends } = startedSessions();
-  await receiveWidgetMessage(
-    request({ ...start, question: "what does that mean?" }),
-    args,
-    200,
-    verify,
-    deps
-  );
-  assert.equal(sends.length, 0);
-  assert.equal(run.outcome?.reason, "kb");
-});
-
-// Run 02be7213: the explain writer timed out at 12s, the null was read as "needs
-// a lookup", and a 135s investigation answered a question that needed none.
-test("an explain writer that fails technically is retried once and then asks for a resend: never an investigation, never a handoff", async (t) => {
-  enabled(t);
-  const ask = (failures: number) => {
-    const { deps, run } = dependencies();
-    deps.route = explainRoute(0.92);
-    let calls = 0;
-    deps.answerChat = (_message, _log, _system, strict) => {
-      calls += 1;
-      assert.equal(strict, true);
-      return calls <= failures
-        ? Promise.reject(new DOMException("aborted", "TimeoutError"))
-        : Promise.resolve({
-            citations: [],
-            message: "Only none were recorded.",
-          });
-    };
-    return receiveWidgetMessage(
-      request({
-        ...start,
-        history: generationHistory,
-        message_id: `8888888${failures}-8888-4888-8888-888888888888`,
-        question: "Does that mean none happened, or just none were recorded?",
-      }),
-      noWork(),
-      200,
-      verify,
-      deps
-    ).then(async (response) => ({
-      body: await response.json(),
-      calls: () => calls,
-      run,
-    }));
-  };
-  const recovered = await ask(1);
-  assert.equal(recovered.calls(), 2);
-  assert.equal(recovered.run.outcome?.reason, "explain");
-  assert.equal(recovered.body.message, "Only none were recorded.");
-
-  const down = await ask(2);
-  assert.equal(down.calls(), 2);
-  assert.equal(down.run.outcome?.reason, "explain_unavailable");
-  // The app asks the customer to send it again instead of handing the thread over.
-  assert.equal(down.body.retry, true);
-  assert.equal(down.body.findings ?? null, null);
-});
 
 test("polls return persisted progress while answer preparation continues in the background", async (t) => {
   enabled(t);
@@ -2477,7 +2083,6 @@ test("an owner or admin who turns on Investigate my workspace skips the front do
     const { deps } = dependencies();
     // Jev scores human and recording requests; no help-center reply is written.
     deps.answerKb = () => assert.fail("must not try the help center");
-    deps.answerChat = () => assert.fail("must not write a front-door reply");
     let sent = false;
     const response = await receiveWidgetMessage(
       request({ ...start, mode: "investigate" }),
@@ -2532,70 +2137,6 @@ test("a sticky investigation follow-up asking for a person hands off before any 
   assert.equal(parseFindings(run.findings)?.needsHuman, true);
 });
 
-test("a member refund with competing scores redirects before chat, explanation or clarification", async (t) => {
-  enabled(t);
-  const { deps, run } = dependencies();
-  deps.route = () =>
-    Promise.resolve({
-      asksForHuman: 0,
-      chat: true,
-      explainsPrevious: 0.99,
-      refund: true,
-      source: "jev",
-      unclear: 0.95,
-    });
-  deps.answerChat = () =>
-    Promise.resolve({ citations: [], message: "Which charge do you mean?" });
-  const response = await receiveWidgetMessage(
-    request({ ...start, question: "I want my money back" }),
-    noWork(),
-    200,
-    () => Promise.resolve({ ...scope, role: "member" as const }),
-    deps
-  );
-  assert.equal(response.status, 200);
-  assert.equal(run.outcome?.reason, "refund_redirect");
-  assert.equal(run.outcome?.message, REFUND_REDIRECT);
-});
-
-test("an owner refund or ticket with competing scores points to investigation before clarification", async (t) => {
-  enabled(t);
-  for (const intent of [{ refund: true }, { ticket: true }]) {
-    const { deps, run } = dependencies();
-    deps.route = () =>
-      Promise.resolve({
-        asksForHuman: 0,
-        ...intent,
-        chat: true,
-        explainsPrevious: 0.99,
-        source: "jev",
-        unclear: 0.95,
-      });
-    const prompts: (string | undefined)[] = [];
-    deps.answerChat = (_message, _log, system) => {
-      prompts.push(system);
-      return Promise.resolve({
-        citations: [],
-        message: "Tap the magnifying glass.",
-      });
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each intent owns a fresh run.
-    const response = await receiveWidgetMessage(
-      request({
-        ...start,
-        question: intent.refund ? "I want a refund" : "Please open a ticket",
-      }),
-      noWork(),
-      200,
-      verify,
-      deps
-    );
-    assert.equal(response.status, 200);
-    assert.deepEqual(prompts, [INVESTIGATE_HINT_PROMPT]);
-    assert.equal(run.outcome?.reason, "kb_miss");
-  }
-});
-
 test("Investigate my workspace from a member, or an owner the live database no longer backs, gets a help-center answer, and an unknown mode is refused", async (t) => {
   enabled(t);
   const member = dependencies();
@@ -2621,9 +2162,9 @@ test("Investigate my workspace from a member, or an owner the live database no l
 
   const denied = dependencies();
   denied.deps.verifyAccess = () => Promise.reject(new WorkspaceAccessDenied());
-  const asks: WidgetAsk[] = [];
-  denied.deps.answerKb = (ask) => {
-    asks.push(ask as WidgetAsk);
+  const customers: (KbCustomer | undefined)[] = [];
+  denied.deps.answerKb = (_ask, _log, _deps, customer) => {
+    customers.push(customer);
     return Promise.resolve(kbAnswer);
   };
   const deniedResponse = await receiveWidgetMessage(
@@ -2638,7 +2179,7 @@ test("Investigate my workspace from a member, or an owner the live database no l
     ((await deniedResponse.json()) as Record<string, unknown>).message,
     kbAnswer.message
   );
-  assert.equal(asks.at(-1)?.cannotLook, true);
+  assert.equal(customers.at(-1)?.canInvestigate, false);
   const refused = await receiveWidgetMessage(
     request({ ...start, mode: "kb" }),
     noWork(),

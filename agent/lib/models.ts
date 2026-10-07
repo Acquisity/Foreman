@@ -15,8 +15,8 @@ export const MODELS = {
   // against 26 to 71s. Its 3 whole-answer blocks are retried with blocking off
   // (`guardedJudge` in widget-egress.ts).
   gate: "openai/gpt-5.6-sol",
-  // Support widget knowledge-base lane: one grounded answer over a few public
-  // help articles, and the lane's short chat, clarify and explain replies.
+  // Support widget front door: the one conversational reply, grounded in a few
+  // public help articles (ENG-14932).
   // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite
   // p50 1.0s, flash p50 8.7s (4 to 16s), and 4 to 39s live on the preview.
   kb: "google/gemini-3.5-flash-lite",

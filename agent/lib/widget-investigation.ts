@@ -15,17 +15,7 @@ import {
 } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
-import {
-  answerFromHelpCenter,
-  CLARIFY_PROMPT,
-  EXPLAIN_PROMPT,
-  INVESTIGATE_HINT_FALLBACK,
-  INVESTIGATE_HINT_PROMPT,
-  KB_MISS_FALLBACK,
-  KB_MISS_PROMPT,
-  type KbAnswer,
-  replyToChat,
-} from "./widget-kb.js";
+import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
 import {
   askedResult,
   handoffEligible,
@@ -45,9 +35,7 @@ import {
   logRouteDecision,
   offersRecording,
   renderConversation,
-  renderReplyAsk,
   routeWidgetMessage,
-  SCREENSHOT_ONLY,
   type WidgetAsk,
   type WidgetRoute,
 } from "./widget-router.js";
@@ -370,7 +358,6 @@ export async function waitForWidgetInvestigation(
 }
 
 export const defaultWidgetDependencies = {
-  answerChat: replyToChat,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
   cancel: cancelWidgetRun,
@@ -419,7 +406,7 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
 // send the message again instead of promising a teammate. The reason itself can
 // name an identifier, so only this flag crosses to the app.
 const RETRYABLE_BLOCK =
-  /^(?:deadline$|gate_unavailable$|explain_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
+  /^(?:deadline$|gate_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
@@ -493,17 +480,6 @@ export const finishCutoff = (
     claimedAt + FINISH_CLAIM_SECONDS * 1000,
     run.created_at.getTime() + APP_POLL_WINDOW_MS
   ) - FINISH_SAVE_RESERVE_MS;
-/**
- * How sure the router must be that nobody could help without first asking what
- * the customer means. High on purpose: a wrongly asked question costs one turn,
- * but it must not get in the way of a real, answerable account question.
- */
-const UNCLEAR_SCORE = 0.8;
-/**
- * How sure the router must be that the customer only asks what the previous
- * reply meant. High on purpose: a request for fresh evidence must not be explained away.
- */
-const EXPLAIN_SCORE = 0.8;
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
 /**
@@ -515,6 +491,9 @@ const INVESTIGATOR_ROLES = new Set<WidgetContext["role"]>(["owner", "admin"]);
 /** Help-center mode: the one place a member or client hears about owners and admins. */
 export const REFUND_REDIRECT =
   "Refunds aren't something I can help with here. Please reach out to your workspace owner or admin about billing.";
+/** An owner or admin's refund or ticket request: only the magnifying glass starts the look that files it (ENG-14841). */
+export const INVESTIGATE_REDIRECT =
+  "I haven't looked into your workspace for this yet. Tap the magnifying glass next to the message box and send your message again, and I'll dig in.";
 const DEADLINE_FALLBACK =
   "The investigation did not finish in time. Please review and reply.";
 
@@ -918,129 +897,6 @@ async function claimOpenRun(
   return deps.claim(scope, input.message_id, withScreenshots(input));
 }
 
-/**
- * The reply to a message the help center did not answer, never blank. An owner
- * or admin is told about the magnifying glass that starts a look at their
- * workspace; anyone else gets a question back that could find the right guide.
- */
-async function kbMissReply(
-  run: WidgetRun,
-  ask: WidgetAsk,
-  deps: Pick<WidgetDependencies, "answerChat" | "complete">,
-  canInvestigate = false
-): Promise<WidgetRun | null> {
-  const reply = await deps
-    .answerChat(
-      renderReplyAsk(ask),
-      { conversationId: run.scope.conversationId, runId: run.id },
-      canInvestigate ? INVESTIGATE_HINT_PROMPT : KB_MISS_PROMPT
-    )
-    .catch(() => null);
-  return deps.complete(
-    run.id,
-    {
-      citations: [],
-      decision: "allow",
-      message:
-        reply?.message ||
-        (canInvestigate ? INVESTIGATE_HINT_FALLBACK : KB_MISS_FALLBACK),
-      reason: "kb_miss",
-      status: "completed",
-    },
-    null,
-    run.id
-  );
-}
-
-/** One clarifying question; null when it cannot be written, so the caller falls through. */
-async function clarifyReply(
-  run: WidgetRun,
-  ask: WidgetAsk,
-  deps: Pick<WidgetDependencies, "answerChat" | "complete">
-): Promise<WidgetRun | null> {
-  const reply = await deps
-    .answerChat(
-      renderReplyAsk(ask),
-      { conversationId: run.scope.conversationId, runId: run.id },
-      CLARIFY_PROMPT
-    )
-    .catch(() => null);
-  return reply
-    ? deps.complete(
-        run.id,
-        {
-          citations: [],
-          decision: "allow",
-          message: reply.message,
-          reason: "clarify",
-          status: "completed",
-        },
-        null,
-        run.id
-      )
-    : null;
-}
-
-const EXPLAIN_ATTEMPTS = 2;
-
-/**
- * Explain the previous reply from its own words. Three outcomes, kept apart:
- * answered; the writer returned nothing because the message needs something the
- * earlier turns do not hold, which is the only one that goes on to an
- * investigation (null); and the writer failing technically. Run 02be7213 timed
- * out at 12s, fell through, and cost the customer a 135s investigation of a
- * question that needed none. A timeout says nothing about the question, so it is
- * tried once more and then the customer is asked to send the message again.
- */
-async function explainPrevious(
-  run: WidgetRun,
-  ask: WidgetAsk,
-  ids: { conversationId: string; runId: string },
-  deps: Pick<WidgetDependencies, "answerChat" | "complete">
-): Promise<WidgetRun | null> {
-  const log = (decision: string, attempts: number) =>
-    logOpsEvent("widget.explain", {
-      ...ids,
-      decision,
-      message: `attempts=${attempts}`,
-    });
-  for (let attempt = 1; attempt <= EXPLAIN_ATTEMPTS; attempt += 1) {
-    try {
-      // biome-ignore lint/performance/noAwaitInLoops: the second try only follows a failed first.
-      const reply = await deps.answerChat(
-        renderReplyAsk(ask, DECISION_CONTEXT),
-        ids,
-        EXPLAIN_PROMPT,
-        true
-      );
-      log(reply ? "answered" : "needs_lookup", attempt);
-      return reply
-        ? deps.complete(
-            run.id,
-            {
-              citations: [],
-              decision: "allow",
-              message: reply.message,
-              reason: "explain",
-              status: "completed",
-            },
-            null,
-            run.id
-          )
-        : null;
-    } catch {
-      // Tried again below, or reported once the attempts run out.
-    }
-  }
-  log("unavailable", EXPLAIN_ATTEMPTS);
-  return deps.complete(
-    run.id,
-    blockedOutcome("explain_unavailable", "completed"),
-    null,
-    run.id
-  );
-}
-
 /** In an investigation, a bug report or an explicit ask or offer to send a recording gets the app's recording button. */
 const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
   route.bug === true || route.recording === true || offersRecording(ask.latest);
@@ -1071,40 +927,32 @@ async function offerRecording(
 
 /**
  * Front door, for every message that is not an explicit investigation: an ask
- * for a person hands off at once, small talk gets a sentence back, a question
- * about the previous reply is explained from it, and an unclear message gets a
- * question back. Everything else is answered from the help center. Nothing here
- * starts an investigation (ENG-14841), and nothing offers a screen recording.
+ * for a person hands off at once, a refund or an owner's ticket request gets
+ * its fixed next step, and everything else goes to the one help-center writer.
+ * Nothing here starts an investigation (ENG-14841), and nothing offers a
+ * screen recording.
  */
 async function answerFromKnowledgeBase(
   run: WidgetRun,
   scope: WidgetContext,
-  asked: WidgetAsk,
+  ask: WidgetAsk,
   signal: AbortSignal,
   deps: WidgetDependencies,
   helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
-  const route = await deps.route(asked, { signal });
-  // Every reply written at the front door reads the latest message first with
-  // a few bounded turns; the full transcript is for a real investigation only.
+  const route = await deps.route(ask, { signal });
   logRouteDecision(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
-  const ids = { conversationId: scope.conversationId, runId: run.id };
-  // Every writer is told the button does not show, so none mentions it.
-  const ask = { ...asked, recordingOffered: false };
-  const question = renderReplyAsk(ask);
-  const finish = (written: KbAnswer) =>
+  const reply = (
+    message: string,
+    reason: string,
+    citations: KbAnswer["citations"] = []
+  ) =>
     deps.complete(
       run.id,
-      {
-        citations: written.citations,
-        decision: "allow",
-        message: written.message,
-        reason: route.chat ? "chat" : "kb",
-        status: "completed",
-      },
+      { citations, decision: "allow", message, reason, status: "completed" },
       null,
       // No session exists on this lane, so the run id is the fencing session id.
       run.id
@@ -1115,93 +963,26 @@ async function answerFromKnowledgeBase(
   if (handoff) {
     return handoff;
   }
-  // Refunds and owner/admin ticket requests have a fixed next step, even when
-  // the message also reads as small talk, an explanation or an unclear ask.
-  if (route.refund || (route.ticket && !helpCenterOnly)) {
-    return helpCenterReply(run, route, ask, finish, deps, helpCenterOnly);
-  }
-  // A thank you or a reaction gets a sentence back. If that reply cannot be
-  // written the message falls through to the help center.
-  if (route.chat) {
-    const reply = await deps.answerChat(question, ids);
-    if (reply) {
-      return finish(reply);
-    }
-  }
-  // "Does that mean none happened, or none were recorded?" is answered by the
-  // reply it asks about. The writer sees the whole previous reply, may add
-  // nothing to it, and returns nothing when the message needs a look, which
-  // falls through to the help center.
-  if (
-    (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
-    ask.turns?.some((turn) => turn.role === "assistant")
-  ) {
-    const explained = await explainPrevious(run, ask, ids, deps);
-    if (explained) {
-      return explained;
-    }
-  }
-  // A screenshot sent on its own, before the customer has said anything, asks
-  // nothing yet: it shows where they are, not what they need. Jev scored an AI
-  // SDR inbox screenshot 0.6 unclear and it was answered with toggle settings.
-  const bareScreenshot =
-    SCREENSHOT_ONLY.test(ask.latest) &&
-    !ask.turns?.some((turn) => turn.role === "customer");
-  // Nothing to answer yet: ask what they mean. If that reply cannot be written,
-  // fall through to the help center.
-  if (bareScreenshot || (route.unclear ?? 0) >= UNCLEAR_SCORE) {
-    const reply = await clarifyReply(run, ask, deps);
-    if (reply) {
-      return reply;
-    }
-  }
-  return helpCenterReply(run, route, ask, finish, deps, helpCenterOnly);
-}
-
-/**
- * Every front-door message without a reply yet ends here with one. A refund
- * request is redirected: a member to their owner or admin, an owner or admin
- * to the magnifying glass, which is also where a ticket request and a
- * help-center miss send an owner or admin. Help-center mode answers an ask for
- * a look with a plain "not something I can do" first.
- */
-async function helpCenterReply(
-  run: WidgetRun,
-  route: WidgetRoute,
-  ask: WidgetAsk,
-  finish: (written: KbAnswer) => Promise<WidgetRun | null>,
-  deps: WidgetDependencies,
-  helpCenterOnly: boolean
-): Promise<WidgetRun | null> {
-  const canInvestigate = !helpCenterOnly;
+  // Refunds and owner or admin ticket requests have a fixed next step: a member
+  // to their owner or admin, an owner or admin to the magnifying glass.
   if (route.refund && helpCenterOnly) {
-    return deps.complete(
-      run.id,
-      {
-        citations: [],
-        decision: "allow",
-        message: REFUND_REDIRECT,
-        reason: "refund_redirect",
-        status: "completed",
-      },
-      null,
-      run.id
-    );
+    return reply(REFUND_REDIRECT, "refund_redirect");
   }
-  if (route.refund || (route.ticket && canInvestigate)) {
-    return kbMissReply(run, ask, deps, true);
+  if (route.refund || (route.ticket && !helpCenterOnly)) {
+    return reply(INVESTIGATE_REDIRECT, "investigate_redirect");
   }
   const answer = await deps.answerKb(
-    helpCenterOnly ? { ...ask, cannotLook: true } : ask,
-    { conversationId: run.scope.conversationId, runId: run.id }
+    // Every writer is told the button does not show, so none mentions it.
+    { ...ask, recordingOffered: false },
+    { conversationId: scope.conversationId, runId: run.id },
+    undefined,
+    {
+      canInvestigate: !helpCenterOnly,
+      role: scope.role,
+      workspace: scope.organizationName,
+    }
   );
-  if (answer?.unclear) {
-    return (
-      (await clarifyReply(run, ask, deps)) ??
-      kbMissReply(run, ask, deps, canInvestigate)
-    );
-  }
-  return answer ? finish(answer) : kbMissReply(run, ask, deps, canInvestigate);
+  return reply(answer.message, "kb", answer.citations);
 }
 
 /**

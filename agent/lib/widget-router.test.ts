@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   asksForChange,
-  DECISION_CONTEXT,
   offersRecording,
   renderAsk,
   routeWidgetMessage,
@@ -28,20 +27,10 @@ describe("routeWidgetMessage", () => {
       apiKey: "test-key",
       fetch: (_url, init) => {
         sent = init;
-        return Promise.resolve(
-          jevReply({
-            explains_previous: { noul: 0.1 },
-            is_unclear: { noul: 0.2 },
-          })
-        );
+        return Promise.resolve(jevReply({ reports_bug: { noul: 0.2 } }));
       },
     });
-    assert.deepEqual(route, {
-      asksForHuman: 0.04,
-      explainsPrevious: 0.1,
-      source: "jev",
-      unclear: 0.2,
-    });
+    assert.deepEqual(route, { asksForHuman: 0.04, source: "jev" });
     assert.ok(sent, "should have called Jev");
     const body = JSON.parse((sent as { body: string }).body);
     assert.equal(body.state, "why did my campaign stop?");
@@ -49,9 +38,6 @@ describe("routeWidgetMessage", () => {
       "asks_for_human",
       "asks_for_refund",
       "asks_for_ticket",
-      "explains_previous",
-      "is_chat",
-      "is_unclear",
       "offers_recording",
       "reports_bug",
     ]);
@@ -61,7 +47,7 @@ describe("routeWidgetMessage", () => {
     );
   });
 
-  it("flags small talk, a refund, a ticket, a bug and a recording offer at their bars", async () => {
+  it("flags a refund, a ticket, a bug and a recording offer at their bars", async () => {
     const flagged = await routeWidgetMessage(
       "thanks! can i send a recording of the bug and get a refund",
       {
@@ -71,7 +57,6 @@ describe("routeWidgetMessage", () => {
             jevReply({
               asks_for_refund: { noul: 0.93 },
               asks_for_ticket: { noul: 0.6 },
-              is_chat: { noul: 0.7 },
               offers_recording: { noul: 0.96 },
               reports_bug: { noul: 0.9 },
             })
@@ -79,14 +64,8 @@ describe("routeWidgetMessage", () => {
       }
     );
     assert.deepEqual(
-      [
-        flagged.bug,
-        flagged.chat,
-        flagged.recording,
-        flagged.refund,
-        flagged.ticket,
-      ],
-      [true, true, true, true, true]
+      [flagged.bug, flagged.recording, flagged.refund, flagged.ticket],
+      [true, true, true, true]
     );
     const below = await routeWidgetMessage(
       "how do I record a video in the app builder",
@@ -97,7 +76,6 @@ describe("routeWidgetMessage", () => {
             jevReply({
               asks_for_refund: { noul: 0.4 },
               asks_for_ticket: { noul: 0.4 },
-              is_chat: { noul: 0.5 },
               offers_recording: { noul: 0.25 },
               reports_bug: { noul: 0.6 },
             })
@@ -105,8 +83,8 @@ describe("routeWidgetMessage", () => {
       }
     );
     assert.deepEqual(
-      [below.bug, below.chat, below.recording, below.refund, below.ticket],
-      [undefined, undefined, undefined, undefined, undefined]
+      [below.bug, below.recording, below.refund, below.ticket],
+      [undefined, undefined, undefined, undefined]
     );
   });
 
@@ -197,7 +175,10 @@ describe("routeWidgetMessage", () => {
       role: n % 2 ? ("assistant" as const) : ("customer" as const),
       text: `turn ${n} ${"x".repeat(2000)}`,
     }));
-    const state = renderAsk({ latest: "okay, what next?", turns });
+    const state = renderAsk(
+      { latest: "okay, what next?", turns },
+      { chars: 1600, turnChars: 400, turns: 4 }
+    );
     assert.ok(state.startsWith("LATEST CUSTOMER MESSAGE"));
     assert.ok(state.indexOf("okay, what next?") < state.indexOf("turn 6"));
     assert.ok(
@@ -225,11 +206,8 @@ describe("routeWidgetMessage", () => {
         },
       }
     );
-    // The router decides on the full shared context, not the short reply one.
-    assert.equal(
-      sent,
-      renderAsk({ latest: "okay, what next?", turns }, DECISION_CONTEXT)
-    );
+    // The router decides on the full shared context.
+    assert.equal(sent, renderAsk({ latest: "okay, what next?", turns }));
   });
 });
 
