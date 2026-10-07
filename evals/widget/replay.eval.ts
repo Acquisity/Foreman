@@ -8,7 +8,11 @@ import {
 } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
-import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
+import {
+  toRequest,
+  type WidgetCase,
+  widgetCaseSchema,
+} from "#lib/widget-case.js";
 import {
   answeredLane,
   gradeRun,
@@ -27,42 +31,10 @@ import { replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
 
-const LATEST = "LATEST CUSTOMER MESSAGE (the one to work on):\n";
-const EARLIER = "\n\nEARLIER TURNS (";
-const TURN = /^(Customer|Support): /u;
 const POLL_MS = 3000;
 const DEADLINE_MS = 300_000;
 /** One review directory per eval invocation, shared by every case in it. */
 const REVIEW_DIR = `${JUDGE_OUTPUT}/${new Date().toISOString().replace(/[:.]/g, "-")}`;
-
-/** A recorded question is the router's rendering; split it back into the message and its earlier turns. */
-function toRequest(question: string) {
-  if (!question.startsWith(LATEST)) {
-    return { question };
-  }
-  const cut = question.indexOf(EARLIER);
-  const latest = question.slice(LATEST.length, cut < 0 ? undefined : cut);
-  const history: { role: "assistant" | "customer"; text: string }[] = [];
-  const lines =
-    cut < 0
-      ? []
-      : question.slice(question.indexOf("\n", cut + 2) + 1).split("\n");
-  for (const line of lines) {
-    const role = TURN.exec(line)?.[1];
-    if (role) {
-      history.push({
-        role: role === "Customer" ? "customer" : "assistant",
-        text: line.slice(role.length + 2),
-      });
-    } else {
-      const last = history.at(-1);
-      if (last) {
-        last.text += `\n${line}`;
-      }
-    }
-  }
-  return { history, question: latest };
-}
 
 // WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
 export default readdirSync("evals/widget/cases")

@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gateway, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
@@ -92,6 +92,22 @@ const SHARED: Claim[] = [
     id: "caveats",
     text: "The message mentions something that could not be checked only when the customer asked about that thing.",
   },
+  // ENG-14931: must hold on every case.
+  {
+    id: "invented",
+    text: "The message invents no Acquisity product fact (a feature, page, setting, plan, price or limit that neither the tool results, the conversation nor a help-center link in the message supports) and promises nothing about what Acquisity or its team will do.",
+  },
+];
+/** Only a case with earlier turns can re-ask or lose the thread. */
+const CONVERSATION: Claim[] = [
+  {
+    id: "reask",
+    text: "The message does not ask for a detail the customer already gave in the earlier turns, such as which feature, page, campaign or plan they mean.",
+  },
+  {
+    id: "context",
+    text: "The message answers the latest customer message, reading the earlier turns only to resolve what it refers to.",
+  },
 ];
 const LIMITED: Claim = {
   id: "member",
@@ -113,6 +129,7 @@ export function claimsFor(recorded: WidgetCase): Claim[] {
     },
     ...SHARED,
     ...(limited ? [LIMITED] : []),
+    ...(toRequest(recorded.question).history?.length ? CONVERSATION : []),
     ...claims.map((text, n) => ({ id: `case-${n + 1}`, text })),
   ];
 }

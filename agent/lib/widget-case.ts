@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { PUBLIC_HOSTS, scanIdentifiers } from "./widget-egress.js";
+import { renderConversation } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 /**
@@ -42,7 +43,7 @@ export const widgetCaseSchema = z.strictObject({
     workspace: z.string().min(1),
   }),
   source: z.strictObject({
-    // Null for a hand-written front-door case: it has no recorded source run. Replay still starts a run.
+    // Null for a front-door case: hand-written ones have no source run, and a recorded front-door run id is a UUID the scrubber replaces. Replay still starts a run.
     runId: z
       .string()
       .regex(/^wrun_[0-9A-Z]{26}$/)
@@ -475,4 +476,70 @@ export function serializeCase(scrubbed: ScrubbedCase): string {
     );
   }
   return `${JSON.stringify(scrubbed.case, null, 2)}\n`;
+}
+
+const LATEST = "LATEST CUSTOMER MESSAGE (the one to work on):\n";
+const EARLIER = "\n\nEARLIER TURNS (";
+const TURN = /^(Customer|Support): /u;
+/** The app sends at most the last 8 customer-visible messages, 2,000 characters each. */
+const APP_HISTORY_MESSAGES = 8;
+const APP_HISTORY_CHARS = 2000;
+
+/** One recorded front-door turn: the customer's message and the reply that went out, if any. */
+export interface RecordedTurn {
+  question: string;
+  reply: string | null;
+}
+
+/**
+ * A front-door run's question in the router's own rendering: the last turn's
+ * message, then the earlier turns as the app sent them. Replay splits it back
+ * into the message and its history with `toRequest`.
+ */
+export function frontDoorQuestion(turns: RecordedTurn[]): string {
+  const latest = turns.at(-1);
+  if (!latest) {
+    throw new Error("A front-door case needs at least one turn.");
+  }
+  const history = turns
+    .slice(0, -1)
+    .flatMap(({ question, reply }) => [
+      { role: "customer" as const, text: question },
+      ...(reply ? [{ role: "assistant" as const, text: reply }] : []),
+    ])
+    .slice(-APP_HISTORY_MESSAGES)
+    .map((turn) => ({ ...turn, text: turn.text.slice(0, APP_HISTORY_CHARS) }));
+  return renderConversation(latest.question, history);
+}
+
+/** A recorded question is the router's rendering; split it back into the message and its earlier turns. */
+export function toRequest(question: string): {
+  history?: { role: "assistant" | "customer"; text: string }[];
+  question: string;
+} {
+  if (!question.startsWith(LATEST)) {
+    return { question };
+  }
+  const cut = question.indexOf(EARLIER);
+  const latest = question.slice(LATEST.length, cut < 0 ? undefined : cut);
+  const history: { role: "assistant" | "customer"; text: string }[] = [];
+  const lines =
+    cut < 0
+      ? []
+      : question.slice(question.indexOf("\n", cut + 2) + 1).split("\n");
+  for (const line of lines) {
+    const role = TURN.exec(line)?.[1];
+    if (role) {
+      history.push({
+        role: role === "Customer" ? "customer" : "assistant",
+        text: line.slice(role.length + 2),
+      });
+    } else {
+      const last = history.at(-1);
+      if (last) {
+        last.text += `\n${line}`;
+      }
+    }
+  }
+  return { history, question: latest };
 }

@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Engages with the specific problem: recurring and Microsoft Teams events from the client's consolidated Outlook calendar do not show up in Acquisity.",
+      "Does not hand the conversation to a person: the customer did not ask for one."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "The issue that I'm having is that my client's calendar is not syncing properly with the Acuity CRM. I've tried unsyncing and resyncing. That's not the problem. \n Upon doing an audit live with my client, what I realized is that the way that we made this work was that he has an Outlook calendar, and we've connected to his Google Calendar. Essentially, he's connected to his Google Calendar, which is where all the meetings are getting booked, and his Outlook calendar is being consolidated on his Google Calendar. \n The problem is that every single instance where he has a Microsoft Teams meeting, something in Outlook that is a reoccurring event (or even can be a reoccurring event), or basically anything with a little rotation arrow in the top-right corner (whether it's showing the reoccurring thing or has an X through it, even for whatever reason), is not showing up on the CRM.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "asked_for_human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

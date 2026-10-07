@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Answers directly which format to use for the AI SDR Knowledge Base entries, consistent with the earlier question-and-answer guidance."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nso just to be clear i write the word question with the question and then write the word answer with the answer or should i just write it out like our core offer is; our desired outcome is; our value proposition is...etc\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I need step by step directions on how to fill out the AI SDR Knowledge Base using the direct campaign method\nSupport: 1. Click Settings in the left sidebar.\n2. Click AI SDR Agent.\n3. Scroll to Knowledge Base [1].\n4. Paste your information into the text box, including core offer, value proposition, common pain point, desired outcome, typical timeframe, key mechanism, email signature, at least one case study, and optional fields like client logos, competitors, guarantee, lead magnet title, and lead magnet link [1][2].\n5. Click Save Settings [1].\nCustomer: When you say past your information for number 4 in what format should i be writing out all of those details\nSupport: You can write your details in Q and A format, such as Q: What is your pricing? A: Our pricing starts at, and keep entries focused on one topic each.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

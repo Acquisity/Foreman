@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Makes clear that this support chat is not the AI Consultant, and that the modes are chosen inside the AI Consultant (the Chat toggle at the top of the left sidebar)."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nSo are all of the modes available directly through using you instead of using them seperately?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: How are you different from Jordan AI, Marketing research AI, TEch AI and Jacob AI?\nSupport: Jordan AI is best for general business, sales, growth, and strategy advice using a built-in growth library. Market Researcher mode is for market, trend, competitor, and niche research, and it adds live web search to the built-in library. Jacob AI focuses on ad copy, campaign angles, and offer messaging using the built-in library plus ads reference material. Tech Wiz provides technical help, automation ideas, and workflow troubleshooting using the built-in library.\nCustomer: that sounds similar to what you told me you do.  How exactly are you different from those other AI tools?\nSupport: Those are not separate external tools, but different modes of the AI Consultant itself that change how I answer and which extra sources I can pull from. You can pick one from the mode selector at the bottom left of the message box, and switching applies to your next message.\nCustomer: So you are a seperate external tool while they are not?\nSupport: No, I am the AI Consultant, and Jordan AI, Market Researcher, Jacob AI, and Tech Wiz are simply different modes of the AI Consultant itself rather than separate external tools.\nCustomer: So do you encompass all of their abilities into one AI tool than?\nSupport: Yes, the AI Consultant encompasses those capabilities across its different modes, and you can switch between them in the mode selector at the bottom left of the message box depending on the specific task you want to tackle.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "explain",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

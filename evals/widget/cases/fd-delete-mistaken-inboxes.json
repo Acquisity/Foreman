@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Answers how to remove the extra email accounts, or says plainly that it has no guide for it, without inventing a delete step.",
+      "Promises no refund or fix."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nIt is a provisioning mistake. I'm trying to delete them\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Where do I go to purchase more email accounts?\nSupport: You can reach the buying flow by going to Cold Email Agent, then Email Accounts, and clicking Add New Inboxes.\nCustomer: How do I see what email accounts I already have\nSupport: To see the email accounts you already have, go to the left sidebar via Marketing, then Cold Email Agent, and click Email Accounts at the top.\nCustomer: It's only showing 6. I bout 18\nSupport: If your inboxes aren't showing after a purchase, provisioning can take anywhere from a few minutes to an hour, and you can see a live status in the user interface. If it has been over an hour, go to the left sidebar, click Cold Email Agent under Marketing, then click Email Accounts at the top. Look for your accounts in the table, where a Provisioning status badge means they are still being set up. If the user interface seems stale, try refreshing the page. If there is still nothing after 24 hours, contact support with your order details.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb_miss",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -70,6 +70,7 @@ test("shared claims cover every answered case; the member claim only member and 
     "steps",
     "jargon",
     "caveats",
+    "invented",
   ]);
   assert.ok(claimsFor(withRole("member")).some((c) => c.id === "member"));
   assert.ok(claimsFor(withRole("client")).some((c) => c.id === "member"));
@@ -79,6 +80,13 @@ test("shared claims cover every answered case; the member claim only member and 
   );
   assert.match(own[0]?.text ?? "", CAUSE_TEXT);
   assert.deepEqual(own.at(-1), { id: "case-1", text: "X" });
+  const conversation = claimsFor({
+    ...withRole("owner"),
+    question:
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nAnd for campaigns?\n\nEARLIER TURNS (context):\nCustomer: Where is billing?\nSupport: Under Settings.",
+  }).map((claim) => claim.id);
+  assert.deepEqual(conversation.slice(-2), ["reask", "context"]);
+  assert.ok(!owner.includes("reask"));
 });
 
 const claims = claimsFor(withRole("owner"));

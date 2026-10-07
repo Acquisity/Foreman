@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Gives a short first step to get started and where to learn more, in a warm tone.",
+      "Does not say a person or coach will contact or teach them."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "Dear helpers of every kind:  I am very knew to this whole  thing.  I am eager for assistance to know what to do next, and how to do it.  I work best when someone shows me and teaches e.  I usualy learn quickly and then proceed with eagerness and hope.  I need someone to point out step by step what I should and can do, to get started.  I want t0 earn money and that's vita and necessary, but I also want to be taught what to do and shown how to do it.  When I know the steps to take, I will be eager to wo9rk at it regulary, each and every day!   Thanks.  Name 1",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

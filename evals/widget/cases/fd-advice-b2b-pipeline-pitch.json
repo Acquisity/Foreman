@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Refers the customer, in a friendly way, to the AI Consultant (the Chat toggle at the top of the left sidebar) for this, and gives no advice or copy of its own."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nIf I find someone hwo wants to try the b2b pipeline what do i tell them\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: where do i go to practice setting up meetings on zoom\nSupport: 1. In the left sidebar, click Settings, then click Conferencing.\n2. Under Meeting Link Type, select Dynamic meeting links.\n3. Connect your Zoom account in the Zoom section.\n4. Complete the Zoom OAuth flow.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb_miss",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}
