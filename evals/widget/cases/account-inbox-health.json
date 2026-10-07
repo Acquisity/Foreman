@@ -61,6 +61,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "Are my inboxes healthy? Any of them disconnected or erroring?",
   "scope": {
     "role": "owner",

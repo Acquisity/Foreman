@@ -127,6 +127,7 @@
     },
     {
       "input": {
+        "mode": "investigate",
         "question": "Which campaign are you asking about \u2014 could you share its name?"
       },
       "output": {

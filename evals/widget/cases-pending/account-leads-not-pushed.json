@@ -163,6 +163,7 @@
     },
     {
       "input": {
+        "mode": "investigate",
         "question": "Which campaign are you seeing this with — \"Name 1,\" \"Name 2,\" or \"Name 3\"?"
       },
       "output": {

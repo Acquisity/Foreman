@@ -104,6 +104,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "Did my AI SDR reply to any of my leads this week?",
   "scope": {
     "role": "owner",

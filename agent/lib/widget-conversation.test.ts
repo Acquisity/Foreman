@@ -41,11 +41,7 @@ async function routerState(latest: string, history: Turn[]) {
     apiKey: "k",
     fetch: (_url, init) => {
       ({ state } = JSON.parse(init.body));
-      return ok({
-        asks_for_human: { noul: 0 },
-        asks_own_data: { noul: 1 },
-        lane: { choice: "investigate", confidence: 0.9 },
-      });
+      return ok({ asks_for_human: { noul: 0 } });
     },
   });
   return state;

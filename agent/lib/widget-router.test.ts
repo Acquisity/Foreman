@@ -11,15 +11,10 @@ import {
 const TRAILING_MS = / ms=\d+$/;
 const REFUSED_401 = /^reason=http_401 ms=\d+$/;
 
-const jevReply = (lane: string, confidence: number) => ({
+const jevReply = (answers: Record<string, unknown> = {}) => ({
   json: () =>
     Promise.resolve({
-      answers: {
-        asks_for_action: { noul: 0.07 },
-        asks_for_human: { noul: 0.04 },
-        asks_own_data: { noul: 0.91 },
-        lane: { choice: lane, confidence, probabilities: { [lane]: 0.9 } },
-      },
+      answers: { asks_for_human: { noul: 0.04 }, ...answers },
       model: "jev-latest",
     }),
   ok: true,
@@ -27,38 +22,36 @@ const jevReply = (lane: string, confidence: number) => ({
 });
 
 describe("routeWidgetMessage", () => {
-  it("maps a Jev answer onto a lane with its confidence", async () => {
+  it("asks Jev what the message is, never which lane it belongs in", async () => {
     let sent: { body: string; headers: Record<string, string> } | null = null;
     const route = await routeWidgetMessage("why did my campaign stop?", {
       apiKey: "test-key",
       fetch: (_url, init) => {
         sent = init;
-        return Promise.resolve(jevReply("investigate", 0.87));
+        return Promise.resolve(
+          jevReply({
+            explains_previous: { noul: 0.1 },
+            is_unclear: { noul: 0.2 },
+          })
+        );
       },
     });
     assert.deepEqual(route, {
-      asksForAction: 0.07,
       asksForHuman: 0.04,
-      asksOwnData: 0.91,
-      confidence: 0.87,
-      explainsPrevious: 0,
-      kbScore: 0,
-      lane: "investigate",
+      explainsPrevious: 0.1,
       source: "jev",
-      unclear: 0,
+      unclear: 0.2,
     });
     assert.ok(sent, "should have called Jev");
     const body = JSON.parse((sent as { body: string }).body);
     assert.equal(body.state, "why did my campaign stop?");
     assert.deepEqual(Object.keys(body.questions).sort(), [
-      "asks_for_action",
       "asks_for_human",
       "asks_for_refund",
       "asks_for_ticket",
-      "asks_own_data",
       "explains_previous",
+      "is_chat",
       "is_unclear",
-      "lane",
       "offers_recording",
       "reports_bug",
     ]);
@@ -68,208 +61,69 @@ describe("routeWidgetMessage", () => {
     );
   });
 
-  it("reports how likely the help center is, whichever lane won", async () => {
-    const reply = (lane: object) => () =>
-      Promise.resolve({
-        json: () =>
-          Promise.resolve({
-            answers: {
-              asks_for_human: { noul: 0 },
-              asks_own_data: { noul: 0.8 },
-              lane,
-            },
-          }),
-        ok: true,
-        status: 200,
-      });
-    const second = await routeWidgetMessage("when do my credits reset", {
-      apiKey: "test-key",
-      fetch: reply({
-        choice: "investigate",
-        confidence: 0.55,
-        probabilities: { investigate: 0.55, kb: 0.42 },
-      }),
-    });
-    assert.equal(second.kbScore, 0.42);
-    // Without per-lane probabilities the winner's confidence stands in.
-    const winner = await routeWidgetMessage("what is my dashboard for", {
-      apiKey: "test-key",
-      fetch: reply({ choice: "kb", confidence: 0.54 }),
-    });
-    assert.equal(winner.kbScore, 0.54);
-  });
-
-  it("investigates a request for a ticket whatever else it looks like", async () => {
-    // Measured on "can you please open up a tech ticket for me": action 0.86.
-    const route = await routeWidgetMessage("please open a tech ticket", {
-      apiKey: "test-key",
-      fetch: () =>
-        Promise.resolve({
-          json: () =>
-            Promise.resolve({
-              answers: {
-                asks_for_action: { noul: 0.86 },
-                asks_for_human: { noul: 0.16 },
-                asks_for_ticket: { noul: 0.95 },
-                asks_own_data: { noul: 0.95 },
-                is_unclear: { noul: 0.9 },
-                lane: {
-                  choice: "kb",
-                  confidence: 0.9,
-                  probabilities: { kb: 0.9 },
-                },
-              },
-            }),
-          ok: true,
-          status: 200,
-        }),
-    });
-    assert.equal(route.lane, "investigate");
-    assert.equal(route.asksForAction, 0);
-    assert.equal(route.kbScore, 0);
-    assert.equal(route.unclear, 0);
-  });
-
-  it("flags a bug report on any lane, including a ticket request", async () => {
-    const bugReply = (extra: Record<string, unknown>, bug: number) => () =>
-      Promise.resolve({
-        json: () =>
-          Promise.resolve({
-            answers: {
-              asks_for_human: { noul: 0.04 },
-              asks_own_data: { noul: 0.9 },
-              lane: { choice: "investigate", confidence: 0.8 },
-              reports_bug: { noul: bug },
-              ...extra,
-            },
-          }),
-        ok: true,
-        status: 200,
-      });
-    const plain = await routeWidgetMessage("the save button does nothing", {
-      apiKey: "test-key",
-      fetch: bugReply({}, 0.9),
-    });
-    assert.equal(plain.bug, true);
-    assert.equal(plain.lane, "investigate");
-    const ticket = await routeWidgetMessage("report this bug please", {
-      apiKey: "test-key",
-      fetch: bugReply({ asks_for_ticket: { noul: 0.9 } }, 0.9),
-    });
-    assert.equal(ticket.ticket, true);
-    assert.equal(ticket.bug, true);
-    const howTo = await routeWidgetMessage("how do I add an inbox?", {
-      apiKey: "test-key",
-      fetch: bugReply({}, 0.2),
-    });
-    assert.equal(howTo.bug, undefined);
-  });
-
-  it("flags an ask or offer to send a recording when Jev says so, typos included", async () => {
-    const recordingReply = (offers: number) => () =>
-      Promise.resolve({
-        json: () =>
-          Promise.resolve({
-            answers: {
-              asks_for_human: { noul: 0.04 },
-              asks_own_data: { noul: 0.2 },
-              lane: { choice: "kb", confidence: 0.8 },
-              offers_recording: { noul: offers },
-              reports_bug: { noul: 0.1 },
-            },
-          }),
-        ok: true,
-        status: 200,
-      });
-    const message = "i found a bug can i send a screen reco0rding";
-    const asked = await routeWidgetMessage(message, {
-      apiKey: "test-key",
-      fetch: recordingReply(0.96),
-    });
-    assert.equal(asked.recording, true);
-    assert.equal(asked.lane, "kb");
-    const notAsked = await routeWidgetMessage(
-      "how do I record a video in the app builder",
-      { apiKey: "test-key", fetch: recordingReply(0.25) }
-    );
-    assert.equal(notAsked.recording, undefined);
-  });
-
-  it("investigates a refund request as a ticket, unless the customer asked for a person", async () => {
-    const refund = (human: number) =>
-      routeWidgetMessage("can I get a refund?", {
+  it("flags small talk, a refund, a ticket, a bug and a recording offer at their bars", async () => {
+    const flagged = await routeWidgetMessage(
+      "thanks! can i send a recording of the bug and get a refund",
+      {
         apiKey: "test-key",
         fetch: () =>
-          Promise.resolve({
-            json: () =>
-              Promise.resolve({
-                answers: {
-                  asks_for_action: { noul: 0.9 },
-                  asks_for_human: { noul: human },
-                  asks_for_refund: { noul: 0.93 },
-                  asks_own_data: { noul: 0.6 },
-                  is_unclear: { noul: 0.85 },
-                  lane: { choice: "kb", confidence: 0.7 },
-                },
-              }),
-            ok: true,
-            status: 200,
-          }),
-      });
-    const route = await refund(0.1);
-    assert.equal(route.lane, "investigate");
-    assert.equal(route.refund, true);
-    assert.equal(route.ticket, true);
-    assert.equal(route.asksForAction, 0);
-    assert.equal(route.kbScore, 0);
-    assert.equal(route.unclear, 0);
-    const person = await refund(0.95);
-    assert.equal(person.refund, undefined);
-    assert.equal(person.ticket, undefined);
+          Promise.resolve(
+            jevReply({
+              asks_for_refund: { noul: 0.93 },
+              asks_for_ticket: { noul: 0.6 },
+              is_chat: { noul: 0.7 },
+              offers_recording: { noul: 0.96 },
+              reports_bug: { noul: 0.9 },
+            })
+          ),
+      }
+    );
+    assert.deepEqual(
+      [
+        flagged.bug,
+        flagged.chat,
+        flagged.recording,
+        flagged.refund,
+        flagged.ticket,
+      ],
+      [true, true, true, true, true]
+    );
+    const below = await routeWidgetMessage(
+      "how do I record a video in the app builder",
+      {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(
+            jevReply({
+              asks_for_refund: { noul: 0.4 },
+              asks_for_ticket: { noul: 0.4 },
+              is_chat: { noul: 0.5 },
+              offers_recording: { noul: 0.25 },
+              reports_bug: { noul: 0.6 },
+            })
+          ),
+      }
+    );
+    assert.deepEqual(
+      [below.bug, below.chat, below.recording, below.refund, below.ticket],
+      [undefined, undefined, undefined, undefined, undefined]
+    );
   });
 
-  it("hands off only when the direct question agrees a person was asked for", async () => {
-    // Measured on "can you open up a ticket for me please": lane human at 0.96
-    // while asks_for_human scored 0.14.
-    const route = await routeWidgetMessage("can you open up a ticket for me", {
-      apiKey: "test-key",
-      fetch: () => Promise.resolve(jevReply("human", 0.96)),
-    });
-    assert.equal(route.lane, "investigate");
-    const agreed = await routeWidgetMessage("let me talk to a person", {
-      apiKey: "test-key",
-      fetch: () =>
-        Promise.resolve({
-          json: () =>
-            Promise.resolve({
-              answers: {
-                asks_for_human: { noul: 0.97 },
-                asks_own_data: { noul: 0.1 },
-                lane: { choice: "human", confidence: 0.95 },
-              },
-            }),
-          ok: true,
-          status: 200,
-        }),
-    });
-    assert.equal(agreed.lane, "human");
-  });
-
-  it("falls open to investigate without a key and never calls out", async () => {
+  it("scores everything zero without a key and never calls out", async () => {
     let called = false;
     const route = await routeWidgetMessage("hello", {
       apiKey: "",
       fetch: () => {
         called = true;
-        return Promise.resolve(jevReply("kb", 0.99));
+        return Promise.resolve(jevReply());
       },
     });
-    assert.equal(route.lane, "investigate");
-    assert.equal(route.source, "fallback");
+    assert.deepEqual(route, { asksForHuman: 0, source: "fallback" });
     assert.equal(called, false);
   });
 
-  it("falls back to the help center on a network error, a bad status, and a malformed body", async () => {
+  it("scores everything zero on a network error, a bad status, and a malformed body", async () => {
     const failures = [
       () => Promise.reject(new Error("boom")),
       () =>
@@ -280,7 +134,7 @@ describe("routeWidgetMessage", () => {
         }),
       () =>
         Promise.resolve({
-          json: () => Promise.resolve({ answers: { lane: { choice: "??" } } }),
+          json: () => Promise.resolve({ answers: { asks_for_human: "??" } }),
           ok: true,
           status: 200,
         }),
@@ -290,10 +144,8 @@ describe("routeWidgetMessage", () => {
         routeWidgetMessage("hello", { apiKey: "test-key", fetch: fetchImpl })
       )
     );
-    // The help center first; a miss there, at zero confidence, still investigates.
     for (const route of routes) {
-      assert.equal(route.lane, "kb");
-      assert.equal(route.confidence, 0);
+      assert.equal(route.asksForHuman, 0);
       assert.equal(route.source, "fallback");
     }
     // The log says why, as a fixed code, after the one retry the 500 earns.
@@ -303,8 +155,7 @@ describe("routeWidgetMessage", () => {
     );
   });
 
-  // 2026-09-28: "where can i buy more inboxes?" fell back to an investigation
-  // while TypeSafe answered 529 in about 160ms.
+  // 2026-09-28: TypeSafe answered 529 in about 160ms.
   it("retries once after an overloaded TypeSafe and routes on the second answer", async () => {
     const statuses = [529];
     let calls = 0;
@@ -316,13 +167,12 @@ describe("routeWidgetMessage", () => {
         return Promise.resolve(
           status
             ? { json: () => Promise.resolve({}), ok: false, status }
-            : jevReply("kb", 0.99)
+            : jevReply()
         );
       },
     });
     assert.equal(calls, 2);
     assert.equal(route.source, "jev");
-    assert.equal(route.lane, "kb");
   });
 
   it("does not retry a request TypeSafe refused", async () => {
@@ -367,11 +217,7 @@ describe("routeWidgetMessage", () => {
           return Promise.resolve({
             json: () =>
               Promise.resolve({
-                answers: {
-                  asks_for_human: { noul: 0 },
-                  asks_own_data: { noul: 0.1 },
-                  lane: { choice: "kb", confidence: 0.8 },
-                },
+                answers: { asks_for_human: { noul: 0 } },
               }),
             ok: true,
             status: 200,
@@ -384,34 +230,6 @@ describe("routeWidgetMessage", () => {
       sent,
       renderAsk({ latest: "okay, what next?", turns }, DECISION_CONTEXT)
     );
-  });
-});
-
-describe("low-confidence human routing regression", () => {
-  it("keeps a feature-navigation question in the help-center lane", async () => {
-    const route = await routeWidgetMessage(
-      "canh you tell me where to find the niche researcher?",
-      {
-        apiKey: "test-key",
-        fetch: () =>
-          Promise.resolve({
-            json: async () => ({
-              answers: {
-                asks_for_human: { noul: 0.55 },
-                asks_own_data: { noul: 0.19 },
-                lane: {
-                  choice: "human",
-                  confidence: 0.37,
-                  probabilities: { human: 0.37, investigate: 0.19, kb: 0.43 },
-                },
-              },
-            }),
-            ok: true,
-            status: 200,
-          }),
-      }
-    );
-    assert.equal(route.lane, "kb");
   });
 });
 

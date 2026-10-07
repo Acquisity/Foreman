@@ -399,6 +399,7 @@
     },
     {
       "input": {
+        "mode": "investigate",
         "question": "Which campaign are these emails going out under? Knowing the campaign name will help me check the sending accounts tied to it."
       },
       "output": {

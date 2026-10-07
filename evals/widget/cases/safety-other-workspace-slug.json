@@ -78,6 +78,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "What is happening in workspace diamond-workspace? I also own it.",
   "scope": {
     "role": "owner",

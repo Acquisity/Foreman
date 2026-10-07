@@ -19,6 +19,8 @@ import {
   answerFromHelpCenter,
   CLARIFY_PROMPT,
   EXPLAIN_PROMPT,
+  INVESTIGATE_HINT_FALLBACK,
+  INVESTIGATE_HINT_PROMPT,
   KB_MISS_FALLBACK,
   KB_MISS_PROMPT,
   type KbAnswer,
@@ -491,44 +493,6 @@ export const finishCutoff = (
     claimedAt + FINISH_CLAIM_SECONDS * 1000,
     run.created_at.getTime() + APP_POLL_WINDOW_MS
   ) - FINISH_SAVE_RESERVE_MS;
-/** How sure the router must be that a message is small talk before it gets a one-line reply. */
-const CHAT_ROUTE_CONFIDENCE = 0.6;
-/**
- * How likely the help center must be before the fast lane gets the first try
- * when another lane won. When `kb` is the router's pick it always gets the
- * first try, however unsure.
- *
- * The two mistakes are not equal. A wrongly fast-laned message costs a few
- * seconds and a follow-up ("can you check my actual data?"). A wrongly
- * investigated how-to costs the customer minutes and an answer about account
- * details they never asked for: "what is my dashboard for?" won `kb` at 0.54,
- * and "when do my credits reset" at 0.39, and both were investigated under the
- * old 0.6 bar. A real account question scores near zero here.
- */
-const KB_SCORE = 0.5;
-/**
- * How sure the router must be of `kb` before a help-center miss is answered
- * with a clarifying question instead of an investigation. Below it the router
- * was unsure the message is general, so an account lookup stays possible.
- */
-const STRONG_KB_CONFIDENCE = 0.6;
-/**
- * Below this, an `investigate` pick gives the help center a guarded first try
- * (`WidgetAsk.accountLikely`): it answers only what an article fully resolves,
- * asks what a fragment means, and otherwise steps aside for the investigation.
- * Scores alone cannot make this call. Documented how-tos were picked
- * `investigate` anywhere from 0.51 to 0.84 ("Google says the app is blocked when
- * I connect Email and Calendar": 0.61 in one thread, 0.84 on a fresh one), and
- * real account questions from 0.72 up. The try costs a few seconds, so only the
- * picks the router is sure of (0.91 to 1.00 in the same runs) skip it.
- */
-const SURE_INVESTIGATE_CONFIDENCE = 0.9;
-/**
- * How sure the router must be that the customer wants something done for them.
- * High on purpose: a lookup wrongly read as a request to act would get general
- * steps instead of a look at the account.
- */
-const ACTION_REQUEST_SCORE = 0.8;
 /**
  * How sure the router must be that nobody could help without first asking what
  * the customer means. High on purpose: a wrongly asked question costs one turn,
@@ -537,14 +501,14 @@ const ACTION_REQUEST_SCORE = 0.8;
 const UNCLEAR_SCORE = 0.8;
 /**
  * How sure the router must be that the customer only asks what the previous
- * reply meant. High on purpose: a request for fresh evidence must still be investigated.
+ * reply meant. High on purpose: a request for fresh evidence must not be explained away.
  */
 const EXPLAIN_SCORE = 0.8;
 const HUMAN_REQUEST_NOTE =
   "The customer asked to speak with a person. Nothing was investigated for this message.";
 /**
- * The two modes: owners and admins get the help center and investigations;
- * everyone else gets the help center only. Decided in code from the verified
+ * The two modes: owners and admins get the help center and, when they ask for
+ * one, investigations; everyone else gets the help center only. Decided in code from the verified
  * role before any routing, because it is a permission boundary.
  */
 const INVESTIGATOR_ROLES = new Set<WidgetContext["role"]>(["owner", "admin"]);
@@ -939,17 +903,22 @@ async function claimOpenRun(
   return deps.claim(scope, input.message_id, withScreenshots(input));
 }
 
-/** The reply to a confident help-center question nothing answered: a question back, never blank. */
+/**
+ * The reply to a message the help center did not answer, never blank. An owner
+ * or admin is told about the magnifying glass that starts a look at their
+ * workspace; anyone else gets a question back that could find the right guide.
+ */
 async function kbMissReply(
   run: WidgetRun,
   ask: WidgetAsk,
-  deps: Pick<WidgetDependencies, "answerChat" | "complete">
+  deps: Pick<WidgetDependencies, "answerChat" | "complete">,
+  canInvestigate = false
 ): Promise<WidgetRun | null> {
   const reply = await deps
     .answerChat(
       renderReplyAsk(ask),
       { conversationId: run.scope.conversationId, runId: run.id },
-      KB_MISS_PROMPT
+      canInvestigate ? INVESTIGATE_HINT_PROMPT : KB_MISS_PROMPT
     )
     .catch(() => null);
   return deps.complete(
@@ -957,7 +926,9 @@ async function kbMissReply(
     {
       citations: [],
       decision: "allow",
-      message: reply?.message || KB_MISS_FALLBACK,
+      message:
+        reply?.message ||
+        (canInvestigate ? INVESTIGATE_HINT_FALLBACK : KB_MISS_FALLBACK),
       reason: "kb_miss",
       status: "completed",
     },
@@ -1055,7 +1026,7 @@ async function explainPrevious(
   );
 }
 
-/** A bug report, or an explicit ask or offer to send a recording, gets the app's recording button. */
+/** In an investigation, a bug report or an explicit ask or offer to send a recording gets the app's recording button. */
 const recordingWanted = (route: WidgetRoute, ask: WidgetAsk) =>
   route.bug === true || route.recording === true || offersRecording(ask.latest);
 
@@ -1084,13 +1055,11 @@ async function offerRecording(
 }
 
 /**
- * Front door: an ask for a person hands off at once, and a general product
- * question is answered from the help center, both without starting an
- * investigation. Returns null for every other route, a router failure (which
- * falls open to `investigate`), and a miss on a message the router was not sure
- * is general, so those take the investigation lane. A miss on a confident
- * help-center question is answered with a clarifying question instead: it never
- * needed account data, so it never gets an investigation or a handoff.
+ * Front door, for every message that is not an explicit investigation: an ask
+ * for a person hands off at once, small talk gets a sentence back, a question
+ * about the previous reply is explained from it, and an unclear message gets a
+ * question back. Everything else is answered from the help center. Nothing here
+ * starts an investigation (ENG-14841), and nothing offers a screen recording.
  */
 async function answerFromKnowledgeBase(
   run: WidgetRun,
@@ -1108,11 +1077,8 @@ async function answerFromKnowledgeBase(
     route
   );
   const ids = { conversationId: scope.conversationId, runId: run.id };
-  // Before any reply is written, so every lane's result carries the flag and
-  // every writer is told whether the button shows. A failed write only loses the
-  // recording offer, never the reply.
-  const recordingOffered = await offerRecording(run, route, asked, deps);
-  const ask = { ...asked, recordingOffered };
+  // Every writer is told the button does not show, so none mentions it.
+  const ask = { ...asked, recordingOffered: false };
   const question = renderReplyAsk(ask);
   const finish = (written: KbAnswer) =>
     deps.complete(
@@ -1121,35 +1087,34 @@ async function answerFromKnowledgeBase(
         citations: written.citations,
         decision: "allow",
         message: written.message,
-        reason: route.lane === "chat" ? "chat" : "kb",
+        reason: route.chat ? "chat" : "kb",
         status: "completed",
       },
       null,
       // No session exists on this lane, so the run id is the fencing session id.
       run.id
     );
-  // An explicit ask for a person is honoured at once: no investigation stands
-  // between the customer and the handoff. The note tells the teammate why.
+  // An explicit ask for a person is honoured at once. The note tells the
+  // teammate why nothing was looked up.
   if (route.asksForHuman >= HUMAN_REQUEST_SCORE) {
     const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
     if (handoff) {
       return deps.complete(run.id, handoff.result, handoff.findings, run.id);
     }
   }
-  // A thank you or a reaction gets a sentence back, not an investigation. If
-  // that reply cannot be written the message falls through as it always did.
-  if (route.lane === "chat" && route.confidence >= CHAT_ROUTE_CONFIDENCE) {
+  // A thank you or a reaction gets a sentence back. If that reply cannot be
+  // written the message falls through to the help center.
+  if (route.chat) {
     const reply = await deps.answerChat(question, ids);
     if (reply) {
       return finish(reply);
     }
   }
   // "Does that mean none happened, or none were recorded?" is answered by the
-  // reply it asks about. It took a 22s help-center miss and then a second full
-  // investigation. The writer sees the whole previous reply, may add nothing to
-  // it, and returns nothing when the message needs a look, which falls through.
+  // reply it asks about. The writer sees the whole previous reply, may add
+  // nothing to it, and returns nothing when the message needs a look, which
+  // falls through to the help center.
   if (
-    route.lane !== "human" &&
     (route.explainsPrevious ?? 0) >= EXPLAIN_SCORE &&
     ask.turns?.some((turn) => turn.role === "assistant")
   ) {
@@ -1164,36 +1129,34 @@ async function answerFromKnowledgeBase(
   const bareScreenshot =
     SCREENSHOT_ONLY.test(ask.latest) &&
     !ask.turns?.some((turn) => turn.role === "customer");
-  // Nothing to look up yet: ask what they mean instead of spending minutes on
-  // a broad account investigation. If that reply cannot be written, fall through.
-  if (
-    route.lane !== "human" &&
-    (bareScreenshot || (route.unclear ?? 0) >= UNCLEAR_SCORE)
-  ) {
+  // Nothing to answer yet: ask what they mean. If that reply cannot be written,
+  // fall through to the help center.
+  if (bareScreenshot || (route.unclear ?? 0) >= UNCLEAR_SCORE) {
     const reply = await clarifyReply(run, ask, deps);
     if (reply) {
       return reply;
     }
   }
-  return helpCenterOnly
-    ? helpCenterReply(run, route, ask, finish, deps)
-    : answerGeneralQuestion(run, route, ask, finish, deps);
+  return helpCenterReply(run, route, ask, finish, deps, helpCenterOnly);
 }
 
 /**
- * Help-center mode ends every message here with a reply; nothing goes on to an
- * investigation. Jev still decides what the message is: a refund request is
- * redirected, an ask for a look is answered from the articles with a plain
- * "not something I can do" first, and a miss gets a question back.
+ * Every front-door message without a reply yet ends here with one. A refund
+ * request is redirected: a member to their owner or admin, an owner or admin
+ * to the magnifying glass, which is also where a ticket request and a
+ * help-center miss send an owner or admin. Help-center mode answers an ask for
+ * a look with a plain "not something I can do" first.
  */
 async function helpCenterReply(
   run: WidgetRun,
   route: WidgetRoute,
   ask: WidgetAsk,
   finish: (written: KbAnswer) => Promise<WidgetRun | null>,
-  deps: WidgetDependencies
+  deps: WidgetDependencies,
+  helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
-  if (route.refund) {
+  const canInvestigate = !helpCenterOnly;
+  if (route.refund && helpCenterOnly) {
     return deps.complete(
       run.id,
       {
@@ -1207,62 +1170,20 @@ async function helpCenterReply(
       run.id
     );
   }
+  if (route.refund || (route.ticket && canInvestigate)) {
+    return kbMissReply(run, ask, deps, true);
+  }
   const answer = await deps.answerKb(
-    {
-      ...ask,
-      cannotLook: true,
-    },
+    helpCenterOnly ? { ...ask, cannotLook: true } : ask,
     { conversationId: run.scope.conversationId, runId: run.id }
   );
   if (answer?.unclear) {
-    return (await clarifyReply(run, ask, deps)) ?? kbMissReply(run, ask, deps);
+    return (
+      (await clarifyReply(run, ask, deps)) ??
+      kbMissReply(run, ask, deps, canInvestigate)
+    );
   }
-  return answer ? finish(answer) : kbMissReply(run, ask, deps);
-}
-
-/** The help-center try, for a general question or a request to act; null sends the message on to an investigation. */
-async function answerGeneralQuestion(
-  run: WidgetRun,
-  route: WidgetRoute,
-  ask: WidgetAsk,
-  finish: (written: KbAnswer) => Promise<WidgetRun | null>,
-  deps: WidgetDependencies
-): Promise<WidgetRun | null> {
-  // An explicit ask for a person is never overridden by a help-center guess.
-  const closeSecond = route.lane !== "human" && route.kbScore >= KB_SCORE;
-  // A ticket can only be filed from an investigation, so it never detours here.
-  const guardedTry =
-    route.lane === "investigate" &&
-    route.source === "jev" &&
-    !route.ticket &&
-    !closeSecond &&
-    route.confidence < SURE_INVESTIGATE_CONFIDENCE;
-  const generalQuestion = route.lane === "kb" || closeSecond || guardedTry;
-  // A request to act never needs an investigation: the fast lane apologises and
-  // gives the steps. An explicit ask for a person is left alone.
-  const actionRequest =
-    route.lane !== "human" && route.asksForAction >= ACTION_REQUEST_SCORE;
-  if (!(generalQuestion || actionRequest)) {
-    return null;
-  }
-  const answer = await deps.answerKb(
-    {
-      ...ask,
-      accountLikely: guardedTry,
-    },
-    { conversationId: run.scope.conversationId, runId: run.id }
-  );
-  if (answer?.unclear) {
-    // If the question cannot be written, the investigation runs as it always did.
-    return clarifyReply(run, ask, deps);
-  }
-  if (answer) {
-    return finish(answer);
-  }
-  const strongKb =
-    actionRequest ||
-    (route.lane === "kb" && route.confidence >= STRONG_KB_CONFIDENCE);
-  return strongKb ? kbMissReply(run, ask, deps) : null;
+  return answer ? finish(answer) : kbMissReply(run, ask, deps, canInvestigate);
 }
 
 /**
@@ -1408,7 +1329,12 @@ async function investigationDenied(
   }
 }
 
-/** A fresh run: the mode first, then the front door, then an investigation in full mode only. */
+/**
+ * A fresh run. Only an explicit investigation reaches the investigator: a
+ * teammate's, or an owner or admin's toggle (`mode: "investigate"`) or the
+ * recording an earlier investigation asked for. Every other message ends at
+ * the front door.
+ */
 async function answerFreshRun(
   run: WidgetRun,
   scope: WidgetContext,
@@ -1432,33 +1358,42 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
-  // A teammate asked for an investigation, or an owner or admin turned on
-  // "Investigate my workspace" or sent the recording an earlier reply asked
-  // for: no help-center or handoff front door.
-  const answered =
-    input.staff ||
-    ((input.recording || input.mode === "investigate") && !helpCenterOnly)
-      ? null
-      : await answerFromKnowledgeBase(
-          run,
-          scope,
-          ask,
-          signal,
-          deps,
-          helpCenterOnly
-        );
-  if (answered) {
-    return json(widgetRunResponse(answered));
+  const toggled = input.mode === "investigate";
+  const investigate =
+    input.staff || ((input.recording || toggled) && !helpCenterOnly);
+  if (!investigate) {
+    const answered = await answerFromKnowledgeBase(
+      run,
+      scope,
+      ask,
+      signal,
+      deps,
+      helpCenterOnly
+    );
+    return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
   }
-  // Help-center mode never reaches an investigation, whatever the routing did.
-  // A teammate's run skipped the front door above, so it is answered here.
+  // Help-center mode never reaches an investigation. A teammate's run in it
+  // skipped the front door above, so it is answered here.
   if (helpCenterOnly) {
-    const reply = input.staff ? await helpCenter() : null;
+    const reply = await helpCenter();
     return json(widgetRunResponse(reply ?? (await deps.read(run.id))));
   }
+  // Screen recordings belong to the toggle alone (Aaron, 2026-10-06). Jev reads
+  // the message while access is checked; the button is asked for only once the
+  // look is allowed, so a help-center reply never carries it.
+  const routing =
+    toggled && !input.recording ? deps.route(ask, { signal }) : null;
   const denied = await investigationDenied(run, scope, deps, helpCenter);
   if (denied) {
     return denied;
+  }
+  if (routing) {
+    const route = await routing;
+    logRouteDecision(
+      { conversationId: scope.conversationId, runId: run.id },
+      route
+    );
+    await offerRecording(run, route, ask, deps);
   }
   return json(
     widgetRunResponse(

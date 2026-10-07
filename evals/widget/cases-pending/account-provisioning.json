@@ -1516,6 +1516,7 @@
     "lane": "investigate",
     "toolBudget": 5
   },
+  "mode": "investigate",
   "question": "Is my workspace fully set up? My domains and inboxes were supposed to be provisioned.",
   "scope": {
     "role": "owner",

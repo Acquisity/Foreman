@@ -406,6 +406,7 @@
     "lane": "investigate",
     "toolBudget": null
   },
+  "mode": "investigate",
   "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n(The customer sent the screen recording you asked for. Read it before answering.)\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: All of my email accounts are frozin in error status.  I need them fixed\nSupport: 1. Click the row of the errored inbox.\n2. Click Reconnect.\n3. Complete the re-authorisation.\n4. Watch for a toast confirming the reconnect was initiated.",
   "scope": {
     "role": "owner",

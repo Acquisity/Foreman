@@ -114,6 +114,7 @@ export default readdirSync("evals/widget/cases")
         };
         let result = await post({
           ...toRequest(recorded.question),
+          ...(recorded.mode ? { mode: recorded.mode } : {}),
           message_id: randomUUID(),
           recording: replayRecording(recorded),
         });

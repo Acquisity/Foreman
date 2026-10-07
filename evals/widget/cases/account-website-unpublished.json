@@ -162,6 +162,7 @@
     "lane": "investigate",
     "toolBudget": 5
   },
+  "mode": "investigate",
   "question": "Is my website live, and is its domain set up correctly?",
   "scope": {
     "role": "owner",
