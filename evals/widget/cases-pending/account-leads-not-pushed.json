@@ -163,7 +163,6 @@
     },
     {
       "input": {
-        "mode": "investigate",
         "question": "Which campaign are you seeing this with — \"Name 1,\" \"Name 2,\" or \"Name 3\"?"
       },
       "output": {
@@ -188,6 +187,7 @@
     "lane": "investigate",
     "toolBudget": 4
   },
+  "mode": "investigate",
   "question": "Why aren't my leads being pushed into my campaign?",
   "scope": {
     "role": "owner",

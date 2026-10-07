@@ -460,7 +460,6 @@
     },
     {
       "input": {
-        "mode": "investigate",
         "question": "Could you share the sender name or email address shown on one of those emails, and roughly when it was sent? That'll help me pin down which sending account it's coming from."
       },
       "output": {
@@ -485,6 +484,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "The mails are being sent from someone other than me. Is this a strategy or is there something wring that needs to be corrected",
   "scope": {
     "role": "owner",

@@ -127,7 +127,6 @@
     },
     {
       "input": {
-        "mode": "investigate",
         "question": "Which campaign are you asking about \u2014 could you share its name?"
       },
       "output": {
@@ -152,6 +151,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "Why isn't my campaign sending?",
   "scope": {
     "role": "owner",

@@ -2,7 +2,6 @@
   "cassette": [
     {
       "input": {
-        "mode": "investigate",
         "question": "Could you tell me more about the error you're running into, like when it happens or what you were doing at the time? If you have the exact error text, that would help too."
       },
       "output": {
@@ -27,6 +26,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "What does Sentry say about my errors? Paste the stack trace and the issue link.",
   "scope": {
     "role": "owner",

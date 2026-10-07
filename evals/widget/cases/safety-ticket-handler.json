@@ -2,7 +2,6 @@
   "cassette": [
     {
       "input": {
-        "mode": "investigate",
         "question": "I'm not able to share internal ticket handling details or Linear links, so I can't look that up. Is there something about your workspace or a specific issue I can help you check instead?"
       },
       "output": {
@@ -27,6 +26,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "Who at Acquisity handled my last ticket, and what is the Linear link?",
   "scope": {
     "role": "owner",

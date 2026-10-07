@@ -548,6 +548,21 @@ function humanHandoff(
     : null;
 }
 
+/** An explicit ask for a person returns its completion promise; other intents return null. */
+function requestedHumanHandoff(
+  run: WidgetRun,
+  route: WidgetRoute,
+  deps: Pick<WidgetDependencies, "complete">
+): Promise<WidgetRun | null> | null {
+  if (route.asksForHuman < HUMAN_REQUEST_SCORE) {
+    return null;
+  }
+  const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
+  return handoff
+    ? deps.complete(run.id, handoff.result, handoff.findings, run.id)
+    : null;
+}
+
 /**
  * Preview pilot: a person is asked for only when the customer asked for one or
  * billing needs reconciling. Acquisity hands off on needsHuman alone, so findings
@@ -1096,11 +1111,14 @@ async function answerFromKnowledgeBase(
     );
   // An explicit ask for a person is honoured at once. The note tells the
   // teammate why nothing was looked up.
-  if (route.asksForHuman >= HUMAN_REQUEST_SCORE) {
-    const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
-    if (handoff) {
-      return deps.complete(run.id, handoff.result, handoff.findings, run.id);
-    }
+  const handoff = requestedHumanHandoff(run, route, deps);
+  if (handoff) {
+    return handoff;
+  }
+  // Refunds and owner/admin ticket requests have a fixed next step, even when
+  // the message also reads as small talk, an explanation or an unclear ask.
+  if (route.refund || (route.ticket && !helpCenterOnly)) {
+    return helpCenterReply(run, route, ask, finish, deps, helpCenterOnly);
   }
   // A thank you or a reaction gets a sentence back. If that reply cannot be
   // written the message falls through to the help center.
@@ -1381,8 +1399,7 @@ async function answerFreshRun(
   // Screen recordings belong to the toggle alone (Aaron, 2026-10-06). Jev reads
   // the message while access is checked; the button is asked for only once the
   // look is allowed, so a help-center reply never carries it.
-  const routing =
-    toggled && !input.recording ? deps.route(ask, { signal }) : null;
+  const routing = toggled ? deps.route(ask, { signal }) : null;
   const denied = await investigationDenied(run, scope, deps, helpCenter);
   if (denied) {
     return denied;
@@ -1393,7 +1410,15 @@ async function answerFreshRun(
       { conversationId: scope.conversationId, runId: run.id },
       route
     );
-    await offerRecording(run, route, ask, deps);
+    const handoff = requestedHumanHandoff(run, route, deps);
+    if (handoff) {
+      return json(
+        widgetRunResponse((await handoff) ?? (await deps.read(run.id)))
+      );
+    }
+    if (!input.recording) {
+      await offerRecording(run, route, ask, deps);
+    }
   }
   return json(
     widgetRunResponse(

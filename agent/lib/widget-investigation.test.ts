@@ -5,7 +5,7 @@ import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import type { GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
-import type { WidgetFindings } from "./widget-findings.js";
+import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   failWidgetRun,
   finishWidgetRun,
@@ -2475,7 +2475,7 @@ test("an owner or admin who turns on Investigate my workspace skips the front do
   enabled(t);
   const investigated = async (role: "owner" | "admin") => {
     const { deps } = dependencies();
-    // Jev is asked only whether to offer a recording; no help-center reply is written.
+    // Jev scores human and recording requests; no help-center reply is written.
     deps.answerKb = () => assert.fail("must not try the help center");
     deps.answerChat = () => assert.fail("must not write a front-door reply");
     let sent = false;
@@ -2500,6 +2500,100 @@ test("an owner or admin who turns on Investigate my workspace skips the front do
     await Promise.all([investigated("owner"), investigated("admin")]),
     [true, true]
   );
+});
+
+test("a sticky investigation follow-up asking for a person hands off before any recording offer or session send", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.route = () =>
+    Promise.resolve({
+      asksForHuman: 0.99,
+      bug: true,
+      recording: true,
+      source: "jev",
+    });
+  deps.requestRecording = () =>
+    assert.fail("a human request must not offer a recording");
+  const { args, sends } = startedSessions();
+  const response = await receiveWidgetMessage(
+    request({
+      ...investigate,
+      history: [{ role: "assistant", text: "I checked the campaign." }],
+      question: "Can I talk to a person please?",
+    }),
+    args,
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(sends.length, 0);
+  assert.equal(run.outcome?.reason, "asked_for_human");
+  assert.equal(parseFindings(run.findings)?.needsHuman, true);
+});
+
+test("a member refund with competing scores redirects before chat, explanation or clarification", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  deps.route = () =>
+    Promise.resolve({
+      asksForHuman: 0,
+      chat: true,
+      explainsPrevious: 0.99,
+      refund: true,
+      source: "jev",
+      unclear: 0.95,
+    });
+  deps.answerChat = () =>
+    Promise.resolve({ citations: [], message: "Which charge do you mean?" });
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "I want my money back" }),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" as const }),
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(run.outcome?.reason, "refund_redirect");
+  assert.equal(run.outcome?.message, REFUND_REDIRECT);
+});
+
+test("an owner refund or ticket with competing scores points to investigation before clarification", async (t) => {
+  enabled(t);
+  for (const intent of [{ refund: true }, { ticket: true }]) {
+    const { deps, run } = dependencies();
+    deps.route = () =>
+      Promise.resolve({
+        asksForHuman: 0,
+        ...intent,
+        chat: true,
+        explainsPrevious: 0.99,
+        source: "jev",
+        unclear: 0.95,
+      });
+    const prompts: (string | undefined)[] = [];
+    deps.answerChat = (_message, _log, system) => {
+      prompts.push(system);
+      return Promise.resolve({
+        citations: [],
+        message: "Tap the magnifying glass.",
+      });
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each intent owns a fresh run.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        question: intent.refund ? "I want a refund" : "Please open a ticket",
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(prompts, [INVESTIGATE_HINT_PROMPT]);
+    assert.equal(run.outcome?.reason, "kb_miss");
+  }
 });
 
 test("Investigate my workspace from a member, or an owner the live database no longer backs, gets a help-center answer, and an unknown mode is refused", async (t) => {
