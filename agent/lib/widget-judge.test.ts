@@ -5,10 +5,12 @@ import { test } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
+  citedArticles,
   claimsFor,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
   judgeAnswer,
+  judgeInput,
   judgeRecordSchema,
   parseMarks,
   parseVerdicts,
@@ -438,3 +440,59 @@ for (const cancellation of ["deadline", "caller"] as const) {
     assert.equal(model.doGenerateCalls.length, 1);
   });
 }
+
+test("a cited run's judge input carries the cited article text and the widget affordances", async () => {
+  const urls: string[] = [];
+  const articles = await citedArticles(
+    [
+      "https://help.acquisity.ai/docs/mailboxes",
+      "https://help.acquisity.ai/docs/mailboxes",
+      "https://example.com/docs/elsewhere",
+    ],
+    {
+      baseUrl: "https://help.acquisity.ai",
+      fetch: (url) => {
+        urls.push(url);
+        return Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              content: `Click Add New Inboxes.${"x".repeat(9000)}`,
+              title: "Add mailboxes",
+              url,
+            }),
+          ok: true,
+          status: 200,
+        });
+      },
+    }
+  );
+  assert.equal(
+    urls.length,
+    1,
+    "each cited article is read once, off-site urls never"
+  );
+  const input = JSON.parse(
+    judgeInput(recorded, "An answer.", claims, articles)
+  );
+  assert.equal(input.citedArticles.length, 1);
+  assert.equal(input.citedArticles[0].title, "Add mailboxes");
+  assert.ok(
+    input.citedArticles[0].content.startsWith("Click Add New Inboxes.")
+  );
+  assert.equal(input.citedArticles[0].content.length, 8000);
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("magnifying glass")
+    )
+  );
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("AI Consultant")
+    )
+  );
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("Report a problem")
+    )
+  );
+});

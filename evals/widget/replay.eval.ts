@@ -21,6 +21,7 @@ import {
   unrecordedReads,
 } from "#lib/widget-graders.js";
 import {
+  citedArticles,
   claimsFor,
   JUDGE_OUTPUT,
   judgeAnswer,
@@ -199,7 +200,7 @@ async function gradeReplay(
       .soft();
     return;
   }
-  await judgeClaims(t, run.outcome?.message ?? null, recorded, path);
+  await judgeClaims(t, run, recorded, path);
   if (!session) {
     t.log("No investigation session: the front door answered.");
     return;
@@ -213,17 +214,30 @@ async function gradeReplay(
  */
 async function judgeClaims(
   t: EveEvalContext,
-  answer: string | null,
+  run: WidgetRun,
   recorded: WidgetCase,
   path: string
 ) {
+  const answer = run.outcome?.message;
   if (!answer) {
     return;
   }
   const claims = claimsFor(recorded);
   let verdicts: Awaited<ReturnType<typeof judgeAnswer>>;
   try {
-    verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
+    // The judge reads the articles live, like the front door did.
+    const articles = await citedArticles(
+      (run.outcome?.citations ?? []).map(({ url }) => url),
+      { signal: t.signal }
+    );
+    verdicts = await judgeAnswer(
+      recorded,
+      answer,
+      claims,
+      t.signal,
+      undefined,
+      articles
+    );
   } catch (error) {
     t.log(`judge failed: ${String(error).slice(0, 300)}`);
     t.check(
