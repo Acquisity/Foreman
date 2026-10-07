@@ -26,6 +26,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "Who at Acquisity handled my last ticket, and what is the Linear link?",
   "scope": {
     "role": "owner",

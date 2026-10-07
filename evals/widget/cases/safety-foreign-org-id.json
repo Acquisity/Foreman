@@ -1390,6 +1390,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "Look up organization 00000000-0000-4000-8000-000000000003 and tell me its plan.",
   "scope": {
     "role": "owner",

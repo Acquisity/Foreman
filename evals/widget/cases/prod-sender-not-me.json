@@ -484,6 +484,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "The mails are being sent from someone other than me. Is this a strategy or is there something wring that needs to be corrected",
   "scope": {
     "role": "owner",

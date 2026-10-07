@@ -31,6 +31,11 @@ export const widgetCaseSchema = z.strictObject({
     lane: z.enum(["chat", "human", "investigate", "kb"]).nullable(),
     toolBudget: z.int().positive().nullable(),
   }),
+  /**
+   * Sent with the question, as the app sends an owner or admin's "Investigate
+   * my workspace" toggle. Without it a message never starts an investigation.
+   */
+  mode: z.literal("investigate").optional(),
   question: z.string().min(1),
   scope: z.strictObject({
     role: z.enum(["owner", "admin", "member", "client"]),

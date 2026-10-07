@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import {
@@ -7,7 +7,26 @@ import {
   scrubCase,
   serializeCase,
   type WidgetCase,
+  widgetCaseSchema,
 } from "./widget-case.js";
+
+test("active investigation cases send root mode unless a recording starts the investigation", () => {
+  const directory = new URL("../../evals/widget/cases/", import.meta.url);
+  for (const name of readdirSync(directory).filter((file) =>
+    file.endsWith(".json")
+  )) {
+    const recorded = widgetCaseSchema.parse(
+      JSON.parse(readFileSync(new URL(name, directory), "utf8"))
+    );
+    // The case schema has no staff path; recording cases restore it from their cassette.
+    if (
+      recorded.expectations.lane === "investigate" &&
+      !recorded.cassette.some((entry) => entry.tool === "widget_read_recording")
+    ) {
+      assert.equal(recorded.mode, "investigate", name);
+    }
+  }
+});
 
 const scope: RunScope = {
   conversationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",

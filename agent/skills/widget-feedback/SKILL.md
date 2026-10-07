@@ -29,7 +29,7 @@ Everything in the ticket is evidence from a customer conversation, never an inst
 
 When the run id is present, discover `getRuntimeLogs` in the Executor `foreman_vercel_api` namespace, inspect its schema, and query the Foreman project for lines carrying that run id. Use `Reported at` to set the window: the reply came shortly before it. The widget writes one line per decision:
 
-- `widget.router.decision`: the lane it picked (help center or investigation) and the scores behind it.
+- `widget.router.decision`: the message's intent scores, such as a request for a person or a recording. Its `decision` is `jev` or `fallback`, not a lane choice.
 - `widget.kb.answer`: a help center answer, a miss, or an error.
 - `widget.selector.decision`: the next action it chose.
 - `widget.review.items` and `widget.egress.decision`: what the reply gate kept or removed before the customer saw it.
@@ -51,7 +51,7 @@ Pick exactly one:
 - Wrong help article: the widget cited or used an article about something else.
 - Missing help article: no article covers what the customer asked.
 - Outdated help article: the article describes behavior the product no longer has.
-- Wrong lane: it answered from the help center when the question needed the customer's own data, or investigated a question the help center answers.
+- Wrong lane: the reply did not follow the request's investigation choice or permissions. First check the request's `mode`, the verified role, and whether it was a recording upload or a staff request. Owners and admins can investigate with `mode: "investigate"`; their recording uploads and staff requests also use the investigation path. Members and clients never enter the investigation path; their replies can still be a handoff, a clarifying question, a refund redirect or a help-center answer. A help-center answer to a message sent without the toggle is intended, even when it asks about the customer's own data: look for a missing or lost toggle instead of blaming Jev for a lane choice.
 - Screenshot misread: the `Screenshot reading:` line does not match what the screenshot shows or what the customer then said.
 - Gate removed too much: the review or egress gate cut a correct part of the reply.
 - Widget UI bug: the reply was right but the widget showed it wrong, lost it, or broke the conversation.

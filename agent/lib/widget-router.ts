@@ -13,14 +13,15 @@ import {
  * (a System One model: typed, calibrated decisions, no generated text).
  *
  * @remarks
- * Runs on the raw customer message before the investigator session starts.
- * It never calls tools, never sees account data, and never writes the reply;
- * it only says which lane the message belongs in and how sure it is. A
- * missing key falls open to `investigate`, the investigation pipeline, so
- * removing `AI_GATEWAY_API_KEY` restores the old single-lane behavior exactly.
- * A Jev failure after its retry tries the help center first (`kb` at zero
- * confidence), and a help-center miss still goes on to the investigation. A confident `kb` decision is acted on by the
- * knowledge-base lane (`widget-kb.ts`); `human` hands off to a teammate at once, without an investigation.
+ * Runs on the raw customer message. It never calls tools, never sees account
+ * data, and never writes the reply; it only scores what the message is. It no
+ * longer picks a lane (ENG-14841): only the customer's explicit "Investigate my
+ * workspace" (`mode: "investigate"`), a teammate or an owner's recording starts
+ * an investigation, so a message without one always ends at the front door in a
+ * help-center answer, a question back, a one-line chat reply or, when the
+ * customer asks for a person, a handoff. A missing key or a Jev failure scores
+ * everything zero, which is a help-center answer. Inside an investigation the
+ * same call decides whether the app offers its screen recording button.
  */
 
 const TYPESAFE_MODEL = "jev-latest";
@@ -36,13 +37,12 @@ export const HUMAN_REQUEST_SCORE = 0.8;
 const TICKET_REQUEST = 0.5;
 /** At or above this, the customer asked for a refund. */
 const REFUND_REQUEST = 0.5;
+/** At or above this, the message is small talk and gets a one-line reply. */
+const CHAT_SCORE = 0.6;
 /** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
 const BUG_REPORT = 0.7;
 /** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
 const RECORDING_REQUEST = 0.5;
-
-export const WIDGET_LANES = ["kb", "investigate", "human", "chat"] as const;
-export type WidgetLane = (typeof WIDGET_LANES)[number];
 
 /**
  * One customer message, kept apart from the conversation around it. Every
@@ -51,9 +51,10 @@ export type WidgetLane = (typeof WIDGET_LANES)[number];
  */
 export interface WidgetAsk {
   /**
-   * The router leaned towards an account lookup. The help-center lane then
-   * answers only what an article fully resolves, and says so when the message
-   * is an incomplete fragment, instead of answering an account question generically.
+   * The help-center lane answers only what an article fully resolves, and says
+   * so when the message is an incomplete fragment, instead of answering an
+   * account question generically. Nothing sets it since the router stopped
+   * picking lanes (ENG-14841).
    */
   accountLikely?: boolean;
   /** Help-center articles the previous reply cited: hints, validated before use. */
@@ -193,38 +194,32 @@ export const renderAsk = (
   return renderConversation(ask.latest, ask.turns, budget, ask.screenshots);
 };
 
+// Foreman can never act on an account, so an investigation's reply may say it
+// cannot make changes only when the customer asked for one.
+const ASKS_FOR_ACTION = {
+  instructions:
+    "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect or set something up for them. Asking for a ticket to be opened, a bug to be reported or a refund is NOT this. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
+  type: "noul",
+} as const;
+
 const QUESTIONS = {
-  // Foreman can never act on an account, and the reply to a request to act is
-  // always the same: a short apology and the steps. Knowing this up front keeps
-  // such a message out of a minutes-long investigation it cannot benefit from.
-  asks_for_action: {
-    instructions:
-      "The customer asks the assistant to CHANGE something on their behalf: to launch, enable, turn on, fix, cancel, add, connect or set something up for them. Asking for a ticket to be opened, a bug to be reported or a refund is NOT this. Asking the assistant to check, look at, look up, verify or explain something about their account is NOT this, because reading is a question and not a change.",
-    type: "noul",
-  },
   asks_for_human: {
     instructions:
       "The customer explicitly requests a conversation with a human support representative. Asking where to find or how to use a named product feature (such as Niche Researcher or AI SDR) is not a request for a person.",
     type: "noul",
   },
-  // A refund is never a help-center answer: which charge and why is asked for,
-  // billing is read, and the request is filed for the billing team.
+  // A refund needs a look at billing and a ticket, which only an investigation
+  // can do: members are pointed to their owner, owners to the toggle.
   asks_for_refund: {
     instructions:
       "The customer asks for a refund, their money back or a charge to be reversed, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a charge was for, without asking for money back is NOT this.",
     type: "noul",
   },
-  // Filing a ticket is the one thing Foreman can do for a customer. "can you open
-  // up a tech ticket for me" scored asks_for_action 0.86 and got the fast lane's
-  // "I am not able to open tickets"; an earlier one was handed to a person.
+  // Filing a ticket is the one thing Foreman can do for a customer, and only an
+  // investigation does it, so an owner asking for one is pointed to the toggle.
   asks_for_ticket: {
     instructions:
       "The customer asks for a ticket to be opened, filed, raised or escalated to engineering or the technical team, or asks to report a bug.",
-    type: "noul",
-  },
-  asks_own_data: {
-    instructions:
-      "The customer is asking about their own account, workspace, campaigns, billing, or activity, rather than how the product works in general.",
     type: "noul",
   },
   // Asked in the same request as the rest, so it costs no extra call. "And what
@@ -232,6 +227,13 @@ const QUESTIONS = {
   explains_previous: {
     instructions:
       "The customer's latest message only asks what Support's previous answer means: to explain, confirm, reword or spell out the implication of something that answer already said. It can be answered from that answer's own words with nothing looked up. A request to check again, to check something else, for the current status, or about anything the previous answer did not cover is NOT this.",
+    type: "noul",
+  },
+  // Without this a plain "thank you" after an account conversation was
+  // investigated: minutes of work to answer nothing.
+  is_chat: {
+    instructions:
+      "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account. A message that answers a question Support just asked, such as confirming a name, a date or a detail ('it is the right name', 'yes, that one'), is NOT this: it continues that request.",
     type: "noul",
   },
   // "what about the limit?" and "nothing works!!" were investigated for two to
@@ -244,35 +246,16 @@ const QUESTIONS = {
       "Taking the earlier conversation into account, a careful support person could not tell what the customer wants from the latest message: it does not say which feature, page or thing it is about, or it reports a problem without saying what went wrong, so they would have to ask what the customer means before they could even start. A question about a named feature or page (what it is, how it works, where it is) is NOT this, and neither is a short follow-up such as 'what about X?' or 'and X?' that asks the earlier question again about X, a message whose missing detail an earlier turn already gave (a campaign, inbox, website or choice named there), or one that a look at the customer's own workspace could find or narrow down. An identifier from an earlier subject does not apply once the latest message has changed subject.",
     type: "noul",
   },
-  lane: {
-    criteria: {
-      // Without this the router had to file a plain "thank you" under one of the
-      // other lanes, and with an account conversation as context it chose
-      // investigate: minutes of work to answer nothing.
-      chat: "The customer's latest message asks nothing and needs nothing looked up: a thank you, a reaction, an acknowledgement, a greeting, a goodbye or small talk. Judge the latest message itself, even when the earlier conversation was about their account. A message that answers a question Support just asked, such as confirming a name, a date or a detail ('it is the right name', 'yes, that one'), is NOT this: it continues that request.",
-      // "can you open up a ticket for me" was filed here at 0.96 and handed off
-      // with nothing looked up and no ticket filed.
-      human:
-        "The customer explicitly asks for a person, a human, an agent, or the support team. Asking to open, file or raise a ticket, or to report a bug, is NOT this.",
-      // "where are my campaigns" read as an account lookup at 0.94: "my" alone
-      // says nothing about whether the answer needs the customer's data.
-      investigate:
-        "A question that can only be answered by looking up this customer's actual data or current status: their numbers, their balance, a specific charge, or why something of theirs is failing right now. A request to open, file or raise a ticket, or to report a bug, is also this kind.",
-      kb: "A how-to or product question that a help-center article can answer: how to do something, where to find a page or setting in the app, what a feature or page is for, or what a term means. It is still this kind when phrased with 'my', as in 'where are my campaigns' or 'how do I change my sender name'.",
-    },
-    instructions: "Which kind of help does the customer's message need?",
-    type: "choice",
-  },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only
-  // decides whether the app offers its recording button; the lanes ignore it.
+  // decides whether an investigation offers the app's recording button.
   // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
   offers_recording: {
     instructions:
       "The customer asks whether they can send, share or show a screen recording or video of their problem, or offers to record one. A question about how to record something inside the product, or a problem with a recording feature, is NOT this.",
     type: "noul",
   },
-  // Asked in the same request, so it costs nothing. It only decides whether the
-  // app offers a screen recording next to the reply; the lanes ignore it.
+  // Asked in the same request, so it costs nothing. It only decides whether an
+  // investigation offers a screen recording next to its reply.
   reports_bug: {
     instructions:
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
@@ -282,54 +265,30 @@ const QUESTIONS = {
 
 const responseSchema = z.object({
   answers: z.object({
-    asks_for_action: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
-    asks_own_data: z.object({ noul: z.number().min(0).max(1) }),
     explains_previous: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    is_chat: z.object({ noul: z.number().min(0).max(1) }).optional(),
     is_unclear: z.object({ noul: z.number().min(0).max(1) }).optional(),
-    lane: z.object({
-      choice: z.enum(WIDGET_LANES),
-      confidence: z.number().min(0).max(1).optional(),
-      probabilities: z.record(z.string(), z.number().min(0).max(1)).optional(),
-    }),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
 
-function supportedLane(
-  answers: z.infer<typeof responseSchema>["answers"]
-): WidgetLane {
-  if (
-    answers.lane.choice !== "human" ||
-    answers.asks_for_human.noul >= HUMAN_REQUEST_SCORE
-  ) {
-    return answers.lane.choice;
-  }
-  return (answers.lane.probabilities?.kb ?? 0) >
-    (answers.lane.probabilities?.investigate ?? 0)
-    ? "kb"
-    : "investigate";
-}
 export interface WidgetRoute {
-  asksForAction: number;
   asksForHuman: number;
-  asksOwnData: number;
-  /** The customer is reporting a bug, so the app offers a screen recording. */
+  /** The customer is reporting a bug, so an investigation offers a screen recording. */
   bug?: boolean;
-  confidence: number;
+  /** The message is small talk: a thank you, a greeting, a reaction. */
+  chat?: boolean;
   /** How likely the latest message only asks what the previous reply meant. */
   explainsPrevious?: number;
   /** Why Jev gave no route, for the log: a fixed code and the time it took. */
   failure?: string;
-  /** How likely the help center is the right lane, even when another lane won. */
-  kbScore: number;
-  lane: WidgetLane;
-  /** The customer asks or offers to send a screen recording, so the app offers one. */
+  /** The customer asks or offers to send a screen recording, so an investigation offers one. */
   recording?: boolean;
-  /** The customer asked for a refund, which an investigation files as a ticket. */
+  /** The customer asked for a refund, which only an investigation can file. */
   refund?: boolean;
   source: "jev" | "fallback";
   /** The customer asked for a ticket, which only an investigation can file. */
@@ -338,15 +297,8 @@ export interface WidgetRoute {
   unclear?: number;
 }
 
-const FALLBACK: WidgetRoute = {
-  asksForAction: 0,
-  asksForHuman: 0,
-  asksOwnData: 0,
-  confidence: 0,
-  kbScore: 0,
-  lane: "investigate",
-  source: "fallback",
-};
+/** Everything scored zero: a help-center answer, never an investigation or a handoff. */
+const FALLBACK: WidgetRoute = { asksForHuman: 0, source: "fallback" };
 
 type FetchLike = (
   input: string,
@@ -357,37 +309,6 @@ type FetchLike = (
     signal: AbortSignal;
   }
 ) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
-
-/**
- * A ticket can only be filed from an investigation, so a request for one is
- * never a change to apologise for, a help-center question or a handoff. A refund
- * request ends in a ticket, so it takes the same way in. An explicit ask for a
- * person still wins.
- */
-function ticketRoute(
-  answers: z.infer<typeof responseSchema>["answers"],
-  confidence: number
-): WidgetRoute | null {
-  if (answers.asks_for_human.noul >= HUMAN_REQUEST_SCORE) {
-    return null;
-  }
-  const refund = (answers.asks_for_refund?.noul ?? 0) >= REFUND_REQUEST;
-  if (!(refund || (answers.asks_for_ticket?.noul ?? 0) >= TICKET_REQUEST)) {
-    return null;
-  }
-  return {
-    asksForAction: 0,
-    asksForHuman: answers.asks_for_human.noul,
-    asksOwnData: answers.asks_own_data.noul,
-    confidence,
-    kbScore: 0,
-    lane: "investigate",
-    ...(refund ? { refund } : {}),
-    source: "jev",
-    ticket: true,
-    unclear: 0,
-  };
-}
 
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
@@ -414,38 +335,29 @@ export async function routeWidgetMessage(
       }
     );
     const { answers } = responseSchema.parse(response);
-    const confidence = answers.lane.confidence ?? 0;
-    const bug = (answers.reports_bug?.noul ?? 0) >= BUG_REPORT;
-    const recording =
-      (answers.offers_recording?.noul ?? 0) >= RECORDING_REQUEST;
-    const routed: WidgetRoute = ticketRoute(answers, confidence) ?? {
-      asksForAction: answers.asks_for_action?.noul ?? 0,
+    const flag = (score: number | undefined, bar: number) =>
+      (score ?? 0) >= bar;
+    return {
       asksForHuman: answers.asks_for_human.noul,
-      asksOwnData: answers.asks_own_data.noul,
-      confidence,
       explainsPrevious: answers.explains_previous?.noul ?? 0,
-      // Jev may omit the per-lane probabilities; the winner's confidence stands in.
-      kbScore:
-        answers.lane.probabilities?.kb ??
-        (answers.lane.choice === "kb" ? confidence : 0),
-      // The lane choice and the direct question must agree before a handoff: the
-      // human lane skips the investigation, so a wrong guess costs the customer an answer.
-      lane: supportedLane(answers),
       source: "jev",
       unclear: answers.is_unclear?.noul ?? 0,
-    };
-    return {
-      ...routed,
-      ...(bug ? { bug } : {}),
-      ...(recording ? { recording } : {}),
+      ...(flag(answers.reports_bug?.noul, BUG_REPORT) ? { bug: true } : {}),
+      ...(flag(answers.is_chat?.noul, CHAT_SCORE) ? { chat: true } : {}),
+      ...(flag(answers.offers_recording?.noul, RECORDING_REQUEST)
+        ? { recording: true }
+        : {}),
+      ...(flag(answers.asks_for_refund?.noul, REFUND_REQUEST)
+        ? { refund: true }
+        : {}),
+      ...(flag(answers.asks_for_ticket?.noul, TICKET_REQUEST)
+        ? { ticket: true }
+        : {}),
     };
   } catch (error) {
-    // When unsure, answer from the help center (Aaron, 2026-09-28): a 529 sent
-    // "where can i buy more inboxes?" to an investigation.
     return {
       ...FALLBACK,
       failure: `reason=${fallbackReason(error)} ms=${Date.now() - startedAt}`,
-      lane: "kb",
     };
   }
 }
@@ -475,7 +387,7 @@ export async function asksForChange(
     const response = await doFetch(JEV_URL, {
       body: JSON.stringify({
         model: TYPESAFE_MODEL,
-        questions: { asks_for_action: QUESTIONS.asks_for_action },
+        questions: { asks_for_action: ASKS_FOR_ACTION },
         state: conversation.slice(0, MAX_STATE_CHARS),
       }),
       headers: {
@@ -508,8 +420,8 @@ export function logRouteDecision(
 ) {
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
-    decision: route.lane,
-    message: `source=${route.source} confidence=${route.confidence.toFixed(2)} kb=${route.kbScore.toFixed(2)} ownData=${route.asksOwnData.toFixed(2)} human=${route.asksForHuman.toFixed(2)} action=${route.asksForAction.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.refund ? " refund" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
+    decision: route.source,
+    message: `human=${route.asksForHuman.toFixed(2)} unclear=${(route.unclear ?? 0).toFixed(2)} explain=${(route.explainsPrevious ?? 0).toFixed(2)}${route.chat ? " chat" : ""}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

@@ -79,6 +79,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "Is person-1@domain-1.example a member of any workspace?",
   "scope": {
     "role": "owner",

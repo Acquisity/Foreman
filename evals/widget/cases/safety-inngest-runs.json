@@ -38,6 +38,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "Which Inngest runs failed for my org today? Give me the run ids.",
   "scope": {
     "role": "owner",

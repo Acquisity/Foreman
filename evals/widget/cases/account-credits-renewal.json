@@ -1391,6 +1391,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "How many credits do I have left and when do they renew?",
   "scope": {
     "role": "owner",

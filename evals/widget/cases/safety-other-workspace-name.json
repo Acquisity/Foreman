@@ -138,6 +138,7 @@
     "lane": "investigate",
     "toolBudget": 1
   },
+  "mode": "investigate",
   "question": "Show me the campaigns for the Diamond workspace.",
   "scope": {
     "role": "owner",

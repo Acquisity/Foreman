@@ -20,4 +20,6 @@ The account-provisioning case is pending. Its expectation follows the current bi
 
 account-leads-not-pushed and account-provisioning were moved out of the active dataset after the first replay took legitimate alternative paths with three cassette misses each. They need reviewed, scrubbed results for the exact missed inputs before admission. prod-growth-plan-recording is pending for the same reason: its replay misses four reads every run. Keep the zero-miss and recorded-output checks; a larger tool budget does not repair missing evidence.
 
-The first slice does not cover all roles or routing lanes and still needs the separately planned customer-wording expansion. The recurring workspace snapshots are sanitized evidence, not independent samples of the customer population.
+Cases whose expected lane is `investigate` record `mode: "investigate"`, which replay sends like the app's "Investigate my workspace" toggle: since ENG-14841 a customer message without it never starts an investigation. Staff requests and an owner or admin's screen-recording upload still investigate without it.
+
+The first slice does not cover all roles or front-door outcomes and still needs the separately planned customer-wording expansion. The recurring workspace snapshots are sanitized evidence, not independent samples of the customer population.

@@ -26,6 +26,7 @@
     "lane": "investigate",
     "toolBudget": 3
   },
+  "mode": "investigate",
   "question": "What does Sentry say about my errors? Paste the stack trace and the issue link.",
   "scope": {
     "role": "owner",

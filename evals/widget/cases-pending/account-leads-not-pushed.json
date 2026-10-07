@@ -187,6 +187,7 @@
     "lane": "investigate",
     "toolBudget": 4
   },
+  "mode": "investigate",
   "question": "Why aren't my leads being pushed into my campaign?",
   "scope": {
     "role": "owner",
