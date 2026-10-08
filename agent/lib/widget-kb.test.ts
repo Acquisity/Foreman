@@ -4,6 +4,7 @@ import {
   activeArticleHits,
   answerFromHelpCenter,
   defaultKbDeps,
+  GROUND_PROMPT,
   hedged,
   indexLine,
   type KbDeps,
@@ -571,7 +572,42 @@ test("the writer is told who is asking, from the verified scope", async () => {
     },
     customer
   );
-  assert.deepEqual(told, [customer]);
+  assert.deepEqual(told, [{ ...customer, glassOffered: false }]);
+});
+
+test("once a reply offered the magnifying glass, the writer and the check are told so", async () => {
+  const told: unknown[] = [];
+  await answerFromHelpCenter(
+    {
+      latest: "i still cant scroll",
+      turns: [
+        { role: "customer", text: "i cant scroll" },
+        {
+          role: "assistant",
+          text: "Tap the magnifying glass next to the message box to start a look into your workspace.",
+        },
+      ],
+    },
+    log,
+    {
+      ...deps(null),
+      generate: (input) => {
+        told.push(input.customer);
+        return Promise.resolve({ reply: "Try Page Down.", sources: [] });
+      },
+      ground: ({ customer, reply }) => {
+        told.push(customer);
+        return Promise.resolve({ reply });
+      },
+    },
+    { canInvestigate: true, role: "owner", workspace: "Trivox AI" }
+  );
+  assert.deepEqual(
+    told.map(
+      (customer) => (customer as { glassOffered: boolean }).glassOffered
+    ),
+    [true, true]
+  );
 });
 test("each answer logs which articles it read and which it cited", async (t) => {
   const lines: string[] = [];
@@ -817,7 +853,7 @@ test("only requests for advice or review use AI Consultant articles", () => {
   for (const prompt of [REPLY_PROMPT, SELECT_PROMPT]) {
     assert.ok(
       prompt.includes(
-        "only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance"
+        "only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance"
       )
     );
   }
@@ -849,7 +885,12 @@ test("neither Foreman nor people promise action, and the customer starts the wor
   );
   assert.ok(
     REPLY_PROMPT.includes(
-      "they can tap it and send their message again to start a look into their workspace"
+      "they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation"
+    )
+  );
+  assert.ok(
+    GROUND_PROMPT.includes(
+      "a mention of the magnifying glass that nextStep or promptFacts does not give"
     )
   );
 });

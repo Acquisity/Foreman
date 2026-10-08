@@ -216,7 +216,7 @@ const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-a
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
-The input is JSON: conversation, customer (their workspace name, their role, and canInvestigate), recordingOffered, and articles, the numbered help-center articles found for this conversation. ${LATEST_SUBJECT}
+The input is JSON: conversation, customer (their workspace name, their role, canInvestigate and glassOffered), recordingOffered, and articles, the numbered help-center articles found for this conversation. ${LATEST_SUBJECT}
 
 Facts specific to Acquisity come only from the articles: where something is, what a setting does, steps, limits, plans, prices, and whether a feature exists. After a sentence or step that uses an article, add its number in square brackets, like [1], once per step or paragraph, and only numbers you were given. Never invent menu names, links, settings or URLs. When more than one article touches a point, cite the one whose own topic is the latest message. A rule in an article applies only to the product that article is about, so never carry the policy for one product or charge (such as domains or inboxes) over to another (such as the subscription). When the question could be about more than one product or charge and the conversation does not say which, ask which one.
 
@@ -224,9 +224,9 @@ When a screenshot arrives with no question and no earlier customer goal, ask one
 
 Explaining what a product term or feature means and how the pieces fit together is your job, from the articles. Give the steps themselves, never only a pointer to an article or the help center. For a procedure, give every step the articles give, in order, starting with how to reach the page, and keep every warning or lasting consequence they attach, such as data deleted for good or inboxes that must warm up before sending. When the next step depends on the customer's situation, give each case the articles describe. For troubleshooting, give the first one or two checks and ask what they see. A timezone conversion is only a possible explanation, never proof of how their calendar is set up.
 
-Refer to the AI Consultant, using its help article, only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance; otherwise do not mention it.
+Refer to the AI Consultant, using its help article and rather than another tool, only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not mention it.
 
-When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step is the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. When it is false, they can ask a workspace owner or admin, and you never mention the magnifying glass.
+When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, they can ask a workspace owner or admin, and you never mention the magnifying glass.
 
 You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do it themselves. Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified. A thanks, greeting or reaction gets a short friendly reply with no product facts.
 
@@ -250,21 +250,29 @@ Go through the reply sentence by sentence and find every claim about Acquisity i
 
 Two examples. An article says "Paste your Zoom or Riverside room link into Meeting Link." A reply saying "Yes, you can paste your Teams link there" is unsupported, because no article names Teams: write "I'm not sure a Teams link works there" and keep the steps for the links the article names. An article says "New inboxes warm up for 14 days before sending." A reply saying "You can't skip warmup" is unsupported, because the article does not say whether it can be skipped: write "I'm not sure whether warmup can be skipped" and keep the 14 days.
 
+A promise that you, we, a person or anyone will look, check, see or follow up is unsupported however it is worded, and so is a mention of the magnifying glass that nextStep or promptFacts does not give.
+
 In unsupported, list each unsupported claim as it is written in the reply, or nothing. Then return in reply the reply with each unsupported claim removed, or replaced by a short sentence saying you are not sure about that specific thing, and edit only as much of the surrounding sentence as it needs to still read naturally. Keep every supported sentence and step. When nothing the customer can do is left, no step, question or referral, add nextStep in one short sentence. Change nothing else: keep the tone, wording, questions, numbered steps, line breaks, referrals and bracketed article numbers such as [1] exactly as they are, and never add a bracketed number. When unsupported is empty, return the reply exactly as given.
 
-Then set stillAnswers: false only when your reply, after trimming, gives the customer nothing useful toward their latest message, or reads as broken or no longer makes sense. A reply that says you are not sure about one point and keeps supported facts or steps about what they asked still answers, so it is true; so is a short reply to a thanks or greeting. When stillAnswers is false, write notSure: a short honest reply to the latest message that says plainly you are not sure about that part, then gives one next step, either one question that would find the right guide or nextStep. Otherwise leave notSure empty.
+Then set stillAnswers: false only when your reply, after trimming, gives the customer nothing useful toward their latest message, or reads as broken or no longer makes sense. A reply that says you are not sure about one point and keeps supported facts or steps about what they asked still answers, so it is true; so is a short reply to a thanks or greeting. When stillAnswers is false, write notSure: a short honest reply to the latest message that says plainly you are not sure about that part, then gives one next step: one question that would find the right guide, or nextStep. Otherwise leave notSure empty.
 
 Plain text only, no markdown and no em dashes.`;
 
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
-const nextStep = (customer: KbCustomer | undefined) =>
-  customer?.canInvestigate
+const nextStep = (customer: KbCustomer | undefined) => {
+  if (customer?.glassOffered) {
+    return "Ask the one question that would help find the answer.";
+  }
+  return customer?.canInvestigate
     ? "Tap the magnifying glass next to the message box and send the message again to start a look into the workspace."
     : "Ask a workspace owner or admin.";
+};
 
 /** What REPLY_PROMPT itself tells the writer, so the check never trims it. */
 const promptFacts = (customer: KbCustomer | undefined) => [
-  ...(customer?.canInvestigate ? [nextStep(customer)] : []),
+  ...(customer?.canInvestigate && !customer.glassOffered
+    ? [nextStep(customer)]
+    : []),
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
@@ -281,7 +289,7 @@ const groundSchema = z.object({
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
 // inboxes" lexically, but a model reading both sees they are the same thing.
-export const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path): description [keywords]". Many articles share a title such as Overview or Frequently Asked Questions: tell them apart by path and description. Return up to ${MAX_ARTICLES} articles most likely to contain the answer, best first, each with its number and its fit: direct when the article itself is about what the customer asks (the same feature, page, setting or task), related when it is about a neighbouring feature, page or setting that does not answer the question itself. When the conversation lists articles the previous reply cited, pick them again only when they are still direct for the latest message. Prefer a specific how-to guide over an index, overview or FAQ listing page. Choose AI Consultant articles only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance; otherwise do not select them. Return an empty list if nothing fits.`;
+export const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path): description [keywords]". Many articles share a title such as Overview or Frequently Asked Questions: tell them apart by path and description. Return up to ${MAX_ARTICLES} articles most likely to contain the answer, best first, each with its number and its fit: direct when the article itself is about what the customer asks (the same feature, page, setting or task), related when it is about a neighbouring feature, page or setting that does not answer the question itself. When the conversation lists articles the previous reply cited, pick them again only when they are still direct for the latest message. Prefer a specific how-to guide over an index, overview or FAQ listing page. Choose AI Consultant articles only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not select them. Return an empty list if nothing fits.`;
 
 // The help-center search is lexical and matches short keyword queries against
 // article titles. A whole conversational sentence ranks on its filler words
@@ -350,6 +358,11 @@ export async function hedged<T>(
 export interface KbCustomer {
   /** An owner or admin outside help-center mode, who can start a look with the magnifying glass. */
   canInvestigate: boolean;
+  /**
+   * An earlier reply already offered the magnifying glass, so no reply offers
+   * it again. Read from Foreman's own earlier turns, which word it one way.
+   */
+  glassOffered?: boolean;
   role: string;
   workspace: string;
 }
@@ -878,6 +891,14 @@ export async function answerFromHelpCenter(
 ): Promise<KbAnswer> {
   const ask = toAsk(input);
   const question = renderTranscript(ask);
+  // Offered once, then never again: the writer repeated it turn after turn.
+  const reader = customer && {
+    ...customer,
+    glassOffered: (ask.turns ?? []).some(
+      (turn) =>
+        turn.role === "assistant" && turn.text.includes("magnifying glass")
+    ),
+  };
   const startedAt = Date.now();
   const signal = AbortSignal.timeout(KB_TIMEOUT_MS);
   const finish = (outcome: string, detail: string) =>
@@ -936,7 +957,7 @@ export async function answerFromHelpCenter(
     const written = replySchema.parse(
       await deps.generate({
         articles,
-        customer,
+        customer: reader,
         images,
         question,
         recordingOffered: ask.recordingOffered,
@@ -949,7 +970,7 @@ export async function answerFromHelpCenter(
           written.reply,
           question,
           articles,
-          customer,
+          reader,
           signal,
           deps,
           log
