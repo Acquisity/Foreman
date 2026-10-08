@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertGuideSections } from "./widget-guide-validation.js";
+import {
+  assertGuideSections,
+  frontmatterField,
+} from "./widget-guide-validation.js";
 import {
   PRODUCT_GUIDE,
   PRODUCT_GUIDE_ARTICLES,
@@ -37,4 +40,16 @@ test("guide coverage rejects missing, duplicate, unexpected and invalid sections
   assert.doesNotThrow(() =>
     assertGuideSections(PRODUCT_GUIDE, Object.keys(PRODUCT_GUIDE_ARTICLES))
   );
+});
+
+test("front matter titles read folded block scalars, not the >- marker", () => {
+  const front =
+    "title: >-\n  Can I prevent the AI SDR from auto-booking\n  into the client's calendar?\ndescription: Short.";
+  assert.equal(
+    frontmatterField(front, "title"),
+    "Can I prevent the AI SDR from auto-booking into the client's calendar?"
+  );
+  assert.equal(frontmatterField(front, "description"), "Short.");
+  assert.equal(frontmatterField('title: "Quoted"', "title"), "Quoted");
+  assert.equal(frontmatterField("other: x", "title"), "");
 });

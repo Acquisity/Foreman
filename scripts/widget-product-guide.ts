@@ -25,7 +25,10 @@ import { join, relative } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
-import { assertGuideSections } from "../agent/lib/widget-guide-validation.js";
+import {
+  assertGuideSections,
+  frontmatterField,
+} from "../agent/lib/widget-guide-validation.js";
 
 const MODEL = "anthropic/claude-sonnet-5";
 /** The limits pass only collects what the distilled guide already says. */
@@ -209,11 +212,7 @@ const order = (path: string): string[] => {
 /** MDX to plain markdown: components become text, navigation-only lists go. */
 function stripMdx(source: string): { body: string; title: string } {
   const front = source.match(FRONTMATTER);
-  const field = (name: string) =>
-    front?.[1]
-      .match(new RegExp(`^${name}:\\s*(.*)$`, "mu"))?.[1]
-      ?.replace(/^["']|["']$/gu, "")
-      .trim() ?? "";
+  const field = (name: string) => frontmatterField(front?.[1] ?? "", name);
   const body = source
     .slice(front?.[0].length ?? 0)
     .replace(/^(import|export) .*$/gmu, "")

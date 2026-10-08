@@ -29,3 +29,24 @@ export function assertGuideSections(
     throw new Error(`Invalid product guide: ${problems.join("; ")}`);
   }
 }
+
+const BLOCK_SCALAR = /^[>|][+-]?$/u;
+
+/** One front matter value, including a folded or literal block scalar (`title: >-`). */
+export function frontmatterField(front: string, name: string): string {
+  const match = front.match(
+    new RegExp(`^${name}:[ \\t]*(.*)$((?:\\n[ \\t]+.*)*)`, "mu")
+  );
+  if (!match) {
+    return "";
+  }
+  const [, head = "", rest = ""] = match;
+  const value = BLOCK_SCALAR.test(head.trim())
+    ? rest
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(" ")
+    : head;
+  return value.replace(/^["']|["']$/gu, "").trim();
+}

@@ -60,11 +60,11 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "ai-sdr/faq/configuration/can-i-point-the-ai-sdr-at-a-docs-url-instead-of-pasting-entries":
     "Can I point the AI SDR at a docs URL instead of pasting entries?",
   "ai-sdr/faq/configuration/can-i-prevent-the-ai-sdr-from-auto-booking-into-the-clients-calendar-gate-interested-calls-instead":
-    ">-",
+    "Can I prevent the AI SDR from auto-booking into the client's calendar (gate interested calls instead)?",
   "ai-sdr/faq/configuration/can-i-support-multiple-knowledge-bases-for-separate-offersclients":
     "Can I support multiple knowledge bases for separate offers/clients?",
   "ai-sdr/faq/configuration/do-i-need-to-personally-answerjoin-booked-calls-and-what-routing-is-required":
-    ">-",
+    "Do I need to personally answer/join booked calls, and what routing is required?",
   "ai-sdr/faq/configuration/how-do-i-configure-the-ai-sdr-to-only-reply-during-business-hours-monfri":
     "How do I configure the AI SDR to only reply during business hours (Mon–Fri)?",
   "ai-sdr/faq/configuration/how-do-i-set-up-the-ai-sdr-from-scratch":
@@ -99,11 +99,11 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "ai-sdr/faq/inbox-replies/who-receives-ai-sdr-escalation-and-booking-notification-emails":
     "Who receives AI SDR escalation and booking notification emails?",
   "ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-make-up-answers-when-the-knowledge-base-doesnt-cover-something":
-    ">-",
+    "Why does the AI SDR make up answers when the knowledge base doesn't cover something?",
   "ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-reply-in-the-wrong-language-and-how-do-i-enforce-a-specific-reply-language":
-    ">-",
+    "Why does the AI SDR reply in the wrong language, and how do I enforce a specific reply language?",
   "ai-sdr/faq/inbox-replies/why-isnt-the-ai-sdr-kb-changing-the-reply-tonepersona-despite-my-instructions":
-    ">-",
+    "Why isn't the AI SDR KB changing the reply tone/persona despite my instructions?",
   "ai-sdr/faq/scheduling-calendar": "Scheduling & Calendar",
   "ai-sdr/faq/scheduling-calendar/how-do-i-connect-a-clients-google-calendar-to-cold-email-agent":
     "How do I connect a client's Google or Outlook calendar to Cold Email Agent?",
@@ -112,9 +112,9 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr":
     "How do I set the correct timezone for my AI SDR?",
   "ai-sdr/faq/scheduling-calendar/the-ai-sdr-double-booked-after-i-manually-replied-with-a-calendly-link-how-do-i-prevent-this":
-    ">-",
+    "The AI SDR double-booked after I manually replied with a Calendly link - how do I prevent this?",
   "ai-sdr/faq/scheduling-calendar/where-do-i-enter-my-conferencemeeting-link-zoom-google-meet-riverside-for-ai-sdr-bookings":
-    ">-",
+    "Where do I enter my conference/meeting link (Zoom, Google Meet, Riverside) for AI SDR bookings?",
   "ai-sdr/faq/scheduling-calendar/why-does-the-ai-sdr-book-duplicate-meetings-with-different-hosts-for-the-same-prospect":
     "Why does the AI SDR book duplicate meetings with different hosts for the same prospect?",
   "ai-sdr/faq/scheduling-calendar/why-is-the-ai-sdr-asking-prospects-for-their-times-instead-of-offering-slots":
@@ -316,7 +316,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "cold-email-agent/faq/email-accounts/my-inbox-warmup-shows-0-emails-and-no-health-score-how-do-i-initialize-it":
     "My inbox warmup shows 0 emails and no health score - how do I initialize it?",
   "cold-email-agent/faq/email-accounts/my-pre-warmed-inboxes-dont-appear-after-purchase-how-long-does-provisioning-take":
-    ">-",
+    "My pre-warmed inboxes don't appear after purchase — how long does provisioning take?",
   "cold-email-agent/faq/email-accounts/what-are-pre-warmed-inboxes":
     "What are pre-warmed inboxes?",
   "cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean":
@@ -337,7 +337,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "cold-email-agent/faq/lead-search/how-do-i-export-previous-campaign-leads-while-excluding-bounced-emails":
     "How do I export previous campaign leads while excluding bounced emails?",
   "cold-email-agent/faq/lead-search/how-do-i-get-nichehard-to-find-emails-when-the-built-in-scraper-cant-find-them":
-    ">-",
+    "How do I get niche/hard-to-find emails when the built-in scraper can't find them?",
   "cold-email-agent/faq/lead-search/how-do-i-hide-the-leads-were-skipped-during-upload-notification":
     "How do I hide the 'leads were skipped during upload' notification?",
   "cold-email-agent/faq/lead-search/how-do-i-send-cold-emails-only-to-specific-leads-via-csv-upload":
