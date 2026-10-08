@@ -34,19 +34,23 @@ const BLOCK_SCALAR = /^[>|][+-]?$/u;
 
 /** One front matter value, including a folded or literal block scalar (`title: >-`). */
 export function frontmatterField(front: string, name: string): string {
-  const match = front.match(
-    new RegExp(`^${name}:[ \\t]*(.*)$((?:\\n[ \\t]+.*)*)`, "mu")
-  );
-  if (!match) {
+  const lines = front.split("\n");
+  const at = lines.findIndex((line) => line.startsWith(`${name}:`));
+  if (at < 0) {
     return "";
   }
-  const [, head = "", rest = ""] = match;
-  const value = BLOCK_SCALAR.test(head.trim())
-    ? rest
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .join(" ")
-    : head;
+  const head = lines[at].slice(name.length + 1).trim();
+  let value = head;
+  if (BLOCK_SCALAR.test(head)) {
+    const block: string[] = [];
+    for (const line of lines.slice(at + 1)) {
+      // The block runs until the next top-level key; blank lines stay inside it.
+      if (line.trim() && !/^[ \t]/u.test(line)) {
+        break;
+      }
+      block.push(line.trim());
+    }
+    value = block.filter(Boolean).join(" ");
+  }
   return value.replace(/^["']|["']$/gu, "").trim();
 }

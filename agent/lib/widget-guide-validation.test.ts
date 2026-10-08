@@ -52,4 +52,11 @@ test("front matter titles read folded block scalars, not the >- marker", () => {
   assert.equal(frontmatterField(front, "description"), "Short.");
   assert.equal(frontmatterField('title: "Quoted"', "title"), "Quoted");
   assert.equal(frontmatterField("other: x", "title"), "");
+  assert.equal(
+    frontmatterField(
+      "title: >-\n  First part\n\n  second part\nnext: y",
+      "title"
+    ),
+    "First part second part"
+  );
 });
