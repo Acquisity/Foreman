@@ -31,6 +31,7 @@ export function assertGuideSections(
 }
 
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
+const INDENTED = /^[ \t]/u;
 
 /** One front matter value, including a folded or literal block scalar (`title: >-`). */
 export function frontmatterField(front: string, name: string): string {
@@ -45,7 +46,7 @@ export function frontmatterField(front: string, name: string): string {
     const block: string[] = [];
     for (const line of lines.slice(at + 1)) {
       // The block runs until the next top-level key; blank lines stay inside it.
-      if (line.trim() && !/^[ \t]/u.test(line)) {
+      if (line.trim() && !INDENTED.test(line)) {
         break;
       }
       block.push(line.trim());
