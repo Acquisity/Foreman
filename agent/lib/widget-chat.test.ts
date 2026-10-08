@@ -81,4 +81,7 @@ test("the guide's own words never reach the customer", () => {
     ),
     "Tap the magnifying glass and send your message again. Then check Leads."
   );
+  const glass =
+    "Tap the magnifying glass next to the message box and send your message again to have your account investigated.";
+  assert.equal(customerWords(glass), glass);
 });
