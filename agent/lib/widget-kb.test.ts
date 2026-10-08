@@ -17,6 +17,7 @@ import {
 } from "./widget-kb.js";
 
 const TRY_AGAIN = /try your message again/u;
+const GROUND_MS = /^ms=\d+$/u;
 const GENERATE_529 =
   /^step=generate attempt=1 reason=AI_APICallError:529 ms=\d+$/;
 
@@ -29,6 +30,7 @@ const log = { conversationId: "c", runId: "r" };
 
 const deps = (answer: unknown, hits = articles): KbDeps => ({
   generate: () => Promise.resolve(answer),
+  ground: ({ reply }) => Promise.resolve({ reply }),
   index: () => Promise.resolve(null),
   read: (url) =>
     Promise.resolve({
@@ -121,6 +123,102 @@ test("a grounded answer is returned with the urls of the searched articles only"
     citations: [{ n: 1, title: "Setup", url: articles[0].url }],
     message: "Connect your calendar.",
   });
+});
+
+test("the checked reply replaces the writer's, and its citations resolve against the checked text", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  const seen: { articles: number; reply: string }[] = [];
+  const result = await answerFromHelpCenter(
+    "where is the ai sdr calendar?",
+    log,
+    {
+      ...deps({
+        reply: "Open settings [2]. It cannot be turned off [3].",
+        sources: [],
+      }),
+      ground: ({ articles: read, reply }) => {
+        seen.push({ articles: read.length, reply });
+        return Promise.resolve({
+          reply:
+            "Open settings [2]. I'm not sure whether it can be turned off.",
+        });
+      },
+    }
+  );
+  assert.deepEqual(seen, [
+    { articles: 3, reply: "Open settings [2]. It cannot be turned off [3]." },
+  ]);
+  assert.deepEqual(result, {
+    citations: [{ n: 1, title: "Settings", url: articles[1].url }],
+    message: "Open settings. I'm not sure whether it can be turned off.",
+  });
+  const ground = lines
+    .map((line) => JSON.parse(line))
+    .find((line) => line.event === "widget.kb.ground");
+  assert.equal(ground?.outcome, "changed");
+  assert.match(ground?.message, GROUND_MS);
+});
+
+test("a check that trimmed away the answer sends its short honest reply instead", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  const asked: string[] = [];
+  const result = await answerFromHelpCenter("can I use Calendly there?", log, {
+    ...deps({ reply: "Yes, paste your Calendly link [1].", sources: [] }),
+    ground: ({ question }) => {
+      asked.push(question);
+      return Promise.resolve({
+        notSure:
+          "I'm not sure a Calendly link works there. Which page are you on?",
+        reply: "",
+        stillAnswers: false,
+        unsupported: ["Yes, paste your Calendly link"],
+      });
+    },
+  });
+  assert.deepEqual(asked, ["Customer: can I use Calendly there?"]);
+  assert.deepEqual(result, {
+    citations: [],
+    message: "I'm not sure a Calendly link works there. Which page are you on?",
+  });
+  assert.ok(
+    lines.some(
+      (line) =>
+        JSON.parse(line).event === "widget.kb.ground" &&
+        JSON.parse(line).outcome === "replaced"
+    )
+  );
+});
+
+test("a failed or empty check sends the writer's reply as written", async (t) => {
+  const lines: string[] = [];
+  t.mock.method(console, "info", (line: string) => lines.push(line));
+  for (const ground of [
+    () => Promise.reject(new Error("timeout")),
+    () => Promise.resolve({ reply: "  " }),
+    () => Promise.resolve({ nope: true }),
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: cases are independent and tiny.
+    const result = await answerFromHelpCenter("q", log, {
+      ...deps({ reply: "Open settings [2]. Then save [1].", sources: [] }),
+      ground,
+    });
+    assert.deepEqual(result, {
+      citations: [
+        { n: 1, title: "Settings", url: articles[1].url },
+        { n: 2, title: "Setup", url: articles[0].url },
+      ],
+      message: "Open settings [1]. Then save [2].",
+    });
+  }
+  assert.deepEqual(
+    lines
+      .map((line) => JSON.parse(line))
+      .filter((line) => line.event === "widget.kb.ground")
+      .map((line) => line.outcome),
+    ["fallback", "fallback", "fallback"]
+  );
 });
 
 test("a reply that cites nothing is delivered as written, with or without articles", async () => {

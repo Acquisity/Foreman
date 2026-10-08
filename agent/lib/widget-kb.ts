@@ -51,6 +51,12 @@ const KB_TIMEOUT_MS = 45_000;
  */
 export const HEDGE_AFTER_MS = 4000;
 
+/**
+ * The check after the writer (ENG-14932) has its own deadline inside the
+ * lane's: a slow check sends the writer's reply rather than eating the turn.
+ */
+const GROUND_TIMEOUT_MS = 8000;
+
 const MAX_ANSWER_CHARS = 4000;
 const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
@@ -220,6 +226,48 @@ ${TEXT_ONLY}
 
 Return the reply, and in sources the number of every article it uses, empty when it uses none.`;
 
+// The check after the writer, modelled on Intercom Fin's validate stage
+// (ENG-14932). The writer blended near-miss articles, stretched them and
+// stated uncited assumptions in about 14 of 108 replies; stronger writers
+// invented more, so a second read against the same articles trims instead.
+export const GROUND_PROMPT = `You check a support reply before it is sent. The input is JSON: conversation, the support conversation so far ending with the customer's latest message; reply, the reply a support writer drafted for it; articles, the numbered help-center articles the writer was given; promptFacts, facts the writer was given apart from the articles; and nextStep, what the customer can do when an answer is not known.
+
+Go through the reply sentence by sentence and find every claim about Acquisity itself: where something is in the product, what a setting or feature does or cannot do, steps, limits, plans, prices, whether something exists, works or happens automatically, and anything about the customer's account or setup. For each claim, find the article sentence or promptFacts entry that says it. A claim is unsupported when none does. In particular:
+- A yes or no answer, or a word like always, never, cannot, only, automatically or not supported, is unsupported unless an article says that itself. An article that describes how something works does not say whether it can be changed or turned off.
+- A tool, app, integration or example that no article names is not covered by an article about other ones: a yes or no about it, or a step that uses it in a setting, is unsupported.
+- A claim placed on a different page or setting from the one the article names, or carried over from an article about a different feature, is unsupported.
+- What the customer said, what their screenshot showed, and what the reply's writer ("I") can or cannot do for them are not product claims.
+
+Two examples. An article says "Paste your Zoom or Riverside room link into Meeting Link." A reply saying "Yes, you can paste your Teams link there" is unsupported, because no article names Teams: write "I'm not sure a Teams link works there" and keep the steps for the links the article names. An article says "New inboxes warm up for 14 days before sending." A reply saying "You can't skip warmup" is unsupported, because the article does not say whether it can be skipped: write "I'm not sure whether warmup can be skipped" and keep the 14 days.
+
+In unsupported, list each unsupported claim as it is written in the reply, or nothing. Then return in reply the reply with each unsupported claim removed, or replaced by a short sentence saying you are not sure about that specific thing, and edit only as much of the surrounding sentence as it needs to still read naturally. Keep every supported sentence and step. When nothing the customer can do is left, no step, question or referral, add nextStep in one short sentence. Change nothing else: keep the tone, wording, questions, numbered steps, line breaks, referrals and bracketed article numbers such as [1] exactly as they are, and never add a bracketed number. When unsupported is empty, return the reply exactly as given.
+
+Then set stillAnswers: false only when your reply, after trimming, gives the customer nothing useful toward their latest message, or reads as broken or no longer makes sense. A reply that says you are not sure about one point and keeps supported facts or steps about what they asked still answers, so it is true; so is a short reply to a thanks or greeting. When stillAnswers is false, write notSure: a short honest reply to the latest message that says plainly you are not sure about that part, then gives one next step, either one question that would find the right guide or nextStep. Otherwise leave notSure empty.
+
+Plain text only, no markdown and no em dashes.`;
+
+/** REPLY_PROMPT's own next step for an answer the articles do not give. */
+const nextStep = (customer: KbCustomer | undefined) =>
+  customer?.canInvestigate
+    ? "Tap the magnifying glass next to the message box and send the message again to start a look into the workspace."
+    : "Ask a workspace owner or admin.";
+
+/** What REPLY_PROMPT itself tells the writer, so the check never trims it. */
+const promptFacts = (customer: KbCustomer | undefined) => [
+  ...(customer?.canInvestigate ? [nextStep(customer)] : []),
+  "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
+  "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
+  "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
+];
+
+// biome-ignore assist/source/useSortedKeys: claims first, so the model checks before it rewrites.
+const groundSchema = z.object({
+  unsupported: z.array(z.string()),
+  reply: z.string(),
+  stillAnswers: z.boolean(),
+  notSure: z.string(),
+});
+
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
 // inboxes" lexically, but a model reading both sees they are the same thing.
@@ -306,6 +354,14 @@ export interface KbDeps {
     recordingOffered?: boolean;
     signal: AbortSignal;
   }) => Promise<unknown>;
+  /** The writer's reply checked against the articles it was given; see GROUND_PROMPT. */
+  ground: (input: {
+    articles: KbArticle[];
+    customer?: KbCustomer;
+    question: string;
+    reply: string;
+    signal: AbortSignal;
+  }) => Promise<unknown>;
   /** The screenshots behind `WidgetAsk.images`; absent, the lane reads only their readings. */
   images?: (urls: string[], signal: AbortSignal) => Promise<KbImage[]>;
   /** Every article's id and title, or null where the web app has no index route yet. */
@@ -326,6 +382,13 @@ export interface KbDeps {
 
 let indexCache: { at: number; value: KbIndex } | null = null;
 
+const articleInput = (articles: KbArticle[]) =>
+  articles.map((article, index) => ({
+    content: article.content,
+    number: index + 1,
+    title: article.title,
+  }));
+
 export const defaultKbDeps: KbDeps = {
   async generate({
     articles,
@@ -337,11 +400,7 @@ export const defaultKbDeps: KbDeps = {
   }) {
     const model = await resolveModel(images?.length ? "kbImages" : "kb");
     const input = JSON.stringify({
-      articles: articles.map((article, index) => ({
-        content: article.content,
-        number: index + 1,
-        title: article.title,
-      })),
+      articles: articleInput(articles),
       conversation: question,
       customer: customer ?? {
         canInvestigate: false,
@@ -359,6 +418,27 @@ export const defaultKbDeps: KbDeps = {
         ...fastCallOptions(model),
         schema: replySchema,
         system: withImages(REPLY_PROMPT, images),
+      })
+    );
+    return object;
+  },
+  async ground({ articles, customer, question, reply, signal }) {
+    const model = await resolveModel("kb");
+    const { object } = await hedged("ground", signal, (abortSignal) =>
+      generateObject({
+        abortSignal,
+        maxRetries: 0,
+        model: gateway(model),
+        prompt: JSON.stringify({
+          articles: articleInput(articles),
+          conversation: question,
+          nextStep: nextStep(customer),
+          promptFacts: promptFacts(customer),
+          reply,
+        }),
+        ...fastCallOptions(model),
+        schema: groundSchema,
+        system: GROUND_PROMPT,
       })
     );
     return object;
@@ -704,6 +784,59 @@ function withSources(
 }
 
 /**
+ * The writer's reply after the check. It trims, never blocks: a check that
+ * fails, times out or comes back empty sends the writer's reply as written.
+ */
+async function grounded(
+  reply: string,
+  question: string,
+  articles: KbArticle[],
+  customer: KbCustomer | undefined,
+  signal: AbortSignal,
+  deps: KbDeps,
+  log: { conversationId: string; runId: string }
+): Promise<{ replaced: boolean; reply: string }> {
+  const startedAt = Date.now();
+  const done = (outcome: string, text: string) => {
+    logOpsEvent("widget.kb.ground", {
+      ...log,
+      message: `ms=${Date.now() - startedAt}`,
+      outcome,
+    });
+    return { replaced: outcome === "replaced", reply: text };
+  };
+  try {
+    const result = groundSchema
+      .partial({ notSure: true, stillAnswers: true, unsupported: true })
+      .parse(
+        await deps.ground({
+          articles,
+          customer,
+          question,
+          reply,
+          signal: AbortSignal.any([
+            signal,
+            AbortSignal.timeout(GROUND_TIMEOUT_MS),
+          ]),
+        })
+      );
+    const checked = result.reply.trim();
+    const notSure = result.notSure?.trim();
+    // Trimming that removed the answer itself sends the check's short honest
+    // reply rather than what is left (Fin's validate stage).
+    if (result.stillAnswers === false && notSure) {
+      return done("replaced", notSure);
+    }
+    if (!checked) {
+      return done("fallback", reply);
+    }
+    return done(checked === reply.trim() ? "unchanged" : "changed", checked);
+  } catch {
+    return done("fallback", reply);
+  }
+}
+
+/**
  * Retrieve, then the one writer. Always a reply: a technical failure, or a
  * writer that returns nothing, is a short fixed ask to send the message again.
  */
@@ -758,20 +891,37 @@ export async function answerFromHelpCenter(
       )
     ).filter((article): article is KbArticle => article !== null);
     mark("read");
-    const answer = withSources(
-      replySchema.parse(
-        await deps.generate({
-          articles,
-          customer,
-          images,
-          question,
-          recordingOffered: ask.recordingOffered,
-          signal,
-        })
-      ),
-      articles
+    const written = replySchema.parse(
+      await deps.generate({
+        articles,
+        customer,
+        images,
+        question,
+        recordingOffered: ask.recordingOffered,
+        signal,
+      })
     );
     mark("generate");
+    const checked = written.reply.trim()
+      ? await grounded(
+          written.reply,
+          question,
+          articles,
+          customer,
+          signal,
+          deps,
+          log
+        )
+      : { replaced: false, reply: written.reply };
+    // The honest replacement cites nothing, so the writer's sources do not ride along.
+    const answer = withSources(
+      {
+        reply: checked.reply,
+        sources: checked.replaced ? [] : written.sources,
+      },
+      articles
+    );
+    mark("ground");
     if (!answer.message) {
       throw new Error("empty_reply");
     }
