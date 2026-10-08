@@ -1,15 +1,11 @@
-import { gateway, isStepCount, streamText, tool } from "ai";
-import { z } from "zod";
-import { getHelpArticleContent, HELP_CENTER_BASE_URL } from "./help-center.js";
+import { gateway, streamText } from "ai";
+import { HELP_CENTER_BASE_URL } from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
-  defaultKbDeps,
-  grounded,
   hedged,
   type KbAnswer,
   type KbCustomer,
-  renderTranscript,
   resolveCitations,
 } from "./widget-kb.js";
 import {
@@ -28,8 +24,7 @@ import { toAsk, type WidgetAsk } from "./widget-router.js";
  * Behind WIDGET_CHAT=guide; without it the help-center writer in widget-kb.ts
  * answers. Like that lane it is ungated on purpose: its only inputs are the
  * customer's own conversation and public help-center text, and it has no
- * account data and no account tools. Keep it that way. With
- * WIDGET_CHAT_TOOL=1 it may read one public article by slug.
+ * account data and no account tools. Keep it that way.
  */
 
 export const chatGuideEnabled = () => process.env.WIDGET_CHAT === "guide";
@@ -38,7 +33,6 @@ const CHAT_TIMEOUT_MS = 20_000;
 const MAX_OUTPUT_TOKENS = 900;
 const MAX_TURNS = 12;
 const MAX_TURN_CHARS = 2000;
-const MAX_ARTICLE_CHARS = 8000;
 const MAX_ANSWER_CHARS = 4000;
 // {slug}, {slug: slug} or a comma-separated list of them, as the prompt and the guide write them.
 const TRAILING_SLASH = /\/+$/u;
@@ -82,9 +76,6 @@ Plain text only: no markdown, no headings, no asterisks, no em dashes. A numbere
 
 ${PRODUCT_GUIDE}`;
 
-const TOOL_RULE =
-  "You can call read_help_article with a slug from the guide when the customer needs exact click-by-click detail the guide leaves out. Most questions need no lookup; call it at most once.";
-
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
@@ -103,7 +94,6 @@ interface ChatAttempt {
   inputTokens: number;
   model: string;
   text: string;
-  toolCalls: number;
   ttftMs: number;
 }
 
@@ -192,13 +182,6 @@ function numberSlugs(text: string) {
   return { articles, numbered };
 }
 
-/** The guide's availability notes, navigation map and limits: every path a reply may use. */
-const GUIDE_MAP = {
-  content: PRODUCT_GUIDE.slice(0, PRODUCT_GUIDE.indexOf("\n## Articles")),
-  title: "Navigation map",
-  url: new URL("/docs", HELP_CENTER_BASE_URL).toString(),
-};
-
 /** One article's section of the guide: its heading line to the next heading. */
 function guideSection(slug: string): string {
   const start = PRODUCT_GUIDE.indexOf(`{slug: ${slug}}\n`);
@@ -209,24 +192,6 @@ function guideSection(slug: string): string {
   const end = PRODUCT_GUIDE.indexOf("\n#", start);
   return PRODUCT_GUIDE.slice(from, end < 0 ? undefined : end).trim();
 }
-
-const readArticle = tool({
-  description:
-    "Read one Acquisity help-center article in full by the slug the guide gives it.",
-  async execute({ slug }, { abortSignal }) {
-    if (!(slug in PRODUCT_GUIDE_ARTICLES)) {
-      return { error: "Only a slug from the guide can be read." };
-    }
-    const article = await getHelpArticleContent(
-      new URL(`/docs/${slug}`, HELP_CENTER_BASE_URL).toString(),
-      { signal: abortSignal }
-    );
-    return "error" in article
-      ? { error: "That article could not be read." }
-      : { content: article.content.slice(0, MAX_ARTICLE_CHARS) };
-  },
-  inputSchema: z.object({ slug: z.string().max(300) }),
-});
 
 const GET_HERE_LABEL = /\bGet here:\s*/giu;
 // Only "the guide says / covers": a blanket swap also renamed places in the app "the help center" (round 3).
@@ -258,7 +223,6 @@ export const defaultChatDeps: ChatDeps = {
   async generate({ messages, signal }) {
     const model =
       process.env.WIDGET_CHAT_MODEL ?? (await resolveModel("kbChat"));
-    const withTool = process.env.WIDGET_CHAT_TOOL === "1";
     const startedAt = Date.now();
     let ttftMs = -1;
     const options = fastCallOptions(model);
@@ -269,7 +233,7 @@ export const defaultChatDeps: ChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: withTool ? `${CHAT_PROMPT}\n\n${TOOL_RULE}` : CHAT_PROMPT,
+          content: CHAT_PROMPT,
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -293,14 +257,6 @@ export const defaultChatDeps: ChatDeps = {
             : {}),
         },
       },
-      ...(withTool
-        ? {
-            prepareStep: ({ stepNumber }: { stepNumber: number }) =>
-              stepNumber >= 1 ? { activeTools: [] } : undefined,
-            stopWhen: isStepCount(2),
-            tools: { read_help_article: readArticle },
-          }
-        : {}),
     });
     let text = "";
     for await (const delta of result.textStream) {
@@ -310,13 +266,11 @@ export const defaultChatDeps: ChatDeps = {
       text += delta;
     }
     const usage = await result.totalUsage;
-    const steps = await result.steps;
     return {
       cachedTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
       inputTokens: usage.inputTokens ?? 0,
       model,
       text,
-      toolCalls: steps.reduce((sum, step) => sum + step.toolCalls.length, 0),
       ttftMs,
     };
   },
@@ -351,31 +305,13 @@ export async function answerFromGuide(
     const { articles, numbered } = numberSlugs(
       customerWords(attempt.text.slice(0, MAX_ANSWER_CHARS * 2))
     );
-    // WIDGET_CHAT_GROUND=1: the help-center lane's check, against the guide
-    // sections the reply cites plus the guide's navigation map, trims
-    // unsupported claims before it is sent.
-    const checked =
-      process.env.WIDGET_CHAT_GROUND === "1" && numbered.trim()
-        ? await grounded(
-            numbered,
-            renderTranscript(ask),
-            [...articles, GUIDE_MAP],
-            reader,
-            scoped,
-            defaultKbDeps,
-            log
-          )
-        : { replaced: false, reply: numbered };
-    const answer = resolveCitations(
-      checked.reply,
-      checked.replaced ? [] : articles
-    );
+    const answer = resolveCitations(numbered, articles);
     if (!answer.message) {
       throw new Error("empty_reply");
     }
     logOpsEvent("widget.chat.answer", {
       ...log,
-      message: `model=${attempt.model} ttft=${attempt.ttftMs} ms=${Date.now() - startedAt} in=${attempt.inputTokens} cached=${attempt.cachedTokens} tools=${attempt.toolCalls} citations=${answer.citations.length}`,
+      message: `model=${attempt.model} ttft=${attempt.ttftMs} ms=${Date.now() - startedAt} in=${attempt.inputTokens} cached=${attempt.cachedTokens} citations=${answer.citations.length}`,
       outcome: answer.citations.length > 0 ? "ok" : "uncited",
     });
     return answer;

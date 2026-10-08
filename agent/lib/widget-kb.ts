@@ -830,7 +830,7 @@ function withSources(
  * The writer's reply after the check. It trims, never blocks: a check that
  * fails, times out or comes back empty sends the writer's reply as written.
  */
-export async function grounded(
+async function grounded(
   reply: string,
   question: string,
   articles: KbArticle[],
