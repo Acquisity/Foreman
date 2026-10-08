@@ -6,6 +6,7 @@ import {
   answeredLane,
   type GradedRun,
   gradeRun,
+  repeatsPreviousReply,
   replayAssessment,
   stepUsage,
   unrecordedReads,
@@ -348,4 +349,33 @@ test("replay assessment fails uncovered leaks and raw fields while keeping them 
       rawFields: grades.rawFields,
     });
   }
+});
+
+test("a reply that repeats the previous one fails, ignoring case, spacing and punctuation", () => {
+  const conversation = {
+    ...recorded,
+    question:
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nStill same day.\n\nEARLIER TURNS (context):\nCustomer: Why same day?\nSupport: Open the campaign.\nGo to Sequences, then edit the delay.",
+  };
+  assert.equal(
+    gradeRun(
+      run({
+        message: "open the campaign. Go to sequences then edit the delay!",
+      }),
+      conversation
+    ).repeat,
+    "fail"
+  );
+  assert.equal(
+    repeatsPreviousReply("Your delay is saved as 3 days.", conversation),
+    "pass"
+  );
+  assert.equal(repeatsPreviousReply(null, conversation), "pass");
+  assert.equal(
+    repeatsPreviousReply("Open the campaign.", {
+      ...recorded,
+      question: "Why same day?",
+    }),
+    "not set"
+  );
 });

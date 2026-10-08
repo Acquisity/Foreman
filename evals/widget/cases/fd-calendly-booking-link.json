@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Answers whether a Calendly booking link can be used as the campaign's meeting link, or says plainly that it does not know, instead of asking which feature."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ncan I use a calendly booking link?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Hey I just bought domains and emails, I'm on pro now. I'm trying to set up my email campaign to launch and get bookings for my sales reps calendar?  What's next?  Where do I include my booking link?\nSupport: 1. In the left sidebar, click Settings, then click Conferencing.\n2. Under Meeting Link Type, select either Static meeting link or Dynamic meeting links.\n3. Complete the setup for your chosen link type, such as pasting your link in the Meeting Link input or connecting your Zoom account, and click Save.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb_miss",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

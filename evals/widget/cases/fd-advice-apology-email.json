@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Refers the customer, in a friendly way, to the AI Consultant (the Chat toggle at the top of the left sidebar) for this, and gives no advice or copy of its own."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nhow can I write an apology email to let everyone know that is not Name 1 the podcast host but its me Name 2 the co-host and partner founder\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how do I put myself as podcast host instead of Name 1\nSupport: 1. In the left sidebar, click Marketing, then Cold Email Agent, and click Email Accounts at the top of the page.\n2. Find the account in the table and click on its row to open the settings panel on the right side of the screen.\n3. Edit the First Name and Last Name fields to your name.\n4. Click the Save button.\n\nAll future emails from that inbox will use your name. If you manage multiple inboxes, you'll need to repeat this for each inbox.\nCustomer: there is no marketing on the left side bar only outreach\nSupport: I could not find a help-center article for that, so could you please share a screenshot so I can find the right guide?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb_miss",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

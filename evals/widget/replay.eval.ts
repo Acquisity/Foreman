@@ -8,7 +8,11 @@ import {
 } from "eve/evals";
 import { equals, satisfies } from "eve/evals/expect";
 import { verifiedWidgetContext as fixture } from "#lib/widget.fixture.js";
-import { type WidgetCase, widgetCaseSchema } from "#lib/widget-case.js";
+import {
+  toRequest,
+  type WidgetCase,
+  widgetCaseSchema,
+} from "#lib/widget-case.js";
 import {
   answeredLane,
   gradeRun,
@@ -17,6 +21,7 @@ import {
   unrecordedReads,
 } from "#lib/widget-graders.js";
 import {
+  citedArticles,
   claimsFor,
   JUDGE_OUTPUT,
   judgeAnswer,
@@ -27,42 +32,10 @@ import { replayRecording } from "#lib/widget-replay.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
 import { SERVICE_SECRET_HEADER } from "#lib/widget-service-secret.js";
 
-const LATEST = "LATEST CUSTOMER MESSAGE (the one to work on):\n";
-const EARLIER = "\n\nEARLIER TURNS (";
-const TURN = /^(Customer|Support): /u;
 const POLL_MS = 3000;
 const DEADLINE_MS = 300_000;
 /** One review directory per eval invocation, shared by every case in it. */
 const REVIEW_DIR = `${JUDGE_OUTPUT}/${new Date().toISOString().replace(/[:.]/g, "-")}`;
-
-/** A recorded question is the router's rendering; split it back into the message and its earlier turns. */
-function toRequest(question: string) {
-  if (!question.startsWith(LATEST)) {
-    return { question };
-  }
-  const cut = question.indexOf(EARLIER);
-  const latest = question.slice(LATEST.length, cut < 0 ? undefined : cut);
-  const history: { role: "assistant" | "customer"; text: string }[] = [];
-  const lines =
-    cut < 0
-      ? []
-      : question.slice(question.indexOf("\n", cut + 2) + 1).split("\n");
-  for (const line of lines) {
-    const role = TURN.exec(line)?.[1];
-    if (role) {
-      history.push({
-        role: role === "Customer" ? "customer" : "assistant",
-        text: line.slice(role.length + 2),
-      });
-    } else {
-      const last = history.at(-1);
-      if (last) {
-        last.text += `\n${line}`;
-      }
-    }
-  }
-  return { history, question: latest };
-}
 
 // WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
 export default readdirSync("evals/widget/cases")
@@ -227,7 +200,7 @@ async function gradeReplay(
       .soft();
     return;
   }
-  await judgeClaims(t, run.outcome?.message ?? null, recorded, path);
+  await judgeClaims(t, run, recorded, path);
   if (!session) {
     t.log("No investigation session: the front door answered.");
     return;
@@ -241,17 +214,30 @@ async function gradeReplay(
  */
 async function judgeClaims(
   t: EveEvalContext,
-  answer: string | null,
+  run: WidgetRun,
   recorded: WidgetCase,
   path: string
 ) {
+  const answer = run.outcome?.message;
   if (!answer) {
     return;
   }
   const claims = claimsFor(recorded);
   let verdicts: Awaited<ReturnType<typeof judgeAnswer>>;
   try {
-    verdicts = await judgeAnswer(recorded, answer, claims, t.signal);
+    // The judge reads the articles live, like the front door did.
+    const articles = await citedArticles(
+      (run.outcome?.citations ?? []).map(({ url }) => url),
+      { signal: t.signal }
+    );
+    verdicts = await judgeAnswer(
+      recorded,
+      answer,
+      claims,
+      t.signal,
+      undefined,
+      articles
+    );
   } catch (error) {
     t.log(`judge failed: ${String(error).slice(0, 300)}`);
     t.check(

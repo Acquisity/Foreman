@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Answers whether the automatic lead cleanup can be turned off, or says plainly that it does not know, instead of asking which feature or page."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "is there a way to turn of the automatic cleanup for my leads.  I do not want my leads removed unless I do it",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb_miss",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

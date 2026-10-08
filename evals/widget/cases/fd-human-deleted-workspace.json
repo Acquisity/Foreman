@@ -1,0 +1,27 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": ["Hands the conversation to a person right away."],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "block",
+    "lane": "human",
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ncan i speak with a human\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I WAS TRYING to reset the onboarding for the workspace and i deleted the entire workspace. i lost the domains i bought, i lost my campaigns. this was also a legacy workspace for $1 / month and now its charging me\nSupport: I understand how stressful this must feel, especially after putting work into those campaigns. I have reported this to the engineering team as a ticket.\n\nHere's what your records show: on 2026-10-07, two charges went through successfully, a $1 subscription update and a $42 subscription creation covering 1 domain and 3 inboxes. A provisioning order from that same day shows 1 domain and 3 inboxes as active, matching that $42 charge. Neither charge has a refund recorded.\n\nThere's no record tying that order to the workspace-reset action, so whether the reset itself caused the workspace deletion or triggered the new charge isn't something that can be confirmed. Whether your previously purchased domains or campaigns are still recoverable in any form also isn't something that was checked, so I can't tell you either way right now.\n\nI'm not able to promise a refund, a specific amount, or a timeline here. If you can share the exact plan name and the domains or campaigns you had before the reset, that would help pin down exactly what's missing.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "asked_for_human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

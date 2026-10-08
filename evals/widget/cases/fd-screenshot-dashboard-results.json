@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Explains where to see the campaign's results, given that the dashboard in the screenshot shows no data.",
+      "Does not repeat the earlier two-step Dashboard reply."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nthis is what it shows\n\n[Screenshot the customer attached, as read by an image model]\nScreen: Acquisity Dashboard\nWhat stands out: Dashboard widgets ('New People' and 'All Appointments') display 0 with no data, and the 'Appointments Over Time' chart displays 'No data available'. An Acquisity Foreman helper chat window is open on the right side of the screen.\nCould not read: Some partially cut-off text on the far right edges of the chat window.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: person-1@domain-1.example\nWed, Sep 30, 3:56\u202fAM (5 days ago)\nto me\n\nHey Name 1,\n\nWe noticed that your email account has been disconnected from the system, which means your campaign is currently unable to send emails.\n\nPlease reconnect your email account by going to the Outreach section here:\nhttps://domain-3.example/outreach\n\nOnce it\u2019s reconnected, please post a message in the Done For You channel in the community. Our team will then restart your campaign for you.\n\nIf you have any questions or run into any issues, feel free to reach out in the community, and someone from our team will assist you as soon as possible.  \n\nRegards,\nName 3\nSupport: It looks like your email account was disconnected from the system, which is why your campaign stopped sending. To get your sending account reconnected, click on the account to open its settings, then click Reconnect.\nCustomer: IT has been reconnected\nSupport: That is great to hear! Let me know if you need help with anything else.\nCustomer: I see the emails being sent\nSupport: That's good to hear, and glad to see emails going out again.\n\nFor keeping an eye on things going forward, you can check your sending account status directly in the Outreach section of the product. Right now, no problem is recorded against your account, but I should be upfront that our records don't show any active sending accounts or campaigns for this workspace at the moment. If emails stop again or something looks off, let us know with specifics so we can take a closer look.\nCustomer: I want to see the results of the campaign on my dashboard\n\nName 2 <person-2@domain-1.example>\nMon, Aug 24, 12:23\u202fPM\nto me\n\nHi Name 1,\n\nHope you\u2019re well - how are you doing?\n\nI wanted to share some great news with you - on our Onboarding Strategy session together we selected the cost-effective outreach method for you, utilising LinkedIn instead of cold email to reach your first prospects and generate your first deal.\n\nI\u2019ve been speaking to my Director, Name 4, about you specifically and we want to really ensure we set you up for success.\n\nSo, we\u2019re building an email outreach tool specifically for you. It won\u2019t cost you a cent to use, and we will be able to set up an email outreach campaign for you as part of your Done-For-You deliverables. How great is that? \n\nWe\u2019re putting the finishing touches to the build today and tomorrow, and then we\u2019ll jump on a call and set that up together. All you will need is a (free) gmail email address. If you don\u2019t have one yet, head to domain-5.example and set one up in your name.\n\nEven more exciting is that you will still be able to run the LinkedIn outreach we discussed as well - this will essentially double the amount of outreach messages you are able to send. Meaning you can contact twice as many leads at once (don\u2019t worry - your free 1000 leads will cover this). But more outreach means a faster path to deal 1.\n\nJust wanted to share the news, and let you know I\u2019ll be in touch midweek once the system is ready for you and we can get that live and sending.\n\nExciting!\n\nSpeak soon,\nName 2\nSupport: 1. Click Dashboard in the left menu.\n2. The page loads with your numbers.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

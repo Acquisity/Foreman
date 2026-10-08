@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Confirms the screenshot came through and says briefly what the screen shows.",
+      "Asks what they want to do there, or gives the next step, without inventing a problem."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n(The customer sent only the screenshot below, with no message. Their last message was \"hi. test if this shows\" and the screenshot most likely shows where they are while they continue that. Answer the next step of that from where the screenshot shows they are, then mention anything notable on screen, such as a warning, in one short sentence so they can resolve it. If that message does not say what they were doing, such as a greeting, explain what the screenshot shows instead.)\n\n[Screenshot the customer attached, as read by an image model]\nScreen: Admin Panel Users management list\nWhat stands out: The 'Users' option in the sidebar is highlighted. Multiple rows show as 'Unassigned' in the Assigned To column.\nCould not read: The full name of 'Demo Workspaces (A...' is truncated.; The text of the last filter button on the far right starting with '+ La...' is cut off.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: hi. test if this shows\nSupport: Loud and clear! What can I help you with today?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}
