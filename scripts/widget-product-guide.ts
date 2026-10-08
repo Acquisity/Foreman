@@ -25,6 +25,7 @@ import { join, relative } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
+import { assertGuideSections } from "../agent/lib/widget-guide-validation.js";
 
 const MODEL = "anthropic/claude-sonnet-5";
 /** The limits pass only collects what the distilled guide already says. */
@@ -455,6 +456,7 @@ const body = lines
 const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
+assertGuideSections(body, slugs);
 const limits = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
 const availability = AVAILABILITY.map((line) => `- ${line}`).join("\n");
 const guide = `# Acquisity product guide
@@ -481,6 +483,8 @@ const vendors = plain.match(VENDOR_LEFT) ?? [];
 if (vendors.length) {
   throw new Error(`vendor names left in the guide: ${vendors.join(", ")}`);
 }
+
+assertGuideSections(plain, slugs);
 
 const escaped = plain
   .replace(/\\/gu, "\\\\")
