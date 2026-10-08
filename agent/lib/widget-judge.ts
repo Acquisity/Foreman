@@ -156,8 +156,12 @@ const WIDGET_AFFORDANCES = [
   'The "Report a problem" link.',
 ];
 
-/** Bounded like the KB lane's article read. */
-const MAX_ARTICLE_CHARS = 8000;
+/**
+ * Every help-center article fits whole (the longest was 17,297 characters on
+ * 2026-10-08). At 8,000 the judge flagged true facts that sat past the cut in
+ * the very article a reply cited (ENG-14932 round 3).
+ */
+const MAX_ARTICLE_CHARS = 40_000;
 
 export interface CitedArticle {
   content: string;
@@ -192,6 +196,9 @@ function localArticle(url: string, docs: string) {
 /**
  * The text of each cited help-center article; an unreadable one is left out.
  * Live from the help center unless WIDGET_JUDGE_DOCS names a local docs folder.
+ * WIDGET_JUDGE_NAV names a file holding the app's navigation as checked in the
+ * real app (the product guide's sidebar map); it is added as one more source,
+ * so a path it supports is not counted as invented.
  */
 export async function citedArticles(
   urls: readonly string[],
@@ -203,11 +210,23 @@ export async function citedArticles(
       docs ? localArticle(url, docs) : getHelpArticleContent(url, opts)
     )
   );
-  return read.flatMap((article) =>
-    "error" in article
-      ? []
-      : [{ ...article, content: article.content.slice(0, MAX_ARTICLE_CHARS) }]
-  );
+  const nav = process.env.WIDGET_JUDGE_NAV;
+  return [
+    ...read.flatMap((article) =>
+      "error" in article
+        ? []
+        : [{ ...article, content: article.content.slice(0, MAX_ARTICLE_CHARS) }]
+    ),
+    ...(nav
+      ? [
+          {
+            content: readFileSync(nav, "utf8").slice(0, MAX_ARTICLE_CHARS),
+            title: "App navigation (sidebar and menus)",
+            url: "/docs",
+          },
+        ]
+      : []),
+  ];
 }
 
 /** The judge's user message: the answer, its claims and every piece of evidence it may rely on. */

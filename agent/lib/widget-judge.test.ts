@@ -462,7 +462,7 @@ test("a cited run's judge input carries the cited article text and the widget af
         return Promise.resolve({
           json: () =>
             Promise.resolve({
-              content: `Click Add New Inboxes.${"x".repeat(9000)}`,
+              content: `Click Add New Inboxes.${"x".repeat(41_000)}`,
               title: "Add mailboxes",
               url,
             }),
@@ -485,7 +485,7 @@ test("a cited run's judge input carries the cited article text and the widget af
   assert.ok(
     input.citedArticles[0].content.startsWith("Click Add New Inboxes.")
   );
-  assert.equal(input.citedArticles[0].content.length, 8000);
+  assert.equal(input.citedArticles[0].content.length, 40_000);
   assert.ok(
     input.widgetAffordances.some((line: string) =>
       line.includes("magnifying glass")
@@ -525,5 +525,27 @@ test("WIDGET_JUDGE_DOCS reads cited articles from a local docs folder instead of
     ]);
   } finally {
     delete process.env.WIDGET_JUDGE_DOCS;
+  }
+});
+
+test("WIDGET_JUDGE_NAV adds the app's navigation as one more source, cited or not", async () => {
+  const dir = mkdtempSync(`${tmpdir()}/judge-nav-`);
+  writeFileSync(
+    `${dir}/nav.txt`,
+    'Under the "Outreach" heading: "Cold Email Agent"'
+  );
+  process.env.WIDGET_JUDGE_DOCS = dir;
+  process.env.WIDGET_JUDGE_NAV = `${dir}/nav.txt`;
+  try {
+    assert.deepEqual(await citedArticles([]), [
+      {
+        content: 'Under the "Outreach" heading: "Cold Email Agent"',
+        title: "App navigation (sidebar and menus)",
+        url: "/docs",
+      },
+    ]);
+  } finally {
+    delete process.env.WIDGET_JUDGE_DOCS;
+    delete process.env.WIDGET_JUDGE_NAV;
   }
 });

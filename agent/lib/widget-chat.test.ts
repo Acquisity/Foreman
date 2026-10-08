@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   answerFromGuide,
   chatMessages,
+  customerWords,
   guideCitations,
 } from "./widget-chat.js";
 
@@ -58,4 +59,13 @@ test("a failed model call is a short ask to send again", async () => {
   );
   assert.equal(answer.citations.length, 0);
   assert.match(answer.message, TRY_AGAIN);
+});
+
+test("the guide's own words never reach the customer", () => {
+  assert.equal(
+    customerWords(
+      'Get here: In the left sidebar, click "Workflows". The guide says so; see the product guide.'
+    ),
+    'In the left sidebar, click "Workflows". The help center says so; see the help center.'
+  );
 });

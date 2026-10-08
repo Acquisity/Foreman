@@ -18,7 +18,7 @@ The 40 `fd-` cases come from every customer widget run created from 2026-10-02 t
 
 Claims come from the customer's need, never from any reply. Advice, strategy, copywriting and copy-review asks expect a friendly referral to the AI Consultant (the Chat toggle at the top of the left sidebar) and no advice or copy (Aaron, 2026-10-07). An explicit ask for a person expects `lane: "human"`, which the lane grader checks; other front-door cases leave `lane` unset, since which writer answers is not the expectation. Every judged answer also gets the `invented` claim (no invented product fact or promise), and a case with earlier turns gets `reask` (no re-asked detail) and `context` (answers the latest message). The `repeat` grader fails a reply that matches the previous assistant turn after lowercasing and dropping punctuation and spacing.
 
-The judge reads each cited article live from the help center. `WIDGET_JUDGE_DOCS=<checkout>/apps/web/content/docs` makes it read the same slugs from a local docs tree instead, for judging against docs that have not shipped yet (ENG-14932 judges against Acquisity PR 6965, the docs the product guide is built from).
+The judge reads each cited article live from the help center. `WIDGET_JUDGE_DOCS=<checkout>/apps/web/content/docs` makes it read the same slugs from a local docs tree instead, for judging against docs that have not shipped yet (ENG-14932 judges against Acquisity PR 6965, the docs the product guide is built from). `WIDGET_JUDGE_NAV=<file>` adds the app's navigation (the product guide's "## Navigation" section, checked in the real app) as one more source on every reply, so a sidebar or menu path it supports is not counted as invented (ENG-14932 round 3, Aaron 2026-10-08).
 
 ## Decisions awaiting Aaron
 

@@ -62,12 +62,15 @@ const AVAILABILITY = [
 ];
 
 /**
- * Places the sidebar catalog does not list, as the docs at the same ref
- * describe them (workspace-settings, support and ai-consultant articles).
+ * Places the sidebar catalog does not list, checked in the app as an owner on
+ * 2026-10-08 (ENG-14932 round 3) and in the shell's menu components.
  */
 const ENTRY_POINTS = [
-  '"Settings": click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Workspace" and "Personal".',
-  'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources" and "Log out".',
+  '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Personal" and "Workspace".',
+  'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
+  'Workspace menu: click the workspace name in the top-left corner. It lists your workspaces, then "New Workspace", "Settings" and "Sign Out".',
+  'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources", "Toggle theme", "Edit sidebar" and "Log out".',
+  'Bottom of the sidebar, above "Settings": the "Credits" card with "Add credits", then "What\'s New" and "Help Center".',
   'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar.',
 ];
 
@@ -161,7 +164,7 @@ function sidebar(source: string): string {
     .join("\n");
 }
 
-const SIDEBAR = `Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it; Client users see only "Client Portal".
+const SIDEBAR = `Left sidebar, top to bottom, as a new workspace has it (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it; Client users see only "Client Portal". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
 ${sidebar(git("show", `${sha}:${CATALOG}`))}
 ${ENTRY_POINTS.map((line) => `- ${line}`).join("\n")}`;
 console.log(SIDEBAR);
@@ -266,7 +269,7 @@ const DISTILL_PROMPT = `You turn Acquisity help-center articles into sections of
 
 Cover every article in the batch, in order. For each article write a heading line exactly like this, using the article's own title and slug as given:
 ### <title> {slug: <slug>}
-then one line "Get here: <path>" giving how a customer reaches, inside the Acquisity app, the page or feature the article is about, then the article's facts as short lines or bullets. Every article gets this line, FAQ and overview pages included. The path is a path only: it stops at the page, and the steps go below it. It is never the help center's own sections or page titles ("Getting Started", "FAQ"). Write the path the way the article does when it gives one ("In the left sidebar, click "Cold Email Agent", then "Email Accounts""); when it gives none, build it from the sidebar and entry points below, which are the product's real navigation, starting from the sidebar page or entry point. Never put a sidebar heading in a path as something to click. Use only labels the article or the sidebar list gives; when neither places the feature, write "Get here: not stated". When an article adds nothing beyond another article in this batch, write only its heading and one line naming that slug.
+then one line "Get here: <path>" giving how a customer reaches, inside the Acquisity app, the page or feature the article is about, then the article's facts as short lines or bullets. Every article gets this line, FAQ and overview pages included. The path is a path only: it stops at the page, and the steps go below it. It is never the help center's own sections or page titles ("Getting Started", "FAQ"). Write the path the way the article does when it gives one ("In the left sidebar, click "Cold Email Agent", then "Email Accounts""); when it gives none, build it from the sidebar and entry points below, which are the product's real navigation, starting from the sidebar page or entry point. Never put a sidebar heading in a path as something to click. Use only labels the article or the sidebar list gives, each in double quotes; never a slug, an article title or "see" another section. When neither places the feature, write exactly "Get here: not stated" with nothing after it. When an article adds nothing beyond another article in this batch, write only its heading and one line naming that slug.
 
 Keep, in this order of importance:
 1. Where things are: every navigation path, page, tab, menu, button, field, toggle and setting name. Copy each UI label exactly as the article writes it, with its capitalisation, in double quotes, and write paths as "Settings" > "Members". Never paraphrase or invent a label.
@@ -385,22 +388,45 @@ const linked = sections
       : `{slug: ${matches[0]}}`;
   });
 /**
- * Each section keeps its own "Get here:" line; a section without one, or
- * whose article placed nothing, takes its nearest parent article's line, and
- * a sidebar heading written as a click is dropped from the path.
+ * Each section keeps its own "Get here:" line when it is a usable path: it
+ * quotes at least one label, every quoted label appears in the article or the
+ * navigation above, and it names no help-center section. Otherwise the section
+ * takes its nearest parent article's line, or none. A sidebar heading written
+ * as a click is dropped from the path.
  */
 const HEADING_ONLY = /"(Client Access|Outreach|Build|Go To Market)" > /gu;
 const SECTION_HEAD = /^### .*\{slug: ([^}]+)\}$/u;
 const GET_HERE = /^Get here: (.*)$/u;
-const NOT_STATED = /^not stated\.?$/iu;
+const QUOTED = /"([^"]+)"/gu;
+const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
+/** The two entry points that have no label to quote. */
+const UNLABELLED = /\bworkspace name\b|\byour name at the bottom\b/iu;
+const HELP_CENTER_PATH =
+  /\bnot stated\b|\bFAQ\b|\bhelp center\b|"Getting Started"|\bsee (?:the )?\S+ section\b/iu;
+const sourceText = new Map(available.map((a) => [a.slug, a.text]));
+const usablePath = (slug: string, path: string): boolean => {
+  const labels = [...path.matchAll(QUOTED)].map((m) =>
+    m[1].replace(LABEL_EDGE, "")
+  );
+  const source = `${sourceText.get(slug) ?? ""}\n${SIDEBAR}`;
+  return (
+    (labels.length > 0 || UNLABELLED.test(path)) &&
+    !HELP_CENTER_PATH.test(path) &&
+    labels.every((label) => source.includes(label))
+  );
+};
 const lines = linked.split("\n");
 const paths = new Map<string, string>();
 let current = "";
+let dropped = 0;
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
-  const path = line.match(GET_HERE)?.[1];
-  if (path && !NOT_STATED.test(path)) {
-    paths.set(current, path.replace(HEADING_ONLY, ""));
+  const path = line.match(GET_HERE)?.[1]?.replace(HEADING_ONLY, "");
+  if (path && usablePath(current, path)) {
+    paths.set(current, path);
+  } else if (path) {
+    dropped += 1;
+    console.log(`  rejected ${current}: ${path}`);
   }
 }
 const inherited = (slug: string): string | undefined => {
@@ -413,15 +439,15 @@ const inherited = (slug: string): string | undefined => {
 };
 const body = lines
   .flatMap((line) => {
-    const path = line.match(GET_HERE)?.[1];
-    if (path) {
-      return NOT_STATED.test(path)
-        ? []
-        : [`Get here: ${path.replace(HEADING_ONLY, "")}`];
+    if (GET_HERE.test(line)) {
+      return [];
     }
     const slug = line.match(SECTION_HEAD)?.[1];
-    const fallback = slug && !paths.has(slug) && inherited(slug);
-    return fallback ? [line, `Get here: ${fallback}`] : [line];
+    if (!slug) {
+      return [line];
+    }
+    const path = paths.get(slug) ?? inherited(slug);
+    return path ? [line, `Get here: ${path}`] : [line];
   })
   .join("\n");
 const headed = new Set(
@@ -465,5 +491,5 @@ writeFileSync(
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(
-  `get_here=${getHere} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
