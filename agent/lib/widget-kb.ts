@@ -183,8 +183,18 @@ const indexSchema = z.array(
 );
 type KbIndex = z.infer<typeof indexSchema>;
 
+// Fin's rerank stage (ENG-14932): each pick says whether it answers the
+// question itself or only sits next to it, and only direct picks are read.
+// Related ones are what the writer blended into wrong menu paths.
 const selectSchema = z.object({
-  articles: z.array(z.number().int()).max(MAX_ARTICLES),
+  articles: z
+    .array(
+      z.object({
+        fit: z.enum(["direct", "related"]),
+        n: z.number().int(),
+      })
+    )
+    .max(MAX_ARTICLES),
 });
 
 const rewriteSchema = z.object({
@@ -271,7 +281,7 @@ const groundSchema = z.object({
 // Choosing from the real list of titles beats guessing search keywords: a
 // customer asking how to "add" inboxes never matches a guide titled "Buying
 // inboxes" lexically, but a model reading both sees they are the same thing.
-export const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path): description [keywords]". Many articles share a title such as Overview or Frequently Asked Questions: tell them apart by path and description. Return the numbers of up to ${MAX_ARTICLES} articles most likely to contain the answer, best first. Prefer a specific how-to guide over an index, overview or FAQ listing page. Choose AI Consultant articles only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance; otherwise do not select them. Return an empty list if nothing fits.`;
+export const SELECT_PROMPT = `You pick help-center articles for a customer's support question. ${LATEST_SUBJECT} You are given the full numbered list of articles as "number. title (path): description [keywords]". Many articles share a title such as Overview or Frequently Asked Questions: tell them apart by path and description. Return up to ${MAX_ARTICLES} articles most likely to contain the answer, best first, each with its number and its fit: direct when the article itself is about what the customer asks (the same feature, page, setting or task), related when it is about a neighbouring feature, page or setting that does not answer the question itself. When the conversation lists articles the previous reply cited, pick them again only when they are still direct for the latest message. Prefer a specific how-to guide over an index, overview or FAQ listing page. Choose AI Consultant articles only when the customer asks you to give advice or strategy, write or review their copy, or assess their campaign performance; otherwise do not select them. Return an empty list if nothing fits.`;
 
 // The help-center search is lexical and matches short keyword queries against
 // article titles. A whole conversational sentence ranks on its filler words
@@ -606,23 +616,43 @@ async function findArticles(
   question: string,
   signal: AbortSignal,
   deps: KbDeps,
-  images?: KbImage[]
+  images?: KbImage[],
+  cited: string[] = []
 ): Promise<{ hits: { title: string; url: string }[]; via: string }> {
   try {
     const index = await deps.index(signal);
     if (index) {
-      const { articles } = selectSchema.parse(
-        await deps.select({ images, index, question, signal })
+      const citedNumbers = index.flatMap((article, n) =>
+        cited.includes(article.id) ? [n + 1] : []
       );
-      const hits = [...new Set(articles)]
+      const { articles } = selectSchema.parse(
+        await deps.select({
+          images,
+          index,
+          question: citedNumbers.length
+            ? `${question}\n\nArticles the previous reply cited: ${citedNumbers.join(", ")}`
+            : question,
+          signal,
+        })
+      );
+      const direct = [
+        ...new Set(
+          articles.filter((pick) => pick.fit === "direct").map((pick) => pick.n)
+        ),
+      ]
         .map((n) => index[n - 1])
         .filter((article) => article !== undefined)
         .map((article) => ({
           title: article.title,
           url: new URL(`/docs/${article.id}`, HELP_CENTER_BASE_URL).toString(),
         }));
-      if (hits.length > 0) {
-        return { hits, via: "index" };
+      // Picks that are all related mean nothing answers it: the writer gets no
+      // articles and says it is not sure. Only an empty pick searches instead.
+      if (articles.length > 0) {
+        return {
+          hits: direct,
+          via: `index:${direct.length}/${articles.length}`,
+        };
       }
     }
   } catch {
@@ -878,11 +908,23 @@ export async function answerFromHelpCenter(
     // so the latest message outweighs the earlier citation.
     const [active, { hits: fresh, via }] = await Promise.all([
       activeArticleHits(ask, signal, deps),
-      findArticles(question, signal, deps, images),
+      findArticles(
+        question,
+        signal,
+        deps,
+        images,
+        (ask.activeArticles ?? []).flatMap(
+          (article) => helpArticleSlug(article.url) ?? []
+        )
+      ),
     ]);
-    const kept = active
-      .filter((hit) => !fresh.some((found) => found.url === hit.url))
-      .slice(0, MAX_ACTIVE_ARTICLES);
+    // With the index, a previous citation reaches the writer only when the
+    // selector picked it again as direct; keyword search still carries it over.
+    const kept = via.startsWith("index")
+      ? []
+      : active
+          .filter((hit) => !fresh.some((found) => found.url === hit.url))
+          .slice(0, MAX_ACTIVE_ARTICLES);
     const picked = fresh.slice(0, MAX_ARTICLES - kept.length);
     mark(`active=${kept.length} find:${via}`);
     const articles = (

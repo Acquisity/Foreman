@@ -328,7 +328,10 @@ test("articles are picked from the title index, with keyword search only as the 
       return Promise.resolve({ content: "body", title: "Buying inboxes", url });
     },
     search: () => assert.fail("must not search when the index answers"),
-    select: () => Promise.resolve({ articles: [2, 2, 99] }),
+    select: () =>
+      Promise.resolve({
+        articles: [2, 2, 99].map((n) => ({ fit: "direct", n })),
+      }),
   };
   const result = await answerFromHelpCenter(
     "how do i add inboxes?",
@@ -355,6 +358,57 @@ test("articles are picked from the title index, with keyword search only as the 
     });
     assert.equal(fallback.citations[0].title, "Setup");
   }
+});
+
+test("only articles the selector marks direct reach the writer, previous citations included", async () => {
+  const index = [
+    { id: "ai-sdr/setup", title: "Setup" },
+    { id: "ai-sdr/settings", title: "Settings" },
+    { id: "availability", title: "Availability" },
+  ];
+  const run = async (
+    picks: { fit: string; n: number }[],
+    activeArticles: { title: string; url: string }[] = []
+  ) => {
+    const selected: string[] = [];
+    const given: string[][] = [];
+    await answerFromHelpCenter(
+      { activeArticles, latest: "where do i set the ai sdr calendar?" },
+      log,
+      {
+        ...deps({ reply: "I'm not sure.", sources: [] }),
+        generate: ({ articles: read }) => {
+          given.push(read.map((article) => article.title));
+          return Promise.resolve({ reply: "I'm not sure.", sources: [] });
+        },
+        index: () => Promise.resolve(index),
+        search: () =>
+          assert.fail("a pick that found only related articles never searches"),
+        select: ({ question }) => {
+          selected.push(question);
+          return Promise.resolve({ articles: picks });
+        },
+      }
+    );
+    return { given: given[0], selected: selected[0] };
+  };
+  assert.deepEqual(
+    (
+      await run([
+        { fit: "direct", n: 3 },
+        { fit: "related", n: 1 },
+      ])
+    ).given,
+    ["Availability"]
+  );
+  assert.deepEqual((await run([{ fit: "related", n: 2 }])).given, []);
+  // The previous citation is named to the selector and read only if picked direct again.
+  const cited = await run(
+    [{ fit: "related", n: 2 }],
+    [{ title: "Settings", url: articles[1].url }]
+  );
+  assert.deepEqual(cited.given, []);
+  assert.ok(cited.selected.endsWith("Articles the previous reply cited: 2"));
 });
 
 test("a reaction gets a short conversational reply with no citations, not an investigation", async () => {
@@ -598,7 +652,7 @@ test("the selector and the writer look at the screenshots; without them, a load 
         Promise.resolve([{ id: "ai-sdr/setup", title: "Email accounts" }]),
       select: (input) => {
         record.select = input.images?.length ?? 0;
-        return Promise.resolve({ articles: [1] });
+        return Promise.resolve({ articles: [{ fit: "direct", n: 1 }] });
       },
     });
   };
