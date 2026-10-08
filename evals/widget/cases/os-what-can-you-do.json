@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Says in plain words what it can help with: explaining how Acquisity works, where things are, step-by-step setup and troubleshooting.",
+      "Does not claim it can see or change the customer's account, and invites a question."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "what can you do?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "chat",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

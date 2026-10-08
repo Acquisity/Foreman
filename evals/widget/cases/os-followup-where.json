@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Tells the customer how to get to the Email Accounts page the previous reply mentioned.",
+      "Does not ask which page they mean."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nwhere is that page again?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how do i see if my inboxes are healthy\nSupport: Each inbox has a health score you can check on the Email Accounts page of the Cold Email Agent. A green flame icon means warmup is going well.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -20,6 +20,9 @@ export const MODELS = {
   // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite
   // p50 1.0s, flash p50 8.7s (4 to 16s), and 4 to 39s live on the preview.
   kb: "google/gemini-3.5-flash-lite",
+  // Prototype front-door chat behind WIDGET_CHAT=guide (widget-chat.ts): one
+  // streamed reply with the whole product guide in a cached system prefix.
+  kbChat: "google/gemini-3.5-flash-lite",
   // The same answer when the customer's message carries screenshots. On the
   // #6627 preview's real conversations flash-lite answered a screenshot's
   // warning instead of the customer's request; flash followed the request.

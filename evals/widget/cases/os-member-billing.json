@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Tells the member that billing is managed by the workspace owner, so they should ask the owner.",
+      "Does not give the member steps they cannot complete."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "how do i update the credit card on our subscription?",
+  "scope": {
+    "role": "member",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "member",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Does not claim an iPhone or mobile app exists or name an app store listing; says plainly it is not sure."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "is there an iphone app for acquisity",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

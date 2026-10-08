@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Briefly acknowledges the frustration and gives the concrete steps to pause a campaign.",
+      "Does not repeat the previous vague reply."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nTHIS IS THE THIRD TIME IM ASKING. HOW DO I PAUSE MY CAMPAIGN\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how do i pause my campaign\nSupport: You can manage your campaign from the Campaigns page.\nCustomer: ok but how do i pause it\nSupport: Open the Campaigns page to manage your campaigns.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Understands the customer means connecting a calendar for the AI SDR to book meetings, and gives the steps to connect it.",
+      "Does not ask the customer to rephrase or point out the typos."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "how do i conect my calender so the ai sdr can book meetngs",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

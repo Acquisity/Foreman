@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Answers when the new inboxes can start sending, based on whether they were bought pre-warmed, without stating a warmup length the help center does not give.",
+      "Does not ask the customer to repeat what they already said."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "hey so ive been using the platform a few weeks and my first campaign went out fine. yesterday i bought 5 more inboxes because i want to send more, and now they show warming up. no rush but when will they actually be able to send?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

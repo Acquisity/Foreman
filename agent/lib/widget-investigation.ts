@@ -2,6 +2,7 @@ import type { RouteHandlerArgs, Session } from "eve/channels";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
   defaultGateDeps,
@@ -940,7 +941,27 @@ async function answerFromKnowledgeBase(
   deps: WidgetDependencies,
   helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
-  const route = await deps.route(ask, { signal });
+  const customer = {
+    canInvestigate: !helpCenterOnly,
+    role: scope.role,
+    workspace: scope.organizationName,
+  };
+  const log = { conversationId: scope.conversationId, runId: run.id };
+  // The guide prototype starts writing while the router scores the message,
+  // and is dropped when the router sends the message somewhere else.
+  const drafting = new AbortController();
+  const draft = chatGuideEnabled()
+    ? answerFromGuide(
+        { ...ask, recordingOffered: false },
+        log,
+        customer,
+        AbortSignal.any([signal, drafting.signal])
+      )
+    : null;
+  const route = await deps.route(ask, { signal }).catch((error: unknown) => {
+    drafting.abort();
+    throw error;
+  });
   logRouteDecision(
     { conversationId: scope.conversationId, runId: run.id },
     route
@@ -961,8 +982,14 @@ async function answerFromKnowledgeBase(
   // teammate why nothing was looked up.
   const handoff = requestedHumanHandoff(run, route, deps);
   if (handoff) {
+    drafting.abort();
     return handoff;
   }
+  if (draft && !(route.refund || (route.ticket && !helpCenterOnly))) {
+    const answer = await draft;
+    return reply(answer.message, "kb", answer.citations);
+  }
+  drafting.abort();
   // Refunds and owner or admin ticket requests have a fixed next step: a member
   // to their owner or admin, an owner or admin to the magnifying glass.
   if (route.refund && helpCenterOnly) {
@@ -974,13 +1001,9 @@ async function answerFromKnowledgeBase(
   const answer = await deps.answerKb(
     // Every writer is told the button does not show, so none mentions it.
     { ...ask, recordingOffered: false },
-    { conversationId: scope.conversationId, runId: run.id },
+    log,
     undefined,
-    {
-      canInvestigate: !helpCenterOnly,
-      role: scope.role,
-      workspace: scope.organizationName,
-    }
+    customer
   );
   return reply(answer.message, "kb", answer.citations);
 }
