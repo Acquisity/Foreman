@@ -176,7 +176,7 @@ const ASKS_FOR_ACTION = {
 const QUESTIONS = {
   asks_for_human: {
     instructions:
-      "The customer explicitly requests a conversation with a human support representative. Asking where to find or how to use a named product feature (such as Niche Researcher or AI SDR) is not a request for a person.",
+      "The customer explicitly requests a conversation with a human support representative, or asks for their question to be escalated or passed on to a person. Asking for a bug report or ticket for engineering is not this. Asking where to find or how to use a named product feature (such as Niche Researcher or AI SDR) is not a request for a person.",
     type: "noul",
   },
   // A refund needs a look at billing and a ticket, which only an investigation
@@ -248,6 +248,39 @@ type FetchLike = (
   }
 ) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
+/** How much of Foreman's previous reply the router reads: its end, where it asks or points. */
+const PREVIOUS_REPLY_CHARS = 2000;
+/** How much of the latest message the router reads: its start, where the ask usually is. */
+const LATEST_CHARS = 4000;
+
+/**
+ * The router's input, after Fin's feedback classifier (ENG-14932): Foreman's
+ * previous reply, then the customer's latest message as the answer to it, so
+ * "Can you escalate this?" after a reply that did not help reads as the ask it
+ * is. The other turns follow as usual, so a refund named earlier still
+ * continues. Without a previous reply it is the shared format.
+ */
+export function routerInput(input: string | WidgetAsk): string {
+  const ask = toAsk(input);
+  const turns = ask.turns ?? [];
+  const last = turns.map((turn) => turn.role).lastIndexOf("assistant");
+  if (last < 0) {
+    return renderAsk(ask);
+  }
+  const previous = turns[last].text.trim();
+  const latest =
+    ask.latest.length > LATEST_CHARS
+      ? `${ask.latest.slice(0, LATEST_CHARS)} [message cut here]`
+      : ask.latest;
+  const rest = renderConversation(
+    latest,
+    turns.filter((_, n) => n !== last),
+    DECISION_CONTEXT,
+    ask.screenshots
+  );
+  return `FOREMAN'S PREVIOUS REPLY, which the latest message answers:\n${previous.length > PREVIOUS_REPLY_CHARS ? `[start cut] ${previous.slice(-PREVIOUS_REPLY_CHARS)}` : previous}\n\n${rest.startsWith("LATEST CUSTOMER MESSAGE") ? rest : `LATEST CUSTOMER MESSAGE (the one to work on):\n${rest}`}`;
+}
+
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
   opts?: {
@@ -264,7 +297,7 @@ export async function routeWidgetMessage(
   try {
     const response = await askJev(
       QUESTIONS,
-      renderAsk(ask, DECISION_CONTEXT).slice(0, MAX_STATE_CHARS),
+      routerInput(ask).slice(0, MAX_STATE_CHARS),
       apiKey,
       {
         fetch: opts?.fetch,

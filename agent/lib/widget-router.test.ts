@@ -5,6 +5,7 @@ import {
   HUMAN_REQUEST_SCORE,
   offersRecording,
   renderAsk,
+  routerInput,
   routeWidgetMessage,
 } from "./widget-router.js";
 
@@ -207,25 +208,49 @@ describe("routeWidgetMessage", () => {
         },
       }
     );
-    // The router decides on the full shared context.
-    assert.equal(sent, renderAsk({ latest: "okay, what next?", turns }));
+    // The router reads Foreman's previous reply first, then the shared context
+    // without it (ENG-14932).
+    assert.ok(sent.startsWith("FOREMAN'S PREVIOUS REPLY"));
+    // A long previous reply keeps its end, where it asks or points.
+    assert.ok(sent.includes(`[start cut] ${"x".repeat(2000)}\n\n`));
+    assert.ok(
+      sent.endsWith(
+        renderAsk({ latest: "okay, what next?", turns: turns.slice(0, 9) })
+      )
+    );
+    assert.equal(
+      routerInput("hello"),
+      "hello",
+      "without a previous reply it is the shared format"
+    );
   });
 });
 
-// Jev's asks_for_human scores, five runs each (2026-10-07). "Human agent" never
-// handed off at the old 0.8 bar.
+// Jev's asks_for_human scores, five runs each, remeasured 2026-10-07 after the
+// router began reading Foreman's previous reply and escalation asks (ENG-14932).
+// "Human agent" never handed off at the old 0.8 bar.
 const EXPLICIT_ASKS = {
-  "agent please": [0.9, 0.88, 0.9, 0.89, 0.9],
-  "can I speak to a real person": [0.97, 0.97, 0.97, 0.97, 0.97],
-  "get me support staff": [0.88, 0.87, 0.85, 0.86, 0.86],
-  "Human agent": [0.72, 0.71, 0.72, 0.73, 0.73],
-  "talk to a human": [0.94, 0.93, 0.94, 0.94, 0.94],
+  "agent please": [0.95, 0.95, 0.94, 0.94, 0.94],
+  // fd-escalate-workspaces: after a reply that did not answer the question.
+  "Can you escalate this? I wanna know how many workspaces I have": [
+    0.93, 0.93, 0.93, 0.93, 0.92,
+  ],
+  "can I speak to a real person": [0.98, 0.98, 0.98, 0.98, 0.98],
+  "can I talk to someone?": [0.91, 0.9, 0.9, 0.91, 0.9],
+  "get me support staff": [0.93, 0.92, 0.92, 0.93, 0.93],
+  "Human agent": [0.73, 0.72, 0.73, 0.73, 0.69],
+  "talk to a human": [0.96, 0.96, 0.96, 0.96, 0.96],
 };
 const MENTIONS_A_PERSON = {
-  "is a human reviewing my campaigns?": [0.45, 0.39, 0.39, 0.43, 0.43],
-  "my human SDR quit": [0.31, 0.31, 0.31, 0.33, 0.33],
-  "thanks, you're better than a human": [0.12, 0.11, 0.11, 0.14, 0.13],
-  "this is useless": [0.17, 0.19, 0.19, 0.2, 0.21],
+  "can you file a ticket for this": [0.07, 0.07, 0.06, 0.07, 0.07],
+  "is a human reviewing my campaigns?": [0.43, 0.4, 0.44, 0.44, 0.45],
+  "is there someone who reviews my campaign copy?": [
+    0.16, 0.17, 0.16, 0.15, 0.15,
+  ],
+  "my human SDR quit": [0.12, 0.12, 0.11, 0.13, 0.12],
+  "please escalate this bug to engineering": [0.33, 0.39, 0.38, 0.39, 0.36],
+  "thanks, you're better than a human": [0.02, 0.02, 0.02, 0.02, 0.02],
+  "this is useless": [0.04, 0.04, 0.04, 0.04, 0.04],
 };
 
 describe("HUMAN_REQUEST_SCORE", () => {
