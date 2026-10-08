@@ -4,9 +4,12 @@ import { getHelpArticleContent, HELP_CENTER_BASE_URL } from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
+  defaultKbDeps,
+  grounded,
   hedged,
   type KbAnswer,
   type KbCustomer,
+  renderTranscript,
   resolveCitations,
 } from "./widget-kb.js";
 import {
@@ -41,7 +44,7 @@ const MAX_ANSWER_CHARS = 4000;
 const TRAILING_SLASH = /\/+$/u;
 const SLUG_MARKER = /\{\s*(?:slug:\s*)?([a-z0-9][a-z0-9/_-]*)\s*\}/gu;
 
-export const CHAT_PROMPT = `You are Foreman, Acquisity's support teammate in the in-app chat. You are friendly, warm and direct, like a knowledgeable colleague who knows the product inside out. You help customers find their way around Acquisity, understand what each feature does, and fix problems with clear guidance. Talk in the second person, in short paragraphs, and answer first, with no preamble and no sign-off. Use a numbered list only for a real procedure.
+export const CHAT_PROMPT = `You are Foreman, Acquisity's support teammate in the in-app chat. You are friendly, warm and direct, like a knowledgeable colleague who knows the product inside out. You help customers find their way around Acquisity, understand what each feature does, and fix problems with clear guidance. Talk in the second person, in short paragraphs, and answer first, with no preamble and no sign-off. Write two or more steps as a numbered list, one step per line, never run together in a sentence.
 
 Every message deserves a natural reply, whatever shape it takes:
 - A greeting, thanks, reaction or small talk gets a short friendly reply with no product facts, and never repeats an earlier answer.
@@ -139,6 +142,12 @@ export function chatMessages(
 
 /** The {slug} markers as numbered citations; a slug the guide does not have is dropped. */
 export function guideCitations(text: string): KbAnswer {
+  const { articles, numbered } = numberSlugs(text);
+  return resolveCitations(numbered, articles);
+}
+
+/** The reply with [n] markers, and the cited articles with their guide section as content. */
+function numberSlugs(text: string) {
   const slugs: string[] = [];
   const numbered = text.replace(SLUG_MARKER, (_, slug: string) => {
     const clean = slug.replace(TRAILING_SLASH, "");
@@ -150,13 +159,30 @@ export function guideCitations(text: string): KbAnswer {
     }
     return `[${slugs.indexOf(clean) + 1}]`;
   });
-  return resolveCitations(
-    numbered,
-    slugs.map((slug) => ({
-      title: PRODUCT_GUIDE_ARTICLES[slug] ?? slug,
-      url: new URL(`/docs/${slug}`, HELP_CENTER_BASE_URL).toString(),
-    }))
-  );
+  const articles = slugs.map((slug) => ({
+    content: guideSection(slug),
+    title: PRODUCT_GUIDE_ARTICLES[slug] ?? slug,
+    url: new URL(`/docs/${slug}`, HELP_CENTER_BASE_URL).toString(),
+  }));
+  return { articles, numbered };
+}
+
+/** The guide's availability notes, navigation map and limits: every path a reply may use. */
+const GUIDE_MAP = {
+  content: PRODUCT_GUIDE.slice(0, PRODUCT_GUIDE.indexOf("\n## Articles")),
+  title: "Navigation map",
+  url: new URL("/docs", HELP_CENTER_BASE_URL).toString(),
+};
+
+/** One article's section of the guide: its heading line to the next heading. */
+function guideSection(slug: string): string {
+  const start = PRODUCT_GUIDE.indexOf(`{slug: ${slug}}\n`);
+  if (start < 0) {
+    return "";
+  }
+  const from = PRODUCT_GUIDE.lastIndexOf("\n", start) + 1;
+  const end = PRODUCT_GUIDE.indexOf("\n#", start);
+  return PRODUCT_GUIDE.slice(from, end < 0 ? undefined : end).trim();
 }
 
 const readArticle = tool({
@@ -265,7 +291,28 @@ export async function answerFromGuide(
     const attempt = await hedged("chat", scoped, (abortSignal) =>
       deps.generate({ messages, signal: abortSignal })
     );
-    const answer = guideCitations(attempt.text.slice(0, MAX_ANSWER_CHARS * 2));
+    const { articles, numbered } = numberSlugs(
+      attempt.text.slice(0, MAX_ANSWER_CHARS * 2)
+    );
+    // WIDGET_CHAT_GROUND=1: the help-center lane's check, against the guide
+    // sections the reply cites plus the guide's navigation map, trims
+    // unsupported claims before it is sent.
+    const checked =
+      process.env.WIDGET_CHAT_GROUND === "1" && numbered.trim()
+        ? await grounded(
+            numbered,
+            renderTranscript(ask),
+            [...articles, GUIDE_MAP],
+            reader,
+            scoped,
+            defaultKbDeps,
+            log
+          )
+        : { replaced: false, reply: numbered };
+    const answer = resolveCitations(
+      checked.reply,
+      checked.replaced ? [] : articles
+    );
     if (!answer.message) {
       throw new Error("empty_reply");
     }
