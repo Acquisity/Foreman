@@ -15,19 +15,20 @@ import {
 import { toAsk, type WidgetAsk } from "./widget-router.js";
 
 /**
- * Prototype front-door chat (ENG-14932): one streamed model call that already
+ * Front-door chat (ENG-14932): one streamed model call that already
  * knows the product. The system prefix is the persona, the rules and the whole
  * product guide distilled from the help center, identical on every call so
  * provider prompt caching serves it; the conversation follows.
  *
  * @remarks
- * Behind WIDGET_CHAT=guide; without it the help-center writer in widget-kb.ts
- * answers. Like that lane it is ungated on purpose: its only inputs are the
+ * The default; WIDGET_CHAT=legacy hands the front door back to the
+ * help-center writer in widget-kb.ts for one release. Like that lane it is ungated on purpose: its only inputs are the
  * customer's own conversation and public help-center text, and it has no
  * account data and no account tools. Keep it that way.
  */
 
-export const chatGuideEnabled = () => process.env.WIDGET_CHAT === "guide";
+export const chatGuideEnabled = (value = process.env.WIDGET_CHAT) =>
+  value !== "legacy";
 
 const CHAT_TIMEOUT_MS = 20_000;
 const MAX_OUTPUT_TOKENS = 900;

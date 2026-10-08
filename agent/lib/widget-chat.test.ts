@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   answerFromGuide,
+  chatGuideEnabled,
   chatMessages,
   customerWords,
   guideCitations,
 } from "./widget-chat.js";
 
 const TRY_AGAIN = /try your message again/u;
+
+test("the guide lane answers unless WIDGET_CHAT is legacy", () => {
+  assert.equal(chatGuideEnabled(undefined), true);
+  assert.equal(chatGuideEnabled("guide"), true);
+  assert.equal(chatGuideEnabled("legacy"), false);
+});
 
 test("guide slugs become numbered citations and unknown slugs are dropped", () => {
   const answer = guideCitations(

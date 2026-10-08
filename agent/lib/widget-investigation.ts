@@ -359,6 +359,8 @@ export async function waitForWidgetInvestigation(
 }
 
 export const defaultWidgetDependencies = {
+  /** The front-door chat: the guide lane unless WIDGET_CHAT=legacy, then the help-center writer. */
+  answerChat: chatGuideEnabled() ? answerFromGuide : undefined,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
   cancel: cancelWidgetRun,
@@ -384,12 +386,16 @@ export const defaultWidgetDependencies = {
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
-  "changeRequested" | "plan" | "progress" | "requestRecording"
+  "answerChat" | "changeRequested" | "plan" | "progress" | "requestRecording"
 > &
   Partial<
     Pick<
       typeof defaultWidgetDependencies,
-      "changeRequested" | "plan" | "progress" | "requestRecording"
+      | "answerChat"
+      | "changeRequested"
+      | "plan"
+      | "progress"
+      | "requestRecording"
     >
   >;
 
@@ -929,7 +935,8 @@ async function offerRecording(
 /**
  * Front door, for every message that is not an explicit investigation: an ask
  * for a person hands off at once, a refund or an owner's ticket request gets
- * its fixed next step, and everything else goes to the one help-center writer.
+ * its fixed next step, and everything else gets the guide lane's reply, or the
+ * help-center writer's with WIDGET_CHAT=legacy.
  * Nothing here starts an investigation (ENG-14841), and nothing offers a
  * screen recording.
  */
@@ -947,17 +954,15 @@ async function answerFromKnowledgeBase(
     workspace: scope.organizationName,
   };
   const log = { conversationId: scope.conversationId, runId: run.id };
-  // The guide prototype starts writing while the router scores the message,
-  // and is dropped when the router sends the message somewhere else.
+  // The guide lane starts writing while the router scores the message, and is
+  // dropped when the router sends the message somewhere else.
   const drafting = new AbortController();
-  const draft = chatGuideEnabled()
-    ? answerFromGuide(
-        { ...ask, recordingOffered: false },
-        log,
-        customer,
-        AbortSignal.any([signal, drafting.signal])
-      )
-    : null;
+  const draft = deps.answerChat?.(
+    { ...ask, recordingOffered: false },
+    log,
+    customer,
+    AbortSignal.any([signal, drafting.signal])
+  );
   const route = await deps.route(ask, { signal }).catch((error: unknown) => {
     drafting.abort();
     throw error;

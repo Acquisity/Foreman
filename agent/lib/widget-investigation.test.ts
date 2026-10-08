@@ -1022,6 +1022,49 @@ test("an owner or admin's refund or ticket request points to the magnifying glas
   }
 });
 
+test("with the guide lane on, a person, a refund or an owner's ticket request still bypasses it, and everything else gets its reply", async (t) => {
+  enabled(t);
+  const human = () =>
+    Promise.resolve({ asksForHuman: 0.95, source: "jev" as const });
+  const refund = () =>
+    Promise.resolve({ asksForHuman: 0, refund: true, source: "jev" as const });
+  const ticket = () =>
+    Promise.resolve({ asksForHuman: 0, source: "jev" as const, ticket: true });
+  for (const [role, route, message, reason] of [
+    ["owner", human, null, "asked_for_human"],
+    ["owner", refund, INVESTIGATE_REDIRECT, "investigate_redirect"],
+    ["admin", ticket, INVESTIGATE_REDIRECT, "investigate_redirect"],
+    ["member", refund, REFUND_REDIRECT, "refund_redirect"],
+    ["member", ticket, kbAnswer.message, "kb"],
+    ["owner", kbRoute, kbAnswer.message, "kb"],
+  ] as const) {
+    const { deps, run } = dependencies();
+    deps.route = route;
+    deps.answerKb = () => assert.fail("the guide lane answers instead");
+    const signals: (AbortSignal | undefined)[] = [];
+    deps.answerChat = (_ask, _log, _customer, signal) => {
+      signals.push(signal);
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, message_id: crypto.randomUUID() }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, role }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.message, message);
+    assert.equal(run.outcome?.reason, reason);
+    // A draft the router sends elsewhere is aborted, never sent.
+    assert.deepEqual(
+      signals.map((signal) => signal?.aborted),
+      [reason !== "kb"]
+    );
+  }
+});
+
 test('a follow-up reaches the router and the fast lane with the earlier turns, so "that" can be resolved', async (t) => {
   enabled(t);
   const history = [
