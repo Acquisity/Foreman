@@ -1,12 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import {
-  gateway,
-  generateObject,
-  generateText,
-  isStepCount,
-  Output,
-  tool,
-} from "ai";
+import { gateway, generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import {
@@ -39,8 +32,8 @@ import {
  */
 
 const MAX_ARTICLES = 4;
-/** Help-center lookups one reply may make (ENG-14932 round 4). */
-export const MAX_LOOKUPS = 4;
+/** How many previously cited articles ride along with every fresh retrieval. */
+const MAX_ACTIVE_ARTICLES = 2;
 const INDEX_TIMEOUT_MS = 5000;
 const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
@@ -220,21 +213,18 @@ const LATEST_SUBJECT = `The input is the support conversation so far, oldest fir
 /** Who Foreman is, before any rule about what it may say. */
 const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-app chat. You know how the product works, campaigns, the AI SDR, inboxes and domains, websites, the CRM, billing and the rest, and you help customers understand and use it. You are not a sales, strategy or copywriting coach. Talk like a knowledgeable colleague: warm, direct, in the second person, in short paragraphs. Answer first, with no preamble and no sign-off. Use a numbered list only for a real procedure. You are continuing the conversation you are given: never ask for something it already gave, never repeat your previous reply, and when the customer reports what they saw or did, accept it and give the next step. When they sound frustrated, acknowledge it in a few words and try a different approach.`;
 
-// The one front-door writer (ENG-14932). Its only tools search and read the
-// public help center; no account data and no investigation tools reach it.
+// The one front-door writer (ENG-14932). No account data and no tools reach it.
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
-The input is JSON: conversation, customer (their workspace name, their role, canInvestigate and glassOffered), recordingOffered, and previousArticles, the help-center articles the previous reply cited. ${LATEST_SUBJECT}
+The input is JSON: conversation, customer (their workspace name, their role, canInvestigate and glassOffered), recordingOffered, and articles, the numbered help-center articles found for this conversation. ${LATEST_SUBJECT}
 
-You look things up in the public help center yourself. On any question about how the product works, call search_help_center first with what the customer needs, then read_help_article for each article you will rely on, starting with those marked direct. A previous article you still need can be read without searching. You have at most ${MAX_LOOKUPS} lookups in all. A thanks, greeting, reaction or other chat, and a referral to the AI Consultant, need no lookup. When a lookup fails or finds nothing, answer as when the articles do not give a fact.
-
-Facts specific to Acquisity come only from the articles you read: where something is, what a setting does, steps, limits, plans, prices, and whether a feature exists. After a sentence or step that uses an article, add the number read_help_article gave it in square brackets, like [1], once per step or paragraph, and only numbers of articles you read. Never invent menu names, links, settings or URLs. When more than one article touches a point, cite the one whose own topic is the latest message. A rule in an article applies only to the product that article is about, so never carry the policy for one product or charge (such as domains or inboxes) over to another (such as the subscription). When the question could be about more than one product or charge and the conversation does not say which, ask which one.
+Facts specific to Acquisity come only from the articles: where something is, what a setting does, steps, limits, plans, prices, and whether a feature exists. After a sentence or step that uses an article, add its number in square brackets, like [1], once per step or paragraph, and only numbers you were given. Never invent menu names, links, settings or URLs. When more than one article touches a point, cite the one whose own topic is the latest message. A rule in an article applies only to the product that article is about, so never carry the policy for one product or charge (such as domains or inboxes) over to another (such as the subscription). When the question could be about more than one product or charge and the conversation does not say which, ask which one.
 
 When a screenshot arrives with no question and no earlier customer goal, ask one short question about what they want to do and never infer a task from the page or a warning; when it continues an earlier stated goal, give the next step toward that goal.
 
 Explaining what a product term or feature means and how the pieces fit together is your job, from the articles. Give the steps themselves, never only a pointer to an article or the help center. For a procedure, give every step the articles give, in order, starting with how to reach the page, and keep every warning or lasting consequence they attach, such as data deleted for good or inboxes that must warm up before sending. When the next step depends on the customer's situation, give each case the articles describe. For troubleshooting, give the first one or two checks and ask what they see. A timezone conversion is only a possible explanation, never proof of how their calendar is set up.
 
-Refer to the AI Consultant, under the Chat toggle at the top of the left sidebar, rather than another tool, only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not mention it.
+Refer to the AI Consultant, using its help article and rather than another tool, only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not mention it.
 
 When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, they can ask a workspace owner or admin, and you never mention the magnifying glass.
 
@@ -245,21 +235,6 @@ Plain text only: no markdown, no headings, no asterisks, no em dashes. A numbere
 ${TEXT_ONLY}
 
 Return the reply, and in sources the number of every article it uses, empty when it uses none.`;
-
-const lookupTools = (lookup: KbLookup) => ({
-  read_help_article: tool({
-    description:
-      "Read one Acquisity help-center article by the url search_help_center or previousArticles gave. Returns its title, its content and the number to cite it by.",
-    execute: ({ url }) => lookup.read(url),
-    inputSchema: z.object({ url: z.string().max(500) }),
-  }),
-  search_help_center: tool({
-    description:
-      "Find Acquisity help-center articles for what the customer needs. Returns up to four articles, best first, each with its title, url and fit: direct when it is about what the customer asks itself, related when it is about something next to it.",
-    execute: ({ query }) => lookup.search(query),
-    inputSchema: z.object({ query: z.string().max(300) }),
-  }),
-});
 
 // The check after the writer, modelled on Intercom Fin's validate stage
 // (ENG-14932). The writer blended near-miss articles, stretched them and
@@ -392,31 +367,16 @@ export interface KbCustomer {
   workspace: string;
 }
 
-/**
- * One writer attempt's help-center lookups. Each hedged attempt gets its own,
- * so two racing attempts never number each other's articles.
- */
-export interface KbLookup {
-  /** The articles read so far, in citation order: [1] is the first. */
-  articles: KbArticle[];
-  /** Each lookup made, for the log. */
-  calls: string[];
-  read: (url: string) => Promise<unknown>;
-  search: (query: string) => Promise<unknown>;
-}
-
 export interface KbDeps {
-  /** The writer: its reply object and the articles its lookups read. */
   generate: (input: {
+    articles: KbArticle[];
     customer?: KbCustomer;
     images?: KbImage[];
-    lookup: () => KbLookup;
-    previousArticles: { title: string; url: string }[];
     question: string;
     /** See {@link WidgetAsk.recordingOffered}; absent, the writer is told false. */
     recordingOffered?: boolean;
     signal: AbortSignal;
-  }) => Promise<{ articles: KbArticle[]; reply: unknown }>;
+  }) => Promise<unknown>;
   /** The writer's reply checked against the articles it was given; see GROUND_PROMPT. */
   ground: (input: {
     articles: KbArticle[];
@@ -454,43 +414,36 @@ const articleInput = (articles: KbArticle[]) =>
 
 export const defaultKbDeps: KbDeps = {
   async generate({
+    articles,
     customer,
     images,
-    lookup,
-    previousArticles,
     question,
     recordingOffered,
     signal,
   }) {
     const model = await resolveModel(images?.length ? "kbImages" : "kb");
     const input = JSON.stringify({
+      articles: articleInput(articles),
       conversation: question,
       customer: customer ?? {
         canInvestigate: false,
         role: "unknown",
         workspace: "unknown",
       },
-      previousArticles,
       recordingOffered: recordingOffered === true,
     });
-    return await hedged("generate", signal, async (abortSignal) => {
-      const attempt = lookup();
-      const { output } = await generateText({
+    const { object } = await hedged("generate", signal, (abortSignal) =>
+      generateObject({
         abortSignal,
         maxRetries: 0,
         messages: withImageParts(input, images),
         model: gateway(model),
         ...fastCallOptions(model),
-        output: Output.object({ schema: replySchema }),
-        // The lookup itself refuses a fifth call; the last step only answers.
-        prepareStep: ({ stepNumber }) =>
-          stepNumber >= MAX_LOOKUPS ? { activeTools: [] } : undefined,
-        stopWhen: isStepCount(MAX_LOOKUPS + 1),
+        schema: replySchema,
         system: withImages(REPLY_PROMPT, images),
-        tools: lookupTools(attempt),
-      });
-      return { articles: attempt.articles, reply: output };
-    });
+      })
+    );
+    return object;
   },
   async ground({ articles, customer, question, reply, signal }) {
     const model = await resolveModel("kb");
@@ -677,12 +630,8 @@ async function findArticles(
   signal: AbortSignal,
   deps: KbDeps,
   images?: KbImage[],
-  cited: string[] = [],
-  fallback = question
-): Promise<{
-  hits: { fit?: "direct" | "related"; title: string; url: string }[];
-  via: string;
-}> {
+  cited: string[] = []
+): Promise<{ hits: { title: string; url: string }[]; via: string }> {
   try {
     const index = await deps.index(signal);
     if (index) {
@@ -699,31 +648,30 @@ async function findArticles(
           signal,
         })
       );
-      const hits = articles
-        .filter(
-          (pick, n) =>
-            index[pick.n - 1] !== undefined &&
-            articles.findIndex((other) => other.n === pick.n) === n
-        )
-        .map((pick) => ({
-          fit: pick.fit,
-          title: index[pick.n - 1].title,
-          url: new URL(
-            `/docs/${index[pick.n - 1].id}`,
-            HELP_CENTER_BASE_URL
-          ).toString(),
+      const direct = [
+        ...new Set(
+          articles.filter((pick) => pick.fit === "direct").map((pick) => pick.n)
+        ),
+      ]
+        .map((n) => index[n - 1])
+        .filter((article) => article !== undefined)
+        .map((article) => ({
+          title: article.title,
+          url: new URL(`/docs/${article.id}`, HELP_CENTER_BASE_URL).toString(),
         }));
-      // Each pick carries its fit, so the writer reads direct ones first and
-      // knows when nothing answers the question itself. Only an empty pick
-      // searches instead.
+      // Picks that are all related mean nothing answers it: the writer gets no
+      // articles and says it is not sure. Only an empty pick searches instead.
       if (articles.length > 0) {
-        return { hits, via: "index" };
+        return {
+          hits: direct,
+          via: `index:${direct.length}/${articles.length}`,
+        };
       }
     }
   } catch {
     // fall through to keyword search
   }
-  const queries = await searchQueries(question, signal, deps, fallback);
+  const queries = await searchQueries(question, signal, deps);
   return {
     hits: mergeHits(
       await Promise.all(
@@ -734,12 +682,11 @@ async function findArticles(
   };
 }
 
-/** Keyword queries for the message; the writer's own query is the fallback if the rewrite fails. */
+/** Keyword queries for the message; the raw message is the fallback if the rewrite fails. */
 async function searchQueries(
   question: string,
   signal: AbortSignal,
-  deps: KbDeps,
-  fallback: string
+  deps: KbDeps
 ): Promise<string[]> {
   try {
     const { queries } = rewriteSchema.parse(
@@ -748,9 +695,9 @@ async function searchQueries(
     const cleaned = queries
       .map((query) => query.trim().slice(0, 80))
       .filter((query) => query.length > 0);
-    return cleaned.length > 0 ? cleaned : [fallback];
+    return cleaned.length > 0 ? cleaned : [question];
   } catch {
-    return [fallback];
+    return [question];
   }
 }
 
@@ -974,93 +921,50 @@ export async function answerFromHelpCenter(
     if (ask.images?.length) {
       mark(`images=${images.length}/${ask.images.length}`);
     }
-    // What the previous reply cited stays a hint the writer can read without
-    // searching: "where do i go from here?" with a screenshot continued the
-    // buying guides it had cited.
-    const previousArticles = await activeArticleHits(ask, signal, deps);
-    const cited = previousArticles.flatMap(
-      (article) => helpArticleSlug(article.url) ?? []
-    );
-    const attempts: KbLookup[] = [];
-    const lookup = (): KbLookup => {
-      const articles: KbArticle[] = [];
-      const calls: string[] = [];
-      let used = 0;
-      // Every lookup is bounded and never throws: a failure is something the
-      // writer answers around, never an empty reply.
-      const bounded = async (name: string, run: () => Promise<unknown>) => {
-        used += 1;
-        calls.push(name);
-        if (used > MAX_LOOKUPS) {
-          return {
-            error: "No lookups left for this reply: answer from what you read.",
-          };
-        }
-        try {
-          return await run();
-        } catch {
-          return { error: "The help center could not be reached." };
-        }
-      };
-      const attempt: KbLookup = {
+    // Every message also reads what the previous reply cited, whatever the
+    // router made of it: "where do i go from here?" with a screenshot scored 0.25
+    // as a follow-up, was read without the buying guides it continued, and
+    // missed. Never instead of a fresh retrieval: "and if the chat bubble is
+    // missing?" answered from the ticket-status article alone. Fresh hits lead,
+    // so the latest message outweighs the earlier citation.
+    const [active, { hits: fresh, via }] = await Promise.all([
+      activeArticleHits(ask, signal, deps),
+      findArticles(
+        question,
+        signal,
+        deps,
+        images,
+        (ask.activeArticles ?? []).flatMap(
+          (article) => helpArticleSlug(article.url) ?? []
+        )
+      ),
+    ]);
+    // With the index, a previous citation reaches the writer only when the
+    // selector picked it again as direct; keyword search still carries it over.
+    const kept = via.startsWith("index")
+      ? []
+      : active
+          .filter((hit) => !fresh.some((found) => found.url === hit.url))
+          .slice(0, MAX_ACTIVE_ARTICLES);
+    const picked = fresh.slice(0, MAX_ARTICLES - kept.length);
+    mark(`active=${kept.length} find:${via}`);
+    const articles = (
+      await Promise.all(
+        [...picked, ...kept].map((hit) => deps.read(hit.url, signal))
+      )
+    ).filter((article): article is KbArticle => article !== null);
+    mark("read");
+    const written = replySchema.parse(
+      await deps.generate({
         articles,
-        calls,
-        read: (url) =>
-          bounded("read", async () => {
-            const slug = helpArticleSlug(url);
-            if (!slug) {
-              return {
-                error: "Only a help-center article url can be read.",
-              };
-            }
-            const clean = new URL(
-              `/docs/${slug}`,
-              HELP_CENTER_BASE_URL
-            ).toString();
-            const known = articles.findIndex((seen) => seen.url === clean);
-            const article =
-              known >= 0 ? articles[known] : await deps.read(clean, signal);
-            if (!article) {
-              return { error: "That article could not be read." };
-            }
-            if (known < 0) {
-              articles.push(article);
-            }
-            return {
-              cite: known >= 0 ? known + 1 : articles.length,
-              content: article.content,
-              title: article.title,
-            };
-          }),
-        search: (query) =>
-          bounded("search", async () => {
-            const { hits } = await findArticles(
-              `${question}\n\nLooking up: ${query.slice(0, 300)}`,
-              signal,
-              deps,
-              images,
-              cited,
-              query.slice(0, 300)
-            );
-            return { results: hits };
-          }),
-      };
-      attempts.push(attempt);
-      return attempt;
-    };
-    const { articles, reply } = await deps.generate({
-      customer: reader,
-      images,
-      lookup,
-      previousArticles,
-      question,
-      recordingOffered: ask.recordingOffered,
-      signal,
-    });
-    const written = replySchema.parse(reply);
-    const calls =
-      attempts.find((attempt) => attempt.articles === articles)?.calls ?? [];
-    mark(`generate:${calls.join(",") || "none"}`);
+        customer: reader,
+        images,
+        question,
+        recordingOffered: ask.recordingOffered,
+        signal,
+      })
+    );
+    mark("generate");
     const checked = written.reply.trim()
       ? await grounded(
           written.reply,

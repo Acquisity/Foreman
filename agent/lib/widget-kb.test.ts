@@ -9,7 +9,6 @@ import {
   indexLine,
   type KbDeps,
   loadImages,
-  MAX_LOOKUPS,
   mergeHits,
   REPLY_PROMPT,
   renderTranscript,
@@ -30,23 +29,8 @@ const articles = [
 ];
 const log = { conversationId: "c", runId: "r" };
 
-/** A writer that searches once and reads what it found, as the prompt asks. */
-const writer =
-  (answer: unknown) =>
-  async ({ lookup }: Parameters<KbDeps["generate"]>[0]) => {
-    const attempt = lookup();
-    const found = (await attempt.search("q")) as {
-      results?: { url: string }[];
-    };
-    for (const hit of (found.results ?? []).slice(0, MAX_LOOKUPS - 1)) {
-      // biome-ignore lint/performance/noAwaitInLoops: reads in order, as the model does.
-      await attempt.read(hit.url);
-    }
-    return { articles: attempt.articles, reply: answer };
-  };
-
 const deps = (answer: unknown, hits = articles): KbDeps => ({
-  generate: writer(answer),
+  generate: () => Promise.resolve(answer),
   ground: ({ reply }) => Promise.resolve({ reply }),
   index: () => Promise.resolve(null),
   read: (url) =>
@@ -301,7 +285,7 @@ test("hits from several queries merge by agreement and rank, capped at four", ()
   );
 });
 
-test("the message is searched as keyword queries, and as the writer's query when the rewrite fails", async () => {
+test("the message is searched as keyword queries, and as itself when the rewrite fails", async () => {
   const searched: string[] = [];
   const base = deps({ reply: "Do this [1].", sources: [] });
   const recording: KbDeps = {
@@ -321,7 +305,7 @@ test("the message is searched as keyword queries, and as the writer's query when
     ...recording,
     rewrite: () => Promise.reject(new Error("gateway down")),
   });
-  assert.deepEqual(searched, ["q"]);
+  assert.deepEqual(searched, ["Customer: how do i add inboxes?"]);
 });
 
 test("articles are picked from the title index, with keyword search only as the fallback", async () => {
@@ -377,142 +361,55 @@ test("articles are picked from the title index, with keyword search only as the 
   }
 });
 
-test("search_help_center returns each pick with its fit, and names the previous citation to the selector", async () => {
+test("only articles the selector marks direct reach the writer, previous citations included", async () => {
   const index = [
     { id: "ai-sdr/setup", title: "Setup" },
     { id: "ai-sdr/settings", title: "Settings" },
     { id: "availability", title: "Availability" },
   ];
-  const selected: string[] = [];
-  let found: unknown = null;
-  await answerFromHelpCenter(
-    {
-      activeArticles: [{ title: "Settings", url: articles[1].url }],
-      latest: "where do i set the ai sdr calendar?",
-    },
-    log,
-    {
-      ...deps(null),
-      generate: async ({ lookup }) => {
-        const attempt = lookup();
-        found = await attempt.search("ai sdr calendar");
-        return { articles: [], reply: { reply: "I'm not sure.", sources: [] } };
-      },
-      index: () => Promise.resolve(index),
-      search: () => assert.fail("a pick that found articles never searches"),
-      select: ({ question }) => {
-        selected.push(question);
-        return Promise.resolve({
-          articles: [
-            { fit: "direct", n: 3 },
-            { fit: "related", n: 1 },
-          ],
-        });
-      },
-    }
-  );
-  assert.deepEqual(found, {
-    results: [
-      { fit: "direct", title: "Availability", url: articles[2].url },
-      { fit: "related", title: "Setup", url: articles[0].url },
-    ],
-  });
-  assert.ok(selected[0].includes("Looking up: ai sdr calendar"));
-  assert.ok(selected[0].endsWith("Articles the previous reply cited: 2"));
-});
-
-test("an article the writer read is citable and is what the check receives; one it did not read is not", async () => {
-  const checked: string[][] = [];
-  const result = await answerFromHelpCenter("where are my hours?", log, {
-    ...deps(null),
-    generate: async ({ lookup }) => {
-      const attempt = lookup();
-      await attempt.read(articles[2].url);
-      return {
-        articles: attempt.articles,
-        reply: { reply: "Set your hours [1]. Also see [2].", sources: [] },
-      };
-    },
-    ground: ({ articles: read, reply }) => {
-      checked.push(read.map((article) => article.url));
-      return Promise.resolve({ reply });
-    },
-  });
-  assert.deepEqual(checked, [[articles[2].url]]);
-  assert.deepEqual(result, {
-    citations: [{ n: 1, title: "Availability", url: articles[2].url }],
-    message: "Set your hours. Also see.",
-  });
-});
-
-test("a failing lookup is answered around, never an empty reply, and a fifth lookup is refused", async (t) => {
-  const lines: string[] = [];
-  t.mock.method(console, "info", (line: string) => lines.push(line));
-  const got: unknown[] = [];
-  const result = await answerFromHelpCenter("q", log, {
-    ...deps(null),
-    generate: async ({ lookup }) => {
-      const attempt = lookup();
-      for (let n = 0; n < MAX_LOOKUPS + 1; n += 1) {
-        // biome-ignore lint/performance/noAwaitInLoops: lookups run in order, as the model makes them.
-        got.push(await attempt.search("q"));
+  const run = async (
+    picks: { fit: string; n: number }[],
+    activeArticles: { title: string; url: string }[] = []
+  ) => {
+    const selected: string[] = [];
+    const given: string[][] = [];
+    await answerFromHelpCenter(
+      { activeArticles, latest: "where do i set the ai sdr calendar?" },
+      log,
+      {
+        ...deps({ reply: "I'm not sure.", sources: [] }),
+        generate: ({ articles: read }) => {
+          given.push(read.map((article) => article.title));
+          return Promise.resolve({ reply: "I'm not sure.", sources: [] });
+        },
+        index: () => Promise.resolve(index),
+        search: () =>
+          assert.fail("a pick that found only related articles never searches"),
+        select: ({ question }) => {
+          selected.push(question);
+          return Promise.resolve({ articles: picks });
+        },
       }
-      return {
-        articles: attempt.articles,
-        reply: { reply: "I'm not sure. Which page are you on?", sources: [] },
-      };
-    },
-    index: () => Promise.reject(new Error("down")),
-    rewrite: () => Promise.reject(new Error("down")),
-    search: () => Promise.reject(new Error("down")),
-  });
-  assert.equal(result.message, "I'm not sure. Which page are you on?");
+    );
+    return { given: given[0], selected: selected[0] };
+  };
   assert.deepEqual(
-    got.slice(0, MAX_LOOKUPS),
-    new Array(MAX_LOOKUPS).fill({ results: [] })
+    (
+      await run([
+        { fit: "direct", n: 3 },
+        { fit: "related", n: 1 },
+      ])
+    ).given,
+    ["Availability"]
   );
-  assert.deepEqual(got[MAX_LOOKUPS], {
-    error: "No lookups left for this reply: answer from what you read.",
-  });
-  const read = await answerFromHelpCenter("q", log, {
-    ...deps(null),
-    generate: async ({ lookup }) => {
-      const attempt = lookup();
-      got.push(await attempt.read("https://evil.example/docs/x"));
-      got.push(await attempt.read(articles[0].url));
-      return {
-        articles: attempt.articles,
-        reply: { reply: "I'm not sure.", sources: [] },
-      };
-    },
-    read: () => Promise.reject(new Error("timeout")),
-  });
-  assert.equal(read.message, "I'm not sure.");
-  assert.deepEqual(got.slice(-2), [
-    { error: "Only a help-center article url can be read." },
-    { error: "The help center could not be reached." },
-  ]);
-  assert.ok(
-    lines.some((line) =>
-      JSON.parse(line).message?.includes(
-        "generate:search,search,search,search,search"
-      )
-    )
+  assert.deepEqual((await run([{ fit: "related", n: 2 }])).given, []);
+  // The previous citation is named to the selector and read only if picked direct again.
+  const cited = await run(
+    [{ fit: "related", n: 2 }],
+    [{ title: "Settings", url: articles[1].url }]
   );
-});
-
-test("the writer looks things up on product questions only, at most four times", () => {
-  assert.ok(
-    REPLY_PROMPT.includes(
-      "On any question about how the product works, call search_help_center first"
-    )
-  );
-  assert.ok(
-    REPLY_PROMPT.includes(
-      "A thanks, greeting, reaction or other chat, and a referral to the AI Consultant, need no lookup."
-    )
-  );
-  assert.ok(REPLY_PROMPT.includes(`at most ${MAX_LOOKUPS} lookups`));
+  assert.deepEqual(cited.given, []);
+  assert.ok(cited.selected.endsWith("Articles the previous reply cited: 2"));
 });
 
 test("a reaction gets a short conversational reply with no citations, not an investigation", async () => {
@@ -541,14 +438,15 @@ const grounded = {
 for (const [latest, screenshots] of [
   ["okay, what next?", undefined],
   // A screenshot with no text, as the app words it, and one sent with just "?":
-  // the carried guides are still offered, like any message.
+  // the carried guides are still read, after the fresh pick like any message.
   [
     "(The customer sent only the screenshot below, with no message.)",
     ["Screen: All Campaigns"],
   ],
   ["?", ["Screen: All Campaigns"]],
 ] as const) {
-  test(`every message offers the articles the previous reply cited, readable without a search: ${latest}`, async () => {
+  test(`every message reads the articles the previous reply cited alongside a fresh retrieval: ${latest}`, async () => {
+    const given: string[][] = [];
     const result = await answerFromHelpCenter(
       {
         activeArticles: [articles[0]],
@@ -558,26 +456,50 @@ for (const [latest, screenshots] of [
       log,
       {
         ...deps(null, [articles[2]]),
-        generate: async ({ lookup, previousArticles }) => {
-          assert.deepEqual(
-            previousArticles.map((article) => article.url),
-            [articles[0].url]
-          );
-          const attempt = lookup();
-          await attempt.read(previousArticles[0].url);
-          return {
-            articles: attempt.articles,
-            reply: { reply: "Set your hours [1].", sources: [] },
-          };
+        generate: ({ articles: read }) => {
+          given.push(read.map((a) => a.url));
+          return Promise.resolve({
+            reply: "Set your hours [2].",
+            sources: [],
+          });
         },
       }
     );
+    const [fresh, carried] = [articles[2].url, articles[0].url];
+    assert.deepEqual(given, [[fresh, carried]]);
     assert.deepEqual(
       result.citations.map((c) => c.url),
       [articles[0].url]
     );
   });
 }
+
+test("a new subject outweighs the previous citation: the fresh article is read first and cited", async () => {
+  const [ticketStatus, , widgetMissing] = articles;
+  const result = await answerFromHelpCenter(
+    {
+      activeArticles: [ticketStatus],
+      latest:
+        "And if the support chat bubble itself is missing, what should I try first?",
+    },
+    log,
+    {
+      ...deps(null, [widgetMissing]),
+      generate: ({ articles: read }) => {
+        // The fresh hit always leads, so the model is never left with only the old article.
+        assert.equal(read[0].url, widgetMissing.url);
+        return Promise.resolve({
+          reply: "Check your ad blocker [1].",
+          sources: [],
+        });
+      },
+    }
+  );
+  assert.deepEqual(
+    result.citations.map((c) => c.url),
+    [widgetMissing.url]
+  );
+});
 
 test("prior citations are hints only: foreign, malformed and unlisted urls never become something to read", async () => {
   const index = [{ id: "ai-sdr/setup", title: "Setup" }];
@@ -645,10 +567,7 @@ test("the writer is told who is asking, from the verified scope", async () => {
       ...deps(null),
       generate: (input) => {
         told.push(input.customer);
-        return Promise.resolve({
-          articles: [],
-          reply: { reply: "Hi.", sources: [] },
-        });
+        return Promise.resolve({ reply: "Hi.", sources: [] });
       },
     },
     customer
@@ -674,10 +593,7 @@ test("once a reply offered the magnifying glass, the writer and the check are to
       ...deps(null),
       generate: (input) => {
         told.push(input.customer);
-        return Promise.resolve({
-          articles: [],
-          reply: { reply: "Try Page Down.", sources: [] },
-        });
+        return Promise.resolve({ reply: "Try Page Down.", sources: [] });
       },
       ground: ({ customer, reply }) => {
         told.push(customer);
@@ -743,7 +659,7 @@ test("every stage reads the conversation as a transcript, latest message last wi
       return base.rewrite(question, signal);
     },
   });
-  assert.deepEqual(seen, [transcript, `${transcript}\n\nLooking up: q`]);
+  assert.deepEqual(seen, [transcript, transcript]);
 });
 
 test("the selector and the writer look at the screenshots; without them, a load failure or no loader, they read text only", async () => {
@@ -916,31 +832,15 @@ test("article picking and text answers run on flash-lite, and an answer with scr
   );
   assert.deepEqual(
     await used(() =>
-      defaultKbDeps.generate({
-        lookup: () => ({
-          articles: [],
-          calls: [],
-          read: () => Promise.resolve({}),
-          search: () => Promise.resolve({}),
-        }),
-        previousArticles: [],
-        question: "Customer: hi",
-        signal,
-      })
+      defaultKbDeps.generate({ articles: [], question: "Customer: hi", signal })
     ),
     ["google/gemini-3.5-flash-lite"]
   );
   assert.deepEqual(
     await used(() =>
       defaultKbDeps.generate({
+        articles: [],
         images: [{ data: new Uint8Array([1]), mediaType: "image/png" }],
-        lookup: () => ({
-          articles: [],
-          calls: [],
-          read: () => Promise.resolve({}),
-          search: () => Promise.resolve({}),
-        }),
-        previousArticles: [],
         question: "Customer: hi",
         signal,
       })
