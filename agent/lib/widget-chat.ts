@@ -233,6 +233,8 @@ const GET_HERE_LABEL = /\bGet here:\s*/giu;
 const GUIDE_SAYS =
   /\b(t)he (?:product )?guide (says|covers|does not cover|doesn't cover|does not say|doesn't say)\b/giu;
 const NOTE_FIELD = /\s*\{(?:canInvestigate|glassOffered)\}/gu;
+// "Resend" is also a vendor's name; the magnifying-glass copy says "send ... again".
+const RESEND = /\bresend (your|the|that|this) message\b/giu;
 // Nobody is notified, so no reply speaks for a team that will look.
 const TEAM_CLAUSE =
   /,?\s+so (?:that )?we can (?:investigate|look into|check)[^.!?\n]*/giu;
@@ -248,6 +250,7 @@ export const customerWords = (text: string) =>
       (_, t: string, verb: string) => `${t}he help center ${verb}`
     )
     .replace(NOTE_FIELD, "")
+    .replace(RESEND, (_, which: string) => `send ${which} message again`)
     .replace(TEAM_CLAUSE, "")
     .replace(TEAM_SENTENCE, "");
 

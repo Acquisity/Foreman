@@ -70,8 +70,8 @@ test("the guide's own words never reach the customer", () => {
   );
   assert.equal(
     customerWords(
-      "Tap the magnifying glass so we can investigate why it stalls. We can look into your workspace for you. Then check Leads."
+      "Tap the magnifying glass and resend your message so we can investigate why it stalls. We can look into your workspace for you. Then check Leads."
     ),
-    "Tap the magnifying glass. Then check Leads."
+    "Tap the magnifying glass and send your message again. Then check Leads."
   );
 });
