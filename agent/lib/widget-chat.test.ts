@@ -10,7 +10,7 @@ const TRY_AGAIN = /try your message again/u;
 
 test("guide slugs become numbered citations and unknown slugs are dropped", () => {
   const answer = guideCitations(
-    "Open Members. {workspace-settings/members}\nThen invite. {slug: workspace-settings/members}\nBuy inboxes. {cold-email-agent/email-accounts/buying-inboxes} Nothing here. {not/a-real-slug}"
+    "Open Members. {workspace-settings/members}\nThen invite. {slug: workspace-settings/members}\nBuy inboxes. {cold-email-agent/email-accounts/buying-inboxes} Nothing here. {not/a-real-slug}\nBoth. {slug: workspace-settings/members, cold-email-agent/email-accounts/buying-inboxes}"
   );
   assert.deepEqual(
     answer.citations.map((c) => c.url),

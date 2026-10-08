@@ -23,7 +23,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "account-settings/faq/is-the-email-plan-pricing-monthly-or-annual-1800":
     "Is the email plan pricing monthly or annual ($1,800)?",
   "account-settings/faq/sign-up-vs-log-in-which-do-i-use":
-    "Sign up vs Log in, which do I use?",
+    "Sign up vs Log in — which do I use?",
   "account-settings/faq/where-is-the-billing-cancel-option-for-email-subscriptions":
     "Where is the Billing cancel option for email subscriptions?",
   "ad-writer": "AI Ads Maker",
@@ -244,7 +244,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "cold-email-agent/faq/campaigns/how-many-email-methods-are-there":
     "How many email methods are there?",
   "cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account":
-    "Why is my campaign Active but not sending when I use my own Instantly account?",
+    "Why is my campaign Active but not sending when I use my own the sending platform account?",
   "cold-email-agent/faq/campaigns/pausing-a-campaign-vs-pausing-my-subscription":
     "What's the difference between pausing a campaign and pausing my subscription?",
   "cold-email-agent/faq/campaigns/what-are-the-lead-source-options-for-campaigns":
@@ -273,7 +273,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "cold-email-agent/faq/deliverability/how-do-i-add-leads-to-the-blocklist":
     "How do I add leads to the blocklist?",
   "cold-email-agent/faq/deliverability/i-sent-1000-emails-and-got-zero-replies-whats-wrong":
-    "I sent 1000+ emails and got zero replies, what's wrong?",
+    "I sent 1000+ emails and got zero replies — what's wrong?",
   "cold-email-agent/faq/deliverability/what-do-i-do-if-my-campaign-is-paused-for-high-bounce-rate":
     "What do I do if my campaign is paused for high bounce rate?",
   "cold-email-agent/faq/deliverability/what-does-the-spfdkimdmarc-deliverability-warning-mean":
@@ -343,11 +343,11 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "cold-email-agent/faq/lead-search/how-many-leads-can-i-generate-per-campaign":
     "How many leads can I generate per campaign?",
   "cold-email-agent/faq/lead-search/i-bought-10k-leads-and-only-got-4k-why":
-    "I bought 10k leads and only got 4k, why?",
+    "I bought 10k leads and only got 4k — why?",
   "cold-email-agent/faq/lead-search/i-ordered-7000-leads-and-got-1700-why":
-    "I ordered 7000 leads and got 1700, why?",
+    "I ordered 7000 leads and got 1700 — why?",
   "cold-email-agent/faq/lead-search/my-scrape-is-running-what-happens-if-i-close-the-tab":
-    "My scrape is still running, what happens if I close the tab?",
+    "My scrape is still running — what happens if I close the tab?",
   "cold-email-agent/faq/lead-search/should-i-verify-imported-lead-emails":
     "Should I verify imported lead emails?",
   "cold-email-agent/faq/lead-search/what-are-the-advanced-filters":
@@ -415,7 +415,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "crm/faq/where-do-i-find-my-calendarappointments-in-the-dashboard":
     "Where do I find my calendar/appointments in the dashboard?",
   "crm/faq/which-meeting-link-should-i-configure-mine-or-my-clients":
-    "Which meeting link should I configure, mine or my client's?",
+    "Which meeting link should I configure — mine or my client's?",
   "crm/faq/why-is-the-crm-companies-tab-empty-while-peopledeals-show-data":
     "Why is the CRM Companies tab empty while People/Deals show data?",
   "crm/faq/why-is-the-crm-showing-no-results":
@@ -632,7 +632,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "support/faq/i-cant-see-the-support-chat-widget":
     "I can't see the support chat bubble?",
   "support/faq/my-urgent-workspace-issue-needs-help-fast":
-    "My urgent workspace issue needs help fast, what do I say?",
+    "My urgent workspace issue needs help fast — what do I say?",
   "support/faq/the-ai-chat-said-something-different-to-what-a-human-told-me":
     "The AI chat said something different from what a human agent told me?",
   "support/faq/where-can-i-check-my-support-ticket-status":
@@ -695,7 +695,7 @@ export const PRODUCT_GUIDE_ARTICLES: Record<string, string> = {
   "workspace-settings/faq/billing-subscriptions/how-do-i-cancel-my-acquisity-workspace-and-stop-all-billing":
     "How do I cancel my Acquisity workspace and stop all billing?",
   "workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity":
-    "How do I disconnect Instantly from Acquisity?",
+    "How do I disconnect the sending platform from Acquisity?",
   "workspace-settings/faq/billing-subscriptions/is-there-a-limit-on-how-many-leads-i-can-upload-or-store":
     "Is there a limit on how many leads I can upload or store?",
   "workspace-settings/faq/billing-subscriptions/what-does-my-course-or-program-purchase-include-and-why-do-i-see-0-credits":
@@ -756,2393 +756,2936 @@ Distilled from the Acquisity help center (apps/web/content/docs at 33f26bec1b9b)
 - Network Researcher, a Resources tool, is only on workspaces where it has been turned on, and the help center has no guide for it.
 - Most features can be turned off for a workspace, and Client users see only the "Client Portal". When a customer does not see a feature in the sidebar, it may not be on for their workspace or their role.
 
-## Navigation map
+## Navigation
+Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it; Client users see only "Client Portal".
+- Under the "Client Access" heading: "Client Portal"
+- At the top: "Dashboard", "CRM" (when the CRM group is not shown)
+- Under the "CRM" heading: "My Day", "Conversations", "Deals", "People", "Companies", "Meetings", "Tasks", "Notes", "Scheduled"
+- Under the "Outreach" heading: "Cold Email Agent", "AI SDR Inbox", "Sales Call Analyzer"
+- Under the "Build" heading: "Workflows", "Sites", "Ads", "Brand", "Growth Plan Creator"
+- Under the "Go To Market" heading: "Market Researcher", "Offer Creator", "Product Ideator", "Product Researcher"
+- "Settings": click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Workspace" and "Personal".
+- Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources" and "Log out".
+- AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar.
+Each article below opens with "Get here:", the path to the page it describes.
 
-This map lists every location within Acquisity that a customer can navigate to, grouped by the product's functional areas. It details the exact page labels, menus, tabs, and settings as described in the product guide, alongside the navigation path to reach them and their associated documentation slug.
+## Who can do what
 
-### Core Workspaces & Onboarding
-* **Landing Page** 
-  * Path: Root URL {index}
-* **Onboarding Wizard**
-  * Path: Automated redirect on first access or \`/dashboard/onboarding\` {onboarding}
-* **Workspace Switcher Dropdown**
-  * Path: Click workspace name or logo in top-left corner {workspace-switcher}
-* **Dashboard**
-  * Path: Left menu > "Dashboard" {dashboard}
-
-### AI Consultant
-* **AI Consultant Chat**
-  * Path: Left sidebar "Home" / "Chat" toggle > click "Chat" {ai-consultant}
-
-### Go To Market
-* **Niche Researcher** (labeled "Market Researcher" in the UI)
-  * Path: Left menu > "Go To Market" > "Market Researcher" {niche-researcher}
-* **Offer Creator**
-  * Path: Left menu > "Offer Creator" {offer-creator}
-
-### CRM (Customer Relationship Management)
-* **Deals Kanban Board**
-  * Path: Left menu > "CRM" > "Deals" {crm/deals}
-* **CRM People**
-  * Path: Left menu > "CRM" > "People" {crm/people}
-* **CRM Companies**
-  * Path: Left menu > "CRM" > "Companies" {crm/companies}
-* **CRM Appointments**
-  * Path: Left menu > "CRM" > "Appointments" {crm/faq}
-* **Import CSV Panel**
-  * Path: Left menu > "CRM" > [People / Companies / Deals] > "Import People" / "Import Companies" / "Import Deals" {crm/importing}
-
-### Outreach & Cold Email Agent
-* **All Campaigns Dashboard**
-  * Path: Left menu > "Outreach" > "Cold Email Agent" {cold-email-agent/campaigns}
-* **New Campaign Wizard**
-  * Path: Left menu > "Outreach" > "Cold Email Agent" > "New Campaign" {cold-email-agent/campaigns/create-a-campaign}
-* **Email Accounts Management**
-  * Path: Left menu > "Outreach" > "Cold Email Agent" > "Email Accounts" {cold-email-agent/email-accounts}
-  * Path: Left menu > "Outreach" > "Cold Email Agent" > "All Campaigns" > "Email Accounts" button {cold-email-agent/email-accounts}
-* **Add New Inboxes Checkout**
-  * Path: Left menu > "Outreach" > "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" {cold-email-agent/email-accounts/buying-inboxes}
-* **Campaign Detail Tabs**
-  * Path: Left menu > "Outreach" > "Cold Email Agent" > Click Campaign Row
-    * **Analytics Tab** {cold-email-agent/campaigns/managing-campaigns/analytics}
-    * **AI Agent Tab** {cold-email-agent/campaigns/managing-campaigns/ai-agent}
-    * **Leads Tab** {cold-email-agent/campaigns/managing-campaigns/leads}
-    * **Sequences Tab** {cold-email-agent/campaigns/managing-campaigns/sequences}
-    * **Options Tab** {cold-email-agent/campaigns/managing-campaigns/options}
-
-### AI SDR
-* **AI SDR Inbox**
-  * Path: Left menu > "AI SDR Inbox" {ai-sdr/inbox}
-
-### AI Website Builder
-* **AI Website Builder**
-  * Path: Left menu > "Website Builder" {ai-website-builder/getting-started}
-
-### Sales Call Analyzer
-* **Sales Calls List**
-  * Path: Left menu > "Sales Call Analyzer" {sales-call-analyzer}
-* **New Call Upload Form**
-  * Path: Left menu > "Sales Call Analyzer" > "New Call" > "Review an existing call recording" {sales-call-analyzer/recordings}
-* **Call Analysis Dashboard**
-  * Path: Left menu > "Sales Call Analyzer" > Click Call Row {sales-call-analyzer/analysis}
-
-### Resources
-* **Resources Directory**
-  * Path: Click your name (bottom of sidebar) > "Resources" {resources}
-* **Cold Email Writer**
-  * Path: Click your name (bottom of sidebar) > "Resources" > "Cold Email Writer" card {resources/cold-email-writer}
-* **Variations Tool**
-  * Path: Click your name (bottom of sidebar) > "Resources" > "Cold Email Writer" > "Create Variations From Existing Script" button {resources/cold-email-writer/variations}
-* **Hiring Portal**
-  * Path: Click your name (bottom of sidebar) > "Resources" > "Hiring Portal" card {hiring-portal}
-
-### Account & Workspace Settings
-* **Personal Account Settings**
-  * Path: Click workspace name (top-left) > "Settings" > "Profile" (under "Personal" section) {account-settings}
-* **Workspace Settings**
-  * Path: Click workspace name (top-left) > "Settings" {workspace-settings}
-* **General Workspace Settings**
-  * Path: Click workspace name (top-left) > "Settings" > "General" {workspace-settings/general}
-* **Team Members & Roles**
-  * Path: Click workspace name (top-left) > "Settings" > "Members" {workspace-settings/members}
-* **Billing & Credits**
-  * Path: Click workspace name (top-left) > "Settings" > "Billing" {workspace-settings/billing}
-* **Cold Email Agent Settings**
-  * Path: Click workspace name (top-left) > "Settings" > "Cold Email Agent" {cold-email-agent/settings}
-* **AI SDR Agent Settings**
-  * Path: Click workspace name (top-left) > "Settings" > "AI SDR Agent" {ai-sdr/settings}
-* **Sales Call Analyzer Settings**
-  * Path: Click workspace name (top-left) > "Settings" > "Sales Call Analyzer" {sales-call-analyzer}
-* **Cold Email Blocklist**
-  * Path: Click workspace name (top-left) > "Settings" > "Cold Email Blocklist" {cold-email-agent/settings/blocklist}
-* **Email Templates**
-  * Path: Click workspace name (top-left) > "Settings" > "Email Templates" {workspace-settings/email-templates}
-* **CRM Custom Fields**
-  * Path: Click workspace name (top-left) > "Settings" > "CRM Custom Fields" {workspace-settings/crm-custom-fields}
-
-### Help, Feedback & White-Label Partner Panel
-* **Feedback (Support Chat)**
-  * Path: Click your name (bottom of sidebar) > "Feedback" {support}
-* **Partner Panel**
-  * Path: Workspace switcher dropdown > "Partner Panel" {white-label-partners/partner-admin}
-
-***
+* Only the Owner can see and fully manage workspace billing and payment details {workspace-settings, workspace-settings/faq/billing-subscriptions/does-pausing-a-campaign-stop-billing, workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset, workspace-settings/faq/billing-subscriptions/where-can-i-see-my-subscription-end-date-on-the-dashboard}.
+* Only the Owner can view, manage, and buy lead credits on the Billing page {workspace-settings/billing}.
+* Only the Owner can initiate a workspace subscription cancellation {workspace-settings/faq/billing-subscriptions/can-i-pause-billing-without-deleting-my-workspace, workspace-settings/faq/workspace-management/how-do-i-rename-a-workspace}.
+* Only the Owner can grant the Owner role to another user {client-portal/faq/can-i-change-a-client-to-a-member, workspace-settings/faq/members-roles/how-do-i-change-my-workspace-role-from-membereditor-to-owner}.
+* Only Owners and Admins can see the delete option for campaigns {cold-email-agent/faq/campaigns/how-do-i-find-the-campaign-delete-menu}.
+* Only Owners and Admins can view and edit the workspace general settings, such as uploading a workspace logo and renaming a workspace {workspace-settings, workspace-settings/faq/workspace-management/how-do-i-rename-a-workspace}.
+* Only Owners and Admins can invite team members or clients to a workspace {workspace-settings/members, workspace-settings/faq/members-roles/how-do-i-invite-team-members-to-my-workspace, client-portal}.
+* Owners, Admins, and Members have full access to upload, analyze, export, and delete recordings inside the Sales Call Analyzer {sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}.
+* Members can use workspace tools but can only view settings as read-only {workspace-settings, workspace-settings/faq/members-roles/how-do-i-invite-team-members-to-my-workspace}.
+* Members cannot access the workspace Billing page or change workspace roles {workspace-settings/members, workspace-settings/faq/members-roles/how-do-i-invite-an-admin-member-and-manage-their-billing-access}.
+* Clients see a read-only home view with no rights to create or change project resources {client-portal}.
+* Clients cannot see or access workspace settings, billing, credits, lead database searches, or the Ask AI feature {client-portal}.
+* Clients cannot access the Sales Call Analyzer {sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}.
+* Clients cannot view or use the Standalone Resources tools unless a white-label partner specifically enables them {resources, client-portal/faq/why-cant-my-client-see-a-tool}.
+* Clients cannot see the Feedback, Resources, or Edit Sidebar menu options in the account menu {account-settings/faq/how-do-i-sign-out-of-acquisity, client-portal}.
+* Clients cannot make plan changes, upgrades, or downgrades {cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits}.
+* Clients can only see the Cold Email Agent or AI SDR campaigns if their managing white-label partner has enabled these specific features for them {client-portal}.
 
 ## What Acquisity cannot do
 
-This section details every explicit system limitation, unsupported format, missing integration, and feature restriction specified throughout the documentation.
-
-* Sample data on the main Dashboard cannot be regenerated once cleared {slug: dashboard}
-* Workspace-wide CSV exporting of bounced leads is not supported; exports can only be performed on a per-campaign basis {slug: dashboard/faq/where-do-i-find-my-bounce-rate-and-bounced-emails}
-* Lead Details fields must live on a linked deal profile and cannot be stored directly on a CRM Person profile {slug: crm/people}
-* Merging duplicate Person, Company, or Deal records in the CRM cannot be undone {slug: crm/people}
-* Unlinking a Person from a Company does not delete the Person from the CRM {slug: crm/companies}
-* Deleting a Company from the CRM does not delete its linked People records; it only unlinks them {slug: crm/companies}
-* The last remaining "Closed Won" or "Closed Lost" stage in a CRM pipeline cannot be deleted {slug: crm/deals}
-* CRM Deal stages cannot be changed automatically by the AI SDR; stage changes, Closed Won, and Closed Lost transitions must be made manually {slug: crm/deals}
-* CRM imports are limited to a maximum of 1,000 rows per file and a maximum file size of 2 MB {slug: crm/importing}
-* Acquisity does not offer a native synchronization integration with GoHighLevel, Salesforce, HubSpot, or Pipedrive {slug: crm/faq/does-acquisity-integrate-with-gohighlevel-ghl-crm}
-* Multiple team members cannot be automatically assigned calls using round-robin or load-balancing methods; bookings are routed solely to the selected call handler {slug: crm/faq/which-meeting-link-should-i-configure-mine-or-my-clients}
-* The CRM Companies tab is never auto-populated by the AI SDR; companies must be added manually, imported, or linked from People imports {slug: crm/faq/why-is-the-crm-companies-tab-empty-while-peopledeals-show-data}
-* The AI Consultant cannot automatically read active campaigns, CRM records, or sales call recordings; data must be pasted manually into the chat {slug: ai-consultant}
-* The AI Consultant cannot build websites, build funnels, send email campaigns, configure integration settings, update the CRM, or edit the AI SDR Knowledge Base {slug: ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}
-* AI Consultant chats are not available or queryable via the public API or the Model Context Protocol (MCP) {slug: ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}
-* The underlying AI models running the AI Consultant, AI SDR, and Cold Email Writer cannot be swapped by the user {slug: ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}
-* Niche Researcher reports cannot generate lead contact data, scraping credits, or CSV list exports {slug: niche-researcher/faq}
-* The Offer Creator does not support a proposal builder, contract builder, or proposal creation features {slug: offer-creator/faq/can-i-create-proposals-from-offers}
-* Generated offer packages are view-only and cannot be edited within the Offer Creator tool {slug: offer-creator/faq/can-i-edit-the-generated-offers}
-* The Offer Creator does not connect with payment processing systems such as Stripe or PayPal {slug: offer-creator/faq/does-it-connect-to-payment-processing}
-* Masterclass sequence methods cannot be generated via the Campaign creation wizard; they must be written in the standalone Cold Email Writer {slug: cold-email-agent/campaigns/create-a-campaign}
-* Lead Magnet campaigns cannot be activated without a resource file or a valid Loom, YouTube, or Vimeo URL starting with https {slug: cold-email-agent/campaigns/lead-magnet-campaigns}
-* Video or file resources uploaded for Lead Magnet campaigns cannot exceed 25 MB in size {slug: cold-email-agent/campaigns/lead-magnet-campaigns}
-* Campaign deletion is permanent and cannot be reversed; deleted analytics, sequences, and leads cannot be recovered by support {slug: cold-email-agent/campaigns}
-* The AI campaign management agent cannot pause an underperforming campaign unless a replacement campaign action is enabled alongside it {slug: cold-email-agent/campaigns/managing-campaigns/ai-agent}
-* The AI campaign management agent is blocked from taking action if the optimization choice would disable all variants in a sequence step {slug: cold-email-agent/campaigns/managing-campaigns/ai-agent}
-* Personalization variables in email sequences are case-sensitive and must be written exactly as defined {slug: cold-email-agent/campaigns/managing-campaigns/sequences}
-* The campaign sequence editor does not feature a rich-text link hyperlinking tool; URLs must be pasted as plain text {slug: cold-email-agent/campaigns/managing-campaigns/sequences}
-* Non-CSV file formats such as .xlsx and .xls are not supported for campaign lead imports {slug: cold-email-agent/campaigns/managing-campaigns/import-leads}
-* Campaign lead uploads are limited to a maximum of 20,000 rows per file and a maximum file size of 100 MB {slug: cold-email-agent/campaigns/managing-campaigns/import-leads}
-* Deduplication checks do not automatically scan or remove duplicates from deleted campaigns {slug: cold-email-agent/campaigns/managing-campaigns/import-leads}
-* Connecting existing external email accounts via Google, Microsoft, or IMAP/SMTP is disabled and labeled Coming Soon {slug: cold-email-agent/email-accounts}
-* Managed campaign sending is capped at a hard platform maximum of 35 emails per inbox, per day, which cannot be increased by the user {slug: cold-email-agent/email-accounts}
-* Managed domain purchases and inbox setups are strictly non-refundable once registered or ordered {slug: cold-email-agent/email-accounts/buying-inboxes}
-* Pre-warmed domains and inboxes are auto-assigned and cannot be self-service customized to a different domain name {slug: cold-email-agent/faq/billing-domains/how-do-i-set-my-sender-domain-and-customize-the-sender-name}
-* Managed outreach domains cannot be transferred out of Acquisity to an external registrar account {slug: cold-email-agent/faq/billing-domains/who-owns-my-purchased-domains-after-i-cancel}
-* Refunds are not provided for lead credits consumed by bounced email addresses {slug: cold-email-agent/concepts/credits}
-* Public consumer email domains such as Gmail cannot be blocked at the domain level on the Cold Email Blocklist {slug: cold-email-agent/settings/blocklist}
-* Cold Email Blocklist CSV imports are limited to a maximum of 1,000 valid entries per upload {slug: cold-email-agent/settings/blocklist}
-* Campaign lead limits cannot be increased on the $99/month Growth plan beyond the 5,000 concurrent lead storage cap {slug: cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits}
-* The AI Ads Maker does not generate actual video files, image assets, or graphics {slug: ad-writer/faq/can-it-generate-video-or-images}
-* The AI Ads Maker does not connect directly with advertising platforms like Facebook Ads Manager, Google Ads, or LinkedIn Campaign Manager {slug: ad-writer/faq/does-it-connect-to-ad-platforms}
-* The AI Website Builder cannot bypass login-blocked, credential-gated, or paywalled URLs for competitor website imports {slug: ai-website-builder/prompting-best-practices}
-* AI Website Builder environment variable keys cannot contain spaces and must start with a letter or an underscore {slug: ai-website-builder/environment-variables}
-* Files uploaded to the AI Website Builder cannot exceed 5 MB for images, 10 MB for PDFs, and 1 MB for TXT or Markdown files {slug: ai-website-builder/credits-and-limits}
-* The AI SDR cannot book calendar slots outside the call handler's defined availability, buffer times, or connected calendar conflicts {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}
-* The AI SDR cannot write custom email reply templates or change its core professional tone; instructions are limited to the facts in the Knowledge Base {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}
-* The AI SDR cannot be set to a specific reply language via a toggle; it will mirror the language of the prospect unless guided by a top-level instruction {slug: ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-reply-in-the-wrong-language-and-how-do-i-enforce-a-specific-reply-language}
-* The AI SDR cannot parse city-only location data to determine prospect timezone; State or Country values must be provided in the import {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr}
-* Custom variables inside email templates will send as raw plain text placeholder brackets unless they are manually replaced {slug: workspace-settings/email-templates}
-* CRM Status system fields are locked and cannot be deleted or duplicated {slug: workspace-settings/crm-custom-fields}
-* CRM Custom Fields of URL type only accept links starting with http:// or https:// {slug: workspace-settings/crm-custom-fields}
-* CRM Custom Fields of Currency type are capped at a maximum numeric value of 9,999,999,999,999.99 {slug: workspace-settings/crm-custom-fields}
-* Changing the currency type of a CRM Custom Field only updates the display symbol and does not perform any financial exchange conversion {slug: workspace-settings/crm-custom-fields}
-* The Sales Call Analyzer cannot analyze audio characteristics such as voice tone, pacing, or emotional delivery {slug: sales-call-analyzer/faq/does-it-analyze-voice-tone}
-* Pasted transcripts in the Sales Call Analyzer must meet a minimum length of 175 words to be accepted {slug: sales-call-analyzer/recordings}
-* Audio and video uploads to the Sales Call Analyzer cannot exceed a maximum file size of 2 GB {slug: sales-call-analyzer/recordings}
-* Transcripts within the Sales Call Analyzer cannot be manually edited or rewritten {slug: sales-call-analyzer/faq/can-i-edit-the-transcript}
-* Call analyses cannot be exported to PDF or text files natively; they are downloadable as Markdown only {slug: sales-call-analyzer/faq/can-i-export-to-pdf}
-* Users with the Client role have no access to the Sales Call Analyzer tool {slug: sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}
-* The Growth Plan Creator does not support importing brand asset logos or custom business branding to the generated document {slug: growth-plan-creator/faq/can-i-add-my-logo-to-the-plan}
-* The Growth Plan Creator does not feature a native PDF or Microsoft Word export tool {slug: growth-plan-creator/faq/can-i-export-to-word-or-pdf}
-* Discovery call transcripts pasted into the Growth Plan Creator must meet a minimum length of 1,000 characters {slug: growth-plan-creator}
-* Team member roles cannot be changed once an invitation is sent; the invitation must be revoked and sent again to assign a different role {slug: workspace-settings/members}
-* Sole Owners of a workspace cannot demote themselves or change their role to Admin or Member; a workspace must always retain at least one Owner {slug: workspace-settings/members}
-* Workspace deletion is not supported; active workspaces cannot be deleted or removed {slug: workspace-settings/faq/workspace-management/how-do-i-deleteremove-a-client-workspace}
-* Personal accounts share a single payment card across all workspaces; separate credit cards cannot be assigned to different workspaces under the same login {slug: workspace-settings/faq/billing-subscriptions/can-i-use-different-payment-cards-per-workspace}
-* Sourcing credits do not reset or refill at the end of a billing cycle; recurring credit packs are refilled up to their cap and do not stack {slug: workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset}
-* White-label partners cannot self-edit listed specialist profiles on the Hiring Portal; edits must be requested via support {slug: hiring-portal}
-* The Hiring Portal does not provide an automated matching engine, subcontractor contract templates, or payment escrow services {slug: hiring-portal/faq/how-do-i-pick-the-right-specialist-for-my-project}
-* Acquisity does not provide customer support over phone or email; help is accessible solely via the in-app chat widget and Feedback form {slug: support}
+* The platform Dashboard does not track total replies, only the Positive Reply Rate {dashboard}.
+* The platform Dashboard cannot regenerate sample data once it has been deleted {dashboard/faq/where-did-my-sample-data-go}.
+* The Cold Email Agent Leads tab cannot export leads across the entire workspace at once, only on a per-campaign basis {dashboard/faq/where-do-i-find-my-bounce-rate-and-bounced-emails}.
+* The CRM does not natively sync or auto-push/pull data with GoHighLevel, Salesforce, HubSpot, or Pipedrive {crm/faq/does-acquisity-integrate-with-gohighlevel-ghl-crm, account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+* The platform does not offer a packaged Zapier or n8n integration for GoHighLevel syncing {crm/faq/does-acquisity-integrate-with-gohighlevel-ghl-crm}.
+* The CRM cannot retroactively create or update deals for email replies that occurred before deal automation settings were active {crm/deals}.
+* The CRM pipeline builder cannot delete the last "Won" stage or the last "Lost" stage in a pipeline {crm/deals, crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}.
+* The CRM pipeline does not have a "reset all" button to clear or restart stages {crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}.
+* The CRM cannot bulk delete deals; they must be deleted manually one card at a time {crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}.
+* The CRM Companies tab cannot automatically populate data via the AI SDR {crm/faq/why-is-the-crm-companies-tab-empty-while-peopledeals-show-data}.
+* The AI Consultant cannot automatically read, access, or review your active campaigns, CRM records, or sales calls {ai-consultant}.
+* The AI Consultant cannot build websites, send email campaigns, change configuration settings, edit the CRM, or update your Knowledge Base {ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}.
+* The AI Consultant is not available via public API or the Model Context Protocol (MCP) {ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}.
+* The platform does not allow users to swap out the underlying AI model used by the AI Consultant, AI SDR, or Cold Email Writer {ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support, account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+* The Offer Creator does not have an in-platform proposal or contract builder to convert packages into documents {offer-creator/faq/can-i-create-proposals-from-offers}.
+* The Offer Creator results page is view-only and cannot be edited directly within the app interface {offer-creator/faq/can-i-edit-the-generated-offers}.
+* The Offer Creator does not integrate with payment processors {offer-creator/faq/does-it-connect-to-payment-processing}.
+* The Cold Email Agent does not support direct sending to a contact from the CRM without first exporting and uploading them as a CSV lead list {crm/faq/how-do-i-import-my-crm-contacts-into-a-spreadsheet-for-cold-email}.
+* The Cold Email Agent Sequences editor cannot display live, personalized lead-data previews, only unfilled placeholders {cold-email-agent/campaigns/managing-campaigns/sequences}.
+* The Cold Email Agent Sequences editor does not have a rich-text link insert tool {cold-email-agent/campaigns/managing-campaigns/sequences}.
+* The Cold Email Agent cannot automatically pause a campaign on its own unless an enabled replacement-campaign action is ready to run {cold-email-agent/campaigns/managing-campaigns/ai-agent, cold-email-agent/settings}.
+* The Cold Email Agent cannot disable every single email variant inside a step; at least one variant must remain active {cold-email-agent/campaigns/managing-campaigns/ai-agent}.
+* The Cold Email Agent cannot retroactively change the copy of sent or in-flight emails when you switch campaign types or edit sequence text {cold-email-agent/campaigns/managing-campaigns/options, cold-email-agent/faq/campaigns/how-do-i-prevent-the-cold-email-agent-from-re-sending-oldoutdated-emails}.
+* The Cold Email Agent cannot retroactively reassign a salesperson or calendar destination for a meeting that has already been booked {cold-email-agent/campaigns/managing-campaigns/options}.
+* The Cold Email Agent cannot send one-off individual cold emails; all outreach must run through active campaigns {cold-email-agent/faq/lead-search/how-do-i-send-cold-emails-only-to-specific-leads-via-csv-upload}.
+* The Cold Email Agent cannot verify email addresses for CSV lead imports unless you manually check the verification toggle during the import process {cold-email-agent/faq/lead-search/how-do-i-splitexport-a-large-ai-generated-lead-list-into-csv}.
+* The Cold Email Agent cannot bypass its hard limit of 35 campaign sends per day per inbox {cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit}.
+* The Cold Email Agent does not have a vacation pause feature to temporarily pause email accounts or warmup {cold-email-agent/faq/email-accounts/can-i-temporarily-holdpause-my-email-accounts-while-im-away}.
+* The Cold Email Agent cannot allow users to connect external or personal email accounts for campaign outreach, as the option is disabled {cold-email-agent/email-accounts, cold-email-agent/email-accounts/buying-inboxes}.
+* The Cold Email Agent does not support buying a single custom domain; they are sold only in bundles of three inboxes per domain {account-settings/faq/can-i-buy-a-single-domain-instead-of-the-fixed-bundle}.
+* The Cold Email Agent cannot perform county-level geographical targeting in the Lead Database; locations are limited to countries, states, and cities {cold-email-agent/faq/lead-search/can-i-search-by-city-or-state}.
+* The AI Ads Maker does not generate finished video or image files, only text-based scripts {ad-writer/faq/can-it-generate-video-or-images}.
+* The AI Ads Maker does not connect to external advertising platforms like Facebook or Google Ads {ad-writer/faq/does-it-connect-to-ad-platforms}.
+* The AI Website Builder cannot bypass login pages or paywalls to scan external websites {ai-website-builder/prompting-best-practices}.
+* The AI Website Builder does not charge credits for publishing or setting up custom domains {ai-website-builder/credits-and-limits}.
+* The AI Website Builder custom domains cannot serve pages until the first site version is successfully published {ai-website-builder/publishing, ai-website-builder/connect-custom-domain}.
+* The AI Website Builder does not support direct third-party script integrations unless they are configured using environment variables {ai-website-builder/troubleshooting}.
+* The AI SDR cannot change its reply voice, alter its core tone, or manage complex scope and pricing negotiations {ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits, ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-make-up-answers-when-the-knowledge-base-doesnt-cover-something, ai-sdr/faq/inbox-replies/why-isnt-the-ai-sdr-kb-changing-the-reply-tonepersona-despite-my-instructions}.
+* The AI SDR cannot book meetings outside your configured availability window or calendar conflicts {ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}.
+* The AI SDR cannot automatically run a round-robin assignment system for booking across multiple team members' calendars {ai-sdr/faq/scheduling-calendar/do-i-need-to-personally-answerjoin-booked-calls-and-what-routing-is-required}.
+* The AI SDR cannot accept custom send-time inputs for automated follow-up messages {ai-sdr/faq/configuration/can-i-manually-setoverride-when-the-ai-sdr-sends-a-follow-up}.
+* The AI SDR cannot crawl or ingest documentation URLs to build its Knowledge Base {ai-sdr/faq/configuration/can-i-point-the-ai-sdr-at-a-docs-url-instead-of-pasting-entries}.
+* The AI SDR cannot maintain a revision history of previous Knowledge Base edits {ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app}.
+* The AI SDR cannot route escalation notifications to any email address other than the workspace owner's primary email {ai-sdr/faq/inbox-replies/who-receives-ai-sdr-escalation-and-booking-notification-emails}.
+* The AI SDR cannot run on a hybrid manual/automated basis on the same thread; it must be either fully enabled or fully disabled {ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}.
+* The Sales Call Analyzer cannot analyze voice tone, inflection, pace, or emotional markers {sales-call-analyzer/faq/does-it-analyze-voice-tone}.
+* The Sales Call Analyzer cannot allow users to edit the generated transcript {sales-call-analyzer/faq/can-i-edit-the-transcript}.
+* The Sales Call Analyzer cannot export analysis reports directly to PDF or plain text, only to Markdown {sales-call-analyzer/analysis}.
+* The Growth Plan Creator does not support custom branding or logo uploads {growth-plan-creator/faq/can-i-add-my-logo-to-the-plan}.
+* The Growth Plan Creator does not support direct document exporting to Microsoft Word or PDF format {growth-plan-creator/faq/can-i-export-to-word-or-pdf}.
+* The Growth Plan Creator cannot adjust its growth projections or packages to account for a client's specific budget constraint {growth-plan-creator/faq/the-growth-plan-doesnt-account-for-my-clients-budget}.
+* The platform does not provide a "sign out everywhere" option for user accounts {account-settings/faq/how-do-i-sign-out-of-acquisity}.
+* The platform does not support native Slack, GoHighLevel, or Zapier webhooks or integrations {account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+* White-label portal setups cannot automatically transfer branding, domains, or workspaces to existing client accounts {white-label-partners, branding-domains}.
+* White-label partner features do not support reordering or customizing the steps of the onboarding sequence {white-label-partners/features-settings}.
+* The Hiring Portal does not support posting job listings or matching engines {hiring-portal/faq/can-i-post-a-job-listing-on-the-hiring-portal, hiring-portal/faq/how-do-i-pick-the-right-specialist-for-my-project}.
+* The platform does not offer custom templates for subcontractor agreements or contracts {hiring-portal/faq/is-there-a-subcontractor-contract-template}.
+* The AI Automation Creator cannot export workflows as JSON into n8n during its early testing phase {resources/faq/how-do-i-import-the-n8n-workflow-creator-json-into-n8n}.
+* Workspaces cannot be deleted by users, nor can account billing be paused without cancelling the subscription {workspace-settings/general, workspace-settings/faq/billing-subscriptions/can-i-pause-billing-without-deleting-my-workspace}.
+* Standalone workspace plans do not include a direct "pause subscription" option; only full cancellation stops renewal billing {cold-email-agent/faq/campaigns/pausing-a-campaign-vs-pausing-my-subscription}.
 
 ## Articles
 
 ### Home {slug: index}
-Help-center landing page; no product facts.
+
 
 ### Frequently Asked Questions {slug: faq}
-No specific facts given; refers users to area-specific FAQ sections.
+No facts given; points to area-specific FAQ sections.
 
 ### Glossary {slug: glossary}
-Full term list with definitions; filter and letter-jump navigation. Dotted-underlined terms elsewhere link here; hover shows short definition, click jumps to full entry.
+Reference page listing definitions for all platform terms, with filter and letter navigation. Dotted-underline terms elsewhere link here for full definitions.
 
 ### Dashboard {slug: dashboard}
-Main workspace overview. Open via "Dashboard" in left menu. Greets by name (Good morning/afternoon/evening).
-Four sections top to bottom:
-1. KPI Cards: "Contacted Leads", "Positive Replies", "Booked Calls", "Cash Collected" - each shows % change vs previous period, green up/red down arrow.
-2. "Contacted Leads Chart" - line chart of outreach volume over time.
-3. "Conversion Rates": "Positive Reply Rate" (Positive Replies/Contacted Leads), "Booked Call Rate" (Booked Calls/Positive Replies) with progress bar vs target. Benchmarks: Podcast 1-2%, Interview 0.5-1.5%, AI Business Audit 0.5-1%, Direct 0.3-0.8%; Booked Call Rate 20-40% (default target 25%). Low Booked Call Rate: check "Settings" > "AI SDR Agent".
-4. "Pipeline Performance" (Sales Calls, Closed Deals stage cards, funnel not kanban; drag-card pipeline is under "CRM" > "Deals") and "Sales Performance" ("Sales Calls Taken", "Close Rate").
-Only counts true Positive Reply Rate, excludes Out of Office/Unsubscribe.
-"Workspace selector" top left switches workspaces, reloads data.
-"Date range picker" top right: Last 7/14/30(default)/90 days, Last year, All time; disabled during sample data.
-Sample Data Mode: shows if no real campaigns; auto-clears on real campaign or click "Clear Sample Data" banner; cannot be regenerated once cleared.
-Troubleshooting: all zeros = no campaigns, wrong date range, or paused campaigns (check Cold Email Agent status Active). Wrong workspace data = use workspace selector.
+Get here: "Dashboard"
+Overview workspace page with four sections: KPI Cards, Contacted Leads Chart, Conversion Rates, Pipeline Performance/Sales Performance.
+- KPI cards: Contacted Leads, Positive Replies, Booked Calls, Cash Collected; each shows % change vs previous period.
+- Only tracks Positive Reply Rate, not total replies.
+- Sample data shows if no real campaigns yet; date picker disabled then; clears automatically with real campaign or via "Clear Sample Data" banner button.
+- Workspace selector top left switches workspace data.
+- Conversion Rates: Positive Reply Rate (Positive Replies/Contacted Leads), Booked Call Rate (Booked Calls/Positive Replies, target 25%, healthy 20-40%).
+- Benchmarks: Podcast 1-2%, Interview 0.5-1.5%, AI Business Audit 0.5-1%, Direct 0.3-0.8%.
+- Low Booked Call Rate: check "Settings" > "AI SDR Agent".
+- Pipeline Performance: funnel cards Sales Calls, Closed Deals (% of contacted leads); not a kanban, use "CRM" > "Deals" for draggable pipeline.
+- Sales Performance: Sales Calls Taken, Close Rate.
+- Date range picker (top right): Last 7/14/30(default)/90 days, Last year, All time.
+- Zeros: no campaigns yet, date range too narrow (try All time), or campaigns Paused instead of Active.
+- Wrong workspace: use workspace selector.
 
 ### Frequently Asked Questions {slug: dashboard/faq}
-Index page only, no additional facts.
+Get here: "Dashboard"; overview page, no added facts.
 
 ### How am I doing after 2 weeks of cold email? {slug: dashboard/faq/how-am-i-doing-after-2-weeks-of-cold-email}
-Healthy: Open rate ≥40% (else deliverability/SPF/DKIM/health score issue); Positive reply rate per method (see dashboard); Bounce rate under 5% (else sender reputation damage, verify list). Fix order: deliverability first, then bounce rate, then reply rate. Use AI Consultant for diagnosis.
+Get here: "Dashboard"
+- Healthy: open rate 40%+, bounce rate under 5%, positive reply rate per method benchmarks above.
+- Fix order: deliverability first, then bounce rate, then reply rate.
+- Paste numbers into AI Consultant for diagnosis.
 
 ### How do I get real data into my Dashboard? {slug: dashboard/faq/how-do-i-get-real-data-into-my-dashboard}
-Close Rate = Won CRM deals / sales-call-stage deals in date range. If empty: check date range picker (try All time), workspace selector, campaign status (reopen paused campaigns, set Active).
+Get here: "Dashboard"
+- Close Rate = won CRM deals / sales-call-stage deals in range.
+- Check date range (try All time), workspace selector, campaign status (Active vs Paused).
 
 ### How do I see which leads haven't been contacted yet? {slug: dashboard/faq/how-do-i-see-which-leads-have-not-been-contacted-yet}
-Open campaign via "Cold Email Agent" > campaign > "Leads" tab > "Filter" > "Email Sent" > "Not Yet Contacted".
+Get here: "Cold Email Agent", open campaign, "Leads" tab
+- Click "Filter" > "Email Sent" > "Not Yet Contacted".
 
 ### What is a good positive reply rate? {slug: dashboard/faq/what-is-a-good-positive-reply-rate}
-"Really good": Podcast 2%+, Interview 1.5%+, AI Business Audit 1%+, Direct 0.8%+. View at Dashboard > Conversion Rates, campaign Analytics tab, or AI SDR Inbox filtered to Interested. Fixes: narrow offer, specific subject lines, emails under 100 words, continue follow-ups.
+Get here: "Dashboard" > "Conversion Rates" > "Positive Reply Rate"; also campaign "Analytics" tab; or "AI SDR Inbox" filtered to "Interested"
+- Great: Podcast 2%+, Interview 1.5%+, AI Business Audit 1%+, Direct 0.8%+.
+- Fixes: narrow offer, specific subject lines, under 100-word first email, don't stop follow-ups early.
 
 ### Where are my campaigns? {slug: dashboard/faq/where-are-my-campaigns}
-Via "Cold Email Agent" sidebar icon; tabs: "Analytics", "AI Agent", "Leads", "Sequences", "Options". Missing sidebar item: feature/role not enabled (ask admin) or Legacy Pro plan lacks Cold Email Agent (upgrade via "Settings" > "Billing").
+Get here: "Cold Email Agent"
+- Campaign detail tabs: Analytics, AI Agent, Leads, Sequences, Options.
+- Missing sidebar item: feature/role disabled (ask admin) or Legacy Pro plan lacks it; upgrade via "Settings" > "Billing".
 
 ### Where did my sample data go? {slug: dashboard/faq/where-did-my-sample-data-go}
-Same as dashboard sample data facts; disappears via Clear Sample Data click, real campaign existing, or wrong workspace selected; cannot be regenerated.
+Get here: "Dashboard"
+- Disappears via "Clear Sample Data" or real campaign existing; cannot be regenerated once gone.
 
 ### Where do I find my bounce rate and bounced emails? {slug: dashboard/faq/where-do-i-find-my-bounce-rate-and-bounced-emails}
-Bounce rate shown in campaign "Leads" tab header. Bounced threads: "Inbox" filter "Bounced". Export: Leads tab, apply bounce filter, click "Export CSV" (per-campaign only, no workspace-wide export). Keep bounce rate under 3%; above 5% harms sender reputation; pause and verify list if climbing.
+Get here: "Cold Email Agent", open campaign, "Leads" tab (bounce % in header)
+- Bounced threads: "Inbox" filter status "Bounced".
+- Export: Leads tab, apply bounce filter, click "Export CSV" (per campaign only, no workspace-wide export).
+- Keep bounce rate under 3%; above 5% harms sender reputation; pause and verify list if climbing.
 
 ### Why does the Dashboard show a booked call but my Inbox doesn't? {slug: dashboard/faq/why-does-the-dashboard-show-a-booked-call-but-my-inbox-does-not}
-Check "AI SDR Inbox" > "Inbox" filter "Meeting Booked" (authoritative). Wait 10-15 min and refresh if mismatch; report via "Feedback" in account menu or chat bubble after an hour.
+Get here: "AI SDR Inbox" > "Inbox", filter "Meeting Booked"
+- Dashboard may lag 10-15 min; report persistent mismatch via account menu "Feedback".
 
 ### Why don't my Dashboard totals match per-campaign numbers? {slug: dashboard/faq/why-dont-dashboard-and-per-campaign-totals-match}
-Dashboard defaults to last 30 days; Contacted Leads counts unique leads, not emails sent. Fix: set Dashboard date filter to All time, compare to Cold Email Agent stat cards. Other causes: wrong workspace, mid-send campaigns, archived/hidden campaigns excluded. Report persistent mismatch via Feedback/chat bubble.
+Get here: "Dashboard"
+- Default 30-day filter differs from campaign all-time totals; set "Dashboard" date filter to All time and compare to "Cold Email Agent" stat cards.
+- Contacted Leads counts unique leads, not emails sent.
+- Check workspace selector, mid-send campaigns, archived/hidden campaigns; else report via account menu "Feedback".
 
 ### CRM Overview {slug: crm}
-- CRM sections (nav): "Deals", "Appointments", "People", "Companies", "Tasks", "Notes", "Files".
-- Stores people, companies, deals, tasks, notes, files, appointments.
-- Connects with Cold Email Agent (interested replies/bookings create/update People/Deals), AI SDR (booked meetings become appointments, link to CRM), Sales Call Analyzer (call activity on linked records), Dashboard (KPIs pull from CRM data).
-- Add Task: open record > "Tasks" tab > "Add task" > fill details, due date, assignee > "Save".
-- Add Note: open record > "Notes" tab > "Add note" > type text > "Save". Notes show timestamp + author.
-- Appointments sync from connected Google/Outlook calendar; set up at "Settings" > "Email & Calendar". Click appointment for details/join link.
-- Sample Data Mode: new empty workspaces show sample data; disappears once a real record is added or banner dismissed.
+Get here: "CRM"
+- Manage People, Companies, Deals, Tasks, Notes, Files, Appointments in one place.
+- Connects to Cold Email Agent, AI SDR, Sales Call Analyzer, Dashboard.
+- Sections (CRM nav): Deals, Appointments, People, Companies, Tasks, Notes, Files.
+- Add task/note: open record > "Tasks"/"Notes" tab > "Add task"/"Add note" > fill in > "Save".
+- Appointments sync from connected Google/Outlook calendar, set up in "Settings" > "Email & Calendar".
+- New workspaces show sample data until first real record added; dismiss via banner.
 
 ### Managing People {slug: crm/people}
-- Path: "CRM" > "People".
-- Add Person: "Add Person" button > dialog > Name required; Email, Phone optional > "Add Person".
-- Profile fields: Name, Do Not Contact, Title, Emails, Phones, Address, Tags, Facebook, Instagram, LinkedIn, Twitter (social hidden until "Show all values").
-- Companies/Deals sections: "Link" to connect, "X" to unlink.
+Get here: "CRM" > "People"
+- "Add Person": only Name required; email/phone optional.
+- Profile shows Details (Name, Do Not Contact, Title, Emails, Phones, Address, Tags, social links hidden by default, click "Show all values").
+- Link/unlink Companies and Deals via "Link"/"X".
 - Lead Details live on linked deal, not person.
-- Edit: click field value, type, autosaves.
-- Timeline tabs: Activity, Emails, Notes, Tasks, Files, Calls & Texts (varies by workspace).
-- Search bar filters live; filter icon for column conditions; save filter/sort as "Views" > "Create new view".
-- Bulk actions (checkbox select): "Update tags", "Export selected", "Delete selected".
-- Merge: open record to keep > three-dot menu > "Merge records" > select duplicate > review fields > confirm. Combines linked data; cannot be undone.
-- Delete: three-dot menu > "Delete record" > confirm. Removes from all linked companies/deals, not undoable.
-- Troubleshooting: clear filters, search by email, check workspace switcher, check CSV import errors; use merge for duplicates.
+- Edit fields inline, autosaves.
+- Timeline tabs: Activity, Emails, Notes, Tasks, Files, Calls & Texts.
+- Search bar, filter icon, Saved Views ("Views" > "Create new view").
+- Bulk actions: Update tags, Export selected, Delete selected.
+- Merge: three-dot menu > "Merge records", pick duplicate, confirm; merges all linked data.
+- Delete: three-dot menu > "Delete record"; permanent, removes links.
+- Troubleshooting: clear filters, search by email, check workspace, check CSV import errors; prevent duplicates by searching first/deduping CSVs.
 
 ### Managing Companies {slug: crm/companies}
-- Path: "CRM" > "Companies".
-- Add Company: "Add Company" button > Name required; Description, Industry, Employees optional > "Add Company".
-- Profile fields: Name, Description, Industry, Employees, Websites, Address, Tags, social links (hidden, "Show all values").
-- People/Deals sections: "Link"/"X" to unlink (unlinking person doesn't delete them).
-- Edit fields inline, autosaves.
+Get here: "CRM" > "Companies"
+- "Add Company": only Name required; description, industry, employees optional.
+- Profile: Record Details, People (link/unlink), Deals (link/unlink).
+- Edit inline, autosaves.
 - Timeline tabs: Activity, Notes, Tasks.
-- Search/filter/save views same as People.
-- Bulk actions: "Delete", "Tag".
-- Merge via three-dot menu > "Merge records", same flow as People.
-- Delete: three-dot menu > "Delete record" > confirm. Does NOT delete linked people, only unlinks them.
-- Troubleshooting: merge duplicate-named companies; re-link contacts via "Link" button if missing.
+- Search, filter, Saved Views like People.
+- Bulk actions: Delete, Tag.
+- Merge via three-dot menu > "Merge records".
+- Delete via three-dot menu > "Delete record"; does not delete linked people, only unlinks them.
+- Troubleshooting: merge duplicate-named companies; link contacts via "Link" button if missing.
 
 ### Deals and Pipelines {slug: crm/deals}
-- Path: "CRM" > "Deals" (kanban board).
-- Create Pipeline: three-dot menu near "Export"/"Import Deals"/"Add Deal" > "Add Pipeline" > pick template or "Custom Pipeline" > set stages (Stage Name, Probability, Won checkbox, Lost checkbox) > must have ≥1 Won and ≥1 Lost stage > drag to reorder > "Create Pipeline". Cannot delete last Won/Lost stage.
-- Multiple pipelines supported; switch via dropdown.
-- Create Deal: "Add Deal" or "+" in column > fill Deal Name (required), Amount, Currency (USD/EUR/GBP/CAD/AUD), Win Probability, Pipeline (required), Stage (required), Source, Owner, Contacts, Companies > "Create Deal".
-- Automatic deal creation from Cold Email Agent/AI SDR interested replies or bookings; review and adjust stage manually.
-- Move deals via drag-and-drop or Stage dropdown on deal profile.
-- Filters above board: search, Probability, Amount, Date, Tags, Owner, Sort, Views.
-- Deal profile fields: Deal Name, Pipeline, Stage, Amount, Currency, Probability, Source, Owner, Tags; tabs: Activity, Notes, Tasks, Emails, Files.
+Get here: "CRM" > "Deals"
+- Need at least one pipeline before adding deals; create via three-dot menu (near Export/Import Deals/Add Deal) > "Add Pipeline".
+- Pipeline needs ≥1 "Won" and ≥1 "Lost" stage; cannot delete last of either.
+- Multiple pipelines allowed, switch via dropdown.
+- "Add Deal": Deal Name, Pipeline, Stage required; Amount, Currency (USD/EUR/GBP/CAD/AUD), Win Probability, Source, Owner, Contacts, Companies optional.
+- Interested replies/bookings from Cold Email Agent or AI SDR can auto-create/update deals; review and move manually afterward.
+- Move deals by drag-and-drop or Stage dropdown on deal profile.
+- Filter/search/sort controls above board; Views for saving.
 - Merge duplicates via three-dot menu > "Merge records".
-- Closing: drag to Closed Won/Lost stage; Won deals count toward Dashboard revenue.
-- Edit Pipeline: dropdown "All Pipelines" > three-dot menu > "Edit Pipeline" > "Update Pipeline".
-- Troubleshooting: create pipeline if no stages shown; check campaign CRM/AI SDR settings if deals not auto-created (not retroactive for old replies); use Stage dropdown if drag stuck (Closed deals are not locked).
+- Closed Won deals count toward Dashboard revenue; Closed Lost deals stay visible, can add note.
+- Edit Pipeline via "All Pipelines" dropdown > three-dot menu > "Edit Pipeline" > "Update Pipeline".
+- Troubleshooting: create pipeline if no stages appear; check campaign Options and Settings > AI SDR Agent if auto-deals missing (not retroactive for old replies); refresh or use Stage dropdown if drag-drop stuck.
 
 ### Importing Data {slug: crm/importing}
-- Import People/Companies/Deals via "CRM" > section > "Import People"/"Import Companies"/"Import Deals".
-- Limits: 1,000 rows per file, max file size 2 MB.
-- 4 steps: Upload file > Map columns (verify auto-matches) > Validate (fix errors: required fields, email format, duplicates, format issues) > Confirm and Import (shows created/updated/skipped counts).
-- People fields: Name (required), Job Title, Email, Phone, social URLs, address fields, Tags, Company Name/Website (links/creates company).
-- Company fields: Company Name (required), Description, Industry, Employees, Websites, socials, address, Tags, Team Name/Email.
-- Deal fields: Deal Name (required), Amount, Currency, Probability, Pipeline (required), Stage (required), Tags, associated Company/Contact fields.
-- Tips: clean CSV, import companies before people, test with 10-20 rows, avoid >1,000 rows, quote commas in fields.
-- Troubleshooting: fix flagged rows/missing name/invalid email; company matching is exact (merge duplicates after); large imports may take time, try batches of 500.
+Get here: "CRM" > "People"/"Companies"/"Deals" > "Import People"/"Import Companies"/"Import Deals"
+- Row limit: 1,000 per file; max file size 2 MB.
+- 4 steps: Upload file, Map columns, Validate data, Confirm and Import.
+- People fields: Name (required), Job Title, Email, Phone, social links, address, Tags, Company Name/Website/fields.
+- Company fields: Company Name (required), Description, Industry, Employees, Website URLs, social links, address, Tags, Team Name/Email.
+- Deal fields: Deal Name (required), Amount, Currency, Probability, Pipeline (required), Stage (required), Tags, Company/Contact fields.
+- Validation flags missing required fields, bad email format, duplicates, format issues; fix inline or skip rows.
+- Confirm shows created/updated/skipped counts.
+- Tips: import companies before people, test with 10-20 rows, avoid >1,000 rows, dedupe CSV.
+- Troubleshooting: fix flagged red cells; company matching is exact (merge duplicates after); large imports split into 500-row batches, don't close tab.
 
 ### Frequently Asked Questions {slug: crm/faq}
-No additional facts; see crm, crm/people, crm/companies, crm/deals, crm/importing.
+Get here: "CRM"
+No facts given beyond section headings (People/Companies/Deals, Import/Export, Calendar/Meetings, AI SDR × CRM).
 
 ### Can I add custom fields to People and contacts in the CRM? {slug: crm/faq/can-i-add-custom-fields-to-people-and-contacts}
-Yes. "Settings" > "CRM Custom Fields" > pick "People", "Companies", or "Deals" > "Add Field" > choose Icon, Label, Description, Field Type > "Create Field". Types: Text, Number, Date, Select, Multi-select, Boolean. Default Person fields: Name, Email, Phone, Companies, LinkedIn, Notes, Tags, Do Not Contact. Use Notes for free text, Tags for filtering, Deal fields for deal-specific data.
+Get here: "Settings" > "CRM Custom Fields"
+- Choose "People", "Companies", or "Deals" (separate field lists each).
+- Click "Add Field" > pick Icon > fill "Label", "Description", "Field Type" > "Create Field".
+- Field types: Text, Number, Date, Select, Multi-select, Boolean.
+- Default Person fields: Name, Email, Phone, Companies, LinkedIn, Notes, Tags, Do Not Contact.
+- Use Notes for long context, Tags for filtering, Deal fields for deal-specific data.
 
 ### Can I delete appointments from the CRM? {slug: crm/faq/can-i-delete-appointments-from-the-crm}
-"CRM" > "Appointments" > click appointment > "Delete" > confirm "Delete". Permanent, no undo. Deleting AI SDR-booked or synced appointments also deletes the connected calendar event and sends attendee a cancellation; manually-added ones only remove from CRM. To avoid notifying attendee, cancel on calendar first, then delete here. If not syncing, check "Settings" > "Email & Calendar" connection; reconnect if disconnected (new bookings sync immediately, past events within minutes).
+Get here: "CRM" > "Appointments"
+- Click appointment > "Delete" > confirm "Delete". Permanent, no undo.
+- AI SDR-booked: deletes from CRM and connected calendar, sends cancellation to attendee.
+- Manually added: removed from CRM only. Synced: removed from both.
+- To avoid notifying attendee, cancel on calendar first, then delete here.
+- If not syncing: "Settings" > "Email & Calendar", check/reconnect Google/Outlook; new bookings sync immediately, past events within minutes.
 
 ### Does Acquisity integrate with GoHighLevel (GHL) CRM? {slug: crm/faq/does-acquisity-integrate-with-gohighlevel-ghl-crm}
-No native GHL/Salesforce/HubSpot/Pipedrive sync. Options: Public CRM REST API (people, companies, deals, meetings), Public Cold Email API, MCP (org API keys only, not personal tokens), manual CSV export/import via "Export" button in "CRM" > People/Companies/Deals/Appointments, or Zapier/n8n with API calls. People export columns: Name, Title, Primary Email, All Emails, Primary Phone, All Phones, Tags, Linked Companies, Linked Deals, LinkedIn, Twitter, Facebook, Instagram, Address, Created At, Updated At.
+Get here: "CRM" > "People" (or "Companies"/"Deals"/"Appointments")
+- No native GHL sync; no auto push/pull to GHL, Salesforce, HubSpot, Pipedrive.
+- Manual CSV export (Export button, top-right) then import into GHL; reformat headers as needed.
+- Public CRM REST API, Public Cold Email API, MCP available for developers; no packaged Zapier/n8n GHL sync.
+- People export columns: Name, Title, Primary Email, All Emails, Primary Phone, All Phones, Tags, Linked Companies, Linked Deals, LinkedIn, Twitter, Facebook, Instagram, Address, Created At, Updated At.
 
 ### Does the AI SDR update CRM deal stages automatically? {slug: crm/faq/does-the-ai-sdr-update-crm-deal-stages-automatically}
-Positive reply: Person/Deal created/updated and linked. Meeting booked: appears in "CRM" > "Appointments". DNC in inbox: marks Person DNC. Stage changes, Closed Won/Lost always manual.
+Get here: "CRM"
+- Positive reply: Person/Deal created/updated and linked.
+- Meeting booked: appears in "CRM" > "Appointments", links to CRM records.
+- DNC in inbox: Person marked DNC.
+- Closed Won/Lost and stage changes after sales conversation starts are always manual.
 
 ### How do I add a Google Meet link to CRM meetings (instead of Zoom)? {slug: crm/faq/how-do-i-add-a-google-meet-link-to-crm-meetings-instead-of-zoom}
-Create Meet room, copy URL. "Settings" > "Conferencing" > "Meeting Link Type" > "Static meeting link" > paste URL in "Meeting Link" > "Save". For Zoom, paste static link or use "Dynamic meeting links" for per-meeting rooms. Bookings show in "CRM" > "Appointments".
+Get here: "Settings" > "Conferencing"
+- "Meeting Link Type" > "Static meeting link" > paste Meet URL > "Save". Applies to all AI SDR bookings.
+- To keep Zoom: paste Zoom link as static link, or connect Zoom via "Dynamic meeting links".
+- Meetings show in "CRM" > "Appointments".
 
 ### How do I connect a client's calendar to the Cold Email Agent? {slug: crm/faq/how-do-i-connect-a-clients-calendar-to-the-cold-email-agent}
-Switch to client workspace > "Settings" > "Email & Calendar" > "Connect" Google or Outlook > sign in as the call-taker > set "Create events on" and "Check for conflicts". Either client signs in directly or you use a delegated account. Also set "Settings" > "Conferencing". AI SDR assigns calls via campaign Assigned Salesperson, then workspace Assigned Call Handler, then automatic assignment.
+Get here: click workspace name (top-left) to switch workspace, then "Settings" > "Email & Calendar"
+- Click "Connect" on "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)", sign in as call-taker.
+- Set "Create events on" calendar and "Check for conflicts" toggles.
+- Client can sign in directly, or you use a delegated account they share calendar with.
+- Also set "Settings" > "Conferencing" (static or dynamic link).
+- AI SDR assigns via campaign's Assigned Salesperson, then workspace Assigned Call Handler, then automatic.
 
 ### How do I export my CRM People list to a spreadsheet? {slug: crm/faq/how-do-i-export-my-crm-people-list-to-a-spreadsheet}
-"CRM" > "People" (or Companies/Deals/Appointments) > apply filter if desired > "Export" (download icon) > CSV downloads, respecting active filters. To use as campaign source: "Cold Email Agent" > "New Campaign" > lead source "Upload Your Own" > upload file; duplicates skipped workspace-wide.
+Get here: "CRM" > "People"
+- Apply filter/search, click "Export" (download icon, top-right), CSV downloads reflecting active filters.
+- Same export works on Companies, Deals, Appointments.
+- Columns listed in GHL article above.
+- To use as campaign source: "Cold Email Agent" > "New Campaign" > lead source "Upload Your Own"; duplicates skipped workspace-wide.
 
 ### How do I import a lead list into the CRM? {slug: crm/faq/how-do-i-import-a-lead-list-into-the-crm}
-Direct CRM import: "CRM" > section > "Import People/Companies/Deals" > upload CSV > map columns > review summary (created/updated/skipped) > confirm. Campaign upload (for outreach): "Cold Email Agent" > "New Campaign" > "Upload Your Own", up to 100MB/20,000 rows; doesn't cost credits; replies auto-create/update CRM records. Minimum People field: Name.
+Get here: "CRM" > section ("People"/"Companies"/"Deals")
+- Click "Import People/Companies/Deals" (top right), upload CSV, map columns, review summary, confirm.
+- For outreach instead: "Cold Email Agent" > "New Campaign" > lead source "Upload Your Own"; up to 100MB/20,000 rows; launch only when ready. Campaign uploads don't cost credits.
+- Minimum required field for People import: Name.
 
 ### How do I load my CRM contacts into a cold email campaign? {slug: crm/faq/how-do-i-import-my-crm-contacts-into-a-spreadsheet-for-cold-email}
-No direct button. Export People CSV from "CRM" > "People", then "Cold Email Agent" > "New Campaign" > "Upload Your Own" > upload CSV; check email column mapped. Workspace dedupe skips existing contacts. For single contact, use campaign "Leads" > "Add Leads" manually. Exclude DNC/closed-deal contacts (dedupe only blocks DNC automatically).
+Get here: "CRM" > "People", export CSV, then "Cold Email Agent" > "New Campaign"
+- No direct send button; export then upload via "Upload Your Own" lead source.
+- Workspace dedupe skips existing contacts; shows "leads skipped" summary.
+- For single contact: open campaign > "Leads" > "Add Leads", or wait for reply.
+- Don't add contacts with booked meeting, closed deal, or DNC; dedupe catches DNC only.
 
 ### How do I reset my CRM pipeline / delete deals? {slug: crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}
-"CRM" > "Deals" tab > open deal > three-dot menu (⋮) > "Delete record" > confirm. No bulk delete; one at a time, not recoverable. To edit pipeline: choose pipeline from "All Pipelines" dropdown > three-dot menu > "Edit Pipeline" > remove/add/reorder stages > "Update Pipeline". Stage with deals must be emptied first. Cannot delete last Won or Lost stage; no reset-all button. New pipeline via three-dot menu > "Add Pipeline".
+Get here: "CRM" > "Deals"
+- Open deal card > three-dot menu (⋮) > "Delete record" > confirm. No bulk delete; one at a time.
+- To edit stages: choose pipeline from "All Pipelines" dropdown > three-dot menu near Export/Import Deals/Add Deal > "Edit Pipeline" > remove (trash icon), add ("Add Stage"), reorder (drag handle) > "Update Pipeline".
+- Stage with deals must be emptied first. Cannot delete last Won or last Lost stage. No "reset all" button. Deleted deals unrecoverable.
+- New pipeline: three-dot menu > "Add Pipeline".
 
 ### How do I set my calendar availability hours? {slug: crm/faq/how-do-i-set-my-calendar-availability-hours}
-"Settings" > "Availability" > set start/end per day > "Buffer Times" (No buffer, 5, 15, 30 min before/after) > Save. Works with connected calendar free/busy and buffers; AI SDR searches next 14 days (extends to 60 if prospect requests later date). If no slots available, AI asks prospect for their times instead. Fix: widen availability hours, free calendar space, or reduce meeting duration (e.g. 30→15 min).
+Get here: "Settings" > "Availability"
+- Set start/end time per day (e.g. Mon-Fri 10:00-16:00); set "Buffer Times" before/after (None, 5, 15, 30 min); Save.
+- Works with connected calendar free/busy and buffers; AI searches next 14 days, extends to 60 days if prospect requests later date.
+- If fully booked, AI asks prospect for times instead of offering slots.
+- Fixes: widen hours, free calendar space, reduce meeting duration.
+- Related: "Settings" > "Email & Calendar", "Settings" > "Conferencing".
 
 ### What is 'Add to DNC' in the AI SDR inbox? {slug: crm/faq/what-is-add-to-dnc-in-the-ai-sdr-inbox}
-"Add to DNC" in thread (top-right) adds lead's email to workspace blocklist, blocking future outreach and cancelling pending sequence; thread stays visible. Use when lead asks to stop, complains, or threatens legal action; don't use for "not now" replies or wrong-person records. Unsubscribe link handled automatically. Manage via thread DNC controls or "Settings" > "Cold Email Blocklist".
+Get here: "AI SDR Inbox", open thread, top-right of thread
+- Click "Add to DNC", confirm. Blocks email workspace-wide, cancels pending follow-ups, keeps thread visible.
+- Use when lead asks to stop/unsubscribes via reply or threatens legal/spam report; not for "try later" or wrong person.
+- Unsubscribe link clicks handled automatically.
+- Manage blocklist at "Settings" > "Cold Email Blocklist".
 
 ### Where do I find my calendar/appointments in the dashboard? {slug: crm/faq/where-do-i-find-my-calendarappointments-in-the-dashboard}
-"CRM" > "Appointments" > toggle "Calendar" (day/week/month) or "List" view (grouped by date, shows time, title, call type, assignee). "Export" downloads CSV. If empty, connect calendar via "Settings" > "Email & Calendar".
+Get here: "CRM" > "Appointments"
+- Switch "Calendar" (day/week/month) or "List" view (grouped by date, shows time/title/call type/assignee).
+- Click appointment for details; "Export" downloads CSV.
+- If none show, connect calendar at "Settings" > "Email & Calendar".
 
 ### Which meeting link should I configure, mine or my client's? {slug: crm/faq/which-meeting-link-should-i-configure-mine-or-my-clients}
-- Usually connect client's calendar/meeting link; prospect expects client's brand.
-- "Assigned Call Handler" controls who gets invite/call; set default via "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler", or per campaign via campaign > "Options" > "Assigned Salesperson".
-- Handler must be a workspace member; invite via "Settings" > "Members".
-- Match handler, their calendar, and conferencing link to same person.
+Get here: "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler"
+Use client's calendar/link if client takes calls; yours if you take calls. Per-campaign: open campaign > "Options" > "Assigned Salesperson". Handler must be a workspace member; invite via "Settings" > "Members". Match handler, calendar, and conferencing link to same person.
 
 ### Why is the CRM Companies tab empty while People/Deals show data? {slug: crm/faq/why-is-the-crm-companies-tab-empty-while-peopledeals-show-data}
-- AI SDR auto-populates "People" and "Deals" but never "Companies".
-- Add companies via "CRM" > "Companies" > "Add Company", "Import Companies", or CSV import of People/Deals with company column (auto-links).
-- Link existing People: open person > "Companies" section > "Link".
+Get here: "CRM" > "Companies"
+AI SDR auto-fills People/Deals, never Companies. Add via "Add Company", "Import Companies", or CSV import of People/Deals with company column. Link existing person: open record > "Companies" section > "Link".
 
 ### Why is the CRM showing no results? {slug: crm/faq/why-is-the-crm-showing-no-results}
-- Check workspace (top-left) - CRM data is per-workspace.
-- New workspace is empty by design; populates via campaigns, manual add, CSV import, or calendar sync.
-- Campaigns take 15-60 min provisioning, then send, replies typically in 3-7 days; check "Analytics" tab.
-- Import existing contacts via "CRM" > "People" > "Import People".
-- If CRM missing from sidebar, check role in "Settings" > "Members" or contact support for ads-only workspaces.
+Get here: "CRM"
+Check workspace (top-left name); data doesn't cross workspaces. New workspaces start empty; fills via campaigns, manual add, CSV import, calendar sync. Campaigns take 15-60min provisioning, replies in 3-7 days; check "Analytics" tab. Import via "CRM" > "People" > "Import People". If CRM missing, check role/features in "Settings" > "Members" or contact support. Clear filters if stuck.
 
 ### AI Consultant {slug: ai-consultant}
-Conversational AI for growth strategy, positioning, cold email, offers, automation. Answers from training knowledge, built-in growth library, and pasted chat content only. Does not read campaigns, CRM, or call recordings automatically; paste data for review.
-Find it: left sidebar "Home" / "Chat" toggle, click "Chat". Header "AI Consultant". Home screen "How can I help you, [your name]?" with tabs "Plan", "Automate", "Analyze", "Learn". Input box: "Ask me anything about cold email, sales, and business growth. Drag & drop files to upload."
-"Open Chat History" shows past chats; "New Chat" starts new.
-Mode selector bottom left of message box. Default modes: "Jordan AI" (general strategy), "Market Researcher" (research + web search), "Jacob AI" (ad copy/offers), "Tech Wiz" (technical/automation). Extra modes possible per workspace.
-Attachments via paperclip or drag-drop: images 5MB, PDF/DOCX 10MB, TXT/MD 1MB.
-"Settings" (gear) menu: "Export Chat" (Markdown download, only in existing chat), "Enable AI Model Switcher" (adds model picker).
-Message actions: copy, edit, thumbs up/down, retry, delete.
-Use AI Consultant for advice/strategy; use dedicated tools (Niche Researcher, Offer Creator, Cold Email Agent, Sales Call Analyzer) for structured in-platform workflows.
+Get here: Top of the left sidebar, click "Chat" toggle (next to "Home").
+- Conversational AI for strategy, cold email, offers, automation. Uses training knowledge, built-in library, and chat context, not your campaigns/CRM/calls automatically; paste data for review.
+- Modes (bottom left of message box): Jordan AI (general), Market Researcher (web search), Jacob AI (ad copy), Tech Wiz (automation/tech). Extra modes may exist.
+- Attach images (5MB), PDF/DOCX (10MB), TXT/MD (1MB) via paperclip or drag-drop.
+- "Open Chat History" to search/edit/delete past chats; "New Chat" starts fresh.
+- Settings (gear): "Export Chat" (Markdown download), "Enable AI Model Switcher".
+- Message actions: copy, edit, thumbs up/down, retry, delete.
+- Gives advice only; use dedicated tools (Niche Researcher, Offer Creator, Cold Email Agent, Sales Call Analyzer) for workflows.
 
 ### Frequently Asked Questions {slug: ai-consultant/faq}
-Index page only, no additional facts.
+Get here: Top of the left sidebar, click "Chat" toggle (next to "Home").
+No added facts beyond the articles below.
 
 ### Can I upload files to the AI Consultant? {slug: ai-consultant/faq/can-i-upload-files-to-the-ai-consultant}
-Same upload limits as ai-consultant. Over-limit shows "File size exceeds ... limit" error; split file or paste relevant section instead.
+Get here: Top of the left sidebar, click "Chat" toggle (next to "Home").
+Same file limits as ai-consultant. Oversized files show "File size exceeds ... limit"; split file or paste relevant section instead.
 
 ### How do I find or export old AI Consultant chats? {slug: ai-consultant/faq/how-do-i-find-or-export-old-ai-consultant-chats}
-"Open Chat History" dialog has "Search your chats..." field and "Recent Chats" list with edit-title/delete controls. Export: open chat > "Settings" gear > "Export Chat" > downloads as Markdown file.
+Get here: "Chat" > "Open Chat History" (top right).
+Same as ai-consultant: search/edit/delete chats; export via gear > "Export Chat" (Markdown).
 
 ### The AI Consultant said something is possible but it isn't? {slug: ai-consultant/faq/the-ai-consultant-said-something-is-possible-but-it-isnt}
-AI can hallucinate features. Signs: feature not findable in UI, missing button in steps, no integration page, vague phrasing like "you should be able to". Fix: search Help Centre, check FAQ/guides, else open "Feedback" in account menu (click name at sidebar bottom) or chat bubble, type "human agent", paste the claim and ask. Include exact prompt and answer when reporting.
+Get here: click your name at bottom of sidebar, then "Feedback".
+AI can hallucinate features. Check Help Centre/FAQ first; if unresolved, message support with "human agent" and exact prompt/answer.
 
 ### What are the AI Consultant modes? {slug: ai-consultant/faq/what-are-the-ai-consultant-modes}
-Mode changes answer style/sources; chosen via selector bottom left; shows "Switched to ..." confirmation, applies to next message only. Four default modes as in ai-consultant. All modes can search AI tools directory. Extra modes: "Ask Brook" and "Acquisity Agent" (Acquisity-enabled, latter can act on workspace data with approval). Partners may rename/hide/add modes. "No modes available" means admin disabled all modes; contact admin/partner.
+Get here: ai-consultant.
+Mode selector shows "Switched to..." confirmation, applies next message only. Extra modes "Ask Brook" and "Acquisity Agent" enabled per workspace by Acquisity team; partners may rename/hide modes. "No modes available" means admin disabled all.
 
 ### What can the AI Consultant do vs what should I ask support? {slug: ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}
-Use AI Consultant for strategy, feedback on pasted content, troubleshooting, tool recommendations, research (Market Researcher). Use support ("Feedback" in account menu or Fin AI chat bubble) for account/billing, activation/approval, bugs, provisioning, settings changes.
-AI Consultant cannot: build websites/funnels, send campaigns/emails, configure settings/integrations, update CRM, change Knowledge Base - use Cold Email Agent, AI SDR, AI Ads Maker, Website Builder, Growth Plan Creator, Sales Call Analyzer instead. "Acquisity Agent" mode (if enabled) can look up data and act with approval.
-Not available via public API or MCP; cannot swap its model. Acquisity's public API/MCP cover Cold Email Agent campaigns, leads, results, webhooks only, not AI Consultant chats.
-AI Consultant and support chats are not shared between each other.
+Get here: "Chat" toggle; support via "Feedback" in account menu.
+AI Consultant: strategy, feedback, troubleshooting, tool choice, research. Support: billing, activation, bugs, provisioning, account changes.
+AI Consultant cannot build sites, send campaigns, configure settings, update CRM, or change Knowledge Base; use Cold Email Agent, AI SDR, AI Ads Maker, Website Builder, Growth Plan Creator, Sales Call Analyzer instead. Not available via public API/MCP; can't swap its model. API/MCP (developer docs) covers Cold Email Agent data only, not AI Consultant chats. AI Consultant and support chats are not shared with each other.
 
 ### Niche Researcher {slug: niche-researcher}
-Path: "Market Researcher" under "Go To Market" in left menu.
-Step 1: fill optional "Professional Background & Experience", "Key Professional Skills & Expertise", click "Next".
-Step 2: optional fields "Personal Interests & Passions", "Industry Connections & Network", "Observed Business Problems or Market Gaps", "Resource Constraints (Time, Money, etc.)", click "Generate Report". Takes 1-2 minutes.
-Results show profile summary, ranked niches with Niche Name, $1M+ Potential, High Ticket, Familiarity, Targetability, Analysis, and a "Best Option" (suggestion only).
-Past results: open "Market Researcher", scroll to "History" table, click a row; start new via form above.
-Fixes: empty results - wait 2-5 min, refresh, check History, resubmit with more detail. Grayed-out "Generate Report" button - wait for session load, ensure workspace selected, refresh.
+Get here: In the left sidebar, click "Market Researcher" under "Go To Market"
+- Suggests ranked business niches from your background, skills, interests, network, observed market gaps, and constraints.
+- Step 1: "Professional Background & Experience", "Key Professional Skills & Expertise" (both optional), click "Next".
+- Step 2: "Personal Interests & Passions", "Industry Connections & Network", "Observed Business Problems or Market Gaps", "Resource Constraints (Time, Money, etc.)" (all optional), click "Generate Report". Takes 1-2 minutes.
+- Results: profile summary, ranked niches with Niche Name, $1M+ Potential, High Ticket, Familiarity, Targetability, Analysis, and a "Best Option" (suggestion only).
+- Past reports: "History" table below the form; click a row to open; use form above it for a new report.
+- Fix empty results: wait, refresh, check History, or resubmit with more detail after 5 minutes.
+- Fix grayed-out "Generate Report": wait for session/workspace to load, check workspace selected, refresh.
 
 ### Frequently Asked Questions {slug: niche-researcher/faq}
-Leads (scraping, CSV import, credits, exports) live under Cold Email Agent > Lead Database & Search, not here. Niche Researcher only researches niches.
+Get here: In the left sidebar, click "Market Researcher" under "Go To Market"
+Niche Researcher only researches niches; lead scraping, CSV imports, credits, exports are under "Cold Email Agent" > Lead Database & Search.
 
 ### Can I change my niche later? {slug: niche-researcher/faq/can-i-change-my-niche-later}
-Yes, anytime. Go to "Market Researcher" in left sidebar, start new research, then update offer and AI SDR context. Onboarding doesn't create/replace a submission. Old campaigns keep running until paused/completed; new campaigns can target new niche; running both in parallel is common.
+Get here: In the left sidebar, click "Market Researcher" under "Go To Market"
+- You can change niche anytime; start a new research session, then update offer and AI SDR context.
+- Onboarding doesn't create/replace a Niche Researcher submission.
+- Old campaigns keep running till paused/completed; new campaigns can target new niche; running both in parallel is common.
 
 ### How do I create my IVP and UVP? {slug: niche-researcher/faq/how-do-i-create-my-ivp-and-uvp}
-IVP: "I help [niche] [outcome] by [method]." Needs specific niche, measurable outcome, clear method. UVP: why pick you (speed, results, specificity, method) - pick one angle. Narrow niche, pick one deliverable outcome, build solution around it. Use AI Consultant to refine.
+Get here: In the left sidebar, click "Market Researcher" under "Go To Market"
+- IVP formula: "I help [niche] [outcome] by [method]."
+- UVP: why choose you (angles: speed, results, specificity, method), pick one angle.
+- Narrow niche, pick one provable outcome, build solution around it.
+- Tip: refine via AI Consultant ("Chat" toggle in sidebar).
 
 ### How do I validate whether my niche can actually pay? {slug: niche-researcher/faq/how-do-i-validate-whether-my-niche-can-actually-pay}
-Check profitability score and CAGR in Niche Researcher. Check financial viability (revenue, margins, spend). Do ROI math (e.g. $3k offer needs $9k+ value). Test with live outreach: 1,000-1,500 leads quick test, 2,000-2,500 if validated; pricing pushback = reprice, silence/no budget = wrong niche.
+Get here: In the left sidebar, click "Market Researcher" under "Go To Market", open Niche Researcher
+- Check profitability score and CAGR.
+- Check financial viability: revenue per business, margins, similar-service spend.
+- Do ROI math: $3k/mo needs $9k+ value; $10k/mo needs $30k+; $500/mo needs $1.5k+.
+- Test with live outreach: 1,000-1,500 leads quick test, 2,000-2,500 if niche known promising; pushback = reprice, silence/no budget = wrong niche.
 
 ### Offer Creator {slug: offer-creator}
-Turns your background, skills, network into service offer packages for sales/marketing.
-Left menu > "Offer Creator". Two tabs: "Manual Input", "From Transcript".
-Manual Input: 2 steps, 8 optional fields total (results, skills, processes, industry knowledge, network, validation, trusted clients, credibility leverage). Click "Next", then "Generate Offer". Takes 1-2 min.
-From Transcript: upload call recording (MP3, WAV, M4A, AAC, OGG, up to 250MB) or paste transcript, click "Generate Offers from Transcript".
-Output: 2-4 offer packages, each with Offer Title, Core Deliverables, Supporting Deliverables, Pricing Model, Price Point, Positioning Statement. Results view-only, not editable; copy into own proposals.
-History: "Offer Creator" page > History table below form; click row to reopen.
-Fixes: empty results - wait/refresh, check past submissions, resubmit with more detail if still empty after 5 min. Grayed-out "Generate Offer" button - wait for session load, check workspace selected, refresh.
+Get here: In the left sidebar, click "Offer Creator"
+- Turns your background, skills, network into service offer packages.
+- Two tabs: "Manual Input" (2-step, 8 optional fields about results, skills, processes, industry knowledge, network, validation, trusted clients, credibility) or "From Transcript" (upload call recording - MP3, WAV, M4A, AAC, OGG, up to 250MB - or paste transcript).
+- Click "Next" then "Generate Offer", or "Generate Offers from Transcript". Takes 1-2 minutes.
+- Produces 2-4 offers with Offer Title, Core/Supporting Deliverables, Pricing Model, Price Point, Positioning Statement.
+- Past results: scroll to "History" table below form, click a row.
+- Empty results: wait, refresh, check latest submission, resubmit with more detail if still empty after 5 minutes.
+- Grayed-out "Generate Offer" button: wait for session/workspace to load, refresh page.
 
 ### Frequently Asked Questions {slug: offer-creator/faq}
-Index page, no standalone facts.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
 
 ### Can I create proposals from offers? {slug: offer-creator/faq/can-i-create-proposals-from-offers}
-Not available; no proposal/contract builder. Copy details into own templates.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+No proposal/contract builder; copy offer details into your own templates.
 
 ### Can I edit the generated offers? {slug: offer-creator/faq/can-i-edit-the-generated-offers}
-Same as offer-creator: view-only results.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Results page is view-only; copy text into your own proposals and adjust.
 
 ### Can I run multiple offers for different businesses? {slug: offer-creator/faq/can-i-run-multiple-offers-for-different-businesses}
-Workspace is isolation unit; distinct offers/audiences need separate workspaces (avoids AI SDR KB bleed, mixed metrics, CRM contact collisions, one brand voice, billing confusion). Each workspace needs Pro plan. Setup: click workspace name > "+ New Workspace", name it, complete onboarding, assign domains/inboxes, build campaigns there. One workspace fine for same offer with minor pricing variants (use segmented audiences instead).
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Each workspace is the isolation unit; run distinct offers in separate workspaces to avoid AI SDR context bleed, mixed metrics, CRM contact collisions, and billing confusion. Create via workspace name (top-left) > "+ New Workspace", name it, complete onboarding, assign domains/inboxes, build campaigns there. Every workspace needs a Pro plan. One workspace is fine for minor packaging variants of the same offer.
 
 ### Does it connect to payment processing? {slug: offer-creator/faq/does-it-connect-to-payment-processing}
-Not available; no Stripe/PayPal link, planning only.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Not available; offers are planning only, no link to payment tools.
 
 ### How does my offer connect to email campaigns and the AI? {slug: offer-creator/faq/how-does-my-offer-connect-to-email-campaigns-and-the-ai}
-Offer is workspace-scoped context read by Cold Email Agent and AI SDR for copy/replies/KB seeding and Growth Plan Creator. New campaigns pick up offer updates; existing campaigns/sequences don't regenerate. KB doesn't auto-update from offer edits, update separately. Small wording changes: update KB. Big repositioning: new workspace. Pricing changes: update KB directly.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Offer is workspace-scoped context read by Cold Email Agent and AI SDR for copy, replies, and Knowledge Base defaults; also used by Growth Plan Creator. New campaigns pick up offer edits automatically; running campaigns keep existing copy, AI SDR uses new offer on new replies only; KB doesn't auto-update, edit separately.
 
 ### How many offers does it generate? {slug: offer-creator/faq/how-many-offers-does-it-generate}
-Usually 2-4, varying price tiers or service models (done-for-you vs coaching).
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Usually 2-4 options with different price tiers or service models.
 
 ### What are the two ways to use it? {slug: offer-creator/faq/what-are-the-two-ways-to-use-it}
-Same as offer-creator: Manual Input (8 fields, 2 steps) vs From Transcript (recording/text upload).
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Same as offer-creator slug: Manual Input (8 fields, 2 steps) vs From Transcript (recording up to 250MB or pasted text).
 
 ### What does Offer Creator do? {slug: offer-creator/faq/what-does-offer-creator-do}
-Same as offer-creator overview.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Same as offer-creator slug.
 
 ### What information should I include in the manual form? {slug: offer-creator/faq/what-information-should-i-include-in-the-manual-form}
-All 8 fields optional; be specific with measurable results, systems, expertise, clients, proof points.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+All 8 fields optional; be specific with measurable results, systems built, expertise, notable clients, proof points.
 
 ### What is included in each offer? {slug: offer-creator/faq/what-is-included-in-each-offer}
-Same as offer-creator: title, deliverables, pricing model, price point, positioning.
+Get here: In the left sidebar, click "Offer Creator", see FAQ section on page.
+Same as offer-creator slug.
 
 ### Cold Email Agent {slug: cold-email-agent}
-Runs outreach: finds people, AI writes emails, sends from warmed-up inboxes, tracks performance.
-Subsections: Getting Started, Campaigns, Email Accounts, Settings, Best Practices, Concepts, FAQ.
-Different from Cold Email Writer (single-email scripts, no campaigns/leads).
+Get here: In the left sidebar, click "Cold Email Agent"
+Runs full outreach: finds leads, writes emails, sends from warmed-up inboxes, tracks performance.
+Subpages: Getting Started, Campaigns, Email Accounts, Settings, Best Practices, Concepts, FAQ.
+Separate from "Cold Email Writer" (one-off email scripts, no campaigns/leads).
 
 ### Getting Started {slug: cold-email-agent/getting-started}
-Two pages: "Your first campaign" + "Glossary." Takes ~15 min if inbox + lead source ready; setup itself up to 1 hour, or 2 weeks for Done-For-You domain (warmup).
+Get here: In the left sidebar, click "Cold Email Agent", then "Getting Started"
+Two pages: first campaign walkthrough, glossary. ~15 min if inbox and leads ready; setup up to 1 hour, or 2 weeks for custom domain warmup.
 
 ### Your first campaign {slug: cold-email-agent/getting-started/your-first-campaign}
-Prereqs: 1 sending inbox (Pre-Warmed, 4+ weeks warmup, ready same day, includes domain; or Done-For-You custom domain, ~2 weeks warmup). Inbox ready when Status "Active" (green), Flame icon green, Health Score 80%+.
-Lead sources: CSV upload (free), AI lead finder (~1 credit/verified lead), AI-generated (uses credits).
-SPF/DKIM/DMARC/forwarding auto-handled on Acquisity/DFY inboxes.
-Pre-flight checklist: billing ok, inbox ready, leads ready.
-Steps: sidebar "Cold Email Agent" > "All Campaigns" > "New Campaign" (4-step wizard): 1) Name 2) Leads ("Acquisity Lead Database" default 500/min 100 leads, or "Upload Your Own" CSV) 3) Sequence (AI Generated; methods: Podcast, Interview, AI Business Audit, Direct) 4) Finalization (tick sending inboxes) > "Create Campaign". Review drafts via "Sequences" tab; if auto-launch off, campaign stays "Draft" with "Launch campaign" button.
-First 24h: check Analytics, Leads, AI Agent tabs; bounce rate >3% = stop and investigate.
-Good reply rates: Podcast 2%+, Interview 1.5%+, AI Business Audit 1%+, Direct 0.8%+.
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts" (for inboxes); click "Cold Email Agent" then "New Campaign" (for campaign wizard)
+Need: 1 active inbox (Status Active, green flame, 80%+ health) and leads (CSV free, AI lead finder ~1 credit/lead, AI-generated uses credits).
+Inbox options: Pre-Warmed (buy via "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes", 3 inboxes/domain) or Done-For-You domain (~2 weeks warmup).
+SPF/DKIM/DMARC handled automatically on Acquisity/DFY inboxes.
+Wizard steps: Name > Leads (Acquisity Lead Database, default 500/min 100 leads, or Upload Own CSV) > Sequence (method: Podcast/Interview/AI Business Audit/Direct) > Finalization (pick inboxes) > "Create Campaign".
+If auto-launch off, campaign stays Draft until "Launch campaign" clicked.
+Check Analytics, Leads, AI Agent tabs in first 24h; bounce rate over 3% needs investigation.
+Good reply rate thresholds: Podcast 2%+, Interview 1.5%+, AI Business Audit 1%+, Direct 0.8%+.
 
 ### Glossary {slug: cold-email-agent/getting-started/glossary}
-Plain-English term definitions; dotted-underline terms link here.
+Get here: In the left sidebar, click "Cold Email Agent", then "Getting Started", then "Glossary"
+Plain-English term definitions; dotted-underline terms link here throughout docs.
 
 ### Overview (Campaigns) {slug: cold-email-agent/campaigns}
-Home screen, reached via sidebar "Cold Email Agent." Buttons: "Settings," "Email Accounts," "New Campaign."
+Get here: In the left sidebar, click "Cold Email Agent"
+Top buttons: "Settings", "Email Accounts", "New Campaign".
 Aggregate stats: Contacted Leads, Positive Replies, Positive Reply Rate, Booked Call Rate, Calls Booked.
-Table columns: Campaign, Status (Active/Paused/Draft/Completed/Archived/Attention Needed), Leads Contacted, Replies, Positive Replies, Calls Booked, Started At.
-Row actions: View Details/Continue Setup, Rename, Duplicate, Launch, Pause, Resume, Delete (permanent, use Archive instead).
+Table columns: Campaign, Status, Leads Contacted, Replies, Positive Replies, Calls Booked, Started At.
+Row menu: View Details/Continue Setup, Rename, Duplicate, Launch, Pause, Resume, Delete (permanent, use Archive instead).
 Bulk actions: Pause, Resume, Delete campaigns.
 New workspaces show read-only demo sample data until first real campaign created.
-Fixes: clear filters if campaign missing; aggregate numbers lag ~15 min; deleted campaigns unrecoverable, contact support.
+Aggregate numbers can lag minutes; if mismatched after 15 min, contact support. Deleted campaigns unrecoverable.
 
 ### Create a Campaign {slug: cold-email-agent/campaigns/create-a-campaign}
-Wizard with 4 steps; progress bar; work autosaves as Draft, visible on Campaigns list.
-Before starting: need an Active (green flame) sending inbox on "Email Accounts" page; a list or target description; an angle (email method).
-Step 1 Name: enter name, click "Next" creates Draft; toast "Campaign draft created."
-Step 2 Leads: Path A "Acquisity Lead Database" (AI-found, uses credits, ~1 credit/verified lead); Path B "Upload Your Own" (CSV, no credits).
-"Launch campaigns automatically once the setup is complete" checkbox: on by default for AI leads, disabled for uploads; leave off to review first.
-Path A: set filters, default import 500 leads, minimum 100; opens "Add Leads To Campaign" dialog showing cost. Background job 5-15 min; can leave page.
-Step 3 Sequence: choose "AI Generated" or "Create your own"; pick method: Podcast (recommended), Interview, AI Business Audit, Direct. Masterclass method only in standalone Cold Email Writer. CSV uploads require targeting context input. Generation takes 5-15 min, async.
-Review on "Sequences" tab: step cards, subject/body, variants, delay between steps, personalization variables. Use "Variables" button, 2-4 per email ideal. Save edits before switching variants.
-Step 4 Finalization: pick inboxes (only Active/green-flame shown; warming orange hidden); all eligible selected by default. Click "Create Campaign" to launch (async, few minutes).
-Success signs: progress screen completes, redirect to campaign detail page (~2s), status Draft with "Launch campaign" button if auto-launch off, or Active if on.
-Troubleshooting: errored wizard, reopen Draft from Campaigns list; fewer leads than requested, check credits, see Scraping leads; sequence >30 min stuck, check job, retry, contact support; launch failed, select at least one Active inbox; missing draft, clear list filters.
+Get here: In the left sidebar, click "Cold Email Agent", then open "Campaigns" and click "+ New Campaign" (wizard, not stated exact button label)
+- 4-step wizard: Name, Leads, Sequence, Finalization. Work autosaves as Draft; resume from Campaigns list.
+- Requires: one Active (green flame) sending inbox; a lead idea; an angle (email method).
+- Step 1: name campaign, click Next (creates Draft).
+- Step 2 Leads: Path A AI lead database (costs credits, ~1/verified lead, default import 500, min 100); Path B upload CSV (no credits). "Launch campaigns automatically..." checkbox, on by default for AI leads, disabled for uploads. Scraping/sequence jobs take 5-15 min, can leave page.
+- Step 3 Sequence: AI Generated (default) or Create your own; pick method (Podcast, Interview, AI Business Audit, Direct); Masterclass only in standalone Cold Email Writer. CSV uploads need targeting context. Review Sequences tab: steps, variants, delays, variables ({{firstName}}), Variables button (2-4 vars ideal). Save edits before switching variants.
+- Step 4 Finalization: pick Active inboxes (warming/orange hidden), all selected by default; click Create Campaign; async launch job.
+- Success: Draft shows Launch campaign button if auto-launch off; Active if on.
+- Fixes: wizard error - resume Draft; lead finder errors - retry, check credits; sequence >30min stuck - contact support; launch failed - select Active inbox; missing draft - clear list filter.
 
 ### Lead Magnet Campaigns {slug: cold-email-agent/campaigns/lead-magnet-campaigns}
-Campaign type that sends a resource (PDF/PNG/JPG/JPEG up to 25MB, or Loom/YouTube/Vimeo video URL starting with https) on positive reply instead of booking a call, then follows up.
-Set via existing campaign's "Options" tab > "Campaign configuration" > "Campaign type" dropdown > select "Lead Magnet" > "Save settings". Not available in creation wizard.
-"Lead Magnet Resource" card: toggle Upload/Video URL, "Name" (optional, 200 chars), "Lead magnet context" (1,000 chars). Click "Save Resource"; "Replace Resource" to swap; "Save Context" to edit context only.
-Cannot activate without a resource attached. Removing resource from active campaign pauses it (confirmation required).
-Settings > "AI SDR Agent" > "The Lead Magnet Method": "Booking call type" (default Intro), "Follow-up delay" 1-30 days (default 3). Applies to all Lead Magnet campaigns.
-Fixes: missing card = set Campaign type first; can't launch = attach resource; paused unexpectedly = resource removed, re-link; rejected video link = must be https Loom/YouTube/Vimeo, else use Upload; call-booking instead of resource = check Campaign type is Lead Magnet.
+Get here: open a campaign, click "Options" tab, "Campaign configuration" section, "Campaign type" dropdown
+- Lead Magnet campaign sends an attached resource (PDF/PNG/JPG/JPEG up to 25MB, or Loom/YouTube/Vimeo https video URL) on positive reply instead of booking a call, then follows up.
+- Set type via Options tab dropdown, select "Lead Magnet", click "Save settings".
+- Attach resource in "Lead Magnet Resource" card: toggle Upload/Video URL, Name (optional, 200 chars), Lead magnet context (1000 chars), click "Save Resource"; "Replace Resource" to swap; "Save Context" to edit context alone.
+- Cannot activate without a resource; removing resource from active campaign pauses it (confirmation required).
+- Settings > AI SDR Agent > "The Lead Magnet Method": Booking call type (default Intro), Follow-up delay (1-30 days, default 3).
 
 ### Managing Campaigns {slug: cold-email-agent/campaigns/managing-campaigns}
-Campaign detail page, 5 tabs: Analytics, AI Agent, Leads, Sequences, Options.
-Header (all tabs): campaign name (click to rename), status badge (Active/Paused/Completed/Attention Needed), Launch/Pause/Resume button, sending schedule note, alert banners.
-Priority order: Analytics (reply rate, positive reply rate, emails sent, booked calls) > Sequences (variant performance) > Leads (bounce rate: over 3% needs attention, over 5% auto-pauses; unsubscribes; blank variables). AI Agent checked daily. Options only when changing settings.
-Add leads via Leads tab: "AI Lead Search" (credits, ~1/verified lead) or "Import Leads" CSV (free). Both block duplicates already in workspace; standalone Acquisity filters duplicates pre-import, Instantly-connected may only block during upload.
-Common actions table: pause via header button; edit email in Sequences; rename via header; change salesperson/schedule/AI management in Options; export leads via "Export CSV" in Leads.
+Get here: In the left sidebar, click "Cold Email Agent", then "Campaigns", then click a campaign
+- 5 tabs: Analytics, AI Agent, Leads, Sequences, Options.
+- Header shows: campaign name (click to rename), status badge, Launch/Pause/Resume button, sending schedule note, alert banners.
+- Check order: Analytics first (reply rate, positive replies, booked calls), then Sequences (variant performance), then Leads (bounce rate: >3% needs attention, >5% auto-pauses).
+- AI Agent tab: check daily, not live monitoring.
+- Options: inboxes, salesperson, sending schedule, lead filters, AI campaign management; only visit when changing settings.
+- Add leads from Leads tab: AI Lead Search (credits, ~1/lead) or Import CSV (free); both block duplicates already in another workspace campaign.
+- Export lead list via Leads tab "Export CSV" button.
 
 ### Analytics {slug: cold-email-agent/campaigns/managing-campaigns/analytics}
-Default tab when opening a campaign. Contains 4 KPI cards, Performance Trend chart, per-step breakdown tables.
-- **Leads Contacted**: unique leads sent ≥1 email, shown as fraction over total uploaded (capped), progress bar. Counts people not emails.
-- **Replies**: reply count + reply rate (% of leads contacted). "Include auto replies" toggle, default **on** (includes OoO/auto-responders); off = manual replies only.
-- **Positive Replies**: AI-classified genuine-interest replies + positive reply rate. Shows target (Healthy PRR from "Options" tab; podcast default 1%). Progress bar; excludes OoO, "not interested", unsubscribes.
-- **Booked Calls**: count + booking conversion rate (% of positive replies). Target default 25%, configurable in "Options" tab.
-- **Contacted** (trend chart line) = emails sent/day (includes follow-ups), differs from "Leads Contacted" KPI (unique people, capped).
-- Trend chart: "Contacted" (blue), "Replied" (orange), "Positive" (green) lines; time-range selector: Last 7/14/30/90 days, Last year, All time.
-- Per-step tables (Step 1, Step 2…): rows per variant + Total row. Columns: Variant (enable/disable toggle), Sent, Replied (+rate), Positive Responses (+rate), Booked Calls (+rate of positive). Metrics are per-email, not per-lead.
-- Variants need to clear workspace "Minimum Threshold" of sends (see Thresholds) before judging.
-- Disabling a variant stops future use; historical data stays.
-
-**Troubleshooting:**
-- Zero replies after 1,000+ sends: check bounce rate on "Leads" tab (campaign auto-pauses at 5% bounce via bounce protection); check inbox health in "Email Accounts" (<80% = reputation issue); check domain auth (SPF/DKIM/DMARC, usually fine if inboxes bought via Acquisity); send test email to self.
-- No activity 3+ days: check campaign status (Active/Paused/Completed), sending schedule on "Options" tab, inbox health/Active status, "Attention Needed" banners.
-- Low reply rate on later steps: reply fatigue or follow-up repeating Step 1's pitch.
-- One variant has far more sends: normal if it cleared Healthy PRR threshold or others manually disabled.
-- Replies count seems wrong: toggle "Include auto replies" off/on to recalc.
+Get here: In the left sidebar, click "Cold Email Agent", open a campaign (default tab is Analytics).
+- KPI cards: Leads Contacted (unique leads, fraction of total uploaded, capped), Replies (reply rate, toggle "Include auto replies", on by default), Positive Replies (rate vs target "Healthy PRR"; podcast default 1%), Booked Calls (rate vs target, default 25%, both configurable on Options tab).
+- Trend chart lines: Contacted (emails/day incl. follow-ups), Replied, Positive; range selector: Last 7/14/30/90 days, Last year, All time.
+- Per-step tables (Step 1, Step 2...): rows per variant with enable/disable toggle; columns Sent, Replied, Positive Responses, Booked Calls - all per-email not per-lead.
+- Disabling a variant keeps its historical data, only stops future sends.
+- Variants need to clear the Minimum Threshold (see Thresholds settings) before agent judges them.
+- Troubleshooting: zero replies after 1,000+ sends → check bounce rate on Leads tab (auto-pause at 5%), inbox health in Email Accounts (<80% is bad), domain authentication, send test to self.
+- No activity 3+ days → check campaign status, sending schedule (Options), inbox health, Attention Needed banners.
+- Lower reply rate on later steps → reply fatigue or repeating Step 1's pitch.
+- One variant gets most sends → normal once it clears Healthy PRR threshold and AI campaign management optimizes variants, or manual disabling.
+- Replies count surprising → check "Include auto replies" toggle state.
 
 ### AI Agent {slug: cold-email-agent/campaigns/managing-campaigns/ai-agent}
-Tab showing AI campaign management history/recommendations.
-- Reviews active campaigns ~once/day (not real-time); checks sends, PRR, variant performance, lead sufficiency, deliverability, booking conversion. Waits if insufficient data or in cooldown.
-- Settings location: workspace defaults at "Settings" > "Cold Email Agent"; per-campaign at campaign > "Options" tab > "Cold Email Agent" section.
+Get here: In the left sidebar, click "Cold Email Agent", open a campaign, click "AI Agent" tab. Settings: click workspace name > "Settings" > "Cold Email Agent" (defaults), or open campaign > "Options" tab > "Cold Email Agent" section (per-campaign).
+- Master switch "AI campaign management": off = insights only, no actions.
+- Reviews active campaigns ~once/day; waits if too little data or in cooldown.
 - Timeline cards: Key Finding, Recommended Actions, Pending Actions, Actions Successfully Taken.
-- Actions: Disable variants, Add leads to this campaign, Pause campaign (only alongside replacement action, never alone), Start new campaign, Flag deliverability, Wait for volume.
-- Master switch "AI campaign management": off = insights only, no actions; on = acts per mode. "Coming soon" = feature unavailable yet.
-- Modes per action: "Run automatically", "Ask first", "Off".
-- Recommended setup: AI campaign management ON; "Optimize email variants" = Run automatically; "Add more leads", "Start new campaigns", "Pause underperforming campaigns" = Ask first; "Run actions when approvals expire" = Off.
-- Speed presets ("How quickly should the agent act?"): Careful, Balanced (default), Proactive, Custom (manual thresholds). Pause/replacement actions have separate readiness gate beyond preset.
-- Agent Approval modals (24-hour expiry): buttons Approve, Reject, Review later, Continue, Top up. Types: Add more leads (may need credits), Add leads from CSV, Start new campaign, Start new campaign needing lead source, Start new campaign from CSV, Pause + start new, Disable underperforming email variants (blocked if it would disable all variants).
-- "Run actions when approvals expire": Off = expired approvals don't run; On = they can auto-run after 24h, except actions still missing required lead-source info.
-- Adding leads via AI Lead Search can spend lead credits; CSV uploads don't spend credits but count toward contact capacity.
-- Re-enable variants anytime via "Sequences" tab.
+- Actions: Disable variants, Add leads to this campaign, Pause campaign, Start new campaign, Flag deliverability, Wait for volume.
+- Each action mode: Run automatically / Ask first / Off. Recommended: Optimize email variants = Run automatically; Add more leads, Start new campaigns, Pause underperforming campaigns = Ask first.
+- Speed presets: Careful, Balanced (default), Proactive, Custom.
+- Agent Approval modal appears for "Ask first" actions; buttons: Approve, Reject, Review later, Continue, Top up.
+- Approvals expire after 24 hours; setting "Run actions when approvals expire" off (default) = expire unused, on = run automatically at timeout, except missing lead-source info still blocks.
+- Approving lead-add actions can spend lead credits (AI Lead Search); CSV uploads don't use credits but count toward contact capacity.
+- Agent cannot pause a campaign by itself, only alongside an enabled replacement-campaign action.
+- Cannot disable every variant via approval; campaign needs at least one active variant.
+- Re-enable variants via "Sequences" tab.
 
 ### Leads {slug: cold-email-agent/campaigns/managing-campaigns/leads}
-- "Leads" tab: master list of campaign leads. Sections: status cards, metrics row, toolbar, leads table, pagination.
-- Status cards: "Scrape in progress", "Leads skipped during upload" (reasons: already in other campaigns, duplicates, in blocklist, invalid emails, incomplete), "Scrape failed".
-- Metrics: "Leads Uploaded", "Leads Contacted", "Leads In Progress", "Leads Completed", "Bounced Emails", "Email Bounce Rate" (healthy under 2%).
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign, then "Leads"
+- Tab shows status cards (Scrape in progress, Leads skipped during upload, Scrape failed), a metrics row (Leads Uploaded, Leads Contacted, Leads In Progress, Leads Completed, Bounced Emails, Email Bounce Rate), toolbar, leads table, pagination.
+- Skip reasons: already in other campaigns, duplicates, blocklist, invalid emails, incomplete fields.
 - Table columns: Name, Email, Company, Title, Industry, Location, LinkedIn, Website, Company Description, Status, Date Added, plus custom variables. Row menu: "Edit Lead" (future sends only).
-- Controls: "Search leads…", "Status" filter, "Filter" (funnel, builder with multiple fields), column sort.
+- Filters: "Search leads…", "Status" dropdown, "Filter" (advanced builder), sortable column headers.
 - Status values: Not Yet Contacted, Contacted, Contacted No Reply, Reply Received, Interested, Not Interested, Out of Office, Meeting Booked, Completed, Completed No Reply, Bounced, Unsubscribed.
-- "History" view (clock icon) shows per-upload stats: Requested, Received, Verified, Uploaded.
-- Selection: "Select all" (all filtered), "Select this page"; bulk bar: export/delete selected/clear.
+- "History" toggle (clock icon) shows Requested/Received/Verified/Uploaded per source.
+- Checkbox menu: "Select all" / "Select this page"; bulk bar: export, delete, clear selection.
 - Toolbar buttons: "Add Leads" (Single Lead or Lead Database/AI Lead Search), "Import Leads" (CSV), "Export Leads" (CSV, respects filters/selection), "Delete All" (permanent, respects filters).
-- Duplicate leads blocked workspace-wide across campaigns; AI Lead Search previews may still show duplicates if Instantly connected, blocked on upload (may consume credits).
-- Bounce rate guidance: under 3% safe; 3-5% re-verify list, pause campaign; over 5% re-verify and check copy; auto-pause at 5%.
-- Campaign-lead capacity: Growth plan shares 5,000 concurrent leads across providers; other plans use provider capacity (often 25,000, varies).
-- Pagination: 50 rows/page default, adjustable; use Search/Filter for large lists (80+ pages).
+- Export includes lead data, status, allStatuses, statusUpdatedAt, source, date added, email activity, deliverability fields.
+- Healthy: bounce rate under 2%. 3-5% re-verify list and pause; over 5% re-verify and check copy; auto-pauses at 5% bounce.
+- Duplicate leads blocked workspace-wide across campaigns; to force-add, delete from other campaign first.
+- Growth plan: 5,000 concurrent campaign-lead limit shared across providers; other plans ~25,000, varies by provider/plan.
+- Table paginates 50 rows/page by default, adjustable; use Search/Filter for large lists.
 
 ### Sequences {slug: cold-email-agent/campaigns/managing-campaigns/sequences}
-- "Sequences" tab holds email content; editable live, edits affect only unsent emails.
-- Steps = emails in order. Step 1 first email, Step 2 default follow-up, Step 3 optional second follow-up. Max 3 steps.
-- Step card shows step number/timing, Variants, Performance (Emails sent, Positive replies, Reply rate, Booked calls, Booked call rate).
-- Variants: alternate versions per step; 2-3 recommended. "Add Variant" button; "Save" required before switching variants (no autosave).
-- AI campaign management can auto-disable underperforming variants ("Run automatically") or ask first; re-enable manually. Disable, don't delete, to keep data.
-- Personalization variables: {{firstName}}, {{lastName}}, {{companyName}}, {{industry}}, {{jobTitle}} (use sparingly). Insert via Variables "{ }" button; case-sensitive. 2-4 variables/email recommended.
-- Custom variables from CSV columns mapped during import, referenced as {{your_variable_name}}. Enriching existing campaign: Export CSV, add columns, delete leads (not campaign), re-import, add variables to copy.
-- {{sendingAccountName}}/{{sendingAccountFirstName}} pull from sending inbox display name; change via "Email Accounts" or hardcode name.
-- "Preview" shows placeholders only, not real lead data yet.
-- No rich-text link tool; paste URL as plain text. Never put links in Step 1 (spam risk); one link per follow-up max.
-- Editing live campaigns applies to future sends only; don't add steps to fix poor Step 1 performance.
-- Fixes: raw {{variable}} = missing lead data or typo; "Unknown variables detected" = use Variables button; unsaved edits = must click Save before switching variants; generic AI draft = sharpen Options description then duplicate campaign (can't regenerate in place).
-- Duplicate campaign via three-dots menu on Campaigns list, creates Draft with same sequence/settings/leads.
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign, then "Sequences"
+- Edits apply only to unsent emails; live editing supported.
+- Sequence = ordered steps (emails). Step 1 first email, Step 2 first follow-up (default), Step 3 optional second follow-up. Max 3 steps recommended.
+- Each step shows number, timing, variants, performance (Emails sent, Positive replies, Reply rate, Booked calls, Booked call rate).
+- Variants: alternate versions per step, 2-3 recommended; "Add Variant" button; click variant to edit subject/body; must click "Save" before switching variants or edits are lost.
+- AI campaign management can auto-disable underperforming variants if "Optimize email variants" set to "Run automatically"; "Ask first" requires approval. Disable rather than delete to keep data.
+- Personalization variables: {{firstName}}, {{lastName}}, {{companyName}}, {{industry}}, {{jobTitle}}; insert via Variables button ({ } icon); case-sensitive. Use 2-4 per email.
+- Custom variables from CSV columns, referenced as {{your_variable_name}}; to add to existing leads, export CSV, add column, delete leads, re-import via "Import Leads", remap.
+- {{sendingAccountName}}/{{sendingAccountFirstName}} pull from sending inbox display name; change via "Email Accounts", or hardcode name instead.
+- "Preview" button shows placeholders unfilled, not real lead data (live preview coming).
+- No rich-text link tool; paste URLs as plain text. Never put a link in Step 1 (spam risk); one link max per follow-up (Steps 2-3).
+- Don't add follow-ups to fix poor Step 1 performance; fix Step 1 first.
+- Duplicate a campaign via three-dot menu on Campaigns list to get a fresh AI draft; can't regenerate sequence in place.
+- Troubleshooting: raw {{variable}} means missing lead data or typo; "Unknown variables detected" means invalid variable name, fix via Variables button.
 
 ### Options {slug: cold-email-agent/campaigns/managing-campaigns/options}
-
-Path: open campaign > "Options" tab. Controls one campaign: inboxes, campaign setup, lead filters, sending schedule, AI campaign management. Unsaved campaign settings fall back to "Settings" > "Cold Email Agent" workspace defaults; saving creates campaign-specific overrides.
-
-Sections: "Email accounts", "Campaign configuration", "Lead search filters", "Sending schedule", "Cold Email Agent". Footer shows "Unsaved changes", "Discard", "Save settings" - must save changes.
-
-**Email accounts**: inboxes sending this campaign; use "Add or remove accounts". Campaign only sends with eligible active inboxes.
-
-**Campaign configuration**: "Campaign type" (Podcast, Interview, Workshop, Masterclass, AI Business Audit, Direct, Other, Lead Magnet) - changing after launch doesn't rewrite existing emails; "Lead Magnet" shares a resource instead of booking calls. "Assigned salesperson" controls meeting routing, one per campaign, or "No salesperson (use default)". "CRM pipeline". "Start/end dates".
-
-**Lead search filters**: saved AI Lead Search targeting (industry, titles, location, headcount, keywords, exclusions); changing doesn't rewrite existing leads.
-
-**Sending schedule**: time range, timezone, days. Sending pauses outside window; queued sends inside window complete. Needs Active status + in-window time + healthy inboxes to send.
-
-**Cold Email Agent / AI campaign management**: master switch, speed preset, action modes ("Optimize email variants", "Add more leads" - spends lead credits, "Start new campaigns", "Pause underperforming campaigns" - only works with an enabled replacement action), approval-expiry. Recommended: "Optimize email variants" = Run automatically; others Ask first until trusted. Custom speed exposes thresholds: Minimum Threshold, Base Threshold, Healthy positive reply rate, Winner positive reply rate, Booked call target.
-
-Turning on for existing campaign: Open campaign > "Options" > "Cold Email Agent" > enable "AI campaign management" > choose speed > set each action mode > "Save settings". Future campaigns: set defaults in "Settings" > "Cold Email Agent" (applies only to campaigns created after).
-
-Troubleshooting: not sending - check schedule window, inbox health, "Attention Needed" banner. Agent inactive - check toggle, action set to Off, low volume, cooldown; agent reviews daily, not real-time. Can't retroactively reassign a booked meeting - change salesperson for future bookings only, manually move existing meeting. Bounce protection pause: under 3% bounce = fine; 3-5% re-verify list; over 5% re-verify list and check copy for spam triggers.
+Get here: In the left sidebar, click "Cold Email Agent", open a campaign, click "Options"
+- Controls one campaign: email accounts, campaign configuration, lead search filters, sending schedule, AI campaign management (Cold Email Agent section).
+- Until saved, shows workspace defaults from "Settings" > "Cold Email Agent"; saving gives campaign its own settings.
+- Footer shows "Unsaved changes", "Discard", "Save settings".
+- Email accounts: inboxes sending this campaign; "Add or remove accounts" changes pool; campaign needs eligible active inboxes to send.
+- Campaign configuration: Campaign type (Podcast, Interview, Workshop, Masterclass, AI Business Audit, Direct, Other, Lead Magnet), Assigned salesperson (one per campaign, or "No salesperson (use default)"), CRM pipeline, start/end dates. Changing type after launch doesn't rewrite existing emails.
+- Lead search filters: saved AI Lead Search targeting; editing doesn't rewrite existing leads.
+- Sending schedule: time range, timezone, days; sending pauses outside window; queued sends still complete.
+- Cold Email Agent section: AI campaign management master switch, speed preset, action modes (Optimize email variants, Add more leads [spends lead credits], Start new campaigns, Pause underperforming campaigns [needs enabled replacement action]), approval-expiry, Custom thresholds (Minimum Threshold, Base Threshold, Healthy positive reply rate, Winner positive reply rate, Booked call target).
+- Recommended: Optimize email variants = Run automatically; others Ask first until trusted.
+- Setting workspace defaults only affects future campaigns; existing campaigns keep current setup unless resaved.
+- Troubleshooting: check sending schedule, inbox health, Attention Needed banner; agent reviews campaigns ~once/day; bounce protection pauses at high bounce rate (under 3% safe, 3-5% re-verify list, over 5% re-verify and check copy for spam triggers).
+- Can't retroactively move a booked meeting; reassign manually in calendar tool and change salesperson for future bookings.
 
 ### Importing leads via CSV {slug: cold-email-agent/campaigns/managing-campaigns/import-leads}
-
-CSV uploads cost no credits (vs credit-based AI Lead Search).
-
-Access: "New campaign wizard" > Lead source step > "Upload Your Own"; or existing campaign > "Leads" tab > "Import Leads".
-
-File limits: .csv only (not .xlsx/.xls), up to 20,000 rows/file, up to 100MB.
-
-Required columns: Name, Email, Industry - rows missing these are rejected.
-
-Optional columns power personalization variables: Job title {{title}}, Company {{companyName}}, LinkedIn URL {{linkedin}}, Phone {{phone}}, Number of employees {{employees}}, City {{city}}, State {{state}}, Country {{country}}, Tags. Other columns can be mapped as custom variables.
-
-Flow: Upload CSV (drag or "Choose a .CSV file"; "Download template" available) > check column mapping (auto-mapper is fuzzy, verify each required field; unmapped columns set to "No mapping selected" are ignored) > map extra columns via "Map as {{Column Name}}" > optional "Automatically verify lead emails on upload" checkbox (off by default, adds minutes, recommended for third-party/old/bounce-prone lists) > "Review values" step shows errors, "Show only rows with errors" checkbox, error rows skipped if continuing > "Preview import" shows valid count, skipped count, Workspace Contact Capacity fit > click "Import N leads" > wait (large files/verification run as background job with progress card) > check Leads tab.
-
-Duplicate check: across every existing campaign (paused/draft/completed) in workspace, excluding deleted ones; duplicates skipped by default. To force-add: delete lead from other campaign's Leads tab ("Delete Selected"), then re-import.
-
-Success signs: new leads "Active" status in Leads tab, fields populated, personalization fills correctly, Active campaigns send next window, Drafts send nothing until launched.
-
-Troubleshooting: rejected rows - blank required field or invalid email, fix and re-upload. Blank variables - column unmapped or source blank. Upload fails - file not real CSV, re-export as CSV (UTF-8). Many duplicates skipped - already in another campaign. Missing Import Leads button - check role permissions. Many invalid emails after verification - if over 10% invalid, regenerate list from source.
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign's "Leads" tab, click "Import Leads" (or during new campaign wizard's lead source step, click "Upload Your Own")
+- CSV uploads use no credits; AI Lead Search costs credits.
+- File must be .csv, up to 20,000 rows, up to 100 MB.
+- Required columns: Name, Email, Industry; missing values reject the row.
+- Optional columns power personalization variables: Job title, Company, LinkedIn URL, Phone, Number of employees, City, State, Country, Tags; unmapped columns can be custom variables.
+- Steps: upload file or "Choose a .CSV file" (or "Download template"), check column mapping (map or set "No mapping selected"), map extras as "{{Column Name}}", optionally toggle "Automatically verify lead emails on upload" (off by default, adds minutes), review values (fix errors, "Show only rows with errors"), preview import shows valid/invalid counts and Workspace Contact Capacity fit, click "Import N leads".
+- Imported leads land as Active status.
+- Duplicate check spans all non-deleted campaigns in workspace; duplicates skipped by default; force-add by deleting lead from other campaign's Leads tab then re-import.
+- If Active, campaign sends next window; Draft campaigns send nothing until launched.
+- Troubleshooting: rejected rows from blank required fields or bad emails; blank personalization from unmapped/blank columns; upload failures from non-CSV files (resave as CSV UTF-8); many duplicates mean leads exist in another campaign; missing Import Leads button may be a role permission issue; high invalid-email rate (>10%) means re-verify list source.
 
 ### Acquisity AI Lead Search {slug: cold-email-agent/campaigns/managing-campaigns/scrape-leads}
-- Entry: New campaign wizard > Lead source step > "Acquisity Lead Database"; or existing campaign > "Leads" tab > "Add Leads" > "Lead Database" > "Open Lead Scraper".
-- Step 1: "AI Search" box takes niche description; defaults to 1-50 employees, United States, unless overridden. Works best for broad market categories, not exact ICP (use researched CSV for that).
-- Step 2: Filters - "Job Titles", "Location", "Industries", "Company keywords", "Employees" - all editable.
-- Step 3: Live preview of matching companies; click company for details (description, LinkedIn, industry/location/size, keywords, person). Company Keywords use OR logic; prune unwanted keywords or add to Excluded Keywords. Do a 3-5 company check before proceeding.
-- Step 4: Click "Next"; launch dialog shows estimated available leads, "Number of leads to import" (default 500, min 100), lead credit balance (top up via dialog, "Settings">"Billing">"Credit Balances", or "Settings">"Cold Email Agent">"Feature Credits"). Click "Confirm" to scrape.
-- Standalone Acquisity auto-filters already-owned leads; Instantly-connected workspaces may show/charge duplicates that get blocked at upload.
-- Final count may be lower than requested; unverifiable emails dropped.
-- Checkbox "Launch campaigns automatically once the setup is complete" is on by default for AI Lead Search; off = campaign lands as Draft. Disabled when "Upload Your Own" selected.
+Get here: New campaign wizard > "Lead source" step > "Acquisity Lead Database"; or existing campaign > "Leads" tab > "Add Leads" > "Lead Database" > "Open Lead Scraper"
+- Describe niche in "AI Search" box or set filters manually (job titles, locations, industries, keywords, headcount).
+- Defaults: 1-50 employees, United States, if unspecified.
+- Finds/verifies emails live at import; unverifiable people are filtered out.
+- Best for market-category targeting, not exact ICP; use researched CSV for very specific targeting.
+- Company Keywords filter uses OR logic; refine by removing/excluding keywords, not adding.
+- Preview shows company description, LinkedIn, industry, location, size, keywords, matched person; check 3-5 companies before scraping.
+- Click "Next" to see launch dialog: estimated leads available, number to import (default 500, min 100), lead credit balance; top up via dialog, "Settings" > "Billing" > "Credit Balances", or "Settings" > "Cold Email Agent" > "Feature Credits".
+- Standalone workspaces auto-dedupe owned leads; sending-platform-connected workspaces may still charge credits for duplicates blocked at upload.
+- "Launch campaigns automatically once the setup is complete" checkbox: on by default, disabled for "Upload Your Own" (CSV).
 - Campaign lead capacity: Growth plan 5,000 concurrent leads/org; other plans ~25,000/provider workspace (varies). CRM contacts unlimited.
-- To free capacity: open old campaign > Leads tab > "Export CSV" > delete leads (keep campaign for analytics).
-- Replicate filters: open campaign > "Options" tab > scroll to see filters used (only shown for AI Lead Search campaigns, not CSV uploads).
-- Credits: 1 credit = 1 verified lead delivered; previews/filter changes free; CSV uploads cost 0 credits.
-- Reasons for fewer leads than requested: tight filters, email not found/invalid, workspace dedupe, recent-contact hold-back, verification drops.
-- Tips: start broad then prune; always do 3-5 check; vary keywords across campaigns; import 1,000-2,500 leads for testing, avoid over 5,000 per campaign.
+- To free capacity: open old campaign, Leads tab > Export CSV, then delete leads (not whole campaign).
+- Reuse filters: open past campaign > "Options" tab > scroll to bottom; only shown for AI Lead Search campaigns, not CSV.
+- Credits: 1 credit = 1 verified lead; previews/filter changes free; CSV uploads cost 0 credits.
+- Final count often lower than requested due to tight filters, unfound/invalid emails, dedupe, recent-contact holdback.
+- Tips: start broad then prune; test with 1,000-2,500 leads; avoid over 5,000 leads per campaign.
 
 ### Overview {slug: cold-email-agent/email-accounts}
-- Path: sidebar "Outreach" > "Cold Email Agent" > "Email Accounts".
-- Two ways to add inboxes: buy pre-warmed inboxes (4+ weeks warmup, ready day one) or Done-For-You domain (branded domain, ~2 weeks warmup).
+Get here: "Cold Email Agent" > "Email Accounts"
+- Need at least one sending inbox before launching a campaign; more inboxes raise daily send capacity.
+- Two ways to add inboxes: buy pre-warmed inboxes (ready day one) or Done-For-You domain (~2 weeks warmup).
 - Related pages: domain provisioning (SPF/DKIM/DMARC, automatic), domain forwarding, warmup, health & troubleshooting.
-- Table columns: "Name", "Email", "Emails Sent" (e.g. "12 of 35"), "Warmup Emails", "Health Score" (>80% good, dash = no data), "Account Type" (Pre-Warmed Inbox, Normal Inbox, External Inbox), "Status" (Active/Paused/Error/Warmup), "Warmup icon" flame (orange=not ready, green=ready).
-- "Connect Existing Accounts" card is "Coming Soon", disabled.
-- Buttons: "Search email accounts...", Status filter, "Move Accounts", "Domain Forwarding", "Manage Billing" (links to Settings>Billing), "Add New Inboxes".
-- Hard limit: 35 campaign emails/day per inbox. Suggested: 3 inboxes/100 emails, 9/300, 15/500, 29/1,000. Start with min 3 inboxes/campaign.
-- Inbox ready when: Status=Active, flame=green, Health Score ≥90% (or dash if flame green).
-- If errors on Active inboxes, use "Feedback" in account menu.
-- Fix for empty table: clear search box and reset Status filter.
+- Table columns: Name, Email, Emails Sent (of daily limit, usually 35), Warmup Emails, Health Score (above 80% good), Account Type (Pre-Warmed Inbox/Normal Inbox/External Inbox), Status (Active/Paused/Error/Warmup), Warmup flame icon (orange=not ready, green=ready).
+- "Connect Existing Accounts" is disabled, marked Coming Soon.
+- Top buttons: "Search email accounts...", Status filter, "Move Accounts", "Domain Forwarding", "Manage Billing" (links to "Settings" > "Billing"), "Add New Inboxes".
+- Each inbox sends up to 35 campaign emails/day (hard limit). Needs: 100/day=3 inboxes, 300=9, 500=15, 1,000=29. Start with at least 3 per campaign.
+- Inbox ready when: Status Active, flame green, Health Score 90%+ (or dash if new with green flame).
+- If table empty, clear search/filter. For stuck/error inboxes see Health & troubleshooting; otherwise use "Feedback" in account menu.
 
 ### Buying inboxes {slug: cold-email-agent/email-accounts/buying-inboxes}
-- Path: "Cold Email Agent" > "Email Accounts" > "Add New Inboxes"
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts", then "Add New Inboxes"
+- Two options: Pre-warmed (Google, ready day one, platform picks domain, 3 inboxes/domain) or Done-For-You/DFY (you pick domain, exactly 3 inboxes, ~2 weeks warmup before use).
 - "Connect Existing Accounts" (Google/Microsoft/IMAP-SMTP) is disabled, "Coming Soon".
-- Two options: Pre-warmed (ready day one, platform picks domain, 3 inboxes/domain) vs Done-For-You/DFY (you pick domain, 3 inboxes required, ~2 weeks warmup before sending).
-- Pre-warmed flow: "Add New Inboxes" > "Pre-warmed Inboxes" card > "Continue" > select domain pills (green=selected) > "Selected Domains" list > "Next" > optional "Forwarding Domain" field (empty triggers "Confirm Domain Forwarding" dialog, choose "Cancel" or "Continue Without Forwarding") > review order table (Provider, Persona, Email, Domain, Price; Inbox subtotal monthly, Domain subtotal yearly, Recurring total) > optional promo code + "Apply" > countdown timer at checkout, expiry releases domains > "Place Order".
-- Billing: subscriptions renew 15th of each month; inbox purchases non-refundable; domains non-refundable once registered.
-- Provisioning banner states: "Processing domains...", "Provisioning domains (X/Y)...", "Provisioning complete!", "Provisioning requires attention".
-- DFY flow: "Add New Inboxes" > "Done-For-You Setup" card > "Continue" > search domain name, filters .com/.net/.org > select domain pills (taken shown red) > "Next" > for each domain add exactly 3 inboxes with Sender name, Email (username + domain dropdown), quick-fill patterns, "Add"; counter "2/3 inboxes for domain"; red error if incomplete > optional Forwarding Domain > "Place Order".
-- DFY inboxes show orange flame (warmup, ~2 weeks); cannot add to campaigns until flame turns green; after warmup ramps to 35 emails/day capacity.
-- Ready signals (both types): Status "Active", green flame, health score 80%+.
-- After purchase: SPF/DKIM/DMARC auto-configured within minutes; warmup starts immediately; forwarding takes effect within hours once DNS propagates.
-- Partial provisioning: yellow banner "Provisioning requires attention"; retries every ~30 min for 24 hrs; auto-refund if all fail; contact support if unresolved after 24h; X on banner dismisses it permanently with no way to recall.
-- Limits: exactly 3 inboxes per domain, no more; no refunds on inboxes/domains.
-- Troubleshooting: stuck provisioning >24h (DFY) or minutes (pre-warmed) contact support; Error status often DNS propagation delay, wait 30 min and refresh.
+- Pre-warmed flow: select domain pills, review "Selected Domains", click "Next"; optional "Forwarding Domain" field; checkout table shows Provider/Persona/Email/Domain/Price, totals "$X/mo + $Y/yr"; billing renews 15th of month; inbox purchases not refundable; checkout has countdown timer, expiry releases domains; click "Place Order"; provisioning banner stages through "Processing domains...", "Provisioning domains (X/Y)...", "Provisioning complete!" or "Provisioning requires attention".
+- DFY flow: search domain, filter by .com/.net/.org, taken domains show red badge; configure exactly 3 inboxes per domain (sender name, email, quick-fill suggestions), click "Add"; "Place Order"; new inboxes show orange flame (not usable yet), turn green and reach 35 emails/day capacity after ~2 weeks.
+- Ready when: Status Active, flame green, health score 80%+.
+- After purchase: SPF/DKIM/DMARC auto-configured; warmup starts; forwarding takes effect within hours.
+- Partial provisioning: retries every ~30min up to 24h; contact support after 24h; full failure = automatic refund (few business days); banner X dismisses permanently with no way back.
+- Can't add more than 3 inboxes per domain; buy more domains instead.
+- No refunds on inboxes or registered domains.
 
 ### Domain provisioning {slug: cold-email-agent/email-accounts/domain-provisioning}
-- Explains SPF (guest list of allowed sending servers), DKIM (digital signature/tamper-proof seal), DMARC (rulebook: None/Quarantine/Reject, tells providers what to do on failure).
-- All three auto-configured for pre-warmed and DFY purchases; no DNS knowledge needed.
-- "Email Accounts" page shows Status, Warmup, Health score, Account Type, daily sending counts; click row for First Name, Last Name, "Save", "Reconnect" (for Error status).
-- Domain billing: "Settings" > "Billing" > "Email Accounts & Domains" shows managed domains, inbox counts, pricing, "Cancel", "Cancel all", "Buy More" (not a DNS status panel).
-- If managed inbox shows Error or SPF/DKIM/DMARC/forwarding flagged, use "Feedback" (account menu via name at bottom of sidebar) or contact support.
-- AI agent may log FLAG_DELIVERABILITY action; check Email Accounts for Error rows, else contact support.
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts"
+- SPF = allowed sending servers list; DKIM = digital signature proving authenticity; DMARC = tells providers what to do on failure (None/Quarantine/Reject), plus reporting. Missing DMARC is top cause of spam placement.
+- Platform auto-sets SPF/DKIM/DMARC and forwarding for pre-warmed and DFY inboxes; no DNS work needed.
+- Email Accounts page shows Status, Warmup, Health score, Account Type, daily counts; click row for First Name, Last Name, Save, Reconnect (on Error).
+- Domain billing: "Settings" > "Billing" > "Email Accounts & Domains" shows domains, inbox counts, pricing, Cancel, Cancel all, Buy More (not a DNS panel).
+- Error row troubleshooting: use Reconnect if present; else contact support with domain/inbox.
+- Deliverability flags (FLAG_DELIVERABILITY) mentioning SPF/DKIM/DMARC: check Email Accounts for Error rows, else contact support.
 
 ### Domain forwarding {slug: cold-email-agent/email-accounts/domain-forwarding}
-- Redirects outreach domain to main site; builds prospect trust and may help sender reputation.
-- Set via: checkout "Forwarding Domain" field, or "Email Accounts" page > "Domain Forwarding" button (single or bulk).
-- Panel: tick domains (or "Select All"), enter "Forwarding URL", click "Update". Empty URL removes forwarding for selected domains; entering URL overwrites it.
-- Takes effect within minutes, up to an hour.
-- Avoid forwarding to hard sales pages; use homepage/About/landing page.
-- Affects only web visits, not email sending/receiving; subdomain behavior may vary.
-- Only works on platform-managed domains (pre-warmed/DFY), not externally hosted domains.
-- Troubleshooting: DNS delay up to hours, reapply; check Error status inboxes; typo/missing https:// breaks redirect; can set different URLs per domain group.
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts", then "Domain Forwarding"
+- Redirects outreach domain to main site; builds trust with prospects and email providers.
+- Set during checkout via "Forwarding Domain" field, or retroactively via "Domain Forwarding" button (supports bulk update across selected domains).
+- Panel: tick domains (or "Select All"), enter "Forwarding URL", click "Update"; empty URL removes forwarding for selected domains; takes effect in minutes, up to an hour.
+- Avoid forwarding to hard sales pages; prefer homepage, landing page, or About page.
+- Affects only web visits, not email sending/receiving; subdomain behavior varies.
+- Only works on platform-managed (pre-warmed/DFY) domains, not externally hosted ones.
+- Troubleshooting: wait for DNS propagation; re-enter URL including "https://"; check Email Accounts for Error rows; contact support with domain name if unresolved.
 
 ### Inbox warmup {slug: cold-email-agent/email-accounts/warmup}
-- Warmup builds sender reputation automatically on every inbox before real campaigns can send.
-- Two kinds: Initial warmup (orange flame, new DFY inboxes, ~2 weeks, cannot send campaigns) and Continuous warmup (green flame, all inboxes, ongoing, can send).
-- Pre-warmed inboxes arrive with green flame, ready day one (4+ weeks warmup already done).
-- Health score (0-100%): 90%+ good; 80-90% warning, keep warmup running, avoid new volume; below 80% pause from campaigns, replacing is safer; dash (, ) = not enough data yet.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Warmup builds sending reputation with Gmail/Outlook via automated small emails, runs on every inbox automatically.
+- Two kinds: Initial warmup (orange flame, ~2 weeks, DFY inboxes, cannot send campaigns) and Continuous warmup (green flame, ongoing, can send).
+- Pre-warmed inboxes start green, skip initial phase.
+- Health score 0-100%: ≥90% good, 80-90% warning (keep warmup, watch replies), <80% pause/replace, dash (, ) means no data yet.
 - Health score reflects warmup traffic only, not real campaign deliverability.
-- Ready to campaign when: "Status" = Active (green), flame icon green, Health Score 90%+ (or dash with green flame).
-- Platform caps campaign sending at 35 emails/inbox/day.
-- Fixes: bounce rate >5% = list problem; spammy copy trips filters; pause inbox from campaigns, keep warmup running, recheck in 5-7 days.
-- Orange flame after 2 weeks: check Status - Error use "Reconnect"; Paused re-enable; Warmup wait 3-5 more days; past 3 weeks contact support.
-- 0 warmup emails/no health score: wait 24h for provisioning, check Paused/Error status, else contact support.
+- Ready to send when: Status=Active, flame green, Health Score ≥90% (or dash with green flame).
+- Score drops from: bounce rate >5% on last campaign, volume ramped too fast (platform caps 35 campaign emails/inbox/day), spammy copy.
+- Fix: pause inbox from campaigns, keep warmup running, recheck in 5-7 days.
+- If orange after 2 weeks: check Status - Error use "Reconnect"; Paused re-enable; Warmup wait 3-5 more days; past 3 weeks contact support.
+- 0 warmup emails: wait 24h if provisioning, re-enable if Paused, Reconnect if Error, else contact support.
+- High health score but no replies: check bounce rate (Analytics), copy, angle, not inbox quality.
 
 ### Health & troubleshooting {slug: cold-email-agent/email-accounts/health-and-troubleshooting}
-- Statuses: Active (green, working), Paused (yellow, manual, no sends), Error (red, connection broken, use "Reconnect"), Warmup (yellow, initial warmup, not campaign-ready).
+Get here: "Cold Email Agent" > "Email Accounts"
+- Statuses: Active (green, fine), Paused (yellow, you stopped it, re-enable), Error (red, click row then "Reconnect"), Warmup (yellow, wait ~2 weeks).
 - "Status" filter options: Status, Active, Paused, Has Errors, Initial Warm-up.
-- Click row opens settings panel: "Enabled/Disabled" toggle (pauses both campaign and warmup sends), Status badge, email (read-only), "First Name/Last Name" (edit, "Save", only affects future sends), "Reconnect" button (only shown in Error).
-- Reconnect: click row > "Reconnect" > auto re-authorization > toast "OAuth reconnect initiated. This may take up to 48 hours to complete" (usually seconds); if unresolved after 48h, contact support.
-- Bulk actions: select rows, "Bulk actions" menu has "Enable Accounts"; "Move Accounts" button opens "Move accounts" dialog with "Select destination workspace" dropdown.
-- Domain billing: "Settings" > "Billing" > "Email Accounts & Domains" shows Total Domains, Total Inboxes, pricing, "Cancel", "Cancel all", "Buy More".
-- Burnt inbox playbook: remove from campaigns, diagnose (bad list, bad copy, too-early sending, broken SPF/DKIM/DMARC), replace with pre-warmed (fast) or DFY (slow, 2-week warmup), update sending accounts on campaign's Options tab, let old inbox rest or cancel domain.
-- Rotate vs recover: health score <90% pause and watch; <80% replace; reply rate (incl. auto-replies) <1% across campaigns = replace; bounce rate under 3% = healthy recovery sign.
-- Permanently stuck Warmup >3 weeks or health score drop with no sends: contact support.
+- Click row to open settings panel: Enabled/Disabled toggle (stops all sending), Status badge, Email address (read-only), First Name/Last Name (edit, click "Save", only affects future sends), "Reconnect" button (Error only).
+- Reconnect: click row, click "Reconnect", automatic re-auth, toast "OAuth reconnect initiated. This may take up to 48 hours to complete" (usually seconds). If unresolved after 48h, contact support.
+- Bulk actions (select rows): "Enable Accounts". "Move Accounts" button opens "Move accounts" dialog with "Select destination workspace" dropdown and final "Move accounts" button.
+- Domain/inbox billing: "Settings" > "Billing" > "Email Accounts & Domains" shows Total Domains, Total Inboxes, pricing, "Cancel", "Cancel all", "Buy More".
+- Burnt inbox playbook: toggle off/remove from campaigns, diagnose cause (bad list, bad copy, too-early sending, broken SPF/DKIM/DMARC), replace with pre-warmed (fast) or DFY (slow, 2-week warmup), update campaign's Options tab sending accounts, let old inbox rest in warmup or cancel domain.
+- Rotate if: health score <80%, reply rate (incl. auto-replies) <1% across campaigns, multiple clean campaigns underperform.
+- Recovered signs: score >90% after warmup-only rest, reply rate >1% on test sends, bounce rate <3%.
+- Lost cause: score stays <90%, reply rate stays <1%, DMARC shows domain rejected.
+- Stuck in Warmup >3 weeks or score drop with no sends: contact support.
+- Reconnect only visible in Error status.
 
 ### DFY warmup & reconnect errors {slug: cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors}
-Same facts as warmup and health-and-troubleshooting articles. Additional: can select a warming inbox when building a campaign but cannot launch until warmup finishes (launch error shows exact date); cannot add a warming inbox to a live campaign. Navigation: "Cold Email Agent" (under "Outreach") > "Email Accounts". Reconnect blocked from second attempt until current one finishes/expires (48h max).
+Get here: "Cold Email Agent" > "Email Accounts"
+- DFY inboxes: 2-week initial warmup, Status=Warmup, flame orange, cannot send campaigns; can be selected but launch blocked until warmup finishes (error shows exact date); can't add warming inbox to a live campaign.
+- Zero warmup emails/dash score normal in first 24-48h or weekends (sends weekdays only); not normal if still 0 after 48h with Paused/Error status - fix per Status column, else contact support.
+- Use "Status" filter: "Has Errors", "Initial Warm-up".
+- Reconnect: click row, "Reconnect" button (Error only), confirmation toast, up to 48h, button shows "Reconnect in Progress", blocks second attempt until done/expired.
+- If Error persists after 48h, contact support with inbox email(s), error start/reconnect time, button state.
 
 ### Overview {slug: cold-email-agent/settings}
-- Page: "Settings" > "Cold Email Agent" controls workspace-level defaults; campaign "Options" tab overrides per campaign.
-- Sections: "Default Campaign Sending Schedule" (days, time window, timezone; does not control meeting booking), "AI campaign management" (master switch, speed preset, action modes, approval expiry; "Pause underperforming campaigns" only works with enabled replacement-campaign action), "Credits / Feature Credits" (lead credit balance, also in "Settings" > "Billing" > "Credit Balances"), "Workspace Contact Capacity" (storage limit), "Cold Email Blocklist" (separate page at "Settings" > "Cold Email Blocklist").
-- Credits consumed by AI Lead Search verified leads; CSV uploads don't use credits; Instantly-connected workspaces can consume a credit on a verified duplicate before final upload blocks it.
-- Can have credits but still blocked from adding leads if contact capacity full.
-- Top-up available via Billing > Credit Balances, Feature Credits, or lead-search confirmation dialog.
+Get here: click workspace name (top-left) > "Settings" > "Cold Email Agent"
+- Sets workspace defaults: Default Campaign Sending Schedule (days, time window, timezone), AI campaign management defaults, Credits/Feature Credits, Workspace Contact Capacity, Cold Email Blocklist.
+- Campaign Options tab overrides workspace defaults once saved.
+- Sending schedule doesn't control meeting booking availability (separate calendar settings).
+- "Pause underperforming campaigns" only works with an enabled replacement-campaign action.
+- Credits consumed by AI Lead Search verified leads; verified duplicates may consume a credit before upload blocks it; CSV uploads don't use credits.
+- Capacity can block adding leads even with credits available.
+- Blocklist at "Settings" > "Cold Email Blocklist" (separate page).
+- Top-up via "Settings" > "Billing" > "Credit Balances", or "Settings" > "Cold Email Agent" > "Feature Credits", or lead-search confirmation dialog.
 
 ### Thresholds {slug: cold-email-agent/settings/thresholds}
-Controls how much campaign data the agent needs before acting.
-Presets (min sends/variant, base sends/variant): "Careful" 150/300; "Balanced" 100/250 (recommended default); "Proactive" 50/200.
-Settings location: "Settings" > "Cold Email Agent" (workspace defaults) or Campaign > "Options" > "Cold Email Agent" (campaign-specific, more custom fields).
-Custom fields (choose "Custom"): Minimum Threshold, Base Threshold, Healthy positive reply rate, Winner positive reply rate, Booked call target.
-For agent to act: AI campaign management must be on, action set to "Run automatically" or "Ask first", enough data, performance triggers decision, approval/credit/capacity/lead-source checks pass.
-"Ask first" can trigger an Agent Approval instead of auto-change.
-Fixes: agent too slow → use "Proactive" or lower thresholds, or run fewer variants. Agent too fast → use "Careful" or raise thresholds. Everything looks underperforming → Healthy PRR may be too strict. Agent never flags anything → Healthy PRR too low, action is "Off", or insufficient data.
+Get here: In the left sidebar, click "Cold Email Agent", then "Settings" or campaign "Options" tab, then "Cold Email Agent"
+- Presets: Careful (min 150/base 300 sends per variant, conservative), Balanced (100/250, default), Proactive (50/200, faster/less data).
+- Workspace Settings→Cold Email Agent sets defaults; Campaign→Options→Cold Email Agent overrides per campaign, with more custom fields.
+- Custom fields: Minimum Threshold (fewest sends before judging), Base Threshold (volume for confident decisions), Healthy PRR, Winner PRR (higher than Healthy), Booked Call Target.
+- Agent only acts if: AI campaign management is on, action set to Run automatically/Ask first, enough data, performance triggers decision, approval/credit/capacity/lead checks pass. "Ask first" triggers Agent Approval instead of auto change.
+- Fixes: agent too slow → Proactive/lower thresholds/fewer variants; too fast → Careful/raise thresholds; everything looks bad → Healthy PRR too strict; nothing flagged → PRR too low, action Off, or insufficient data.
 
 ### Cold Email Blocklist {slug: cold-email-agent/settings/blocklist}
-Location: "Settings" > "Cold Email Blocklist".
-Entry types: Email address (blocks exact address) or Domain (blocks all addresses on that domain).
-Blocked leads may show as "in blocklist" in campaign lead tables.
-Controls: "Search emails or domains...", "Download CSV", "Import CSV", "Add", columns "Email / Domain" and "Block Date". Empty list shows "No blocked emails or domains found."
-Add manually: open blocklist > click "Add" > opens "Add Entries Manually" > paste one per line in "Type or paste emails and domains (one per line)" (emails detected by "@", else treated as domain) > fill "Reason" (default "Manually added to blocklist") > click "Preview" > review "Review Import" > click "Import".
-Import CSV: click "Import CSV", use "Get template" for format (column "Email/Domain"). Invalid entries skipped. Limit: 1,000 valid entries per import. Public/consumer email domains (e.g. Gmail) cannot be blocked as domains.
-Remove: check entry > "Bulk Actions" > "Remove from blocklist" > confirm "Remove from Blocklist". Removing one entry doesn't help if a broader domain block still applies.
-Distinct from "Add to DNC" (AI SDR Inbox, blocks one email on request) and CRM "Do Not Contact" marking, but outcome (blocked outreach) is the same.
+Get here: "Settings" > "Cold Email Blocklist"
+- Blocks an email address, or an entire domain (blocks all addresses on it); public consumer email domains can't be blocked as domains.
+- Blocked leads show as "in blocklist" in campaign lead tables.
+- Controls: "Search emails or domains...", "Download CSV", "Import CSV", "Add", table columns "Email/Domain" and "Block Date".
+- Add: click "Add" > paste one per line (auto-detected by @) > set "Reason" (default "Manually added to blocklist") > "Preview" > "Import".
+- Import CSV: use "Get template"; up to 1,000 valid entries per import; invalid entries skipped.
+- Remove: check entry > "Bulk Actions" > "Remove from blocklist" > confirm. Removing one match doesn't undo a broader domain block.
+- Distinct from "Add to DNC" (AI SDR Inbox, blocks one email on request) and CRM "Do Not Contact" marking; all block future outreach.
 
 ### Billing {slug: cold-email-agent/settings/billing}
-Layers: Workspace plan ("Settings" > "Billing" > "Current Plan"), Lead credits ("Settings" > "Billing" > "Credit Balances" or "Settings" > "Cold Email Agent" > "Feature Credits"), Workspace Contact Capacity ("Settings" > "Cold Email Agent" > "Workspace Contact Capacity"), Email accounts/domains ("Settings" > "Billing" > "Email Accounts & Domains" or "Cold Email Agent" > "Email Accounts").
-Lead credits spent only when AI Lead Search delivers verified leads; not used for CSV upload, viewing/editing leads, sending to existing leads, or creating/editing campaigns.
-Pausing a campaign stops sends only; does not refund credits, cancel inbox/domain subscriptions, or cancel workspace subscription.
-Manage via "Manage Billing" (billing portal), "Credit Balances → Buy More", "Email Accounts → Add New Inboxes".
-No single "pause all billing" toggle; contact support via "Feedback" before cancelling.
-Each client workspace has its own billing context.
-Fixes: unexpected charge → check "Manage Billing" vs plan/credits/accounts; still charged after cancel → check separate email/domain subscriptions; credits disappeared → check recent lead-search jobs, contact support; upgrade not reflected after 24h → contact support.
+Get here: "Settings" > "Billing"
+- Layers: Workspace plan ("Current Plan"), lead credits ("Credit Balances" or Cold Email Agent "Feature Credits"), workspace contact capacity (Cold Email Agent "Workspace Contact Capacity"), inboxes/domains ("Email Accounts & Domains" or Cold Email Agent "Email Accounts").
+- Credits spent only when AI Lead Search delivers verified leads; not used for CSV upload, viewing/editing leads, sending to existing leads, or campaign creation/editing.
+- Pausing a campaign stops sends only; does not refund credits, cancel inbox/domain subscriptions, or cancel workspace subscription.
+- No single "pause all billing" toggle; contact support via "Feedback" before cancelling.
+- Manage: "Manage Billing" (portal), "Buy More" (credits), "Email Accounts → Manage Billing", "Add New Inboxes".
+- Don't delete campaigns to stop billing; deletion is permanent.
+- Troubleshooting: unexpected charge → check Manage Billing vs plan/credits/accounts; still charged after cancel → check separate email/domain subscriptions; missing credits → check recent lead-search jobs, contact support; upgrade not reflected after 24h → contact support.
 
 ### Best Practices {slug: cold-email-agent/best-practices}
-Methods: Podcast (best default, highest replies), Interview (like Podcast, written/video), AI Business Audit (free review, good for service businesses), Direct (needs strong proof/case study, else weak).
-Target Industry: use broad market terms ("Software", "B2B SaaS"), not full ICP; refine using industries, keywords, headcount, locations, exclusions in lead search preview; lead search can't infer exact product/ICP fit.
-Core offer and case studies should be specific (names, numbers, timeframes), not vague.
-Subject lines: short, casual, curiosity-driven; avoid formal/spammy/all-caps with exclamation marks.
-Lead volume: test with 1,000-1,500 leads minimum, 2,000-2,500 if niche known; avoid above 5,000 leads per campaign.
-Inboxes: use at least 18 inboxes for meaningful volume; sending splits evenly across inboxes/campaigns.
-Review every email before launch (opening line, CTA, claims/numbers).
-Typical positive reply rates: Podcast 1-2% (great 2%+), Interview 0.5-1.5% (1.5%+), AI Business Audit 0.5-1% (1%+), Direct 0.3-0.8% (0.8%+). Below 1% across multiple campaigns signals check deliverability/spammy wording/sender reputation.
-Check AI SDR "Needs Attention" threads daily. Use Cold Email Writer's Variations tool to test new copy alongside (not replacing) winners.
-Five mistakes: vague/overspecific niche input, testing with too few leads, too few inboxes, not reviewing copy as the ICP, ignoring repeated low reply rates (possible deliverability/reputation damage).
+Get here: In the left sidebar, click "Cold Email Agent"
+- Methods: Podcast (best default, highest replies), Interview (written/video alt to podcast), AI Business Audit (free review, good for service businesses), Direct (needs real case study with numbers).
+- Target Industry: use market category (e.g. "Software"), not full ICP; refine via industries, keywords, headcount, locations, exclusions in lead search preview.
+- Direct method needs specific Core Offer and specific Case Studies (company, result, timeframe) for credibility.
+- Subject lines: short, casual, curiosity-driven; avoid formal/spammy or all-caps/exclamation lines.
+- Start campaigns with 1,000-1,500 leads for quick tests, 2,000-2,500 if niche known; avoid over 5,000 leads per campaign.
+- Use at least 18 inboxes for meaningful volume; sending splits evenly across all active inboxes/campaigns.
+- Review every email before launch, especially opening line, CTA, and claims/numbers.
+- Typical positive reply rates: Podcast 1-2% (good 2%+), Interview 0.5-1.5% (1.5%+), AI Business Audit 0.5-1% (1%+), Direct 0.3-0.8% (0.8%+). Below 1% across multiple campaigns signals deliverability/copy/reputation issues.
+- Check AI SDR Inbox "Needs Attention" threads daily.
+- Use Cold Email Writer's Variations tool to test alongside winners, not replace them.
+- Five fatal mistakes: vague/overspecific niche inputs, too few test leads, too few inboxes, not reviewing copy as the ICP, ignoring repeated low reply rates.
 
 ### Overview {slug: cold-email-agent/concepts}
-Index of seven concept docs: Email methods, Personalization (16 variables), Variants and A/B testing, Deliverability, Campaign states (Draft, Active, Paused, Completed, Archived, Attention Needed), Lead lifecycle (14 stages), Credits (AI lead finder billing; ordering more leads can yield fewer, e.g. 7000 ordered may give 1700).
+Get here: In the left sidebar, click "Cold Email Agent"
+- Explains seven core concepts referenced across Cold Email Agent docs: Email methods, Personalization (16 variables), Variants/A-B testing, Deliverability, Campaign states (Draft, Active, Paused, Completed, Archived, Attention Needed), Lead lifecycle (14 stages), Credits.
+- Suggested reading order: Campaign states, Deliverability, Email methods, Personalization, Lead lifecycle, Credits, Variants/A-B testing.
 
 ### Email methods {slug: cold-email-agent/concepts/email-methods}
-- 5 methods: Podcast, Interview, AI Business Audit, Direct, Masterclass. Wizard offers only first 4; standalone Cold Email Writer has all 5.
-- Podcast/Interview: best for relationships/experts, highest reply rates (Podcast 1-2%, Interview 0.5-1.5%).
-- AI Business Audit: free AI review offer, best for services; 0.5-1% reply rate.
-- Direct: needs extra fields (offer, value prop, pain points, case studies); 0.3-0.8% reply rate; needs strong proof.
-- Masterclass: only in Cold Email Writer, not generated by wizard.
-- Method affects email tone, required fields, AI SDR call type routing (e.g. Podcast/Pre-Podcast/Intro; Interview/Pre-Interview; AI Business Audit Review).
-- Test suggestion: 1,000-1,500 leads quick test, 2,000-2,500 for known niche.
-- Fix generic emails: set "Target Industry", fill all Direct fields, use real case study numbers, try "Variations" tool.
-- Fix wrong method chosen: edit "Campaign Type" on "Options" tab (includes legacy Workshop/Masterclass/Other); doesn't rewrite sequence copy; edit sequence manually or regenerate in Cold Email Writer.
-- Masterclass missing from Campaigns: expected; write in Cold Email Writer, copy script, paste into sequence editor of new campaign, set "Campaign Type" to Masterclass.
+Get here: In the left sidebar, click "Cold Email Agent", then create/open a campaign, Step 4 method selection (Campaign Wizard); or the Cold Email Writer for the standalone tool.
+- Wizard methods (4): Podcast, Interview, AI Business Audit, Direct. Direct needs extra fields (offer, proof, pain points).
+- Cold Email Writer has 5 methods: adds Masterclass.
+- New to cold email: use Podcast/Interview (highest reply rates). Strong proof: Direct. Service, show value: AI Business Audit. Educational event: Masterclass (Writer only).
+- Test: 1,000-1,500 leads quick test; 2,000-2,500 leads if niche known.
+- Method affects tone, required fields, AI SDR call type routing, reply rates (Podcast 1-2%, Interview 0.5-1.5%, AI Business Audit 0.5-1%, Direct 0.3-0.8%).
+- Fix generic emails: set clear Target Industry, fill all Direct fields, use real case studies, try Variations tool.
+- Wrong method chosen: edit "Campaign Type" on "Options" tab (doesn't rewrite sequence); edit sequence manually or regenerate in Cold Email Writer.
+- Masterclass missing from Campaigns is expected (wizard can't generate it); write in Cold Email Writer, copy script, paste into a campaign's sequence editor, set Campaign Type to Masterclass.
 
 ### Personalization {slug: cold-email-agent/concepts/personalization}
-- 16 variables, format \`{{variableName}}\`, case-sensitive, double braces required.
-- Contact: firstName, lastName, jobTitle. Company: companyName, industry, companyDomain, companyDescription, employeeCount. Location: location, city, state, country. Social: linkedIn. Sender: sendingAccountName, sendingAccountFirstName, accountSignature.
-- Insert via "Variables" button ({ } icon) in sequence editor; browse by category; click to insert.
-- "Preview" button opens dialog: left panel enter sample values, right panel shows rendered email; unknown variables show yellow warning with closest-match suggestion.
-- Recommend 2-4 variables per email.
-- Fix raw \`{{var}}\` showing: check spelling/case, use double braces, no spaces, use Variables button.
-- Missing variable: use closest existing variable or static text; AI SDR can reference other lead data in replies.
+Get here: "Cold Email Agent" > open campaign > Sequences tab (sequence editor).
+- 16 variables (\`{{firstName}}\`, \`{{lastName}}\`, \`{{jobTitle}}\`, \`{{companyName}}\`, \`{{industry}}\`, \`{{companyDomain}}\`, \`{{companyDescription}}\`, \`{{employeeCount}}\`, \`{{location}}\`, \`{{city}}\`, \`{{state}}\`, \`{{country}}\`, \`{{linkedIn}}\`, \`{{sendingAccountName}}\`, \`{{sendingAccountFirstName}}\`, \`{{accountSignature}}\`), case-sensitive, double braces only.
+- Insert via "Variables" button ({ } icon) in editor toolbar.
+- "Preview" button shows sample-value input (left) and rendered email (right); unmatched variables show a yellow warning with closest-match suggestion.
+- Use 2-4 variables per email; avoid overuse.
+- Fixes: check spelling/braces, use Variables button, check preview warnings; no custom variables beyond the 16, use static text instead.
 
 ### Variants & A/B testing {slug: cold-email-agent/concepts/variants-and-ab-testing}
-- Variant = alternate subject+body per step; platform rotates sends evenly, tracks per variant.
-- Metrics (Analytics tab): Sent, Replied, Positive Responses, Booked Calls; PRR = Positive Responses ÷ Sent.
-- Thresholds (Options tab): Minimum Threshold 100 sends, Base Threshold 250 sends, Winner PRR 2%, Healthy PRR 1% (defaults, campaign-level, adjustable).
-- Below Healthy PRR after Minimum Threshold → DISABLE_VARIANTS pending action on AI Agent tab: "Run automatically" disables it; "Ask first" creates Agent Approval; "Off" requires manual action via Sequences tab.
-- Under Minimum Threshold → WAIT_FOR_VOLUME action, no verdict yet.
-- Manual disable: Sequences tab > open step > toggle/delete variant; in-flight sends complete.
-- Guidance: 2-3 variants/step ideal; >3 only with high volume; keep at least one active variant per step.
+Get here: "Cold Email Agent" > open campaign > Sequences tab (edit variants); metrics on Analytics tab; thresholds on Options tab; agent actions on AI Agent tab.
+- Variant = subject+body pair per step; sends rotate evenly, tracked separately.
+- Metrics: Sent, Replied, Positive Responses, Booked Calls; Positive Reply Rate (PRR)=Positive Responses/Sent.
+- Default thresholds (Options tab): Minimum 100 sends, Base 250 sends, Winner PRR 2%, Healthy PRR 1%.
+- Below Healthy PRR past Minimum Threshold: agent logs DISABLE_VARIANTS in Pending Actions (AI Agent tab); behavior depends on "Optimize email variants" setting: Run automatically (auto-disables), Ask first (creates Agent Approval), Off (manual only).
+- Under Minimum Threshold: agent logs WAIT_FOR_VOLUME, no action.
+- Manual disable: Sequences tab > open step > toggle off/delete variant; in-flight sends complete.
+- Guidance: 2-3 variants/step is best; more than 3 only with high volume; keep at least one active variant per step.
 
 ### Deliverability {slug: cold-email-agent/concepts/deliverability}
-Inbox placement depends on four pillars:
-- Domain authentication: SPF, DKIM, DMARC DNS records. Required by Gmail/Outlook for volume sending. Automatic on Acquisity-purchased pre-warmed/DFY inboxes.
-- Sender reputation: driven by engagement, spam reports, bounce rate, domain/IP age. Slow to build, fast to burn.
-- Sending velocity: DFY inboxes warm up before campaign attachment; volume ramps daily until hitting cap of 35 campaign emails/inbox/day (hard platform max, not user-configurable).
-- List hygiene/content: bad lists cause bounces; avoid spam-trigger content; must include unsubscribe link (CAN-SPAM/GDPR).
-
-Built-in protections: pre-warmed inboxes, automatic SPF/DKIM/DMARC, continuous warmup, 35/day sending cap, bounce detection (moves leads to terminal status), domain forwarding (302 redirect), AI agent "FLAG_DELIVERABILITY" action on AI Agent tab.
-
-Monitor: bounce rate in Analytics (healthy <3%, >5% needs action), inbox health score in Email Accounts table, AI Agent tab entries, Positive Reply Rate drops.
-
-Burnt-inbox recovery: pause inbox in Email Accounts table immediately; diagnose cause; bring up fresh pre-warmed or DFY inbox (wait for warmup); move campaign's sending account via Options tab; let old inbox rest for weeks or retire it.
-
-Compliance (user's responsibility): US CAN-SPAM needs physical address + opt-out; EU GDPR needs legitimate interest + honored unsubscribes; Canada CASL needs consent, stricter than US.
+Get here: In the left sidebar, click "Cold Email Agent"
+- Four pillars: domain authentication (SPF, DKIM, DMARC), sender reputation, sending velocity, list hygiene/content.
+- Gmail/Outlook require SPF, DKIM, DMARC for volume sending. Auto-configured on Acquisity domains.
+- Reputation driven by engagement, spam reports, bounce rate, age; slow to build, fast to burn.
+- Hard cap: 35 campaign emails per inbox per day. DFY inboxes ramp gradually after warmup; no campaign sending during initial warmup.
+- Bounce rate >5% needs intervention; healthy is under 3%.
+- Protections: pre-warmed inboxes, automatic SPF/DKIM/DMARC, continuous warmup, sending caps, bounce detection, domain forwarding, AI Agent FLAG_DELIVERABILITY.
+- Watch: bounce rate in Analytics, inbox health score in Email Accounts table, AI Agent tab, Positive Reply Rate drops.
+- Burnt-inbox fix: pause sending, review cause, bring up new pre-warmed/DFY inbox, move campaign's sending account on Options tab, let old inbox rest weeks or retire.
+- Compliance: CAN-SPAM (US) needs address + opt-out; GDPR (EU) needs legitimate interest + honored unsubscribes; CASL (Canada) needs consent. User is responsible for compliance.
 
 ### Campaign states {slug: cold-email-agent/concepts/campaign-states}
-Statuses: Draft (not sending, unfinished or awaiting launch), Active (sending during configured hours only), Paused (stopped by user/bounce protection/agent pairing a replacement; data preserved, billing continues), Completed (sequence finished for all leads; resume or duplicate to re-engage), Archived (hidden from default list, filter by Status to find), Attention Needed (safety pause, not an error; causes: high bounce rate, provider safety state, AI flag, inbox/domain issue).
-For Active sending right now: status Active + within sending window + inboxes Active.
-Resume available on Paused, Completed, Attention Needed (after reading reason); confirmation dialog shown if bounce protection caused pause.
-Transitions mostly manual (Launch, Pause, Resume, Archive); automatic: Draft→Active on launch/auto-launch, Active→Completed on sequence finish, Active→Attention Needed on detected problem, Active→Paused when AI starts a replacement campaign.
-Troubleshooting: stuck Draft - reopen wizard or Launch; unexpected Paused - check AI Agent tab/bounce protection; Completed with leads remaining - duplicate campaign; Attention Needed with no banner - check AI Agent tab, else contact support; Resume not sending - check sending hours, inbox status, remaining leads.
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign from the Campaigns list
+- Statuses: Draft, Active, Paused, Completed, Archived, Attention Needed.
+- Draft: not sending; finish wizard or click "Launch campaign".
+- Active: sends only within configured hours; also needs inboxes Active.
+- Paused: stops sending but preserves data and keeps receiving replies; billing continues; click "Resume campaign".
+- Completed: sequence finished for all leads; won't resend; use "Resume campaign" with new leads, or "Duplicate Campaign" from three-dots menu.
+- Archived: hidden from default list, visible via Status filter; no restore button, duplicate instead.
+- Attention Needed: safety pause (bounce protection, provider issue, AI flag, inbox/domain issue); resuming bounce-paused campaigns shows a confirmation dialog.
+- No automatic Attention Needed → Active transition.
+- Check Options tab for sending schedule/assigned salesperson, AI Agent tab for reasons, Billing page for charge behavior.
 
 ### Lead lifecycle {slug: cold-email-agent/concepts/lead-lifecycle}
-14 statuses (OutreachLeadStatus enum): Active, NotYetContacted, Contacted, ReplyReceived, Replied, Interested, NotInterested, OutOfOffice, MeetingBooked, Completed, Converted, Bounced, Unsubscribed, CompletedNoReply (legacy).
-Each transition triggered by an event: email_sent, reply_received/auto_reply_received, lead_interested, lead_not_interested, lead_out_of_office, lead_meeting_booked, lead_meeting_completed, lead_closed, email_bounced, lead_unsubscribed/DNC.
-Interested = AI classified reply positive; MeetingBooked = actual calendar event exists; distinct states.
-AI SDR (if on) auto-classifies replies and can auto-answer; booked meetings route to campaign's Assigned Salesperson (Options tab). If off, replies land in AI SDR inbox for manual classification.
-Bounced is terminal per campaign; re-adding should be deliberate. Unsubscribed/DNC blocks future outreach; remove only with explicit re-consent.
-Seen on: Leads tab (status filters, History view separates uploads vs imports), Analytics tab (aggregates into positive reply rate, booked call rate, bounce rate).
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign, then "Leads" tab
+- 14 statuses: Active, NotYetContacted, Contacted, ReplyReceived, Replied, Interested, NotInterested, OutOfOffice, MeetingBooked, Completed, Converted, Bounced, Unsubscribed, CompletedNoReply.
+- Each driven by a system event (e.g. email_sent, reply_received, lead_interested, lead_meeting_booked, email_bounced, lead_unsubscribed).
+- Interested (classification) differs from MeetingBooked (actual calendar event).
+- AI SDR auto-classifies replies and can auto-answer; meetings route to Assigned Salesperson set on Options tab; if AI SDR off, replies go to AI SDR Inbox for manual classification.
+- Bounced is terminal per campaign; Unsubscribed/DNC blocks future outreach, only remove with explicit re-consent.
+- Leads tab shows status filters and History view; Analytics tab aggregates into positive reply rate, booked call rate, bounce rate.
 
 ### Credits {slug: cold-email-agent/concepts/credits}
-- Credits buy verified leads via AI Lead Search/Acquisity Lead Database; normally 1 credit = 1 verified lead delivered.
-- Not charged for: CSV uploads, sending emails, editing/viewing existing leads, creating campaigns/sequences.
-- Import counts can fall short (e.g. 7,000 requested, 1,700 delivered) due to tight filters, failed email lookups, role/company changes, verification failures, ownership/duplicate rules, blocklist/safety rules.
-- Fix: treat preview as guidance, widen filters, accept smaller verified lists.
-- Plan-included credits and one-time topups never expire; recurring credit packs refill monthly up to pack amount, don't stack.
-- Buy packs via "Buy More"; one-time vs recurring split in Acquisity-billed workspaces; partner-billed workspaces vary.
-- Balance shown as single combined number.
-- "Next Billing Date" on Billing page = subscription renewal, not credit top-up date.
-- Check balance: "Settings" > "Billing" > "Credit Balances"; "Settings" > "Cold Email Agent" > "Feature Credits"; "Import X leads" dialog shows credit badge.
-- Low balance: shows warning in lead finder; top up via Buy More/Top Up, use own CSV, or reuse eligible existing leads.
-- Troubleshooting: unexplained credit drops - check submissions (long scrapes can complete after tab close); CSV upload using credits - contact support; bounce refunds - not given (bounces normal, >5% rate flag to support); duplicates consuming credits when Instantly connected - preview can include duplicates, verified/charged before upload blocks them.
+Get here: "Settings" > "Billing" > "Credit Balances"; also "Settings" > "Cold Email Agent" shows "Feature Credits"
+- Credits buy verified leads via AI Lead Search/Acquisity Lead Database, normally 1 credit = 1 verified lead delivered.
+- Not charged for: CSV uploads, sending emails, editing/viewing existing leads, campaign creation.
+- Import can return fewer leads than requested: tight filters, failed email lookups, role/company changes, verification failures, ownership/duplicate rules, blocklist/safety rules.
+- Preview counts aren't guaranteed; widen filters if market too narrow.
+- Plan credits and one-time topups never expire/reset; recurring packs refill monthly up to pack amount, don't stack. Balance is one combined number. "Next Billing Date" on Billing page ≠ credit refresh date.
+- Buy more credits via "Buy More" (One-Time Topups / Recurring Credits) in "Settings" > "Billing".
+- Low-balance warnings appear in lead finder; top up or use own CSV/existing leads.
+- No refund for bounces (credits charged on verified delivery, not send success); flag support if bounce rate over 5%.
+- Duplicate leads can still cost credits when sending platform is connected, since duplicates may appear in preview and get blocked only at upload.
+- Issues: contact support with campaign/submission ID for mismatched balances or wrongly charged CSV uploads.
 
 ### Compliance {slug: cold-email-agent/concepts/compliance}
-- CAN-SPAM (US): sender ID, physical mailing address, working unsubscribe, honor unsubscribes within 10 business days, no deceptive subject lines. No opt-in needed.
-- GDPR (EU/UK): needs lawful basis (usually legitimate interest for B2B), must honor data-subject/delete requests, immediate unsubscribe honoring, purchased lists risky.
+Get here: In the left sidebar, click "Cold Email Agent"
+- CAN-SPAM (US): sender ID, physical mailing address, working unsubscribe, honour opt-outs within 10 business days, no deceptive subject lines; no opt-in required.
+- GDPR (EU/UK): needs lawful basis (usually legitimate interest for B2B), must answer data-subject requests, honour unsubscribes immediately, purchased lists risky.
 - CASL (Canada): stricter, generally needs consent.
-- Platform handles: opt-out detection in AI SDR Inbox ("Add to DNC"), "Settings → Cold Email Blocklist", automatic SPF/DKIM/DMARC on platform-purchased domains, hard bounce blocking, bounce protection pausing campaigns, reply/OOO detection.
-- User responsibility: physical mailing address in signature, lawful basis documentation, list sourcing judgment, email copy compliance, responding to GDPR data requests (typically within 30 days) via Leads tab search.
-- Compliance docs for procurement: contact support for data-handling statement, sub-processor list, GDPR posture, SOC 2.
-- Healthy signs: bounce rate under 3%, no unsubscribe complaints, green sender reputation/health scores.
-- Issues: legal threats - stop contact, add to DNC/Blocklist, document; high bounce pause - fix list quality; EU deletion request - honor promptly via DNC/Blocklist.
+- Platform handles: opt-out/DNC detection ("Add to DNC" in AI SDR Inbox or "Settings" > "Cold Email Blocklist"), sender identification, automatic SPF/DKIM/DMARC on platform-bought domains, bounce handling/bounce protection pausing campaigns, reply/OOO detection.
+- User responsible for: physical mailing address, lawful basis for EU/UK contacts, list sourcing quality (own-built lists fine, purchased lists risky), email copy compliance, responding to GDPR data requests within ~30 days (search Leads tab).
+- Compliance docs for procurement: contact support for compliance summary package (data-handling statement, sub-processor list, GDPR posture, certifications).
+- Healthy signs: bounce rate under 3%, no unsubscribe complaints, green sender/health scores.
+- Issues: legal threat → stop contact, add to DNC/Blocklist, document, consult counsel. High bounce rate → fix list quality. EU deletion request → honour promptly, add to DNC.
 
 ### FAQ {slug: cold-email-agent/faq}
-Index page listing FAQ categories: Campaigns, Email Accounts & Domains, Leads, Sequences & Variants, Deliverability & Compliance, Billing & Domains. No standalone facts.
+Get here: not stated. Index of FAQ topics; no standalone facts.
 
 ### Billing & Domains {slug: cold-email-agent/faq/billing-domains}
-Index page; see individual articles below. Full guides: Buying inboxes, Domain forwarding, Settings.
+Get here: "Settings" > "Billing". Index page; no standalone facts beyond linked articles.
 
 ### Can I pause my account instead of cancelling? {slug: cold-email-agent/faq/billing-domains/can-i-pause-my-account-instead-of-cancelling}
+Get here: "Settings" > "Billing" > "Email Accounts & Domains"
 - No account-wide pause toggle exists.
-- Inboxes bill monthly (~15th); domains bill yearly.
-- Option 1: "Settings → Billing" > "Email Accounts & Domains" > "Cancel" (per domain) or "Cancel all" to stop billing at period end.
-- Option 2: contact support for a possible hold (not guaranteed), be specific about dates.
-- Option 3: pause campaigns (stops sending, does not change billing) - fine for short pauses.
-- Option 4: full cancel, in order: cancel campaigns, cancel domains/inboxes ("Settings → Billing → Email Accounts & Domains"), cancel workspace plan. Wrong order can leave you paying for inboxes on a cancelled workspace.
+- Inboxes bill monthly (~15th), domains bill yearly.
+- Option 1: Cancel/"Cancel all" domains/inboxes to stop billing at period end.
+- Option 2: Contact support to request a billing hold (not guaranteed).
+- Option 3: Pause campaigns (stops sending, doesn't change billing).
+- Option 4: Full cancel order matters: cancel campaigns, then domains/inboxes via "Settings → Billing → Email Accounts & Domains", then cancel workspace plan.
 
 ### Can I redirect my Acquisity-purchased domain to my main website? {slug: cold-email-agent/faq/billing-domains/can-i-redirect-my-acquisity-purchased-domain-to-my-main-website}
-- Yes, domain forwarding available at purchase (Forwarding Domain field) or after.
-- Steps: "Cold Email Agent" (under "Outreach") > "Email Accounts" > "Domain Forwarding" button > select domains > enter URL in "Forwarding URL" > "Update".
-- Remove forwarding: leave URL blank, click "Update".
-- Purpose: avoids error page if prospects visit sending domain directly, looks more professional.
+Get here: "Cold Email Agent" > "Email Accounts" > "Domain Forwarding"
+- Domain forwarding available for Acquisity-purchased domains, settable at purchase or later.
+- Steps: select domains via checkboxes, enter "Forwarding URL", click "Update"; leave URL blank and update to remove.
+- Prevents error page when prospects type sender domain into browser; redirects to main site.
 
 ### How do I enable domain forwarding for my purchased inboxes? {slug: cold-email-agent/faq/billing-domains/how-do-i-enable-domain-forwarding-for-my-purchased-inboxes}
-Same steps and facts as domain forwarding article above.
+Get here: "Settings" > "Billing". Index page; no standalone facts beyond linked articles.
+Same as can-i-redirect-my-acquisity-purchased-domain-to-my-main-website.
 
 ### How do I set my sender domain and customize the sender name? {slug: cold-email-agent/faq/billing-domains/how-do-i-set-my-sender-domain-and-customize-the-sender-name}
-- Path: "Outreach" > "Cold Email Agent" > "Email Accounts" > click account row > edit "First Name"/"Last Name" fields > "Save".
-- Pre-Warmed Inboxes: domain auto-assigned, cannot self-service change to custom domain.
-- DFY Setup: you choose domain during setup; once purchased it's platform-managed.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Click the email account row, edit "First Name"/"Last Name" fields, click "Save".
+- Pre-warmed inboxes: domain auto-assigned, cannot self-service change.
+- DFY setup: you choose domain during setup; platform manages it after purchase.
 
 ### How much does it cost to add more sending capacity? {slug: cold-email-agent/faq/billing-domains/how-much-does-it-cost-to-add-more-sending-capacity}
-Inboxes bill monthly, domains bill yearly, exact prices at checkout. Each domain includes 3 inboxes. Checkout shows "Recurring total" as $X/mo + $Y/yr. Subscriptions renew on the 15th; inbox purchases not refundable. Go to "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" (hidden while an order provisions). Choose "Pre-warmed Inboxes" (same-day) or "Done-For-You Setup" (~2 weeks warmup). Each inbox caps at 35 campaign emails/day (hard limit); "Emails Sent" column shows "X of Y". New-contact sends capped near 70% of daily capacity, rest for follow-ups. Capacity scales linearly with inboxes/domains. Lead credits (1 credit = 1 lead) are billed separately from inbox/domain charges, check balance before scaling.
+Get here: "Cold Email Agent" > "Email Accounts" > "Add New Inboxes"
+- Inboxes bill monthly per inbox; domains bill yearly per domain; each domain includes 3 inboxes.
+- Checkout shows exact prices; "Recurring total" shown as $X/mo + $Y/yr.
+- Subscriptions renew the 15th; inbox purchases non-refundable.
+- Choose "Pre-warmed Inboxes" (same-day) or "Done-For-You Setup" (~2 weeks warmup).
+- Each inbox sends up to 35 campaign emails/day (hard cap); "Emails sent" column shows "X of Y".
+- New contacts capped at ~70% of daily sends, rest for follow-ups.
+- Lead credits (sourcing contacts) bill separately from inbox/domain charges.
 
 ### Where do I find the Cold Email Agent in the app? {slug: cold-email-agent/faq/billing-domains/where-do-i-find-the-cold-email-agent-in-the-app}
-In left menu under "Outreach" > "Cold Email Agent", opens to "All Campaigns"; top actions: "Settings", "Email Accounts", "New Campaign".
+Get here: "Cold Email Agent"
+Opens to "All Campaigns"; top actions: "Settings", "Email Accounts", "New Campaign".
 
 ### Who owns my purchased domains after I cancel, and what happens to warmup billing? {slug: cold-email-agent/faq/billing-domains/who-owns-my-purchased-domains-after-i-cancel}
-Domains/inboxes are managed, not held in your own registrar account; no transfer-out option. Cancelling a domain permanently deletes it and its inboxes (irreversible, non-refundable). Domains/inboxes keep billing (yearly/monthly) and warmup keeps running after a campaign ends or pauses; warmup is included in inbox price, no separate charge. To cancel: "Settings" > "Billing" > "Email Accounts & Domains" > "Cancel" or "Cancel all". Workspace plan and domain/inbox subscriptions bill separately; cancelling one doesn't cancel the other. Contact support before cancelling if you need the domain later.
+Get here: "Settings" > "Billing" > "Email Accounts & Domains"
+- Domains/inboxes are managed, not registrar-owned; no transfer-out option; cancelling deletes them permanently, unrecoverable.
+- Campaign pause/end does not stop domain (yearly) or inbox (monthly) billing or warmup.
+- Warmup is included in monthly inbox fee, not billed separately.
+- To stop charges: "Cancel" next domain or "Cancel all"; not refundable; stops sending immediately.
+- Workspace plan billing is separate from domain/inbox billing.
 
 ### Why was I charged $129 when I have free credits? {slug: cold-email-agent/faq/billing-domains/why-was-i-charged-129-when-i-have-free-credits}
-Credits only pay for leads (1 credit = 1 lead), not subscription, sending, inboxes, or domains. Charges may be workspace subscription, plan/feature upgrade, inbox/domain billing, or extra credits. Check "Settings" > "Billing" > "Manage Billing", "Current Plan", "Email Accounts & Domains", "Credit Balances". Contact support with invoice reference if unclear.
+Get here: "Settings" > "Billing"
+- Credits only pay for leads (1 credit = 1 lead); not for subscription, sending, inboxes, or domains.
+- Check "Manage Billing" for subscription, "Email Accounts & Domains" for inbox/domain charges, "Credit Balances" for extra credits.
+- Four separate billing layers, each billed on its own schedule; contact support with invoice reference if unclear.
 
 ### Campaigns {slug: cold-email-agent/faq/campaigns}
-Overview only; see other articles in this batch.
+Get here: "Cold Email Agent"
+Overview page; no new facts beyond linked guides.
 
 ### What is the difference between a campaign and the Cold Email Writer? {slug: cold-email-agent/faq/campaigns/campaign-vs-cold-email-writer}
-Campaign = full system (leads, sequences, scheduling, sending). Cold Email Writer = standalone script generator, no sending/lead management; copy output manually.
+Get here: "Cold Email Agent"
+Campaign = leads, sequences, scheduling, automated sending. Cold Email Writer only generates copy; no sending or lead management.
 
 ### How do I cap per-inbox email volume across campaigns? {slug: cold-email-agent/faq/campaigns/how-do-i-cap-per-inbox-email-volume-across-campaigns}
-"Cold Email Agent" > "Email Accounts"; "Emails Sent" column shows total across all campaigns, max 35/day, no user control to raise it. Don't assign one inbox to more than 2-3 active campaigns. Add multiple accounts on "Select email accounts" step; system auto-rotates and rebalances caps automatically.
+Get here: "Cold Email Agent" > "Email Accounts"
+- "Emails Sent" column shows "X of Y" (max 35/day), counts across all campaigns sharing that inbox.
+- No user control to raise limit; platform auto-throttles if combined campaigns exceed 35.
+- Keep ≤2-3 active campaigns per inbox.
+- Add multiple accounts on "Select email accounts" step; system rotates sending; add inboxes via "Add New Inboxes".
 
 ### How do I duplicate an existing campaign? {slug: cold-email-agent/faq/campaigns/how-do-i-duplicate-an-existing-campaign}
-Open campaign row's three-dot menu > "Duplicate Campaign" > enter new name (min 3 chars) > "Duplicate". Starts as Draft; copies sequences, variants, lead filters, options, email accounts; does not copy leads or analytics. Variants also have individual "Duplicate variant" action.
+Get here: "Cold Email Agent"
+- Row's three-dot menu > "Duplicate Campaign" > enter name (min 3 chars) > "Duplicate".
+- Duplicate starts in Draft, no leads, no analytics; sequences, variants, lead filters, options, email accounts carry over.
+- Variant-level "Duplicate variant" option exists inside campaign editor for A/B testing.
 
 ### How do I find the campaign delete menu? {slug: cold-email-agent/faq/campaigns/how-do-i-find-the-campaign-delete-menu}
-Campaign row > "⋯" menu > "Delete Campaign" > confirm. Bulk delete via checkboxes + bulk actions bar. Only Owner/Admin see delete. Deletion permanent, removes leads, sequences, analytics.
+Get here: "Cold Email Agent"
+- Row's three-dot menu > "Delete Campaign" > confirm "Delete".
+- Bulk delete via row checkboxes and bulk actions bar.
+- Only Owner/Admin see delete; widen browser if menu hidden.
+- Deletion permanent: removes campaign, leads, sequences, analytics.
 
 ### How do I pause a campaign without stopping my subscription payments? {slug: cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments}
-Open campaign > "Pause campaign"/"Resume campaign" button near header. Stops sending only; leads/sequence progress kept; billing, warmup, other campaigns unaffected.
+Get here: "Cold Email Agent" > campaign detail page
+- Click "Pause campaign"/"Resume campaign" near campaign name.
+- Pausing stops sending for that campaign only; billing, warmup, other campaigns unaffected.
+- Resuming continues sequence where it left off.
 
 ### How do I prevent the Cold Email Agent from re-sending old/outdated emails? {slug: cold-email-agent/faq/campaigns/how-do-i-prevent-the-cold-email-agent-from-re-sending-oldoutdated-emails}
-Open campaign > "Sequences" tab > edit email body > "Save". Edits apply only to unsent emails; leads already past that step aren't affected. No duplicate sends. For big changes, create a new campaign instead.
+Get here: "Cold Email Agent" > campaign > "Sequences" tab
+- Edit email body, update dates/offers, click "Save".
+- Changes apply only to unsent emails; leads can't receive duplicate emails.
+- For major changes, create a new campaign instead of editing a live one.
 
 ### How do I turn on AI campaign management for new and existing campaigns? {slug: cold-email-agent/faq/campaigns/how-do-i-turn-on-ai-campaign-management-for-new-and-existing-campaigns}
-"Settings" > "Cold Email Agent" sets defaults ("AI campaign management" toggle, speed preset, action modes); "Save settings". Per-campaign: open campaign > "Options" > "Cold Email Agent" section, toggle, save (overrides defaults). Reply automation is separate: "Settings" > "AI SDR Agent", enable, toggle per campaign.
+Get here: "Settings" > "Cold Email Agent"
+- Toggle "AI campaign management", set speed preset/action modes, "Save settings"; becomes default for new campaigns.
+- For one existing campaign: open campaign > "Options" > "Cold Email Agent" section > toggle > "Save settings" (overrides defaults).
+- Separate: "Settings" > "AI SDR Agent" controls reply automation, enabled per campaign.
+- Both switches independent; combos determine whether campaign management and/or reply handling are automated.
 
 ### How many email methods are there? {slug: cold-email-agent/faq/campaigns/how-many-email-methods-are-there}
-Campaign wizard: 4 methods (Podcast, Interview, AI Business Audit, Direct). Standalone Cold Email Writer: 5 (adds Masterclass, wizard-only unavailable).
+Get here: "Cold Email Agent"
+Campaign wizard: 4 methods (Podcast, Interview, AI Business Audit, Direct). Standalone Cold Email Writer: 5 (adds Masterclass, wizard-only exclusive).
 
-### Why is my campaign Active but not sending when I use my own Instantly account? {slug: cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account}
-Only applies to legacy workspaces connected via Instantly.ai API key; check "Settings" > "Cold Email Agent" > "Outreach Providers" card: "Managed by Acquisity" badge = use standard checklist; "Edit" button = connected to Instantly.
-Instantly controls mailbox connections, warmup, sending limits, plan/billing; Acquisity controls campaign status, leads, schedule, synced analytics. Green status only reflects last sync, not live sending.
-Steps: 1) check campaign is "Active" with no "Attention Needed" banner; 2) check "Options tab" sending schedule; 3) in "Outreach Providers" click "Test Connection" and "Sync Campaigns"; 4) if "Disconnected" with API key error, click "Edit" and reconnect using Instantly Settings→Integrations→API keys (all:all scope); other errors (webhook/sync) go to support; 5) compare campaign setup in both systems.
-Compare send counts: Instantly sends but Acquisity shows 0 → contact support via "Feedback" (account menu) type "human agent". Both show 0 → check Instantly's own troubleshooting guide (pause, schedule, mailbox errors, warmup, limits, billing). Contact Instantly support for sending logs if unresolved.
+### Why is my campaign Active but not sending when I use my own the sending platform account? {slug: cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account}
+Get here: "Settings" > "Cold Email Agent" > "Outreach Providers" card
+- Applies only to legacy workspaces connected via own API key (no "Managed by Acquisity" badge; shows "Edit" instead).
+- Acquisity controls campaign status, leads, sequences, schedule, analytics sync; sending platform controls actual sending, mailbox health, warmup, caps, billing.
+- Checks: campaign Active with no "Attention Needed"; "Options" tab sending window; "Test Connection" and "Sync Campaigns" on Outreach Providers card; compare campaign setup in both systems.
+- If key invalid: click "Edit", reconnect with new API key (all:all scope) from sending platform Settings→Integrations→API keys.
+- Other connection errors (webhook/sync): contact support, don't rotate key.
+- Compare send counts in sending platform dashboard; if sending platform shows sends but Acquisity shows 0, contact support.
+- If sending platform also shows 0, check sending platform's own troubleshooting (pause, schedule, mailbox errors, warmup, limits, billing).
+- Contact support via account menu > "Feedback", type "human agent"; mention using own connected sending platform account.
 
 ### What's the difference between pausing a campaign and pausing my subscription? {slug: cold-email-agent/faq/campaigns/pausing-a-campaign-vs-pausing-my-subscription}
-Pausing a campaign stops sending immediately, keeps all data, does not affect billing or credits; resumes where it left off.
-No "pause subscription" option exists, only cancel. Options: cancel inbox subscriptions (keep yearly domain), cancel workspace plan (doesn't auto-cancel inboxes/domains, billed separately), or contact support to ask about a hold.
+Get here: "Cold Email Agent" > open campaign
+- Pause campaign: stops sending immediately, keeps data, does not change billing or refund credits; resumes where left off.
+- No "pause subscription" option exists; only cancellation stops charges.
+- Options to reduce cost: cancel inbox subscriptions (keep yearly domain), cancel workspace plan (inboxes/domains bill separately, cancel each), or contact support for a possible hold.
 
 ### What are the lead source options for campaigns? {slug: cold-email-agent/faq/campaigns/what-are-the-lead-source-options-for-campaigns}
-Two options: "Acquisity Lead Database" (AI finds leads, filter by job title, location, industry, company size); "Upload Your Own" CSV, up to 20,000 rows, 100 MB max.
+Get here: "Cold Email Agent" > "New Campaign"
+- "Acquisity Lead Database": AI finds leads; filter by job title, location, industry, company size.
+- "Upload Your Own": CSV, up to 20,000 rows, 100 MB max.
 
 ### What are the step-by-step instructions for creating a new campaign? {slug: cold-email-agent/faq/campaigns/what-are-the-step-by-step-instructions-for-creating-a-new-campaign}
-Sidebar "Cold Email Agent" (under "Outreach") > "New Campaign". 4 steps: name campaign; choose lead source ("Acquisity Lead Database" or "Upload Your Own"); create sequence ("AI Generated": Podcast, Interview, AI Business Audit, Direct, or "Create your own"); select email accounts, click "Create Campaign". Default leads to import is 500, minimum 100. If auto-launch off, campaign opens as "Draft"; review "Leads", "Sequences", "Options" tabs, click "Launch campaign". Takes 20-55 minutes.
+Get here: "Cold Email Agent" (under "Outreach") > "New Campaign"
+- Steps: name campaign; choose lead source ("Acquisity Lead Database" or "Upload Your Own"); create sequence (AI Generated: Podcast, Interview, AI Business Audit, Direct, or Create your own); select email accounts; click "Create Campaign".
+- "Add Leads To Campaign" dialog: default 500 leads, minimum 100.
+- If "Launch campaigns automatically once the setup is complete" is off, campaign opens as Draft; review "Leads", "Sequences", "Options" tabs then click "Launch campaign".
+- Process takes 20-55 minutes.
 
 ### What happens when I upload a CSV with duplicate leads? {slug: cold-email-agent/faq/campaigns/what-happens-when-i-upload-a-csv-with-duplicate-leads}
-Checked at 3 levels: unassigned workspace leads get linked; duplicates in same campaign skipped; leads in another campaign (even paused/draft/completed) skipped, delete from other campaign first to re-upload. Summary shown; warnings "Duplicate Leads Skipped"/"All Leads Already in Another Campaign".
+Get here: "Cold Email Agent"
+- Duplicates in workspace but unassigned: linked to campaign.
+- Already in this campaign: skipped.
+- In another campaign (even paused/draft/completed): skipped; must delete from other campaign to re-upload.
+- Summary shown; wizard may show "Duplicate Leads Skipped" or "All Leads Already in Another Campaign".
 
 ### What's the recommended naming format for campaigns? {slug: cold-email-agent/faq/campaigns/whats-the-recommended-naming-format-for-campaigns}
-Format: "Method | Niche | Country | Employee Size", e.g. "Podcast | Software Development | US | 1-50".
+Get here: "Cold Email Agent" > "New Campaign"
+- Format: Method | Niche | Country | Employee Size, e.g. "Podcast | Software Development | US | 1-50".
 
 ### Where is the bounce protection toggle for a paused campaign? {slug: cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign}
-No toggle; automatic, status becomes \`campaign_bounce_protect\` above 3% bounce rate. Fix: "Leads" tab, check "Bounce Rate", export filter \`hasBounced=true\`→"Export CSV", verify list, fix spam copy, remove bounced leads, click "Resume campaign". Thresholds: <2% clean, 2-3% caution, >3% auto-pause, >5% reputation damage.
+Get here: "Cold Email Agent" > open campaign > "Leads" tab
+- No manual toggle; automatic status \`campaign_bounce_protect\` triggers above 3% bounce rate.
+- Fix: check "Bounce Rate" metric, filter hasBounced=true, export CSV, verify list, fix spam-trigger copy, remove bounced leads, click "Resume campaign".
+- Rates: under 2% clean, 2-3% caution, above 3% auto-paused, above 5% fast reputation damage.
 
 ### Why can't I send emails from a completed campaign? {slug: cold-email-agent/faq/campaigns/why-cant-i-send-emails-from-a-completed-campaign}
-Completed = all leads finished sequence. "Resume campaign" button reopens for new leads only (starts at step 1); doesn't resend to same leads. To re-pitch same leads, make new campaign (dedupe skips leads in active campaigns elsewhere). Duplicate via three-dot menu "Duplicate Campaign" for similar audience. Leads tab shows In progress/Completed/Bounced/Replied/Unsubscribed statuses.
+Get here: "Cold Email Agent" > open campaign
+- Completed means all leads finished sequence; "Resume campaign" button reopens campaign but only new leads restart sequence from step 1.
+- Add new leads via "Leads" > "Import Leads" or "Add Leads" > "Lead Database".
+- To re-pitch same leads, make new campaign with new copy; dedupe skips leads already active elsewhere.
+- Duplicate via three-dot menu > "Duplicate Campaign" for similar audience.
+- Leads tab statuses: In progress, Completed, Bounced, Replied, Unsubscribed.
 
 ### Why did my campaign stall at 200 emails? {slug: cold-email-agent/faq/campaigns/why-did-my-campaign-stall-at-200-emails}
-For Acquisity-managed inboxes only. Causes: 1) workspace contact capacity full, check "Settings"→"Cold Email Agent"→"Workspace Contact Capacity", delete old leads; 2) campaign Paused (manual, bounce protection, or AI replacement); 3) "Attention Needed" status, read banner; 4) outside sending hours ("Options tab"); 5) all inboxes paused/errored, check "Email Accounts", reconnect/unpause.
+Get here: "Settings" > "Cold Email Agent" (for capacity); "Cold Email Agent" > open campaign (for status/schedule); "Email Accounts" (for inbox issues)
+- No monthly CSV quota, but workspace has contact capacity cap shown under "Workspace Contact Capacity"; fix by deleting old leads.
+- Check if Paused (manual, bounce protection, or AI management starting replacement).
+- Check "Attention Needed" banner (bounce rate, domain auth failure, inbox error).
+- Check "Options" tab sending schedule/hours.
+- Check "Email Accounts" for Error/Paused inbox badges; reconnect or unpause.
 
 ### Why is my new campaign sending so few emails? {slug: cold-email-agent/faq/campaigns/why-is-my-new-campaign-sending-so-few-emails}
-Normal in first week. Cap ~35 emails/day per inbox, non-adjustable, split across active campaigns sharing inboxes. Low start due to launch timing, batch lead imports, gradual DFY warmup ramp (2-week warmup). Check "Analytics" tab: increasing daily sends = healthy; flat zero = check stall checklist.
+Get here: "Cold Email Agent" > open campaign > "Analytics" tab
+- Normal; full volume reached within first week.
+- Cap: ~35 campaign emails/day per inbox, not adjustable; shared evenly across active campaigns using same inboxes.
+- Low start causes: mid-day launch, batch lead import, DFY inbox warmup ramp (2-week warmup, no skip).
+- Healthy = increasing daily sends; flat zero or stopped = check stall checklist.
 
 ### Deliverability & Compliance {slug: cold-email-agent/faq/deliverability}
-Overview only; see linked Deliverability concept and Domain provisioning pages.
+Get here: not stated. Index of FAQ topics; no standalone facts.
+- Overview only; see other articles for details.
 
 ### Are my outbound emails CAN-SPAM compliant? {slug: cold-email-agent/faq/deliverability/are-my-outbound-emails-can-spam-compliant}
-AI SDR detects opt-out phrases, flags thread, lets you add to DNC/blocklist; view in "AI SDR Inbox" > "Needs Attention". User responsibilities: add physical address via "Email Signature" (Direct) or "Contact Info" field; review AI subject lines in "Sequences" tab; ensure commercial identification; manually "Add to DNC" if needed; keep lists clean via filters/CSV; monitor bounce/reply rates in "Analytics" tab.
+Get here: "AI SDR Inbox" (under "Outreach") > "Needs Attention"
+- AI SDR detects opt-out language ("unsubscribe," "remove me," etc.), flags thread, lets you add to DNC/blocklist.
+- User must: add physical address in "Email Signature" or "Contact Info" field; keep subject lines accurate (editable in "Sequences" tab); ensure messages read as commercial; manually handle missed opt-outs via "Add to DNC" in "AI SDR Inbox" > "Needs Attention"; keep lead lists clean via filters/CSV.
+- Monitor bounce rates in campaign "Analytics" tab.
 
 ### Do I need a live company website before starting cold email campaigns? {slug: cold-email-agent/faq/deliverability/do-i-need-a-live-company-website-before-starting-cold-email-campaigns}
-Not required but strongly recommended; blank/missing site hurts trust and deliverability even with correct SPF/DKIM/DMARC.
-Minimum: business name/logo, description, contact info, professional template (WordPress, Carrd, etc).
-Domain forwarding (for Acquisity-purchased domains): sidebar "Cold Email Agent" > "Email Accounts" > "Domain Forwarding" button > select domains > enter main site URL > "Update".
+Get here: In the left sidebar, click "Cold Email Agent" (under "Outreach"), then "Email Accounts"
+Not required technically but strongly recommended; blank/missing site hurts trust and can trigger spam.
+Minimum site: business name, logo, description, contact info, professional template.
+Domain forwarding: on "Email Accounts" click "Domain Forwarding", select domains, enter site URL, click "Update".
+Email providers check for active website, matching domain, professional look, contact info; missing these raises spam risk even with SPF/DKIM/DMARC set.
 
 ### How can I manage my Do Not Contact list? {slug: cold-email-agent/faq/deliverability/how-can-i-manage-my-do-not-contact-list}
-Manage via "Settings" > "Cold Email Blocklist" (search, add, import, export, remove). Also "AI SDR Inbox" > "Add to DNC" (per reply) and CRM contact "Do Not Contact" toggle.
-Search box "Search emails or domains...", "Download CSV", "Bulk Actions" > "Export selected".
-Remove: search entry, check row, "Bulk Actions" > "Remove from blocklist" > confirm. Remove both email and domain entries if blocked both ways. Only unblock if outreach is actually allowed again.
+Get here: "Settings" > "Cold Email Blocklist"
+Also: "AI SDR Inbox" reply thread "Add to DNC"; CRM contact "Do Not Contact" toggle.
+Search box finds entries; "Download CSV" exports all; "Bulk Actions" > "Export selected" exports chosen rows.
+Remove: search entry, check row, "Bulk Actions" > "Remove from blocklist" > confirm.
+If blocked by both email and domain, remove both. Only unblock if outreach is confirmed welcome.
 
 ### How do I add leads to the blocklist? {slug: cold-email-agent/faq/deliverability/how-do-i-add-leads-to-the-blocklist}
-"Settings" > "Cold Email Blocklist" > "Add" > paste one email/domain per line > "Preview" > "Import". Domain blocks whole company.
-Bulk: "Import CSV" with "Email/Domain" column, preview, "Import". Max 1,000 valid entries per import.
-Blocked leads are skipped on import/search, shown as "in blocklist".
+Get here: "Settings" > "Cold Email Blocklist"
+Add individually: click "Add", paste one email/domain per line, "Preview", then "Import".
+Bulk: click "Import CSV", upload file with "Email/Domain" column, preview, "Import". Up to 1,000 entries per import.
+Blocked leads get skipped in future imports/searches, shown as "in blocklist".
 
 ### I sent 1000+ emails and got zero replies, what's wrong? {slug: cold-email-agent/faq/deliverability/i-sent-1000-emails-and-got-zero-replies-whats-wrong}
-Usually a deliverability issue. Check: Analytics tab bounce rate (under 3% fine, 3-5% marginal, over 5% bad); "Email Accounts" Health Score column (below 80% pause inbox); inbox Status/Error rows (use "Reconnect"); send test email to personal Gmail to check spam placement. If all fine, check list relevance, generic copy, or volume/targeting mismatch.
+Get here: "Cold Email Agent" > open campaign > "Analytics" tab
+Usually a deliverability problem. Check bounce rate (under 3% fine, 3-5% marginal, over 5% bad – clean list).
+Check "Email Accounts" Health Score column; below 80% pause that inbox.
+Check inbox status/Error rows, click "Reconnect"; for SPF/DKIM/DMARC issues use "Feedback" in account menu.
+Send yourself a test email to check spam placement.
+If all fine, review list targeting, copy, and send volume.
 
 ### What do I do if my campaign is paused for high bounce rate? {slug: cold-email-agent/faq/deliverability/what-do-i-do-if-my-campaign-is-paused-for-high-bounce-rate}
-Don't just resume. Check "Leads tab" filter "Bounced", review reasons. Bounce rate: under 3% healthy, over 5% dangerous, over 10% catastrophic. Clean list via email verification, remove bounced leads, or discard purchased lists. Check inbox Health Score; if below 80%, pause inbox 2-3 weeks. Resume only after fixes; watch Analytics closely.
+Get here: "Cold Email Agent" > open campaign > "Leads" tab
+Don't just resume. Filter by "Bounced", check reasons (invalid recipient = list issue; spam rejected = deliverability issue).
+Bounce rate: under 3% healthy, over 5% dangerous, over 10% catastrophic (see Analytics tab).
+Clean list: use Email Verification toggle on import, bulk-remove bounced leads, consider discarding purchased lists.
+Check "Email Accounts" health scores; if below 80%, pause affected inboxes 2-3 weeks.
+Resume only after cleanup; watch Analytics closely.
 
 ### What does the SPF/DKIM/DMARC deliverability warning mean? {slug: cold-email-agent/faq/deliverability/what-does-the-spfdkimdmarc-deliverability-warning-mean}
-No dedicated UI flag; symptoms show as "Error" status, rising bounces, falling opens/replies. SPF/DKIM/DMARC auto-configured for Pre-Warmed/DFY accounts. If provisioning, wait for "Provisioning domains (X/Y)…" bar (DFY includes 2-week warmup). Persistent errors: use "Feedback" in account menu or contact support.
+Get here: "Cold Email Agent" > "Email Accounts"
+SPF/DKIM/DMARC are authentication protocols proving email legitimacy; no dedicated UI flag, shown via Error status, rising bounces, falling opens/replies.
+Acquisity-managed accounts auto-configure these; wait for "Provisioning domains (X/Y)…" bar (DFY ~2 weeks for warmup).
+If errors persist, use "Feedback" in account menu for support to check DNS.
+Missing records raise spam risk, rejection, and hurt domain reputation.
 
 ### What GDPR compliance language can I include in proposals for prospects? {slug: cold-email-agent/faq/deliverability/what-gdpr-compliance-language-can-i-include-in-proposals-for-prospects}
-General, non-legal guidance only. Legitimate interest basis for B2B outreach; opt-out via reply; data from public directories; stored securely, not shared with unauthorized parties; subjects can request access/correction/deletion. For formal DPA, contact Acquisity support.
+Get here: not stated. Index of FAQ topics; no standalone facts.
+Not legal advice. Suggested points: legitimate interest basis, opt-out via reply, data from public directories, secure storage, no unauthorized sharing, data subject rights.
+For official Data Processing Agreement, contact Acquisity support via "Feedback".
 
 ### When is 1 day too soon for the first follow-up email? {slug: cold-email-agent/faq/deliverability/when-is-1-day-too-soon-for-the-first-follow-up-email}
-Generally too aggressive. Recommended: first follow-up 2-3 days, second 4-5 days after first, later ones 5-7 days apart. 1-day ok for time-sensitive offers, warm leads, short check-ins. Edit via campaign > "Sequences" tab, delay input per step, autosaves. Changes apply to future sends only.
+Get here: "Cold Email Agent" > open campaign > "Sequences" tab
+1-day follow-up usually too aggressive; recommended: first follow-up 2-3 days, second 4-5 days later, subsequent 5-7 days apart.
+1-day ok for time-sensitive offers, warm leads, short check-ins.
+Edit delay input per step; autosaves. Changes apply to future sends only.
 
 ### Why did my test email land in spam? {slug: cold-email-agent/faq/deliverability/why-did-my-test-email-land-in-spam}
-Causes: under-warmed inbox (check Health Score), missing SPF/DKIM/DMARC, spam-trigger content, self-sent emails. Check "Email Accounts": Warmup flame icon, Health score, "Active" badge. Test via mail-tester.com. Reduce spam words/links/images, 2-4 personalization variables. "Error" rows: click, "Reconnect"; unresolved SPF/DKIM/DMARC warnings: contact support.
+Get here: "Cold Email Agent" > "Email Accounts"
+Causes: under-warmed inbox, missing authentication, spam-trigger content, self-sent emails flagged by providers.
+Check Warmup column (flame icon), Health score, Status "Active".
+Use mail-tester.com for a deliverability score; limit links to 1-2, avoid trigger words, small/no images, 2-4 personalization variables.
+For Error rows, click "Reconnect"; otherwise contact support with domain name.
 
 ### Why doesn't my business name appear on the emails my agent sends? {slug: cold-email-agent/faq/deliverability/why-doesnt-my-business-name-appear-on-the-emails-my-agent-sends}
-"Cold Email Agent" > "Email Accounts" > click account row > edit "First Name"/"Last Name" fields > "Save". Also check signature in campaign "Sequences" tab. Pre-warmed inboxes need manual name updates. Changes apply to new emails only.
+Get here: "Cold Email Agent" > "Email Accounts"
+Click account row to open settings panel, edit "First Name"/"Last Name", click "Save".
+Also check email signature under campaign "Sequences" tab.
+Pre-warmed inboxes need manual name updates. Changes apply to new emails only.
 
 ### Email Accounts & Domains {slug: cold-email-agent/faq/email-accounts}
-Overview only; see Email Accounts section articles.
+Get here: "Cold Email Agent" > "Email Accounts"
+Overview only; see other articles for setup, warmup, domains, health.
 
 ### Can I move email accounts between workspaces? {slug: cold-email-agent/faq/email-accounts/can-i-move-email-accounts-between-workspaces}
-Yes: select accounts via checkboxes, use bulk move action.
+Get here: "Cold Email Agent" > "Email Accounts"
+Yes: select accounts via checkboxes, use bulk action to move to another workspace.
 
 ### Can I set a per-inbox daily sending limit? {slug: cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit}
-No manual control; platform auto-sets cap, max 35 campaign emails/inbox/day, shown as "X of Y" in "Emails Sent" column. DFY ramps gradually; health score and active campaigns affect cap. Add more inboxes via "Email Accounts" > "Add New Inboxes" to raise total capacity.
+Get here: "Cold Email Agent" > "Email Accounts"
+No manual control; platform auto-sets cap, max 35 campaign emails/inbox/day, shown as "X of Y" in "Emails Sent" column.
+Cap depends on warmup stage, health score, and number of active campaigns sharing the inbox.
+Low cap: wait for ramp-up, improve health score, or buy more inboxes via "Add New Inboxes".
+Trying to bypass the cap damages deliverability.
 
 ### Can I temporarily hold/pause my email accounts while I'm away? {slug: cold-email-agent/faq/email-accounts/can-i-temporarily-holdpause-my-email-accounts-while-im-away}
-No vacation-pause feature. Options: pause campaigns (via campaign header pause button) - billing continues; or cancel domains via "Settings" > "Billing" > "Email Accounts & Domains" > "Cancel"/"Cancel all" - billing stops at period end but requires re-warming new inboxes later.
+Get here: "Cold Email Agent"
+No vacation-pause feature. Options: pause campaigns (stops sending, billing continues, warmup intact) or cancel domains via "Settings" > "Billing" > "Email Accounts & Domains" ("Cancel"/"Cancel all", billing stops at period end, requires re-warming new inboxes later).
+Recommended: pause campaigns for short absences (1-2 weeks).
 
 ### How do I distribute volume across multiple inboxes and campaigns safely? {slug: cold-email-agent/faq/email-accounts/how-do-i-distribute-volume-across-multiple-inboxes-and-campaigns}
-Hard max 35 emails/inbox/day, cap is shared across all campaigns using that inbox, platform auto-throttles. Keep total requested volume ≤ total inbox capacity; rotate inboxes across campaigns periodically.
+Get here: "Cold Email Agent" > "Email Accounts"
+Hard cap: 35 campaign emails/inbox/day, platform-enforced, shared across all campaigns per inbox.
+Platform spreads sends evenly across attached inboxes; total workspace capacity = inboxes × 35.
+Keep total requested campaign volume under total capacity; rotate inboxes across campaigns periodically to avoid overload.
 
 ### How do I fix an account with an error? {slug: cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error}
-Click account, click "Reconnect" to re-authenticate (OAuth); can take up to 48 hours.
+Get here: "Cold Email Agent" > "Email Accounts"
+Click account to open settings, click "Reconnect" to re-authenticate (OAuth); can take up to 48 hours to resolve.
 
 ### How do I get email accounts to send from? {slug: cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from}
-- Two options: buy pre-warmed inboxes (ready day one, 3 inboxes/domain, aged 4+ weeks) or Done-For-You (DFY) setup on chosen domain, needs ~2 weeks warmup.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Buy pre-warmed inboxes: 3 per domain, aged 4+ weeks, ready day one.
+- Or Done-For-You setup on an outreach domain you choose; needs ~2 weeks warmup.
 
 ### How do I replace burnt/spam-flagged outreach inboxes? {slug: cold-email-agent/faq/email-accounts/how-do-i-replace-burntspam-flagged-outreach-inboxes}
-- Pause affected campaigns: "Cold Email Agent" > campaign > "Pause campaign".
-- Buy new: "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes" > "Continue" > select domains > "Next" > enter "Forwarding Domain" > "Place Order".
-- Wait for "Provisioning complete!" banner.
-- Update paused campaigns: campaign > "Options" tab > update email accounts > resume.
-- Disable burnt accounts: click account > toggle "Enabled/Disabled" > "Save" (or bulk select + disable).
-- Prevent burnout: cap 35 emails/inbox/day (hard cap); keep "Health Score" above 80%; pause if bounce rate >5%; use "Status filter"; use verified leads.
+Get here: "Cold Email Agent"
+- Pause affected campaigns ("Pause campaign" button, campaign header).
+- "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes" > "Continue" > select domains > "Next" > enter "Forwarding Domain" > "Place Order".
+- Wait for "Provisioning domains (X/Y)..." to become "Provisioning complete!".
+- Update campaigns: campaign > "Options" tab > reassign accounts > resume.
+- Disable burnt accounts: click account, toggle "Enabled/Disabled" off, "Save" (or bulk disable via checkboxes).
+- Keep sends ≤35/inbox/day (hard cap); keep Health Score above 80%; pause if bounce rate >5%; use "Status filter" dropdown; verify lead lists.
 
 ### How many email accounts do I need? {slug: cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need}
-- Hard cap 35 emails/account/day. 300/day≈9 accounts; 100/day≈3 accounts. Start with at least 3 per campaign.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Hard cap: 35 emails/account/day. ~9 accounts for 300/day, ~3 for 100/day. Use at least 3 per campaign.
 
 ### How much do inboxes cost? {slug: cold-email-agent/faq/email-accounts/how-much-do-inboxes-cost}
-- Domains billed yearly, inboxes monthly; prices shown at checkout. Subscriptions renew on the 15th. Inbox purchases non-refundable.
+Get here: "Cold Email Agent" > "Email Accounts"
+Domains billed yearly, inboxes monthly; prices shown at checkout; renews 15th monthly; inbox purchases non-refundable.
 
 ### My inbox warmup shows 0 emails and no health score - how do I initialize it? {slug: cold-email-agent/faq/email-accounts/my-inbox-warmup-shows-0-emails-and-no-health-score-how-do-i-initialize-it}
-- Check "Cold Email Agent" > "Email Accounts" > "Warmup" column (orange=warming, green=normal).
-- Wait 24h; if "Status"=Error, click row > "Reconnect".
-- DFY needs ~2 weeks warmup. Pattern: days 1-3 slow (5-10/day), weeks 1-2 ramp, weeks 3-4 full (20-40/day); score appears after 50+ warmup emails.
-- Check enable toggle in account panel top-right. Contact support if unchanged after 48h.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Warmup column: orange flame = still warming, green = normal.
+- If 0 emails, wait 24h; if Status shows red "Error", click row, "Reconnect".
+- DFY needs ~2 weeks warmup. Pattern: days 1-3 slow (5-10/day), weeks 1-2 rising, weeks 3-4 full (20-40/day); Health Score appears after 50+ warmup emails.
+- Click account row, check toggle top-right of panel; flip on to enable.
+- Contact support if unchanged after 48 hours.
 
-### >- (pre-warmed inbox provisioning) {slug: cold-email-agent/faq/email-accounts/my-pre-warmed-inboxes-dont-appear-after-purchase-how-long-does-provisioning-take}
-- Provisioning takes minutes to an hour (DNS: SPF/DKIM/DMARC).
-- Status: "Processing domains...", "Provisioning domains (X/Y)...", "Provisioning complete!".
-- If not showing after an hour: "Cold Email Agent" > "Email Accounts", check "Provisioning" badge, refresh; contact support after 24h.
-- "Active" status = safe to use; pre-warmed inboxes usable immediately, no extra wait.
+### [Pre-warmed inbox provisioning time] {slug: cold-email-agent/faq/email-accounts/my-pre-warmed-inboxes-dont-appear-after-purchase-how-long-does-provisioning-take}
+Get here: "Cold Email Agent" > "Email Accounts"
+- Provisioning takes minutes to an hour; sets up SPF/DKIM/DMARC.
+- Statuses: "Processing domains...", "Provisioning domains (X/Y)...", "Provisioning complete!".
+- If nothing after an hour, refresh; contact support after 24h.
+- "Provisioning" badge = not ready; "Active" = safe to use; Warmup emails/Health score columns track status (80%+ good).
+- Pre-warmed inboxes usable immediately once Active.
 
 ### What are pre-warmed inboxes? {slug: cold-email-agent/faq/email-accounts/what-are-pre-warmed-inboxes}
-- Aged 4+ weeks, ready day one; 3 inboxes/domain; SPF/DKIM/DMARC preconfigured.
+Get here: "Cold Email Agent" > "Email Accounts"
+Same as how-do-i-get-email-accounts-to-send-from.
 
 ### What do the account statuses mean? {slug: cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean}
-- Active(green)=sending; Paused(yellow)=manually paused; Error(red)=needs "Reconnect".
+Get here: "Cold Email Agent" > "Email Accounts"
+- Active (green): sending normally. Paused (yellow): manually paused. Error (red): click account, "Reconnect".
 
 ### What does the health score mean? {slug: cold-email-agent/faq/email-accounts/what-does-the-health-score-mean}
-- Measures warmup email deliverability, not campaign deliverability. 80%+ good; below 80% needs more warmup time.
+Get here: "Cold Email Agent" > "Email Accounts"
+- Measures warmup landing rate, not real campaign deliverability. 80%+ good; below 80% give more warmup time.
 
 ### What is the warmup period? {slug: cold-email-agent/faq/email-accounts/what-is-the-warmup-period}
-- Builds sender reputation via automated send/receive. Pre-warmed skip it; DFY needs ~2 weeks. Flame icon shows warming accounts.
+Get here: "Cold Email Agent" > "Email Accounts"
+Same as my-inbox-warmup-shows-0-emails-and-no-health-score-how-do-i-initialize-it.
 
 ### Lead Database & Search {slug: cold-email-agent/faq/lead-search}
-- Overview index; no standalone facts.
+Get here: "Cold Email Agent"
+Overview of lead finding, imports, credits, exports, dedupe; see other articles.
 
 ### Can I search by city or state? {slug: cold-email-agent/faq/lead-search/can-i-search-by-city-or-state}
-- "Location" filter supports country/state/city, combinable. Counties not supported; falls back to state-wide results. Add individual cities instead.
+Get here: "Cold Email Agent" > "New Campaign" > lead search Location filter
+- Supports countries, states, cities; combine multiple. No county-level targeting; add county's cities individually instead.
 
 ### Can I use Apollo.io leads or upload a CSV to start a campaign? {slug: cold-email-agent/faq/lead-search/can-i-use-apolloio-leads-or-upload-a-csv-to-start-a-campaign}
-- No direct Apollo sync. New campaign: "Cold Email Agent">"New Campaign">"Select Your Leads">"Upload Your Own". Existing: campaign>"Leads" tab>"Import Leads". Map Name, Email, Industry (required); Company recommended; extra columns via "Map as {{Column Name}}". Must be real .csv. Verify old/purchased lists. Duplicates across campaigns skipped ("Duplicate Leads Skipped"/"All Leads Already in Another Campaign").
+Get here: "Cold Email Agent" > "New Campaign" > "Select Your Leads" > "Upload Your Own" (or campaign > "Leads" tab > "Import Leads")
+- No direct Apollo sync; export CSV then import.
+- Map Name, Email, Industry (required); Company recommended; extra columns via "Map as {{Column Name}}".
+- Use real .csv, verify old/purchased lists, remove junk rows.
+- Duplicates across campaigns skipped; shown as "Duplicate Leads Skipped"/"All Leads Already in Another Campaign"; delete from original campaign to reuse.
 
 ### How do I explain the initial lead allotment and add-on lead pricing? {slug: cold-email-agent/faq/lead-search/how-do-i-explain-the-initial-lead-allotment-and-add-on-lead-pricing}
-- Lead credits used only by Acquisity Lead Database/AI Lead Search, not CSV uploads (free). Check balance: "Settings">"Billing">"Credit Balances">"Lead credits", or in lead-search flow via "Add Leads">"Acquisity Lead Database". "Top Up" button when low; price shown at purchase.
+Get here: "Settings" > "Billing"
+- Lead credits used only for Acquisity Lead Database/AI Lead Search, not CSV uploads.
+- Check "Credit Balances" > "Lead credits", or in campaign "Add Leads" > "Acquisity Lead Database" dialog.
+- "Top Up" button when low; price shown at purchase, not fixed. CSV uploads free.
 
 ### How do I export my leads with emailed vs. not-contacted status? {slug: cold-email-agent/faq/lead-search/how-do-i-export-my-leads-with-emailed-vs-not-contacted-status}
-- Campaign>"Leads" tab>filter by status (Contacted, Not Yet Contacted, Contacted No Reply, Reply Received, Bounced)>"Export Leads" downloads \`campaign-leads-<date>.csv\` with only matching rows. Selecting rows limits export to selection; "Select all" exports all matches. Advanced "Filter" lacks Source condition. Re-upload uncontacted leads via New Campaign>Upload Your Own; workspace dedupe still applies. Export excludes full AI SDR reply history.
+Get here: "Cold Email Agent" > campaign > "Leads" tab
+- Status filters: Contacted, Not Yet Contacted, Contacted No Reply, Reply Received, Bounced.
+- "Export Leads" downloads campaign-leads-<date>.csv of matching/selected rows only.
+- Select rows via checkboxes, "Select this page"/"Select all".
+- Advanced "Filter" has no Source condition; use History view for source.
+- Re-upload via "New Campaign" > "Upload Your Own"; workspace dedupe still applies.
 
 ### How do I export previous campaign leads while excluding bounced emails? {slug: cold-email-agent/faq/lead-search/how-do-i-export-previous-campaign-leads-while-excluding-bounced-emails}
-- No direct exclude-bounced toggle. Filter Status and export, or export all then manually remove Bounced rows in spreadsheet. Also check Unsubscribed, negative Reply Received, DNC (auto-excluded), closed-lost (not tracked). Verify old lists before reuse.
+Get here: "Cold Email Agent" > campaign > "Leads" tab
+- No single exclude-bounced toggle; filter by Status or export all then remove "Bounced" rows manually.
+- Also check Unsubscribed, negative replies, DNC, closed-lost deals (in CRM) before reuse.
+- Re-verify old lists before resending.
 
-### How do I get niche/hard-to-find emails when the built-in scraper can't find them? {slug: cold-email-agent/faq/lead-search/how-do-i-get-nichehard-to-find-emails-when-the-built-in-scraper-cant-find-them}
-- Use external sources (Apollo.io, LinkedIn Sales Navigator, Hunter.io, directories, associations, conference lists), format as CSV (Name, Email, Industry required; Company optional), then campaign>"Leads" tab>"Import Leads" or wizard "Upload Your Own". Verify emails before upload; CSV uploads cost no credits.
+### [Niche/hard-to-find emails] {slug: cold-email-agent/faq/lead-search/how-do-i-get-nichehard-to-find-emails-when-the-built-in-scraper-cant-find-them}
+Get here: "Cold Email Agent" > campaign > "Leads" tab > "Import Leads" (or "New Campaign" > "Upload Your Own")
+- Built-in scraper covers broad B2B only; for niche lists use external sources (Apollo.io, Sales Navigator, Hunter.io, directories, associations, conferences).
+- Format CSV with Name, Email, Industry, Company; verify emails before upload. No credit cost.
 
 ### How do I hide the 'leads were skipped during upload' notification? {slug: cold-email-agent/faq/lead-search/how-do-i-hide-the-leads-were-skipped-during-upload-notification}
-- Cannot dismiss manually; clears on navigating away/refresh. Skip reasons: already in other campaigns, duplicates, blocklist, invalid emails, incomplete rows. Warning card shows counts and reasons.
+Get here: "Cold Email Agent" > campaign > "Leads" tab
+- Cannot dismiss manually; clears on navigating away or refresh.
+- Skip reasons: already in other campaigns, duplicates, blocklist, invalid emails, incomplete rows.
 
 ### How do I send cold emails only to specific leads via CSV upload? {slug: cold-email-agent/faq/lead-search/how-do-i-send-cold-emails-only-to-specific-leads-via-csv-upload}
-- "Cold Email Agent">"New Campaign">name campaign>"Upload Your Own". CSV limits: under 100MB, ≤20,000 rows, needs Name/Email/Industry. Map columns, review "Review values", "Preview import". Choose email method (Podcast, Interview, AI Business Audit, Direct), review Sequences tab, select email accounts, "Create Campaign", launch Draft when ready. All cold emails must go through campaigns; no one-off sends, use single-row CSV for one person.
+Get here: "Cold Email Agent" > "New Campaign"
+- Name campaign, choose "Upload Your Own".
+- CSV limits: under 100MB, ≤20,000 rows, needs Name, Email, Industry.
+- Map columns, review "Review values"/"Preview import" steps.
+- Choose email method (Podcast, Interview, AI Business Audit, Direct), review Sequences tab, select accounts, "Create Campaign", launch when ready.
+- All cold email must go through campaigns; no one-off sends.
 
 ### How do I show/fix CSV lead import validation errors? {slug: cold-email-agent/faq/lead-search/how-do-i-showfix-csv-lead-import-validation-errors}
-- Two error locations: "Review values" (row/cell errors before import, grouped by column, has "Show only rows with errors" checkbox) and "Leads skipped" warning (on Leads tab after import, for duplicates, blocklist matches, invalid emails, incomplete data).
-- Required columns: \`Name\`, \`Email\`, \`Industry\`. Missing these = skipped.
-- Fix invalid emails: missing @, extra spaces, bad special chars, missing domain.
-- Remove duplicates: sort by email in Excel/Sheets, use Remove Duplicates, re-save CSV.
-- Cross-campaign conflicts: wait for other campaign to finish, or remove those leads before import.
-- Encoding issues: open in text editor, save as UTF-8 (Notepad: File > Save As > Encoding UTF-8; VS Code: encoding button > Save with Encoding > UTF-8).
-- "Preview import" step shows valid record count vs rows still with errors that will be skipped.
-- Test with a 10-20 row sample CSV first to isolate problems.
+Get here: In the left sidebar, click "Cold Email Agent", then open a campaign, then "Leads" tab, then import CSV
+- Required columns: Name, Email, Industry; missing = validation error, skipped if you continue.
+- Fix invalid emails: missing @, stray spaces, bad characters, missing domain.
+- Remove duplicate emails before import.
+- Cross-campaign conflicts: wait for other campaign to finish, or remove leads from CSV.
+- Encoding issues: save CSV as UTF-8 in a text editor.
+- "Review values" step: shows error count by column, "Show only rows with errors" checkbox, editable cells.
+- "Preview import" step shows valid vs skipped row counts.
+- Test with a 10-20 row sample CSV first.
 
 ### How do I export a large AI-generated lead list to CSV? {slug: cold-email-agent/faq/lead-search/how-do-i-splitexport-a-large-ai-generated-lead-list-into-csv}
-- Niche Researcher doesn't export leads; leads live in the campaign.
-- Steps: "Cold Email Agent" (under "Outreach") > campaign > "Leads" tab > optional filters (status/source/bounce/search) > "Export CSV" button. File downloads as \`campaign-leads-<date>.csv\`.
-- No row cap; large exports take a few seconds. Slice by status, source, search, or date added.
-- Reuse workflow: export filtered "Not contacted" > "Cold Email Agent" > "New Campaign" > "Upload Your Own" > upload file. Dedupe is workspace-wide; leads in other campaigns since export are skipped.
-- Reimported CSV leads don't get fresh verification automatically; verify externally if scrape is old, to avoid bounces.
+Get here: "Cold Email Agent" > open campaign > "Leads" tab
+- Filter by status/source/bounce/search, then click "Export CSV".
+- File name format: campaign-leads-<date>.csv; not row-capped, large exports take a few seconds.
+- Slice by status, source, search, or date added.
+- Reuse: export "Not contacted", then "Cold Email Agent" > "New Campaign" > "Upload Your Own" to reimport; workspace-wide dedupe skips leads already in another campaign.
+- Reimported CSV leads get no fresh verification pass; verify externally if the scrape is old.
 
 ### How do lead credits work - when are they consumed during setup? {slug: cold-email-agent/faq/lead-search/how-do-lead-credits-work-when-are-they-consumed-during-setup}
-- Credits consumed when AI Lead Search/Acquisity Lead Database delivers verified leads, not when sending emails, not for preview, not for unfindable/unverifiable emails.
-- If Instantly connected, duplicates can still consume credits during import then get blocked at campaign upload.
-- Not consumed for: CSV upload, emailing existing leads, campaigns without AI scraping.
-- Credits not refunded if campaign canceled after delivery.
-- Tips: use preview + small first request; test volumes 1,000-1,500 (quick test) or 2,000-2,500 (known niche).
-- Accidental credit use: use "Feedback" in account menu (click name at bottom of sidebar), contact support with workspace/campaign/timing.
+Get here: "Cold Email Agent"
+- Credits consumed only by AI Lead Search/Acquisity Lead Database delivering verified leads, not by sending emails, previewing, or unfound/unverified contacts.
+- Not refundable after delivery even if campaign is cancelled.
+- CSV uploads, emailing existing leads, and non-scrape campaigns don't use credits.
+- If sending platform connected, duplicates can still consume credits before being blocked at upload.
+- Tip: preview and small test batch first; 1,000-1,500 leads for a quick test, 2,000-2,500 for known-good niches.
+- Accidental credit use: contact support via Feedback (click name at bottom of sidebar) with workspace, campaign, timing.
 
 ### How many leads can I generate per campaign? {slug: cold-email-agent/faq/lead-search/how-many-leads-can-i-generate-per-campaign}
-- 100 to 10,000 leads per search; more can be added later.
+Get here: "Cold Email Agent"
+- 100 to 10,000 leads per search; more can be added to an existing campaign later.
 
 ### I bought 10k leads and only got 4k, why? {slug: cold-email-agent/faq/lead-search/i-bought-10k-leads-and-only-got-4k-why}
-- Leads dropped: email not found, invalid email, duplicate (workspace-wide dedupe), unverifiable, catch-all rejected.
+Get here: "Cold Email Agent"
+- Only finds/verifies live; drops occur from: email not found, invalid, duplicate (workspace dedupe), unverifiable, catch-all rejected.
 - Typical drop: 40-60% hard niches, 15-30% common B2B, higher for ultra-niche.
 - Bounces above 5% damage sender reputation.
-- Credits charged only for delivered verified leads (except Instantly duplicates, which can still consume credits before being blocked).
-- Use live preview before importing to sanity-check pool size.
+- Credits spent on verified delivered leads only; connected sending platform duplicates can still consume credits.
+- Use live preview to check pool size before importing.
 
 ### I ordered 7000 leads and got 1700, why? {slug: cold-email-agent/faq/lead-search/i-ordered-7000-leads-and-got-1700-why}
-- Same cause as above article: emails not found/invalid/already-owned/recently-contacted leads excluded.
-- "Leads in search" badge shows live estimated count as filters change; widen filters if too low.
-- Confirmation dialog shows requested size and credit impact before starting.
-- Credits charged only for verified delivered leads (1,700 here), not the 7,000 requested; Instantly duplicates are exception (can consume credit then get blocked).
+Get here: Cold Email Agent scrape flow, "Leads in search" count badge
+- Shrinkage causes: tight filters, email not found, invalid/outdated email, already-owned leads in workspace, recently-contacted leads excluded.
+- Confirmation dialog shows requested size and credit impact before confirming.
+- Credits charged only on verified delivery; unfulfilled requests aren't wasted credits, but effort is wasted.
+- Start broad with country+role+industry, narrow one filter at a time.
 
 ### My scrape is still running, what happens if I close the tab? {slug: cold-email-agent/faq/lead-search/my-scrape-is-running-what-happens-if-i-close-the-tab}
-- Scrapes run as background jobs; closing tab/browser doesn't stop them.
-- Check progress via campaign's "Leads" tab, "Scrape in progress" card, refreshes every 5 seconds.
-- Typical: few minutes; up to 30 min normal for specific filters; over 30 min likely failed; over 1 hour still "in progress", contact support with campaign name.
-- Failure causes: ran out of credits (top up, retry), upstream provider issue (wait, retry), invalid filter combo (adjust, retry).
+Get here: "Cold Email Agent" > campaign > "Leads" tab
+- Scrapes/imports/campaign creation run as background jobs; closing tab/browser is safe.
+- Progress card refreshes every 5 seconds; typical wait a few minutes, up to 30 minutes normal, over an hour contact support.
+- Failures show "Scrape failed" with error: out of credits, upstream issue, invalid filter combo.
 
 ### Should I verify imported lead emails? {slug: cold-email-agent/faq/lead-search/should-i-verify-imported-lead-emails}
+Get here: "Cold Email Agent"
 - CSV uploads are free (no credits).
 - Import screen has "Automatically verify lead emails on upload" checkbox, off by default.
-- Bounces over 3-5% damage sender reputation; 20% bounce rate can trigger automatic bounce protection pause.
-- Verification tools: NeverBounce, ZeroBounce, MillionVerifier (1-3 cents/email); Apollo, Clay (built-in); Instantly (built-in).
-- Verified = syntax, domain, mailbox checks pass.
-- If can't verify beforehand: test small sample for bounce risk; if under 3% bounce, list likely fine; above 3%, verify rest.
+- Bounces over 3-5% damage sender reputation; 20% bounce rate can auto-pause campaign (bounce protection).
+- Verified = passes syntax, domain, mailbox checks.
+- No prior verification: test on small sample, keep bounce under 3%, else verify rest before continuing.
 
 ### What are the advanced filters? {slug: cold-email-agent/faq/lead-search/what-are-the-advanced-filters}
-- Filters: "Department", "Seniority / Level", "Revenue", "News", "Funding Type", "Find Similar Companies" (paste company URL), "Domains" (paste URLs), "Company Name" (include/exclude).
+Get here: "Cold Email Agent"
+- Filters: Department, Seniority/Level, Revenue, News, Funding Type, Find Similar Companies (paste URL), Domains, Company Name (include/exclude).
 
 ### What are the default search settings? {slug: cold-email-agent/faq/lead-search/what-are-the-default-search-settings}
-- AI Search defaults: "Employees" 1-50, "Country" United States. Changeable.
+Get here: "Cold Email Agent"
+- AI Search defaults: Employees 1-50, Country United States; editable.
 
 ### What does "1 lead per company" do? {slug: cold-email-agent/faq/lead-search/what-does-1-lead-per-company-do}
-- Returns only one contact per company, preventing multiple emails to same company. Recommended for most use cases.
+Get here: "Cold Email Agent"
+- Toggle limits results to one contact per company; recommended for most use cases.
 
 ### Where can I see which emails failed during upload? {slug: cold-email-agent/faq/lead-search/where-can-i-see-which-emails-failed-during-upload}
-- "Review values" step before import: errors by column, toggle "Show only rows with errors".
-- After import, Leads tab summary card shows: "N already in other campaigns", "N duplicates", "N in blocklist", "N invalid emails", "N incomplete".
-- For row-level detail, re-upload and use "Review values" before "Import".
+Get here: "Cold Email Agent" > campaign > "Leads" tab
+- Pre-import: "Review values" step, errors by column, "Show only rows with errors".
+- Post-import summary card labels: "N already in other campaigns", "N duplicates", "N in blocklist", "N invalid emails", "N incomplete".
+- For row detail, re-upload and use Review values before clicking Import.
 
 ### Why can't I re-upload leads that were in a deleted campaign? {slug: cold-email-agent/faq/lead-search/why-cant-i-re-upload-leads-that-were-in-a-deleted-campaign}
-- Workspace-level dedupe: lead flagged duplicate if in any other existing campaign (paused, draft, completed all count).
-- Fix: open other campaign > "Leads" tab > select leads > "Delete Selected", then re-upload. Don't delete whole campaign for this; deleting leads directly is immediate and keeps sending history.
-- If campaign already deleted, cleanup finishes in background; wait a few minutes and retry.
+Get here: "Cold Email Agent" > other campaign > "Leads" tab
+- Workspace-level dedupe flags leads in any existing campaign (paused, draft, completed all count).
+- Fix: select leads in the other campaign, "Delete Selected", then re-upload; don't delete the whole campaign.
+- If campaign already deleted, wait a few minutes for background cleanup, then retry.
 
 ### Why did my AI Lead Search show fewer leads after I imported some? {slug: cold-email-agent/faq/lead-search/why-did-my-lead-search-count-drop-after-importing-leads}
-- Applies only to AI Lead Search, not CSV imports (CSV dedupes at upload, no preview count).
-- Standalone Acquisity: imported leads removed from future search availability (e.g. 10,800 preview → import 4,000 → re-search shows ~6,800).
-- Instantly-connected: preview does not dedupe; duplicates blocked only at campaign upload confirmation, but may still consume credit.
-- Use preview as net-new pool (standalone) or gross estimate (Instantly-connected); change filters when rerunning niche.
+Get here: "Cold Email Agent"
+- Applies to AI Lead Search only, not CSV import.
+- Standalone Acquisity: imported leads removed from future search pool (e.g. 10,800 to 6,800 after importing 4,000).
+- Sending-platform-connected: preview does not dedupe; duplicates blocked only at upload, but may still consume credits.
+- Treat preview as net-new in standalone, as gross estimate when connected.
 
 ### Why can't I add campaign leads when I still have credits? {slug: cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits}
-- Sourcing credits (lead-finding) and campaign-lead storage (stored leads) are separate limits.
-- Growth plan: $99/month, no included sourcing credits, 5,000 stored campaign lead limit; credits bought separately.
-- Pro plan: 10,000 one-time credits, 25,000 stored campaign lead limit.
-- Warning appears at 4,000 stored leads (80%) on Growth; blocked at 5,000 (CSV, lead database, or CRM imports all count).
-- Existing campaigns still send; viewing, reading replies, exporting, deleting leads unaffected. No automatic deletion.
-- Make room: campaign > "Leads" tab > "Export CSV" (optional) > delete unneeded leads or "Delete All" > wait for count refresh > retry.
-- Plan changes: "Settings" > "Billing" > "View plans" (Owner). Owners/Admins can "View plans"; Members "Compare plans" only; Client cannot change plan.
-- Upgrade: "Upgrade to Growth"/"Upgrade to Pro", confirm amount due, "Continue to checkout".
-- Downgrade: "Downgrade to Base"/"Downgrade to Growth", takes effect at next renewal, no auto-deletion; must make room if over new limit.
-- Cancel scheduled downgrade: "Keep my current plan" (owner/admin) or Billing page (owner).
-- "Cancel Subscription" removes scheduled Growth plan, ends Pro at renewal.
-- Pending payment: Growth access/limit remains until confirmed; use "Check plan status" or "Resume payment"; contact support with reference if needed.
+Get here: "Settings" > "Billing" > "View plans"
+- Sourcing credits (finding leads) and campaign-lead storage (leads stored workspace-wide) are separate.
+- Growth: $99/month, no sourcing credits included, 5,000 campaign-lead storage. Pro: 10,000 one-time credits, 25,000 storage.
+- Growth warns at 4,000 stored (80%); blocks adding/importing at 5,000 (CSV, lead database, or CRM); existing campaigns keep sending; no auto-deletion.
+- To make room: campaign "Leads" tab, "Export CSV" to back up, then delete unneeded leads or "Delete All"; campaign itself and analytics remain.
+- Plan changes: Owners open Settings > Billing > View plans; Admins/Members use View plans/Compare plans in the warning; only Owner has full Billing access; Client cannot change plan.
+- Upgrade via "Upgrade to Growth/Pro", confirm shown price; downgrade via "Downgrade to Base/Growth", takes effect at renewal, no auto-deletion.
+- Pending downgrade can be reversed with "Keep my current plan"; scheduled Pro-to-Growth can be cancelled via "Cancel Subscription".
+- Payment pending: use "Check plan status" or "Resume payment"; don't start a second payment.
 
 ### Sequences & Variants {slug: cold-email-agent/faq/sequences-and-variants}
-- Overview article only; no standalone facts. See Writer FAQ for variation generation/Writer-specific fields.
+Get here: In the left sidebar, click "Cold Email Agent"
+Overview of sequence/variant editing, personalization, A/B testing. See linked articles below.
 
 ### Can I edit the AI-generated email scripts? {slug: cold-email-agent/faq/sequences-and-variants/can-i-edit-the-ai-generated-email-scripts}
-- Campaigns: edit any email on "Sequences" tab before clicking "Launch campaign".
-- Writer: copy generated script and edit freely.
+Get here: In the left sidebar, click "Cold Email Agent", then open campaign, then "Sequences" tab
+Edit any email before clicking "Launch campaign". In Writer, copy/edit script freely.
 
 ### How do I make the sender name on emails be my name and not the default? {slug: cold-email-agent/faq/sequences-and-variants/how-do-i-make-the-sender-name-be-my-name}
-- Sender name controlled by inbox display name, not sequence; \`{{sendingAccountName}}\` pulls from inbox, system-filled, can't be typed.
-- Fix: "Cold Email Agent" > "Email Accounts" > click inbox row > edit "First Name"/"Last Name" > "Save".
-- Doesn't affect already-sent emails. Repeat per inbox. For clients, use client's name. No per-lead sender name; need separate campaigns/inboxes for that.
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts"
+Click inbox row, edit "First Name"/"Last Name" in right panel, click "Save". \`{{sendingAccountName}}\` pulls from inbox, not editable in sequence; past emails unchanged. Multi-inbox: repeat per inbox. No lead-level sender name control.
 
 ### How many email variants should I use per campaign for A/B testing? {slug: cold-email-agent/faq/sequences-and-variants/how-many-email-variants-should-i-use-per-campaign-for-ab-testing}
-- Initial email: 2-3 variants; follow-ups: 1-2 each. Small campaigns: 1-2 max.
-- >3 dilutes data. Use 1,000-1,500 leads for quick test; 2,000-2,500 for deeper test.
-- Test subject lines (opens), opening lines (replies), CTAs; change one element at a time.
-- Create via "Sequences" tab > "Add Variant" > "Preview".
-- Check "Analytics" tab, per-step variant table (A/B/C) below Campaign Performance Trend; disable toggle; disabling last variant removes the step ("Disable the last variant?" confirmation).
+Get here: In the left sidebar, click "Cold Email Agent", then open campaign, then "Sequences" tab
+Initial email: 2-3 variants; follow-ups: 1-2. Small campaigns: max 1-2. Use 1,000-1,500 leads minimum for tests; 2,000-2,500 ideal. Click "Add Variant", edit, "Preview". Check "Analytics" tab per-step variant table (A/B/C); toggle disables variant; disabling last active variant removes step ("Disable the last variant?" confirm).
 
 ### What does 'unknown variables detected' mean in my email sequence? {slug: cold-email-agent/faq/sequences-and-variants/what-does-unknown-variables-detected-mean-in-my-email-sequence}
-- Warns of unrecognized \`{{variable}}\` placeholders; variables case-sensitive.
-- Fix in "Sequences" tab > "Preview" dialog shows yellow banner with suggestions; edit, delete, or use "Variables" button ({ } icon).
-- 16 supported variables: firstName, lastName, jobTitle, companyName, industry, companyDomain, companyDescription, employeeCount, location, city, state, country, linkedIn, sendingAccountName, sendingAccountFirstName, accountSignature.
+Get here: In the left sidebar, click "Cold Email Agent", then open campaign, then "Sequences" tab
+Warns on unrecognized \`{{variable}}\` (typos, case-sensitive, unsupported, or pasted from other tools). Fix via "Preview" banner suggestions or "Variables" button. 16 supported variables: firstName, lastName, jobTitle, companyName, industry, companyDomain, companyDescription, employeeCount, location, city, state, country, linkedIn, sendingAccountName, sendingAccountFirstName, accountSignature.
 
 ### What fields does the Direct method need that other methods do not? {slug: cold-email-agent/faq/sequences-and-variants/what-fields-does-the-direct-method-need}
-- Direct needs: Core Offer, Value Proposition, Common Pain Point, Desired Outcome, Typical Timeframe, Key Mechanism, Email Signature, at least one case study.
-- Optional: Client Logos, Competitors, Guarantee, Lead Magnet Title, Lead Magnet Link.
-- Other methods (Podcast, Interview, AI Business Audit, Masterclass) only need target/sender/referrer info.
+Get here: In the left sidebar, click "Cold Email Agent"
+Direct needs Core Offer, Value Proposition, Pain Point, Desired Outcome, Timeframe, Key Mechanism, Signature, 1+ case study; optional logos, competitors, guarantee, lead magnet. Other methods only need target/sender/referrer info.
 
 ### Why does jobTitle show in preview but go blank in the sent email? {slug: cold-email-agent/faq/sequences-and-variants/why-does-jobtitle-show-in-preview-but-go-blank-in-the-sent-email}
-- Preview uses sample data; sent email uses real lead data; blank if lead's title field empty or CSV mapping wrong.
-- Fix: "Cold Email Agent" > campaign > "Leads" tab > check "Title" field; "Export CSV", fill titles, re-upload; verify column mapping to "title" field during import.
+Get here: In the left sidebar, click "Cold Email Agent", then open campaign, then "Leads" tab
+Preview uses sample data; real emails use lead's "title" field. Check lead record; fix via "Export CSV", edit, re-upload with correct column mapping to "title".
 
 ### AI Ads Maker {slug: ad-writer}
-- Path: "Build" > "Ads" opens "Video Script Writer" in "AI Ads Maker"; some workspaces show "Products" or "Discovery" instead. Direct URL: \`/dashboard/your-workspace-slug/ai-ads-maker?tab=video\`. Requires workspace access.
-- 6 steps, click "Next"/"Previous":
-  1. Your Identity & Business: Business Name (required), Your Name & Title (optional), Business Overview (required)
-  2. The Offer Details: Offer Name/Description, Key Components (2-4), Pricing, Unique Mechanism (all required)
-  3. Understanding Your Audience: Ideal Customer Profile, Pain Point, What They've Tried (all required)
-  4. Benefits, Outcomes & Transformation: Transformation, Key Benefits, Timeframe (all required)
-  5. Building Trust & Credibility: Case Study 1, Case Study 2, Other Proof Points (all optional)
-  6. Ad Directives: Primary CTA, CTA Link (must start http:// or https://), Urgency (optional)
+Get here: Click "Ads" under "Build" in the left menu.
+- Opens "Video Script Writer" tab (may instead open "Products"/"Discovery" depending on workspace); direct URL: \`/dashboard/your-workspace-slug/ai-ads-maker?tab=video\`.
+- Needs workspace access to this feature.
+- 6 steps, click "Next"/"Previous": Business info; Offer details; Audience; Benefits/outcomes; Trust/proof (optional); CTA (link must start with http:// or https://, urgency optional).
 - Click "Generate Ad Scripts"; takes 1-2 minutes.
-- Results: "Generated Ad Scripts (4)", tabs "Ad Script 1-4", each with Template Type, Script Sections (Problem, Agitation, Solution, Proof & CTA), "Copy" buttons, "Full Script".
-- Past results: scroll to "History" table, click row; "Video Script Writer" form above creates new ones.
-- Fixes: invalid CTA link needs full URL with http(s)://. Grayed-out "Generate Ad Scripts" button: fill required fields, wait for session, select workspace, refresh if needed.
+- Results: 4 scripts in tabs, each with Template Type, timed Sections (Problem, Agitation, Solution, Proof & CTA), "Copy" buttons, Full Script.
+- Past results: scroll to "History" table, click a row.
+- Fixes: invalid CTA link needs full URL; grayed-out Generate button means missing required fields, no workspace selected, or needs refresh.
 
 ### Frequently Asked Questions {slug: ad-writer/faq}
-No separate facts; index of FAQ articles below.
+Get here: Click "Ads" under "Build" in the left menu.
+No added facts beyond ad-writer.
 
 ### Can it generate video or images? {slug: ad-writer/faq/can-it-generate-video-or-images}
-Only text scripts, no finished video. Some workspaces have "Image Ads Maker" tab for images.
+Get here: Click "Ads" under "Build" in the left menu.
+Produces text scripts only, no finished video. Some workspaces have an "Image Ads Maker" tab for images.
 
 ### Does it connect to ad platforms? {slug: ad-writer/faq/does-it-connect-to-ad-platforms}
-No direct connection to Facebook Ads Manager, Google Ads, LinkedIn Campaign Manager. Copy/paste scripts manually.
+Get here: Click "Ads" under "Build" in the left menu.
+No direct connection to ad platforms; copy/paste scripts manually.
 
 ### How many scripts do I get? {slug: ad-writer/faq/how-many-scripts-do-i-get}
+Get here: Click "Ads" under "Build" in the left menu.
 Same as ad-writer: 4 scripts, tabs "Ad Script 1-4".
 
 ### What are the 6 steps? {slug: ad-writer/faq/what-are-the-6-steps}
+Get here: Click "Ads" under "Build" in the left menu.
 Same steps as listed in ad-writer.
 
 ### What does AI Ads Maker do? {slug: ad-writer/faq/what-does-ad-writer-do}
+Get here: Click "Ads" under "Build" in the left menu.
 Same as ad-writer overview.
 
 ### What is included in each script? {slug: ad-writer/faq/what-is-included-in-each-script}
+Get here: Click "Ads" under "Build" in the left menu.
 Same as ad-writer results section.
 
 ### What platforms are the scripts for? {slug: ad-writer/faq/what-platforms-are-the-scripts-for}
+Get here: Click "Ads" under "Build" in the left menu.
 Facebook/Instagram, YouTube, TikTok, LinkedIn, other video-first channels.
 
 ### Which fields are required? {slug: ad-writer/faq/which-fields-are-required}
-Same optional fields as noted in ad-writer (Step1 name/title, Step5 case studies/proof, Step6 urgency); all else required.
+Get here: Click "Ads" under "Build" in the left menu.
+Optional: Step1 Name/Title; Step5 Case Studies/Proof; Step6 Urgency. All else required.
 
 ### AI Website Builder {slug: ai-website-builder}
-Build, edit, preview, publish, and connect a site without code, from a prompt, files, or existing website.
-What it can build: business, client, landing, lead magnet, sales, event, proposal, redesign, portfolio, local service, personal brand, product, campaign, restaurant/venue, and simple multi-section sites.
-How it works: 1) Describe the site 2) Review draft 3) Ask for changes via chat 4) Publish selected version 5) Connect a domain (own or buy in-platform).
-Helpful details to prep: business name, audience, main goal, offer/services, proof, brand assets.
-Most users should edit with chat first; Code mode is for advanced tweaks/support.
+Get here: "Sites"
+- Build sites from prompts, notes, files, or existing sites; edit via chat; preview on desktop/tablet/phone; publish; connect a domain.
+- Use cases: business, client, landing, lead magnet, sales, event, proposal, portfolio, local, personal brand, product, campaign, restaurant/venue pages.
+- Flow: describe site, review draft, request edits in chat, publish, connect domain.
+- Most edits should use chat; Code mode is for advanced tweaks/support.
 
 ### Build Your First Website {slug: ai-website-builder/getting-started}
-Path: workspace > "Website Builder" (left menu) > prompt box, example prompt, or template.
-If "Website Builder" not visible: check workspace, refresh, or contact support.
-Prompt templates: "Landing Page", "Business Website", "Portfolio Site", "Agency Website", "Local Business", "Personal Brand" - edit before generating.
-Strong prompt needs: who site is for, visitors, desired action, sections, style.
-Attachments via attachment button. File limits: Images 5MB, PDF 10MB, TXT/Markdown 1MB.
-Steps: write prompt > attach files > click generate > review preview > ask for changes via chat.
-AI may pause to ask questions; answer briefly in the card.
-Before publishing check: business name correct, offer accurate, no invented testimonials/numbers/certifications, main button correct, phone view good, forms/links/embeds work.
+Get here: "Sites" > "Website Builder"
+- If missing, check workspace, refresh, or contact support.
+- Start from prompt box, example prompt, or template: Landing Page, Business Website, Portfolio Site, Agency Website, Local Business, Personal Brand.
+- Edit template prompt before generating: add name, audience, offer, location, services, hours, proof.
+- Strong prompt covers: who it's for, visitors, desired action, sections, style.
+- Attach files via attachment button: Images (5MB), PDF (10MB), TXT/Markdown (1MB).
+- Steps: write prompt, attach files, click generate, review preview, ask for changes via chat.
+- AI may pause to ask questions; answer in the card.
+- Before publishing check: business name, offer accuracy, no invented testimonials/numbers/certifications, main CTA, phone view, forms/links/embeds.
 
 ### Prompting Best Practices {slug: ai-website-builder/prompting-best-practices}
-Give AI context before asking it to build (audience, services, tone, proof, URLs, docs).
-Can use current website URL, competitor URLs, proposals, PDFs, brand guides, old copy, screenshots as input.
-If site is login-blocked, upload screenshots/paste copy/attach PDF instead.
-Tell AI not to invent testimonials, stats, guarantees, certifications, pricing.
-Can ask AI to plan page structure before building.
-Edit in small, focused steps rather than broad requests; state what to keep.
+Get here: "Sites"
+- Give context before asking AI to create: business details, audience, services, proof, tone.
+- Prompt formula: business name, audience/outcome, goal, sections, style, brand details, proof points, mobile note.
+- Can feed AI: current site URL, competitor URLs, proposals, PDFs, brand guides, old copy, testimonials, screenshots.
+- If site blocked/behind login, upload screenshots or paste copy instead.
+- Tell AI not to invent testimonials, stats, guarantees, certifications, pricing.
+- Can use outside AI tools to draft a prompt, then paste into AI Website Builder.
+- Edit in small, focused steps rather than broad requests.
+- State what to keep when editing existing site.
 
 ### Edit With AI Chat {slug: ai-website-builder/editing-with-ai}
-Chat sidebar is main editing tool after first generation: copy, layout, sections, mobile, styling, fixes.
-Format: "Change X. Keep Y. Make it Z."
-Attachments (images, PDF, TXT, Markdown) usable during edits.
-AI may ask follow-up questions in a questionnaire card.
-"Try next" shows suggested follow-up prompts, editable before sending.
-If AI gives advice instead of changing the site, request was too broad - be more specific.
-Keep edit requests focused, not whole-site changes at once.
+Get here: chat sidebar inside AI Website Builder after first site is generated
+- Ask changes in format: Change X, Keep Y, Make it Z.
+- Attachments supported during edits: images, PDF, TXT, Markdown.
+- AI may ask follow-up questions in a questionnaire card; answer briefly.
+- "Try next" shows suggested follow-up prompts, editable before sending.
+- If AI gives advice instead of changing site, request is too broad; be more specific.
+- Keep edits focused (one section at a time) for easier review.
 
 ### Previewing And Versions {slug: ai-website-builder/previewing-and-versions}
-Two views: "Preview" (review like a visitor) and "Code" (advanced inspection/manual edits).
-Device controls in preview toolbar: desktop, tablet, phone - check phone view before publishing.
-Open-in-new-tab control for full-screen review.
-Reload control if preview looks stale; if still stuck, check if still generating or build failed.
-Each successful build creates a version; version dropdown lets you compare, see which is live, select before publishing, download code.
-Version labels: "Building", "Failed" (try "Fix with AI"), "Deploying", "Live".
-Download Code: actions menu in preview toolbar > "Download Code" downloads zip of selected version.
+Get here: preview area inside AI Website Builder
+- Two modes: Preview (review as visitor) and Code (advanced/manual edits).
+- Device controls in preview toolbar: desktop, tablet, phone; check phone view before publishing.
+- Open-in-new-tab control for full screen review.
+- Reload control if preview looks stale; if stuck, check if still generating or build failed.
+- Each successful build creates a version; version dropdown shows previous outputs, select version to publish/download.
+- Status labels: Building, Failed (try Fix with AI), Deploying, Live.
+- Download Code: actions menu in preview toolbar > "Download Code", downloads selected version as zip.
 
 ### Code Editor And Files {slug: ai-website-builder/code-editor-and-files}
-Code mode: inspect/manually edit generated files; use for small known fixes, support/developer help, not for broad design changes or rebuilding sections.
-File panel shows files; pages panel shows page structure. Open file, edit, then "Save" or "Discard".
-Warning: AI broad changes may overwrite manual code edits unless told to keep them.
-"Fix with AI" resends detected build/preview problems to AI for repair; if it fails, request a focused chat fix.
-Best practice: use chat for creative changes, Code mode for precise fixes.
+Get here: "Code" mode in preview toolbar inside AI Website Builder
+- Use for small known fixes, support/developer requests, tiny AI mistakes; avoid for broad design changes.
+- File panel shows generated files; pages panel shows page structure.
+- Open file, edit, click "Save" to keep or "Discard" to drop changes.
+- Manual edits may get overwritten by later broad AI changes; tell AI what to keep.
+- "Fix with AI" resends detected build/preview problems to AI for repair; if it fails, ask chat for a focused fix.
 
 ### Publish Your Website {slug: ai-website-builder/publishing}
-- Publishing makes a selected version live; editing creates drafts.
-- Before publishing check: selected version correct, desktop/tablet/phone views, buttons/links, forms/embeds/contact details, generated claims accurate.
-- Steps: use version dropdown to select version > click "Publish" > wait for publishing/deploying state > open live URL to check.
-- Edits after publishing are not automatically live; must publish again to update live site.
-- If publishing fails: check selected version for build error > use "Fix with AI" if available > ask chat to repair build without changing design > try publishing again > contact support with website name and error if still failing.
-- A connected custom domain only serves pages after a successful publish; connected-but-404 means no successful publish yet.
+Get here: "Sites"
+- Publishing makes a selected version live; editing creates drafts, publishing chooses which is visible.
+- Before publishing, check: selected version, desktop/tablet/phone views, links/buttons, forms/embeds/contact details, generated claims.
+- Steps: select version in version dropdown > click Publish > wait for publishing/deploying state > open live URL and check.
+- Edits made after publishing are not live until republished.
+- If publishing fails: check for build error, use "Fix with AI" if available, ask chat to repair build without changing design, retry. If still failing, contact support with website name and error.
+- Connected custom domain only serves pages after a successful publish; "Connected" + 404 means publish hasn't succeeded yet.
 
 ### Connect Your Custom Domain {slug: ai-website-builder/connect-custom-domain}
-- Requires copying DNS records from AI Website Builder into your DNS provider (registrar may differ from DNS host; check nameservers).
-- Universal steps: open website > domain setup flow > choose "I already own a domain" > enter domain exactly > copy Type/Name-Host/Value from AI Website Builder > add records at DNS provider > wait for verification status in AI Website Builder.
-- DNS changes may take time (up to 24h); not instant.
-- Subdomains (e.g. keepersolutions.northstaros.com): add records to DNS of the root domain (northstaros.com), use short host name (e.g. "keepersolutions"); remove conflicting existing records for same host.
-- Registrar-specific paths (DNS management locations): GoDaddy "Domain Portfolio">"Domain Settings">"DNS"; Namecheap "Domain List">"Manage">"Advanced DNS">"Host Records"; Squarespace Domains dashboard>domain>"DNS">"Custom records"; Cloudflare domain>"DNS">"Records" (set "DNS only" if proxy blocks verification); Network Solutions "Domains">domain>"Advanced Tools">"Advanced DNS Records"; Porkbun "Domain Management">"DNS".
-- Root host usually "@", www host "www"; Porkbun root host left blank.
-- Verification: domain setup screen refreshes in AI Website Builder; once verified, live site opens only if website has been published successfully.
-- Troubleshooting checklist: records added where DNS is actually managed, Type/Host/Value copied exactly, no conflicting old record, enough time elapsed.
-- Contact support with domain name and screenshots of DNS records (both AI Website Builder and registrar) if unresolved after 24 hours.
+Get here: In AI Website Builder, open the website, then the domain setup flow, choose "I already own a domain"
+- Enter domain exactly as desired (root, www, or subdomain).
+- Copy DNS records (Type, Name/Host, Value) shown by AI Website Builder exactly; paste at registrar/DNS provider; wait for status to update.
+- Subdomains: add DNS at the main domain's DNS, using the subdomain label as Host/Name.
+- Registrar steps given for GoDaddy, Namecheap, Squarespace Domains, Cloudflare, Network Solutions, Porkbun (each: find DNS page, add record type/host/value shown by Acquisity, save).
+- Cloudflare: set proxied records to "DNS only" if verification struggles.
+- Domain only serves pages once publish succeeds; "Connected" + 404 means no successful publish yet.
+- DNS changes can take time; not instant.
+- Troubleshooting: verify DNS managed location, exact Type/Host/Value, no conflicting old record, enough time passed.
+- Contact support (after 24h unresolved) with domain name, screenshot of Acquisity DNS records, screenshot of registrar records.
 
 ### Domains {slug: ai-website-builder/domains}
-- Three domain options: use generated live URL, connect owned domain, or buy domain in platform.
-- Buying a domain: "Domains" tab > search (min 2 characters) > pick available domain > enter owner details > choose renewal settings (auto-renew) > checkout > return to Domains tab.
-- Assign domain: open "Domains" > choose domain > assign to website > wait for configuration > confirm connected. One domain assigns to one website at a time.
-- Domain management modal: view assignment, reassign, unassign, check renewal settings.
-- Platform-bought domains may connect automatically; external domains depend on DNS provider timing.
+Get here: AI Website Builder > "Domains"
+- Options: use generated live URL, connect owned domain, or buy domain in platform.
+- Buy: open "Domains" > search (min 2 characters) > pick domain > enter owner details > choose renewal/auto-renew > checkout.
+- Assign: open "Domains" > choose domain > assign to website > wait for configuration > confirm connection. One domain assigns to one website at a time.
+- Domain management modal: view assignment, reassign, unassign, check renewal.
+- External domains depend on DNS at current provider; platform-bought domains may connect automatically.
 
 ### Environment Variables {slug: ai-website-builder/environment-variables}
-- Private settings for form tools, embed scripts, public API keys, service URLs, integrations.
-- AI may pause and request them via "Environment Variables" dialog (opened from preview toolbar actions menu). Don't paste sensitive keys into normal chat unless asked via this dialog.
-- Steps: open actions menu in preview toolbar > click "Environment Variables" > add key/value pairs > save > continue generation/edit.
-- Names: letters, numbers, underscores only; must start with letter or underscore; no spaces.
-- Can paste \`.env\`-style lines; dialog converts to rows.
-- If unsure whether a key is secret, ask the service provider or contact support before adding.
+Get here: preview toolbar actions menu > "Environment Variables"
+- Used for private config: form tools, embed scripts, public API keys, service URLs, integrations.
+- AI may pause and request them via the Environment Variables dialog; don't paste sensitive keys into normal chat otherwise.
+- Steps: open actions menu > click "Environment Variables" > add key/value pairs > Save > continue.
+- Names: letters, numbers, underscores; must start with letter/underscore; no spaces.
+- Can paste \`.env\`-style lines to auto-create rows.
+- Check with service provider or support if unsure a key is safe to expose.
 
 ### Credits And Limits {slug: ai-website-builder/credits-and-limits}
-- Website credits used for AI generation/edits/retries. Publishing and domain setup do not use credits.
+Get here: "Sites"
+- Website credits used for AI generation/edits/retries; publishing and domain setup don't use generation credits.
 - If balance too low, app shows top-up option; top up then resend request.
 - Generation limits: 60/hour per user, 300/hour per workspace.
-- File upload limits: Images 5MB, PDF 10MB, TXT/Markdown 1MB. If rejected: check type/size, compress, or paste key text into chat instead.
+- File upload limits: images 5MB, PDF 10MB, TXT/Markdown 1MB. If rejected, check type/size, compress, or paste key text into chat.
 
 ### Troubleshooting {slug: ai-website-builder/troubleshooting}
-- Can't see Website Builder: check workspace, refresh, contact support.
+Get here: "Sites"
+- Builder missing: check workspace, refresh, contact support.
 - Generate button disabled: wait, add prompt text, remove oversized/unsupported files, refresh.
-- Not enough credits: top up, resend prompt.
-- File rejected: check type/size limits (as above).
-- Preview stuck building: wait, reload, check if still generating, ask chat to repair or contact support.
-- Preview failed: use "Fix with AI" or send chat message describing error and asking to fix without changing design.
+- Low credits: top up, resend prompt.
+- File rejected: check type/size per limits above.
+- Preview stuck building: wait, reload, check generation status, ask chat to repair or contact support.
+- Preview failed: use "Fix with AI" or send chat message asking to fix build error, keep design.
 - Unwanted AI change: send focused correction describing what to keep/restore.
-- Domain not verified: check records location, exact values, conflicting records, time elapsed.
-- Domain pending after purchase: wait, refresh Domains tab, contact support with domain name if still pending.
-- Domain "Connected" but site shows 404: means no successful publish yet. Domain connection and publishing are separate steps; domain only serves pages after successful publish. Fix: open Publish/Update control > start publish > copy build error text immediately if shown (disappears on click away) > ask chat to fix using error text, or use "Fix with AI" > click Retry; once one publish succeeds, domain works. Contact support with website name/error if unresolved.
-- Environment variables blocking progress: open "Environment Variables" from preview actions menu, add requested keys; don't paste private keys into chat unless told.
-- Unsure which version is live: check version dropdown, live version marked in preview toolbar; select and publish newer draft to make it live.
+- Domain not verified: check DNS location, exact values, conflicting records, time elapsed.
+- Domain pending after purchase: wait, refresh Domains tab, contact support if still pending.
+- "Connected" but 404: publish never succeeded; open Publish/Update control, start publish, copy build error before clicking away, ask chat to fix pasting error text or use "Fix with AI", click Retry; domain stays connected and will work after one successful publish. Contact support if error unclear, keeps failing, or still 404 after success.
+- Environment Variables blocking progress: open from preview actions menu, add requested keys; don't paste private keys into chat unless told.
+- Unsure which version is live: open version dropdown, live version marked in preview toolbar.
 
 ### Frequently Asked Questions {slug: ai-website-builder/faq}
-Index page, no additional facts.
+Get here: "Sites"
+Overview page listing FAQ topics; no additional facts beyond linked FAQ articles below.
 
 ### Are there generation limits? {slug: ai-website-builder/faq/are-there-generation-limits}
-Same as credits-and-limits: 60/hour per user, 300/hour per workspace.
+Get here: "Sites"
+Same as credits-and-limits.
 
 ### Can I edit a website after it is generated? {slug: ai-website-builder/faq/can-i-edit-a-website-after-it-is-generated}
-Yes, via chat sidebar; can request new sections, rewrites, layout/style/CTA changes, fixes. Be specific in prompts.
+Get here: "Sites"
+- Yes, open website and describe change in chat sidebar: sections, copy, mobile layout, colors/style, CTAs, proof/FAQ/pricing/contact, fixes.
+- Specific prompts work better than vague ones.
 
 ### Can I use my own domain? {slug: ai-website-builder/faq/can-i-use-my-own-domain}
-Same as connect-custom-domain: yes, connect owned domain via DNS records shown in app.
+Get here: "Sites"
+Same as connect-custom-domain.
 
 ### Do I need to know code? {slug: ai-website-builder/faq/do-i-need-to-know-code}
-No; chat/prompt is sufficient for most tasks. Code mode exists for advanced users/devs; not required for copy, style, mobile, publishing, or domains.
+Get here: "Sites"
+- No; most editing via prompt box/chat. Code mode available for advanced users/developers, not required for copy, style, mobile, publish, or domain tasks.
 
 ### How do I check the mobile version? {slug: ai-website-builder/faq/how-do-i-check-the-mobile-version}
-Use device controls in preview toolbar to switch to phone/tablet view; check headline fit, tap targets, CTA visibility, spacing, contact info.
+Get here: preview toolbar device controls
+- Switch to phone/tablet view; check headline fit, tappable buttons, early CTA, spacing, visible contact details.
 
 ### How long does domain setup take? {slug: ai-website-builder/faq/how-long-does-domain-setup-take}
-Owned domains: allow up to 24 hours for DNS. Platform-bought domains may be more automatic but still take time. Contact support with DNS screenshots if unresolved after 24 hours.
+Get here: "Sites"
+- Owned domains: allow up to 24 hours for DNS. Purchased-in-platform domains may be more automatic but still take time. Contact support with DNS screenshots if unresolved after 24 hours.
 
 ### What are website credits? {slug: ai-website-builder/faq/what-are-website-credits}
-Same as credits-and-limits: used for AI generation/edits/retries; publishing/domains separate.
+Get here: "Sites"
+Same as credits-and-limits.
 
 ### What does publishing do? {slug: ai-website-builder/faq/what-does-publishing-do}
-Same as publishing: makes selected version live; edits after stay draft until republished; check version/layout/links/forms/claims before publishing.
+Get here: "Sites"
+Same as publishing.
 
 ### What files can I upload? {slug: ai-website-builder/faq/what-files-can-i-upload}
-Upload Images (5 MB), PDF (10 MB), TXT or Markdown (1 MB). Tell AI what to do with each file.
+Get here: "Sites"
+Upload limits: Images 5 MB, PDF 10 MB, TXT/Markdown 1 MB. Use for logos, screenshots, brand refs, brochures, menus, testimonials, copy notes. Tell AI what to do with each file.
 
 ### What if the AI changes something I wanted to keep? {slug: ai-website-builder/faq/what-if-the-ai-changes-something-i-wanted-to-keep}
-Send focused follow-up prompt naming the section, what to restore, what stays. Pre-protect liked elements before requesting changes.
+Get here: "Sites"
+Send focused follow-up prompt naming the section, what to restore, what to keep. Protect preferences in future prompts before requesting changes.
 
 ### What is a domain registrar? {slug: ai-website-builder/faq/what-is-a-domain-registrar}
-Company where domain is bought/managed (GoDaddy, Namecheap, Squarespace Domains, Cloudflare Registrar, Network Solutions, Porkbun). DNS may be managed elsewhere, at nameserver company.
+Get here: "Sites"
+Registrar = company where domain is bought/managed (e.g. GoDaddy, Namecheap, Squarespace Domains, Cloudflare Registrar, Network Solutions, Porkbun). Registrar may differ from DNS host if nameservers point elsewhere; edit DNS there instead.
 
 ### What is AI Website Builder? {slug: ai-website-builder/faq/what-is-ai-website-builder}
-Builds editable sites from ideas/notes/files/existing site. Flow: describe, review preview, request changes, publish, connect custom domain.
+Get here: "Sites"
+Builds editable websites from ideas, notes, files, or existing site via chat. Flow: describe site, review preview, request changes, publish, optionally connect custom domain.
 
 ### What is Code mode for? {slug: ai-website-builder/faq/what-is-code-mode-for}
-Advanced manual file inspection/editing; use chat first; use Code mode with a developer, per support request, for precise tiny fixes, or preview repairs.
+Get here: "Sites"
+Advanced file inspection/manual edits. Use chat first for copy/layout/style. Use Code mode only with developer help, when support requests it, for precise known fixes, or exact preview repairs.
 
 ### What is DNS? {slug: ai-website-builder/faq/what-is-dns}
-Internet address book routing domains; copy records from app into DNS provider.
+Get here: "Sites"
+DNS directs domain names to websites; a DNS record is one instruction. Usually just copy records shown in app into your DNS provider.
 
 ### What should I include in my first prompt? {slug: ai-website-builder/faq/what-should-i-include-in-my-first-prompt}
-Include business name, type, audience, visitor action, sections, style, real details (pricing, proof, contact).
+Get here: "Sites"
+Include business name, what it does, audience, visitor goal, desired sections, style, real details (pricing, testimonials, contact, locations). Starter template provided; mention mobile-friendly.
 
 ### Where do I add DNS records? {slug: ai-website-builder/faq/where-do-i-add-dns-records}
-Add records wherever active nameservers are managed, not necessarily the registrar; check nameservers if unsure.
+Get here: "Sites"
+Add records where domain's active nameservers are managed, which may differ from registrar (e.g. bought at GoDaddy, nameservers at Cloudflare, add records in Cloudflare). Check nameservers or contact support if unsure.
 
 ### Which registrars have step-by-step guides? {slug: ai-website-builder/faq/which-registrars-have-step-by-step-guides}
-Guides for GoDaddy, Namecheap, Squarespace Domains, Cloudflare, Network Solutions, Porkbun; others use universal fields: Type, Name/Host, Value/Target, TTL.
+Get here: "Sites"
+Custom domain guide covers GoDaddy, Namecheap, Squarespace Domains, Cloudflare, Network Solutions, Porkbun. Others: use universal steps with fields Type, Name/Host, Value/Target, TTL.
 
 ### Why am I being asked to top up credits? {slug: ai-website-builder/faq/why-am-i-being-asked-to-top-up-credits}
-Low website credit balance blocks AI generation/edit; top up then resend prompt; contact support with workspace name if wrong.
+Get here: "Sites"
+Website credit balance too low for generation/edit. Top up, then resend prompt. If incorrect, contact support with workspace name and attempted action.
 
 ### AI SDR {slug: ai-sdr}
-Automates replies to cold-email prospects, drafts personalized responses, books meetings on call handler's calendar, sends configured follow-up resources when prospects go quiet, flags tricky threads to "Needs Attention".
-Nav: "AI SDR Inbox" (left menu) for conversations; "Settings" > "AI SDR Agent" for config.
-Works with campaigns sent via Cold Email Agent only.
-Requires Pro or legacy plan. Client role only sees it if partner enabled it for clients.
-Fixes:
-- Not in menu: check workspace, plan, role, refresh/relogin, else contact support.
-- Not replying: check "Auto Agent Run" toggle on; click "Enable" on "Enable Cold Email Agent and AI SDR" screen; check per-campaign toggle via "Configure AI SDR for Specific Campaigns"; complete calendar/meeting link setup; ensure active campaign exists; check thread not "AI SDR Disabled"; check "Needs Attention" threads, click "Resume AI SDR"; replying to a thread moves it to "AI SDR Disabled"; fill Knowledge Base to reduce escalations.
-- Wrong person getting replies/meetings: verify correct account in "Settings" > "Email & Calendar"; check campaign's "Options" tab Instantly provider card ("Managed by Acquisity" = contact support; else check Instantly Hypergrowth+ plan, generate new API key with "all:all" scope, click "Edit", paste, "Save Changes", "Test Connection"); campaign "Assigned Salesperson" controls meeting owner, else falls back to "Assigned Call Handler", then owner>admin>member; AI replies from the inbox that received the reply, including pre-warmed inboxes.
+Get here: "AI SDR Inbox" in left sidebar (Outreach group)
+- Automated replies to cold email prospects: reads replies, writes responses, books meetings, sends follow-ups, flags issues to "Needs Attention"
+- Settings: "Settings" > "AI SDR Agent"
+- Requires Pro or legacy plan; Client role only sees it if partner enables it
+- Needs active Cold Email Agent campaign; meeting booked on assigned call handler's calendar
+- Troubleshooting: check "Auto Agent Run" toggle, per-campaign toggle, complete calendar/meeting setup, check "AI SDR Disabled"/"Needs Attention" threads, fill Knowledge Base
+- Wrong person issues: check "Settings" > "Email & Calendar", campaign "Options" tab salesperson, sending platform API key (needs Hypergrowth plan+, all:all scope)
 
 ### Setup {slug: ai-sdr/setup}
-Needs calendar + meeting link connected before use; blocking modal "Complete Your AI SDR Setup" appears otherwise, with cards "Calendar Connection" ("Connect") and "Meeting Link" ("Add Link").
-Calendar: "Settings" > "Email & Calendar" > connect "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)" via OAuth; set "Create events on" calendar; toggle "Check for conflicts" calendars; up to 5 accounts via "Connect another account".
-Set "Settings" > "Availability": timezone, working hours, "Before meeting"/"After meeting" buffers (No buffer, 5, 15, 30 min).
-Meeting link: "Settings" > "Conferencing"; choose "Static meeting link" (paste URL, click "Save") or "Dynamic meeting links (Connect Zoom account)" (click "Connect", OAuth; each meeting gets unique Zoom link).
-Each team member must set up their own account to appear in Call Assignment dropdown.
-Fixes: confirm both connections; hard-refresh; re-login; disable popup blockers/incognito/extensions; for Zoom, "Disconnect" then reconnect, or fall back to static link; if Conferencing page missing, check workspace or ask admin.
+Get here: "AI SDR Inbox"; setup modal links to "Settings" > "Email & Calendar" and "Settings" > "Conferencing"
+- Must connect calendar (Google/Outlook, up to 5 accounts) and meeting link before inbox usable
+- "Create events on" picks calendar; "Check for conflicts" toggles calendars checked
+- "Settings" > "Availability": timezone, working hours, buffers (No buffer/5/15/30 min)
+- "Settings" > "Conferencing": Static meeting link (paste URL, Save) or Dynamic (Connect Zoom via OAuth)
+- Each team member must connect own calendar/link to appear in Call Assignment dropdown
+- Fixes: reconnect accounts, disable popup blockers/incognito, disconnect/reconnect Zoom, use static link as workaround
 
 ### Inbox {slug: ai-sdr/inbox}
-Folders: "Inbox" (all threads), "Needs Attention", "AI SDR Disabled", "Favourites" (always visible, show counts/unread badges); collapsible "All Campaigns", "Responses" (Interested, Not Interested, Meeting Booked), "Others" (Out of Office, Bounced, Unsubscribed).
-Top controls: "Search mail", "All Statuses" filter.
-Thread statuses: Contacted, Replied, Slots Sent, Meeting Booked, Completed, Declined, No Response.
-"Disable AI SDR" checkbox stops AI on a thread (hidden on escalated threads; use X on "Escalated for Review" banner instead).
-Footer actions: "Reply", "Forward", "Reply All".
-Three-dot menu: Star/Unstar, Mark as read/unread, Add to DNC/Remove from DNC, Delete thread (permanent).
-Green banner shows next follow-up time, cancel via X; else "No follow-up scheduled".
-"Out of Office" label shows "Remove OOO" action.
+Get here: "AI SDR Inbox"
+- Top folders: Inbox, Needs Attention, AI SDR Disabled, Favourites; counts/unread badges
+- Collapsible: All Campaigns, Responses (Interested, Not Interested, Meeting Booked), Others (Out of Office, Bounced, Unsubscribed)
+- Search mail, All Statuses filter
+- Thread statuses: Contacted, Replied, Slots Sent, Meeting Booked, Completed, Declined, No Response
+- "Disable AI SDR" checkbox (hidden if escalated; use X on "Escalated for Review" banner instead)
+- Reply, Reply All, Forward; three-dot menu: Star/Unstar, Mark read/unread, Add/Remove DNC, Delete thread (permanent)
+- Follow-up banner shows next scheduled send, cancel via X
+- "Remove OOO" quick action clears Out of Office label
 
 ### Settings {slug: ai-sdr/settings}
-Nav: "Settings" > "AI SDR Agent".
-"Auto Agent Run" toggle (default On) controls org-wide auto-replies.
-"Configure AI SDR for Specific Campaigns" popup toggles AI per campaign, autosaves.
-"Call Assignment": "Assigned Call Handler" dropdown (only members with calendar+meeting link set up appear); default is automatic by role priority owner>admin>member; campaign "Assigned Salesperson" (Options tab) overrides.
-"Knowledge Base" text box for company/product info to improve replies.
-Call Type Settings: Podcast Method (Podcast Call, Pre-Podcast Chat, Intro Call); Interview Method (Interview Call, Pre-Interview Call); AI Audit Method fixed to "AI Business Audit Review".
-"Resources" section: "Add Resource" for videos/PDFs/lead lists, assignable to all or specific campaigns.
-Click "Save Settings" to save.
+Get here: "Settings" > "AI SDR Agent"
+- "Auto Agent Run" toggle (on by default) controls org-wide automatic replies
+- "Configure AI SDR for Specific Campaigns" popup toggles per campaign; autosaves
+- Call Assignment: "Assigned Call Handler" dropdown (only shows members with calendar+meeting link set up); default is automatic by role priority owner>admin>member; campaign's own Assigned Salesperson (Options tab) overrides
+- Knowledge Base text box: company/product/pricing info for AI replies
+- Call Type settings: Podcast Method (Podcast Call/Pre-Podcast Chat/Intro Call), Interview Method (Interview Call/Pre-Interview Call), AI Audit Method (fixed: AI Business Audit Review)
+- Resources section: "Add Resource" for videos/PDFs/lead lists, assignable to all or specific campaigns
+- Click "Save Settings" to save
 
 ### AI SDR Knowledge Base {slug: ai-sdr/knowledge-base}
-- Path: "Settings" > "AI SDR Agent" > "Knowledge Base" textarea > "Save Settings".
-- Plain-text facts the AI uses when replying/answering questions; not a rulebook, not enforced instructions.
-- Read only by the reply-writing/answering step; not by scheduling, escalation, or opt-out detection.
-- Size: target 1,500-3,500 characters (~250-600 words), max ~6,000; each answer 1-3 sentences.
-- Cover: proof/examples, audience size, notable guests/clients, free/cost on both sides, company name/location, call purpose/length/attendees/platform, identity verification.
-- If no public proof, write an honest pre-launch line instead of leaving blank.
-- Cannot change: whether AI books directly vs sends link (books connected calendar, or asks for availability if none connected); when a thread escalates to human (use Inbox > Needs Attention); opt-out detection, intent routing, time slots offered.
-- One Knowledge Base per workspace, shared across all its campaigns. Best option: one workspace per offer. If sharing, label facts per exact campaign name (best-effort only).
-- Resources (links/PDFs) are separate, set in "Settings" > "AI SDR Agent" > "Resources", not in Knowledge Base text.
-- Template and quality checklist provided for drafting (size, no leftover brackets, proof filled, money answered both sides, company/location stated).
-- Update when niche/offer/method/pricing/show/host changes; check Inbox > Needs Attention daily in week 1 of new campaign, then review monthly.
+Get here: "Settings" > "AI SDR Agent" > "Knowledge Base"
+- Plain-text facts the AI uses to answer prospects; unclear/missing info can push threads to Inbox > Needs Attention.
+- Different from Resources (approved links attached to follow-ups).
+- Read as facts, not rules; only used by the reply/answer step, not scheduling, escalation, or opt-out detection.
+- Keep short: 1,500-3,500 characters ideal, 6,000 max, 1-3 sentences per answer.
+- Cover proof, pricing/free-or-not, identity/location, call logistics, trust/verification.
+- If no public proof yet, write an honest line instead of leaving blank.
+- Cannot change: booking vs sending links (AI books connected calendar or asks for times), escalation rules, opt-out/intent routing, slot selection.
+- One Knowledge Base per workspace, shared by all its campaigns; for multiple offers use separate workspaces, or label campaigns clearly (best-effort only).
+- Template provided to copy/paste; remove all brackets before saving.
+- Check Inbox > Needs Attention daily in week 1 of a new campaign; update KB when a question repeats; review monthly after.
+- Update whenever niche, offer, pricing, show name, or host changes.
 
 ### Follow-Up Resources {slug: ai-sdr/follow-up-resources}
-- Path: "Settings" > "AI SDR Agent" > "Resources" (bottom of page).
-- Attachable links (videos, PDFs, lead lists) sent in automated follow-ups when prospect goes quiet.
-- Follow-up 1 (~24h after last reply): evidence/proof. Follow-up 2 (~48h after follow-up 1): high-value gift.
-- Add Resource: click "Add Resource", fill "Active" toggle, "Resource Name" (3-100 chars), "Resource URL", "Description" (10-500 chars), "Include in Follow-up" (1 or 2), optional "Available in Campaigns" (blank = all campaigns), click "Save Resource".
-- Manage: pencil icon edits, trash icon deletes, "Active" toggle enables/disables without deleting.
-- Campaign-specific: edit resource, check campaigns under "Available in Campaigns", save.
-- Broken URLs hurt credibility; description used by AI to introduce resource naturally.
+Get here: "Settings" > "AI SDR Agent", scroll to "Resources"
+- Links (videos, PDFs, lead lists) the AI can attach to follow-ups when a prospect goes quiet.
+- Two slots: Follow-up 1 (~24h after last reply, proof/evidence), Follow-up 2 (~48h after follow-up 1, high-value gift).
+- Click "Add Resource", fill "Active" toggle, "Resource Name" (3-100 chars), "Resource URL", "Description" (10-500 chars), "Include in Follow-up" (1 or 2), optional "Available in Campaigns" (blank = all campaigns).
+- Click "Save Resource".
+- Edit via pencil icon, delete via trash icon, toggle Active on/off without deleting.
+- Limit a resource to specific campaigns by checking them under "Available in Campaigns", then "Save Resource".
+- Broken URLs hurt credibility; description should be clear since AI uses it to introduce the resource.
 
 ### Frequently Asked Questions {slug: ai-sdr/faq}
-Index page only; no additional facts beyond its sub-articles.
+Get here: "AI SDR Inbox" in left sidebar (Outreach group)
+No additional facts; overview/index of FAQ topics.
 
 ### Configuration {slug: ai-sdr/faq/configuration}
-Index page only; no additional facts beyond its sub-articles.
+Get here: "AI SDR Inbox" in left sidebar (Outreach group)
+No additional facts; category index page.
 
 ### Can I manually set/override when the AI SDR sends a follow-up? {slug: ai-sdr/faq/configuration/can-i-manually-setoverride-when-the-ai-sdr-sends-a-follow-up}
-- No custom send-time control; follow-ups are auto-scheduled.
-- Workaround: open thread in AI SDR inbox, check "Disable AI SDR" in action bar, send reply manually, uncheck to resume AI.
-- Green banner shows next scheduled follow-up (click "X" to cancel); grey "No follow-up scheduled" label when none pending.
+Get here: "AI SDR Inbox", open a thread
+- No custom send time for follow-ups; timing is automatic.
+- Workaround: check "Disable AI SDR" in thread action bar, send reply manually, uncheck to resume.
+- Green banner shows next scheduled follow-up (click "X" to cancel); grey "No follow-up scheduled" label if none pending.
 
-### Can I point the AI SDR at a docs URL instead of pasting entries? {slug: ai-sdr/faq/configuration/can-i-point-the-ai-sdr-at-a-docs-url-instead-of-pasting-entries}
-- Knowledge Base is a paste-in text field, not a crawler; no auto-sync with a docs URL; must copy and manually update content.
-- Workaround: pick 5-15 FAQs, paste condensed Q&A answers, update when docs change.
-- Include: pricing ballpark, core features, company basics, standard timelines, common objections. Leave in docs only: full pricing calculators, API docs, team bios, case studies, thought leadership.
-- Ten focused 50-word entries outperform one large paste.
+### (untitled, can-i-point-the-ai-sdr-at-a-docs-url-instead-of-pasting-entries) {slug: ai-sdr/faq/configuration/can-i-point-the-ai-sdr-at-a-docs-url-instead-of-pasting-entries}
+Get here: "Settings" > "AI SDR Agent" > "Knowledge Base"
+- No URL/crawler ingestion; must paste and manually update content.
+- Workaround: find top 5-15 FAQs, paste condensed Q&A answers, not full docs; update when docs change.
+- Put pricing ballpark, core features, company basics, standard timelines, common objections in KB; leave calculators, API docs, bios, case studies, thought leadership in full docs.
+- Ten focused 50-word entries outperform one long dump.
 
-### (untitled, auto-booking gate) {slug: ai-sdr/faq/configuration/can-i-prevent-the-ai-sdr-from-auto-booking-into-the-clients-calendar-gate-interested-calls-instead}
+### (untitled, can-i-prevent-the-ai-sdr-from-auto-booking...) {slug: ai-sdr/faq/configuration/can-i-prevent-the-ai-sdr-from-auto-booking-into-the-clients-calendar-gate-interested-calls-instead}
+Get here: "Settings" > "AI SDR Agent"
 - No dedicated "gate but never book" switch.
-- Options: disable AI SDR for one campaign via "Settings" > "AI SDR Agent" > "Configure AI SDR for Specific Campaigns"; disable for one thread via "Disable AI SDR" checkbox; pause all via "Auto Agent Run" toggle off in "Settings" > "AI SDR Agent".
-- Alternative: add Knowledge Base instruction to ask for availability and escalate instead of booking; not 100% consistent.
-- Avoid disconnecting calendar as workaround; triggers "Complete Your AI SDR Setup" modal in AI SDR Inbox and inconsistent booking.
-- Re-enable: "Settings" > "Email & Calendar" > "Connect" > complete Google OAuth > select calendar.
+- Per-campaign: "Configure AI SDR for Specific Campaigns", turn off for that campaign.
+- Per-thread: "AI SDR Inbox", check "Disable AI SDR".
+- Workspace-wide pause: toggle "Auto Agent Run" off.
+- Alternative: add instruction in Knowledge Base textarea (e.g. ask for availability and escalate instead of booking); click "Save Settings"; not guaranteed consistent.
+- Avoid disconnecting calendar as workaround: triggers "Complete Your AI SDR Setup" modal and inconsistent booking.
+- To re-enable booking: "Settings" > "Email & Calendar", click "Connect", complete Google OAuth, select calendar.
 
 ### Can I support multiple knowledge bases for separate offers/clients? {slug: ai-sdr/faq/configuration/can-i-support-multiple-knowledge-bases-for-separate-offersclients}
-- One Knowledge Base per workspace; for multiple offers/clients create separate workspaces.
-- Steps: click workspace name (top-left) > "New Workspace" > name it > complete setup (niche, offer, AI SDR config) > "Settings" > "AI SDR Agent" > "Knowledge Base" textarea > enter info > "Save Settings".
-- Recommended when offers differ significantly in messaging, pricing, or audience.
+Get here: click workspace name (top-left) > "New Workspace"
+- One Knowledge Base per workspace, shared across its campaigns.
+- For separate offers/clients, create a new workspace, name it, complete setup (niche, offer, AI SDR config), then go to "Settings" > "AI SDR Agent", scroll past "Call Assignment" to "Knowledge Base", enter info, "Save Settings".
+- Recommended when offers differ significantly, to avoid mixed-up info.
 
-### (untitled, do I need to join booked calls) {slug: ai-sdr/faq/configuration/do-i-need-to-personally-answerjoin-booked-calls-and-what-routing-is-required}
-- Yes, you/your team must personally join booked calls; AI only handles email/booking.
-- Flow: AI sends slots, prospect picks, event created on call handler's connected calendar, prospect gets invite with meeting link, you get reminder, you join.
-- Routing: "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler" dropdown: specific team member, or "Automatic assignment (role-based priority)" (Owner > Admin > Member).
-- Only team members with completed setup (calendar + meeting link connected) appear in dropdown; complete via "AI SDR Inbox" setup modal.
-- No automatic round-robin/load balancing; calls go to whoever is selected.
+### (untitled, do-i-need-to-personally-answer/join booked calls) {slug: ai-sdr/faq/configuration/do-i-need-to-personally-answerjoin-booked-calls-and-what-routing-is-required}
+Get here: "Settings" > "AI SDR Agent" > "Call Assignment"
+- You/your team must personally join booked calls; AI only handles email/booking.
+- Process: AI sends slots, prospect picks, event created on assigned handler's calendar, prospect gets invite with meeting link, you get reminder, join call.
+- "Assigned Call Handler" dropdown: pick specific member or "Automatic assignment" (priority Owner > Admin > Member).
+- Only members with completed setup (calendar + meeting link connected) appear; they complete via "AI SDR Inbox" setup modal.
+- Each member connects own calendar/meeting link; no automatic round-robin/load balancing.
+- Change assignment anytime via dropdown, then "Save Settings".
 
 ### How do I configure the AI SDR to only reply during business hours (Mon–Fri)? {slug: ai-sdr/faq/configuration/how-do-i-configure-the-ai-sdr-to-only-reply-during-business-hours-monfri}
-- No dedicated setting for reply-send hours; use "Settings" > "Availability" to set the outer booking window (Mon-Fri, toggle off Sat/Sun, set hours, confirm timezone, set "Buffer Times", save).
-- Connect calendar via "Settings" > "Email & Calendar" > "Connect" (Google or Outlook) > sign in > grant access; narrows booking offers to free/available/buffered slots.
-- Confirm "Settings" > "AI SDR Agent" > "Auto Agent Run" is on, else no automatic replies at all, regardless of time.
-- Availability is per-user; AI uses campaign's Assigned Salesperson hours first, then workspace Assigned Call Handler, then automatic assignment.
-- Hard pause outside hours: toggle "Auto Agent Run" off/on manually.
+Get here: "Settings" > "Availability"
+- Sets outer window for meeting slots offered, combined with calendar free/busy and buffers.
+- No separate setting to restrict reply-sending hours; for a hard pause, toggle "Settings" > "AI SDR Agent" > "Auto Agent Run" off/on manually.
+- Steps: toggle off Saturday/Sunday, set Mon-Fri hours, confirm timezone, set "Buffer Times", save.
+- Connect calendar: "Settings" > "Email & Calendar", click "Connect" (Google or Outlook), sign in, grant access.
+- Confirm "AI SDR Enabled" > "Auto Agent Run" is on, else no auto replies.
+- Availability is per-user; AI uses hours of campaign's Assigned Salesperson, then workspace Assigned Call Handler, then automatic assignment.
 
 ### How do I set up the AI SDR from scratch? {slug: ai-sdr/faq/configuration/how-do-i-set-up-the-ai-sdr-from-scratch}
-5 steps, budget 20 min, tune KB over first week.
-1. Connect calendar: "Settings" > "Email & Calendar" > "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)" → "Connect". Use client's calendar for agency setups.
-2. Set availability: "Settings" > "Availability" - set day/time windows, "Before meeting"/"After meeting" buffers.
-3. Assigned Call Handler: "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler" (workspace default) or campaign "Options" tab > "Assigned Salesperson" (overrides default).
-4. Fill Knowledge Base: "Settings" > "AI SDR Agent" > "Knowledge Base" - add company basics, niche, pricing, timelines, objection Q&As, escalation rules.
-5. Agree on "Needs Attention" check cadence: daily baseline, 48 hours max, else warm leads go cold.
-Default behavior: AI auto-replies and auto-books; can gate interested calls instead for first campaign.
+Get here: In the left sidebar, click "AI SDR Inbox", then "Settings"
+- 5 steps, ~20 min first pass; tuning KB continues over first week.
+1. Connect calendar: "Settings" > "Email & Calendar" > "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)" > "Connect". Use client's calendar for agency setups.
+2. "Settings" > "Availability": set day/time windows, "Before meeting"/"After meeting" buffers.
+3. Call handler: workspace default at "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler" (or Automatic assignment); campaign-level override via campaign "Options" tab > "Assigned Salesperson".
+4. Fill "Settings" > "AI SDR Agent" > "Knowledge Base": company basics, who you help, pricing ballpark, delivery timeline, 3-5 objection responses, escalation rules.
+5. Decide Needs Attention check frequency: daily baseline, 48 hours is floor.
+- Skipping Knowledge Base causes the AI to make up answers.
+- Default behavior: AI auto-replies and auto-books; can gate interested calls instead of auto-booking.
 
 ### How do I turn off the AI SDR auto-replies? {slug: ai-sdr/faq/configuration/how-do-i-turn-off-the-ai-sdr-auto-replies}
-"Settings" > "AI SDR Agent" > "AI SDR Enabled" card > toggle "Auto Agent Run" off. Stops new auto-replies immediately; in-flight threads/bookings unaffected. Also: per-campaign toggle via "Configure AI SDR for Specific Campaigns"; per-thread via "Disable AI SDR" checkbox or manual reply. Warm leads can go cold in 2-3 days if left off.
+Get here: "Settings" > "AI SDR Agent" (or click "Settings" from AI SDR Inbox header)
+- Toggle "Auto Agent Run" off in "AI SDR Enabled" card; stops auto-replies immediately, in-flight threads unaffected.
+- Pending follow-up can be removed via "X" on green follow-up banner in thread.
+- Escalated/Needs Attention and Meeting Booked threads unchanged.
+- Levels: whole workspace toggle; per-campaign via "Configure AI SDR for Specific Campaigns"; per-thread "Disable AI SDR" checkbox or manual reply (human takeover).
+- Warning: warm leads can go cold in 2-3 days if off too long.
 
 ### Why are my leads showing as "AI SDR Disabled"? {slug: ai-sdr/faq/configuration/why-are-my-leads-showing-as-ai-sdr-disabled}
-Check 3 levels: workspace "Auto Agent Run" toggle, per-campaign toggle ("Configure AI SDR for Specific Campaigns"), and per-thread "AI SDR Disabled"/"Resume AI SDR" button. Sending a manual reply auto-disables AI SDR on that thread.
+Get here: "Settings" > "AI SDR Agent"
+- Check workspace toggle "Auto Agent Run" is on.
+- Check "Configure AI SDR for Specific Campaigns" popup, toggle each campaign on.
+- Check individual thread in "AI SDR Inbox": click "AI SDR Disabled" or "Resume AI SDR" to re-enable.
+- Sending a manual reply yourself auto-switches a thread to "AI SDR Disabled".
 
 ### Inbox & Replies {slug: ai-sdr/faq/inbox-replies}
-Category page, no additional facts.
+Get here: "AI SDR Inbox"
+No additional facts.
 
 ### How do I add FAQ/escalation content to the AI SDR knowledge base? {slug: ai-sdr/faq/inbox-replies/how-do-i-add-faqescalation-content-to-the-ai-sdr-knowledge-base}
-"Settings" > "AI SDR Agent" > "Knowledge Base" textarea > type/paste Q&A content > "Save Settings". Use Q&A format, one topic per entry, include objections and specifics. AI's main goal remains booking calls.
+Get here: "Settings" > "AI SDR Agent" > "Knowledge Base"
+- Paste Q&A content, click "Save Settings".
+- Use Q&A format, one topic per entry, include objections, concrete specifics.
+- AI's main goal always remains booking a call.
 
 ### How do I assign AI SDR inbox threads to specific salespeople? {slug: ai-sdr/faq/inbox-replies/how-do-i-assign-ai-sdr-inbox-threads-to-specific-salespeople}
-No per-thread assignment feature. Routing only via workspace "Assigned Call Handler" dropdown (only shows team members with connected calendar/meeting link) or campaign "Assigned Salesperson". Manual takeover via "Disable AI SDR". "Star" (three-dot menu) marks threads, shown in "Favourites" folder.
+Get here: "AI SDR Inbox"
+- No per-thread assignment dropdown exists.
+- Workspace default: "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler" (only shows members with connected calendar/meeting link).
+- Campaign "Options" tab > "Assigned Salesperson" overrides default.
+- Manual takeover: check "Disable AI SDR" to move thread to "AI SDR Disabled" folder.
+- "Star" (three-dot menu) marks threads, shown in "Favourites" folder.
 
 ### How do I clear or retrieve sample data from the AI SDR inbox? {slug: ai-sdr/faq/inbox-replies/how-do-i-clear-or-retrieve-sample-data-from-the-ai-sdr-inbox}
-Click "Clear Sample Data" on banner. Not undoable via UI; it's demo content only, local to workspace.
+Get here: "AI SDR Inbox"
+- Click "Clear Sample Data" on the sample-mode banner; irreversible via UI, local to workspace, no real data lost.
 
 ### How do I manually reply in the AI SDR inbox? {slug: ai-sdr/faq/inbox-replies/how-do-i-manually-reply-in-the-ai-sdr-inbox}
-Open "AI SDR Inbox" > thread > "Reply" > type > "Send". Manual reply = takeover, AI stops on that thread. Dismiss "Escalated for Review" banner via "X" if needed; update lifecycle status.
+Get here: "AI SDR Inbox"
+- Open thread, click "Reply", write, click "Send".
+- Manual reply = takeover; AI stops auto-replying that thread.
+- Use "X" on "Escalated for Review" banner to dismiss escalation, update lifecycle status.
+- Reply manually for custom pricing/scope/legal, confirmed bookings, or angry threads.
 
 ### How do I re-enable the AI SDR after a human takeover? {slug: ai-sdr/faq/inbox-replies/how-do-i-re-enable-the-ai-sdr-after-a-human-takeover}
-Open thread > click "AI SDR Disabled" button to re-enable, or "Resume AI SDR" if escalated. Resumes on next prospect reply or scheduled follow-up. If unresponsive, toggle Disable/Enable again; else contact support.
+Get here: "AI SDR Inbox"
+- Open thread, click "AI SDR Disabled" button (or "Resume AI SDR" if escalated) to re-enable.
+- AI resumes on next prospect reply or next scheduled follow-up, not instantly.
+- If still unresponsive, click "Disable AI SDR" then re-enable; else contact support.
 
 ### How do I reply to an AI SDR escalation for a 'Not Interested' prospect? {slug: ai-sdr/faq/inbox-replies/how-do-i-reply-to-an-ai-sdr-escalation-for-a-not-interested-prospect}
-"AI SDR Inbox" > "Needs Attention" > open thread > click "X" on "Escalated for Review" banner > "Reply" > set "Lifecycle" dropdown to "Declined". Thread moves to "AI SDR Disabled" folder.
+Get here: "AI SDR Inbox" > "Needs Attention"
+- Open escalated thread, click "X" on "Escalated for Review" banner, click "Reply", send acknowledgement, set "Lifecycle" dropdown to "Declined".
+- Thread moves to "AI SDR Disabled" folder after dismissal.
 
 ### How do I stop the AI SDR replying after I've escalated a thread? {slug: ai-sdr/faq/inbox-replies/how-do-i-stop-the-ai-sdr-replying-after-ive-escalated-a-thread}
-Dismiss "Escalated for Review" banner (X), reply manually, or check "Disable AI SDR". Workspace-wide toggle is last resort. If AI replies again within an hour, takeover didn't register - contact support via "Feedback" with thread ID.
+Get here: "AI SDR Inbox"
+- Dismiss "Escalated for Review" banner via "X", or send manual reply, or check "Disable AI SDR" (hidden while escalated), or turn off workspace-wide (last resort).
+- Drafts don't count as takeover; manual reply must actually send.
+- If AI replies again within an hour of takeover, contact support via "Feedback" with thread ID.
 
 ### What are the AI SDR's capabilities and limits? {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}
-Does automatically: reads replies, classifies intent (Interested/Not Interested/Meeting Booked/Out of Office/Do Not Contact/Needs Attention), sends follow-ups, books meetings within availability/buffers, recovers ghosted threads, handles basic objections, escalates complex cases.
-Limits: can't change tone/voice (KB only affects facts), can't handle complex negotiations, unreliable at tracking names, can't fully manage CRM, can't book outside availability/buffers, can't be partially manual on same thread (use Disable AI SDR).
+Get here: "AI SDR Inbox"
+- Does: reads campaign replies, classifies intent, sends follow-ups, books meetings per availability/buffers/calendar, recovers ghosted threads, handles basic objections, escalates complex cases.
+- Can't: change tone/voice, handle complex negotiations, reliably track names, fully manage CRM, book outside availability/buffers, be partially manual on same thread (must disable/re-enable fully).
 
 ### Where do I find the AI SDR knowledge base in the app? {slug: ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app}
-"AI SDR Inbox" > "Settings", or "Settings" > "AI SDR Agent" > "Knowledge Base" textarea. Edit > "Save Settings"; takes effect on next reply, no restart. No revision history - keep external backup. Requires Settings access (check role under "Settings" > "Members").
+Get here: "Settings" > "AI SDR Agent" (or "AI SDR Inbox" > "Settings")
+- Knowledge Base textarea below "Call Assignment"; edit and click "Save Settings"; effective on next reply, no restart.
+- Editing needs permission; check role at "Settings" > "Members".
+- No revision history; keep external backup copy.
 
 ### Who receives AI SDR escalation and booking notification emails? {slug: ai-sdr/faq/inbox-replies/who-receives-ai-sdr-escalation-and-booking-notification-emails}
-Escalation emails always go to workspace Owner's email, no setting to change this. Booking notifications go to campaign's "Assigned Salesperson" (if connected calendar) else workspace "Assigned Call Handler". To redirect escalation emails, transfer ownership via "Settings" > "Members".
+Get here: "AI SDR Inbox"
+- Escalation emails always go to workspace owner's email; not configurable.
+- Booking notifications go to campaign's "Assigned Salesperson" (if connected calendar) else workspace "Assigned Call Handler".
+- To redirect escalation emails, must transfer ownership via "Settings" > "Members".
 
-### Why does the AI SDR make up answers when the KB doesn't cover something {slug: ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-make-up-answers-when-the-knowledge-base-doesnt-cover-something}
-- AI guesses plausibly when KB lacks info; fix: comprehensive KB, explicit escalation rules, monitor "Needs Attention" folder.
-- Add KB entries for pricing, timeline, guarantees, company basics if asked 3+ times.
-- Add escalation rules block (custom pricing, legal/compliance, scope negotiation, unanswered questions) to KB.
-- Escalated threads land in AI SDR Inbox → "Needs Attention"; check daily.
+### Why does the AI SDR make up answers when the knowledge base doesn't cover something {slug: ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-make-up-answers-when-the-knowledge-base-doesnt-cover-something}
+Get here: "Settings" > "AI SDR Agent" (Knowledge Base)
+- Fixes: fill KB gaps for pricing/timeline/guarantees/company info; add explicit escalation rules (custom pricing, legal/compliance, scope negotiation, unanswered questions).
+- Escalated threads go to "AI SDR Inbox" → "Needs Attention"; check daily.
 - KB gives facts only, doesn't change tone/persona.
 
 ### Why does the AI SDR reply in the wrong language and how do I enforce a specific reply language {slug: ai-sdr/faq/inbox-replies/why-does-the-ai-sdr-reply-in-the-wrong-language-and-how-do-i-enforce-a-specific-reply-language}
-- AI mirrors language of prospect's latest message; no per-workspace language setting, controlled via KB instructions only.
-- Misdetection triggers: signature blocks, quoted text, email client locale headers, pasted translated text.
-- Add language rule instruction at top of Knowledge Base ("Settings" > "AI SDR Agent"); be explicit, single rule, specify fallback and what to ignore.
-- Click "Save Settings" to apply; new rule affects new replies only, not in-flight threads.
-- If wrong language persists on a thread, take it over manually and reply yourself.
+Get here: "Settings" > "AI SDR Agent" (Knowledge Base)
+- No per-workspace language setting; AI mirrors prospect's latest message language.
+- Misdetection causes: signature blocks, quoted text, email client locale headers, translated snippets.
+- Fix: add a standalone language rule at top of Knowledge Base textarea; click "Save Settings".
+- Rule takes effect on new replies/follow-ups only; in-flight threads unaffected.
+- If still wrong, check "Disable AI SDR" and reply manually.
 
 ### Why isn't the AI SDR KB changing the reply tone/persona despite my instructions {slug: ai-sdr/faq/inbox-replies/why-isnt-the-ai-sdr-kb-changing-the-reply-tonepersona-despite-my-instructions}
-- KB is for facts; tone instructions are easily overridden. Put a dedicated tone block at top of KB.
-- KB textarea is on "Settings" → "AI SDR Agent"; must click "Save Settings" or changes don't persist.
-- New tone applies only to new replies, not in-progress threads.
-- "Configure AI SDR for Specific Campaigns" modal only toggles AI SDR on/off per campaign, no tone override.
+Get here: "Settings" > "AI SDR Agent" (Knowledge Base)
+- KB is for facts; tone instructions are easily overridden.
+- Put tone rules in a dedicated block at top of KB; click "Save Settings" (unsaved changes stay local).
+- New instructions apply only to new replies, not in-progress threads.
+- "Configure AI SDR for Specific Campaigns" only toggles AI SDR on/off per campaign, not tone.
 - To fix a drifting thread, check "Disable AI SDR" in thread header and reply manually.
 
 ### Scheduling & Calendar {slug: ai-sdr/faq/scheduling-calendar}
-Overview only: covers booking links, calendar connections, timezone, meeting settings.
+Get here: "AI SDR Inbox" in left sidebar (Outreach group)
+Overview: booking links, calendar connections, timezone, and meeting settings.
 
 ### How do I connect a client's Google or Outlook calendar to Cold Email Agent {slug: ai-sdr/faq/scheduling-calendar/how-do-i-connect-a-clients-google-calendar-to-cold-email-agent}
-- Switch to client workspace via workspace selector; "Settings" > "Email & Calendar"; click "Connect" on "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)"; sign in; allow permissions; select calendar to "Create events on" and toggle "Check for conflicts".
-- Call-taker should connect their own calendar; up to 5 accounts per user per provider.
-- Booking calendar priority: campaign's "Assigned Salesperson" → workspace "Assigned Call Handler" → automatic assignment.
+Get here: workspace selector (top of sidebar) > "Settings" > "Email & Calendar"
+- Click "Connect" on "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)"; sign in, allow permissions.
+- Select calendar to "Create events on"; toggle calendars to "Check for conflicts".
+- Up to 5 Google/Outlook accounts per user.
+- Booking calendar priority: campaign's Assigned Salesperson, then workspace Assigned Call Handler, then auto-assignment.
 
 ### How do I set a Riverside/Zoom/custom booking link for podcast calls {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-a-riversidezoomcustom-booking-link-for-podcast-calls}
-- "Settings" > "Conferencing" > "Meeting Link Type" > select "Static meeting link" > paste link in "Meeting Link" field > click "Save".
-- Link must be direct join, no account required; each team member sets own link; only those with calendar+link appear in Call Assignment dropdown.
+Get here: "Settings" > "Conferencing"
+- Select "Static meeting link"; paste link in "Meeting Link" field; click "Save".
+- Link must be a direct join link, no account required.
+- Each call-handler sets their own link; only users with connected calendar+link appear in Call Assignment dropdown.
 
 ### How do I set the correct timezone for my AI SDR {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr}
-- "Settings" > "Availability", "Timezone" dropdown, set hours, click "Save".
-- AI SDR prefers weekdays 8AM-6PM prospect time; uses host's (Assigned salesperson/Call Handler/auto) availability and timezone.
-- Prospect timezone determined by: lead location data > campaign target location > host's timezone (defaults US Eastern).
-- Import State/Country columns for accuracy; City alone insufficient.
-- Fix single thread: open in AI SDR Inbox, "Contact details" > "Edit timezone" next to "Current time".
-- "Disable AI SDR"/"Resume AI SDR" toggle in thread header for manual handling.
+Get here: "Settings" > "Availability"
+- Set "Timezone" dropdown and available hours; click "Save".
+- AI prefers weekdays 8AM-6PM prospect time; can offer other times if requested.
+- Timezone priority: campaign Assigned Salesperson, then Assigned Call Handler, then auto-pick (default US Eastern).
+- Prospect timezone determined from lead location data, then campaign target location, then host's timezone fallback.
+- Map State/Province and Country columns on import for accuracy; City alone insufficient.
+- "Email & Calendar" page has no timezone setting.
+- Fix wrong-timezone thread: open in AI SDR Inbox, "Contact details" > "Edit timezone" next to "Current time".
+- To take over: "Disable AI SDR" in thread header, then "Reply" (button reads "Resume AI SDR" on escalated threads).
 
-### The AI SDR double-booked after I manually replied with a Calendly link, how do I prevent this {slug: ai-sdr/faq/scheduling-calendar/the-ai-sdr-double-booked-after-i-manually-replied-with-a-calendly-link-how-do-i-prevent-this}
+### The AI SDR double-booked after I manually replied with a Calendly link {slug: ai-sdr/faq/scheduling-calendar/the-ai-sdr-double-booked-after-i-manually-replied-with-a-calendly-link-how-do-i-prevent-this}
+Get here: "AI SDR Inbox"
 - Before manual reply, check "Disable AI SDR" checkbox in thread action bar; thread moves to "AI SDR Disabled" folder.
-- On escalated threads, dismiss "Escalated for Review" banner (click X) first.
-- Re-enable by unchecking box.
+- On escalated threads, dismiss "Escalated for Review" banner (X) first.
+- Re-enable by unchecking the box.
 
-### Where do I enter my conference/meeting link (Zoom, Google Meet, Riverside) for AI SDR bookings {slug: ai-sdr/faq/scheduling-calendar/where-do-i-enter-my-conferencemeeting-link-zoom-google-meet-riverside-for-ai-sdr-bookings}
-- "Settings" > "Conferencing": choose "Static meeting link" or "Dynamic meeting links (Connect Zoom account)"; static needs paste+"Save"; dynamic needs Zoom OAuth.
-- Personal setting; each host sets own link.
+### Where do I enter my conference/meeting link for AI SDR bookings {slug: ai-sdr/faq/scheduling-calendar/where-do-i-enter-my-conferencemeeting-link-zoom-google-meet-riverside-for-ai-sdr-bookings}
+Get here: "Settings" > "Conferencing"
+- Choose "Static meeting link" (paste link, "Save") or "Dynamic meeting links" (connect Zoom, OAuth).
+- Personal setting; each call handler sets their own link.
 
 ### Why does the AI SDR book duplicate meetings with different hosts for the same prospect {slug: ai-sdr/faq/scheduling-calendar/why-does-the-ai-sdr-book-duplicate-meetings-with-different-hosts-for-the-same-prospect}
-- Caused by same prospect enrolled in multiple campaigns (tracked per conversation, not globally); different hosts via each campaign's Assigned Salesperson.
-- Fix: dedupe leads before launching campaigns; watch for email variants; use same Assigned Salesperson across campaigns if prospect must be in two.
-- To fix existing duplicate: "Disable AI SDR" on duplicate thread, cancel wrong meeting on host's calendar, keep correct one.
+Get here: "AI SDR Inbox"
+- Cause: prospect enrolled in multiple campaigns, each with different Assigned Salesperson (campaign "Options" tab).
+- Fix: dedupe lead lists, watch for same person under different emails, align Assigned Salesperson across campaigns.
+- To correct existing duplicate: check "Disable AI SDR" on duplicate thread, cancel wrong meeting on host's calendar, keep correct booking.
 
 ### Why is the AI SDR asking prospects for their times instead of offering slots {slug: ai-sdr/faq/scheduling-calendar/why-is-the-ai-sdr-asking-prospects-for-their-times-instead-of-offering-slots}
-- Happens when no open slots found in 14-day scheduling window (checks availability hours, calendar conflicts, buffer times).
-- Window extends to 60 days if prospect requests further-out date.
-- Fix by freeing availability; resumes auto-offering once slots open.
+Get here: "Settings" > "Availability"
+- AI searches next 14 days for slots passing availability hours, calendar conflicts, buffer times; extends to 60 days if prospect requests further out.
+- If no slots found, AI asks prospect for times instead.
 
 ### Why is the AI SDR booking 30-minute events when I set it to 15 minutes {slug: ai-sdr/faq/scheduling-calendar/why-is-the-ai-sdr-booking-30-minute-events-when-i-set-it-to-15-minutes}
-- Duration set by call/meeting type in Acquisity, not calendar provider defaults; existing events unaffected by changes, only new bookings.
-- Buffers (Settings → Availability) control spacing, not event length.
-- Static meeting link doesn't set duration, just join link.
-- Troubleshoot: confirm correct salesperson/call type/connected calendar; else contact support with event URL.
+Get here: "Settings" (AI SDR/scheduling settings for assigned salesperson)
+- Check call type/meeting type duration setting; save; only new bookings use updated duration.
+- Calendar provider default length doesn't override Acquisity-set duration.
+- Buffers ("Settings" > "Availability") control spacing, not event length.
+- Static link ("Settings" > "Conferencing") is join link only, doesn't set duration.
+- If still wrong: confirm campaign's assigned salesperson, correct call type, connected calendar account ("Settings" > "Email & Calendar"); else contact support with event URL.
 
 ### Why is the AI SDR booking meetings on the wrong calendar/email? {slug: ai-sdr/faq/scheduling-calendar/why-is-the-ai-sdr-booking-meetings-on-the-wrong-calendaremail}
+Get here: In the left sidebar, click "Cold Email Agent", then open campaign "Options" tab
 
-- Booking order: campaign "Options" tab "Assigned Salesperson" > "Settings" > "AI SDR Agent" > "Call Assignment" > "Assigned Call Handler" > automatic assignment.
-- Fix: check "Assigned Salesperson"; else selected user goes "Settings" > "Email & Calendar", confirm correct Google/Outlook account, set "Create events on" calendar, toggle "Check for conflicts" calendars.
-- Cause: multiple signed-in accounts; fix by signing out extras/using fresh browser session.
-- Changes apply to new bookings only; existing events not moved automatically.
+Booking order: campaign Assigned Salesperson, then Settings > AI SDR Agent > Call Assignment > Assigned Call Handler, then auto-assignment.
+Fix: check Assigned Salesperson in campaign "Options"; check "Assigned Call Handler" in Settings > AI SDR Agent; user goes to Settings > Email & Calendar, confirms correct Google/Outlook account, sets "Create events on" calendar, toggles "Check for conflicts" calendars.
+Cause: multiple signed-in accounts confuse connection; fix by signing out extras before reconnecting.
+Changes apply to new bookings only; existing events don't move.
 
 ### Sales Call Analyzer {slug: sales-call-analyzer}
-Nav: "Sales Call Analyzer" (left menu) > "New Call" > "Review an existing call recording".
-Form Step 1: Call type ("Discovery Call", "Interview Call", "Sales Call", "Podcast Call"), call date, prospect name/title/email.
-Step 2: company name, "Input Type" ("Upload Recording"/"Paste Transcript"), "Notes, Questions, or Requests".
-Processing: 1-3 min typical.
-Output: transcript, stage breakdown, coaching feedback, marketing insights, downloadable Markdown via "Actions" menu.
-Stages by call type: Discovery (Intro, Frame, Questions, Transition, Close); Sales (Intro, Present the Growth Plan, Partnership Options, Close); Interview/Podcast (Intro, Questions, Transition, Close).
-List page "Sales Calls": columns Type, Meeting/Call, Status, Date, Duration, Insights, Progress; filters and search box.
-"Settings" > "Sales Call Analysis Settings": Owners/Admins edit "Organization Settings" (frameworks per call type + "Real-time Coaching"), edit via "Framework Content" then "Save Framework". Everyone sets "Personal Preferences" (Language), "Save Personal Preferences".
-Problems: stuck processing (wait 10 min, resubmit; files >500MB trim/compress); empty/wrong transcript (audio quality, paste transcript instead, speaker mislabeling is known limitation); missing call (check workspace, filters); upload failure (check connection, format, size, try Chrome, or paste transcript).
+Get here: In the left sidebar, click "Sales Call Analyzer"
+- AI-powered feedback on sales calls: transcribes, scores, breaks into stages, gives coaching and marketing insights, answers your questions.
+- Click "New Call" > "Review an existing call recording".
+- Form Step 1: Call Type (Discovery, Interview, Sales, Podcast), Call Date, prospect name/title/email.
+- Step 2: Company name, Input Type (Upload Recording or Paste Transcript), Notes/Questions/Requests.
+- Processing: 1-3 min typically, up to 5 min for long files.
+- Review: click call to see Transcript, Stage Breakdown, Coaching Feedback, Marketing Insights; download via "Actions" > export as Markdown.
+- Stages differ by call type (see Analysis article).
+- List page "Sales Calls": columns Type, Meeting/Call, Status, Date, Duration, Insights, Progress; filter/search.
+- Settings (Owners/Admins): "Settings" page "Sales Call Analysis Settings" > Organization Settings with per-call-type Frameworks and Real-time Coaching, edit "Framework Content", click "Save Framework". Everyone: "Personal Preferences" sets Language, "Save Personal Preferences".
+- Fixes: stuck processing >10min, resubmit; files over 500MB may fail, compress; bad audio causes transcript errors, use external transcript instead; speaker mislabeling is a known limit; uploads over 500MB may fail, try MP3 or different browser (Chrome best).
 
 ### Recordings {slug: sales-call-analyzer/recordings}
-Two-step form, Step1 Next to Step2.
-Step1: Call Type (required), Call Date (required, defaults today); Prospect: Full Name, Job Title, Email (required), LinkedIn URL (optional).
-Step2: Company Name, Industry (required); Website URL, Headcount, Company LinkedIn URL, HQ Location, Yearly Revenue (optional).
-Input: "Upload Recording" (default) or "Paste Transcript".
-Upload formats: audio MP3,WAV,M4A,AAC,OGG,WMA,FLAC; video MP4,WebM,MOV,AVI,MKV. Max size 2GB.
-Transcript: min 175 words; word counter turns red if under; speaker labels recommended.
-Notes/Questions field optional.
-Submit via "Submit for Analysis".
-Processing times: 15min call 3-5min, 30min 5-8min, 60min 8-12min. Runs in background.
-Sources: Zoom, Google Meet, Teams, Gong/Chorus, phone recording apps.
-Problems: upload failure (size/format/connection, convert, try different browser, or paste transcript); slow upload (check speed, refresh if stuck); transcript under word count (strip timestamps/metadata, use plain text editor).
+Get here: In the left sidebar, click "Sales Call Analyzer", then "New Call", then "Review an existing call recording"
+- Step 1 fields: Call Type (required), Call Date (required, defaults today), Full Name/Job Title/Email (required), LinkedIn URL (optional).
+- Step 2 fields: Company Name (required), Website URL, Industry (required), Headcount, Company LinkedIn URL, HQ Location, Yearly Revenue (optional).
+- Upload Recording: drag/drop or pick file. Supported: audio MP3/WAV/M4A/AAC/OGG/WMA/FLAC; video MP4/WebM/MOV/AVI/MKV. Max size 2GB.
+- Paste Transcript: min 175 words (~70 sec); word counter turns red if under; add speaker labels for best results.
+- Notes/Questions/Requests optional field.
+- Click "Submit for Analysis".
+- Processing times: 15min call = 3-5min, 30min = 5-8min, 60min = 8-12min; runs in background, can leave page.
+- Fixes: failed upload - check size/format/connection, compress or convert, try different browser, paste transcript instead; slow upload - don't close tab, use MP3; short transcript - strip timestamps/metadata, only spoken words count toward 175 min.
 
 ### Analysis {slug: sales-call-analyzer/analysis}
-Open via "Sales Call Analyzer" > click call.
-Status: "Processing", "Completed", "Failed".
-Stage click shows Summary, Quotes, Strengths, Improvements.
-Stage Scores (if frameworks enabled): 80-100% great, 60-79% good, 40-59% needs work, below 40% big opportunity.
-Transcript: search, copy, jump to stage.
-AI Feedback: Key Strengths, Areas for Improvement, Recommended Next Steps, Overall Score (0-100%, if frameworks enabled).
-Marketing Insights tab (only if found): Pain Points, Goals, Previous Solutions, Concerns, Success Metrics, Budget, Decision Process, Competitive Landscape.
-Custom Questions answered separately with quotes.
-Export: "Actions" menu > "Export Analysis" > Markdown file only, no PDF/text export (print-to-PDF workaround via text editor).
-Growth Plan: "Actions" > "Generate Growth Plan" opens Growth Plan Creator pre-filled; review and submit.
-Problems: wrong/missed analysis (check audio, add context, resubmit); can't find transcript text (use search, exact words); feedback mismatch (edit framework in "Settings → Sales Call Analyzer", click Edit, update Framework Content, Save Framework, re-analyze).
+Get here: In the left sidebar, click "Sales Call Analyzer", then click a call in the list
+- Status: Processing, Completed, Failed (check error, resubmit).
+- Stages by call type: Discovery (Intro, Frame, Questions, Transition, Close); Sales (Intro, Present the Growth Plan, Partnership Options, Close); Interview/Podcast (Intro, Questions, Transition, Close).
+- Each stage: Summary, Quotes, Strengths, Improvements; Stage Scores (if frameworks enabled): 80-100% great, 60-79% good, 40-59% needs work, below 40% big opportunity.
+- Transcript: searchable, copyable, click stage blocks to jump.
+- AI Feedback: Key Strengths, Areas for Improvement, Recommended Next Steps, Overall Score (if frameworks enabled).
+- Marketing Insights tab (only if found): Pain Points, Goals, Previous Solutions, Concerns/Objections, Success Metrics, Budget, Decision Process, Competitive Landscape.
+- Custom questions answered with quotes if submitted.
+- Export: "Actions" menu > "Export Analysis" downloads Markdown only; no PDF/plain text; print Markdown to PDF yourself.
+- Growth Plan: "Actions" > "Generate Growth Plan" opens Growth Plan Creator pre-filled; review and submit.
+- Fixes: wrong analysis - check transcript accuracy, add context, resubmit; can't find text - use search, exact words; feedback mismatch - edit Framework under "Settings" > "Sales Call Analyzer", click "Edit", update "Framework Content", "Save Framework", re-analyze.
 
 ### Frequently Asked Questions {slug: sales-call-analyzer/faq}
-Index page only, no standalone facts beyond linked FAQ articles.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+No additional facts beyond listed FAQ articles.
 
 ### Can I create a growth plan from a call? {slug: sales-call-analyzer/faq/can-i-create-a-growth-plan-from-a-call}
-Same as analysis slug Growth Plan section.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Same as sales-call-analyzer/analysis.
 
 ### Can I edit the transcript? {slug: sales-call-analyzer/faq/can-i-edit-the-transcript}
-No. Transcript cannot be edited; use own notes.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+No, transcript cannot be edited; use your own notes for corrections.
 
 ### Can I export the analysis? {slug: sales-call-analyzer/faq/can-i-export-the-analysis}
-Same as analysis slug export section.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Same as sales-call-analyzer/analysis.
 
 ### Can I export to PDF? {slug: sales-call-analyzer/faq/can-i-export-to-pdf}
-Not built in; same workaround as analysis slug.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Same as sales-call-analyzer/analysis.
 
 ### Can I paste a transcript instead of uploading? {slug: sales-call-analyzer/faq/can-i-paste-a-transcript-instead-of-uploading}
-Same as recordings slug transcript section.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Same as sales-call-analyzer/recordings.
 
 ### Can I use Google Meet or Teams? {slug: sales-call-analyzer/faq/can-i-use-google-meet-or-teams}
-Yes, any platform works if you have recording/transcript; submit via New Call.
+Get here: In the left sidebar, click "Sales Call Analyzer", then "New Call", then "Review an existing call recording"
+Works with any platform's recording or transcript, not just Zoom/Meet/Teams.
 
 ### Can I use Sales Call Analyzer to build a podcast script? {slug: sales-call-analyzer/faq/can-i-use-sales-call-analyzer-for-a-podcast-script}
-Works on any recording; use Podcast Call type, 600+ word transcripts recommended. Outputs: transcript, key moments, strengths/weaknesses, stage breakdown. Doesn't write intros/outros/transitions.
+Get here: In the left sidebar, click "Sales Call Analyzer", then "New Call", then "Review an existing call recording"
+- Works on non-sales recordings too; fill prospect/company fields with closest guest/company info.
+- Transcript minimum 175 words; 600+ recommended for more material.
+- Outputs usable for scripting: full transcript, key moments, strengths/weaknesses, stage breakdown; still need manual editing for intros/transitions.
 
 ### Can my team members access Sales Call Analyzer? {slug: sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}
-Owner, Admin, Member: full access (upload/analyze/export/delete). Client: no access, Client Portal only. Uploads workspace-scoped, visible to all with access; no private mode. Invite via "Settings" > "Members" > "Invite Member"; roles not editable after invite, must re-invite.
+Get here: "Settings" > "Members"
+- Owner, Admin, Member: full access (upload, analyze, export, delete). Client: no access, only Client Portal.
+- Uploads/analyses are workspace-scoped; all members with access see all calls; no private per-user mode.
+- Invite via "Settings" > "Members" > "Invite Member", enter email, pick Admin or Member, send invite.
+- Roles aren't editable after invite; must re-invite to change role.
 
 ### Does it analyze voice tone? {slug: sales-call-analyzer/faq/does-it-analyze-voice-tone}
-No; text-only analysis, no tone/emotion/pace.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+No, only text content is analyzed, not tone/emotion/pace.
 
 ### How long does analysis take? {slug: sales-call-analyzer/faq/how-long-does-analysis-take}
-Pasted transcript 1-2min; 15min recording 3-5min; 60min recording 8-12min.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Pasted transcript: 1-2 min; 15min recording: 3-5 min; 60min recording: 8-12 min. Runs in background.
 
 ### What do I do if my call is stuck processing? {slug: sales-call-analyzer/faq/my-call-is-stuck-processing}
-Wait up to 12min, refresh list, resubmit after 15min.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Wait up to 12-15 min, refresh "Sales Calls" list, resubmit if still stuck after 15 min.
 
 ### Should I use Fathom or Fireflies recordings? {slug: sales-call-analyzer/faq/should-i-use-fathom-or-fireflies-recordings}
-Tool choice doesn't matter; pick cleaner input (upload vs paste transcript). Aim 600+ words for pasted transcripts.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+- Tool used doesn't matter; input quality does.
+- Upload file if clean audio/video; paste transcript (600+ words) if recording is messy but transcript is clean; upload if both good; re-record if both bad.
+- Inform prospects they're being recorded.
 
 ### What do I do if submission fails? {slug: sales-call-analyzer/faq/submission-failed}
-File: check format/size(2GB)/corruption/network. Transcript: min 175 words, remove formatting/special characters.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+File issues: wrong format, over 2GB, corrupted, network timeout - fix accordingly. Transcript issues: under 175 words, odd formatting, special characters - clean and retry.
 
 ### What do I do if the analysis seems wrong? {slug: sales-call-analyzer/faq/the-analysis-seems-wrong}
-Same fixes as analysis slug troubleshooting.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Same as sales-call-analyzer/analysis.
 
 ### What do I do if the transcript has mistakes? {slug: sales-call-analyzer/faq/the-transcript-has-mistakes}
-Accuracy depends on audio; cannot edit transcript, use own notes.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Errors come from background noise, multiple speakers, accents, technical terms. No editing possible; use your own notes.
 
 ### What coaching feedback do I get? {slug: sales-call-analyzer/faq/what-coaching-feedback-do-i-get}
-Analysis includes "Key Strengths", "Areas for Improvement", "Recommended Next Steps", and "Overall Score" (0-100%, only if evaluation frameworks are on).
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Analysis includes: "Key Strengths", "Areas for Improvement", "Recommended Next Steps", "Overall Score" (0-100%, if evaluation frameworks are on).
 
 ### What does Sales Call Analyzer do? {slug: sales-call-analyzer/faq/what-does-sales-call-analyzer-do}
-Gives AI coaching: stage breakdown, coaching feedback, marketing insights (pain points, goals, budget, competitors), full searchable transcript with speaker labels, and custom answers to your questions.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Gives AI coaching feedback: stage breakdown, coaching feedback, marketing insights (pain points, goals, budget, competitors), full transcript with speaker labels, custom answers to questions you asked.
 
 ### What file types can I upload? {slug: sales-call-analyzer/faq/what-file-types-can-i-upload}
-Audio: MP3, WAV, M4A, AAC, OGG, WMA, FLAC. Video: MP4, WebM, MOV, AVI, MKV. Video files sent directly for transcription, no conversion needed.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Audio: MP3, WAV, M4A, AAC, OGG, WMA, FLAC. Video: MP4, WebM, MOV, AVI, MKV. Video files don't need converting to audio.
 
 ### What is the file size limit? {slug: sales-call-analyzer/faq/what-is-the-file-size-limit}
-Max file size: 2 GB. If too large: use audio-only (MP3), compress/lower bitrate, trim dead time.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Max 2 GB. If too large: use audio-only (MP3 smaller than MP4), compress audio/lower bitrate, trim dead time.
 
 ### What stages does the AI look for? {slug: sales-call-analyzer/faq/what-stages-does-the-ai-look-for}
-Stages depend on call type: Discovery Call (Intro, Frame, Questions, Transition, Close); Sales Call (Intro, Present the Growth Plan, Partnership Options, Close); Interview Call and Podcast Call (Intro, Questions, Transition, Close). Each stage shows what happened, quotes, strengths, improvements.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Discovery Call: Intro, Frame, Questions, Transition, Close. Sales Call: Intro, Present the Growth Plan, Partnership Options, Close. Interview/Podcast Call: Intro, Questions, Transition, Close. Each stage shows what happened, quotes, strengths, improvements.
 
 ### What ways can I submit a call? {slug: sales-call-analyzer/faq/what-ways-can-i-submit-a-call}
-Upload recording (see file types, 2GB limit) or paste a transcript with speaker labels, minimum 175 words.
+Get here: In the left sidebar, click "Sales Call Analyzer"
+Upload recording (same file types/2GB limit as above) or paste transcript with speaker labels, minimum 175 words.
 
 ### Growth Plan Creator {slug: growth-plan-creator}
-Builds a custom growth plan document for a prospect via AI, from a 6-step form.
-
-Click "Growth Plan Creator" in left menu to open form.
-
-Step 1: "Your Email", "Your Full Name" (auto-filled, required), "Your Company" (optional); "Prospect Company Name"*, "Industry"*, "Contact Name"*, "Contact Title"*. Click "Next".
-
-Step 2: Transcript optional. Choose "Yes, I have a transcript" (upload audio or paste text, min 1,000 characters, use "Rep:"/"Prospect:" labels) or "No transcript" to fill manually. AI pre-fills Steps 3-5 from transcript. Click "Next".
-
-Step 3: Business Context fields - ARR* (required), team size, primary pain point*, prior solutions tried, current monthly spend, duration of challenge, key metrics. Click "Next".
-
-Step 4: Goals/Challenges - desired outcome*, obstacles*, competitive situation*, industry trends, urgency reasons* (checklist: revenue declining, competitors growing, deadline, lost key client, new regulations, other), budget situation*, metrics, success definition*. Click "Next".
-
-Step 5: Services - your expertise*, AI/tech experience level*, approach*, deliverables* (checklist: lead gen, automation, content, paid ads, sales funnels, other), work style, results timeframe*, differentiation, guarantee*, early win, Case Studies (Client Type, Challenge, Solution, Result via "Add Case Study"). Click "Next".
-
-Step 6: Review answers, each section has "Edit"; add "Additional Notes"; check "I confirm that all information provided is accurate and ready for submission."; click "Submit Growth Plan". Must check box or Submit stays disabled. Generation takes 5-10 minutes; email sent when ready.
-
-Output sections: State of Markets, Market Gap, Four Pillars, Projected Outcomes, Advantages, Investment Options (2-3 pricing packages with setup/monthly fees), Next Steps.
-
-Past plans: "Growth Plan Creator" > scroll to "History" table, click row to view; new plan via form above table.
-
-Troubleshooting: transcript rejected if under 1,000 characters/odd formatting/missing speaker labels - clean and retry. Slow generation: wait 10 min, check email/history; retry if over 15 min. Submit button disabled: check confirmation box and required fields, refresh.
+Get here: In the left sidebar, click "Growth Plan Creator"
+- 6-step form: Your Info/Prospect Basics, Discovery Call Transcript (optional, needs 1,000+ chars, speaker labels help), Business Context, Goals and Challenges, Services and Solutions, Review and Submit.
+- Must check confirmation box before "Submit Growth Plan" is enabled.
+- Generation takes 5-10 minutes; email notification when ready; can leave page.
+- Plan sections: State of Markets, Market Gap, Four Pillars, Projected Outcomes, Advantages, Investment Options (2-3 pricing packages), Next Steps.
+- History table below form shows past plans; click a row to open; use form above to start new.
+- Fixes: transcript issues - clean formatting, add speaker labels, ensure 1,000+ chars; if generation stuck over 15 min, resubmit; if Submit stays disabled, fill required (*) fields and check confirmation box.
 
 ### Frequently Asked Questions {slug: growth-plan-creator/faq}
-Index page only, no standalone facts.
+Get here: In the left sidebar, click "Growth Plan Creator", see FAQ section.
 
 ### Can I add my logo to the plan? {slug: growth-plan-creator/faq/can-i-add-my-logo-to-the-plan}
-Not supported. Copy content into your own branded Word/Google Docs template.
+Get here: growth-plan-creator
+No custom branding support; copy content into your own branded Word/Google Docs template.
 
 ### Can I create a plan from a sales call analysis? {slug: growth-plan-creator/faq/can-i-create-a-plan-from-a-sales-call-analysis}
-Yes: open call detail page, click "Generate Growth Plan" in Actions menu; form opens pre-filled from the call; review and submit.
+Get here: In the left sidebar, click "Sales Call Analyzer", open a call detail page, then "Actions" > "Generate Growth Plan"
+Pre-fills Growth Plan Creator form; review and submit.
 
 ### Can I export to Word or PDF? {slug: growth-plan-creator/faq/can-i-export-to-word-or-pdf}
-Export is limited/basic. Copy plan content into Word or Google Docs manually.
+Get here: growth-plan-creator
+Export is limited/basic; copy content manually into Word or Google Docs for editing.
 
 ### Do I need a discovery call transcript? {slug: growth-plan-creator/faq/do-i-need-a-discovery-call-transcript}
-No, optional; see growth-plan-creator Step 2.
+Get here: In the left sidebar, click "Growth Plan Creator", see FAQ section.
+Same as growth-plan-creator.
 
 ### Does my progress get saved if I leave? {slug: growth-plan-creator/faq/does-my-progress-get-saved-if-i-leave}
-Yes, auto-saved; data is saved per workspace.
+Get here: growth-plan-creator
+Auto-saves answers; progress is per workspace.
 
 ### How do I translate the Growth Plan for non-technical clients? {slug: growth-plan-creator/faq/how-do-i-translate-the-growth-plan-for-non-technical-clients}
-Lead with outcomes not tactics, translate jargon to business impact, use Pricing Calculator for dollar figures, frame as a conversation not a final plan.
+Get here: growth-plan-creator
+Lead with outcomes not tactics; translate jargon into plain impact; use Pricing Calculator to show dollar figures; frame as a discussion, not final plan.
 
 ### How long does it take to generate? {slug: growth-plan-creator/faq/how-long-does-it-take-to-generate}
-5-10 minutes; email notification sent; page need not stay open.
+Get here: In the left sidebar, click "Growth Plan Creator", see FAQ section.
+5-10 minutes, same as growth-plan-creator.
 
 ### The Growth Plan Creator could not save progress? {slug: growth-plan-creator/faq/the-growth-plan-creator-could-not-save-progress}
-Progress saves to browser local storage. Fixes: clear cache/cookies, avoid incognito, enable cookies/local storage, disable privacy extensions, try another browser, else contact support via "Feedback" in account menu or chat bubble with error details.
+Get here: growth-plan-creator
+Saves to browser local storage; error if blocked. Fixes: clear cache/cookies, avoid incognito, enable local storage/cookies, disable privacy extensions, try another browser. If still failing, report via "Feedback" (account menu, click name at sidebar bottom) with error and browsers tried.
 
 ### The Growth Plan Creator retains info from a previous client? {slug: growth-plan-creator/faq/the-growth-plan-creator-retains-info-from-a-previous-client}
-Auto-save causes this. Click "Reset Form" (next to Back, Skip, Next), confirm; cannot be undone; generated plans stay in history.
+Get here: growth-plan-creator
+Click "Reset Form" (near Back, Skip, Next), confirm. Cannot be undone; copy data first. Saved/generated plans remain in History.
 
 ### The Growth Plan Creator shows an Application Error? {slug: growth-plan-creator/faq/the-growth-plan-creator-shows-an-application-error}
-Often transient; refresh, check "History" table, resubmit, try incognito; after 2-3 retries contact support via "Feedback"/chat bubble with details.
+Get here: growth-plan-creator
+Usually transient; refresh page, check History table, resubmit, try incognito. After 2-3 retries, use "Feedback" (account menu) with offer/niche, error message, and whether plan appears in history.
 
 ### The Growth Plan doesn't account for my client's budget? {slug: growth-plan-creator/faq/the-growth-plan-doesnt-account-for-my-clients-budget}
-AI optimizes for growth potential, ignores entered budget. Generate full plan, manually adjust/remove items over budget, highlight 2-3 high-ROI fitting items, use Pricing Calculator to justify.
+Get here: growth-plan-creator
+AI optimizes for growth potential, ignores entered budget. Manually trim/downgrade items, highlight 2-3 high-ROI fits plus upsell items, use Pricing Calculator to justify ROI.
 
 ### What are the key deliverable options? {slug: growth-plan-creator/faq/what-are-the-key-deliverable-options}
-Step 5 checklist: lead generation, automation, content strategy, paid advertising, sales funnels, "Other" (custom text).
+Get here: growth-plan-creator
+Step 5 checklist: lead generation, automation, content strategy, paid advertising, sales funnels, "Other" (type own).
 
 ### What are the urgency driver options? {slug: growth-plan-creator/faq/what-are-the-urgency-driver-options}
-Step 4 checklist: revenue declining, competitors growing, deadline approaching, lost key client, new regulations, Other.
+Get here: growth-plan-creator
+Step 4 checklist: revenue declining, competitors growing, deadline approaching, lost key client, new regulations, "Other".
 
 ### What does Growth Plan Creator do? {slug: growth-plan-creator/faq/what-does-growth-plan-creator-do}
-Same as growth-plan-creator overview.
+Get here: In the left sidebar, click "Growth Plan Creator", see FAQ section.
+Same as growth-plan-creator.
 
 ### What if I do not have a recording? {slug: growth-plan-creator/faq/what-if-i-do-not-have-a-recording}
+Get here: growth-plan-creator
 Pick "No" in Step 2, fill Steps 3-5 manually from notes/memory.
 
 ### What sections are in the growth plan? {slug: growth-plan-creator/faq/what-sections-are-in-the-growth-plan}
-Same sections as growth-plan-creator overview; also includes metadata on generation date and transcript use.
+Get here: In the left sidebar, click "Growth Plan Creator", see FAQ section.
+Same sections as growth-plan-creator; plan also shows metadata (generation date, whether transcript used).
 
 ### Manage Your Personal Account {slug: account-settings}
-Personal settings apply across all workspaces. Access: click workspace name (top-left) > "Settings" > "Profile" under "Personal". Six pages: "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing".
-- Profile: change name (3+ letters) via "Update your Name" card; change email via "Update your Email" card (confirm link in current inbox, then verify link in new inbox, each link expires ~10 min, login stays old email until both done); change photo via "Choose File" + crop, square image best.
-- Appearance: "Light"/"Dark"/"System", applies instantly.
-- Security: "Update your Password" card, password 12-72 chars, changing it signs out other devices; "Set Password" card for social-login users; "Active Sessions" card lists devices, click "X" to revoke.
-- Availability: set timezone (affects meeting slots/scheduled emails), "Buffer Times" (No buffer/5/15/30 min before/after), working hours per day (toggle on, default 9-5 if untimed, "+" for extra blocks), copy icon to duplicate hours to other days, click "Save".
-- Email & Calendar: connect Google/Outlook (up to 5 accounts), "Create events on", "Check for conflicts", "Connected Accounts", "Connect another account", "Re-authenticate account", "Disconnect account", "Reveal my external events" toggle (shares external titles; off = only you/superadmins see them; staff events show as "External Event" to normal users). Settings save automatically.
-- Conferencing: "Static meeting link" (one URL for all meetings) or "Dynamic meeting links (Connect Zoom account)" (unique link per meeting, Zoom only).
-- Danger Zone: "Delete your Account" under Profile - permanent, deletes all data, signs out immediately.
-- Troubleshooting: email change issues (check both inboxes/spam, resubmit if expired); calendar missing (connect via Email & Calendar).
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
+- Personal pages: "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing"
+- Profile: change name (3+ letters), change email (confirm via current inbox link, then verify via new inbox link, each link ~10min, re-submit if expired), upload square photo
+- Appearance: Light/Dark/System, applies instantly
+- Security: password 12-72 chars, changing it signs out all other devices; social-login users see "Set Password"; view/revoke Active Sessions via "X"
+- Availability: set timezone (affects meeting slots, scheduled email times), buffers (No buffer/5/15/30 min before/after), working hours per day (blank day=9-5 default), copy hours to other days
+- Email & Calendar: connect Google/Outlook (up to 5 accounts), set "Create events on", "Check for conflicts", "Connected Accounts", "Connect another account", "Re-authenticate account", "Disconnect account", "Reveal my external events" toggle
+- Conferencing: Static link (same for all meetings) or Dynamic (Zoom only, unique link per meeting)
+- Danger Zone: "Delete your Account" - permanent, all data removed, signs you out
+- Troubleshooting: email change needs both links clicked; calendar missing = connect Google/Outlook in Email & Calendar
 
 ### Frequently Asked Questions {slug: account-settings/faq}
-Index page, no additional facts.
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
 
 ### Can I buy a single domain instead of the fixed bundle? {slug: account-settings/faq/can-i-buy-a-single-domain-instead-of-the-fixed-bundle}
-No single-domain purchase; domains/inboxes sold as fixed bundles, each domain = 3 inboxes. Buy via "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes" > choose bundle size > checkout.
+Get here: In the left sidebar, click "Cold Email Agent", then "Email Accounts"
+- Domains/inboxes sold only as fixed bundles, no single-domain purchase
+- Click "Add New Inboxes" (top right) > select "Pre-Warmed Inboxes" > choose domain count (each domain = 3 inboxes) > checkout
 
 ### Can I connect Acquisity to Claude, Zapier, Slack, or GoHighLevel? {slug: account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}
-No native Zapier/Slack/GHL/Salesforce/HubSpot/Pipedrive integrations. Available: Cold Email public API (campaigns, leads, results, webhooks), CRM REST API (people, companies, deals, meetings; needs Public API access; org keys need scopes/access checks; CRM Payments needs separate rollout), MCP for Claude/Codex/Cursor to access Cold Email Agent and CRM data within permissions. CSV export self-serve on CRM People/Companies/Deals/Appointments via "Export"; CSV import in CRM and Cold Email campaigns. Google/Outlook calendar sync via "Settings" > "Email & Calendar". MCP endpoint: https://api.acquisity.ai/mcp, choose one workspace + Read-only or Full access, no API key needed (manual key otherwise). Cannot swap built-in AI models used by AI SDR, AI Consultant, Cold Email Writer.
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
+- No native Zapier, Slack, or CRM (GHL/Salesforce/HubSpot/Pipedrive) integrations
+- Public REST APIs and MCP exist for CRM records and Cold Email Agent; developer builds custom connections
+- Can't swap built-in AI models used by AI SDR, AI Consultant, Cold Email Writer
+- CSV export self-serve from CRM People/Companies/Deals/Appointments via "Export" button
+- CSV import available in CRM (People/Companies/Deals) and Cold Email Agent campaigns
+- Google/Outlook calendar sync live via "Settings" > "Email & Calendar"
+- Claude/Codex/Cursor can connect via MCP; choose one workspace and Read-only or Full access
 
 ### Google is blocking sign-in when connecting my Email & Calendar? {slug: account-settings/faq/google-is-blocking-sign-in-when-connecting-my-email-and-calendar}
-Google-side blocks ("Couldn't sign you in" etc.), not Acquisity's fault. Causes: suspicious activity, new Workspace account, inaccessible verification phone, new device/network. Fixes: sign in at accounts.google.com first, use same device/network, wait 24-48h, use Google account recovery, check recovery email/phone. If unresolved, contact support via "Feedback" in account menu, type "human agent", give Google email, error message, whether account was purchased during onboarding.
+Get here: "Settings" > "Email & Calendar" (click "Connect")
+- Blocking is from Google's security, not Acquisity; triggers include new device/network/account
+- Fixes: sign in directly to Google first, use same device/network, wait 24-48 hrs and retry, use Google account recovery, check recovery email/phone
+- Contact support via "Feedback" in account menu (click name at bottom of sidebar), type "human agent", give email, error message, whether account was from onboarding
 
 ### How do I sign out of Acquisity? {slug: account-settings/faq/how-do-i-sign-out-of-acquisity}
-Click name (bottom of sidebar) > "Log out". Account menu also has "Feedback", "Resources", "Toggle theme", "Edit sidebar" (Clients don't see Feedback/Resources/Edit sidebar). Signing out only ends current browser session; doesn't cancel billing, stop campaigns, or disconnect integrations. No "sign out everywhere" button; to force, sign out each browser, change password (doesn't force others off immediately), or contact support. Workspace deletion not available.
+Get here: click your name at bottom of sidebar
+- Account menu: "Feedback", "Resources", "Toggle theme", "Edit sidebar", "Log out" (Clients lack Feedback/Resources/Edit sidebar)
+- Logging out ends only current browser session; does not affect billing, campaigns, or connected services
+- No "sign out everywhere" button; to force, sign out each browser, change password, or contact support
 
 ### How do I view how many workspaces my Pro subscription covers? {slug: account-settings/faq/how-do-i-view-how-many-workspaces-my-pro-subscription-covers}
-See workspace-settings/faq/workspace-management equivalent article.
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
+Same as Workspace Settings FAQ (slug: workspace-settings/faq/workspace-management/how-do-i-view-how-many-workspaces-my-pro-subscription-covers)
 
 ### How do I log in after buying a course or program? {slug: account-settings/faq/i-bought-a-course-how-do-i-log-in}
-Check inbox for "Set Password" email first; if included, use it then "Log in". If education-only, no account exists yet; use "Sign up" with purchase email, creates workspace with 0 credits/no subscription. First access steps: Sign up > same purchase email > verify email > log in > complete Onboarding (website, workspace details, business type, sales method, bottleneck). If access missing: contact support with purchase emails/receipt/date.
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
+- If platform access included: look for "Set Password" email, use it, then "Log in"; otherwise "Log in" > "Forgot password" with purchase email
+- Education-only purchase: use "Sign up" (creates workspace with 0 credits, no subscription)
+- Complete Onboarding: website, workspace details, business type, sales method, primary bottleneck
+- Wrong email used or missing access: contact support with receipt/purchase date
 
 ### I changed my email and now I can't log in? {slug: account-settings/faq/i-changed-my-email-and-now-i-cant-log-in}
-Login email only changes after confirming both links inside Acquisity (not external email changes/forwarding). Use current email until fully confirmed. Links expire ~10 min; resubmit via "Settings">"Profile" if expired. If new email already used by another account, error shown; use different address or contact support.
+Get here: click workspace name > "Settings" > "Profile" (under "Personal")
+- Login email changes only after confirming both links (current inbox then new inbox)
+- Keep logging in with current email until fully confirmed
+- Forwarding or external email changes (Google) do not change Acquisity login
+- Links expire ~10 min; resubmit from "Settings" > "Profile" if expired
+- If new email already used by another account, must pick different address or contact support
+- Lost access to old email: contact support via "Feedback" with old/new email and proof of ownership
 
 ### I didn't receive the forgot password email? {slug: account-settings/faq/i-didnt-receive-the-forgot-password-email}
-Check spam/Promotions/Updates and filters (email subject "Reset password instructions"). Check for typo in email entered. Most common: no account exists yet if never clicked Sign up, use "Sign up" instead with purchase email. Contact support with email, purchase date, plan if still stuck.
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
+- Check spam/junk and Gmail Promotions/Updates tabs
+- Check for typo in email entered on Forgot password form
+- Most common cause: no account exists yet - use "Sign up" not "Log in" with purchase email
+- Contact support via "Feedback" in account menu with email, purchase date, plan
 
 ### Is the email plan pricing monthly or annual ($1,800)? {slug: account-settings/faq/is-the-email-plan-pricing-monthly-or-annual-1800}
-Check "Settings" > "Billing" > "Current Plan" card for billing frequency; "Next Billing Date" 12 months out = annual. "Manage Billing" opens billing portal with full invoice history.
+Get here: "Settings" (under workspace name) > "Billing" (under "Workspace")
+- Check "Current Plan" card for billing frequency
+- "Next Billing Date" 12 months out = annual billing
+- Click "Manage Billing" to open billing portal for full invoice/payment history
 
 ### Sign up vs Log in, which do I use? {slug: account-settings/faq/sign-up-vs-log-in-which-do-i-use}
+Get here: click workspace name (top-left) > "Settings" > "Profile" (under "Personal")
 - "Sign up" creates new account; "Log in" opens existing one.
-- Paid but never opened platform: check for "Set Password" email first; else "Sign up" with same email as purchase.
-- Used platform before: "Log in"; forgot password: "Log in" > "Forgot password".
-- Mismatched purchase email prevents matching; use exact receipt email.
-- After Sign up: Onboarding (website, workspace details, business type, sales method, bottleneck); then always "Log in" after.
+- Paid but never logged in: check email for "Set Password" link; else use "Sign up" with purchase email.
+- Already used platform: use "Log in" > "Forgot password" if needed.
+- Mismatched signup email can't match purchase; use receipt email.
+- After signup, Onboarding collects website, workspace details, business type, sales method, bottleneck.
 
 ### Where is the Billing cancel option for email subscriptions? {slug: account-settings/faq/where-is-the-billing-cancel-option-for-email-subscriptions}
-- Path: click workspace name > "Settings" > "Billing" (Workspace section) > "Email Accounts & Domains" card.
-- Shows domains, inboxes, costs.
-- Click "Cancel" next to domain > confirm "Cancel domain" in dialog ("Cancel domain and inboxes?").
-- Removes domain/inboxes from list immediately; billing stops at end of current period; cannot be undone.
-- No Cancel button showing: contact support with domain name.
+Get here: click workspace name (top-left) > "Settings" > "Billing"
+- Find "Email Accounts & Domains" card showing domains, inboxes, costs.
+- Click "Cancel" next to domain; confirm "Cancel domain" in dialog.
+- Domain/inboxes removed immediately; billing stops at period end; action cannot be undone.
+- No Cancel button: contact support with domain name.
 - "Manage Billing" button opens billing portal for other subscriptions.
 
 ### White Label & Partners {slug: white-label-partners}
-- Approved partners sell Acquisity as own branded software portal; private beta, invite-only. Missing "Partner Panel" means account not enabled.
-- Partner Panel sections: "Branding", "Domains", "Users", "Workspaces", "Features", "Announcements", "Billing / Payouts", "Settings".
-- Clients see own workspace, partner brand, and only enabled tools; never see "Partner Panel".
-- Enabling white label does not change existing client work, running campaigns, billing setup (unless partner billing enabled), or beta access to unenabled tools.
-- Terms: Partner (your business), Partner portal (branded Acquisity), Partner Panel (control area), Client user, Workspace, Domain (e.g. app.youragency.com), Partner billing.
-- Setup order: Partner Onboarding > Branding & Domains > login link > Features & Settings > Users & Workspaces.
+- Private beta feature; only invited partner accounts see it.
+- Lets approved partners sell Acquisity under their own brand with a client workspace managed from "Partner Panel".
+- Partners control branding, domain/login link, which tools clients see, client users/workspaces, announcements, and (where enabled) billing/payouts.
+- Does not auto-change existing client work, running campaigns, billing setup (unless partner billing enabled), or beta access to unenabled tools.
+- Clients see only their own workspace and brand, never "Partner Panel".
+- Terms: Partner, Partner portal, Partner Panel, Client user, Workspace, Domain, Partner billing.
+- Setup order: Partner Onboarding > Branding & Domains > set login link > Features & Settings > add first client via Users & Workspaces.
 
 ### Partner Onboarding {slug: white-label-partners/partner-onboarding}
-- Invite-only private beta; ask support if option missing.
-- Prep: partner name, domain registrar login, logo file, brand colour, feature access plan.
-- Steps: "Settings" > "Become a Partner" (bottom of sidebar) > open wizard > enter partner name > click "Get Started" > complete white-label partner subscription > choose pre-generated domain or custom domain (recommend subdomain, e.g. app.youragency.com) > enter subdomain > click "Add Custom Domain" > copy DNS values > add record in registrar (GoDaddy, Cloudflare, Porkbun, Namecheap, Squarespace) > use CNAME for subdomain, A record for main domain, disable Cloudflare proxy > click "Verify DNS Configuration" (retry after 1-5 min if fails) > upload logo, pick theme colour, save branding > review feature settings (can skip, adjust later in Partner Panel) > click "Complete Setup" > "Go to Partner Sign-In" > confirm via workspace switcher access to "Partner Panel".
-- Warnings: confirm subscription active before branding/DNS; don't skip DNS verification; DNS propagation can take minutes; turn off Cloudflare proxy.
-- First-day recommended: check branding, test with one client user, confirm clean focused view before inviting real clients.
+Get here: "Settings" > "Become a Partner" (bottom of sidebar)
+- Only available to invited private beta partners.
+- Need before starting: partner name, domain registrar login, logo file, brand colour/theme, feature access plan.
+- Steps: open wizard; enter partner name; click "Get Started"; complete white-label partner subscription; choose pre-generated domain or custom subdomain (recommended, e.g. app.youragency.com); enter subdomain, click "Add Custom Domain"; add DNS record (CNAME for subdomain, A record for main domain, TXT for verification) at registrar (GoDaddy, Cloudflare, Porkbun, Namecheap, Squarespace); disable Cloudflare proxy if used; click "Verify DNS Configuration" (retry after 1-5 min if it fails); apply logo/theme and save; review feature access (can adjust later in Partner Panel); click "Complete Setup", then "Go to Partner Sign-In"; confirm access via workspace switcher to "Partner Panel".
+- Warning: confirm subscription active before branding/DNS work; don't assume domain broken immediately, DNS can take minutes.
 
 ### Partner Panel {slug: white-label-partners/partner-admin}
-- Control centre; open via workspace switcher after sign-in. Visible only to invited beta partners/operators.
-- Sections: "Overview", "Users", "Workspaces", "Branding", "Domains", "Features", "Announcements", "Settings", "Billing", "Affiliates", "Payouts", "AI Modes" (some sections may not appear for all partners).
-- Changing Branding/Domains/Users/Features/Announcements/Billing affects what clients see immediately.
-- Clients never see Partner Panel, other workspaces, partner billing, or other clients' data.
-- Support tip: only access client workspace when helping; avoid changing data unasked; return to Partner Panel after.
+Get here: workspace switcher > "Partner Panel"
+- Visible only to invited private beta partners/approved operators.
+- If missing: check account, confirm partner access enabled, try partner portal link, contact support.
+- Sections: Overview, Users, Workspaces, Branding, Domains, Features, Announcements, Settings, Billing, Affiliates, Payouts, AI Modes (some may not appear in beta).
+- Changing Branding/Domains/Features/Announcements affects client-visible look, login link, sidebar tools, or updates.
+- Clients never see Partner Panel, other workspaces, billing, or other clients' data.
+- Support tip: only access client workspace when helping, avoid changing their data, return to Partner Panel after.
 
 ### Branding & Domains {slug: white-label-partners/branding-domains}
-- Path: "Partner Panel" > "Branding" for logo/favicon/theme; click "Save Changes" (app reloads).
-- Path: "Partner Panel" > "Domains" to manage login address; options "Partner Subdomain" or "Custom Domain".
-- Recommended: use subdomain (app./portal./clients.youragency.com); avoid main domain unless intentionally replacing website.
-- Adding subdomain: enter domain > "Add Domain" > copy CNAME + TXT records > add in registrar > "Verify Domain".
-- Main domain: same but uses A record, Name "@".
-- Do not delete existing MX/SPF/DKIM/DMARC records.
-- After verification, must still separately manage Features, Users, Workspaces (not auto-updated).
-- Troubleshooting: pending domain - wait and re-verify (up to 48hrs); record conflicts - check duplicates; auth error - try subdomain/private browser, else contact support; wrong domain connected - move to subdomain.
+Get here: "Partner Panel" > "Branding" / "Domains"
+- Part of private beta; ask support if missing.
+- Quick path: set logo/theme in Branding > Save Changes (app reloads); test with default subdomain in Domains; add test user in Users; connect custom domain later.
+- Branding settings: Logo & Favicon, Theme.
+- Domain options: Partner Subdomain (quick start) or Custom Domain (e.g. app.youragency.com); subdomain recommended over main domain, which may replace main website.
+- Adding subdomain: enter full subdomain, click "Add Domain", copy CNAME record, add at registrar (Type CNAME, Name=subdomain word, Value=target), save, add TXT verification record, click "Verify Domain".
+- Adding main domain: same but Type A, Name "@", Value = IP address.
+- Don't delete existing MX/SPF/DKIM/DMARC records; don't add https:// to values.
+- After verification: doesn't auto-change feature access (Features), invited users (Users), workspace assignment (Workspaces), main website, or email setup.
+- Troubleshooting: pending domain – wait, re-verify (up to 48h); record won't save – check duplicates; security warning – wait and re-verify; auth error – try subdomain then custom domain in private window, else contact support; wrong domain connected to main site – move to a subdomain; domain already connected elsewhere – contact support.
 - Provider-specific guides exist for GoDaddy, Namecheap, Squarespace, Cloudflare, Network Solutions, Bluehost, Porkbun, Hostinger, Dynadot, IONOS, Wix, Shopify, Hover.
+- Contact support with: domain, provider, Partner Panel records screenshot, provider records screenshot, time changed.
 
 ### Users & Workspaces {slug: white-label-partners/users-workspaces}
-Private beta. Users log in; workspaces are client areas. Each client sees only their own workspace.
-New client+workspace: "Partner Panel" > "Users" > "Provision User" → add name, email, workspace name → create user → send password email from user action menu. Creates user/workspace directly, no invite sent.
-Add client to existing workspace: open workspace > "Settings" > "Members" > "Send Invite" (owner/admin only) → enter email, select "Client" (not "Member", which grants broader access) → send. Client must accept with exact invited email. Resending re-sends with selected access.
-Roles: Client user (own workspace), Workspace owner/admin (manages one workspace), Partner operator (manages portal and all workspaces). Don't give clients partner-level/Member access as workaround; use "Partner Panel" > "Features" for client app visibility once released, else contact support.
-"Partner Panel" > "Workspaces": find workspace, creation date, details, confirm user access, check active workspaces.
+Get here: Partner Panel > Users
+Private beta feature. Users log in; workspaces are client areas.
+To create new workspace+user: Partner Panel > Users > Provision User, enter name/email, add workspace name, create, then send password email from user action menu (no invite sent).
+To add client to existing workspace: open workspace > Settings > Members > Send Invite, enter email, select role Client (not Member, which gives broader access), send; client must sign up/in with exact email. Resending updates access.
+Roles: Client user (own workspace), Workspace owner/admin (manages one workspace), Partner operator (manages portal).
+Control client app visibility via Partner Panel > Features (after update); don't elevate clients to Member as workaround; contact support if controls missing.
+Partner Panel > Workspaces: find/check workspaces, creation date, details, user-workspace matching, activity.
 Support/impersonation access: use only to solve client issues.
-Billing/activation for draft workspaces may vary during beta; check agreed setup before inviting users.
+Billing/activation for draft workspaces varies; check your setup before inviting.
 
 ### Features & Settings {slug: white-label-partners/features-settings}
+Get here: Partner Panel > Features
 Private beta; some options enabled by support.
-"Partner Panel" > "Features": toggle visibility of CRM, Cold Email Agent, AI SDR, Sales Call Analyzer, AI Consultant, Resources. Changes sidebar/tools only, not client data. Workflows/automation coming soon, not reliable yet. Some tools need beta access enabled regardless of toggle.
-"Partner Panel" > "Settings": "Public signup", "Onboarding" (show or skip only, fixed sequence, no reordering), "Legal links".
-"Partner Panel" > "Announcements": publish updates to partner users.
-"Partner Panel" > "AI Modes": customize AI Consultant, if enabled by support.
-Billing/commission views (MRR, payouts) appear in Partner Panel if enabled for account; else not available yet.
-Rollout: keep untested features off, test as client, check sidebar, announce, then invite clients.
+Features control client sidebar/tools, not existing data. Toggle only tools you sell (CRM, Cold Email Agent, AI SDR, Sales Call Analyzer, AI Consultant/strategy tools, Resources). Workflows/automation coming soon, not reliable yet.
+Partner Panel > Settings: Public signup, Onboarding (show/skip only, fixed sequence, no reordering), Legal links.
+Partner Panel > Announcements: publish updates for clients.
+Partner Panel > AI Modes: available if enabled, to match AI Consultant to your offer.
+Partner Panel billing/MRR/payout/commission views appear only if enabled.
+Rollout: keep untested off, test as client, check sidebar, announce, then invite clients.
 
 ### Payouts {slug: white-label-partners/payouts}
-Available to self-serve partners only; processed via Whop.
-Needs: completed partner workspace, government ID, phone camera, business/address details.
-"Partner Panel" > "Payouts": shows Payout Method, Payout Compliance, Upcoming Payout, Payout History.
-Click "Connect Whop Account" > fill details > continue > verify identity (scan QR, upload ID, face scan, possible "Additional information") > return to Payouts (shows "Pending"/"Action needed" until verified).
-Add payout method via "Set up" (click "Add payout method in Whop") - required for "Ready" status. Manage via "Manage in Whop" (wallet, balance, withdrawals).
-Optional Automatic Withdrawals: set minimum reserve, frequency, destination via "Add account"; each withdrawal may carry fee/exchange rate; not required for Ready status.
-Ready when: Payout Method "Ready", account "Verified", Tax status and Identity status both "Verified". Use "Refresh compliance" to resync; set "Billing country" and "Save country".
-Upcoming Payout only shows after commissions mature and setup verified. "Disconnect" to switch Whop accounts.
+Get here: Partner Panel > Payouts
+Self-serve partners only; payouts via Whop. Need completed workspace, government ID, phone camera, business/address details.
+Payouts page shows Payout Method, Payout Compliance, Upcoming Payout, Payout History.
+Click Connect Whop Account, fill details, continue to identity verification (QR scan, ID upload, face scan, possible Additional information step). Pending badge/Action needed until verified.
+After connection, add payout method (Set up/Add payout method in Whop) to reach Ready status. Manage in Whop opens wallet for balance/withdrawals.
+Optional Automatic Withdrawals: set reserve amount, frequency, destination account via Add account; each withdrawal may carry fee/exchange rate; not required for Ready status.
+Setup complete when Payout Method=Ready, Whop account Verified, Tax status and Identity status both Verified; use Refresh compliance to resync; set Billing country and Save country.
+Upcoming Payout estimates next payout (recent commissions may lag); Payout History lists past batches; Disconnect to switch Whop accounts.
 
 ### FAQ {slug: white-label-partners/faq}
-No new facts; points to partner onboarding and branding-domains articles.
+Points to Partner onboarding then Branding & domains articles for full setup flow.
 
 ### Domain Provider Setup {slug: white-label-partners/faq/domain-providers}
-Add custom domain first in "Partner Panel" > "Domains" to generate exact Type/Name/Value DNS records.
-Example records: CNAME app/portal/clients → cname.vercel-dns.com; A @ → 76.76.21.21; TXT _vercel for verification.
-Recommend using a subdomain (app/portal/clients.youragency.com) over root domain to keep existing site live.
+Get here: Partner Panel > Domains
+Add custom domain first; DNS records (Type, Name, Value) are generated in Partner Panel; guides show where to paste them.
+Example records: CNAME app/portal/clients → cname.vercel-dns.com; A @ → 76.76.21.21; TXT _vercel verification.
+Subdomains (app./portal./clients.) recommended over main domain to keep existing site live.
 
-### GoDaddy/Namecheap/Squarespace/Cloudflare/Network Solutions/Bluehost/Porkbun/Hostinger/Dynadot domain guides {slug: various under faq/domain-providers}
-Same process: open provider's DNS management page, add each Partner Panel record (Type, Name/Host, Value/Target) exactly, save, repeat for all records, return to "Partner Panel" > "Domains" and click "Verify Domain".
-Provider-specific notes: Cloudflare - disable proxy ("DNS only") while verifying. Squarespace - also hosts migrated Google Domains. Don't delete existing MX/SPF/DKIM/DMARC email records. If pending, wait and re-verify. Check nameservers if DNS section unavailable.
+### How do I connect a GoDaddy domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-godaddy-domain}
+Get here: Partner Panel > Domains
+Steps: GoDaddy Domain Portfolio > select domain > DNS Records > Add New Record, map Type/Name/Value, save, repeat, return to Partner Panel > Domains > Verify Domain.
+Use short host (e.g. "app") not full domain. Issues: don't delete unknown records; pending status may need wait + re-verify; editing root domain can break live site.
+
+### How do I connect a Namecheap domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-namecheap-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Namecheap Domain List > Manage > Advanced DNS > Host Records > Add New Record; Name field maps to Host; use short host.
+
+### How do I connect a Squarespace domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-squarespace-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Squarespace Domains > DNS settings; Google Domains migrated here. Restore MX/SPF/DKIM/DMARC if email breaks.
+
+### How do I connect a Cloudflare domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-cloudflare-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Cloudflare DNS > Records > Add record; use DNS only (grey cloud) while verifying, not proxied.
+
+### How do I connect a Network Solutions domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-network-solutions-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Account Manager > Advanced DNS Records.
+
+### How do I connect a Bluehost domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-bluehost-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Bluehost Domains/DNS or cPanel Zone Editor > Add record. Don't remove MX/SPF/DKIM/DMARC.
+
+### How do I connect a Porkbun domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-porkbun-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via Porkbun Domain Management > DNS Records > Add Record; Value maps to Answer.
+
+### How do I connect a Hostinger domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-hostinger-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via hPanel > Domains > DNS Zone > Add record; use default TTL.
+
+### How do I connect a Dynadot domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-dynadot-domain}
+Get here: Partner Panel > Domains
+Same as GoDaddy slug, via My Domains > Manage Domains > DNS > Add record; edit DNS records not just nameservers.
 
 ### How do I connect an IONOS domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-an-ionos-domain}
-Log into IONOS > "Domains & SSL" > select domain > "DNS" > "Add record". Copy records from "Partner Panel" > "Domains", map Type→Type, Name→Host name, Value→Value/Points to/Destination. Save each record, repeat for all, then "Partner Panel" > "Domains" > "Verify Domain". Keep existing MX, SPF, DKIM, DMARC records. For subdomains enter only the subdomain part.
+Get here: Partner Panel > Domains
+Log in IONOS, "Domains & SSL" > select domain > "DNS" > "Add record". Copy records from "Partner Panel" > "Domains", map Type/Name/Value to Type/Host name/Value, save, repeat, then "Verify Domain". Keep MX, SPF, DKIM, DMARC intact.
 
 ### How do I connect a Wix domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-wix-domain}
-Same process in Wix: "Domains" > "DNS Records". If DNS not editable, nameservers point elsewhere. If Wix site uses root domain, use subdomain like app.youragency.com.
+Get here: Partner Panel > Domains
+Wix "Domains" > select domain > "DNS Records", add record matching Partner Panel type, map Name/Value, save, repeat, then "Verify Domain". If Wix hosts your root site, use a subdomain instead.
 
 ### How do I connect a Shopify domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-shopify-domain}
-Same process: "Settings" > "Domains" > "DNS settings" > "Add custom record". Use a separate subdomain if store uses root/www; don't replace existing website records.
+Get here: Partner Panel > Domains
+Shopify "Settings" > "Domains" > select domain > "DNS settings" > "Add custom record". Map Name/Value, save, repeat, "Verify Domain". Use a separate subdomain; don't replace existing store records.
 
 ### How do I connect a Hover domain? {slug: white-label-partners/faq/domain-providers/how-do-i-connect-a-hover-domain}
-Same process: domain overview > "DNS" > "Add a record". Check nameservers if DNS managed elsewhere; leave website/email records alone unless certain.
+Get here: Partner Panel > Domains
+Hover domain overview > "DNS" > "Add a record". Map Type/Hostname/Value, save, repeat, "Verify Domain". Leave website/email records alone unless safe.
 
 ### Why is my white-label domain not verifying? {slug: white-label-partners/faq/domain-providers/domain-troubleshooting}
-Check "Partner Panel" > "Domains": spelling, Routing Records, Verification Records match exactly, then "Verify Domain". DNS propagation can take up to 48 hours. SSL status shows "Provisioning" then "Active". Fixes: use subdomain not root domain; restore MX/SPF/DKIM/DMARC if email breaks; set Cloudflare records to "DNS only" while verifying. Send support: domain, provider, screenshots of Routing/Verification Records, error, time changed.
+Get here: "Partner Panel" > "Domains"
+Check spelling, Routing/Verification Records match exactly, click "Verify Domain" again. Fixes: wait up to 48h for DNS; try default subdomain/private window for auth errors; SSL shows "Provisioning" before "Active"; don't delete existing records blindly; use subdomain not root; restore MX/SPF/DKIM/DMARC; set Cloudflare records "DNS only". Send support domain, provider, screenshots, error, time changed.
 
 ### Workspace Settings Overview {slug: workspace-settings}
-Path: click workspace name (top-left) > "Settings". Left menu "Workspace" pages: "General", "Members", "Billing" (Owners only), "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "CRM Custom Fields". Some items show only if feature enabled.
-Roles: Owner/Admin edit most settings; Member views only, no edit; Client sees none of workspace settings.
-Permissions table: Owner/Admin/Member can use AI tools & manage CRM; only Owner/Admin edit settings & manage members; only Owner views billing.
-"Your Niche & Offer": tabs "Niche" and "Offer"; affects AI content across all tools.
+Get here: click workspace name (top-left) > "Settings" > "General"
+- Pages under "Workspace": "General", "Members", "Billing" (Owners only), "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "CRM Custom Fields". Shown only if feature enabled.
+- Owners/Admins edit settings; Members view only; Clients don't see workspace settings.
+- "Your Niche & Offer" has "Niche" and "Offer" tabs; affects AI content across all tools.
+- Only Owners see/manage Billing.
 
 ### General Settings {slug: workspace-settings/general}
-Path: "Settings" > "General".
-Logo: "Workspace Logo" card > "Choose File"; square image, min 256x256px; shows in workspace switcher/dashboard.
-Name: "Workspace Name" card, edit field, click "Update Name".
-Color: "Workspace Color" card, pick accent color (if available).
-Workspace deletion not available.
-Logo upload fails if file >5MB or unsupported type; use .png/.jpg/.jpeg, under 5MB, try different browser, resize to 512x512.
+Get here: click workspace name (top-left) > "Settings" > "General"
+- "Workspace Logo" card: "Choose File" to upload; square image, min 256x256px.
+- "Workspace Name" card: edit field, click "Update Name".
+- "Workspace Color" card: pick accent color if available.
+- Workspace deletion not available.
+- Logo upload fails if file >5MB or wrong type; use .png/.jpg/.jpeg, under 5MB, try another browser, or resize to 512x512.
 
 ### Team Members & Roles {slug: workspace-settings/members}
-Path: "Settings" > "Members".
-Roles: Owner (everything incl. billing), Admin (manage members/settings except billing), Member (use tools, view-only settings), Client (Client Portal/Dashboard, CRM if enabled; white-label partners may enable Cold Email Agent/AI SDR for clients).
-Only Owner/Admin see invite form.
-Invite: "Invite Member" card > enter emails (comma-separated) in "Email addresses" > choose role in "Access" dropdown > click "Send Invite"/"Send invites". Confirmation: "Invitation sent successfully."
-Invite link is email-specific, non-transferable.
-Invitations tab shows pending; accepted invitees move to "Active members" tab.
-Revoke: three-dot menu > "Revoke invitation"; resend by re-inviting same email, message "Invitation resent successfully."
-Change role: dropdown next to name; Admins can't change/create Owners; workspace needs ≥1 Owner, so sole Owner can't demote self.
-Remove: three-dot menu > "Remove member" (trash icon); confirmation "Member removed successfully"; access revoked instantly, past data retained, can re-invite later.
-Troubleshooting: check spam, re-invite, try personal email if company blocks; refresh page if removed user still seems active.
+Get here: click workspace name (top-left) > "Settings" > "Members"
+- Roles: Owner (all incl. billing), Admin (all but billing), Member (use tools, view settings only), Client (Client Portal/Dashboard, CRM if enabled).
+- Only Owners/Admins see "Invite Member" card: enter emails (comma-separated), pick role in "Access" dropdown, click "Send Invite(s)".
+- Invitees appear in "Invitations" tab, move to "Active members" tab once accepted; invite link works only for that email.
+- Revoke invite: three-dot menu > "Revoke invitation". Resend by re-inviting same email.
+- Change role: role dropdown next to name; Admins can't change/create Owners; workspace needs ≥1 Owner.
+- Remove member: three-dot menu > "Remove member"; access lost instantly, past work (notes/tasks) stays, can re-invite later.
+- Troubleshooting: check spam folder, verify email, try personal email if company blocks; refresh page if removed user still has access.
 
 ### Billing & Credits {slug: workspace-settings/billing}
-Path: "Settings" > "Billing" (Owners only).
-Shows Plan Name, Next Billing Date; "Manage Billing" for price/invoices.
-No free tier; lead credits spent only when AI Lead Search delivers verified leads (1 credit/lead); uploads/sending emails don't use credits.
-Course/program purchases are separate from subscription/credits; new workspaces start with 0 credits, no subscription.
-Credit Balances: plan-included & one-time topups never expire; recurring packs refill monthly up to cap, don't stack.
-"Buy More" buys credit packs (one-time or recurring).
-Invoice statuses: Paid, Open (unpaid), Void (canceled), Uncollectible (written off).
-Cancel Subscription: "Billing" > "Cancel Subscription" > confirm; access continues till period end.
-Pre-warmed domains: each domain = 3 inboxes (fixed), billed yearly (domain)/monthly (inbox); ready in 30-60 min. Buy via "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes" > "Continue".
-"Email Accounts & Domains" card shows totals/charges; "Cancel"/"Cancel all" stops billing at period end.
-Failed payment: retries automatically; if all fail, subscription canceled, access lost; resubscribe via "Enable Acquisity".
-Troubleshooting: check card/funds/expiry; duplicate charges often one Open+one Paid invoice; credits don't reset, use "Buy More"; Billing page visible to Owners only.
+Get here: click workspace name (top-left) > "Settings" > "Billing"
+- Owners only. No free tier; new workspaces start with 0 credits.
+- Shows Plan Name, Next Billing Date; "Manage Billing" for price/history.
+- Lead credits: 1 per verified lead delivered by AI Lead Search; CSV uploads/sending emails don't use credits.
+- Plan/topup credits never expire; recurring packs refill monthly up to pack cap, don't stack.
+- "Buy More" for credit packs: One-Time Topups or Recurring Credits.
+- "Cancel Subscription" keeps access till period end.
+- Invoice statuses: Paid, Open (unpaid), Void, Uncollectible.
+- Pre-warmed domains: each comes with 3 inboxes, billed monthly, ready in 30-60 min. Buy via "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" > "Pre-Warmed Inboxes", not via Billing page.
+- "Email Accounts & Domains" card: shows totals/charges, "Buy More", "Cancel"/"Cancel all".
+- Troubleshooting: failed payment retries automatically; if all fail, subscription cancels, use "Enable Acquisity" to resubscribe; double charges often one Open invoice; credits don't reset, use Buy More; only Owners see Billing page.
 
 ### Email Templates {slug: workspace-settings/email-templates}
-Path: "Settings" > "Email Templates".
-Controls: "Search templates...", "New Template".
-Create: "New Template" > fill "Name", "Subject", "Body" > "Create". Rich-text formatting available.
-Tokens like {{...}} send as plain text unless replaced.
-Row actions allow edit/delete; delete removes template permanently.
+Get here: click workspace name (top-left) > "Settings" > "Email Templates"
+- "Search templates..." field; "New Template" button opens creation dialog.
+- Create: fill Name, Subject, Body, click "Create". Rich-text formatting available.
+- Tokens like {{...}} send as plain text unless replaced.
+- Row actions let you edit or delete templates; deleting removes it permanently.
 
 ### CRM Custom Fields {slug: workspace-settings/crm-custom-fields}
-- Path: workspace name > "Settings" > "CRM Custom Fields" (under "Workspace").
-- Entity types: People, Companies, Deals, Appointments. Click one, then "Add Field": set Icon, "Label", "Description (optional)", "Field Type", then "Create Field".
-- Field types: Text, Number, Date, Date & time, Select, Multi-select, Boolean, Member, URL, Status (built-in, People/Companies only, cannot add/delete).
-- Member field: assign one active teammate; no default/sort; filters is/is not/is empty/is any of; removed members keep values labeled "former member"; CSV matches by email.
-- URL field: only http(s) accepted; shows as clickable link by domain; behaves like Text for filters/sort/import/export/API/widgets.
-- Currency field: USD/EUR/GBP/CAD/AUD, 2 decimals, supports 0/negative, max 9,999,999,999,999.99; changing currency only relabels, no conversion; CSV plain decimals; API numeric, currency in config.currency.
-- Date & time field: stores exact instant, displayed in browser timezone; CSV/API must include timezone offset or "Z"; exports as ISO 8601 UTC. Regular Date fields use profile timezone.
-- Status field (system, lock icon): relabel/recolor/reposition allowed; cannot delete or duplicate. Meanings: Do not contact (blocks Acquisity emails/texts/calls), Customer, Disqualified, Won/Lost (mutually exclusive), Churned. Clearing status only removes status-added blocks; manual/STOP blocks persist. Blocks don't cover calls outside Acquisity or workflow Resend step. Bulk meaning changes >200 people: email blocks apply shortly after, text/call instantly. Company status meanings are informational only. Status changes logged on timeline; filterable by Status and changed-within. Managed on "Statuses" tab; CSV uses name or ID; API uses option ID.
+Get here: Click workspace name (top-left) > "Settings" > "CRM Custom Fields" (under "Workspace")
+- Entity types: People, Companies, Deals, Appointments. Click one, then "Add Field".
+- Add field: choose Icon, fill "Label", optional Description, choose Field Type, click "Create Field".
+- Field types: Text, Number, Date, Date & time, Select, Multi-select, Boolean, Member, URL, Status (built-in, People/Companies only, not addable), Currency.
+- Member: search teammate or "Unassigned"; no default/sort; filters is/is not/is empty/is any of; former members keep values labeled "former member"; CSV matches by email, blank leaves unchanged.
+- URL: only http/https accepted; shown as link by domain.
+- Currency: USD/EUR/GBP/CAD/AUD, 2 decimals, max 9,999,999,999,999.99, no rounding of extra decimals; changing currency only relabels, doesn't convert.
+- Date & time: stored as instant, shown in browser timezone; CSV/API writes need timezone offset or "Z"; exports as ISO 8601 UTC.
+- Status: system field, lock icon; relabel/recolor/reorder only, can't delete/duplicate. Meanings: Do not contact (blocks Acquisity sending), Customer, Disqualified, Won, Lost (can't combine Won+Lost), Churned. Blocks don't cover outside calls or workflow email step. Bulk changes >200 people: email blocks apply shortly after, text/call instantly. Company status meanings are informational only. Filter by Status and "changed within". Managed on "Statuses" tab; CSV uses option name/ID; API uses option ID.
 
 ### Frequently Asked Questions {slug: workspace-settings/faq}
-No additional facts; see individual articles below.
+Get here: click workspace name (top-left) > "Settings" > "General"
+No content beyond listed FAQ sub-articles.
 
 ### Billing & Subscriptions {slug: workspace-settings/faq/billing-subscriptions}
-No additional facts; see individual articles below.
+Get here: click workspace name (top-left) > "Settings" > "General"
+No content beyond listed FAQ sub-articles.
 
 ### Can I pause billing without deleting my workspace? {slug: workspace-settings/faq/billing-subscriptions/can-i-pause-billing-without-deleting-my-workspace}
-- No pause option; cancel subscription instead (stops at period end; workspace becomes read-only after).
-- To stop sends only, pause campaigns: campaign > "Options" > "Pause" (does not affect billing).
-- Cancel: "Settings" > "Billing" > "Cancel Subscription". Only Owners can cancel. Workspace deletion unavailable.
+Get here: "Settings" > "Billing"
+- No pause option; deleting workspace unavailable.
+- Cancel subscription: stops at period end, workspace becomes read-only after.
+- To just stop sending, pause campaign: open campaign > "Options" > "Pause" (billing continues).
+- Click "Cancel Subscription". Only Owners can cancel.
 
 ### Can I pay monthly for just a short project? {slug: workspace-settings/faq/billing-subscriptions/can-i-pay-monthly-for-a-short-project}
-- No prorated short-term plans; cancelling doesn't refund current period.
-- Domains billed annually, inboxes billed monthly; check "Settings → Billing → Email Accounts & Domains".
-- Pre-warmed domains/inboxes non-refundable once purchased.
+Get here: "Settings" > "Billing" > "Email Accounts & Domains"
+- No single-month plan; cancelling stops future charges, no refund for current period.
+- Domains billed annually, inboxes billed monthly.
+- Purchased domains/inboxes don't refund on cancellation.
 
 ### Can I transfer domains/inboxes between workspaces? {slug: workspace-settings/faq/billing-subscriptions/can-i-transfer-domainsinboxes-between-workspaces}
-- Move inboxes: "Cold Email Agent → Email Accounts" > select rows > "Move Accounts" > choose destination > "Move accounts".
-- Conversation threads/messages stay in original workspace.
-- Domain-level billing transfer needs support.
-- New inboxes: "Cold Email Agent → Email Accounts → Add New Inboxes".
+Get here: "Cold Email Agent" > "Email Accounts"
+- Select inboxes via checkboxes, click "Move Accounts", choose destination workspace, confirm "Move accounts".
+- Conversation threads stay in original workspace; move inbox back to reply from there.
+- Domain-level transfers need support.
+- New inboxes: "Cold Email Agent" > "Email Accounts" > "Add New Inboxes".
 
 ### Can I use different payment cards per workspace? {slug: workspace-settings/faq/billing-subscriptions/can-i-use-different-payment-cards-per-workspace}
-- Only one payment method per account, shared across workspaces, not per-workspace.
-- Workaround: clients use own accounts, invite you as Admin/Member.
-- Check card: "Settings" > "Billing" > "Manage Billing".
+Get here: "Settings" > "Billing"
+- Only one payment method per account, shared across all workspaces.
+- Workaround: clients create own account, invite you as Admin/Member.
+- Click "Manage Billing" to view payment details.
 
 ### Does pausing a campaign stop billing? {slug: workspace-settings/faq/billing-subscriptions/does-pausing-a-campaign-stop-billing}
-- Pausing only stops sends; subscription/inbox charges continue.
-- To stop billing: "Settings" > "Billing" > "Cancel Subscription"; access continues till period end. Only Owners see Billing page.
-- Subscription and inbox charges are separate; cancel both via "Manage Billing".
+Get here: "Settings" > "Billing"
+- Pausing campaign stops sending only; subscription/domain/inbox charges continue.
+- Cancel subscription to stop billing: click "Cancel Subscription"; access continues to period end.
+- Only Owners see Billing page.
+- Subscription and inbox charges are separate; cancel inboxes via "Manage Billing" too.
 
 ### How do I cancel every Acquisity subscription and third-party service? {slug: workspace-settings/faq/billing-subscriptions/how-do-i-cancel-every-acquisity-subscription-and-third-party-service}
-- Per workspace: "Settings" > "Billing" > "Cancel Subscription", then "Manage Billing" for domains/inboxes. Repeat per workspace. No workspace deletion.
-- Cancel third-party tools separately (Instantly, n8n, others) on their own sites.
-- Check statement after 24 hours; report unknown charges via "Feedback" in account menu.
+Get here: "Settings" > "Billing"
+- Per workspace: "Billing" > "Cancel Subscription", then "Manage Billing" for domains/inboxes.
+- Third-party tools (sending platform, n8n, others) must be cancelled separately on their own sites.
+- Deleting workspace unavailable.
+- Check statements after 24 hours; report unknown charges via "Feedback" in account menu.
 
 ### How do I cancel my Acquisity workspace and stop all billing? {slug: workspace-settings/faq/billing-subscriptions/how-do-i-cancel-my-acquisity-workspace-and-stop-all-billing}
-- "Settings" > "Billing": "Cancel Subscription" for plan; "Manage Billing" for domains/inboxes (billed separately).
-- Only Owners can cancel; workspace deletion not available; third-party services (e.g. n8n) cancelled separately.
+Get here: click workspace name (top-left) > "Settings" > "General"
+Same as how-do-i-cancel-every-acquisity-subscription-and-third-party-service plus: only Owners can cancel; deleting workspace unavailable.
 
-### How do I disconnect Instantly from Acquisity? {slug: workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity}
-- "Settings → Cold Email Agent" controls schedule/credits/capacity; no Instantly connection for most workspaces.
-- Legacy direct Instantly connection shows "Outreach Providers" card (Owners/Admins only): "Edit" API key, test connection, sync campaigns. Don't disconnect without contacting support (can stop active campaigns).
-- To disconnect: open "Feedback" in account menu, type "human agent", give workspace name/request.
-- Self-manage: inboxes via "Cold Email Agent → Email Accounts"; domain forwarding via "...→ Domain Forwarding"; billing via "...→ Manage Billing"; schedule via "Settings → Cold Email Agent".
+### How do I disconnect the sending platform from Acquisity? {slug: workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity}
+Get here: "Settings" > "Cold Email Agent"
+- Controls sending schedule, AI campaign defaults, credits, contact capacity.
+- Legacy connections show "Outreach Providers" card (Owners/Admins only): Edit API key, test connection, sync campaigns.
+- Don't disconnect/replace without contacting support first; can stop active campaigns.
+- Contact via "Feedback" in account menu, type "human agent".
+- Self-manage: "Cold Email Agent" > "Email Accounts" (inboxes, Domain Forwarding, Manage Billing).
 
 ### Is there a limit on how many leads I can upload or store? {slug: workspace-settings/faq/billing-subscriptions/is-there-a-limit-on-how-many-leads-i-can-upload-or-store}
-- No monthly upload limit. Capacity = concurrent stored campaign leads; credits = separate, pay for actions.
-- Growth plan: 5,000 concurrent campaign leads per organization across provider workspaces.
-- Other plans: often 25,000 leads per provider workspace (varies).
-- Counts against cap: active/finished campaign leads, in-progress uploads, bounced/unsubscribed leads still attached. CRM contacts and deleted leads (reconciled) don't count.
-- Fix: open campaign > "Leads" tab > select > "Delete" (permanent; export CSV first).
-- Errors: "Growth plan limit of 5,000..." (no credit charge), "Workspace is at capacity", "Duplicate leads skipped", "File too large" (CSV cap 100MB/20,000 rows).
-- Support cannot raise Growth's 5,000 cap case-by-case.
+Get here: "Cold Email Agent" (campaign) > "Leads" tab
+- No monthly upload limit; capacity = concurrent stored leads, separate from credits.
+- Growth plan: 5,000 concurrent leads per organization across campaign workspaces.
+- Other plans: often 25,000 leads per provider workspace, varies.
+- Counts against cap: active/finished campaign leads, in-progress uploads, bounced/unsubscribed still attached. CRM contacts don't count.
+- To free capacity: select leads in finished campaign > "Delete" (permanent, export CSV first).
+- Upload errors: "Growth plan limit of 5,000..." (no credit charge), "Workspace is at capacity", "Duplicate leads skipped", "File too large" (cap 100MB/20,000 rows).
+- Support can't raise Growth's 5,000 cap; contact via "Feedback".
 
 ### What does my course or program purchase include, and why do I see 0 credits? {slug: workspace-settings/faq/billing-subscriptions/what-does-my-course-or-program-purchase-include-and-why-do-i-see-0-credits}
-- Course/program purchases don't include platform subscription or credits. New workspace: no subscription, 0 credits.
-- Only Owners see Billing page.
-- Activate: workspace name > "Settings" > "Billing" > "Enable Acquisity" > confirm checkout. White-label partners checkout elsewhere.
-- Top up: Billing page > "Credit Balances" > "Buy More" > pick package; credits added immediately.
-- If program should include platform access, contact support with email, purchase date/amount, program name.
+Get here: "Settings" > "Billing"
+- Course/program purchase separate from platform subscription/credits.
+- New workspace starts with no subscription and 0 credits.
+- Activate: "Billing" > "Current Plan" > "Enable Acquisity", confirm checkout. Only Owners see this.
+- White-label partners buy via program checkout instead.
+- Top up credits: "Billing" > "Credit Balances" > "Buy More", pick package, credits added immediately.
+- If program should include access, contact support with purchase email/date/amount/program name.
 
 ### What does the Legacy Pro upgrade fee mean during workspace setup? {slug: workspace-settings/faq/billing-subscriptions/what-does-the-legacy-pro-upgrade-fee-mean-during-workspace-setup}
-- Means older plan tier needs migration to current pricing, not an extra charge.
-- Fix: "Billing" (Owners only) > "Manage Billing" > find upgrade/migration option.
-- Contact support with purchase details if Pro access should already apply.
+Get here: "Settings" > "Billing" (Owners only)
+- Not an extra charge; means migrating from old plan tier to current Pro format.
+- Click "Manage Billing" to view plan and find upgrade/migration option.
+- Contact support with purchase details if already entitled to Pro.
 
 ### What happens to my domains if I cancel? {slug: workspace-settings/faq/billing-subscriptions/what-happens-to-my-domains-if-i-cancel}
-- Cancel subscription: domains/inboxes remain until period ends, then read-only; campaign data preserved till then.
-- Cancel a specific managed domain (Settings → Billing → Email Accounts & Domains): removes domain from billing, its inboxes cancelled, campaigns using them stop sending.
-- Pre-warmed domains/inboxes paid in advance, non-refundable.
-- Export before cancelling: leads (CSV per campaign), CRM contacts/deals, analytics, reply threads/bookings.
-- Move inboxes via "Cold Email Agent → Email Accounts → Move Accounts"; domain-level billing moves need support.
+Get here: "Settings" > "Billing" > "Email Accounts & Domains"
+- Cancel subscription: domains/inboxes stay until period end, then read-only; campaign data preserved until then.
+- Cancel single managed domain: removed from billing list, its inboxes cancelled, campaigns using them stop sending.
+- Pre-warmed domains/inboxes paid in advance, no refunds.
+- Export before cancelling: Leads (campaign > Leads > CSV), CRM contacts/deals (export per tab), campaign performance (Analytics), reply threads/bookings (AI SDR inbox).
+- Move inboxes: "Cold Email Agent" > "Email Accounts" > "Move Accounts"; domain-level billing moves need support.
+- Deleting workspace unavailable.
 
 ### When do my credits reset? {slug: workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset}
-- Plan-included credits and one-time topups never expire/reset; carry forward.
-- Recurring credit packs refill monthly to full amount; unused doesn't stack.
-- Buy more: "Buy More" in "Settings" > "Billing" > "Credit Balances".
-- Check balance: workspace name (top-left) > "Settings" > "Billing" (under Workspace) > "Credit Balances" card, "Credits" row. Combined total, no breakdown.
-- "Next Billing Date" = renewal date, doesn't affect credits.
-- Only Owners see Billing page/balances.
+Get here: click workspace name (top-left) > "Settings" > "Billing" (under Workspace)
+- Plan-included credits and one-time topups never reset or expire; carry forward unused.
+- Recurring credit packs refill to full amount each billing cycle; unused amounts don't stack above pack size.
+- "Buy More" under Billing shows "One-Time Topups" and "Recurring Credits" (recurring shows monthly price).
+- Partner-billed workspaces: pack options depend on partner setup.
+- "Credit Balances" card, "Credits" row shows combined total balance (not split by source).
+- "Next Billing Date" shows renewal, doesn't affect credits.
+- Only Owners can see Billing page.
 
 ### Where can I see my subscription end date on the dashboard? {slug: workspace-settings/faq/billing-subscriptions/where-can-i-see-my-subscription-end-date-on-the-dashboard}
-Same path: workspace name > "Settings" > "Billing". "Next Billing Date" = end date of current period. "Manage Billing" shows price, charges, payment history. Only Owners see Billing page.
+Get here: click workspace name (top-left) > "Settings" > "Billing" (under Workspace)
+- "Next Billing Date" at top = effective subscription end date for current period.
+- "Manage Billing" shows monthly price, charges, payment history, domain/inbox charges.
+- Only Owners see Billing page.
 
 ### Members & Roles {slug: workspace-settings/faq/members-roles}
-No additional facts.
+Get here: click workspace name (top-left) > "Settings" > "General"
+Overview only; see other articles in this batch.
 
 ### How do I activate my main business email for login? {slug: workspace-settings/faq/members-roles/how-do-i-activate-my-main-business-email-for-login-allowed-emails}
-Allowed Emails approval no longer required. Sign up with desired business email, or use exact invited email. If stuck: verify email matches invite/purchase; use "Log in" not "Sign up" if account exists; contact support with old/new email if changed.
+Get here: click workspace name (top-left) > "Settings" > "General"
+- Allowed Emails approval no longer required for signup.
+- Use the email that received your invitation; use "Log in" not "Sign up" if account exists.
+- Contact support with old/new email if you changed email.
 
 ### How do I change my workspace role from Member to Owner? {slug: workspace-settings/faq/members-roles/how-do-i-change-my-workspace-role-from-membereditor-to-owner}
-Can't self-change role; Owner/Admin does it via "Settings" > "Members", role dropdown next to name. Only Owner can grant Owner. Admin can't change/grant Owner role. Workspace needs ≥1 Owner (last Owner can't be demoted). Change effective next page load; refresh if needed. Success shows "Member role updated." If stuck, contact support with workspace name and member email.
+Get here: "Settings" > "Members"
+- Only Owner/Admin can change roles; users can't self-promote.
+- Click role dropdown next to name, select new role; only Owner can grant Owner.
+- Admins can't change/grant Owner role.
+- Workspace must always keep one Owner.
+- Change takes effect on next page navigation/refresh.
+- Success shows "Member role updated." message.
 
 ### How do I invite an admin member and manage their billing access? {slug: workspace-settings/faq/members-roles/how-do-i-invite-an-admin-member-and-manage-their-billing-access}
-"Settings" > "Members" > "Invite Member" card > enter email > role dropdown "Admin" > "Send Invite". Only Owners can view/manage Billing; Admins cannot access Billing page. To grant billing access, must set role to Owner.
+Get here: "Settings" > "Members"
+- "Invite Member" card: enter email, select "Admin" role, click "Send Invite".
+- Only Owners can view/manage Billing; Admins cannot access Billing page.
+- To change role later: "Settings" > "Members", click role dropdown, select new role.
 
 ### How do I invite team members to my workspace? {slug: workspace-settings/faq/members-roles/how-do-i-invite-team-members-to-my-workspace}
-Workspace name > "Settings" > "Members" > "Invite Member" card > enter email > choose role (Owner/Admin/Member/Client) > "Send Invite". Success message "Invitation sent successfully". Invitee gets email with "Accept" button, shows "Pending" then "Active". Only Owners/Admins can invite; one invite at a time; invitee must use exact invited email; resending invite updates role. Client role: no admin/billing/pricing access. Don't elevate clients to Member as workaround; use Partner Panel > Features for client app visibility.
+Get here: click workspace name (top-left) > "Settings" > "Members" (under Workspace)
+- "Invite Member" card: enter email, choose role (Owner, Admin, Member, Client), click "Send Invite".
+- Confirmation: "Invitation sent successfully"; invitee gets email with Accept button, shows "Pending" then "Active".
+- Only Owners/Admins can invite; one invite at a time; invitee must use exact invited email; resending updates role.
+- Role guide: Client = end client, no admin access; Member = internal collaborator; Admin/Owner = manage workspace.
+- Keep white-label clients as Client role; use Partner Panel > Features to enable apps, don't elevate to Member.
 
 ### Why can my client workspace member see my personal workspace? {slug: workspace-settings/faq/members-roles/why-can-my-client-workspace-member-see-my-personal-workspace}
-Caused by same email in multiple workspaces. Fix: workspace switcher > select personal workspace > "Settings" > "Members" > "Active Members" tab > three-dot menu > "Remove member" > confirm. Use separate emails/aliases to avoid.
+Get here: workspace switcher (top-left) > select workspace > "Settings" > "Members"
+- Caused by same email invited to multiple workspaces; switcher shows all workspaces for that login.
+- Fix: Members page, "Active Members" tab, three-dot menu, "Remove member", confirm.
+- Removal is immediate; client keeps access to intended workspace.
+- Avoid with separate emails/aliases per workspace.
 
 ### Workspace Management {slug: workspace-settings/faq/workspace-management}
-No additional facts.
+Get here: click workspace name (top-left) > "Settings" > "General"
+Overview only; see other articles in this batch.
 
 ### How do I add a client workspace / onboard a client into Acquisity? {slug: workspace-settings/faq/workspace-management/how-do-i-add-a-client-workspace-onboard-a-client-into-acquisity}
-Workspace Switcher (top-left) > "New Workspace" > "Create Workspace" dialog, enter "Workspace Name" > "Create Workspace" > complete Onboarding (website, business type, sales method, bottleneck) > "Settings" > "Members" > "Invite Member" card, enter email, role "Client" > "Send Invite". Client role can use CRM/Cold Email Agent/AI SDR (if enabled) but not settings. Set niche/branding before inviting. Each client workspace has separate campaigns, leads, email accounts, CRM data.
+Get here: Workspace Switcher dropdown (top-left) > "New Workspace"
+- Enter business name, click "Create Workspace"; complete onboarding (website, business type, sales method, bottleneck).
+- Then "Settings" > "Members", invite client email with "Client" role.
+- Client role can use CRM, Cold Email Agent, AI SDR if enabled, not settings.
+- Configure niche/offer/branding before inviting client.
+- Each client workspace has separate campaigns, leads, email accounts, CRM data.
 
 ### How do I delete/remove a client workspace? {slug: workspace-settings/faq/workspace-management/how-do-i-deleteremove-a-client-workspace}
-Deleting a workspace is not currently available.
+Get here: click workspace name (top-left) > "Settings" > "General"
+- Deleting a workspace isn't available.
 
 ### How do I rename a workspace? {slug: workspace-settings/faq/workspace-management/how-do-i-rename-a-workspace}
-Workspace name > "Settings" > "General" > "Workspace Name" card > edit field > "Update Name". Takes effect immediately. Only Owners/Admins can rename.
+Get here: click workspace name (top-left) > "Settings" > "General" (under Workspace)
+- "Workspace Name" card: type new name, click "Update Name"; takes effect immediately.
+- Only Owners and Admins can rename; Members/Clients view only.
 
 ### How do I view how many workspaces my Pro subscription covers? {slug: workspace-settings/faq/workspace-management/how-do-i-view-how-many-workspaces-my-pro-subscription-covers}
-"Settings" > "Billing" shows plan name (Pro/Launchpad/Accelerator) and renewal date, not workspace count. Workspace switcher dropdown lists active workspaces; compare to purchase confirmation or ask support.
+Get here: click workspace name (top-left) > "Settings" > "Billing" (under Workspace)
+- Billing page shows plan name (Pro, Launchpad, Accelerator) and renewal date, not workspace count/allowance.
+- Check active workspace count via workspace name dropdown; compare to purchase confirmation email or ask support.
 
 ### Why do I still see the onboarding prompt after paying for a workspace? {slug: workspace-settings/faq/workspace-management/why-do-i-still-see-the-onboarding-prompt-after-paying-for-a-workspace}
-Payment unlocks workspace but onboarding still required. Fix: Dashboard > "Start Onboarding" > click through each step; try different browser/clear cache if it resets. Contact support via "Feedback" (click name at sidebar bottom) with workspace name and repeating step.
+Get here: "Dashboard"
+- Click "Start Onboarding" if prompted; click through each step even if info already entered.
+- If onboarding resets to step 1, try different browser or clear cache.
+- Else contact support via "Feedback" in account menu (click name at bottom of sidebar), include workspace name and repeating step.
 
 ### Client Portal {slug: client-portal}
-Read-only home for "Client" role users. Shows greeting "Here's your business performance overview", 8 stat cards (Cash Collected, Contacted Leads, Positive Replies, Booked Calls, Positive Reply Rate, Booked Call Rate, Sales Calls Taken, Close Rate), last 30 days vs previous month. "AI Account Manager" chat with "New Chat" and history; help cards "What I Can Help With", "Sample Questions". Clients can't edit anything; redirected to portal if they try other pages. Can access: Client Portal, Dashboard, CRM (unless disabled), Cold Email Agent/AI SDR campaigns only if partner-enabled, personal settings. Cannot access other tools, workspace settings, Members, Billing, credit balance, search bar, Ask AI. Failed load: click "Retry". Owners/Admins can preview at \`/client-portal\`. Invite: "Settings" > "Members" > "Invite Member", enter email(s), set "Access" to "Client", click "Send Invite"/"Send invites". Only Owners/Admins invite.
+Get here: sidebar "Client Portal"
+- Read-only home for "Client" role users; no create/change rights; blocked pages redirect here.
+- Shows greeting, 8 stats cards (last 30 days vs prior month): Cash Collected, Contacted Leads, Positive Replies, Booked Calls, Positive Reply Rate, Booked Call Rate, Sales Calls Taken, Close Rate. "Retry" if load fails.
+- "AI Account Manager" chat answers project status, results, strategy; "New Chat" / history button.
+- Clients see only: Client Portal, Dashboard, CRM (if enabled), Cold Email Agent/AI SDR campaigns (if partner-enabled, not setup pages), Personal settings. No settings, billing, credits, search, Ask AI.
+- Owners/Admins can preview via workspace URL + "/client-portal".
+- Invite: "Settings" > "Members" > "Invite Member" card, enter email(s), Access = "Client", click "Send Invite"/"Send invites". Only Owners/Admins can invite.
 
 ### Frequently Asked Questions {slug: client-portal/faq}
-Intro page only, no new facts beyond client-portal.
+Get here: sidebar "Client Portal"
 
 ### Can I change a client to a member? {slug: client-portal/faq/can-i-change-a-client-to-a-member}
-"Settings" > "Members", use "Access" dropdown on their row to change role; applies next page load. Admins set Admin/Member/Client; only Owners make Owners. Sole Owner can't change own role.
+Get here: "Settings" > "Members"
+- Find person, use "Access" dropdown to change role; applies next page load.
+- Admins set Admin/Member/Client; only Owners set Owner. Sole Owner can't change own role.
 
 ### How do I invite a client to my workspace? {slug: client-portal/faq/how-do-i-invite-a-client}
-Same steps as client-portal invite flow.
+Get here: sidebar "Client Portal"
+Same steps as client-portal invite section.
 
 ### Why can't my client see a tool I use? {slug: client-portal/faq/why-cant-my-client-see-a-tool}
-Same tool-access limits as client-portal; change role to Member for full access; white-label partner must enable Cold Email Agent/AI SDR for clients.
+Get here: sidebar "Client Portal"
+Same limits as client-portal slug; change role to Member to grant access, or ask white-label partner to enable Cold Email Agent/AI SDR for clients.
 
 ### Switch Between Workspaces {slug: workspace-switcher}
-- Workspace menu: top-left corner, click workspace name/logo to open dropdown.
-- Dropdown items: list of "Your workspaces", "New Workspace", "Settings", "Sign Out".
-- Switch: click workspace in list; current one has blue checkmark.
-- Create: click "New Workspace" > enter name (3-32 chars) > click "Create Workspace" > auto-enters workspace, onboarding wizard starts.
-- If creation not allowed, "Book a Call" shows instead of "New Workspace".
-- "Settings" opens workspace settings; only shown inside a workspace.
-- "Sign Out" at bottom logs out, returns to login screen.
-- Yellow "Inactive" badge = onboarding skipped; click workspace > "Dashboard" to restart onboarding; badge clears after completion.
-- Empty list = not invited to any workspace; create one or ask for invite.
-- Troubleshooting: refresh or re-login if stuck; "Book a Call" to enable workspace creation.
+Get here: click the workspace name in the top-left corner
+- Dropdown shows: your workspaces, "New Workspace", "Settings", "Sign Out"
+- Click a workspace to switch; current one has blue checkmark
+- "New Workspace": name it (3-32 chars), click "Create Workspace"; onboarding wizard starts
+- If creation disabled, see "Book a Call" instead
+- "Settings" opens workspace settings
+- "Sign Out" logs out immediately
+- Yellow "Inactive" badge = onboarding skipped; click workspace, go to "Dashboard" to restart onboarding
+- Empty list means no invites yet; create one or ask for invite
+- Troubleshooting: refresh or log out/in if list stuck; contact support for creation approval
 
 ### Frequently Asked Questions {slug: workspace-switcher/faq}
-Index page, no new facts.
+Get here: click the workspace name in the top-left corner
 
 ### Can I move campaigns or leads between workspaces? {slug: workspace-switcher/faq/can-i-move-campaigns-or-leads-between-workspaces}
-- No transfer of campaigns, leads, domains, inboxes between workspaces; workspaces fully isolated.
-- Workaround: export leads CSV from "Leads" tab, upload in target workspace; rebuild sequences manually; buy new domains/inboxes.
-- Contact support via "Feedback" (click name in sidebar) or chat bubble if domains not yet provisioned.
+Get here: click the workspace name in the top-left corner
+- No transfer of campaigns, leads, domains, inboxes between workspaces; each isolated
+- Export leads via campaign's "Leads" tab to CSV, upload in target workspace
+- Rebuild sequences manually; buy new domains/inboxes per workspace
+- Contact support via "Feedback" (account menu) if domains just purchased, before provisioning
 
 ### Do I need a separate workspace for each client? {slug: workspace-switcher/faq/do-i-need-a-separate-workspace-for-each-client}
-- One workspace per client is standard; gives separate campaigns, leads, CRM, knowledge base, calendar, billing.
-- Can share your workspace for short-term/no-access projects.
-- Check plan's workspace count at "Settings" > "Billing"; contact support via "Feedback" if unsure.
+Get here: click the workspace name in the top-left corner
+- Standard: one workspace per client; separate campaigns, leads, CRM, knowledge base, calendar, billing
+- Can skip for short projects or no-access outreach
+- Check plan workspace count: "Settings" > "Billing"; contact support via "Feedback" if unsure
 
 ### How do I add the extra workspaces my plan includes? {slug: workspace-switcher/faq/how-do-i-add-the-extra-workspaces-my-plan-includes}
-- Included workspaces aren't auto-created or via "+ New Workspace"; support must add them.
-- Contact via "Feedback"/chat bubble, type "human agent", state plan and expected workspace count.
-- Team-added workspaces cost $129/month (Legacy Pro) vs standard $185.
-- May still see "Complete Your Workspace Setup" screen first time.
+Get here: account menu (click your name at bottom of sidebar) > "Feedback"
+- Included workspaces not auto-created or via "+ New Workspace"; support must add them
+- Type "human agent" in chat; give plan and number expected
+- Team-set workspaces cost $129/month (Legacy Pro) vs standard $185
+- May still see "Complete Your Workspace Setup" screen first time
 
 ### What is this workspace I didn't create? {slug: workspace-switcher/faq/what-is-this-workspace-i-did-not-create}
-- Usually demo/sample data from setup or leftover test workspace.
-- Harmless; deleting workspaces is not currently available.
+Get here: click the workspace name in the top-left corner
+- Usually demo/sample data or leftover test workspace
+- Harmless clutter; deleting a workspace not currently available
 
 ### Why am I being asked to pay for workspaces included in my plan? {slug: workspace-switcher/faq/why-am-i-being-asked-to-pay-for-workspaces-included-in-my-plan}
-- Self-created workspaces via "New Workspace" billed at standard Pro, $185/month; shows "Complete Your Workspace Setup" screen with "Upgrade & Create Workspace" button.
-- Plan-included workspaces set up by support at $129/month (Legacy Pro).
-- Unused unpaid workspace stays in switcher; can't delete.
-- Separate billing: domains $18/year, inboxes $8/month (3 per domain); min order $18 + $24/month; Done-For-You $6/inbox/month plus domain cost.
-- Buy via "Cold Email Agent" > "Email Accounts" > "Add New Inboxes" > "Pre-warmed Inboxes".
-- Can move existing inboxes via "Cold Email Agent" > "Email Accounts" > select > "Move Accounts".
-- Support contact: "Feedback"/chat bubble, type "human agent".
+Get here: click "New Workspace", name it
+- Self-created workspaces billed standard Pro $185/month
+- Plan-included workspaces set up by support at $129/month (Legacy Pro)
+- Screen "Complete Your Workspace Setup" with "Upgrade & Create Workspace" button
+- Deleting a workspace not available; unused ones remain visible
+- Domain/inbox purchase prompts separate: domains $18/year, inboxes $8/month (3 per domain); min order $18 upfront + $24/month; Done-For-You $6/inbox/month plus domain cost
+- Buy via "Cold Email Agent" > "Email Accounts", click "Add New Inboxes", choose "Pre-warmed Inboxes"
+- Move existing inboxes instead: "Cold Email Agent" > "Email Accounts", select inboxes, click "Move Accounts"
+- Reach support via "Feedback" in account menu, type "human agent"
 
 ### Complete the Guided Setup {slug: onboarding}
-Onboarding: guided setup scanning website, confirming business context, activating workspace.
-Steps: enter website or "I don't have one yet" > review scan > enter full name, workspace name, optional images > confirm business type (Ecommerce, Infoproduct, Agency, SaaS, other) > choose sales method (online checkout or sales calls) > pick bottleneck > review plan > select plan, activate.
-Scan checks business type, offer summary, products/channels, constraints; preselects type/method, must confirm.
-If scan fails: "Try again" or "Continue without website".
-Only "Pro with monthly billing" supported; Starter, Ultra, annual billing unavailable.
-Activation: creates/activates workspace, checks Pro access, provisions sandbox, saves context, marks complete, sends to Dashboard. Keep page open; refresh resumes from checkpoint.
-Does not create Niche Researcher report, Offer Creator report, cold email campaign, CRM contacts, or client workspace data.
-Progress autosaved per screen; "Back" or stage nav to edit; changing website clears later steps.
-Reset: Owner/Admin only, "Settings" > "Workspace" > "Reset Workspace Onboarding" (confirm). Clears session/context, does not touch campaigns/CRM/reports.
-Fixes: scan fail → retry/skip; stuck question → check error, retry, refresh; setup fail at end → retry same button, else contact support with workspace name + error.
+Get here: not stated (starts automatically for new/incomplete workspaces)
+- Steps: enter website or "I don't have one yet" > review scan > name/workspace/images > business type > sales method (online checkout/sales calls) > pick bottleneck > review plan > select plan, activate.
+- Scan finds business type, offer summary, products/channels, constraints; suggestions must be confirmed/changed.
+- Saves answers as workspace business context only; creates no campaigns, CRM data, or reports.
+- Only Pro monthly supported; Starter, Ultra, annual billing unavailable here.
+- Activation: creates/activates workspace, checks plan access, provisions sandbox, saves context, sends to Dashboard. Keep page open; refresh resumes from checkpoint.
+- Progress autosaved per screen; "Back"/stage nav edits earlier answers; changing website clears later steps.
+- Reset: Owner/Admin only, "Settings" > "Workspace" > "Reset Workspace Onboarding" - clears context, doesn't touch campaigns/CRM/reports.
+- Fixes: scan fails - "Try again"/"Continue without website"; stuck question - check errors, retry, refresh; activation fails - retry same button, else contact support with workspace name/error.
 
 ### Frequently Asked Questions {slug: onboarding/faq}
-Index page, no new facts.
+Get here: not stated (overview index of FAQ articles, no separate facts)
 
 ### What do I do if the website scan fails? {slug: onboarding/faq/an-ai-step-failed-with-an-error}
-Same as onboarding scan-fail steps. Contact support via "Feedback" if retries fail.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding slug.
 
 ### Can I go back and change my answers? {slug: onboarding/faq/can-i-go-back-and-change-my-answers}
-Same as onboarding; details same reset path.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding slug.
 
 ### Can I run onboarding again? {slug: onboarding/faq/can-i-run-onboarding-again}
-Same reset steps. Note: white-label partners may be configured to skip onboarding entirely.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Adds: white-label partners may be set to skip onboarding entirely; reset control hidden until partner setting changes.
 
 ### Can I save my progress and come back later? {slug: onboarding/faq/can-i-save-my-progress-and-come-back-later}
-Yes; log in, open Dashboard, select incomplete workspace, resumes last screen. Leaving during scan may require rerunning scan.
+Get here: "Dashboard" > select workspace with incomplete onboarding
+- Leaving during website scan may require rerunning the scan.
 
 ### How do I change the website scan suggestions? {slug: onboarding/faq/how-do-i-change-what-the-ai-made}
-Same as onboarding; suggestions editable before confirming, or via reset after completion.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding slug.
 
 ### How do I start onboarding? {slug: onboarding/faq/how-do-i-start-onboarding}
-Starts automatically: new account → \`/dashboard/onboarding\`; incomplete workspace; or "Start Onboarding" Dashboard prompt.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Starts automatically: new account opens \`/dashboard/onboarding\`; incomplete workspace reopens it; or click "Start Onboarding" on Dashboard.
 
 ### How long does onboarding take? {slug: onboarding/faq/how-long-does-onboarding-take}
-Questionnaire ~1 minute; scan is quick; activation/provisioning can take longer.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Questions: about 1 minute. Scan: short. Activation/provisioning: longer, keep page open.
 
 ### Why am I seeing the wrong workspace? {slug: onboarding/faq/i-am-seeing-the-wrong-workspace}
-Click workspace name (top-left) > pick correct workspace from list; each workspace has own onboarding progress.
+Get here: click workspace name, top-left corner
+- Choose correct workspace from list; onboarding resumes per workspace.
 
 ### I paid but the platform still asks me to onboard? {slug: onboarding/faq/i-paid-but-the-platform-still-asks-me-to-onboard}
-Payment and onboarding are separate; must still complete questions. If repeats, refresh once; else contact support via "Feedback" (click name at sidebar bottom) or chat, type "human agent", include workspace name, screen, error.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Payment and onboarding are separate. Finish questions, select Pro monthly, let checks finish.
+If onboarding keeps restarting: refresh page; else open "Feedback" (account menu, click name at bottom of sidebar), type "human agent" with workspace name, repeating screen/action, error messages.
 
 ### What if I skipped onboarding and need to start over? {slug: onboarding/faq/i-skipped-onboarding-and-need-to-start-over}
-Click "Dashboard" > follow redirect/"Start Onboarding"; if complete, use reset. White-label partners may skip onboarding entirely.
+Get here: "Dashboard"
+- Redirects to Onboarding or shows "Start Onboarding" prompt. If complete, use reset (see onboarding slug). Some white-label partners skip onboarding permanently.
 
-### What do I do if onboarding is stuck? {slug: onboarding/faq/onboarding-is-stuck-and-will-not-move}
-Check empty fields, retry scan, retry save, refresh page, contact support with workspace name/screen/error.
+### What do I do if onboarding is stuck and will not move? {slug: onboarding/faq/onboarding-is-stuck-and-will-not-move}
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Check empty fields/errors; retry scan or "Continue without website"; retry save/activation; refresh page; contact support with workspace name, screen, error.
 
 ### What are the steps to launch my first campaign? {slug: onboarding/faq/what-are-the-steps-to-launch-my-first-campaign}
-Takes 30–90 min active work.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Takes 30-90 min active work plus provisioning wait.
 1. Finish onboarding.
-2. "Cold Email Agent" > "Email Accounts", buy domains+inboxes; pre-warmed ready sooner; wait 15–30 min provisioning ("Pending").
+2. Get here: "Cold Email Agent" > "Email Accounts" - buy domains/inboxes; pre-warmed inboxes ready sooner; provisioning 15-30 min, shows "Pending".
 3. "Cold Email Agent" > "New Campaign", name it.
-4. Pick lead source: "Acquisity Lead Database" (uses credits, 5–15 min, default 500 leads, min 100) or "Upload Your Own" (free, instant). Credits charged on confirming lead search, before sending.
-5. Build sequence: "AI Generated" (Podcast, Interview, AI Business Audit, Direct) or "Create your own"; review on "Sequences" tab.
-6. Select active inboxes > "Create Campaign"; if auto-launch off, opens as Draft; check Leads/Sequences/Options, click "Launch campaign". Daily limit per inbox enforced.
-7. Monitor via Dashboard (Contacted Leads, Positive Replies, Booked Calls, Cash Collected), AI SDR Inbox, Campaign Analytics. Wait 7–14 days before judging.
+4. Pick lead source: "Acquisity Lead Database" (uses credits, 5-15 min, default 500 leads, min import 100, charged on confirm before sending) or "Upload Your Own" (free, instant, CSV).
+5. Build sequence: "AI Generated" (choose Podcast, Interview, AI Business Audit, or Direct) or "Create your own"; review on "Sequences" tab after Draft.
+6. Select active inboxes, click "Create Campaign"; if auto-launch off, campaign opens as Draft - check "Leads", "Sequences", "Options", click "Launch campaign". Active campaigns send within configured hours, subject to platform daily limit per inbox.
+7. Monitor: "Dashboard" (Contacted Leads, Positive Replies, Booked Calls, Cash Collected), "AI SDR Inbox" (replies auto-classified), Campaign "Analytics" tab. Wait 7-14 days before judging results.
 
 ### What gets created when onboarding finishes? {slug: onboarding/faq/what-gets-created-when-onboarding-finishes}
-Same as onboarding's "What Onboarding Saves and Creates" section.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding slug.
 
 ### What happens during the website scan? {slug: onboarding/faq/what-happens-during-ai-steps}
-Same as onboarding scan section; saves context only, doesn't run other tools.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding slug.
 
 ### Why are tools missing from my sidebar? {slug: onboarding/faq/why-are-crm-and-cold-email-agent-missing-from-my-sidebar}
-Onboarding answers don't control sidebar/feature access. Check: workspace feature settings, role (Client has limited visibility), private beta access, active workspace. Fix: confirm workspace, ask Owner/Admin to check role, ask partner owner, contact support. Reset does not grant missing features.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Onboarding answers don't control sidebar access. Check: workspace feature settings, your role (Client sees less), private beta access, active workspace. Fix: confirm correct workspace, ask Owner/Admin to check role, ask white-label partner owner, contact support. Reset does not grant missing features.
 
 ### Why did credits get consumed during setup? {slug: onboarding/faq/why-did-credits-get-consumed-during-setup}
-Credits charged instantly on confirming lead search, not at campaign launch. Onboarding scan doesn't use credits. "Acquisity Lead Database"/AI Lead Search costs lead credits; "Upload Your Own"/CSV free. To reverse: contact via "Feedback", type "human agent", state action/time; reversal possible if leads unused in sent campaign.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Credits charge on confirming lead search, not on launch. Onboarding scan/questions never run lead search. "Acquisity Lead Database"/AI Lead Search costs lead credits on confirm; CSV upload free. To reverse: "Feedback" in account menu, type "human agent", state action and leads unused.
 
 ### Why do I have to onboard again in my new workspace or account? {slug: onboarding/faq/why-do-i-have-to-onboard-again-in-a-new-workspace}
-Onboarding is per-workspace; doesn't carry over between workspaces/accounts, including white-label portals with same email. No auto-copy tool between workspaces.
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Each workspace/account has separate onboarding session; answers don't transfer, including white-label portals with same email. No auto-copy tool between workspaces; each tool keeps workspace-scoped data.
 
 ### Why is a step taking so long? {slug: onboarding/faq/why-is-a-step-taking-so-long}
-Scan slow: wait, "Try again", or "Continue without website". Activation/provisioning slow: keep page open, refresh is safe. Stuck question: check validation message, contact support via "Feedback".
+Get here: not stated (overview index of FAQ articles, no separate facts)
+Same as onboarding and how-long-does-onboarding-take slugs.
 
 ### Resources {slug: resources}
-- Nav: click your name (bottom of sidebar) > "Resources" in menu.
-- Tools: "Cold Email Writer", "Pricing Calculator", "AI Tools Directory", "Hiring Portal", "Top 50 Niches", "Prompts Directory", "AI Automation Creator" (early testing, JSON not generally available), "AI Automation Library" (downloadable n8n templates).
-- Clients cannot see "Resources". Hidden if workspace has no Resources tools enabled.
-- Custom integrations: Cold Email API/MCP and CRM REST API (developer.acquisity.ai, api.acquisity.ai/docs).
+Get here: click your name at bottom of sidebar, then "Resources"
+- Standalone tools: no campaign/pipeline setup needed.
+- Tools: Cold Email Writer, Pricing Calculator, AI Tools Directory, Hiring Portal, Top 50 Niches, Prompts Directory, AI Automation Creator (early testing), AI Automation Library (pre-built n8n templates).
+- Hidden for Clients and workspaces with no Resources tools enabled.
 
 ### Cold Email Writer {slug: resources/cold-email-writer}
-- Path: name menu > "Resources" > "Cold Email Writer" card.
-- 5 methods (tabs): "Interview", "Podcast", "AI Audit", "Direct", "Masterclass". Direct has 3 steps (extra "Offer Details" step); others have 2.
-- Step 1: fill Target Industry, Target Role, sender info (First/Last Name, Title, Company Name, Email, Address, Contact Info), click "Next".
-- Step 2: referrer info (First/Last Name, Title, Email) - referrer "forwards" email, creating forwarding angle. Click "Generate Scripts" (non-Direct) or "Next" (Direct).
-- Step 3 (Direct only): Core Offer, Value Proposition, Pain Point, Desired Outcome, Timeframe, Key Mechanism, Email Signature, at least 1 case study (Company/Result/Timeframe), optional social proof. Click "Generate Scripts".
+Get here: click your name at bottom of sidebar > "Resources" > "Cold Email Writer"
+- Generates 10 cold email scripts from your inputs; no full campaign needed.
+- Methods (tabs): Interview, Podcast, AI Audit, Direct, Masterclass. Direct has 3 steps (adds "Offer Details" with case studies); others have 2.
+- Step 1: target industry/role, sender info (name, title, company, email, address, contact). Click "Next".
+- Step 2: referrer info (name, title, email). Click "Generate Scripts" (or "Next" for Direct).
+- Step 3 (Direct only): core offer, value prop, pain point, outcome, timeframe, mechanism, signature, 1+ case study, optional social proof.
 - Processing takes 1-2 minutes ("Writing Your Cold Email" animation).
-- Output: Campaign Details card + exactly 10 emails in tabs "Email 1"-"Email 10". Each has subject (edit, max 78 chars), body (edit, max 10,000 chars), {{variables}} badges. "Copy" buttons; no download button; edits autosave.
+- Results: "Campaign Details" summary card; 10 emails in tabs "Email 1"–"Email 10", each with subject (edit, max 78 chars), body (edit, max 10,000 chars), and personalization variable badges. Edits autosave. No download; use "Copy" buttons.
 - "Create Variations From Existing Script" button links to Variations tool.
-- Fixes: empty results - wait 5 min, refresh, check submissions table, resubmit. Grayed-out button - fill required fields, wait for load, select workspace, refresh. Poor-quality output - give specific industry/role, fill optional fields, add real numbers, try different method. Stuck processing - don't navigate away; check status "failed" and resubmit.
+- Fixes: empty results, wait, refresh, check submissions table, resubmit. Grayed-out button, fill required fields, wait for load, ensure workspace selected. Mismatched emails, use specific industry/role, fill optional fields, add real numbers. Stuck processing, wait 5 min, refresh, check table for "failed" status.
 
 ### Variations {slug: resources/cold-email-writer/variations}
-- Access: "Create Variations From Existing Script" button on Cold Email Writer, or Resources > Cold Email Writer > Variations.
-- Paste script (min 50 characters) into text box; select email type (Interview/Podcast/AI Business Audit/Masterclass/Direct) matching original tone.
-- Click "Generate Variations"; 1-2 min processing.
-- Results: Original Email Script card + "Generated Variations (N)" tabs, each with subject/body "Copy" buttons and variable badges.
-- Fixes: grayed button - need 50+ chars and selected type, workspace loaded. Too similar - switch type, rerun, use longer script. Empty results - wait, refresh, check history, resubmit if "failed".
+Get here: "Resources" > "Cold Email Writer" > "Create Variations From Existing Script", or "Resources" > "Cold Email Writer" > "Variations"
+- Paste existing script (min 50 characters) into text box.
+- Pick email type: Interview, Podcast, AI Business Audit, Masterclass, Direct.
+- Click "Generate Variations"; takes 1-2 minutes.
+- Results show original script plus "Generated Variations (N)" tabs with subject/body (Copy only) and variable badges.
+- Fixes: grayed button, script under 50 chars or no type selected, check workspace loaded. Too-similar results, switch type, rerun, use longer script. Empty results, wait, refresh, check history, resubmit if "failed".
 
 ### Cold Email Writer FAQ {slug: resources/cold-email-writer/faq}
-No new facts; see cold-email-writer and variations.
+Get here: click your name at bottom of sidebar > "Resources" > "Cold Email Writer"
+No added facts beyond listed FAQ articles.
 
 ### How do I create variations of an existing script? {slug: resources/cold-email-writer/faq/how-do-i-create-variations-of-an-existing-script}
-Same as resources/cold-email-writer/variations.
+Get here: click your name at bottom of sidebar > "Resources" > "Cold Email Writer"
+Same as slug: resources/cold-email-writer/variations
 
 ### What is the referrer? {slug: resources/cold-email-writer/faq/what-is-the-referrer}
-Same as resources/cold-email-writer.
+Get here: click your name at bottom of sidebar > "Resources" > "Cold Email Writer"
+Same as slug: resources/cold-email-writer (referrer fields)
 
-### Masterclass vs direct vs podcast method {slug: resources/cold-email-writer/faq/what-does-the-masterclass-cold-email-method-mean-vs-direct-and-podcast}
-- Masterclass only exists in Cold Email Writer, not in Cold Email Agent campaigns (which has Podcast, Interview, AI Business Audit, Direct - 4 methods).
-- Masterclass invites prospect to a masterclass/webinar; positions sender as authority; good for HR/L&D/founders.
-- To use Masterclass angle in a campaign, generate in Writer and paste into sequence manually.
+### What does the 'masterclass' method mean vs direct and podcast? {slug: resources/cold-email-writer/faq/what-does-the-masterclass-cold-email-method-mean-vs-direct-and-podcast}
+Get here: click your name at bottom of sidebar > "Resources" > "Cold Email Writer"
+- Masterclass invites prospect to a masterclass/webinar; positions you as authority; good for HR/L&D/founders.
+- Masterclass only exists in Cold Email Writer, not in Cold Email Agent campaigns (which offer Podcast, Interview, AI Business Audit, Direct). To run it as a campaign, generate in Writer then paste into a campaign sequence manually.
 
-### Resources FAQ {slug: resources/faq}
-No new facts beyond linked articles.
+### Frequently Asked Questions {slug: resources/faq}
+Get here: click your name at bottom of sidebar, then "Resources"
+No added facts beyond listed FAQ articles.
 
-### Change cold email method podcast to interview {slug: resources/faq/how-do-i-change-my-cold-email-method-from-podcast-to-interview}
-- Method chosen per script run (tabs), not workspace-wide; past scripts unaffected.
-- Campaign-level method change requires editing Cold Email Agent sequence copy or building new campaign and migrating leads.
-- Warning: sending Direct and Podcast concurrently to same leads hurts deliverability; test on separate lead batches.
+### How do I change my cold email method from podcast to interview? {slug: resources/faq/how-do-i-change-my-cold-email-method-from-podcast-to-interview}
+Get here: "Resources" > "Cold Email Writer"
+- Method chosen per script run, not workspace-wide; start new script, pick tab, fill fields, generate.
+- Past scripts keep their original method.
+- To change a live campaign's method: edit sequence copy in Cold Email Agent's campaign editor, or build a new campaign and migrate leads.
+- Warning: running Direct and Podcast concurrently on same leads hurts deliverability; test on separate batches.
 
-### AI Automation Creator JSON import to n8n {slug: resources/faq/how-do-i-import-the-n8n-workflow-creator-json-into-n8n}
+### Can I import AI Automation Creator JSON into n8n? {slug: resources/faq/how-do-i-import-the-n8n-workflow-creator-json-into-n8n}
+Get here: click your name at bottom of sidebar, then "Resources"
 - AI Automation Creator JSON export not generally available (early testing).
-- Use "AI Automation Library" for pre-built templates, or Cold Email API/CRM REST API with n8n HTTP Request node.
-- CSV import/export supported for CRM records (People, Companies, Deals, Appointments) and campaign Leads tab; CSV import into supported CRM records and Cold Email Agent campaigns.
+- "AI Automation Library" (in Resources) has downloadable pre-built n8n templates.
+- Cold Email API and CRM REST API available via the developer docs for custom integrations.
+- Without API: export CRM records (People, Companies, Deals, Appointments), export campaign leads via Leads tab, import CRM records/leads via CSV.
 
-### Community events and coaching calls location {slug: resources/faq/where-are-community-events-and-weekly-coaching-calls}
-- Community/coaching/replays live in Heartbeat (mastermind.aiacquisitionmethod.com), separate login, invite sent separately (check welcome email/spam).
-- If missing invite: contact support via "Feedback" in account menu with plan tier and purchase email.
-- AI Consultant sessions and Support chat happen inside Acquisity app ("Home"/"Chat" toggle; "Feedback").
+### Where are community events and weekly coaching calls? {slug: resources/faq/where-are-community-events-and-weekly-coaching-calls}
+Get here: not stated (external Heartbeat community platform, separate login/invite)
+- Daily coaching calls, replays, Q&A live in Heartbeat, not the Acquisity app.
+- Missing invite: check welcome email, search inbox for "Heartbeat", else contact support via "Feedback" in account menu (click your name at bottom of sidebar) with plan tier and purchase email.
+- Inside app instead: AI Consultant via "Chat" toggle at top of sidebar; Support chat via "Feedback" in account menu.
 
 ### Hiring Portal {slug: hiring-portal}
-Directory of AI Implementation Specialists for hire. Hiring, contracts, payments happen outside Acquisity.
-Open: click name at bottom of sidebar > "Resources" > "Hiring Portal" card.
-Search: "Search specialists..." box, top right; matches name, company, tags, description; filters as you type; clear box to reset. Start with short/broad terms.
-Card shows: photo, name, company (clickable if website given), years in business (in brackets), up to 5 specialization tags (+N more badge), description ("Show more"/"Show less").
-Buttons: "Email" (copies email), "LinkedIn", "Testimonials", "Watch Video" (only if provided). Footer: "Visit Website", "Book a Call" (only if provided). Email and LinkedIn always present.
-Apply to be listed: scroll to end of grid, find "Want to be listed here?" card, click "Apply Now", fill form, submit; reply within 24 hours; Acquisity team reviews and adds profiles; no self-editing, contact support via "Feedback" in account menu or chat bubble.
-Troubleshooting: no search results - shorten term, check spelling, clear box, specialist may not be listed. Button not working - try another button, outside service may be down, report via Feedback.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+- Directory of AI Implementation Specialists; hiring, contracts, payments happen outside Acquisity.
+- Search box "Search specialists..." matches name, company, tags, description.
+- Cards show photo, name, company (clickable), years in business, up to 5 specialization tags (+N more), description (Show more/less).
+- Buttons: Email (copies address), LinkedIn, Testimonials, Watch Video (shown only if provided); Visit Website, Book a Call (if provided). All cards have Email, LinkedIn.
+- To be listed: scroll to "Want to be listed here?" card, click "Apply Now", fill form; team reviews, reply within 24 hours; no self-edit, contact support via "Feedback" in account menu.
+- No results: shorten term, check spelling, clear box, may not be listed.
+- Broken button: try another button; outside service may be down; report via "Feedback".
 
 ### Frequently Asked Questions {slug: hiring-portal/faq}
-No additional facts; index of FAQ articles below.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+Same as hiring-portal.
 
 ### What do I do if a button on a card is not working? {slug: hiring-portal/faq/a-button-on-a-card-is-not-working}
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
 Same as hiring-portal.
 
 ### Can I post a job listing on the Hiring Portal? {slug: hiring-portal/faq/can-i-post-a-job-listing-on-the-hiring-portal}
-No job-posting flow; only specialists apply to be listed. Alternatives: widen search terms, post on Upwork/LinkedIn/Slack/agency referral, or point a specialist to the "Apply Now" card.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+- No. Specialists apply to be listed; you cannot post jobs.
+- Alternatives: widen search terms, post outside Acquisity, contact a specialist directly and point them to "Apply Now".
 
 ### How do I apply to be featured? {slug: hiring-portal/faq/how-do-i-apply-to-be-featured}
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
 Same as hiring-portal.
 
 ### How do I find a specialist? {slug: hiring-portal/faq/how-do-i-find-a-specialist}
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
 Same as hiring-portal.
 
 ### How do I get in touch with someone? {slug: hiring-portal/faq/how-do-i-get-in-touch-with-someone}
-Same as hiring-portal (Email, LinkedIn, Book a Call, Visit Website).
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+Same as hiring-portal.
 
 ### How do I pick the right specialist for my project? {slug: hiring-portal/faq/how-do-i-pick-the-right-specialist-for-my-project}
-No matching engine; shortlist 2-3 specialists using tags, testimonials/video/website, industry fit, availability via "Book a Call". Use discovery call to judge understanding and delivery proof. Portal doesn't handle contracts/payments/management; agree scope/timeline/payment directly and pay specialist directly, no escrow.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+- No matching engine; shortlist 2-3 specialists using tags, testimonials/video/website, industry fit, availability (Book a Call).
+- Use discovery call to check understanding and proof of delivery.
+- Portal doesn't handle contracts/payments/management; agree scope, pay specialist directly.
 
 ### How long does approval take? {slug: hiring-portal/faq/how-long-does-approval-take}
-Reply within 24 hours of submitting form; no in-app status tracker.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+Same as hiring-portal; within 24 hours, no status page.
 
 ### Is there a subcontractor contract template? {slug: hiring-portal/faq/is-there-a-subcontractor-contract-template}
-No in-platform template. Cover scope, timeline, payment terms, deliverable ownership (esp. AI output), termination clause; optional NDA, non-compete, insurance. Source templates externally (LegalZoom, Rocket Lawyer, lawyer, client's MSA/SOW, or simple email agreement).
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+- No in-platform template; arrange contract outside Acquisity.
+- Cover: scope, timeline, payment terms, ownership of deliverables (incl. AI output), termination clause; optional NDA, non-compete, insurance.
+- Source templates from LegalZoom, Rocket Lawyer, lawyer, or client's MSA/SOW; simple work may use email agreement.
 
 ### Why does my search show no results? {slug: hiring-portal/faq/my-search-shows-no-results}
-Same as hiring-portal troubleshooting.
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
+Same as hiring-portal.
 
 ### What do the profile cards show? {slug: hiring-portal/faq/what-do-the-profile-cards-show}
+Get here: Click your name at the bottom of the sidebar, then "Resources", then the "Hiring Portal" card.
 Same as hiring-portal.
 
 ### Get Help & Report Issues {slug: support}
-- Reach support via "Feedback" in account menu (click your name at bottom of sidebar), or chat bubble in lower-right if visible. Clients don't see "Feedback".
-- No email or phone support; chat only.
-- Steps: click Feedback/bubble > open conversation > describe issue > support replies.
-- Faster answers: include what you tried, expected result, actual result, screenshot.
-- Bug reports: include what you did, expected, actual, page URL, screenshot/recording. Tools: Jam (best), Loom, built-in OS screenshots (Cmd+Shift+4 / Win+Shift+S).
-- Feature requests: describe the problem, not just the solution.
-- Fixes: 404/no access - check URL/workspace, reclick left menu, try incognito, ask admin. Slow page - refresh, check internet, close tabs, disable extensions, try other browser. Logged out repeatedly - check cookie settings/incognito/extensions. Broken display - hard refresh, reset zoom to 100%, try other browser. Payment failed - check card details/funds, try different card, contact bank.
+Get here: account menu (click your name at bottom of sidebar) > "Feedback"
+- Click "Feedback" (clients don't see it) or chat bubble if visible, to reach support chat.
+- Steps: open conversation, describe question/problem, support replies.
+- Faster answers: include what you tried, what happened, screenshot.
+- Bug reports: include what you did, expected result, actual result, page URL, screenshot/recording. Tools: Jam, Loom, Cmd+Shift+4/Win+Shift+S.
+- Feature requests: describe the problem, not just the fix.
+- Fixes: page not found - check URL/workspace, click page again, try incognito, ask admin. Slow page - refresh, check internet, close tabs, disable extensions, try other browser. Logged out repeatedly - check cookie/extension settings, avoid incognito. Broken display - hard refresh, reset zoom to 100%, try other browser.
+- Payment failed: check card details/funds, try different card, contact bank.
 
 ### Frequently Asked Questions {slug: support/faq}
-No additional facts; see support and sub-articles below.
+Get here: account menu (click your name at bottom of sidebar) > "Feedback"
+No new facts beyond other articles in this batch.
 
 ### Can I talk to a human? {slug: support/faq/can-i-talk-to-a-human}
-- All chats start with Fin AI; type "human agent" or "talk to a human" to be queued for a support team member.
-- Flag billing/activation issues upfront for correct-access agent.
+Get here: account menu > "Feedback"
+- Every chat starts with Fin AI; type "human agent" or "talk to a human" to queue for a support team member.
+- Flag billing/activation issues upfront, as these need an agent with account access.
 
 ### How do I reach support? {slug: support/faq/how-do-i-reach-support}
-Same as support/faq/can-i-talk-to-a-human plus: no email/phone exists. Community help (Heartbeat, weekly coaching calls) is separate from support.
+Get here: account menu > "Feedback"
+- No email or phone support, only chat.
+- First answered by Fin AI; type "human agent" anytime to escalate.
+- Chat bubble missing: usually ad blocker, see i-cant-see-the-support-chat-widget article.
+- Community events/coaching calls are separate from support.
 
 ### I can't see the support chat bubble? {slug: support/faq/i-cant-see-the-support-chat-widget}
-- Usually caused by ad blockers/privacy extensions (uBlock Origin, Privacy Badger, Brave Shields) blocking Fin AI's third-party script.
-- Fix: disable blocker for site or allowlist domain, refresh; else use "Feedback".
-- Try incognito with extensions off; re-enable one at a time to find culprit.
-- Bubble intentionally hidden on some builder/import/detail pages; check "Dashboard", "CRM", "Cold Email Agent" instead.
+Get here: account menu > "Feedback"
+- Usually caused by ad blocker/privacy extensions blocking Fin AI's third-party script.
+- Fix: disable blocker for site or allowlist domain, refresh.
+- Still missing: try incognito with extensions off; re-enable extensions one at a time to find culprit.
+- Bubble intentionally hidden on some builder/import/detail pages; check on "Dashboard", "CRM", or "Cold Email Agent" instead.
+- If still missing in incognito, report via Feedback on another browser/device.
 
-### My urgent workspace issue needs help fast {slug: support/faq/my-urgent-workspace-issue-needs-help-fast}
-- For urgent issues (activation, billing, domain approval, access) provide: workspace name, plan tier (Pro, Launchpad, Accelerator, Gold), one-line goal, exact error message.
-- Start chat with "human agent, urgent workspace issue" to skip AI and route to a person. Only humans can make these changes.
+### My urgent workspace issue needs help fast, what do I say? {slug: support/faq/my-urgent-workspace-issue-needs-help-fast}
+Get here: account menu > "Feedback"
+- Include workspace name, plan tier (Pro, Launchpad, Accelerator, Gold), one-line goal, exact error message.
+- Start chat with "human agent, urgent workspace issue" to skip AI and route to a person.
+- Only humans can fix activation/billing/domain/access issues, not the AI.
 
 ### The AI chat said something different from what a human agent told me? {slug: support/faq/the-ai-chat-said-something-different-to-what-a-human-told-me}
+Get here: account menu > "Feedback"
 - Trust the human agent; Fin AI can lag behind product changes.
-- If conflicting, open chat, type "human agent", paste Fin's answer, ask for confirmation; human's answer is final. Support can flag Help Centre for correction.
+- Type "human agent", paste Fin's answer, ask for confirmation; human's answer is final.
+- Support team can flag Help Centre errors for correction.
 
 ### Where can I check my support ticket status? {slug: support/faq/where-can-i-check-my-support-ticket-status}
-- No separate ticket portal; conversation history lives in Feedback/chat bubble.
-- Add follow-up message to bump thread.
-- "AI Consultant" (via "Chat" in "Home"/"Chat" toggle at top of sidebar) is separate, for strategy only, no ticket history.
+Get here: account menu > "Feedback"
+- No separate ticket portal; conversation history and latest reply shown in chat.
+- Add a follow-up message to bump the thread.
+- AI Consultant (via "Chat" in Home/Chat toggle at top of sidebar) is a different feature for strategy advice, not ticket status.
 `;

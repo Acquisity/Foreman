@@ -6,6 +6,9 @@
 // checkout changes), has a gateway model rewrite each group of articles as
 // compact guide sections that keep exact UI labels and the source slug, then
 // writes agent/lib/widget-product-guide.ts. Rerun it whenever the docs ship.
+// Each section opens with a "Get here:" line built from the article and the
+// sidebar in apps/web/lib/sidebar/catalog.ts at the same ref, so a step's path
+// sits in the section it cites.
 // Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
 import { execFileSync } from "node:child_process";
 import {
@@ -24,9 +27,10 @@ import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
 
 const MODEL = "anthropic/claude-sonnet-5";
-/** The navigation pass only reorganises the distilled guide. */
+/** The limits pass only collects what the distilled guide already says. */
 const NAV_MODEL = "google/gemini-3.5-flash";
 const DOCS = "apps/web/content/docs";
+const CATALOG = "apps/web/lib/sidebar/catalog.ts";
 const MDX = /\.mdx$/u;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/u;
 const INDEX_PAGE = /(^|\/)index$/u;
@@ -42,7 +46,7 @@ const BATCH_CHARS = 30_000;
  * Words asked for per source character. The model writes about twice what it
  * is asked for, so 1.09M source characters come out near 45k tokens.
  */
-const RATIO = 0.075 / 6;
+const RATIO = 0.06 / 6;
 
 /**
  * What the app shows depends on the workspace: most features can be switched
@@ -56,6 +60,31 @@ const AVAILABILITY = [
   "Network Researcher, a Resources tool, is only on workspaces where it has been turned on, and the help center has no guide for it.",
   'Most features can be turned off for a workspace, and Client users see only the "Client Portal". When a customer does not see a feature in the sidebar, it may not be on for their workspace or their role.',
 ];
+
+/**
+ * Places the sidebar catalog does not list, as the docs at the same ref
+ * describe them (workspace-settings, support and ai-consultant articles).
+ */
+const ENTRY_POINTS = [
+  '"Settings": click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Workspace" and "Personal".',
+  'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources" and "Log out".',
+  'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar.',
+];
+
+/**
+ * Vendors behind the product and developer hosts; the chat speaks in
+ * Acquisity's own terms, so they are replaced before the model sees the docs.
+ */
+const VENDORS: [RegExp, string][] = [
+  [/\bInstantly(?:\.ai)?\b/gu, "the sending platform"],
+  // "Resend" is also the invitation button; only the vendor's workflow step goes.
+  [/\bResend email step\b/gu, "email step"],
+  [/https?:\/\/(?:developer|api)\.acquisity\.ai\S*/gu, "the developer docs"],
+  [/\b(?:developer|api)\.acquisity\.ai\b/gu, "the developer docs"],
+];
+const VENDOR_LEFT = /\bInstantly\b|(?:developer|api)\.acquisity\.ai/gu;
+const scrub = (text: string) =>
+  VENDORS.reduce((out, [pattern, word]) => out.replace(pattern, word), text);
 
 const { values } = parseArgs({
   options: { ref: { type: "string" }, repo: { type: "string" } },
@@ -86,6 +115,56 @@ execFileSync(
   { timeout: GIT_TIMEOUT_MS }
 );
 const root = join(dir, DOCS);
+
+const GROUP_IDS_BLOCK = /SIDEBAR_GROUP_IDS = \{([\s\S]*?)\}/u;
+const GROUPS_BLOCK = /SIDEBAR_CATALOG_GROUPS[^=]*= \[([\s\S]*?)\n\];/u;
+const CRM_BLOCK = /CRM_V2_PAGE_SPECS[^=]*= \[([\s\S]*?)\n\];/u;
+const PAGES_BLOCK = /SIDEBAR_CATALOG_PAGES[^=]*= \[([\s\S]*?)\n\];/u;
+const GROUP_ID = /(\w+): '([^']+)'/gu;
+const GROUP = /id: SIDEBAR_GROUP_IDS\.(\w+),\s*label: '([^']*)'/gu;
+const CRM_PAGE = /label: '([^']+)'/gu;
+const PAGE =
+  /key: '([^']+)',\s*label: '([^']+)',[\s\S]*?defaultGroupId: SIDEBAR_GROUP_IDS\.(\w+)/gu;
+
+/** The sidebar's groups and pages, in order, from the catalog at the same ref. */
+function sidebar(source: string): string {
+  const groupIds = Object.fromEntries(
+    [...(source.match(GROUP_IDS_BLOCK)?.[1] ?? "").matchAll(GROUP_ID)].map(
+      (m) => [m[1], m[2]]
+    )
+  );
+  const groups = [
+    ...(source.match(GROUPS_BLOCK)?.[1] ?? "").matchAll(GROUP),
+  ].map((m) => ({ id: groupIds[m[1]], label: m[2], pages: [] as string[] }));
+  const crmGroup = groups.find((g) => g.id === "crm");
+  for (const m of (source.match(CRM_BLOCK)?.[1] ?? "").matchAll(CRM_PAGE)) {
+    crmGroup?.pages.push(`"${m[1]}"`);
+  }
+  for (const m of (source.match(PAGES_BLOCK)?.[1] ?? "").matchAll(PAGE)) {
+    const label =
+      m[1] === "crm" ? '"CRM" (when the CRM group is not shown)' : `"${m[2]}"`;
+    groups.find((g) => g.id === groupIds[m[3]])?.pages.push(label);
+  }
+  const pages = groups.flatMap((g) => g.pages).length;
+  // A reshaped catalog must fail here, not ship a guide without a sidebar.
+  if (groups.length < 4 || pages < 15) {
+    throw new Error(
+      `sidebar parse found ${groups.length} groups, ${pages} pages`
+    );
+  }
+  return groups
+    .filter((g) => g.pages.length)
+    .map(
+      (g) =>
+        `- ${g.label ? `Under the "${g.label}" heading` : "At the top"}: ${g.pages.join(", ")}`
+    )
+    .join("\n");
+}
+
+const SIDEBAR = `Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it; Client users see only "Client Portal".
+${sidebar(git("show", `${sha}:${CATALOG}`))}
+${ENTRY_POINTS.map((line) => `- ${line}`).join("\n")}`;
+console.log(SIDEBAR);
 
 interface Article {
   section: string;
@@ -156,7 +235,7 @@ function stripMdx(source: string): { body: string; title: string } {
 
 const articles: Article[] = order(root).map((path) => {
   const slug = relative(root, path).replace(MDX, "").replace(INDEX_PAGE, "");
-  const { body, title } = stripMdx(readFileSync(path, "utf8"));
+  const { body, title } = stripMdx(scrub(readFileSync(path, "utf8")));
   return {
     section: slug.split("/")[0] || "index",
     slug: slug || "index",
@@ -187,7 +266,7 @@ const DISTILL_PROMPT = `You turn Acquisity help-center articles into sections of
 
 Cover every article in the batch, in order. For each article write a heading line exactly like this, using the article's own title and slug as given:
 ### <title> {slug: <slug>}
-then the article's facts as short lines or bullets. When an article adds nothing beyond another article in this batch, write only its heading and one line naming that slug.
+then one line "Get here: <path>" giving how a customer reaches, inside the Acquisity app, the page or feature the article is about, then the article's facts as short lines or bullets. Every article gets this line, FAQ and overview pages included. The path is a path only: it stops at the page, and the steps go below it. It is never the help center's own sections or page titles ("Getting Started", "FAQ"). Write the path the way the article does when it gives one ("In the left sidebar, click "Cold Email Agent", then "Email Accounts""); when it gives none, build it from the sidebar and entry points below, which are the product's real navigation, starting from the sidebar page or entry point. Never put a sidebar heading in a path as something to click. Use only labels the article or the sidebar list gives; when neither places the feature, write "Get here: not stated". When an article adds nothing beyond another article in this batch, write only its heading and one line naming that slug.
 
 Keep, in this order of importance:
 1. Where things are: every navigation path, page, tab, menu, button, field, toggle and setting name. Copy each UI label exactly as the article writes it, with its capitalisation, in double quotes, and write paths as "Settings" > "Members". Never paraphrase or invent a label.
@@ -197,17 +276,21 @@ Keep, in this order of importance:
 5. Limits: what the product cannot do, does not support, or only does in some cases. State these plainly.
 6. Numbers: prices, quotas, durations, limits.
 
-Drop marketing language, motivation, generic advice that is not about Acquisity, repeated explanations, and examples that add no fact. Never add a fact the articles do not state. Plain markdown, no tables, no em dashes. Stay under WORDS words for this batch in total: shorten wording and merge repeated facts rather than drop an article.`;
+Never name the outside services behind the product or developer web addresses; the docs already call them "the sending platform" and "the developer docs".
 
-const NAV_PROMPT = `You are given a product guide for Acquisity, distilled from its help center, with each article's slug in braces. Write two short sections to sit at the top of the guide.
+Drop marketing language, motivation, generic advice that is not about Acquisity, repeated explanations, and examples that add no fact. Never add a fact the articles do not state. Plain markdown, no tables, no em dashes. Stay under WORDS words for this batch in total: shorten wording and merge repeated facts rather than drop an article.
 
-## Navigation map
-Every place in the product a customer can go, grouped by the product's own areas: the exact label of each page, menu, tab and setting as the guide writes it, the path to reach it ("Settings" > "Members"), and the slug that describes it in braces. Copy labels exactly; never invent one. When the guide gives two different paths for the same place, give both and their slugs.
+SIDEBAR_BLOCK`;
+
+const LIMITS_PROMPT = `You are given a product guide for Acquisity, distilled from its help center, with each article's slug in braces. Write two short sections to sit at the top of the guide.
+
+## Who can do what
+Every role limit the guide states: which roles (Owner, Admin, Member, Client) can or cannot see or do an action or page, one line each with its slug in braces. Name the roles exactly as the guide does.
 
 ## What Acquisity cannot do
 Every explicit limit and unsupported thing the guide states, one line each with its slug in braces.
 
-Start with the line "## Navigation map". Plain markdown, no tables, no em dashes. About 4,000 words in total.`;
+Only what the guide states; never generalise one line to other features or roles. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
 const call = async (
@@ -273,7 +356,10 @@ await Promise.all(
       const words = Math.max(60, Math.round(chars * RATIO));
       // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
       sections[index] = await call(
-        DISTILL_PROMPT.replace("WORDS", String(words)),
+        DISTILL_PROMPT.replace("WORDS", String(words)).replace(
+          "SIDEBAR_BLOCK",
+          SIDEBAR
+        ),
         batch
           .map((a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`)
           .join("\n\n=====\n\n"),
@@ -289,7 +375,7 @@ await Promise.all(
  * one article is restored, and em dashes copied from the docs become commas.
  */
 const slugs = available.map((a) => a.slug);
-const body = sections
+const linked = sections
   .join("\n\n")
   .replace(/\{slug: ([^}]+)\}/gu, (marker, slug: string) => {
     const tail = slug.trim().replace(SHORTENED, "/");
@@ -298,10 +384,50 @@ const body = sections
       ? marker
       : `{slug: ${matches[0]}}`;
   });
+/**
+ * Each section keeps its own "Get here:" line; a section without one, or
+ * whose article placed nothing, takes its nearest parent article's line, and
+ * a sidebar heading written as a click is dropped from the path.
+ */
+const HEADING_ONLY = /"(Client Access|Outreach|Build|Go To Market)" > /gu;
+const SECTION_HEAD = /^### .*\{slug: ([^}]+)\}$/u;
+const GET_HERE = /^Get here: (.*)$/u;
+const NOT_STATED = /^not stated\.?$/iu;
+const lines = linked.split("\n");
+const paths = new Map<string, string>();
+let current = "";
+for (const line of lines) {
+  current = line.match(SECTION_HEAD)?.[1] ?? current;
+  const path = line.match(GET_HERE)?.[1];
+  if (path && !NOT_STATED.test(path)) {
+    paths.set(current, path.replace(HEADING_ONLY, ""));
+  }
+}
+const inherited = (slug: string): string | undefined => {
+  for (let parent = slug; parent.includes("/"); ) {
+    parent = parent.slice(0, parent.lastIndexOf("/"));
+    if (paths.has(parent)) {
+      return paths.get(parent);
+    }
+  }
+};
+const body = lines
+  .flatMap((line) => {
+    const path = line.match(GET_HERE)?.[1];
+    if (path) {
+      return NOT_STATED.test(path)
+        ? []
+        : [`Get here: ${path.replace(HEADING_ONLY, "")}`];
+    }
+    const slug = line.match(SECTION_HEAD)?.[1];
+    const fallback = slug && !paths.has(slug) && inherited(slug);
+    return fallback ? [line, `Get here: ${fallback}`] : [line];
+  })
+  .join("\n");
 const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
-const nav = await call(NAV_PROMPT, body, 16_000, NAV_MODEL);
+const limits = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
 const availability = AVAILABILITY.map((line) => `- ${line}`).join("\n");
 const guide = `# Acquisity product guide
 
@@ -310,7 +436,11 @@ Distilled from the Acquisity help center (apps/web/content/docs at ${sha.slice(0
 ## What every workspace may not have
 ${availability}
 
-${nav}
+## Navigation
+${SIDEBAR}
+Each article below opens with "Get here:", the path to the page it describes.
+
+${limits}
 
 ## Articles
 
@@ -319,6 +449,10 @@ ${body}
 rmSync(dir, { force: true, recursive: true });
 // Agent-facing text carries no em dashes; the docs use them freely.
 const plain = guide.replace(/\s*\u2014\s*/gu, ", ");
+const vendors = plain.match(VENDOR_LEFT) ?? [];
+if (vendors.length) {
+  throw new Error(`vendor names left in the guide: ${vendors.join(", ")}`);
+}
 
 const escaped = plain
   .replace(/\\/gu, "\\\\")
@@ -329,6 +463,7 @@ writeFileSync(
   `// Generated by scripts/widget-product-guide.ts from Acquisity ${sha.slice(0, 12)}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n`
 );
 const tokens = Math.round(plain.length / 4);
+const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(
-  `headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `get_here=${getHere} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );

@@ -1,7 +1,13 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { gateway, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { getHelpArticleContent } from "./help-center.js";
+import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 
 /**
@@ -159,13 +165,43 @@ export interface CitedArticle {
   url: string;
 }
 
-/** The text of each cited help-center article; an unreadable one is left out. */
+const FRONTMATTER = /^---\n[\s\S]*?\n---\n?/u;
+const MDX_IMPORTS = /^(import|export) .*$/gmu;
+const TITLE = /^title:\s*["']?(.*?)["']?\s*$/mu;
+
+/**
+ * One article from a local copy of apps/web/content/docs (WIDGET_JUDGE_DOCS),
+ * so the judge can read the docs a change is built from before they ship.
+ */
+function localArticle(url: string, docs: string) {
+  const slug = helpArticleSlug(url);
+  const path = [`${docs}/${slug}.mdx`, `${docs}/${slug}/index.mdx`].find(
+    (candidate) => slug && existsSync(candidate)
+  );
+  if (!path) {
+    return { error: "Article not found.", url };
+  }
+  const raw = readFileSync(path, "utf8");
+  return {
+    content: raw.replace(FRONTMATTER, "").replace(MDX_IMPORTS, "").trim(),
+    title: raw.match(TITLE)?.[1],
+    url: `/docs/${slug}`,
+  };
+}
+
+/**
+ * The text of each cited help-center article; an unreadable one is left out.
+ * Live from the help center unless WIDGET_JUDGE_DOCS names a local docs folder.
+ */
 export async function citedArticles(
   urls: readonly string[],
   opts?: Parameters<typeof getHelpArticleContent>[1]
 ): Promise<CitedArticle[]> {
+  const docs = process.env.WIDGET_JUDGE_DOCS;
   const read = await Promise.all(
-    [...new Set(urls)].map((url) => getHelpArticleContent(url, opts))
+    [...new Set(urls)].map((url) =>
+      docs ? localArticle(url, docs) : getHelpArticleContent(url, opts)
+    )
   );
   return read.flatMap((article) =>
     "error" in article

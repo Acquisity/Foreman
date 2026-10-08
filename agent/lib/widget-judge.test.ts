@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
@@ -495,4 +501,29 @@ test("a cited run's judge input carries the cited article text and the widget af
       line.includes("Report a problem")
     )
   );
+});
+
+test("WIDGET_JUDGE_DOCS reads cited articles from a local docs folder instead of the help center", async () => {
+  const docs = mkdtempSync(`${tmpdir()}/judge-docs-`);
+  mkdirSync(`${docs}/crm`);
+  writeFileSync(
+    `${docs}/crm/index.mdx`,
+    '---\ntitle: "CRM"\n---\nimport X from "x";\nOpen "CRM" in the left sidebar.\n'
+  );
+  process.env.WIDGET_JUDGE_DOCS = docs;
+  try {
+    const articles = await citedArticles([
+      "https://app.acquisity.ai/docs/crm",
+      "https://app.acquisity.ai/docs/missing",
+    ]);
+    assert.deepEqual(articles, [
+      {
+        content: 'Open "CRM" in the left sidebar.',
+        title: "CRM",
+        url: "/docs/crm",
+      },
+    ]);
+  } finally {
+    delete process.env.WIDGET_JUDGE_DOCS;
+  }
 });
