@@ -63,15 +63,17 @@ const AVAILABILITY = [
 
 /**
  * Places the sidebar catalog does not list, checked in the app as an owner on
- * 2026-10-08 (ENG-14932 round 3) and in the shell's menu components.
+ * 2026-10-08 (ENG-14932 round 3) and in the shell's menu components. The
+ * Personal pages carry no role check (settings-menu-items.tsx, isVisible: true),
+ * and the AI Consultant line is the ai-consultant article's own scope (round 4).
  */
 const ENTRY_POINTS = [
   '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Personal" and "Workspace".',
-  'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
+  'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". These are each person\'s own settings: every role sees them and can change its own. "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
   'Workspace menu: click the workspace name in the top-left corner. It lists your workspaces, then "New Workspace", "Settings" and "Sign Out".',
   'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources", "Toggle theme", "Edit sidebar" and "Log out".',
   'Bottom of the sidebar, above "Settings": the "Credits" card with "Add credits", then "What\'s New" and "Help Center".',
-  'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar.',
+  'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar. It gives strategy advice (pricing, positioning, offer structure, niche selection, go-to-market), feedback on campaign results or copy you paste in, help troubleshooting performance, and market research in its Market Researcher mode; its Jacob AI mode helps with ad copy, campaign angles and offer messaging. It does not see your campaigns, CRM or calls. {slug: ai-consultant}',
 ];
 
 /**

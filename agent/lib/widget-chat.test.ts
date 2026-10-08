@@ -64,8 +64,14 @@ test("a failed model call is a short ask to send again", async () => {
 test("the guide's own words never reach the customer", () => {
   assert.equal(
     customerWords(
-      'Get here: In the left sidebar, click "Workflows". The guide says so; see the product guide.'
+      'Get here: In the left sidebar, click "Workflows". The guide says so; buy inboxes in the guide\'s page {canInvestigate}.'
     ),
-    'In the left sidebar, click "Workflows". The help center says so; see the help center.'
+    'In the left sidebar, click "Workflows". The help center says so; buy inboxes in the guide\'s page.'
+  );
+  assert.equal(
+    customerWords(
+      "Tap the magnifying glass so we can investigate why it stalls. We can look into your workspace for you. Then check Leads."
+    ),
+    "Tap the magnifying glass. Then check Leads."
   );
 });
