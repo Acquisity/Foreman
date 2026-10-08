@@ -1,4 +1,4 @@
-import { gateway, streamText } from "ai";
+import { gateway, type LanguageModel, streamText } from "ai";
 import { HELP_CENTER_BASE_URL } from "./help-center.js";
 import { fastCallOptions, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
@@ -161,14 +161,14 @@ export function guideCitations(text: string): KbAnswer {
   return resolveCitations(numbered, articles);
 }
 
-/** The reply with [n] markers, and the cited articles with their guide section as content. */
+/** The reply with [n] markers and the cited articles. */
 function numberSlugs(text: string) {
   const slugs: string[] = [];
   const numbered = text.replace(SLUG_MARKER, (_, list: string) =>
     list
       .split(SLUG_SEPARATOR)
       .map((slug) => slug.replace(TRAILING_SLASH, ""))
-      .filter((slug) => slug in PRODUCT_GUIDE_ARTICLES)
+      .filter((slug) => Object.hasOwn(PRODUCT_GUIDE_ARTICLES, slug))
       .map((slug) => {
         if (!slugs.includes(slug)) {
           slugs.push(slug);
@@ -178,22 +178,10 @@ function numberSlugs(text: string) {
       .join("")
   );
   const articles = slugs.map((slug) => ({
-    content: guideSection(slug),
     title: PRODUCT_GUIDE_ARTICLES[slug] ?? slug,
     url: new URL(`/docs/${slug}`, HELP_CENTER_BASE_URL).toString(),
   }));
   return { articles, numbered };
-}
-
-/** One article's section of the guide: its heading line to the next heading. */
-function guideSection(slug: string): string {
-  const start = PRODUCT_GUIDE.indexOf(`{slug: ${slug}}\n`);
-  if (start < 0) {
-    return "";
-  }
-  const from = PRODUCT_GUIDE.lastIndexOf("\n", start) + 1;
-  const end = PRODUCT_GUIDE.indexOf("\n#", start);
-  return PRODUCT_GUIDE.slice(from, end < 0 ? undefined : end).trim();
 }
 
 const GET_HERE_LABEL = /\bGet here:\s*/giu;
@@ -222,8 +210,27 @@ export const customerWords = (text: string) =>
     .replace(TEAM_CLAUSE, "")
     .replace(TEAM_SENTENCE, "");
 
-export const defaultChatDeps: ChatDeps = {
-  async generate({ messages, signal }) {
+class IncompleteReplyError extends Error {}
+
+/** Fixed failure codes only: provider error messages never enter the log. */
+const chatFailure = (error: unknown) => {
+  if (error instanceof IncompleteReplyError) {
+    return "incomplete_reply";
+  }
+  if (error instanceof Error && error.name === "TimeoutError") {
+    return "timeout";
+  }
+  if (error instanceof Error && error.name === "AbortError") {
+    return "aborted";
+  }
+  return "model_error";
+};
+
+export const defaultChatDeps = {
+  async generate(
+    { messages, signal }: Parameters<ChatDeps["generate"]>[0],
+    languageModel?: LanguageModel
+  ) {
     const model =
       process.env.WIDGET_CHAT_MODEL ?? (await resolveModel("kbChat"));
     const startedAt = Date.now();
@@ -246,7 +253,10 @@ export const defaultChatDeps: ChatDeps = {
         },
         ...messages,
       ],
-      model: gateway(model),
+      model: languageModel ?? gateway(model),
+      // The outer failure path owns bounded reporting; the SDK default prints
+      // the entire provider error, including request and response material.
+      onError: () => undefined,
       providerOptions: {
         ...options.providerOptions,
         gateway: {
@@ -268,6 +278,9 @@ export const defaultChatDeps: ChatDeps = {
       }
       text += delta;
     }
+    if ((await result.finishReason) !== "stop") {
+      throw new IncompleteReplyError("incomplete_reply");
+    }
     const usage = await result.totalUsage;
     return {
       cachedTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
@@ -277,7 +290,7 @@ export const defaultChatDeps: ChatDeps = {
       ttftMs,
     };
   },
-};
+} satisfies ChatDeps;
 
 /** One streamed reply from the guide. Always a reply: a failure is a short ask to send again. */
 export async function answerFromGuide(
@@ -321,7 +334,7 @@ export async function answerFromGuide(
   } catch (error) {
     logOpsEvent("widget.chat.answer", {
       ...log,
-      message: `${error instanceof Error ? error.message.slice(0, 100) : "unknown"} ms=${Date.now() - startedAt}`,
+      message: `reason=${chatFailure(error)} ms=${Date.now() - startedAt}`,
       outcome: "error",
     });
     return {

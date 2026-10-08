@@ -1,14 +1,89 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
+import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import {
   answerFromGuide,
   chatGuideEnabled,
   chatMessages,
   customerWords,
+  defaultChatDeps,
   guideCitations,
 } from "./widget-chat.js";
 
 const TRY_AGAIN = /try your message again/u;
+
+test("SDK failures never log provider text or raw errors", async (t) => {
+  const sentinel = "private-customer-sentinel";
+  const errors = t.mock.method(console, "error", () => undefined);
+  const info = t.mock.method(console, "info", () => undefined);
+  const model = new MockLanguageModelV4({
+    doStream: () =>
+      Promise.resolve({
+        stream: simulateReadableStream({
+          chunkDelayInMs: null,
+          chunks: [{ error: new Error(sentinel), type: "error" }],
+          initialDelayInMs: null,
+        }),
+      }),
+  });
+  const answer = await answerFromGuide(
+    "hi",
+    { conversationId: "c", runId: "r" },
+    undefined,
+    undefined,
+    { generate: (input) => defaultChatDeps.generate(input, model) }
+  );
+  assert.match(answer.message, TRY_AGAIN);
+  assert.equal(errors.mock.callCount(), 0);
+  const lines = info.mock.calls.map((call) => call.arguments.join(" "));
+  assert.ok(lines.length > 0);
+  assert.ok(lines.every((line) => !line.includes(sentinel)));
+  assert.ok(
+    lines.some((line) => line.includes('"event":"widget.chat.answer"'))
+  );
+});
+
+test("a stream cut off by its token limit never sends the partial procedure", async (t) => {
+  const info = t.mock.method(console, "info", () => undefined);
+  const partial = "1. Open Settings.\n2. Delete";
+  const model = wrapLanguageModel({
+    middleware: simulateStreamingMiddleware(),
+    model: new MockLanguageModelV4({
+      doGenerate: {
+        content: [{ text: partial, type: "text" }],
+        finishReason: { raw: "length", unified: "length" },
+        usage: {
+          inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
+          outputTokens: { reasoning: 0, text: 900, total: 900 },
+        },
+        warnings: [],
+      },
+    }),
+  });
+  const answer = await answerFromGuide(
+    "How do I delete this?",
+    { conversationId: "c", runId: "r" },
+    undefined,
+    undefined,
+    { generate: (input) => defaultChatDeps.generate(input, model) }
+  );
+  assert.match(answer.message, TRY_AGAIN);
+  assert.ok(!answer.message.includes(partial));
+  assert.equal(answer.citations.length, 0);
+  assert.ok(
+    info.mock.calls.some((call) =>
+      call.arguments.join(" ").includes("reason=incomplete_reply")
+    )
+  );
+});
+
+test("prototype keys are dropped as unknown citation slugs", () => {
+  assert.deepEqual(guideCitations("Open it. {constructor}"), {
+    citations: [],
+    message: "Open it.",
+  });
+});
 
 test("the guide lane answers unless WIDGET_CHAT is legacy", () => {
   assert.equal(chatGuideEnabled(undefined), true);
