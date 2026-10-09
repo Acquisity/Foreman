@@ -23,6 +23,7 @@ import {
   parseMarks,
   type ReplayRow,
   readRecords,
+  recordFile,
   renderReview,
   renderScorecard,
   reviewedSample,
@@ -97,7 +98,10 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
   if (!existsSync(replay)) {
     throw new Error(`${replay} has no widget replay results.`);
   }
+  // Rows without a run index are numbered by repetition: replay files follow definition order.
+  const seen = new Map<string, number>();
   return readdirSync(replay)
+    .sort()
     .filter((file) => RESULT_FILE.test(file))
     .flatMap((file) => {
       const logs: string[] =
@@ -110,6 +114,8 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
       const row = JSON.parse(line.slice(ROW.length)) as ReplayRow & {
         case: string;
       };
+      row.run ??= seen.get(row.case) ?? 0;
+      seen.set(row.case, row.run + 1);
       // Legacy rows keep the answer in the outcome log.
       if (row.answer === undefined) {
         const outcome = logs.find((log) => log.startsWith("outcome: "));
@@ -136,7 +142,7 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
         ?.slice(REVIEW.length)
         .replace(REVIEW_PAGE, "");
       const name = row.case.split("/").at(-1)?.replace(CASE_FILE, "");
-      const path = `${judgeDir ?? review}/records/${name}.json`;
+      const path = `${judgeDir ?? review}/records/${recordFile(name ?? "", row.run)}`;
       return [
         {
           caseName: name,
@@ -177,7 +183,10 @@ async function rejudgeReplay(replay: ScoredReplay, output: string) {
   if (!name) {
     throw new Error("Saved replay has no case name.");
   }
-  saveRecord(output, reviewedSample(name, recorded, answer, verdicts, gaps));
+  saveRecord(output, {
+    ...reviewedSample(name, recorded, answer, verdicts, gaps),
+    run: replay.row.run || undefined,
+  });
 }
 
 async function rejudge(dirs: string[]) {

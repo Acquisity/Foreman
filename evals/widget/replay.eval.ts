@@ -75,7 +75,7 @@ let warming: Promise<void> | undefined;
 // WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
 export default Array.from({ length: RUNS }, () => selected)
   .flat()
-  .map((file) =>
+  .map((file, index) =>
     defineEval({
       description: `Replay ${file} through the widget route with live models and recorded tool results.`,
       tags: ["widget"],
@@ -90,6 +90,7 @@ export default Array.from({ length: RUNS }, () => selected)
           return;
         }
         const path = `evals/widget/cases/${file}`;
+        const run = Math.floor(index / selected.length);
         // The legacy single-case fallback replays only the case it names.
         const legacy = process.env.WIDGET_REPLAY_CASE;
         if (process.env.WIDGET_REPLAY !== "1" && legacy && legacy !== path) {
@@ -99,16 +100,21 @@ export default Array.from({ length: RUNS }, () => selected)
         if (warming) {
           // A failed warm-up fails its own case only.
           await warming.catch(() => undefined);
-          await replayCase(t, file, path);
+          await replayCase(t, file, path, run);
           return;
         }
-        warming = replayCase(t, file, path);
+        warming = replayCase(t, file, path, run);
         await warming;
       },
     })
   );
 
-async function replayCase(t: EveEvalContext, file: string, path: string) {
+async function replayCase(
+  t: EveEvalContext,
+  file: string,
+  path: string,
+  runIndex: number
+) {
   const recorded = widgetCaseSchema.parse(
     JSON.parse(readFileSync(path, "utf8"))
   );
@@ -173,7 +179,8 @@ async function replayCase(t: EveEvalContext, file: string, path: string) {
     await readWidgetRun(String(runId)),
     recorded,
     path,
-    replyTimes
+    replyTimes,
+    runIndex
   );
 }
 
@@ -182,7 +189,8 @@ async function gradeReplay(
   run: WidgetRun,
   recorded: WidgetCase,
   path: string,
-  replyTimes: { finalReplyMs: number | null; firstReplyMs: number | null }
+  replyTimes: { finalReplyMs: number | null; firstReplyMs: number | null },
+  runIndex: number
 ) {
   const lane = answeredLane(run);
   const session =
@@ -218,6 +226,7 @@ async function gradeReplay(
       case: path,
       citations: (run.outcome?.citations ?? []).map(({ url }) => url),
       replayOutcome: outcome,
+      run: runIndex,
       scored,
       ...(scored
         ? grades
@@ -259,7 +268,7 @@ async function gradeReplay(
       .soft();
     return;
   }
-  await judgeClaims(t, run, recorded, path);
+  await judgeClaims(t, run, recorded, path, runIndex);
   if (!session) {
     t.log("No investigation session: the front door answered.");
     return;
@@ -275,7 +284,8 @@ async function judgeClaims(
   t: EveEvalContext,
   run: WidgetRun,
   recorded: WidgetCase,
-  path: string
+  path: string,
+  runIndex: number
 ) {
   const answer = run.outcome?.message;
   if (!answer) {
@@ -307,10 +317,10 @@ async function judgeClaims(
   }
   const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
   const { gaps, verdicts } = judged;
-  saveRecord(
-    REVIEW_DIR,
-    reviewedSample(name, recorded, answer, verdicts, gaps)
-  );
+  saveRecord(REVIEW_DIR, {
+    ...reviewedSample(name, recorded, answer, verdicts, gaps),
+    run: runIndex || undefined,
+  });
   t.log(`judge review: ${REVIEW_DIR}/review.md`);
   for (const gap of gaps) {
     t.log(`judge gap ${gap.kind}: ${gap.capability ?? ""}`);

@@ -71,6 +71,8 @@ export const judgeRecordSchema = z
     judgedAt: z.iso.datetime(),
     model: z.string().min(1),
     recorded: widgetCaseSchema,
+    // Replay repetition within one eval run; absent on the first run and on older records.
+    run: z.number().int().positive().optional(),
     verdicts: z
       .array(verdictSchema.extend({ claim: z.string().min(1) }))
       .min(1),
@@ -571,12 +573,16 @@ export const readRecords = (dir: string): JudgeRecord[] =>
       )
     );
 
+/** A record's file: one per case and run, so a repeated replay keeps its own verdicts. */
+export const recordFile = (name: string, run?: number) =>
+  `${name}${run ? `.run${run}` : ""}.json`;
+
 /** Save one case's record and regenerate the run's review page from every record so far. */
 export function saveRecord(dir: string, input: JudgeRecord) {
   const record = judgeRecordSchema.parse(input);
   mkdirSync(`${dir}/records`, { recursive: true });
   writeFileSync(
-    `${dir}/records/${record.case}.json`,
+    `${dir}/records/${recordFile(record.case, record.run)}`,
     `${JSON.stringify(record, null, 2)}\n`
   );
   writeFileSync(`${dir}/review.md`, renderReview(readRecords(dir)));
@@ -680,6 +686,8 @@ export interface ReplayRow {
   handedOff?: boolean;
   leaks?: string;
   rawFields?: string;
+  /** Repetition within the eval run, from 0; absent on rows written before ENG-15044 round 4. */
+  run?: number;
   scored?: boolean;
 }
 

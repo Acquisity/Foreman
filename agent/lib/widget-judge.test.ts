@@ -25,6 +25,7 @@ import {
   parseMarks,
   parseVerdicts,
   readRecords,
+  recordFile,
   renderReview,
   renderScorecard,
   reviewedSample,
@@ -189,6 +190,22 @@ test("saveRecord writes the record and regenerates the review", () => {
   );
   const review = readFileSync(`${dir}/review.md`, "utf8");
   assert.ok(review.indexOf("## a") < review.indexOf("## b"));
+});
+
+test("saveRecord keeps each run of a repeated case", () => {
+  const dir = mkdtempSync(`${tmpdir()}/judge-`);
+  saveRecord(dir, record("a"));
+  saveRecord(dir, { ...record("a", [0]), run: 1 });
+  const saved = readRecords(dir);
+  assert.deepEqual(
+    saved.map((r) => [r.run, r.verdicts[0]?.verdict]),
+    [
+      [undefined, "yes"],
+      [1, "no"],
+    ]
+  );
+  assert.equal(recordFile("a", 1), "a.run1.json");
+  assert.equal(recordFile("a", 0), "a.json");
 });
 
 const labelled = (sample: JudgeRecord): GoldEntry =>
