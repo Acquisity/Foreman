@@ -138,12 +138,14 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
       const path = `${judgeDir ?? review}/records/${name}.json`;
       return [
         {
+          caseName: name,
           record:
             (judgeDir || review) && existsSync(path)
               ? judgeRecordSchema.parse(JSON.parse(readFileSync(path, "utf8")))
               : null,
           recorded,
           row,
+          runDir: dir,
         },
       ];
     });
@@ -152,6 +154,31 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
 const percent = (part: number, whole: number) =>
   whole ? `${((part / whole) * 100).toFixed(1)}%` : "n/a";
 
+async function rejudgeReplay(replay: ScoredReplay, output: string) {
+  const recorded = replay.record?.recorded ?? replay.recorded;
+  const { answer } = replay.row;
+  if (!answer) {
+    throw new Error("Saved replay has no answer.");
+  }
+  const articles = await citedArticles(replay.row.citations ?? []);
+  const { verdicts, gaps } = await judgeAnswer(
+    recorded,
+    answer,
+    claimsFor(recorded),
+    undefined,
+    undefined,
+    articles
+  );
+  const name = (replay.row as ReplayRow & { case: string }).case
+    .split("/")
+    .at(-1)
+    ?.replace(CASE_FILE, "");
+  if (!name) {
+    throw new Error("Saved replay has no case name.");
+  }
+  saveRecord(output, reviewedSample(name, recorded, answer, verdicts, gaps));
+}
+
 async function rejudge(dirs: string[]) {
   if (!dirs.length) {
     throw new Error("rejudge requires eval directories.");
@@ -159,34 +186,22 @@ async function rejudge(dirs: string[]) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   for (const [index, dir] of dirs.entries()) {
     const output = `${JUDGE_OUTPUT}/${stamp}-rejudge-${index}`;
+    let judged = 0;
+    let failed = 0;
     for (const replay of replaysIn(dir)) {
       if (replay.row.scored === false || !replay.row.answer) {
         continue;
       }
-      const recorded = replay.record?.recorded ?? replay.recorded;
-      const { answer } = replay.row;
-      // biome-ignore lint/performance/noAwaitInLoops: keep paid judging sequential and cheap to stop.
-      const articles = await citedArticles(replay.row.citations ?? []);
-      const { verdicts, gaps } = await judgeAnswer(
-        recorded,
-        answer,
-        claimsFor(recorded),
-        undefined,
-        undefined,
-        articles
-      );
-      const name = (replay.row as ReplayRow & { case: string }).case
-        .split("/")
-        .at(-1)
-        ?.replace(CASE_FILE, "");
-      if (!name) {
-        throw new Error("Saved replay has no case name.");
+      try {
+        // biome-ignore lint/performance/noAwaitInLoops: keep paid judging sequential and cheap to stop.
+        await rejudgeReplay(replay, output);
+        judged += 1;
+      } catch {
+        failed += 1;
+        console.error(`Rejudge failed: ${replay.caseName} | ${dir}`);
       }
-      saveRecord(
-        output,
-        reviewedSample(name, recorded, answer, verdicts, gaps)
-      );
     }
+    console.log(`Rejudged ${judged} answers; ${failed} failed in ${dir}.`);
     console.log(`pnpm widget:judge scorecard ${dir} --judge-dir ${output}`);
   }
 }
@@ -215,27 +230,42 @@ async function calibrateGold() {
   process.exitCode = under ? 1 : 0;
 }
 
+function scorecardInputs(args: string[]) {
+  const judgeDirs: string[] = [];
+  const runs: string[] = [];
+  const remaining = [...args];
+  while (remaining.length) {
+    const arg = remaining.shift() as string;
+    if (arg === "--judge-dir") {
+      const dir = remaining.shift();
+      if (!dir || dir.startsWith("--")) {
+        throw new Error("--judge-dir requires a directory.");
+      }
+      judgeDirs.push(dir);
+    } else {
+      runs.push(arg);
+    }
+  }
+  const dirs = runs.length
+    ? runs
+    : [`${EVALS}/${readdirSync(EVALS).sort().at(-1)}`];
+  if (judgeDirs.length && judgeDirs.length !== dirs.length) {
+    throw new Error(
+      "Provide one --judge-dir per original eval directory, in matching order."
+    );
+  }
+  return { dirs, judgeDirs };
+}
+
 async function main() {
   const [command, requestedDir] = process.argv.slice(2);
   if (command === "scorecard") {
-    const args = process.argv.slice(3);
-    const overrideAt = args.indexOf("--judge-dir");
-    const judgeDir = overrideAt < 0 ? undefined : args.splice(overrideAt, 2)[1];
-    if (overrideAt >= 0 && !judgeDir) {
-      throw new Error("--judge-dir requires a directory.");
-    }
-    const runs = args;
-    const dirs = runs.length
-      ? runs
-      : [`${EVALS}/${readdirSync(EVALS).sort().at(-1)}`];
-    if (judgeDir && dirs.length !== 1) {
-      throw new Error(
-        "--judge-dir requires exactly one original eval directory."
-      );
-    }
+    const { dirs, judgeDirs } = scorecardInputs(process.argv.slice(3));
     console.log(
       renderScorecard(
-        scorecard(dirs.flatMap((dir) => replaysIn(dir, judgeDir)))
+        scorecard(
+          dirs.flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+        )
       )
     );
     return;

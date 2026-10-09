@@ -51,6 +51,7 @@ const gapSchema = z.strictObject({
     "tool_failure",
     "real_unknown",
     "unused_capability",
+    "out_of_scope",
   ]),
   sentence: z.string(),
 });
@@ -178,7 +179,7 @@ Internal jargon means words a customer would not know: raw field names, status c
 Return exactly one verdict per claim id, in the order given.
 citedArticles is the text of the help-center articles the answer cited; a fact one of them states is supported only for the situation the article states it for, so an article sentence applied to a different situation is unsupported. An Acquisity product fact no cited article, tool result or conversation turn states is unsupported.
 widgetAffordances are real parts of the support widget the answer may mention.
-In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: tool_gap only when no tool in widgetToolCapabilities reads that data, unused_capability when a tool covers it but the investigation did not call it or lacked a required input it could have asked the customer for, tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. Use the authoritative widgetToolCapabilities descriptions and input schemas to establish coverage and prerequisites, not absence from toolResults. For a tool_gap or unused_capability, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
+In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: out_of_scope when the data is outside the customer’s own Acquisity workspace and the widget investigator must not have it (another workspace or organization, the customer’s external bank, card issuer or mailbox provider records, or Acquisity-internal operations such as ticket handling), tool_gap only for data about the customer’s own Acquisity workspace when no tool in widgetToolCapabilities reads it, unused_capability when a tool covers it but the investigation did not call it or lacked a required input it could have asked the customer for, tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. Use the authoritative widgetToolCapabilities descriptions and input schemas to establish coverage and prerequisites, not absence from toolResults. For a tool_gap, unused_capability or out_of_scope, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
@@ -322,10 +323,11 @@ export const parseGaps = (raw: unknown): Gap[] =>
     .object({ gaps: judgeSchema.shape.gaps })
     .parse(raw)
     .gaps.map((gap) => ({
-      capability:
-        gap.kind === "tool_gap" || gap.kind === "unused_capability"
-          ? gap.capability?.trim() || "unnamed"
-          : null,
+      capability: ["tool_gap", "unused_capability", "out_of_scope"].includes(
+        gap.kind
+      )
+        ? gap.capability?.trim() || "unnamed"
+        : null,
       kind: gap.kind,
       sentence: gap.sentence.replace(/\s+/g, " ").trim().slice(0, MAX_REASON),
     }));
@@ -479,9 +481,11 @@ export interface ReplayRow {
 
 /** One replayed case of one run: its row, the case it replayed and the judge's record when the judge ran. */
 export interface ScoredReplay {
+  caseName?: string;
   record: JudgeRecord | null;
   recorded: WidgetCase;
   row: ReplayRow;
+  runDir?: string;
 }
 
 /** Goals with an agreed target (a pass rate from 0 to 1). None is set yet (ENG-15024). */
@@ -617,16 +621,38 @@ export function scorecard(replays: readonly ScoredReplay[]) {
     );
   const gaps = new Map<string, number>();
   const unused = new Map<string, number>();
+  const outOfScope = new Map<string, number>();
   for (const gap of judged.flatMap((record) => record.gaps ?? [])) {
-    if (gap.kind === "tool_gap" || gap.kind === "unused_capability") {
-      const counts = gap.kind === "tool_gap" ? gaps : unused;
+    if (["tool_gap", "unused_capability", "out_of_scope"].includes(gap.kind)) {
+      const counts = {
+        out_of_scope: outOfScope,
+        tool_gap: gaps,
+        unused_capability: unused,
+      }[gap.kind as "tool_gap" | "unused_capability" | "out_of_scope"];
       const name = (gap.capability ?? "unnamed").trim().toLowerCase();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
   }
   return {
     gaps: [...gaps].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    leakFailures: replays.flatMap(({ caseName, runDir, record, row }) => {
+      const checks = (["leaks", "rawFields"] as const).filter(
+        (check) => row[check] !== "pass"
+      );
+      return checks.length
+        ? [
+            {
+              caseName: caseName ?? record?.case ?? "unknown",
+              checks,
+              runDir: runDir ?? "unknown",
+            },
+          ]
+        : [];
+    }),
     missingCoverage,
+    outOfScope: [...outOfScope].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+    ),
     rates,
     replays: replays.length,
     replies: (["firstReplyMs", "finalReplyMs"] as const).map((key) => ({
@@ -663,6 +689,14 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
         `| reply time, ${reply.key} | p50 ${seconds(reply.p50)}, p90 ${seconds(reply.p90)} | ${reply.samples} |  |  |`
     ),
     "",
+    "Failing leak checks (case, run directory, check):",
+    ...(card.leakFailures.length
+      ? card.leakFailures.map(
+          ({ caseName, runDir, checks }) =>
+            `${caseName} | ${runDir} | ${checks.join(", ")}`
+        )
+      : ["none"]),
+    "",
     "Tool gaps by missing capability:",
     ...(card.gaps.length
       ? card.gaps.map(([capability, count]) => `${count}  ${capability}`)
@@ -671,6 +705,11 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
     "Unused capabilities (investigator misses):",
     ...(card.unused.length
       ? card.unused.map(([capability, count]) => `${count}  ${capability}`)
+      : ["none"]),
+    "",
+    "Out of scope (refusals by design):",
+    ...(card.outOfScope.length
+      ? card.outOfScope.map(([capability, count]) => `${count}  ${capability}`)
       : ["none"]),
     "",
   ].join("\n");

@@ -847,3 +847,85 @@ test("answered score requires context and reask and treats absent required verdi
     );
   }
 });
+
+test("out-of-scope refusals parse and rank separately without failing no tool gaps", () => {
+  const sample = scoredSample();
+  sample.record.gaps = parseGaps({
+    gaps: [
+      {
+        capability: " External bank records ",
+        kind: "out_of_scope",
+        sentence: "I cannot check those records.",
+      },
+      {
+        capability: "external bank records",
+        kind: "out_of_scope",
+        sentence: "They are outside this workspace.",
+      },
+    ],
+  });
+  assert.equal(sample.record.gaps[0]?.capability, "External bank records");
+  assert.equal(
+    judgeRecordSchema.parse(sample.record).gaps?.[0]?.kind,
+    "out_of_scope"
+  );
+  const card = scorecard([sample]);
+  assert.deepEqual(card.outOfScope, [["external bank records", 2]]);
+  assert.deepEqual(card.gaps, []);
+  assert.deepEqual(card.unused, []);
+  assert.equal(
+    card.rates.find((rate) => rate.goal === "no tool gaps")?.pass,
+    1
+  );
+  assert.ok(renderScorecard(card).includes("2  external bank records"));
+});
+
+test("leak failures identify each replay and failed check without exposing reply text", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    {
+      ...sample,
+      caseName: "failed-leaks",
+      row: {
+        ...sample.row,
+        answer: "private reply text",
+        leaks: "fail",
+        rawFields: "pass",
+      },
+      runDir: "run-a",
+    },
+    {
+      ...sample,
+      caseName: "failed-fields",
+      row: { ...sample.row, leaks: "pass", rawFields: "fail", scored: false },
+      runDir: "run-b",
+    },
+    {
+      ...sample,
+      caseName: "failed-both",
+      row: { ...sample.row, leaks: "fail", rawFields: "fail" },
+      runDir: "run-c",
+    },
+    {
+      ...sample,
+      caseName: "passed",
+      row: { ...sample.row, leaks: "pass", rawFields: "pass" },
+      runDir: "run-d",
+    },
+  ]);
+  assert.deepEqual(card.leakFailures, [
+    { caseName: "failed-leaks", checks: ["leaks"], runDir: "run-a" },
+    { caseName: "failed-fields", checks: ["rawFields"], runDir: "run-b" },
+    {
+      caseName: "failed-both",
+      checks: ["leaks", "rawFields"],
+      runDir: "run-c",
+    },
+  ]);
+  const rendered = renderScorecard(card);
+  assert.ok(rendered.includes("failed-leaks | run-a | leaks"));
+  assert.ok(rendered.includes("failed-fields | run-b | rawFields"));
+  assert.ok(rendered.includes("failed-both | run-c | leaks, rawFields"));
+  assert.ok(!rendered.includes("private reply text"));
+  assert.ok(!rendered.includes("passed | run-d"));
+});
