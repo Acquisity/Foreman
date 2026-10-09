@@ -1,4 +1,5 @@
-import { gateway, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+import { type LanguageModelMiddleware, wrapLanguageModel } from "ai";
+import { modelFor } from "./models.js";
 import { linkTickets } from "./ticket-links.js";
 
 /** Format model text before eve records or delivers it, including its raw HTTP stream. */
@@ -70,5 +71,5 @@ export const ticketLinkMiddleware: LanguageModelMiddleware = {
 export const ticketLinkedModel = (id: string) =>
   wrapLanguageModel({
     middleware: ticketLinkMiddleware,
-    model: gateway(id),
+    model: modelFor(id),
   });

@@ -1,6 +1,11 @@
-import { gateway, generateObject, generateText } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
-import { fastCallOptions, gatewayRouting, resolveModel } from "./models.js";
+import {
+  fastCallOptions,
+  gatewayRouting,
+  modelFor,
+  resolveModel,
+} from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   type IdentifierCandidates,
@@ -523,7 +528,7 @@ async function modelJudge(
   const model = await resolveModel("gate");
   const { object } = await generateObject({
     abortSignal,
-    model: gateway(model),
+    model: modelFor(model),
     ...gatewayRouting(model),
     prompt: JSON.stringify({
       findings,
@@ -572,7 +577,7 @@ export const defaultGateDeps: GateDeps = {
     const model = await resolveModel("widget");
     const { text } = await generateText({
       abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
-      model: gateway(model),
+      model: modelFor(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
         askedForChange: askedForChange === true,

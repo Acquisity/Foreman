@@ -5,14 +5,15 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { gateway, generateObject, type LanguageModel } from "ai";
+import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
+import { modelFor } from "./models.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
 
 /**
- * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
+ * The claims judge's model. The widget writes with anthropic/claude-sonnet-5.5
  * and its egress gate reviews with openai/gpt-5.6-sol, so the judge is a tier
  * above both and from neither the gate's vendor nor the composer's model:
  * Opus 5.5 is the strongest Anthropic model the gateway serves, at the gate's
@@ -338,7 +339,7 @@ export async function judgeAnswer(
   answer: string,
   claims: Claim[],
   abortSignal?: AbortSignal,
-  model: LanguageModel = gateway(JUDGE_MODEL),
+  model: LanguageModel = modelFor(JUDGE_MODEL),
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
   const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);

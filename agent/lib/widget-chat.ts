@@ -1,6 +1,6 @@
-import { gateway, type LanguageModel, streamText } from "ai";
+import { type LanguageModel, streamText } from "ai";
 import { HELP_CENTER_BASE_URL } from "./help-center.js";
-import { fastCallOptions, resolveModel } from "./models.js";
+import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   hedged,
@@ -253,7 +253,7 @@ export const defaultChatDeps = {
         },
         ...messages,
       ],
-      model: languageModel ?? gateway(model),
+      model: languageModel ?? modelFor(model),
       // The outer failure path owns bounded reporting; the SDK default prints
       // the entire provider error, including request and response material.
       onError: () => undefined,
