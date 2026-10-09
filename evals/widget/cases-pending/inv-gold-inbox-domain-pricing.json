@@ -1,0 +1,189 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "created_at": 1788205721430,
+            "fingerprint": null,
+            "stripe_id": null,
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [],
+            "purchases": [],
+            "licenses": [],
+            "balances": {},
+            "flags": {},
+            "config": {}
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": ["stripe: Autumn record has no stripe_id."]
+      },
+      "requestedAt": "2026-10-06T19:56:14.484Z",
+      "resultAt": "2026-10-06T19:56:42.553Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "creditWindow": {
+          "from": "2025-01-17T00:00:00Z",
+          "to": "2025-04-20T23:59:59Z"
+        }
+      },
+      "output": "[{\"code\":\"custom\",\"path\":[\"creditWindow\"],\"message\":\"Credit history requires a positive window of at most 93 days; from inclusive, to exclusive.\"}]",
+      "requestedAt": "2026-10-06T19:56:45.291Z",
+      "resultAt": "2026-10-06T19:56:45.299Z",
+      "status": "failed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "orderId": null
+      },
+      "output": {
+        "caveats": [
+          "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost. paidAt is the order's own saved paid date, not a link to an invoice or charge: say the order records a paid date, call an order paid only when a billing record ties a payment to that order, and otherwise say payment for it could not be confirmed.",
+          "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
+          "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
+          "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
+          "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+          "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders."
+        ],
+        "observedAt": "2026-10-06T19:56:48.339Z",
+        "orders": [
+          {
+            "billingAccountId": "00000000-0000-4000-8000-000000000001",
+            "completedAt": null,
+            "createdAt": "2026-10-06T19:32:18.762705+00:00",
+            "diagnostics": null,
+            "dismissed": false,
+            "error": "User cancelled the reservation",
+            "hasError": true,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "mailProvider": "coldmailreseller",
+            "orderType": "pre_warmed",
+            "paidAt": null,
+            "providerOrderId": null,
+            "provisioningAttempts": 0,
+            "provisioningFunctionId": "domain-1.example-purchase-order",
+            "provisioningLastUpdated": null,
+            "provisioningStartedAt": null,
+            "reconciliation": {
+              "domainsActive": 0,
+              "domainsCharged": 10,
+              "domainsFailed": 0,
+              "domainsMissing": 10,
+              "domainsProvisionedCounter": 0,
+              "fullyProvisioned": false,
+              "inboxesActive": 0,
+              "inboxesCharged": 30,
+              "inboxesConnected": 0,
+              "inboxesMissing": 30,
+              "inboxesProvisionedCounter": 0,
+              "invisibleInboxes": true
+            },
+            "runState": "cancelled",
+            "status": "cancelled",
+            "step": "0/10",
+            "submissionId": null,
+            "updatedAt": "2026-10-06T19:34:50.53+00:00"
+          }
+        ],
+        "source": "Acquisity product database; saved order state, not a live provisioning or billing check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T19:56:46.867Z",
+      "resultAt": "2026-10-06T19:56:48.808Z",
+      "status": "completed",
+      "tool": "widget_provisioning_status"
+    },
+    {
+      "input": {
+        "question": "Is the $18/year domain and $8/month inbox pricing what you're seeing at checkout right now when adding new inboxes, or is this about a charge that already went through?"
+      },
+      "output": {
+        "asked": "Is the $18/year domain and $8/month inbox pricing what you're seeing at checkout right now when adding new inboxes, or is this about a charge that already went through?"
+      },
+      "requestedAt": "2026-10-06T19:56:51.405Z",
+      "resultAt": "2026-10-06T19:56:51.406Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "Billing shows no plan, subscription or charge on this workspace, and its only order (10 domains, 30 inboxes) was cancelled at reservation without payment; nothing recorded shows a Gold-tier inbox or domain discount.",
+    "causeType": "unclear",
+    "claims": [
+      "Says no plan or Gold membership is recorded on this workspace's billing.",
+      "Says the 10-domain order was cancelled and nothing was charged.",
+      "Does not promise or quote a lower Gold-tier price for inboxes or domains."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n10 domains at $18/year and inboxes $8/month- I thought this was a lot less expensive\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I am a gold member, what is my price for mailboxes and domains?\nSupport: Inboxes bill monthly and domains bill yearly, with exact prices shown at checkout. To see current prices for your workspace, go to Cold Email Agent, click Email Accounts, and click Add New Inboxes in the top right.\nCustomer: It shows $8 a month\nSupport: Which charge is this about, and what did you expect to see instead?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M49CKDF20GSP7QQT1CQNJMAQ",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_billing_summary",
+      "widget_provisioning_status",
+      "widget_ask_customer"
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "Could you tell me where that Zoom link came from (for example, a calendar invite, an email, or a specific page in the app)? That'll help me track down the right link for your 12:30 PM EST walkthrough."
+      },
+      "output": {
+        "asked": "Could you tell me where that Zoom link came from (for example, a calendar invite, an email, or a specific page in the app)? That'll help me track down the right link for your 12:30 PM EST walkthrough."
+      },
+      "requestedAt": "2026-10-07T16:53:27.218Z",
+      "resultAt": "2026-10-07T16:53:27.223Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "No recorded read covers meetings or meeting links; nothing in the evidence identifies the walkthrough or a valid Zoom link.",
+    "causeType": "unclear",
+    "claims": [
+      "Does not invent a Zoom link or meeting ID.",
+      "Says it cannot see or issue the walkthrough's meeting link from here.",
+      "Asks where the link came from or points the customer to whoever scheduled the walkthrough."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "I'm trying to join the Company One walkthrough at 12:30 PM EST, but the Zoom link you gave me returns \"invalid meeting ID.\" Please send a new Zoom link (or paste it here) for the call.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4BMHCYR0GVS8HTCNCTDYH8P",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}

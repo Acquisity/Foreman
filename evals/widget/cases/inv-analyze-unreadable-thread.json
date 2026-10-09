@@ -1,0 +1,78 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "caveats": [
+          "Saved product state is not a live calendar, Zoom or outreach provider check.",
+          "Times are UTC instants; compare against prospectTimezone and the host timezone before calling a slot wrong.",
+          "Meeting links: with conferencingLinkType static the link is the saved static link (hasStaticMeetingLink), and empty conferencingAccounts is normal, not a fault. Only with dynamic does a missing or invalid conferencing account explain missing links. An invalid or missing calendar account explains unbookable slots either way.",
+          "aiSdrEnabled is the workspace's AI SDR switch. aiSdrV2Enabled false only means the workspace runs the earlier AI SDR workflow; it never means AI SDR is off.",
+          "Unfiltered lists contain v2-touched threads. campaignId or prospectEmail also finds legacy threads. A null host with automatic_ambiguous means multiple members qualify and the product fallback is unordered; it does not mean no handler. Without a campaign, the host is only the workspace default."
+        ],
+        "evidence": {
+          "nextAfter": null,
+          "read": "threads",
+          "threads": [],
+          "workspace": {
+            "aiSdrEnabled": true,
+            "aiSdrV2Enabled": true,
+            "hasSettings": true,
+            "host": null,
+            "hostResolution": "no_calendar_host"
+          }
+        },
+        "observedAt": "2026-10-08T13:52:38.272Z",
+        "source": "Acquisity product database; saved state, not a live calendar or provider check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T13:52:36.823Z",
+      "resultAt": "2026-10-08T13:52:38.935Z",
+      "status": "completed",
+      "tool": "widget_sdr_thread_status"
+    },
+    {
+      "input": {
+        "question": "Could you paste the actual text of Name 1's and Name 2's messages (or a screenshot where the text is readable)? I can't read the thumbnail in your screenshot, so I need the message content to analyze the blocker, goal, and Name 2's comment."
+      },
+      "output": {
+        "asked": "Could you paste the actual text of Name 1's and Name 2's messages (or a screenshot where the text is readable)? I can't read the thumbnail in your screenshot, so I need the message content to analyze the blocker, goal, and Name 2's comment."
+      },
+      "requestedAt": "2026-10-08T13:52:41.830Z",
+      "resultAt": "2026-10-08T13:52:41.831Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "The text in the customer's screenshot could not be read and the AI SDR thread read returned no threads, so the recorded evidence does not contain the messages the customer wants analyzed.",
+    "causeType": "unclear",
+    "claims": [
+      "Says it could not read the messages in the screenshot and asks the customer to paste their text or send a readable screenshot.",
+      "Does not invent what the prospect's blocker or goal is, or what the teammate's comment says.",
+      "Does not claim to have found this thread in the workspace."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ncan you please analzye this thread and tell me what Name 1's blocker, goal, and how he cna achieve it, and whatdo yo think aout Name 2's comment,and how i can reply to give a complete answer to Name 1 for his last comment reply\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (what the customer's screen showed, as read by an image model: context for the message, not part of what they wrote):\n[Screenshot the customer attached, as read by an image model]\nScreen: Support chat thread\nWhat stands out: Support chat thread showing messages from Name 1 and Name 2, including an attached thumbnail image.\nCould not read: Text inside the attached screenshot thumbnail\n\n[Screenshot the customer attached, as read by an image model]\nScreen: Contact thread view\nText shown: \"Next follow-up in 4 days\"\nWhat stands out: Nothing looks wrong, disabled, or empty; AI SDR is enabled and follow-up is scheduled.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how can you help?\nSupport: Happy to help! What would you like assistance with today?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4DWK1NY0GP137JVJCSN0EQZ",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_sdr_thread_status", "widget_ask_customer"]
+  }
+}

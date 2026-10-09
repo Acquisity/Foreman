@@ -1,0 +1,1348 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "created_at": 1764078431676,
+            "fingerprint": null,
+            "stripe_id": "cus_x1",
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [
+              {
+                "id": "cus_prod_x2",
+                "plan": {
+                  "id": "legacy",
+                  "internal_id": "prod_x3",
+                  "name": "Legacy",
+                  "description": null,
+                  "group": null,
+                  "version": 3,
+                  "version_slug": "v3",
+                  "active": true,
+                  "add_on": false,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 1,
+                    "interval": "month",
+                    "price_id": "pr_x4",
+                    "display": {
+                      "primary_text": "$1",
+                      "secondary_text": "per month"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x5"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 1,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "1 credit"
+                      },
+                      "entitlement_id": "ent_x6"
+                    },
+                    {
+                      "feature_id": "website_credit",
+                      "included": 500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "500 website credits"
+                      },
+                      "entitlement_id": "ent_x7"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x8"
+                    }
+                  },
+                  "created_at": 1774478699745,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "legacy",
+                "auto_enable": false,
+                "add_on": false,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1766093134299,
+                "current_period_start": 1790353002000,
+                "current_period_end": 1792945002000,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "id": "cus_prod_x9",
+                "plan": {
+                  "id": "domain",
+                  "internal_id": "prod_x10",
+                  "name": "Domain",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": null,
+                  "items": [
+                    {
+                      "feature_id": "domains",
+                      "included": 0,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": null,
+                      "price": {
+                        "amount": 18,
+                        "interval": "year",
+                        "billing_units": 1,
+                        "billing_method": "prepaid",
+                        "max_purchase": null,
+                        "processors": {
+                          "stripe": {
+                            "price_id": "price_x11"
+                          }
+                        }
+                      },
+                      "display": {
+                        "primary_text": "$18 per domain"
+                      },
+                      "proration": {
+                        "on_increase": "prorate_immediately",
+                        "on_decrease": "prorate_immediately"
+                      },
+                      "entitlement_id": "ent_x12",
+                      "price_id": "pr_x13"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x14"
+                    }
+                  },
+                  "created_at": 1764029047554,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "domain",
+                "auto_enable": false,
+                "add_on": true,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1764184963110,
+                "current_period_start": 1790353002000,
+                "current_period_end": 1792945002000,
+                "quantity": 1,
+                "scope": "customer"
+              }
+            ],
+            "purchases": [
+              {
+                "plan": {
+                  "id": "5000_credits",
+                  "internal_id": "prod_x15",
+                  "name": "Name 1",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 45,
+                    "interval": "one_off",
+                    "price_id": "pr_x16",
+                    "display": {
+                      "primary_text": "$45",
+                      "secondary_text": "one-off"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x17"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 5000,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "Name 1"
+                      },
+                      "entitlement_id": "ent_x18"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x19"
+                    }
+                  },
+                  "created_at": 1763906298171,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "5000_credits",
+                "expires_at": null,
+                "started_at": 1770841528851,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "plan": {
+                  "id": "2500_credits",
+                  "internal_id": "prod_x20",
+                  "name": "Name 2",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 23.75,
+                    "interval": "one_off",
+                    "price_id": "pr_x21",
+                    "display": {
+                      "primary_text": "$23.75",
+                      "secondary_text": "one-off"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x22"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 2500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "Name 2"
+                      },
+                      "entitlement_id": "ent_x23"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x24"
+                    }
+                  },
+                  "created_at": 1763906298128,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "2500_credits",
+                "expires_at": null,
+                "started_at": 1770134543663,
+                "quantity": 2,
+                "scope": "customer"
+              }
+            ],
+            "licenses": [],
+            "balances": {
+              "credits": {
+                "feature_id": "credits",
+                "feature": {
+                  "id": "credits",
+                  "internal_id": "fe_x25",
+                  "name": "Credits",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "display": {
+                    "singular": "credit",
+                    "plural": "credits"
+                  },
+                  "archived": false
+                },
+                "granted": 10001,
+                "remaining": 2473,
+                "usage": 7528,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x26",
+                    "plan_id": "legacy",
+                    "included_grant": 1,
+                    "prepaid_grant": 0,
+                    "remaining": 0,
+                    "usage": 1,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  },
+                  {
+                    "id": "cus_ent_x27",
+                    "plan_id": "2500_credits",
+                    "included_grant": 5000,
+                    "prepaid_grant": 0,
+                    "remaining": 0,
+                    "usage": 5000,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  },
+                  {
+                    "id": "cus_ent_x28",
+                    "plan_id": "5000_credits",
+                    "included_grant": 5000,
+                    "prepaid_grant": 0,
+                    "remaining": 2473,
+                    "usage": 2527,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "website_credit": {
+                "feature_id": "website_credit",
+                "feature": {
+                  "id": "website_credit",
+                  "internal_id": "fe_x29",
+                  "name": "Website Credit",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "credit_schema": [
+                    {
+                      "metered_feature_id": "",
+                      "credit_cost": 0
+                    }
+                  ],
+                  "display": {
+                    "singular": "website credit",
+                    "plural": "website credits"
+                  },
+                  "archived": false
+                },
+                "granted": 500,
+                "remaining": 500,
+                "usage": 0,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x30",
+                    "plan_id": "legacy",
+                    "included_grant": 500,
+                    "prepaid_grant": 0,
+                    "remaining": 500,
+                    "usage": 0,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "domains": {
+                "feature_id": "domains",
+                "feature": {
+                  "id": "domains",
+                  "internal_id": "fe_x31",
+                  "name": "Domains",
+                  "type": "metered",
+                  "consumable": false,
+                  "event_names": [],
+                  "display": {
+                    "singular": "domain",
+                    "plural": "domains"
+                  },
+                  "archived": false
+                },
+                "granted": 12,
+                "remaining": 0,
+                "usage": 12,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x32",
+                    "plan_id": "domain",
+                    "included_grant": 0,
+                    "prepaid_grant": 12,
+                    "remaining": 0,
+                    "usage": 12,
+                    "unlimited": false,
+                    "reset": null,
+                    "price": {
+                      "amount": 18,
+                      "billing_units": 1,
+                      "billing_method": "prepaid",
+                      "max_purchase": null
+                    },
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              }
+            },
+            "flags": {},
+            "config": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            }
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [
+          {
+            "amountCents": 13857,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:24:44.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x33",
+            "refunded": false,
+            "status": "failed"
+          },
+          {
+            "amountCents": 13858,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:22:50.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x34",
+            "refunded": false,
+            "status": "failed"
+          }
+        ],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-25T17:17:40.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x35",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-25T17:18:18.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x36",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-25T17:18:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x37",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-25T17:18:03.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x38",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-25T17:18:45.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x39",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-25T17:19:20.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x40",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-03-25T17:18:16.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x41",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-25T17:19:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x42",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 4500,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-11T20:25:27.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x43",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-05T17:04:17.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x44",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-03T16:02:22.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x45",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-01-25T17:20:09.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x46",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 123,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-12-25T17:18:09.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x47",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 13857,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:24:44.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x33",
+            "refunded": false,
+            "status": "failed"
+          },
+          {
+            "amountCents": 10393,
+            "amountRefundedCents": 10393,
+            "createdAt": "2025-11-26T19:24:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x48",
+            "refunded": true,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 13858,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:22:50.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x34",
+            "refunded": false,
+            "status": "failed"
+          },
+          {
+            "amountCents": 10767,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:22:41.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x49",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 12322,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-26T19:12:12.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x50",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-11-25T16:16:45.000Z",
+            "currency": "usd",
+            "description": "Subscription creation",
+            "id": "py_x51",
+            "refunded": false,
+            "status": "succeeded"
+          }
+        ],
+        "recentInvoices": [
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-25T16:17:25.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x52",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-10-25T16:16:42.000Z",
+                "periodStart": "2026-09-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-25T17:17:36.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-25T16:17:35.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x53",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-09-25T16:16:42.000Z",
+                "periodStart": "2026-08-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-25T17:18:13.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-25T16:17:42.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x54",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-08-25T16:16:42.000Z",
+                "periodStart": "2026-07-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-25T17:18:31.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-25T16:17:10.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x55",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-07-25T16:16:42.000Z",
+                "periodStart": "2026-06-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-25T17:17:58.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-25T16:17:51.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x56",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-06-25T16:16:42.000Z",
+                "periodStart": "2026-05-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-25T17:18:39.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-04-25T16:18:16.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x57",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-05-25T16:16:42.000Z",
+                "periodStart": "2026-04-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-25T17:19:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-03-25T16:17:10.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x58",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-04-25T16:16:42.000Z",
+                "periodStart": "2026-03-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-03-25T17:18:11.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-02-25T16:18:18.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x59",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-03-25T16:16:42.000Z",
+                "periodStart": "2026-02-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-25T17:19:32.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 4500,
+            "amountPaidCents": 4500,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-02-11T20:25:21.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x60",
+            "lines": [
+              {
+                "amountCents": 4500,
+                "description": "Name 1",
+                "periodEnd": "2026-02-11T20:25:21.000Z",
+                "periodStart": "2026-02-11T20:25:21.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-11T20:25:25.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 4500
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-02-05T17:04:10.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x61",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 2",
+                "periodEnd": "2026-02-05T17:04:11.000Z",
+                "periodStart": "2026-02-05T17:04:11.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-05T17:04:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-02-03T16:02:16.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x62",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 2",
+                "periodEnd": "2026-02-03T16:02:16.000Z",
+                "periodStart": "2026-02-03T16:02:16.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-03T16:02:20.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-01-25T16:17:26.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x63",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-02-25T16:16:42.000Z",
+                "periodStart": "2026-01-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-01-25T17:20:05.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 123,
+            "amountPaidCents": 123,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2025-12-25T16:17:37.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": -23,
+            "discountCents": 0,
+            "id": "in_x64",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-01-25T16:16:42.000Z",
+                "periodStart": "2025-12-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-12-25T17:18:04.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 0,
+            "amountPaidCents": 0,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2025-12-18T21:25:30.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 23,
+            "discountCents": 0,
+            "id": "in_x65",
+            "lines": [
+              {
+                "amountCents": 23,
+                "description": "Remaining time on Legacy after 18 Dec 2025",
+                "periodEnd": "2025-12-25T16:16:42.000Z",
+                "periodStart": "2025-12-18T21:25:28.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-12-18T21:25:30.000Z",
+            "settlement": "paid_without_money",
+            "status": "paid",
+            "totalCents": 23
+          },
+          {
+            "amountDueCents": 10393,
+            "amountPaidCents": 10393,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2025-11-26T19:24:33.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x66",
+            "lines": [
+              {
+                "amountCents": 10393,
+                "description": "Domain - 12 domains",
+                "periodEnd": "2025-12-25T16:16:42.000Z",
+                "periodStart": "2025-11-26T19:24:33.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-11-26T19:24:36.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 10393
+          },
+          {
+            "amountDueCents": 10767,
+            "amountPaidCents": 10767,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_update",
+            "chargeId": null,
+            "createdAt": "2025-11-26T19:22:39.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x67",
+            "lines": [
+              {
+                "amountCents": 10767,
+                "description": "Remaining time on 6 × Domain - Domains after 26 Nov 2025",
+                "periodEnd": "2026-11-25T16:16:42.000Z",
+                "periodStart": "2025-11-26T19:22:38.000Z",
+                "proration": null,
+                "quantity": 6
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-11-26T19:22:38.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 10767
+          },
+          {
+            "amountDueCents": 12322,
+            "amountPaidCents": 12322,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2025-11-26T19:12:07.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x68",
+            "lines": [
+              {
+                "amountCents": -96,
+                "description": "Unused time on Legacy after 26 Nov 2025",
+                "periodEnd": "2025-12-25T16:16:42.000Z",
+                "periodStart": "2025-11-26T19:12:05.000Z",
+                "proration": null,
+                "quantity": 1
+              },
+              {
+                "amountCents": 12418,
+                "description": "Remaining time on Legacy Pro after 26 Nov 2025",
+                "periodEnd": "2025-12-25T16:16:42.000Z",
+                "periodStart": "2025-11-26T19:12:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-11-26T19:12:10.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 12322
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_create",
+            "chargeId": null,
+            "createdAt": "2025-11-25T16:16:42.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x69",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2025-12-25T16:16:42.000Z",
+                "periodStart": "2025-11-25T16:16:42.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-11-25T16:16:45.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          }
+        ],
+        "recentRefunds": [
+          {
+            "amountCents": 10393,
+            "amountRefundedCents": 10393,
+            "createdAt": "2025-11-26T19:24:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x48",
+            "refunded": true,
+            "status": "succeeded"
+          }
+        ],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": true,
+          "notes": [
+            "Stripe shows a succeeded charge, but the product database has no active subscription status. Check whether this organization was charged without being provisioned."
+          ]
+        },
+        "stripeSubscriptions": [
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x70",
+            "status": "active",
+            "trialEnd": null
+          }
+        ],
+        "truncated": [],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-05T22:22:05.566Z",
+      "resultAt": "2026-10-05T22:22:19.622Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-09-23T16:50:27.729+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-08-26T20:54:33.621+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2025-10-16T20:10:33.776+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T22:22:22.967Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": null,
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T22:22:21.264Z",
+      "resultAt": "2026-10-05T22:22:23.442Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    }
+  ],
+  "expectations": {
+    "cause": "Billing records show this workspace on the Legacy plan at $1 a month plus a domain add-on, with no Silver plan recorded and no workspace allowance in the plan items; nothing recorded shows how many workspaces the customer can open or whether Cold Email Agent and AI SDR can be enabled for a client workspace.",
+    "causeType": "unclear",
+    "claims": [
+      "Says the workspace's billing shows the Legacy plan, not a Silver plan.",
+      "Does not state a specific number of available workspaces.",
+      "Does not claim Cold Email Agent or AI SDR is or will be enabled for the client workspace.",
+      "Tells the customer the request is passed to a person."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "human",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nescalate this\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Process to get a new workspace open for a client. I have 2 or 4 free workspaces as I am on silver plan\nSupport: 1. From your dashboard, click the Workspace Switcher dropdown in the top-left corner.\n2. Click New Workspace at the bottom of the dropdown.\n3. In the Create Workspace dialog, enter your client's business name in the Workspace Name field.\n4. Click Create Workspace.\n5. Complete Onboarding with the client's website, business type, sales method, and primary bottleneck.\n6. Once created, go to Settings, then Members in the left sidebar.\n7. In the Invite Member card, enter your client's email address.\n8. Select Client from the role dropdown.\n9. Click Send Invite.\nCustomer: then how do i turn on the cold email agent and SDR for the client\nSupport: If you use a white-label partner portal, ask your partner to enable the Cold Email Agent and AI SDR for client access.\nCustomer: Can you escalate this? I wanna know how many workspaces I have available as a silver member, and what it takes to enable the AI SDR/Cold Email agent\nSupport: To view how many workspaces your Pro subscription covers:\n1. Click your workspace name in the top-left corner.\n2. Click Settings in the menu that opens.\n3. Click Billing under \"Workspace\" in the left menu.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M472HQJ50GR4EVMEFRTRRSYE",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_billing_summary", "widget_account_access"]
+  }
+}

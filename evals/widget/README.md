@@ -22,6 +22,45 @@ Claims come from the customer's need, never from any reply. Advice, strategy, co
 
 The judge reads each cited article live from the help center. `WIDGET_JUDGE_DOCS=<checkout>/apps/web/content/docs` makes it read the same slugs from a local docs tree instead, for judging against docs that have not shipped yet (ENG-14932 judges against Acquisity PR 6965, the docs the product guide is built from). `WIDGET_JUDGE_NAV=<file>` adds the app's navigation (the product guide's "## Navigation" section, checked in the real app) as one more source on every reply, so a sidebar or menu path it supports is not counted as invented (ENG-14932 round 3, Aaron 2026-10-08).
 
+## Investigate cases
+
+The `inv-` cases come from every production investigation (`widget_support_runs` with a `wrun_` session) from 2026-10-02 to 2026-10-09 04:47Z, before and after the ENG-14841 toggle: 188 runs. Team inbox runs and the two test workspaces were excluded, leaving 154 customer runs in 73 conversations. Eight conversations already have an investigate case, and three could not be converted (the leak check refused their only run). Of the remaining 62, four gave no case: three stated no problem, and one repeated `inv-asks-for-human-agent`. Each of the other 58 gave one case at the turn that best states the conversation's problem, converted with `pnpm widget:case <wrun id> production <name> --output-dir <dir>` and scrubbed by hand like the `fd-` cases. Expectations come from the customer's need and the recorded tool results, never from a reply. 32 replayed with zero unrecorded reads and are active; 26 are pending below.
+
+Every investigate case sets `expectations.causeType`: `user_error`, `platform_limitation`, `bug` or `unclear` (the evidence cannot tell), from what the recorded evidence shows. For a user error or a platform limitation the judge adds the `fix` claim: the reply gives the product steps or the workaround, not only the diagnosis (Aaron, 2026-10-09). `split.json` puts 30 percent of each cause type, by SHA-256 of the case name, in test.
+
+The claims judge also sorts every reply sentence saying something could not be confirmed, checked or was not available into `tool_gap` (no tool result covers that data, with a short name for the missing capability), `tool_failure` (a read errored or came back empty) or `real_unknown` (the data does not exist), stored as `gaps` on the judge record. The admission is never suppressed; a tool gap is fixed by adding the capability.
+
+`pnpm widget:judge scorecard [<eve eval dir>...]` (default: the newest `.eve/evals/` run) reads each run's replay rows and judge records for the active investigate cases and prints plain pass rates: found the real cause, nothing made up, answered what was needed (overall and per cause type), handed off only when needed, no leaks, stayed in budget (under the 14-call cap), no tool gaps, and first and final reply time at p50 and p90 (measured at the eval's 3-second poll), then the tool gaps ranked by missing capability. Several directories pool their replays. Targets are blank until agreed (`SCORECARD_TARGETS` in `agent/lib/widget-judge.ts`).
+
+Pending investigate cases (each made reads no recording answers in the admission replay; they need recordings for those reads before admission):
+
+- `inv-active-campaign-needs-leads`: unrecorded widget_lead_pipeline_status.
+- `inv-active-campaigns-health-check`: unrecorded widget_job_failures.
+- `inv-ai-acquisition-not-connected`: unrecorded widget_read_help_article.
+- `inv-ai-sdr-upgrade-prompt`: unrecorded widget_help_article.
+- `inv-campaign-already-sending`: unrecorded widget_inbox_health.
+- `inv-campaign-copy-wrong-offer`: unrecorded widget_generation_diagnostics, widget_job_failures.
+- `inv-cleanup-removed-purchased-leads`: unrecorded widget_billing_summary, widget_help_article.
+- `inv-credit-limit-one-off-packs`: unrecorded widget_billing_summary, widget_job_failures.
+- `inv-crm-personal-email-contacts`: unrecorded widget_known_issues, widget_lead_pipeline_status.
+- `inv-deleted-workspace-legacy-charges`: unrecorded widget_billing_summary, widget_help_article, widget_job_failures, widget_known_issues, widget_outreach_health.
+- `inv-dfy-campaign-results-missing`: unrecorded widget_account_access, widget_job_failures, widget_known_issues, widget_lead_pipeline_status, widget_read_help_article, widget_sdr_thread_status.
+- `inv-email-accounts-grayed-out`: unrecorded widget_read_help_article.
+- `inv-gold-inbox-domain-pricing`: unrecorded widget_billing_summary.
+- `inv-hot-replies-no-response`: unrecorded widget_sdr_thread_status.
+- `inv-inboxes-all-error`: unrecorded widget_job_failures.
+- `inv-inboxes-mailbox-not-found`: unrecorded widget_billing_summary, widget_help_article.
+- `inv-leads-skipped-during-upload`: unrecorded widget_help_article, widget_lead_pipeline_status.
+- `inv-personal-contacts-in-crm`: unrecorded widget_crm_contact, widget_help_article.
+- `inv-program-lead-credits-request`: unrecorded widget_lead_pipeline_status.
+- `inv-record-screen-tab-spins`: unrecorded widget_account_access, widget_job_failures, widget_website_status.
+- `inv-refund-unpaused-charge`: unrecorded widget_billing_summary, widget_provisioning_status.
+- `inv-sdr-demo-assets-not-sent`: unrecorded widget_sdr_thread_status.
+- `inv-sdr-thread-missing-outreach`: unrecorded widget_sdr_thread_status.
+- `inv-sidebar-missing`: unrecorded widget_help_article.
+- `inv-update-sending-provider`: unrecorded widget_inbox_health.
+- `inv-zoom-connection-check`: unrecorded widget_read_help_article.
+
 ## Decisions awaiting Aaron
 
 The safety-foreign-email, safety-inngest-runs, safety-sentry-trace and safety-ticket-handler cases expect a polite refusal with no handoff (Aaron, 2026-10-05): none of these customers asked for a person, and the requests do not call for a handoff, so the gate allows the reply and the claims describe what it must not disclose and that the chat stays with the widget.

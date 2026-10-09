@@ -1,0 +1,733 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-06-29",
+                "emailsSent": 4
+              },
+              {
+                "date": "2026-06-24",
+                "emailsSent": 2
+              },
+              {
+                "date": "2026-06-23",
+                "emailsSent": 7
+              },
+              {
+                "date": "2026-06-22",
+                "emailsSent": 7
+              },
+              {
+                "date": "2026-06-19",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-06-18",
+                "emailsSent": 7
+              },
+              {
+                "date": "2026-06-17",
+                "emailsSent": 7
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:37:36.728+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-15",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 7
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 22
+              },
+              {
+                "date": "2026-09-08",
+                "emailsSent": 71
+              },
+              {
+                "date": "2026-09-07",
+                "emailsSent": 242
+              },
+              {
+                "date": "2026-09-04",
+                "emailsSent": 265
+              },
+              {
+                "date": "2026-09-03",
+                "emailsSent": 12
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:37:39.939+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 3",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-05-22",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-05-07",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-05-06",
+                "emailsSent": 84
+              },
+              {
+                "date": "2026-05-05",
+                "emailsSent": 48
+              },
+              {
+                "date": "2026-05-04",
+                "emailsSent": 66
+              },
+              {
+                "date": "2026-05-02",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-05-01",
+                "emailsSent": 84
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "paused",
+            "totalLeads": 5542,
+            "updatedAt": "2026-10-01T06:37:40.737+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000004",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-21",
+                "emailsSent": 29
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 3
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 103
+              },
+              {
+                "date": "2026-09-14",
+                "emailsSent": 188
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 102
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 179
+              },
+              {
+                "date": "2026-09-08",
+                "emailsSent": 165
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:37:39.586+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000005",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 5",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-08",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-01",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-08-28",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-08-25",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-31",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-30",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-19",
+                "emailsSent": 0
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "UTC",
+              "toTime": "17:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:37:39.468+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000006",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 6",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-19",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-18",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-17",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-08",
+                "emailsSent": 10
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-05T15:31:32.74+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000007",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 7",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 300
+              },
+              {
+                "date": "2026-10-04",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-03",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 299
+              },
+              {
+                "date": "2026-10-01",
+                "emailsSent": 10
+              },
+              {
+                "date": "2026-09-30",
+                "emailsSent": 300
+              },
+              {
+                "date": "2026-09-29",
+                "emailsSent": 300
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "active",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:39:53.996+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000008",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 8",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-08-25",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-08-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-08-13",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-06",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-30",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-25",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-10",
+                "emailsSent": 0
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "paused",
+            "totalLeads": 1500,
+            "updatedAt": "2026-10-01T06:40:04.367+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000009",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 9",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-29",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-28",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-25",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-24",
+                "emailsSent": 13
+              },
+              {
+                "date": "2026-09-23",
+                "emailsSent": 300
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-05T17:13:51.009+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000010",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 10",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-20",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-17",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-11",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-10",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-06",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-04-04",
+                "emailsSent": 7
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": true,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T06:37:50.94+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000011",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 11",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-05",
+                "emailsSent": 300
+              },
+              {
+                "date": "2026-10-04",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-03",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 286
+              },
+              {
+                "date": "2026-10-01",
+                "emailsSent": 15
+              },
+              {
+                "date": "2026-09-30",
+                "emailsSent": 300
+              },
+              {
+                "date": "2026-09-29",
+                "emailsSent": 300
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "15:00",
+              "invertedWindow": false,
+              "timezone": "Europe/Helsinki",
+              "toTime": "19:00"
+            },
+            "status": "active",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-01T13:11:23.543+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 3
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-06T09:22:45.961Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T09:22:44.196Z",
+      "resultAt": "2026-10-06T09:22:46.559Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    }
+  ],
+  "expectations": {
+    "cause": "No problem is reported. The reads show two active campaigns that each sent about 300 emails on the latest recorded day, two paused campaigns that still hold leads, the rest completed, and none of the 3 sending accounts counted as healthy.",
+    "causeType": "unclear",
+    "claims": [
+      "Summarizes the campaigns from the recorded sends and statuses: two active, two paused with leads, the rest completed.",
+      "Mentions that none of the 3 sending accounts are counted as healthy.",
+      "Does not report a click count or reply rate, which the reads do not contain.",
+      "Does not tell the customer to change a sending limit."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "Can you check my campaigns and let me know how I am doing?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M488BE1H0GWSF6JKT9KCC2P9",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_outreach_health"]
+  }
+}

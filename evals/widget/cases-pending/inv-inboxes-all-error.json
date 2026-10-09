@@ -1,0 +1,1112 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [
+            {
+              "bucket": "paused",
+              "dailyLimit": 30,
+              "email": "person-1@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 2,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-2@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-3@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-4@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 99,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-5@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-6@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-7@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-8@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 99,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-9@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-10@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-11@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-12@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-13@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 99,
+              "warmupStartedAt": "2026-01-14T00:24:03.393Z",
+              "warmupStatus": 1
+            }
+          ],
+          "detailsTruncated": false,
+          "error": 12,
+          "initialWarmup": 0,
+          "paused": 1,
+          "ready": 0,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 13,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": false,
+          "isActive": true,
+          "updatedAt": "2025-12-01T21:52:09.669Z"
+        },
+        "observedAt": "2026-10-07T19:48:57.856Z",
+        "reconnectAttempts": [],
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-09-30T04:37:34.810Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 0,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T19:48:21.982Z",
+      "resultAt": "2026-10-07T19:49:30.241Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": "outside_schedule_window",
+            "notSendingReasonCode": 1,
+            "recentSends": [
+              {
+                "date": "2026-09-17",
+                "emailsSent": 42
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 47
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 56
+              },
+              {
+                "date": "2026-09-14",
+                "emailsSent": 55
+              },
+              {
+                "date": "2026-09-11",
+                "emailsSent": 47
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 54
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 22
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "active",
+            "totalLeads": 5732,
+            "updatedAt": "2026-09-21T23:12:57.189+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-17",
+                "emailsSent": 74
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 63
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 68
+              },
+              {
+                "date": "2026-09-14",
+                "emailsSent": 73
+              },
+              {
+                "date": "2026-09-11",
+                "emailsSent": 63
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 65
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 73
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:30"
+            },
+            "status": "completed",
+            "totalLeads": 2715,
+            "updatedAt": "2026-09-29T13:14:55.265+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 3",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-17",
+                "emailsSent": 94
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 105
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 105
+              },
+              {
+                "date": "2026-09-14",
+                "emailsSent": 102
+              },
+              {
+                "date": "2026-09-11",
+                "emailsSent": 98
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 92
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 105
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "active",
+            "totalLeads": 1862,
+            "updatedAt": "2026-09-22T14:15:19.999+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000004",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-04-06",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-27",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-20",
+                "emailsSent": 60
+              },
+              {
+                "date": "2026-03-19",
+                "emailsSent": 153
+              },
+              {
+                "date": "2026-03-18",
+                "emailsSent": 377
+              },
+              {
+                "date": "2026-03-17",
+                "emailsSent": 315
+              },
+              {
+                "date": "2026-03-16",
+                "emailsSent": 315
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 2500,
+            "updatedAt": "2026-04-16T13:07:21.194+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000005",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 5",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-07-15",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-12",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-08",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-06",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-06-24",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-06-17",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-06-11",
+                "emailsSent": 0
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 10000,
+            "updatedAt": "2026-07-20T13:07:35.826+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000006",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 6",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-03-11",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-09",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-02-26",
+                "emailsSent": 48
+              },
+              {
+                "date": "2026-02-25",
+                "emailsSent": 270
+              },
+              {
+                "date": "2026-02-24",
+                "emailsSent": 270
+              },
+              {
+                "date": "2026-02-23",
+                "emailsSent": 270
+              },
+              {
+                "date": "2026-02-03",
+                "emailsSent": 225
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 2500,
+            "updatedAt": "2026-04-22T15:45:11.351+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000007",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 7",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-01-20",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-13",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-12",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-09",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-08",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-07",
+                "emailsSent": 31
+              },
+              {
+                "date": "2026-01-06",
+                "emailsSent": 171
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "completed",
+            "totalLeads": 500,
+            "updatedAt": "2026-04-22T15:46:47.357+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000008",
+            "leadsNotPushedCount": 2576,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 8",
+            "notSendingReason": "waiting_for_leads",
+            "notSendingReasonCode": 2,
+            "recentSends": [
+              {
+                "date": "2026-09-17",
+                "emailsSent": 60
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 55
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 41
+              },
+              {
+                "date": "2026-09-14",
+                "emailsSent": 40
+              },
+              {
+                "date": "2026-09-11",
+                "emailsSent": 62
+              },
+              {
+                "date": "2026-09-10",
+                "emailsSent": 59
+              },
+              {
+                "date": "2026-09-09",
+                "emailsSent": 70
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "active",
+            "totalLeads": 1491,
+            "updatedAt": "2026-09-21T22:34:22.507+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000009",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 9",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "draft",
+            "totalLeads": 0,
+            "updatedAt": "2026-05-18T15:31:14.112+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000010",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 10",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-07-14",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-07-10",
+                "emailsSent": 77
+              },
+              {
+                "date": "2026-07-09",
+                "emailsSent": 147
+              },
+              {
+                "date": "2026-07-08",
+                "emailsSent": 147
+              },
+              {
+                "date": "2026-07-07",
+                "emailsSent": 147
+              },
+              {
+                "date": "2026-07-06",
+                "emailsSent": 147
+              },
+              {
+                "date": "2026-07-03",
+                "emailsSent": 147
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "17:00"
+            },
+            "status": "completed",
+            "totalLeads": 6680,
+            "updatedAt": "2026-08-13T13:21:31.188+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000011",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 11",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-07-14",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-06-26",
+                "emailsSent": 157
+              },
+              {
+                "date": "2026-06-25",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-06-24",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-06-23",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-06-22",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-06-20",
+                "emailsSent": 0
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "completed",
+            "totalLeads": 1225,
+            "updatedAt": "2026-07-23T12:36:36.616+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000012",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 12",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-06-03",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-05-28",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-05-27",
+                "emailsSent": 65
+              },
+              {
+                "date": "2026-05-26",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-05-25",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-05-22",
+                "emailsSent": 210
+              },
+              {
+                "date": "2026-05-21",
+                "emailsSent": 210
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 3435,
+            "updatedAt": "2026-08-10T20:54:44.302+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000013",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 13",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "08:30",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "16:00"
+            },
+            "status": "draft",
+            "totalLeads": 0,
+            "updatedAt": "2026-08-10T20:46:00.573+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-7.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 11
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T19:49:33.566Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T19:49:31.896Z",
+      "resultAt": "2026-10-07T19:49:34.768Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "area": "scrape",
+        "since": "7d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["scrape"],
+        "failures": [],
+        "observedAt": "2026-10-07T19:49:38.769Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T19:49:36.774Z",
+      "resultAt": "2026-10-07T19:49:38.769Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "query": "email accounts error status preventing campaigns"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-07T19:49:40.565Z",
+      "resultAt": "2026-10-07T19:49:42.877Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "query": "email account error status fix"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error.mdx",
+            "title": "How do I fix an account with an error?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean.mdx",
+            "title": "What do the account statuses mean?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-8.example",
+            "title": "DFY warmup & reconnect errors",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-9.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-07T19:49:45.364Z",
+      "resultAt": "2026-10-07T19:49:46.755Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "output": {
+        "content": "Click on the account to open its settings, then click **Reconnect**. This triggers a re-authentication process (OAuth reconnect). It can take up to 48 hours to fully resolve.\n\n## Related\n\n- [DFY warmup & reconnect errors](/docs/cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors)\n- [What do the account statuses mean?](/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)",
+        "title": "How do I fix an account with an error?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error"
+      },
+      "requestedAt": "2026-10-07T19:49:48.723Z",
+      "resultAt": "2026-10-07T19:49:48.781Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "Of the workspace's 13 Acquisity-provisioned inboxes, 12 are in error and 1 is paused, with none ready and no error code or reconnect attempt recorded; the latest saved sends are from 2026-09-17. The reads do not show why the inboxes went into error.",
+    "causeType": "unclear",
+    "claims": [
+      "Says 12 of 13 inboxes are in error and 1 is paused, with none ready to send.",
+      "Tells the customer to open each errored account and click Reconnect, and that it can take up to 48 hours to resolve.",
+      "Does not name a cause for the errors; the reads carry no error code."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI need to know what's wrong with my inboxes because they're preventing my campaigns from running\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (what the customer's screen showed, as read by an image model: context for the message, not part of what they wrote):\n[Screenshot the customer attached, as read by an image model]\nScreen: Cold Email Agent Email Accounts List\nText shown: \"Error\"; \"Paused\"\nWhat stands out: Almost all email accounts listed show a red 'Error' status badge. Warmup emails are all at 0 and Health scores are blank. The 'Move Accounts' button is disabled.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4BYHQN10GYWKGJYRKKZSRJN",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_inbox_health",
+      "widget_outreach_health",
+      "widget_job_failures",
+      "widget_known_issues",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

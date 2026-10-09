@@ -1,0 +1,540 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-09-30T16:06:48.427+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-08-31T15:28:45.062+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-08-31T15:28:44.924+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-07T20:52:34.008Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "admin"
+            },
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 2
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T20:52:32.191Z",
+      "resultAt": "2026-10-07T20:52:34.489Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-1@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:57:50.779Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-2@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:53:59.666Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-3@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:51:28.757Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-4@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:46:50.473Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-5@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:44:24.565Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-6@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:42:01.231Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-7@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:37:29.948Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-8@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:35:09.173Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-9@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:32:39.086Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-10@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:23:04.641Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-11@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:23:04.641Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-12@domain-4.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:03:38.027Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-13@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T20:03:38.027Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-14@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:48:24.032Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-15@domain-5.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:45:43.525Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-16@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:41:00.961Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-17@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:38:33.149Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-18@domain-6.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:33:59.218Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-19@domain-7.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:28:47.109Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-20@domain-7.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:26:14.620Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-14@domain-7.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:26:14.620Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-8@domain-8.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:11:11.349Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-21@domain-8.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:08:44.591Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "ready",
+              "dailyLimit": 30,
+              "email": "person-22@domain-8.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": 1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-09-08T19:06:08.482Z",
+              "warmupStatus": 1
+            }
+          ],
+          "detailsTruncated": false,
+          "error": 0,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 24,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 24,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": false,
+          "isActive": true,
+          "updatedAt": "2026-09-08T17:40:01.673Z"
+        },
+        "observedAt": "2026-10-07T20:52:37.595Z",
+        "reconnectAttempts": [],
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-10-07T20:13:23.529Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 4635,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T20:52:35.958Z",
+      "resultAt": "2026-10-07T20:53:07.568Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "query": "sending account not connected"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/account-settings.mdx",
+            "title": "Manage Your Personal Account",
+            "url": "https://app.acquisity.ai/docs/account-settings"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean.mdx",
+            "title": "What do the account statuses mean?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-9.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-10.example",
+            "title": "Can I move email accounts between workspaces?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-move-email-accounts-between-workspaces"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-07T20:53:12.543Z",
+      "resultAt": "2026-10-07T20:53:13.438Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "query": "AI Acquisition connection"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/ad-writer/faq/domain-11.example",
+            "title": "Does it connect to ad platforms?",
+            "url": "https://app.acquisity.ai/docs/ad-writer/faq/does-it-connect-to-ad-platforms"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/configuration/domain-12.example",
+            "title": "Why are my leads showing as \"AI SDR Disabled\"?",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/configuration/why-are-my-leads-showing-as-ai-sdr-disabled"
+          },
+          {
+            "path": "apps/web/content/docs/domain-13.example",
+            "title": "AI Consultant",
+            "url": "https://app.acquisity.ai/docs/ai-consultant"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/inbox-replies/domain-14.example",
+            "title": "How do I re-enable the AI SDR after a human takeover?",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/inbox-replies/how-do-i-re-enable-the-ai-sdr-after-a-human-takeover"
+          },
+          {
+            "path": "apps/web/content/docs/domain-15.example",
+            "title": "AI SDR",
+            "url": "https://app.acquisity.ai/docs/ai-sdr"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-07T20:53:12.545Z",
+      "resultAt": "2026-10-07T20:53:13.611Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The inbox read shows an active, error-free sending connection with 24 ready accounts and webhook events arriving. Nothing recorded shows a disconnected integration, and the reads do not establish which connection the customer means.",
+    "causeType": "unclear",
+    "claims": [
+      "Says the sending connection is active with 24 ready email accounts and recent events arriving.",
+      "Does not say the account is disconnected or tell the customer to reconnect it.",
+      "Asks which connection or page shows as not connected."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "AI Aquisition is not connected to my Aquisity",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4C2773A0GKVVWEQVG0TBWGK",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_account_access",
+      "widget_inbox_health",
+      "widget_help_article"
+    ]
+  }
+}

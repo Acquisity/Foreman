@@ -1,0 +1,133 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-06T14:20:22.127+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-08-12T23:50:13.443+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-05-06T19:55:40.464+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-06T14:56:05.052Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T14:56:03.087Z",
+      "resultAt": "2026-10-06T14:56:05.888Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "query": "Zoom"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/crm/faq/domain-1.example",
+            "title": "How do I add a Google Meet link to CRM meetings (instead of Zoom)?",
+            "url": "https://app.acquisity.ai/docs/crm/faq/how-do-i-add-a-google-meet-link-to-crm-meetings-instead-of-zoom"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/scheduling-calendar/domain-2.example",
+            "title": "How do I set a Riverside/Zoom/custom booking link for podcast calls?",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/scheduling-calendar/how-do-i-set-a-riversidezoomcustom-booking-link-for-podcast-calls"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/scheduling-calendar/domain-3.example",
+            "title": "Where do I enter my conference/meeting link (Zoom, Google Meet, Riverside) for AI SDR bookings?",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/scheduling-calendar/where-do-i-enter-my-conferencemeeting-link-zoom-google-meet-riverside-for-ai-sdr-bookings"
+          },
+          {
+            "path": "apps/web/content/docs/sales-call-analyzer/faq/domain-4.example",
+            "title": "Can I use Google Meet or Teams?",
+            "url": "https://app.acquisity.ai/docs/sales-call-analyzer/faq/can-i-use-google-meet-or-teams"
+          },
+          {
+            "path": "apps/web/content/docs/sales-call-analyzer/faq/domain-5.example",
+            "title": "Should I use Fathom or Fireflies recordings?",
+            "url": "https://app.acquisity.ai/docs/sales-call-analyzer/faq/should-i-use-fathom-or-fireflies-recordings"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T14:56:08.498Z",
+      "resultAt": "2026-10-06T14:56:09.610Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "No tool read whether a Zoom account is connected to this workspace; the reads cover only account access and a help search, whose results describe meeting links for AI SDR bookings.",
+    "causeType": "unclear",
+    "claims": [
+      "Does not claim a Zoom account is or is not connected, since nothing read the workspace's conferencing setup.",
+      "Does not name or invent a connected Zoom email or account.",
+      "Tells the customer where meeting or conference links for AI SDR bookings are set."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "Hi — I'm verifying the Zoom setup for this workspace. Please answer these questions (information only, don't change anything): 1) Where exactly in Acquisity settings is a Zoom account connection configured? 2) Is a Zoom account currently connected to this workspace? 3) If yes, which email/account is connected?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M48VDR5N0GM42Q2108FDMHSD",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_account_access", "widget_help_article"]
+  }
+}

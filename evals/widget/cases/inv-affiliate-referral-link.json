@@ -1,0 +1,134 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-04T18:47:13.913+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-10-04T18:49:46.007+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-10-04T18:49:45.855+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-05T20:50:12.426Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-05T20:50:10.278Z",
+      "resultAt": "2026-10-05T20:50:13.008Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "query": "affiliate program referral link"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/billing-subscriptions/domain-1.example",
+            "title": "What does my course or program purchase include, and why do I see 0 credits?",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions/what-does-my-course-or-program-purchase-include-and-why-do-i-see-0-credits"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/scheduling-calendar/domain-2.example",
+            "title": "Where do I enter my conference/meeting link (Zoom, Google Meet, Riverside) for AI SDR bookings?",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/scheduling-calendar/where-do-i-enter-my-conferencemeeting-link-zoom-google-meet-riverside-for-ai-sdr-bookings"
+          },
+          {
+            "path": "apps/web/content/docs/crm/faq/domain-3.example",
+            "title": "How do I add a Google Meet link to CRM meetings (instead of Zoom)?",
+            "url": "https://app.acquisity.ai/docs/crm/faq/how-do-i-add-a-google-meet-link-to-crm-meetings-instead-of-zoom"
+          },
+          {
+            "path": "apps/web/content/docs/crm/faq/domain-4.example",
+            "title": "Which meeting link should I configure \u2014 mine or my client's?",
+            "url": "https://app.acquisity.ai/docs/crm/faq/which-meeting-link-should-i-configure-mine-or-my-clients"
+          },
+          {
+            "path": "apps/web/content/docs/account-settings/faq/domain-5.example",
+            "title": "How do I log in after buying a course or program?",
+            "url": "https://app.acquisity.ai/docs/account-settings/faq/i-bought-a-course-how-do-i-log-in"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-05T20:50:15.092Z",
+      "resultAt": "2026-10-05T20:50:15.530Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The account read shows the user is not partner eligible and the partner menu is hidden (reason not_eligible), so there is no referral link to give. No help article in the cassette covers an affiliate or referral program.",
+    "causeType": "platform_limitation",
+    "claims": [
+      "Says this account is not currently eligible for the partner program, so no referral link is available in the workspace.",
+      "Does not invent or quote a referral link, commission rate or payout terms.",
+      "Does not ask about calendar busy times.",
+      "Tells the customer how to ask the team about becoming eligible for the partner program."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\ndo I have a link that I can share with people so I can get paid if I refer acquisity?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: what's my affiliate link?\nSupport: Could you tell me what busy times your connected calendar shows for the date and timezone you mentioned?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46X9EXY0GWCPHE0K2BZQXFC",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_account_access", "widget_help_article"]
+  }
+}

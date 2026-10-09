@@ -107,6 +107,10 @@ function replaysIn(dir: string): ScoredReplay[] {
       const row = JSON.parse(line.slice(ROW.length)) as ReplayRow & {
         case: string;
       };
+      // A case moved to cases-pending since the run no longer counts.
+      if (!existsSync(row.case)) {
+        return [];
+      }
       const recorded = widgetCaseSchema.parse(
         JSON.parse(readFileSync(row.case, "utf8"))
       );

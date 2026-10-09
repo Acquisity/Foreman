@@ -1,0 +1,211 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 0
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-06T00:55:00.840Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T00:54:58.664Z",
+      "resultAt": "2026-10-06T00:55:01.280Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": false,
+          "reason": "No Instantly connection is configured for this organization."
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": null,
+        "observedAt": "2026-10-06T00:55:04.761Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": null,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T00:55:02.991Z",
+      "resultAt": "2026-10-06T00:55:05.463Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "area": "ai_sdr",
+        "since": "24h"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["ai_sdr"],
+        "failures": [],
+        "observedAt": "2026-10-06T00:55:09.467Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T00:55:07.163Z",
+      "resultAt": "2026-10-06T00:55:09.468Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "sinceDays": 7
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 0,
+          "campaignsWithLeads": 0,
+          "ingestionCreditsUsed": 0,
+          "ingestionCreditTransactions": 0
+        },
+        "observedAt": "2026-10-06T00:55:13.297Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 0,
+          "discrepancy": false,
+          "note": "Declared run totals reconcile with persisted scrape leads; a low dashboard 'Leads Uploaded' figure is an accounting metric, not a missing-leads fact.",
+          "scrapeLeadStoredTotal": 0,
+          "scrapeRunDeclaredTotal": 0
+        },
+        "scrapeRuns": [],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 7,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T00:55:10.892Z",
+      "resultAt": "2026-10-06T00:55:13.765Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
+      "input": {
+        "query": "campaign results not showing on dashboard"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/workspace-1/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/workspace-1/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/domain-1.example",
+            "title": "Dashboard",
+            "url": "https://app.acquisity.ai/docs/dashboard"
+          },
+          {
+            "path": "apps/web/content/docs/crm/workspace-1/domain-2.example",
+            "title": "Why is the CRM showing no results?",
+            "url": "https://app.acquisity.ai/docs/crm/workspace-1/why-is-the-crm-showing-no-results"
+          },
+          {
+            "path": "apps/web/content/docs/dashboard/workspace-1/domain-3.example",
+            "title": "Where are my campaigns?",
+            "url": "https://app.acquisity.ai/docs/dashboard/workspace-1/where-are-my-campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
+            "title": "Managing Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T00:55:16.461Z",
+      "resultAt": "2026-10-06T00:55:17.329Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/dashboard/workspace-1/where-are-my-campaigns"
+      },
+      "output": {
+        "content": "Your campaigns aren't on the Dashboard — they live in their own section.\n\n1. Click **Cold Email Agent** in the left sidebar (paper-plane icon).\n2. The campaign list opens — every campaign in the current workspace appears here.\n3. Click any campaign name to open its detail page. The tabs are **Analytics**, **AI Agent**, **Leads**, **Sequences**, and **Options**.\n\n### If Cold Email Agent isn't showing in your sidebar\n\n- **Cold Email Agent is not enabled for your workspace or role.** Ask a workspace admin to check your enabled features and member permissions. If the workspace uses an ads-only configuration, contact support to switch it to the B2B services toolset. See [Why are CRM and Cold Email Agent missing from my sidebar?](/docs/onboarding/workspace-1/why-are-crm-and-cold-email-agent-missing-from-my-sidebar)\n- **You're on a [Legacy Pro](^ \"legacy-pro\") plan,** which doesn't include Cold Email Agent. Upgrade to the standard Pro plan from **Settings → Billing** to unlock it.\n\n## Related\n\n- [Cold Email Agent overview](/docs/cold-email-agent)\n- [Creating your first campaign](/docs/cold-email-agent/getting-started/your-first-campaign)\n- [Why are CRM and Cold Email Agent missing from my sidebar?](/docs/onboarding/workspace-1/why-are-crm-and-cold-email-agent-missing-from-my-sidebar)",
+        "title": "Where are my campaigns?",
+        "url": "https://app.acquisity.ai/docs/dashboard/workspace-1/where-are-my-campaigns"
+      },
+      "requestedAt": "2026-10-06T00:55:19.336Z",
+      "resultAt": "2026-10-06T00:55:19.452Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The reads show no campaigns, no sending accounts, no Instantly connection, no leads and no failed jobs in this workspace. Nothing recorded shows where the done-for-you campaign the customer describes is running.",
+    "causeType": "unclear",
+    "claims": [
+      "Says this workspace has no campaigns, no connected sending accounts and no leads recorded, so there are no campaign results for the dashboard to show.",
+      "Does not claim the campaign is running or sending from this workspace.",
+      "Does not blame a dashboard display bug for the missing results.",
+      "Asks for something that identifies the campaign, such as its name or where it was set up, or says it may be in a different workspace or account."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "my campaign hs been launched for me but the results aren't on my cold email agent dashboard",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M47B9NXP0GNSHASCNZMX2TRF",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_outreach_health",
+      "widget_inbox_health",
+      "widget_job_failures",
+      "widget_lead_pipeline_status",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

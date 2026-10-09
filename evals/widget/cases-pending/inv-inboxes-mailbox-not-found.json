@@ -1,0 +1,409 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "orderId": null
+      },
+      "output": {
+        "caveats": [
+          "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost. paidAt is the order's own saved paid date, not a link to an invoice or charge: say the order records a paid date, call an order paid only when a billing record ties a payment to that order, and otherwise say payment for it could not be confirmed.",
+          "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
+          "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
+          "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
+          "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+          "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders."
+        ],
+        "observedAt": "2026-10-07T15:05:26.039Z",
+        "orders": [
+          {
+            "billingAccountId": "00000000-0000-4000-8000-000000000001",
+            "completedAt": "2026-04-23T18:54:28.023+00:00",
+            "createdAt": "2026-04-21T17:21:42.598302+00:00",
+            "diagnostics": null,
+            "dismissed": false,
+            "error": null,
+            "hasError": false,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "mailProvider": "coldmailreseller",
+            "orderType": "pre_warmed",
+            "paidAt": "2026-04-21T17:23:00.756+00:00",
+            "providerOrderId": null,
+            "provisioningAttempts": 0,
+            "provisioningFunctionId": "domain-4.example-purchase-order",
+            "provisioningLastUpdated": null,
+            "provisioningStartedAt": "2026-04-21T17:23:05.648+00:00",
+            "reconciliation": {
+              "domainsActive": 3,
+              "domainsCharged": 6,
+              "domainsFailed": 3,
+              "domainsMissing": 3,
+              "domainsProvisionedCounter": 6,
+              "fullyProvisioned": false,
+              "inboxesActive": 0,
+              "inboxesCharged": 18,
+              "inboxesConnected": 0,
+              "inboxesMissing": 18,
+              "inboxesProvisionedCounter": 16,
+              "invisibleInboxes": false
+            },
+            "runState": "completed",
+            "status": "completed",
+            "step": "6/6",
+            "submissionId": "00000000-0000-4000-8000-000000000003",
+            "updatedAt": "2026-04-23T18:54:28.023+00:00"
+          },
+          {
+            "billingAccountId": "00000000-0000-4000-8000-000000000001",
+            "completedAt": "2026-04-21T16:40:00.22+00:00",
+            "createdAt": "2026-04-21T15:36:56.642758+00:00",
+            "diagnostics": null,
+            "dismissed": false,
+            "error": "Reservation expired - order automatically cancelled after reservation expiration",
+            "hasError": true,
+            "id": "00000000-0000-4000-8000-000000000004",
+            "mailProvider": "coldmailreseller",
+            "orderType": "pre_warmed",
+            "paidAt": null,
+            "providerOrderId": null,
+            "provisioningAttempts": 0,
+            "provisioningFunctionId": "domain-4.example-purchase-order",
+            "provisioningLastUpdated": null,
+            "provisioningStartedAt": null,
+            "reconciliation": {
+              "domainsActive": 0,
+              "domainsCharged": 6,
+              "domainsFailed": 0,
+              "domainsMissing": 6,
+              "domainsProvisionedCounter": 0,
+              "fullyProvisioned": false,
+              "inboxesActive": 0,
+              "inboxesCharged": 18,
+              "inboxesConnected": 0,
+              "inboxesMissing": 18,
+              "inboxesProvisionedCounter": 0,
+              "invisibleInboxes": true
+            },
+            "runState": "cancelled",
+            "status": "cancelled",
+            "step": "0/6",
+            "submissionId": null,
+            "updatedAt": "2026-04-21T16:40:00.22+00:00"
+          }
+        ],
+        "source": "Acquisity product database; saved order state, not a live provisioning or billing check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T15:05:13.797Z",
+      "resultAt": "2026-10-07T15:05:33.414Z",
+      "status": "completed",
+      "tool": "widget_provisioning_status"
+    },
+    {
+      "input": {
+        "area": "provisioning",
+        "since": "30d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["provisioning"],
+        "failures": [],
+        "observedAt": "2026-10-07T15:06:02.282Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T15:05:38.043Z",
+      "resultAt": "2026-10-07T15:06:02.283Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": true,
+          "details": [
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-1@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T18:37:33.778Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-2@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T18:34:47.093Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-3@domain-1.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T18:32:21.572Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-4@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:47:47.778Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-5@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:45:21.093Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-6@domain-2.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:42:53.838Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-7@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:38:35.530Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-8@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:36:01.578Z",
+              "warmupStatus": 1
+            },
+            {
+              "bucket": "error",
+              "dailyLimit": 30,
+              "email": "person-9@domain-3.example",
+              "errorCode": null,
+              "lastUsedAt": null,
+              "setupPending": false,
+              "slowRampEnabled": null,
+              "status": -1,
+              "warmupScore": 100,
+              "warmupStartedAt": "2026-04-21T17:33:35.887Z",
+              "warmupStatus": 1
+            }
+          ],
+          "detailsTruncated": false,
+          "error": 9,
+          "initialWarmup": 0,
+          "paused": 0,
+          "ready": 0,
+          "setupPending": 0,
+          "staleSyncAccounts": [],
+          "total": 9,
+          "truncated": false,
+          "unknown": 0
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "system_provisioned",
+          "hasConnectionError": false,
+          "isActive": true,
+          "updatedAt": "2026-04-21T15:30:09.619Z"
+        },
+        "observedAt": "2026-10-07T15:06:05.527Z",
+        "reconnectAttempts": [
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T13:01:09.680111+00:00",
+            "email": "person-5@domain-2.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-1, email=person-5@domain-2.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:42.466549+00:00",
+            "email": "person-2@domain-1.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-2, email=person-2@domain-1.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:38.752738+00:00",
+            "email": "person-9@domain-3.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-3, email=person-9@domain-3.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:21.428707+00:00",
+            "email": "person-8@domain-3.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-4, email=person-8@domain-3.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:21.322035+00:00",
+            "email": "person-1@domain-1.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-5, email=person-1@domain-1.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:18.351083+00:00",
+            "email": "person-7@domain-3.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-6, email=person-7@domain-3.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:55:17.507097+00:00",
+            "email": "person-3@domain-1.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-7, email=person-3@domain-1.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:50:32.227957+00:00",
+            "email": "person-4@domain-2.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-8, email=person-4@domain-2.example",
+            "status": "failed"
+          },
+          {
+            "completedAt": null,
+            "createdAt": "2026-10-06T12:50:24.989987+00:00",
+            "email": "person-6@domain-2.example",
+            "error": "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=mailbox-9, email=person-6@domain-2.example",
+            "status": "failed"
+          }
+        ],
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-10-06T19:34:16.654Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 22,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T15:06:03.845Z",
+      "resultAt": "2026-10-07T15:06:41.494Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "summary": "Workspace: Aaron Fraga's Workspace. Completed provisioning order 00000000-0000-4000-8000-000000000002 (step 6/6) shows reconciliation of 6 domains charged / 3 active, 3 failed, 3 missing, and 18 inboxes charged / 0 active, 18 missing (widget_provisioning_status). A separate earlier order 00000000-0000-4000-8000-000000000004 was auto-cancelled due to reservation expiration.\n\nLive inbox health check (widget_inbox_health) shows all 9 provisioned mail accounts (person-1@domain-1.example, person-2@domain-1.example, person-3@domain-1.example, person-4@domain-2.example, person-5@domain-2.example, person-6@domain-2.example, person-7@domain-3.example, person-8@domain-3.example, person-9@domain-3.example) in error status, none ready/paused/warmup.\n\nRecent system reconnect attempts (Oct 6) for all 9 accounts already failed with identical error: \"Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=..., email=...\". This is a documented, already-attempted remediation that did not resolve the issue, pointing to a provisioning/mailbox-creation fault rather than something the customer can fix on their end.\n\nNo provisioning job failures were recorded in the last 30 days, but that tool does not cover the mail-account connection layer, so it does not contradict the above. Customer asking why inbox activation is taking so long; needs engineering to investigate why mailbox references are invalid at the provider despite order showing completed.",
+        "title": "Provisioned inboxes stuck in error state, OAuth reconnects fail with Mailbox not found"
+      },
+      "output": {
+        "existing": false,
+        "refund": false,
+        "identifier": "ENG-1",
+        "url": "https://internal.example/1"
+      },
+      "requestedAt": "2026-10-07T15:06:58.388Z",
+      "resultAt": "2026-10-07T15:07:03.869Z",
+      "status": "completed",
+      "tool": "widget_file_ticket"
+    }
+  ],
+  "expectations": {
+    "cause": "The paid pre-warmed order is marked completed, but reconciliation shows 18 inboxes charged and 0 active, 3 of 6 domains failed, all 9 Instantly accounts are in error, and the Oct 6 reconnect attempts for all 9 failed with Mailbox not found. This is a provisioning fault the customer cannot fix.",
+    "causeType": "bug",
+    "claims": [
+      "Says the inbox order is marked completed but none of the 18 charged inboxes are active and 3 of the 6 domains failed.",
+      "Says all 9 email accounts are in an error state and the reconnect attempts already failed with a mailbox not found error.",
+      "Does not tell the customer to keep waiting for warmup or to reconnect the inboxes themselves.",
+      "Does not promise a time when the inboxes will be working."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "Why is it taking so long to activate my email boxes",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4BEB9HK0GRQEXC2BRR6HAFG",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_provisioning_status",
+      "widget_job_failures",
+      "widget_inbox_health",
+      "widget_file_ticket"
+    ]
+  }
+}

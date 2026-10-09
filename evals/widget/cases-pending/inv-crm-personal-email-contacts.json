@@ -1,0 +1,238 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "email": "person-1@domain-1.example"
+      },
+      "output": {
+        "caveats": [
+          "Only live CRM people in this workspace are read; deleted and merged people, companies, and leads are not.",
+          "The CRM does not require emails to be unique, so a match here shows the address is already saved on that person, not that a save was refused because of it."
+        ],
+        "emailMatches": [
+          {
+            "emails": ["person-1@domain-1.example"],
+            "emailsTruncated": false,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Name 1"
+          }
+        ],
+        "emailMatchesTruncated": false,
+        "nameMatches": null,
+        "nameMatchesTruncated": false,
+        "observedAt": "2026-10-08T00:14:56.341Z",
+        "source": "Acquisity product database; this workspace's CRM people.",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T00:14:54.165Z",
+      "resultAt": "2026-10-08T00:14:56.341Z",
+      "status": "completed",
+      "tool": "widget_crm_contact"
+    },
+    {
+      "input": {
+        "sinceDays": 30
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 11703,
+          "campaignsWithLeads": 7,
+          "ingestionCreditTransactions": 0,
+          "ingestionCreditsUsed": 0
+        },
+        "observedAt": "2026-10-08T00:14:59.368Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 11703,
+          "discrepancy": true,
+          "note": "Declared totals and persisted rows differ. This does not establish a processing failure or its cause; assess recorded run status and failures separately.",
+          "scrapeLeadStoredTotal": 36848,
+          "scrapeRunDeclaredTotal": 31383
+        },
+        "scrapeRuns": [
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000002",
+            "declaredLeadCount": 303,
+            "finishedAt": "2026-09-21T02:52:27.411+00:00",
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "Name 2",
+            "runId": "00000000-0000-4000-8000-000000000004",
+            "source": "instantly",
+            "startedAt": "2026-09-21T02:43:28.738+00:00",
+            "status": "completed",
+            "storedLeadCount": 309,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-09-21T02:52:27.412+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 309
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000002",
+            "declaredLeadCount": 1,
+            "finishedAt": "2026-09-21T02:53:44.753+00:00",
+            "id": "00000000-0000-4000-8000-000000000005",
+            "name": "Name 2",
+            "runId": "00000000-0000-4000-8000-000000000006",
+            "source": "instantly",
+            "startedAt": "2026-09-21T02:41:32.106+00:00",
+            "status": "completed",
+            "storedLeadCount": 310,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-09-21T02:53:44.753+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 310
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000002",
+            "declaredLeadCount": 761,
+            "finishedAt": "2026-09-17T01:39:58.843+00:00",
+            "id": "00000000-0000-4000-8000-000000000007",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000008",
+            "source": "instantly",
+            "startedAt": "2026-09-17T01:31:01.235+00:00",
+            "status": "completed",
+            "storedLeadCount": 764,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-09-17T01:39:58.844+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 764
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000002",
+            "declaredLeadCount": 1016,
+            "finishedAt": "2026-09-15T02:26:09.288+00:00",
+            "id": "00000000-0000-4000-8000-000000000009",
+            "name": "Name 4",
+            "runId": "00000000-0000-4000-8000-000000000010",
+            "source": "instantly",
+            "startedAt": "2026-09-15T02:15:54.806+00:00",
+            "status": "completed",
+            "storedLeadCount": 1058,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-09-15T02:26:09.288+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1058
+          }
+        ],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 30,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T00:14:57.976Z",
+      "resultAt": "2026-10-08T00:15:00.534Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
+      "input": {
+        "query": "CRM contacts added automatically leads campaigns"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/domain-2.example",
+            "title": "Leads",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns/leads"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/domain-3.example",
+            "title": "Lead Magnet Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/lead-magnet-campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/domain-4.example",
+            "title": "CRM Overview",
+            "url": "https://app.acquisity.ai/docs/crm"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns.mdx",
+            "title": "Managing Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-08T00:15:03.261Z",
+      "resultAt": "2026-10-08T00:15:04.930Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The contact the customer named is saved in this workspace's CRM, and recent lead imports came from the Instantly source into campaigns. Nothing recorded shows how that contact entered the CRM or that a personal mailbox was ever connected.",
+    "causeType": "unclear",
+    "claims": [
+      "Confirms the named contact is saved in the workspace CRM.",
+      "Says the records do not show where the contact came from.",
+      "Does not claim Acquisity read or synced the customer's personal email account.",
+      "Does not claim the contact came from a specific campaign or import without evidence."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nfrom my personal email that  is not connected  to acquisity account\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: what happened with CRM showing my personal contacts from personal email?\nSupport: I have not looked into your workspace yet. If you tap the magnifying glass next to the message box and send your message again, I will dig into your workspace.\nCustomer: what happened with CRM showing my personal contacts from personal email?\nSupport: Could you tell me which personal email address you saw showing up as a contact in the CRM, or share a screenshot of that view? That will help me look into it.\nCustomer: all of these contacts\n\nScreenshot reading: [Screenshot the customer attached, as read by an image model]\nScreen: People contact directory\nWhat stands out: The 'People' tab in the top navigation bar is highlighted. The 'All People' button is selected. Under the 'Title' column, several cells show a placeholder 'Title' in greyed-out text, except for 'Name 5' which displays the value 'owner'. All checkboxes on the left of the list are empty.\nCould not read: The partial text for the email address in the 'Name 1' row; The partial text for the email address in the 'Mortgage Admin' row; The tab label partially cut off on the far right of the top navigatio...\nSupport: Could you tell me the full email addresses (or names) for the contacts you're asking about, like the ones in the Name 1 and Mortgage Admin rows? That'll help me look into why they showed up.\nCustomer: person-1@domain-1.example\nSupport: Thanks! Can you tell me where you recognize this \"Name 1\" contact from, like is it a lead from one of your campaigns, a business email, or does it look like something personal that shouldn't be in there?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4CDSS680GT9ETCBCCGGP3SS",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_crm_contact",
+      "widget_lead_pipeline_status",
+      "widget_help_article"
+    ]
+  }
+}

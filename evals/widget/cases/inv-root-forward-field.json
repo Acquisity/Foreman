@@ -1,0 +1,75 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-1.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 18,
+          "totalSendingAccounts": 18
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-08T19:30:01.774Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T19:29:59.959Z",
+      "resultAt": "2026-10-08T19:30:02.881Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "question": "Quick check: do you have a specific email address in mind for the root/forward setting, or are you unsure what to enter there?"
+      },
+      "output": {
+        "asked": "Quick check: do you have a specific email address in mind for the root/forward setting, or are you unsure what to enter there?"
+      },
+      "requestedAt": "2026-10-08T19:30:05.565Z",
+      "resultAt": "2026-10-08T19:30:05.566Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "This is a how-to question about a campaign setup field. The only read shows no saved campaign in the workspace and 18 healthy sending inboxes; nothing recorded explains what the root forwarding field expects.",
+    "causeType": "unclear",
+    "claims": [
+      "Explains what the root forwarding field is for only from a source, or says plainly it could not confirm it.",
+      "Does not tell the customer they can enter anything they want.",
+      "Does not claim a campaign is live or sending; the read shows no saved campaign."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nFor the root forward information, can I put in whatever I want, or how does that work? What do I do for that? This is for the campaign setup for the cold email agent.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: So my campaign is still having issues getting off the ground...I looked over the Cold email Agent and I think everything looks good....can you review it all and make sure I'm not missing anything or what would explain why the campaign is not firing off?\nSupport: To check why your campaign isn't firing off, let's first confirm whether your workspace is connected to your own domain-2.example account or uses Acquisity-managed sending infrastructure by going to Settings, clicking Cold Email Agent, and looking at the Outreach Providers card. [1] If it shows a Managed by Acquisity badge, check the standard stall checklist to see if you hit workspace contact capacity, the campaign is paused, the status is Attention Needed, you are outside your configured sending hours, or your sending inboxes are paused or errored. [2] If it shows an Edit button instead, run through the checks on the Acquisity side by opening the campaign to ensure it says Active with no Attention Needed banner, confirming on the Options tab that you are inside your sending schedule, clicking Test Connection and Sync Campaigns in Settings, reading any error shown, and comparing the campaign setup in both Acquisity and Instantly. [1]\nCustomer: Screenshot reading: [Screenshot the customer attached, as read by an image model]\nScreen: Campaign details\nText shown: \"We could not finish finding the leads and writing the emails. Nothing was sent. Press Try again; if it stops again, contact support.\"\nWhat stands out: Needs attention status and error banner with a Retry button.\nSupport: I see you are on the campaign detail page, and the status shows Needs attention because the system could not finish finding your leads and writing your emails.\n\nSince this is a safety pause, the system is waiting for you to take action before it can proceed. Please click the blue Retry button on that banner to try finding the leads and writing the emails again.\nCustomer: it is acquisity managed\nSupport: Since your workspace uses Acquisity-managed sending infrastructure, let's check a few common reasons a campaign stalls.\n1. Go to Settings, click Cold Email Agent, and look for Workspace Contact Capacity to see if your workspace is full.\n2. Open the campaign to check if its status is Paused or Attention Needed.\n3. Go to the campaign's Options tab to confirm you are within your configured sending hours.\n4. Go to Email Accounts to check if all sending inboxes are paused or errored.\nCustomer: For the root forward information, can I put in whatever I want, or how does that work? What do I do for that? This is for the campaign setup for the cold email agent.\nSupport: I have not looked into your workspace yet. If you tap the magnifying glass next to the message box and send your message again, I will dig into it.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4EFWTA70GXGX0N1JMPZW2CE",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_outreach_health", "widget_ask_customer"]
+  }
+}

@@ -172,7 +172,7 @@ Internal jargon means words a customer would not know: raw field names, status c
 Return exactly one verdict per claim id, in the order given.
 citedArticles is the text of the help-center articles the answer cited; a fact one of them states is supported only for the situation the article states it for, so an article sentence applied to a different situation is unsupported. An Acquisity product fact no cited article, tool result or conversation turn states is unsupported.
 widgetAffordances are real parts of the support widget the answer may mention.
-In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: tool_gap when no tool result covers that data (no widget tool read it), tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. For a tool_gap, capability is a short name for the missing read, such as "campaign sequence content"; otherwise null. An answer with no such sentence has an empty list.`;
+In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: tool_gap when no tool result covers that data (no widget tool read it), tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. For a tool_gap, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [

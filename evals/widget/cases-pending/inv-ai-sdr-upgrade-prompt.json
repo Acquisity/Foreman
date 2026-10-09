@@ -1,0 +1,99 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {},
+            "billing_controls": {},
+            "config": {},
+            "created_at": 1790104380843,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": null,
+            "subscriptions": []
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": ["stripe: Autumn record has no stripe_id."]
+      },
+      "requestedAt": "2026-10-05T20:05:50.132Z",
+      "resultAt": "2026-10-05T20:07:07.262Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace has no active plan or subscription and 0 credits, so the AI SDR Agent settings asking for an upgrade is the expected gate, not a fault.",
+    "causeType": "user_error",
+    "claims": [
+      "Says the workspace has no active plan or subscription.",
+      "Connects the upgrade prompt on the AI SDR Agent to having no plan.",
+      "Tells the customer how to choose a plan from the Billing page in Settings.",
+      "Does not claim the upgrade prompt is a bug."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nai sdr agent\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: after?\nSupport: Which part of setting your availability or appointment is not working, and what did you expect to happen instead?\nCustomer: no like whats the enxt step and when will i kow a meeting is booked\nSupport: After setting your availability, the next setup steps are to set your Assigned Call Handler, fill the Knowledge Base, and decide on your Needs Attention workflow [1]. When the AI SDR books a meeting, you will receive a booking notification email, and the meeting will be placed on the connected calendar [2][3].\nCustomer: so where do i go for thta\nSupport: To set your Assigned Call Handler, follow these steps:\n\n1. Click Settings in the left menu, then click AI SDR Agent.\n2. Scroll to Call Assignment and find Assigned Call Handler.\n3. Pick a team member from the dropdown, or leave it on Automatic assignment.\n\nTo fill your Knowledge Base, follow these steps:\n\n1. Click Settings in the left menu, then click AI SDR Agent.\n2. Scroll to Knowledge Base.\n3. Paste your information into the text box and click Save Settings.\n\nTo check your Needs Attention workflow, go to AI SDR Inbox and click Needs Attention.\nCustomer: it says I have to upgrade\nSupport: Which part of Acquisity is asking you to upgrade, and what were you trying to do when you saw that message?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46TR8MQ0GNG3TAN7RGG2K73",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_billing_summary"]
+  }
+}
