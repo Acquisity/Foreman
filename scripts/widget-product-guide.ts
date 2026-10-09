@@ -1,6 +1,6 @@
 // Distill the Acquisity help center into the widget chat lane's product guide (ENG-14932).
 //
-//   pnpm widget:guide --repo <acquisity checkout> --ref <commit or branch>
+//   pnpm widget:guide --repo <acquisity checkout> --ref <commit or branch> [--full]
 //
 // Reads apps/web/content/docs at <ref> with `git archive` (nothing in the
 // checkout changes), has a gateway model rewrite each group of articles as
@@ -9,6 +9,10 @@
 // Each section opens with a "Get here:" line built from the article and the
 // sidebar in apps/web/lib/sidebar/catalog.ts at the same ref, so a step's path
 // sits in the section it cites.
+// Each model call's output is stored in a separate JSON cache under a hash of its
+// inputs (model, prompt, sidebar, articles), so a rerun calls the model only
+// for the batches whose inputs changed; --full ignores those stored outputs.
+// A run that changes nothing but the commit leaves the file as it was.
 // Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
 import { execFileSync } from "node:child_process";
 import {
@@ -26,8 +30,19 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
 import {
+  assertGuideCallStopped,
+  cachedGuideText,
+  checkedGuideCall,
+  countedGuideAttempt,
+  guideArtifactsEqual,
+  guideCallKey,
+  parseGuideCache,
+} from "../agent/lib/widget-guide-cache.js";
+import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
+import {
   assertGuideSections,
   frontmatterField,
+  plainDashes,
 } from "../agent/lib/widget-guide-validation.js";
 
 const MODEL = "anthropic/claude-sonnet-5";
@@ -41,9 +56,14 @@ const INDEX_PAGE = /(^|\/)index$/u;
 const WHITESPACE = /\s+/u;
 const SHORTENED = /^\.\.\.\//u;
 const OUT = "agent/lib/widget-product-guide.ts";
+const CACHE_FILE = "scripts/widget-product-guide.cache.json";
+const previousCache = readFileSync(CACHE_FILE, "utf8");
+const productGuideCache = parseGuideCache(previousCache);
 const CALL_TIMEOUT_MS = 240_000;
 const GIT_TIMEOUT_MS = 60_000;
 const CONCURRENCY = 6;
+/** Distill tries per batch before the run fails, naming the batch. */
+const BATCH_TRIES = 3;
 /** Source characters per distill call. */
 const BATCH_CHARS = 30_000;
 /**
@@ -96,7 +116,11 @@ const scrub = (text: string) =>
   VENDORS.reduce((out, [pattern, word]) => out.replace(pattern, word), text);
 
 const { values } = parseArgs({
-  options: { ref: { type: "string" }, repo: { type: "string" } },
+  options: {
+    full: { type: "boolean" },
+    ref: { type: "string" },
+    repo: { type: "string" },
+  },
 });
 if (!(values.repo && values.ref)) {
   throw new Error("Usage: --repo <acquisity checkout> --ref <commit>");
@@ -182,30 +206,34 @@ interface Article {
   title: string;
 }
 
-const files = (path: string): string[] =>
-  readdirSync(path).flatMap((name) => {
-    const full = join(path, name);
-    return statSync(full).isDirectory() ? files(full) : [full];
-  });
-
 /** The help-center sidebar order, from each folder's meta.json. */
 const order = (path: string): string[] => {
-  const meta = join(path, "meta.json");
+  const directory = guideSourcePath(root, path);
+  const entries = readdirSync(directory).map((name) => {
+    guideSourcePath(root, join(directory, name));
+    return name;
+  });
+  const meta = join(directory, "meta.json");
   const pages: string[] = existsSync(meta)
     ? (JSON.parse(readFileSync(meta, "utf8")).pages ?? [])
     : [];
   const names = [
     ...pages.filter((page) => !page.startsWith("---")),
-    ...readdirSync(path)
+    ...entries
       .map((name) => name.replace(MDX, ""))
       .filter((name) => name !== "meta.json"),
   ];
   return [...new Set(names)].flatMap((name) => {
-    const full = join(path, name);
-    if (existsSync(full) && statSync(full).isDirectory()) {
+    const full = join(directory, name);
+    if (
+      existsSync(full) &&
+      statSync(guideSourcePath(root, full)).isDirectory()
+    ) {
       return order(full);
     }
-    return existsSync(`${full}.mdx`) ? [`${full}.mdx`] : [];
+    return existsSync(`${full}.mdx`)
+      ? [guideSourcePath(root, `${full}.mdx`)]
+      : [];
   });
 };
 
@@ -298,17 +326,21 @@ Every explicit limit and unsupported thing the guide states, one line each with 
 Only what the guide states; never generalise one line to other features or roles. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
+const stats = { attempts: 0, successfulCalls: 0 };
+/** This run's outputs by key, in guide order: the next run's cache. */
+const cache = new Map<string, string>();
 const call = async (
   system: string,
   prompt: string,
   maxOutputTokens: number,
   model = MODEL
-): Promise<string> => {
-  // Each try gets its own deadline; the SDK's retries would share one.
-  const attempt = (
-    tries: number
-  ): Promise<Awaited<ReturnType<typeof generateText>>> =>
-    // A stalled response once ignored the abort, so the deadline is raced too.
+): Promise<{ fresh: boolean; key: string; text: string }> => {
+  const key = guideCallKey(model, String(maxOutputTokens), system, prompt);
+  const reused = cachedGuideText(productGuideCache, key, values.full ?? false);
+  if (reused !== undefined) {
+    return { fresh: false, key, text: reused };
+  }
+  const result = await countedGuideAttempt(stats, () =>
     Promise.race([
       generateText({
         abortSignal: AbortSignal.timeout(CALL_TIMEOUT_MS),
@@ -316,7 +348,6 @@ const call = async (
         maxRetries: 0,
         model: gateway(model),
         prompt,
-        // Gemini otherwise spends its whole output budget on hidden reasoning.
         providerOptions: {
           google: { thinkingConfig: { thinkingLevel: "minimal" } },
         },
@@ -325,14 +356,8 @@ const call = async (
       sleep(CALL_TIMEOUT_MS + 5000).then(() => {
         throw new Error("deadline");
       }),
-    ]).catch((error: unknown) => {
-      if (tries <= 1) {
-        throw error;
-      }
-      console.log(`  retry after ${String(error).slice(0, 80)}`);
-      return attempt(tries - 1);
-    });
-  const result = await attempt(3);
+    ])
+  );
   const cost = Number(
     (result.providerMetadata?.gateway as { cost?: string } | undefined)?.cost ??
       0
@@ -342,14 +367,29 @@ const call = async (
     `  out=${result.usage.outputTokens} reasoning=${result.usage.outputTokenDetails?.reasoningTokens ?? 0} words=${result.text.split(WHITESPACE).length}`
   );
   // A cut-off section silently drops every article after it.
-  if (result.finishReason !== "stop") {
-    throw new Error(`distill call ended with ${result.finishReason}`);
-  }
-  return result.text.trim();
+  assertGuideCallStopped(result.finishReason);
+  return { fresh: true, key, text: result.text.trim() };
 };
+
+/**
+ * The model sometimes shortens a slug to ".../tail"; a tail that names exactly
+ * one article is restored. Each batch must then head every one of its own
+ * articles, or that batch is distilled again.
+ */
+const slugs = available.map((a) => a.slug);
+const relink = (text: string) =>
+  text.replace(/\{slug: ([^}]+)\}/gu, (marker, slug: string) => {
+    const tail = slug.trim().replace(SHORTENED, "/");
+    const matches = slugs.filter((known) => `/${known}`.endsWith(tail));
+    return slugs.includes(slug.trim()) || matches.length !== 1
+      ? marker
+      : `{slug: ${matches[0]}}`;
+  });
 
 const startedAt = Date.now();
 const sections: string[] = new Array(batches.length);
+const keys: string[] = new Array(batches.length);
+const fresh: boolean[] = new Array(batches.length);
 let next = 0;
 await Promise.all(
   Array.from({ length: CONCURRENCY }, async () => {
@@ -360,35 +400,42 @@ await Promise.all(
       const chars = batch.reduce((sum, a) => sum + a.text.length, 0);
       const words = Math.max(60, Math.round(chars * RATIO));
       // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
-      sections[index] = await call(
-        DISTILL_PROMPT.replace("WORDS", String(words)).replace(
-          "SIDEBAR_BLOCK",
-          SIDEBAR
-        ),
-        batch
-          .map((a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`)
-          .join("\n\n=====\n\n"),
-        32_000
+      const out = await checkedGuideCall(
+        `batch ${index + 1}/${batches.length} ${batch[0].slug}`,
+        BATCH_TRIES,
+        () =>
+          call(
+            DISTILL_PROMPT.replace("WORDS", String(words)).replace(
+              "SIDEBAR_BLOCK",
+              SIDEBAR
+            ),
+            batch
+              .map(
+                (a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`
+              )
+              .join("\n\n=====\n\n"),
+            32_000
+          ),
+        (text) => {
+          const repaired = relink(text);
+          assertGuideSections(
+            repaired,
+            batch.map((a) => a.slug)
+          );
+          return repaired;
+        }
       );
-      console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
+      sections[index] = out.text;
+      keys[index] = out.key;
+      fresh[index] = out.fresh;
+      if (out.fresh) {
+        console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
+      }
     }
   })
 );
 
-/**
- * The model sometimes shortens a slug to ".../tail"; a tail that names exactly
- * one article is restored, and em dashes copied from the docs become commas.
- */
-const slugs = available.map((a) => a.slug);
-const linked = sections
-  .join("\n\n")
-  .replace(/\{slug: ([^}]+)\}/gu, (marker, slug: string) => {
-    const tail = slug.trim().replace(SHORTENED, "/");
-    const matches = slugs.filter((known) => `/${known}`.endsWith(tail));
-    return slugs.includes(slug.trim()) || matches.length !== 1
-      ? marker
-      : `{slug: ${matches[0]}}`;
-  });
+const linked = sections.join("\n\n");
 /**
  * Each section keeps its own "Get here:" line when it is a usable path: it
  * quotes at least one label, every quoted label appears in the article or the
@@ -456,7 +503,24 @@ const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
 assertGuideSections(body, slugs);
-const limits = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
+const limitsCall = await checkedGuideCall(
+  "role and limit summary",
+  BATCH_TRIES,
+  () => call(LIMITS_PROMPT, body, 8000, NAV_MODEL),
+  (text) => text
+);
+const limits = limitsCall.text;
+for (const [index, key] of keys.entries()) {
+  cache.set(key, sections[index]);
+}
+cache.set(limitsCall.key, limits);
+const regenerated = [
+  ...batches
+    .filter((_, index) => fresh[index])
+    .flat()
+    .map((a) => a.slug),
+  ...(limitsCall.fresh ? ["(role and limit summary)"] : []),
+];
 const availability = AVAILABILITY.map((line) => `- ${line}`).join("\n");
 const guide = `# Acquisity product guide
 
@@ -476,8 +540,7 @@ ${limits}
 ${body}
 `;
 rmSync(dir, { force: true, recursive: true });
-// Agent-facing text carries no em dashes; the docs use them freely.
-const plain = guide.replace(/\s*\u2014\s*/gu, ", ");
+const plain = plainDashes(guide);
 const vendors = plain.match(VENDOR_LEFT) ?? [];
 if (vendors.length) {
   throw new Error(`vendor names left in the guide: ${vendors.join(", ")}`);
@@ -489,12 +552,30 @@ const escaped = plain
   .replace(/\\/gu, "\\\\")
   .replace(/`/gu, "\\`")
   .replace(/\$\{/gu, "\\${");
-writeFileSync(
-  OUT,
-  `// Generated by scripts/widget-product-guide.ts from Acquisity ${sha.slice(0, 12)}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n`
+const short = sha.slice(0, 12);
+const generated = `// Generated by scripts/widget-product-guide.ts from Acquisity ${short}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n`;
+// Written as the formatter leaves it, so an unchanged rerun is byte-identical.
+const formatted = execFileSync(
+  "pnpm",
+  ["exec", "biome", "format", `--stdin-file-path=${OUT}`],
+  { encoding: "utf8", input: generated, maxBuffer: 64 * 1024 * 1024 }
 );
+const previous = readFileSync(OUT, "utf8");
+const cacheJson = `${JSON.stringify(Object.fromEntries(cache), null, 2)}\n`;
+if (
+  guideArtifactsEqual(
+    { cache: previousCache, guide: previous },
+    { cache: cacheJson, guide: formatted }
+  )
+) {
+  console.log("guide unchanged: only the commit differs, file left as it was");
+} else {
+  writeFileSync(OUT, formatted);
+  writeFileSync(CACHE_FILE, cacheJson);
+}
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
+console.log(`regenerated=${regenerated.join(",") || "none"}`);
 console.log(
-  `get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} reported_cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );

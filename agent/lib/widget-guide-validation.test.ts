@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   assertGuideSections,
   frontmatterField,
+  plainDashes,
 } from "./widget-guide-validation.js";
 import {
   PRODUCT_GUIDE,
@@ -58,5 +59,21 @@ test("front matter titles read folded block scalars, not the >- marker", () => {
       "title"
     ),
     "First part second part"
+  );
+});
+
+test("em dashes become commas between words and a hyphen when they stand alone", () => {
+  assert.equal(
+    plainDashes("A dash (\u2014) means not enough data yet \u2014 check back."),
+    "A dash (-) means not enough data yet, check back."
+  );
+  assert.equal(
+    plainDashes('shows "\u2014" or word\u2014word'),
+    'shows "-" or word, word'
+  );
+  // A dash at a line edge must not join the next line, such as a section heading.
+  assert.equal(
+    plainDashes("Status: —\n### Next {slug: next}"),
+    "Status:, \n### Next {slug: next}"
   );
 });

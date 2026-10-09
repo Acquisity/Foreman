@@ -1,3 +1,6 @@
+const LONE_DASH =
+  /(?<=[(["'\u201c\u2018])\u2014|\u2014(?=[)\]"'\u201d\u2019])/gu;
+const DASH = /[ \t]*\u2014[ \t]*/gu;
 const SECTION = /^### .+ \{slug: ([^}\n]+)\}$/u;
 const HEADINGS = /^### .*$/gmu;
 
@@ -55,3 +58,10 @@ export function frontmatterField(front: string, name: string): string {
   }
   return value.replace(/^["']|["']$/gu, "").trim();
 }
+
+/**
+ * Agent-facing text carries no em dashes. One standing alone as a symbol, as
+ * in "(—)", becomes "-"; one between words becomes a comma.
+ */
+export const plainDashes = (text: string): string =>
+  text.replace(LONE_DASH, "-").replace(DASH, ", ");
