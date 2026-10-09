@@ -678,7 +678,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
   const A = "00000000-0000-4000-8000-00000000000a";
   const B = "00000000-0000-4000-8000-00000000000b";
 
-  it("lists the same tools at every act step, so a step reads the one before it from cache", async () => {
+  it("lists the same tools across forced reads and terminal steps", async () => {
     // Two picked reads on the step model, then the write-up and an article read
     // before the finish on the main model.
     const bodies = await session(
@@ -719,14 +719,44 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     assert.equal(JSON.stringify(bodies.warnings).includes("breakpoint"), false);
   });
 
-  it("caches the shared guide prefix ahead of the workspace scope, the same for two workspaces", async () => {
-    const [first] = await session(A, ["finish"], [1]);
-    const [second] = await session(B, ["finish"], [1]);
-    assert.deepEqual(second.system[0], first.system[0]);
-    assert.ok(first.system[0].cache_control);
-    assert.ok(first.system[0].text.endsWith(PRODUCT_GUIDE));
-    assert.equal(first.system[0].text.includes(A), false);
-    assert.ok(first.system[1].text.includes(A));
-    assert.ok(second.system[1].text.includes(B));
+  it("keeps tools and system through the shared breakpoint byte-identical across steps and sessions", async () => {
+    const prefixes = new Map<string, string>();
+    for (const userId of [A, B]) {
+      // biome-ignore lint/performance/noAwaitInLoops: compare consecutive steps of each session.
+      const bodies = await session(
+        userId,
+        ["widget_billing_summary", "widget_account_access", "finish"],
+        [0, 1, 2, 3]
+      );
+      assert.deepEqual(
+        bodies.map((body) => body.model),
+        [
+          "claude-haiku-5-5",
+          "claude-haiku-5-5",
+          "claude-sonnet-5-5",
+          "claude-sonnet-5-5",
+        ]
+      );
+      for (const body of bodies) {
+        const end = body.system.findIndex((block) => block.cache_control);
+        assert.ok(end >= 0);
+        const system = body.system.slice(0, end + 1);
+        if (body.model === "claude-sonnet-5-5") {
+          assert.ok(system.at(-1)?.text.endsWith(PRODUCT_GUIDE));
+        }
+        const prefix = JSON.stringify({ system, tools: body.tools });
+        assert.equal(prefix.includes(userId), false);
+        assert.ok(
+          body.system
+            .slice(end + 1)
+            .some((block) => block.text.includes(userId))
+        );
+        const previous = prefixes.get(body.model);
+        if (previous !== undefined) {
+          assert.equal(prefix, previous);
+        }
+        prefixes.set(body.model, prefix);
+      }
+    }
   });
 });

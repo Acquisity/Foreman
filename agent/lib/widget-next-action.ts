@@ -868,23 +868,34 @@ export function widgetNextActionMiddleware(
       // A call to a tool this step does not offer is refused before it runs.
       // When that leaves the step with nothing, it is asked once more with no tool.
       const unforced = async (input: Params) => {
+        const admit = (
+          response: Awaited<ReturnType<typeof request>>,
+          allowed: Set<string>
+        ) => ({
+          ...response,
+          content: response.content.filter(
+            (part) => part.type !== "tool-call" || allowed.has(part.toolName)
+          ),
+        });
         const generated = await request(input);
-        const allowed = offers.get(input);
-        const content = generated.content.filter(
-          (part) => part.type !== "tool-call" || allowed?.has(part.toolName)
-        );
-        if (!allowed || content.length === generated.content.length) {
+        const admitted = admit(generated, offers.get(input) ?? new Set());
+        if (admitted.content.length === generated.content.length) {
           return generated;
         }
-        const redo = !content.some((part) => part.type === "tool-call");
+        const redo = !admitted.content.some(
+          (part) => part.type === "tool-call"
+        );
         log(
           "fallback",
           { ms: 0, step: plan?.reads.length ?? 0 },
           redo ? "reason=refused_call_redo" : "reason=refused_call"
         );
         return redo
-          ? request({ ...input, toolChoice: { type: "none" } })
-          : { ...generated, content };
+          ? admit(
+              await request({ ...input, toolChoice: { type: "none" } }),
+              new Set()
+            )
+          : admitted;
       };
       if (!plan) {
         return unforced(params);

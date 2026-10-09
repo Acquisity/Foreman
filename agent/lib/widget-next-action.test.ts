@@ -13,6 +13,7 @@ import {
 } from "./widget-next-action.js";
 
 const RUN_ENDED = /run ended/;
+const SUPPORT_BLOCKED = /Support investigation capability is unavailable/u;
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
@@ -161,6 +162,59 @@ const LISTED = TOOLS.map((tool) => tool.name).filter(
   (name) => name !== "web_fetch"
 );
 const forced = (toolName: string) => ({ toolName, type: "tool" });
+
+for (const mode of ["generate", "stream"] as const) {
+  for (const action of ["finish", "human", "asked", "found"] as const) {
+    for (const tool of ["widget_ask_customer", "widget_billing_summary"]) {
+      it(`${mode}: ${action} refuses ${tool} in the no-tool redo without another retry`, async () => {
+        const ask = {
+          input: { question: "Which campaign do you mean?" },
+          output: { asked: "Which campaign do you mean?" },
+          tool: "widget_ask_customer",
+        };
+        const workspaceRead = {
+          input: {},
+          output: {},
+          tool: "widget_outreach_health",
+        };
+        const reads = {
+          asked: [ask],
+          finish: [],
+          found: [workspaceRead, ask],
+          human: [workspaceRead],
+        }[action];
+        const { base, model } = harness(
+          jev(action === "human" ? "human" : "finish", 1),
+          call("widget_billing_summary", {}),
+          call(tool, { question: "Which campaign do you mean?" })
+        );
+        const params = {
+          prompt: prompt("Please help with my campaign", reads),
+          tools: [
+            ...TOOLS,
+            {
+              inputSchema: { type: "object" as const },
+              name: "widget_ask_customer",
+              type: "function" as const,
+            },
+          ],
+        };
+        await assert.rejects(async () => {
+          if (mode === "generate") {
+            await model.doGenerate(params);
+          } else {
+            const { stream } = await model.doStream(params);
+            for await (const part of stream) {
+              assert.notEqual(part.type, "tool-call");
+            }
+          }
+        }, SUPPORT_BLOCKED);
+        assert.equal(base.doGenerateCalls.length, 2);
+        assert.deepEqual(base.doGenerateCalls[1].toolChoice, { type: "none" });
+      });
+    }
+  }
+}
 
 const campaigns = {
   campaigns: [

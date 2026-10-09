@@ -48,10 +48,8 @@ export const withoutGuide = <
 });
 
 /**
- * The system message split right after the guide, with a cache breakpoint on
- * the first part. The per-session scope follows the guide, and Anthropic only
- * caches at block boundaries, so as one block every new workspace re-wrote the
- * whole ~105k-token prefix; split, it reads the shared part and writes ~4k.
+ * Split the existing guide-first system message right after the guide, with a
+ * cache breakpoint on the shared part. The per-session scope follows it.
  */
 export const cacheGuide = <
   T extends { content: unknown; providerOptions?: unknown; role: string },
