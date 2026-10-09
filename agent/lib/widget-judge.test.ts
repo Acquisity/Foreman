@@ -13,12 +13,14 @@ import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   citedArticles,
   claimsFor,
+  guideSections,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
   type JudgeRunner,
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
+  MAX_GUIDE_CHARS,
   parseGaps,
   parseMarks,
   parseVerdicts,
@@ -939,12 +941,30 @@ test("the judge reads the product guide for investigate replies only", async () 
     { ...smoke, mode: "investigate" as const },
   ]) {
     // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
-    await assert.rejects(
-      judgeAnswer(replay, "An answer.", [], undefined, run)
-    );
+    await assert.rejects(judgeAnswer(replay, "An answer.", [], undefined, run));
   }
   assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
-  assert.equal(JSON.parse(present(inputs[1])).productGuide, PRODUCT_GUIDE);
+  assert.equal(
+    JSON.parse(present(inputs[1])).productGuide,
+    guideSections("An answer.", [])
+  );
+});
+
+test("the judge gets the guide sections the answer cites or names, under the cap", () => {
+  const guide = guideSections(
+    'Open **AI SDR Inbox** and check "Needs Attention". See Settings > Conferencing.',
+    ["/docs/crm/importing"]
+  );
+  assert.ok(guide.includes("## Navigation"));
+  assert.ok(guide.includes("{slug: crm/importing}"));
+  assert.ok(guide.includes("{slug: ai-sdr/inbox}"));
+  assert.ok(
+    !guide.includes("{slug: niche-researcher/faq/can-i-change-my-niche-later}")
+  );
+  assert.ok(guide.length < PRODUCT_GUIDE.length / 4);
+  assert.ok(
+    guide.length <= guideSections("", []).length + MAX_GUIDE_CHARS + 2000
+  );
 });
 
 test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {
