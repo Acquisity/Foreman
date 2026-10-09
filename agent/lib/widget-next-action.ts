@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import { withoutGuide } from "./widget-instructions.js";
 
 /**
  * Preview pilot: at the first investigation step and after results, Jev picks the
@@ -846,7 +847,8 @@ export function widgetNextActionMiddleware(
       try {
         generated =
           opts.stepModel && plan.tool !== ASK_TOOL
-            ? await opts.stepModel.doGenerate(params)
+            ? // The step-filler only fills in the chosen read: it gets no guide.
+              await opts.stepModel.doGenerate(withoutGuide(params))
             : await doGenerate();
       } catch (error) {
         // A local request timeout can use the existing fallback. A cancelled
