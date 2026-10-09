@@ -31,7 +31,14 @@ import {
   gapSentences,
   NOT_READS,
   pinnedQuestion,
+  type ReadResult,
+  readResult,
 } from "../agent/lib/widget-live.js";
+import {
+  hasMovingWindow,
+  liveServerUrl,
+  verifyLiveServer,
+} from "../agent/lib/widget-live-policy.js";
 import { type WidgetContext, widgetAuth } from "../agent/lib/widget-scope.js";
 import { SERVICE_SECRET_HEADER } from "../agent/lib/widget-service-secret.js";
 import { RUN_ID, streamRun } from "./widget-run-stream.js";
@@ -51,8 +58,19 @@ if (!(runIds.length && runIds.every((id) => RUN_ID.test(id)))) {
   );
   process.exit(2);
 }
+if (
+  process.env.WIDGET_LIVE === "1" ||
+  process.env.WIDGET_REPLAY === "1" ||
+  process.env.WIDGET_REPLAY_CASE
+) {
+  throw new Error(
+    "Set live/replay flags on the dev server only; the runner requires ordinary exact-input reads."
+  );
+}
+const server = liveServerUrl(values.server);
+await verifyLiveServer(server, process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "");
 const outputDirectory = `.eve/widget-live/${new Date().toISOString().replace(/[:.]/g, "-")}`;
-await mkdir(outputDirectory, { recursive: true });
+await mkdir(outputDirectory, { mode: 0o700, recursive: true });
 
 /** The production run's reply and when it was asked. */
 async function recordedRun(runId: string) {
@@ -76,7 +94,11 @@ async function recordedRun(runId: string) {
 }
 
 /** The authored tool as eve resolves it for this scope, called once with the recorded input. */
-async function reread(tool: string, input: unknown, scope: WidgetContext) {
+async function reread(
+  tool: string,
+  input: unknown,
+  scope: WidgetContext
+): Promise<ReadResult> {
   if (!TOOL_NAME.test(tool)) {
     throw new Error(`Unexpected tool ${tool}.`);
   }
@@ -91,27 +113,26 @@ async function reread(tool: string, input: unknown, scope: WidgetContext) {
     }),
     session: { auth: { current: auth, initiator: auth } },
   } as unknown as ToolContext;
-  const dynamic = (await import(`../agent/tools/${tool}.ts`)).default as {
-    events: Record<string, (event: unknown, ctx: unknown) => unknown>;
-  };
-  const resolved = (await dynamic.events["step.started"]({}, ctx)) as {
-    execute: (input: unknown, ctx: ToolContext) => unknown;
-  } | null;
-  if (!resolved) {
-    throw new Error(`${tool} is not offered to this scope.`);
-  }
   try {
-    return await resolved.execute(input, ctx);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
+    const dynamic = (await import(`../agent/tools/${tool}.ts`)).default as {
+      events: Record<string, (event: unknown, ctx: unknown) => unknown>;
+    };
+    const resolved = (await dynamic.events["step.started"]({}, ctx)) as {
+      execute: (input: unknown, ctx: ToolContext) => unknown;
+    } | null;
+    return resolved
+      ? readResult(await resolved.execute(input, ctx))
+      : { status: "unverifiable" };
+  } catch {
+    return { status: "unverifiable" };
   }
 }
 
 /** The original message through the local server's staff path; the recorded scope is the bearer token. */
-async function liveRun(question: string, scope: WidgetContext) {
+async function liveRun(question: string, scope: WidgetContext, sentAt: string) {
   const conversationId = randomUUID();
   const post = async (body: object) => {
-    const response = await fetch(`${values.server}/internal/widget/message`, {
+    const response = await fetch(`${server}/internal/widget/message`, {
       body: JSON.stringify({
         conversation_id: conversationId,
         organization_id: scope.organizationId,
@@ -119,16 +140,25 @@ async function liveRun(question: string, scope: WidgetContext) {
         ...body,
       }),
       headers: {
-        authorization: `Bearer ${Buffer.from(JSON.stringify(scope)).toString("base64url")}`,
+        authorization: `Bearer ${Buffer.from(JSON.stringify({ scope, sentAt })).toString("base64url")}`,
         "content-type": "application/json",
         [SERVICE_SECRET_HEADER]: process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "",
       },
       method: "POST",
+      redirect: "error",
       signal: AbortSignal.timeout(RUN_DEADLINE_MS),
     });
+    if (!response.ok) {
+      throw new Error("The local live investigation request failed.");
+    }
     return (await response.json()) as Record<string, unknown>;
   };
-  let result = await post({ ...toRequest(question), message_id: randomUUID() });
+  const originalRequest = toRequest(question);
+  let result = await post({
+    ...originalRequest,
+    message_id: randomUUID(),
+    question: pinnedQuestion(originalRequest.question, sentAt),
+  });
   const deadline = Date.now() + RUN_DEADLINE_MS;
   while (result.status === "pending" && Date.now() < deadline) {
     // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
@@ -172,17 +202,21 @@ for (const runId of runIds) {
       .filter((call) => !NOT_READS.has(call.tool))
       .map(async (call) => ({
         ...call,
+        movingWindow: hasMovingWindow(call.tool, call.input),
+        recorded: readResult(call.output, call.status),
         reread: await reread(call.tool, call.input, scope),
       }))
   );
   const drift = driftVerdict(reads);
   const live = await liveRun(
-    pinnedQuestion(raw.question, original.sentAt.toISOString()),
-    scope
+    raw.question,
+    scope,
+    original.sentAt.toISOString()
   );
   await writeFile(
     `${outputDirectory}/${runId}.json`,
-    `${JSON.stringify({ drift, live, original, question: raw.question, reads, runId }, null, 2)}\n`
+    `${JSON.stringify({ drift, live, original, question: raw.question, reads, runId }, null, 2)}\n`,
+    { mode: 0o600 }
   );
   const gaps = gapSentences(original.reply);
   const [liveReply, ...printedGaps] = redacted(raw, scope, [
@@ -200,9 +234,16 @@ for (const runId of runIds) {
         ? printedGaps.map((gap) => `  - ${gap}`)
         : ["  (none found)"]),
       `drift: ${drift.verdict}${drift.changed.length ? ` (${drift.changed.join(", ")})` : ""}, ${drift.compared} of ${reads.length} reads compared`,
-      ...(drift.unavailable.length
-        ? [`unavailable when recorded: ${drift.unavailable.join(", ")}`]
+      ...(drift.unverifiable.length
+        ? [`unverifiable reads: ${drift.unverifiable.join(", ")}`]
         : []),
+      `cause: ${drift.causeGradeAllowed ? "eligible once the classifier is wired" : "not graded"}`,
+      ...reads
+        .filter((read) => read.movingWindow)
+        .map(
+          (read) =>
+            `implicit moving window when recorded: ${read.tool}; exact-input drift re-read is current, historical evidence is pinned only in the new investigation`
+        ),
       `live: ${live.status} ${live.decision ?? ""}`.trim(),
       "new reply:",
       liveReply,

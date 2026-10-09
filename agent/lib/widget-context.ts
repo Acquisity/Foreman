@@ -53,7 +53,7 @@ export async function verifyWidgetContext(
     });
   }
   if (isLiveActive()) {
-    return liveContext(parsed);
+    return liveContext({ ...parsed, staff: input.staff });
   }
   const origin = acquisityOrigin();
   const signal = input.signal

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { defineTool } from "eve/tools";
-import type { z } from "zod";
+import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
@@ -9,6 +9,8 @@ import type {
   IdentifierCandidates,
   OwnedIdentifiers,
 } from "./widget-evidence.js";
+import { assertLiveAllowed } from "./widget-live-policy.js";
+import { normalize } from "./widget-normalize.js";
 import {
   requireWidgetContext,
   type WidgetContext,
@@ -35,14 +37,15 @@ export const REPLAY_TICKET = Object.freeze({
 /**
  * Live re-run (ENG-15026, `pnpm widget:live`): with WIDGET_LIVE=1 every widget read is live,
  * widget_file_ticket files nothing, and identity is the recorded production scope the
- * harness sends as the bearer token. Never on production.
+ * harness sends as the bearer token. Local-only.
  */
 export const LIVE_TICKET = Object.freeze({ filed: false, live: "not filed" });
 
-/** Throws when the replay or live flag is set on a production deployment, or both are set. */
+/** Live is local-only; replay is refused on production, and the flags are exclusive. */
 export function assertReplayAllowed(env: NodeJS.ProcessEnv = process.env) {
+  assertLiveAllowed(env);
   const replay = env.WIDGET_REPLAY === "1" || Boolean(env.WIDGET_REPLAY_CASE);
-  if ((replay || env.WIDGET_LIVE === "1") && env.VERCEL_ENV === "production") {
+  if (replay && env.VERCEL_ENV === "production") {
     throw new Error("Widget replay is not allowed on production.");
   }
   if (replay && env.WIDGET_LIVE === "1") {
@@ -66,6 +69,8 @@ export const isLiveActive = () => {
 
 const MAX_CASSETTE_CHARS = 1_048_576;
 const schemas = new Map<string, z.ZodType>();
+const lookupKey = (tool: string, input: unknown) =>
+  JSON.stringify([tool, normalize(input)]);
 const CASE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
 const casePath = (caseId?: string) => {
   if (!caseId) {
@@ -84,23 +89,6 @@ export function replayCase(caseId?: string): WidgetCase {
   return widgetCaseSchema.parse(JSON.parse(text));
 }
 
-/** Inputs compare with object keys sorted at every depth and null or undefined fields dropped, so `{}` and `{ id: null }` are one call. */
-export const normalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(normalize);
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, child]) => child !== undefined && child !== null)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, child]) => [key, normalize(child)])
-    );
-  }
-  return value;
-};
-const lookupKey = (tool: string, input: unknown) =>
-  JSON.stringify([tool, normalize(input)]);
 /**
  * Free-text search fields the model rewords on every run. A call that differs from a
  * recording of the same tool only in these replays that recording; every other field
@@ -181,10 +169,8 @@ export function replayable<T extends { description: string }>(
     // No outputSchema: the miss result must reach the model as it is.
     // Stricter than the authored issuer-only approval: a widget session without a verified scope reads nothing.
     execute: (input, ctx) => {
-      const { replayCaseId } = requireWidgetContext(
-        ctx.session?.auth.initiator
-      );
-      return live ? LIVE_TICKET : replayRead(name, input, replayCaseId);
+      const scope = requireWidgetContext(ctx.session?.auth.initiator);
+      return live ? LIVE_TICKET : replayRead(name, input, scope.replayCaseId);
     },
     inputSchema,
   }) as unknown as T;
@@ -211,21 +197,34 @@ export function replayContext(input: {
   );
 }
 
+export const liveIdentitySchema = z.strictObject({
+  scope: widgetContextSchema,
+  sentAt: z.iso.datetime(),
+});
+
 /**
  * A live re-run's scope: the production run's recorded scope, sent base64url-encoded as the
  * bearer token, on the request's own conversation and always as a team-only inbox run.
  */
 export function liveContext(input: {
   conversationId: string;
+  organizationId: string;
+  staff?: boolean;
   userToken: string;
 }): WidgetContext {
-  const recorded = JSON.parse(
-    Buffer.from(input.userToken, "base64url").toString("utf8")
+  const { scope: recorded, sentAt } = liveIdentitySchema.parse(
+    JSON.parse(Buffer.from(input.userToken, "base64url").toString("utf8"))
   );
+  if (!input.staff || input.organizationId !== recorded.organizationId) {
+    throw new Error(
+      "Live re-runs require the recorded workspace and staff path."
+    );
+  }
   return Object.freeze(
     widgetContextSchema.parse({
       ...recorded,
       conversationId: input.conversationId,
+      liveAsOf: sentAt,
       recordingId: undefined,
       replayCaseId: undefined,
       source: "inbox",

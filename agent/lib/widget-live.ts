@@ -1,4 +1,4 @@
-import { normalize } from "./widget-replay.js";
+import { normalize } from "./widget-normalize.js";
 
 /**
  * Live re-runs (ENG-15026, `pnpm widget:live`): pure pieces of the report. The
@@ -39,41 +39,88 @@ export const gapSentences = (reply: string | null) =>
 /** Reads with no stored state to compare: customer clarification and the stubbed ticket. */
 export const NOT_READS = new Set(["widget_ask_customer", "widget_file_ticket"]);
 
-// Drift rule: a read is steady when its re-read output equals the recording
-// structurally (keys sorted, null fields dropped, as replay matches inputs)
-// after removing `observedAt`, the only field that stamps when a read ran. A
-// recording that reported itself unavailable holds no state to compare: it is
-// listed apart (a tool gap) and does not decide the verdict.
+export type ReadResult =
+  | { status: "ok"; output: unknown }
+  | { status: "unverifiable" };
+
+/** A partial or failed source cannot establish that customer state stayed the same. */
+const unavailable = (value: unknown, root = true): boolean => {
+  if (Array.isArray(value)) {
+    return value.some(
+      (child) => child && typeof child === "object" && unavailable(child, false)
+    );
+  }
+  if (!value || typeof value !== "object") {
+    return value === null || value === undefined;
+  }
+  const item = value as Record<string, unknown>;
+  if (
+    item.available === false ||
+    item.success === false ||
+    item.ok === false ||
+    item.isError === true ||
+    item.status === "unavailable" ||
+    item.status === "denied" ||
+    (root &&
+      (["error", "failed", "cancelled"].includes(String(item.status)) ||
+        Boolean(item.error))) ||
+    (Array.isArray(item.unavailable) && item.unavailable.length)
+  ) {
+    return true;
+  }
+  // Only nested objects can carry source status; nullable data fields are legitimate.
+  return Object.values(item).some(
+    (child) => child && typeof child === "object" && unavailable(child, false)
+  );
+};
+
+export function readResult(output: unknown, status?: string): ReadResult {
+  return ["error", "failed", "denied", "cancelled"].includes(status ?? "") ||
+    unavailable(output)
+    ? { status: "unverifiable" }
+    : { output, status: "ok" };
+}
+
+// Structural equality of bounded output, with key order/null normalization shared
+// with replay and only observedAt (read time) removed. Failed/partial reads carry
+// no comparable state. Movement requires a real change; steady requires complete,
+// nonempty comparison evidence. Cause grading is permitted only for steady cases.
 const comparable = (output: unknown) =>
   JSON.stringify(
     normalize(
-      JSON.parse(JSON.stringify(output ?? null), (key, value) =>
+      JSON.parse(JSON.stringify(output), (key, value) =>
         key === "observedAt" ? undefined : value
       )
     )
   );
-const wasUnavailable = (output: unknown) =>
-  typeof output === "object" &&
-  output !== null &&
-  ("available" in output
-    ? output.available === false
-    : "status" in output && output.status === "unavailable");
 
 export function driftVerdict(
-  reads: readonly { output: unknown; reread: unknown; tool: string }[]
+  reads: readonly { recorded: ReadResult; reread: ReadResult; tool: string }[]
 ) {
-  const unavailable = reads.filter((read) => wasUnavailable(read.output));
-  const changed = reads
-    .filter(
-      (read) =>
-        !unavailable.includes(read) &&
-        comparable(read.output) !== comparable(read.reread)
-    )
-    .map((read) => read.tool);
+  const changed: string[] = [];
+  const unverifiable: string[] = [];
+  let compared = 0;
+  for (const read of reads) {
+    if (read.recorded.status !== "ok" || read.reread.status !== "ok") {
+      unverifiable.push(read.tool);
+      continue;
+    }
+    compared += 1;
+    if (comparable(read.recorded.output) !== comparable(read.reread.output)) {
+      changed.push(read.tool);
+    }
+  }
+  let verdict: "state moved" | "steady" | "unverifiable" = "unverifiable";
+  if (changed.length) {
+    verdict = "state moved";
+  } else if (compared && !unverifiable.length) {
+    verdict = "steady";
+  }
   return {
+    causeGradeAllowed: verdict === "steady",
     changed,
-    compared: reads.length - unavailable.length,
-    unavailable: unavailable.map((read) => read.tool),
-    verdict: changed.length ? ("state moved" as const) : ("steady" as const),
+    compared,
+    unverifiable,
+    verdict,
   };
 }

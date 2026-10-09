@@ -17,6 +17,7 @@ import {
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
+import { liveDependencies } from "./widget-live-store.js";
 import {
   askedResult,
   handoffEligible,
@@ -1271,7 +1272,7 @@ export async function receiveWidgetMessage(
     Partial<Pick<RouteHandlerArgs, "attachSession" | "resolveSession">>,
   responseWaitMs = 8000,
   verifyContext = verifyWidgetContext,
-  deps: WidgetDependencies = defaultWidgetDependencies
+  deps: WidgetDependencies = liveDependencies(defaultWidgetDependencies)
 ) {
   const refused = serviceSecretRefusal(request);
   if (refused) {
@@ -1375,10 +1376,9 @@ export async function receiveWidgetMessage(
 export async function failWidgetRun(
   runId: string | null,
   sessionId: string,
-  deps: Pick<
-    WidgetDependencies,
-    "complete" | "read"
-  > = defaultWidgetDependencies
+  deps: Pick<WidgetDependencies, "complete" | "read"> = liveDependencies(
+    defaultWidgetDependencies
+  )
 ) {
   if (!runId) {
     return;

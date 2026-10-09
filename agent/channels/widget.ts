@@ -1,9 +1,12 @@
-import { defineChannel, POST } from "eve/channels";
+import { defineChannel, GET, POST } from "eve/channels";
 import {
   failWidgetRun,
   receiveWidgetMessage,
 } from "../lib/widget-investigation.js";
+import { LIVE_PROTOCOL } from "../lib/widget-live-policy.js";
+import { isLiveActive } from "../lib/widget-replay.js";
 import { receiveWidgetScreenshot } from "../lib/widget-screenshot.js";
+import { serviceSecretRefusal } from "../lib/widget-service-secret.js";
 
 export default defineChannel({
   context: (state) => ({ state }),
@@ -13,6 +16,17 @@ export default defineChannel({
     },
   },
   routes: [
+    GET("/internal/widget/live", (request) => {
+      if (!isLiveActive()) {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return Promise.resolve(
+        serviceSecretRefusal(request) ??
+          new Response(LIVE_PROTOCOL, {
+            headers: { "cache-control": "no-store" },
+          })
+      );
+    }),
     POST("/internal/widget/message", receiveWidgetMessage),
     POST("/internal/widget/image", (request) =>
       receiveWidgetScreenshot(request)

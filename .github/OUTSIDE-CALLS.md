@@ -145,3 +145,14 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 `receiveFinInvestigation` runs late identity and delivery checks concurrently with a shared five-second abort signal and response race. The race also bounds response waiting if credential resolution ignores cancellation; it never authorizes disclosure on timeout. Initial checks retain their existing deadlines.
 
 Widget progress writes use the same private-DB transport with a 1.5-second deadline. Progress storage failure never blocks the investigation result.
+
+## Local widget live harness (ENG-15026)
+
+| Call | Bound or exemption | Reason |
+| --- | --- | --- |
+| `widget-live-policy.ts` loopback live-mode probe | Five-second AbortSignal, redirects refused | Carries the service secret only; no recorded scope or customer message precedes admission. |
+| `scripts/widget-live.ts` loopback investigation and polling | Ten-minute request AbortSignal and ten-minute polling observation deadline, redirects refused | Calls only an admitted local server; investigation runs persist to local files. |
+| `scripts/widget-live.ts` authored drift reads | Two-minute caller AbortSignal plus each provider's existing deadline | Exact-input reads reuse the authored widget tools and Executor transport. App token resolution uses the existing Vercel Connect exemption, which exposes no abort option. |
+| `scripts/widget-live.ts` production run lookup | Thirty-second private Postgres client | SELECT-only reader; separate from the live server's file store. |
+| `scripts/widget-run-stream.ts` Workflow CLI stream inspection | Three-minute child-process timeout | Shared existing CLI reader; stream decryption may hang. |
+| `widget-live-store.ts` local filesystem operations | Local filesystem exemption; lock acquisition bounded to five seconds | Runs only without VERCEL_ENV and stores atomic JSON snapshots under `.eve/widget-live/`. No remote storage adapter or database URL is used. Node directory/rename APIs offer no cancellable operation; a crashed lock fails closed and requires local recovery. |

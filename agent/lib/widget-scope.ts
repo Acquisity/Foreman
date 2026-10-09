@@ -7,6 +7,8 @@ export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 
 const shape = {
   conversationId: z.uuid(),
+  // Only the local live harness stamps the original conversation date.
+  liveAsOf: z.iso.datetime().optional(),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
@@ -83,6 +85,7 @@ export function sameWidgetOwner(a: WidgetContext, b: WidgetContext) {
     a.conversationId === b.conversationId &&
     a.role === b.role &&
     a.replayCaseId === b.replayCaseId &&
+    a.liveAsOf === b.liveAsOf &&
     a.partnerId === b.partnerId &&
     a.organizationSlug === b.organizationSlug
   );
