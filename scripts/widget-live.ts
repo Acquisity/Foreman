@@ -193,8 +193,7 @@ function redacted(raw: WidgetCase, scope: WidgetContext, texts: string[]) {
     .map((entry) => String(entry.output));
 }
 
-for (const runId of runIds) {
-  // biome-ignore lint/performance/noAwaitInLoops: one case at a time keeps provider load and output readable.
+async function rerun(runId: string) {
   const { raw, scope } = await streamRun(runId, "production");
   const original = await recordedRun(runId);
   const reads = await Promise.all(
@@ -250,4 +249,24 @@ for (const runId of runIds) {
     ].join("\n")
   );
 }
+
+let failures = 0;
+for (const runId of runIds) {
+  try {
+    // biome-ignore lint/performance/noAwaitInLoops: one case at a time keeps provider load and output readable.
+    await rerun(runId);
+  } catch {
+    // A fixed class, never the error text: it can carry customer data.
+    failures += 1;
+    await writeFile(
+      `${outputDirectory}/${runId}.json`,
+      `${JSON.stringify({ failed: "run_failed", runId }, null, 2)}\n`,
+      { mode: 0o600 }
+    );
+    console.log(`\n=== ${runId}: failed (run_failed); continuing`);
+  }
+}
 console.log(`\nRaw results: ${outputDirectory}`);
+if (failures) {
+  process.exitCode = 1;
+}
