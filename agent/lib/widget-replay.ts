@@ -32,13 +32,21 @@ export const REPLAY_TICKET = Object.freeze({
   replay: "recorded",
 });
 
-/** Throws when the replay flag is set on a production deployment. */
+/**
+ * Live re-run (ENG-15026, `pnpm widget:live`): with WIDGET_LIVE=1 every widget read is live,
+ * widget_file_ticket files nothing, and identity is the recorded production scope the
+ * harness sends as the bearer token. Never on production.
+ */
+export const LIVE_TICKET = Object.freeze({ filed: false, live: "not filed" });
+
+/** Throws when the replay or live flag is set on a production deployment, or both are set. */
 export function assertReplayAllowed(env: NodeJS.ProcessEnv = process.env) {
-  if (
-    (env.WIDGET_REPLAY === "1" || env.WIDGET_REPLAY_CASE) &&
-    env.VERCEL_ENV === "production"
-  ) {
+  const replay = env.WIDGET_REPLAY === "1" || Boolean(env.WIDGET_REPLAY_CASE);
+  if ((replay || env.WIDGET_LIVE === "1") && env.VERCEL_ENV === "production") {
     throw new Error("Widget replay is not allowed on production.");
+  }
+  if (replay && env.WIDGET_LIVE === "1") {
+    throw new Error("Widget replay and live re-runs are exclusive.");
   }
 }
 // Every widget tool resolver imports this module, so production with the flag fails at boot.
@@ -49,6 +57,11 @@ export const isReplayActive = () => {
   return (
     process.env.WIDGET_REPLAY === "1" || Boolean(process.env.WIDGET_REPLAY_CASE)
   );
+};
+
+export const isLiveActive = () => {
+  assertReplayAllowed();
+  return process.env.WIDGET_LIVE === "1";
 };
 
 const MAX_CASSETTE_CHARS = 1_048_576;
@@ -72,7 +85,7 @@ export function replayCase(caseId?: string): WidgetCase {
 }
 
 /** Inputs compare with object keys sorted at every depth and null or undefined fields dropped, so `{}` and `{ id: null }` are one call. */
-const normalize = (value: unknown): unknown => {
+export const normalize = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map(normalize);
   }
@@ -150,12 +163,13 @@ export function replayRead(
   return REPLAY_MISS;
 }
 
-/** The authored tool, or under replay a same-named tool that reads the cassette. */
+/** The authored tool, or under replay a same-named tool that reads the cassette, or in a live re-run a ticket tool that files nothing. */
 export function replayable<T extends { description: string }>(
   name: string,
   tool: T
 ): T {
-  if (!isReplayActive()) {
+  const live = isLiveActive();
+  if (!(isReplayActive() || (live && name === "widget_file_ticket"))) {
     return tool;
   }
   const { description, inputSchema } = tool as T & { inputSchema: z.ZodType };
@@ -166,12 +180,12 @@ export function replayable<T extends { description: string }>(
     description,
     // No outputSchema: the miss result must reach the model as it is.
     // Stricter than the authored issuer-only approval: a widget session without a verified scope reads nothing.
-    execute: (input, ctx) =>
-      replayRead(
-        name,
-        input,
-        requireWidgetContext(ctx.session?.auth.initiator).replayCaseId
-      ),
+    execute: (input, ctx) => {
+      const { replayCaseId } = requireWidgetContext(
+        ctx.session?.auth.initiator
+      );
+      return live ? LIVE_TICKET : replayRead(name, input, replayCaseId);
+    },
     inputSchema,
   }) as unknown as T;
 }
@@ -193,6 +207,28 @@ export function replayContext(input: {
       replayCaseId: input.replayCaseId,
       role: replayCase(input.replayCaseId).scope.role,
       source: input.staff ? "inbox" : "widget",
+    })
+  );
+}
+
+/**
+ * A live re-run's scope: the production run's recorded scope, sent base64url-encoded as the
+ * bearer token, on the request's own conversation and always as a team-only inbox run.
+ */
+export function liveContext(input: {
+  conversationId: string;
+  userToken: string;
+}): WidgetContext {
+  const recorded = JSON.parse(
+    Buffer.from(input.userToken, "base64url").toString("utf8")
+  );
+  return Object.freeze(
+    widgetContextSchema.parse({
+      ...recorded,
+      conversationId: input.conversationId,
+      recordingId: undefined,
+      replayCaseId: undefined,
+      source: "inbox",
     })
   );
 }
