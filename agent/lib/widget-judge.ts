@@ -559,6 +559,8 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   };
   const noAnswer = ({ record, row }: ScoredReplay) =>
     !record && row.answer === null;
+  const handoffExpected = ({ expectations }: WidgetCase) =>
+    expectations.lane === "human" || expectations.fileTicket === true;
   const missingCoverage = scored.filter((replay) => {
     if (noAnswer(replay)) {
       return false;
@@ -577,7 +579,12 @@ export function scorecard(replays: readonly ScoredReplay[]) {
     goal: keyof ReturnType<typeof required>
   ) => {
     if (noAnswer(replay)) {
-      return false;
+      // A correct handoff answered what was needed: a person takes it from here.
+      return (
+        goal === "answered what was needed" &&
+        replay.row.handedOff === true &&
+        handoffExpected(replay.recorded)
+      );
     }
     const ids = required(replay)[goal];
     const { record } = replay;
@@ -611,11 +618,10 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   }
   rate(
     "handed off only when needed",
-    scored.map(({ recorded: { expectations }, row }) =>
+    scored.map(({ recorded, row }) =>
       row.handedOff === undefined
         ? undefined
-        : row.handedOff ===
-          (expectations.lane === "human" || expectations.fileTicket === true)
+        : row.handedOff === handoffExpected(recorded)
     )
   );
   rate(

@@ -27,6 +27,7 @@ import {
   renderScorecard,
   reviewedSample,
   SCORECARD_TARGETS,
+  type ScoredReplay,
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
@@ -949,4 +950,26 @@ test("the judge reads the product guide for investigate replies only", async () 
   }
   assert.ok(!systems[0]?.includes(PRODUCT_GUIDE));
   assert.ok(systems[1]?.includes(PRODUCT_GUIDE));
+});
+
+test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {
+  const sample = scoredSample();
+  const silent = { ...sample, record: null };
+  const handoff = {
+    ...silent,
+    recorded: {
+      ...sample.recorded,
+      expectations: { ...sample.recorded.expectations, lane: "human" as const },
+    },
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const unexpected = {
+    ...silent,
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const answered = (replay: ScoredReplay) =>
+    scorecard([replay]).rates.find((r) => r.goal === "answered what was needed")
+      ?.pass;
+  assert.equal(answered(handoff), 1);
+  assert.equal(answered(unexpected), 0);
 });
