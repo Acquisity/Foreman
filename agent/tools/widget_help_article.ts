@@ -8,7 +8,7 @@ import { isWidgetSupport } from "../lib/widget-scope.js";
 
 const widgetArticleSchema = helpArticleSchema.omit({ path: true });
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

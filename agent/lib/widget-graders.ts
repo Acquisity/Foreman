@@ -69,6 +69,16 @@ export function answeredLane(run: {
   return run.outcome?.reason === "chat" ? "chat" : "kb";
 }
 
+/** A person was brought in: the customer was handed to the team, the gate held the reply for a person, or a ticket was filed. */
+export const handedOff = (
+  lane: GradedRun["lane"],
+  reason: string | null,
+  tools: readonly string[]
+) =>
+  lane === "human" ||
+  reason === "needs_human" ||
+  tools.includes("widget_file_ticket");
+
 /** Everything in the message the customer must never see: foreign identifiers, vendor words, internal hosts, ticket refs. */
 export function leaks(message: string | null, recorded: WidgetCase): string[] {
   if (!message) {

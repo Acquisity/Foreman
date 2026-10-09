@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
+import { tool as sdrTool } from "../tools/widget_sdr_thread_status.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   citedArticles,
@@ -18,12 +19,16 @@ import {
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
+  parseGaps,
   parseMarks,
   parseVerdicts,
   readRecords,
   renderReview,
+  renderScorecard,
   reviewedSample,
+  SCORECARD_TARGETS,
   saveRecord,
+  scorecard,
 } from "./widget-judge.js";
 
 import {
@@ -42,6 +47,8 @@ const present = <T>(value: T | undefined): T => {
   return value;
 };
 
+const LEAK_RATE_ROW = /\| no leaks \| 66\.7% \| 3 \| 100\.0% \| miss \|/;
+const TOP_GAP_ROW = /2 {2}sequence content/;
 const CAUSE_TEXT = /two inboxes disconnected/;
 const CAUSE_ROW = /\| a#cause \| .* \| yes \| a \\\| b \| {2}\|/;
 const CAUSE_MARK = /(\| a#cause \|.*\|) {2}\|/;
@@ -548,4 +555,377 @@ test("WIDGET_JUDGE_NAV adds the app's navigation as one more source, cited or no
     delete process.env.WIDGET_JUDGE_DOCS;
     delete process.env.WIDGET_JUDGE_NAV;
   }
+});
+
+test("a user error or limitation case also needs the fix claim; a bug does not", () => {
+  const ids = (causeType: WidgetCase["expectations"]["causeType"]) =>
+    claimsFor(withRole("owner", { causeType })).map((claim) => claim.id);
+  assert.ok(ids("user_error").includes("fix"));
+  assert.ok(ids("platform_limitation").includes("fix"));
+  assert.ok(!ids("bug").includes("fix"));
+  assert.ok(!ids(undefined).includes("fix"));
+});
+
+test("parseGaps keeps a capability only on a tool gap and bounds each sentence", () => {
+  assert.deepEqual(
+    parseGaps({
+      gaps: [
+        {
+          capability: " sequence content ",
+          kind: "tool_gap",
+          sentence: "I could\n not see it.",
+        },
+        { capability: "x", kind: "tool_failure", sentence: "The read failed." },
+        { capability: null, kind: "tool_gap", sentence: "Not available." },
+      ],
+      verdicts: [],
+    }),
+    [
+      {
+        capability: "sequence content",
+        kind: "tool_gap",
+        sentence: "I could not see it.",
+      },
+      { capability: null, kind: "tool_failure", sentence: "The read failed." },
+      { capability: "unnamed", kind: "tool_gap", sentence: "Not available." },
+    ]
+  );
+  assert.throws(() =>
+    parseGaps({ gaps: [{ capability: null, kind: "other", sentence: "" }] })
+  );
+});
+
+test("scorecard reports pass rates per goal and ranks tool gaps", () => {
+  const userError = withRole("owner", {
+    causeType: "user_error",
+    claims: ["Says where to fix it."],
+  });
+  const all = (list: ReturnType<typeof claimsFor>, no: string[] = []) =>
+    list.map((claim) =>
+      verdict(claim.id, no.includes(claim.id) ? "no" : "yes")
+    );
+  const good = reviewedSample(
+    "a",
+    userError,
+    "Answer.",
+    all(claimsFor(userError)),
+    [{ capability: "Sequence content", kind: "tool_gap", sentence: "s" }]
+  );
+  const bad = reviewedSample(
+    "b",
+    userError,
+    "Answer.",
+    all(claimsFor(userError), ["fix", "invented"]),
+    [
+      { capability: "sequence content", kind: "tool_gap", sentence: "s" },
+      { capability: "billing history", kind: "tool_gap", sentence: "t" },
+      { capability: null, kind: "real_unknown", sentence: "u" },
+    ]
+  );
+  const row = {
+    budgetHit: false,
+    finalReplyMs: 20_000,
+    firstReplyMs: 1000,
+    handedOff: false,
+    leaks: "pass",
+    rawFields: "pass",
+  };
+  const card = scorecard([
+    { record: good, recorded: userError, row },
+    {
+      record: bad,
+      recorded: userError,
+      row: { ...row, budgetHit: true, finalReplyMs: 40_000 },
+    },
+    {
+      record: null,
+      recorded: userError,
+      row: { leaks: "fail", rawFields: "pass", scored: false },
+    },
+  ]);
+  const rate = (goal: string) => card.rates.find((r) => r.goal === goal);
+  assert.deepEqual(rate("found the real cause"), {
+    goal: "found the real cause",
+    pass: 2,
+    total: 2,
+  });
+  assert.deepEqual(rate("nothing made up"), {
+    goal: "nothing made up",
+    pass: 1,
+    total: 2,
+  });
+  assert.deepEqual(rate("answered what was needed (user_error)"), {
+    goal: "answered what was needed (user_error)",
+    pass: 1,
+    total: 2,
+  });
+  assert.equal(rate("answered what was needed (bug)")?.total, 0);
+  assert.deepEqual(rate("handed off only when needed"), {
+    goal: "handed off only when needed",
+    pass: 2,
+    total: 2,
+  });
+  assert.deepEqual(rate("no leaks"), { goal: "no leaks", pass: 2, total: 3 });
+  assert.deepEqual(rate("stayed in budget"), {
+    goal: "stayed in budget",
+    pass: 1,
+    total: 2,
+  });
+  assert.deepEqual(rate("no tool gaps"), {
+    goal: "no tool gaps",
+    pass: 0,
+    total: 2,
+  });
+  assert.deepEqual(card.gaps, [
+    ["sequence content", 2],
+    ["billing history", 1],
+  ]);
+  assert.deepEqual(card.replies[1], {
+    key: "final reply",
+    p50: 20,
+    p90: 40,
+    samples: 2,
+  });
+  const text = renderScorecard(card);
+  assert.match(text, LEAK_RATE_ROW);
+  assert.match(text, TOP_GAP_ROW);
+});
+
+const scoredSample = () => {
+  const example = withRole("owner", {
+    causeType: "user_error",
+    claims: ["Answers the customer's request."],
+  });
+  return {
+    record: reviewedSample(
+      "scored",
+      example,
+      "Answer.",
+      claimsFor(example).map((c) => verdict(c.id)),
+      []
+    ),
+    recorded: example,
+    row: {
+      answer: "Answer.",
+      finalReplyMs: 20_000,
+      firstReplyMs: 1000,
+      scored: true,
+    },
+  };
+};
+
+test("gap judging receives authoritative tool schemas and ranks unused capabilities separately", () => {
+  const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
+  const sdr = input.widgetToolCapabilities.find(
+    (tool: { name: string }) => tool.name === "widget_sdr_thread_status"
+  );
+  assert.equal(sdr.description, sdrTool.description);
+  assert.ok(sdr.inputSchema.properties.threadId);
+  const gaps = parseGaps({
+    gaps: [
+      {
+        capability: " conferencing setup ",
+        kind: "unused_capability",
+        sentence: "I could not confirm the setup.",
+      },
+    ],
+  });
+  const sample = scoredSample();
+  sample.record.gaps = gaps;
+  const card = scorecard([sample]);
+  assert.deepEqual(card.gaps, []);
+  assert.deepEqual(card.unused, [["conferencing setup", 1]]);
+  assert.equal(card.rates.find((r) => r.goal === "no tool gaps")?.pass, 1);
+});
+
+test("scorecard keeps unanswered and unjudged scored replays in denominators and marks missing coverage", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    sample,
+    { ...sample, record: null, row: { ...sample.row, answer: null } },
+    { ...sample, record: null },
+  ]);
+  assert.equal(card.scored, 3);
+  assert.equal(card.missingCoverage, 1);
+  for (const goal of [
+    "found the real cause",
+    "nothing made up",
+    "answered what was needed",
+    "no tool gaps",
+  ]) {
+    const rate = card.rates.find((r) => r.goal === goal);
+    assert.equal(rate?.total, 3);
+    assert.equal(rate?.pass, 1);
+  }
+  assert.ok(renderScorecard(card).includes("1 missing judge coverage"));
+  const previousTarget = SCORECARD_TARGETS["found the real cause"];
+  SCORECARD_TARGETS["found the real cause"] = 1;
+  try {
+    const incomplete = renderScorecard(card);
+    assert.ok(
+      incomplete.includes("| found the real cause | 33.3% | 3 |  |  |")
+    );
+    const complete = renderScorecard(scorecard([sample]));
+    assert.ok(
+      complete.includes("| found the real cause | 100.0% | 1 | 100.0% | hit |")
+    );
+  } finally {
+    SCORECARD_TARGETS["found the real cause"] = previousTarget;
+  }
+});
+
+test("scorecard latency excludes unscored replays from nearest-rank percentiles", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    sample,
+    {
+      ...sample,
+      row: {
+        ...sample.row,
+        finalReplyMs: 900_000,
+        firstReplyMs: 900_000,
+        scored: false,
+      },
+    },
+  ]);
+  assert.deepEqual(card.replies, [
+    { key: "first reply", p50: 1, p90: 1, samples: 1 },
+    { key: "final reply", p50: 20, p90: 20, samples: 1 },
+  ]);
+});
+
+test("answered score requires context and reask and treats absent required verdicts as missing coverage", () => {
+  const base = scoredSample();
+  const example = {
+    ...base.recorded,
+    question:
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nAnd my invoice?\n\nEARLIER TURNS (context):\nCustomer: My invoice is missing.",
+  };
+  const sample = {
+    ...base,
+    record: reviewedSample(
+      "context",
+      example,
+      "Answer.",
+      claimsFor(example).map((c) => verdict(c.id)),
+      []
+    ),
+    recorded: example,
+  };
+  for (const id of ["context", "reask"]) {
+    const failed = {
+      ...sample,
+      record: {
+        ...sample.record,
+        verdicts: sample.record.verdicts.map((v) =>
+          v.id === id ? { ...v, verdict: "no" as const } : v
+        ),
+      },
+    };
+    assert.equal(
+      scorecard([failed]).rates.find(
+        (r) => r.goal === "answered what was needed"
+      )?.pass,
+      0
+    );
+    const missing = {
+      ...sample,
+      record: {
+        ...sample.record,
+        verdicts: sample.record.verdicts.filter((v) => v.id !== id),
+      },
+    };
+    const card = scorecard([missing]);
+    assert.equal(card.missingCoverage, 1);
+    assert.equal(
+      card.rates.find((r) => r.goal === "answered what was needed")?.pass,
+      0
+    );
+    assert.equal(
+      card.rates.find((r) => r.goal === "answered what was needed")?.total,
+      1
+    );
+  }
+});
+
+test("out-of-scope refusals parse and rank separately without failing no tool gaps", () => {
+  const sample = scoredSample();
+  sample.record.gaps = parseGaps({
+    gaps: [
+      {
+        capability: " External bank records ",
+        kind: "out_of_scope",
+        sentence: "I cannot check those records.",
+      },
+      {
+        capability: "external bank records",
+        kind: "out_of_scope",
+        sentence: "They are outside this workspace.",
+      },
+    ],
+  });
+  assert.equal(sample.record.gaps[0]?.capability, "External bank records");
+  assert.equal(
+    judgeRecordSchema.parse(sample.record).gaps?.[0]?.kind,
+    "out_of_scope"
+  );
+  const card = scorecard([sample]);
+  assert.deepEqual(card.outOfScope, [["external bank records", 2]]);
+  assert.deepEqual(card.gaps, []);
+  assert.deepEqual(card.unused, []);
+  assert.equal(
+    card.rates.find((rate) => rate.goal === "no tool gaps")?.pass,
+    1
+  );
+  assert.ok(renderScorecard(card).includes("2  external bank records"));
+});
+
+test("leak failures identify each replay and failed check without exposing reply text", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    {
+      ...sample,
+      caseName: "failed-leaks",
+      row: {
+        ...sample.row,
+        answer: "private reply text",
+        leaks: "fail",
+        rawFields: "pass",
+      },
+      runDir: "run-a",
+    },
+    {
+      ...sample,
+      caseName: "failed-fields",
+      row: { ...sample.row, leaks: "pass", rawFields: "fail", scored: false },
+      runDir: "run-b",
+    },
+    {
+      ...sample,
+      caseName: "failed-both",
+      row: { ...sample.row, leaks: "fail", rawFields: "fail" },
+      runDir: "run-c",
+    },
+    {
+      ...sample,
+      caseName: "passed",
+      row: { ...sample.row, leaks: "pass", rawFields: "pass" },
+      runDir: "run-d",
+    },
+  ]);
+  assert.deepEqual(card.leakFailures, [
+    { caseName: "failed-leaks", checks: ["leaks"], runDir: "run-a" },
+    { caseName: "failed-fields", checks: ["rawFields"], runDir: "run-b" },
+    {
+      caseName: "failed-both",
+      checks: ["leaks", "rawFields"],
+      runDir: "run-c",
+    },
+  ]);
+  const rendered = renderScorecard(card);
+  assert.ok(rendered.includes("failed-leaks | run-a | leaks"));
+  assert.ok(rendered.includes("failed-fields | run-b | rawFields"));
+  assert.ok(rendered.includes("failed-both | run-c | leaks, rawFields"));
+  assert.ok(!rendered.includes("private reply text"));
+  assert.ok(!rendered.includes("passed | run-d"));
 });

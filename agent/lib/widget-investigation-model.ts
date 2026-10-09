@@ -42,7 +42,7 @@ const ALLOWED_TOOLS = new Set([
   "widget_website_status",
 ]);
 /** Past this many tool calls the model is told to stop gathering and answer. */
-const MAX_WIDGET_TOOL_CALLS = 14;
+export const MAX_WIDGET_TOOL_CALLS = 14;
 const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",

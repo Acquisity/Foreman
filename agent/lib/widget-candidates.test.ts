@@ -173,7 +173,7 @@ test("excluded test workspaces never produce a candidate", () => {
     ),
     [ORG]
   );
-  assert.equal(parseExcludedOrgs(undefined).size, 2);
+  assert.equal(parseExcludedOrgs(undefined).size, 5);
   assert.throws(() => parseExcludedOrgs("acme-test"));
 });
 

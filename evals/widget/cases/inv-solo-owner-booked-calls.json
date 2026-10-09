@@ -1,0 +1,96 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banned": false,
+          "banReason": null,
+          "emailVerified": true,
+          "lastLoginAt": "2026-09-15T16:58:26.137+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-08-15T14:44:30.625+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-08-15T14:44:30.5+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-06T16:39:03.287Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T16:39:01.366Z",
+      "resultAt": "2026-10-06T16:39:03.706Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace has one member, the owner, and no pending invitations, so nobody else is set up to take calls the AI SDR books. The product books the meetings but someone in the workspace has to attend them; there is no cover for a solo owner.",
+    "causeType": "platform_limitation",
+    "claims": [
+      "Says the workspace has only the customer as a member, so no one else can take booked calls right now.",
+      "Says Acquisity does not attend booked calls for them: the AI SDR books the meeting and the customer joins it.",
+      "Tells the customer how to limit bookings to times they can attend by keeping their availability schedule to those times, and that inviting someone is optional.",
+      "Does not say Acquisity staff will be assigned to take their calls."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n\"If I'm working alone as I am.\" And I did not have anybody to take my calls when I could not make them.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: \"I still don't get it.\" \"This is not their job. They just have to be kind enough.\" Right, explain it like I'm a child.\nSupport: Inviting a team member simply means giving someone access to help you inside your workspace, and you choose people you work with, like a business partner or assistant, rather than random strangers. When you invite them, they do not have to do it just to be kind; it is for people whose job or role is to collaborate with you on your business.\nCustomer: So I am brand new to this, that's what I'm trying to understand. They are part of AI acquisitions internal team, correct? Not just somebody I choose at random. That I've never spoken with or dealt with.\nSupport: No, the people you invite are not members of Acquisity's internal team, and they are not automatically assigned to you. You choose specific people you already know and work with, such as business partners or assistants, to join your workspace and help you run it.\nCustomer: That's what I told you. I'm brand new. I don't have partners. I don't have anybody I know.\nSupport: That's completely fine. You don't need a team to use your workspace, being the only member is totally normal when you're just starting out. Inviting someone is optional, not required, and you can run everything on your own for now. If down the road you bring on a partner, assistant, or employee, you can invite them from the team/member settings at that point, but there's nothing you need to do about this right now.\nCustomer: \"So, why would they agree to help me run my business? It doesn't financially benefit them.\" There I'm I'm losing something in translation.\nSupport: They would only join if they are part of your actual business, like a business partner, employee, or assistant you hire or work with, rather than someone outside your business. If you are working by yourself, you do not need to invite anyone at all.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M491AADR0GSEWKRQW7TBJJ5A",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_account_access"]
+  }
+}

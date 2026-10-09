@@ -1,0 +1,147 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 0
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-06T20:25:24.140Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T20:25:22.319Z",
+      "resultAt": "2026-10-06T20:25:24.738Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": false,
+          "reason": "No Instantly connection is configured for this organization."
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": null,
+        "observedAt": "2026-10-06T20:25:28.270Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": null,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T20:25:26.139Z",
+      "resultAt": "2026-10-06T20:25:29.315Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "query": "New Campaign button not opening cold email agent"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/domain-1.example",
+            "title": "Cold Email Agent",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/resources/cold-email-writer/domain-2.example",
+            "title": "Cold Email Writer FAQ",
+            "url": "https://app.acquisity.ai/docs/resources/cold-email-writer/faq"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/domain-3.example",
+            "title": "AI Agent",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns/ai-agent"
+          },
+          {
+            "path": "apps/web/content/docs/resources/domain-4.example",
+            "title": "Cold Email Writer",
+            "url": "https://app.acquisity.ai/docs/resources/cold-email-writer"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T20:25:33.171Z",
+      "resultAt": "2026-10-06T20:25:33.505Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+      },
+      "output": {
+        "content": "<div className=\"mb-6\">\n  <InlineSearchBar placeholder=\"Search questions...\" />\n</div>\n\n<QuestionList>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/what-are-the-step-by-step-instructions-for-creating-a-new-campaign\">What are the step-by-step instructions for creating a new campaign?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/why-cant-i-send-emails-from-a-completed-campaign\">Why can't I send emails from a completed campaign?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-pause-a-campaign-without-stopping-my-subscription-payments\">How do I pause a campaign without stopping my subscription payments?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign\">Where is the bounce protection toggle for a paused campaign?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-prevent-the-cold-email-agent-from-re-sending-oldoutdated-emails\">How do I prevent the Cold Email Agent from re-sending old/outdated emails?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-turn-on-ai-campaign-management-for-new-and-existing-campaigns\">How do I turn on AI campaign management for new and existing campaigns?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-find-the-campaign-delete-menu\">How do I find the campaign delete menu?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-cap-per-inbox-email-volume-across-campaigns\">How do I cap per-inbox email volume across campaigns?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-do-i-duplicate-an-existing-campaign\">How do I duplicate an existing campaign?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/how-many-email-methods-are-there\">How many email methods are there?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/what-are-the-lead-source-options-for-campaigns\">What are the lead source options for campaigns?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/whats-the-recommended-naming-format-for-campaigns\">What's the recommended naming format for campaigns?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/what-happens-when-i-upload-a-csv-with-duplicate-leads\">What happens when I upload a CSV with duplicate leads?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/campaign-vs-cold-email-writer\">What is the difference between a campaign and the Cold Email Writer?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/why-did-my-campaign-stall-at-200-emails\">Why did my campaign stall at 200 emails?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/why-is-my-new-campaign-sending-so-few-emails\">Why is my new campaign sending so few emails?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account\">Why is my campaign Active but not sending when I use my own Instantly account?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/campaigns/pausing-a-campaign-vs-pausing-my-subscription\">What's the difference between pausing a campaign and pausing my subscription?</QuestionItem>\n</QuestionList>\n\n<Callout>\nFor the full guides, see [New campaign wizard](/docs/cold-email-agent/campaigns/create-a-campaign), [Managing campaigns](/docs/cold-email-agent/campaigns/managing-campaigns), and [Campaign states](/docs/cold-email-agent/concepts/campaign-states).\n</Callout>",
+        "title": "Campaigns",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+      },
+      "requestedAt": "2026-10-06T20:25:35.432Z",
+      "resultAt": "2026-10-06T20:25:35.504Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The reads show no campaigns, no sending accounts and no Instantly connection in this workspace, even though the customer says email shows as connected. Nothing recorded explains why New Campaign does not open.",
+    "causeType": "unclear",
+    "claims": [
+      "Says no sending account or email connection is recorded in this workspace, despite the customer seeing email as connected.",
+      "Does not claim a known outage or a confirmed bug with the New Campaign button.",
+      "Asks what happens when they click New Campaign, or for a screenshot or recording of it.",
+      "Does not just repeat the campaign creation steps as if the button worked."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nNew Campaign doesn't open\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I need to get my email campaign started. It says email connnected but how do I get the emails to start sending?\nSupport: 1. In the left sidebar, click Cold Email Agent under Marketing, then click New Campaign in the top right [1].\n2. Enter a descriptive name like Podcast | SaaS Founders | US | 1-50 and click Next [1][2].\n3. Select Acquisity Lead Database to find and verify emails live with AI Lead Search, or Upload Your Own to import a CSV [1].\n4. Pick AI Generated or Create your own for your sequence, choose your email method if you selected AI Generated, and wait for the Writing Your Email Sequence progress screen.\n5. Pick which sending accounts to use in Step 4.\n6. Turn off the Launch campaigns automatically once the setup is complete checkbox if you want to review first, then click Create Campaign.\n7. Open the created Draft, review the Leads, Sequences, and Options tabs, and click Launch campaign when you are ready to send [1][2].",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M49E8NTZ0GVC5PXKKTYE5M34",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_outreach_health",
+      "widget_inbox_health",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

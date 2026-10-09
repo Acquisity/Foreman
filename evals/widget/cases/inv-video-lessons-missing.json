@@ -1,0 +1,46 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "Sorry about that! Could you tell me a bit more, like which campaign, course, or section the video lesson content was part of, and what you're seeing now (empty page, error message, etc.)? A screenshot would help too if you have one."
+      },
+      "output": {
+        "asked": "Sorry about that! Could you tell me a bit more, like which campaign, course, or section the video lesson content was part of, and what you're seeing now (empty page, error message, etc.)? A screenshot would help too if you have one."
+      },
+      "requestedAt": "2026-10-06T17:08:06.288Z",
+      "resultAt": "2026-10-06T17:08:06.291Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "The customer reports missing video lesson content, but no workspace evidence was read. Nothing recorded shows where the content lived or what happened to it.",
+    "causeType": "unclear",
+    "claims": [
+      "Asks which product area or course the video lessons were in and what the customer sees now.",
+      "Does not claim the content was deleted, moved or restored.",
+      "Does not invent a location for the videos."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "where the hell is all my video lesson conten????",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M492ZFH90GK9922PZNQTMVG7",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}

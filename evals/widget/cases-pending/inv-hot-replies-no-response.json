@@ -1,0 +1,772 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": "outside_schedule_window",
+            "notSendingReasonCode": 1,
+            "recentSends": [
+              {
+                "date": "2026-09-25",
+                "emailsSent": 18
+              },
+              {
+                "date": "2026-09-24",
+                "emailsSent": 52
+              },
+              {
+                "date": "2026-09-23",
+                "emailsSent": 88
+              },
+              {
+                "date": "2026-09-22",
+                "emailsSent": 85
+              },
+              {
+                "date": "2026-09-21",
+                "emailsSent": 43
+              },
+              {
+                "date": "2026-09-18",
+                "emailsSent": 42
+              },
+              {
+                "date": "2026-09-17",
+                "emailsSent": 42
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 500,
+            "updatedAt": "2026-09-25T14:27:24.605+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-07",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-05",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-28",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-25",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-24",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-23",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-22",
+                "emailsSent": 29
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 500,
+            "updatedAt": "2026-10-05T15:42:29.631+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 3",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "draft",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-07T14:11:55.759843+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000004",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-07",
+                "emailsSent": 64
+              },
+              {
+                "date": "2026-10-06",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-10-05",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-10-02",
+                "emailsSent": 294
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 2500,
+            "updatedAt": "2026-10-02T13:07:09.369+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000005",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-02",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-10-01",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-09-30",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-09-29",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-09-28",
+                "emailsSent": 360
+              },
+              {
+                "date": "2026-09-26",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-25",
+                "emailsSent": 294
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 2500,
+            "updatedAt": "2026-10-02T01:00:13.559+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000006",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 5",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "draft",
+            "totalLeads": 500,
+            "updatedAt": "2026-09-24T14:20:07.939+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-20.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 12,
+          "totalSendingAccounts": 12
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T14:18:02.426Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T14:18:00.764Z",
+      "resultAt": "2026-10-07T14:18:03.362Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000002"
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live calendar, Zoom or outreach provider check.",
+          "Times are UTC instants; compare against prospectTimezone and the host timezone before calling a slot wrong.",
+          "Meeting links: with conferencingLinkType static the link is the saved static link (hasStaticMeetingLink), and empty conferencingAccounts is normal, not a fault. Only with dynamic does a missing or invalid conferencing account explain missing links. An invalid or missing calendar account explains unbookable slots either way.",
+          "aiSdrEnabled is the workspace's AI SDR switch. aiSdrV2Enabled false only means the workspace runs the earlier AI SDR workflow; it never means AI SDR is off.",
+          "Unfiltered lists contain v2-touched threads. campaignId or prospectEmail also finds legacy threads. A null host with automatic_ambiguous means multiple members qualify and the product fallback is unordered; it does not mean no handler. Without a campaign, the host is only the workspace default."
+        ],
+        "evidence": {
+          "nextAfter": null,
+          "read": "threads",
+          "threads": [
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000007",
+              "interestLevel": "very_high",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-10-05T15:50:34+00:00",
+              "lifecycle": "slots_sent",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-1@domain-1.example",
+              "prospectName": "Name 6",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": true
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000008",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-10-05T15:32:35+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-2@domain-2.example",
+              "prospectName": "Name 7",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": true
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000009",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-28T22:01:56+00:00",
+              "lifecycle": "no_response",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-3@domain-3.example",
+              "prospectName": "Name 8",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000010",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-28T16:23:08+00:00",
+              "lifecycle": "no_response",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-4@domain-4.example",
+              "prospectName": "Name 9",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": "human_takeover",
+              "id": "00000000-0000-4000-8000-000000000011",
+              "interestLevel": "very_high",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-28T14:18:19+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-5@domain-5.example",
+              "prospectName": "Name 10",
+              "prospectTimezone": "America/New_York",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": "human_takeover",
+              "id": "00000000-0000-4000-8000-000000000012",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-23T14:09:18+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-6@domain-6.example",
+              "prospectName": "Name 11",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000013",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-22T14:28:51+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-7@domain-7.example",
+              "prospectName": "Name 12",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000014",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-21T18:30:40.974+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-8@domain-8.example",
+              "prospectName": "Name 13",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000015",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-21T16:08:24.014+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-9@domain-9.example",
+              "prospectName": "Name 14",
+              "prospectTimezone": "America/New_York",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000016",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-21T14:40:52.359+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-10@domain-10.example",
+              "prospectName": "Name 15",
+              "prospectTimezone": "America/New_York",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000017",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-21T14:08:10.918+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-11@domain-11.example",
+              "prospectName": "Name 16",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000018",
+              "interestLevel": null,
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-16T14:24:36+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-12@domain-12.example",
+              "prospectName": "Name 17",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": "automated",
+              "id": "00000000-0000-4000-8000-000000000019",
+              "interestLevel": "low",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-16T14:18:20+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-13@domain-13.example",
+              "prospectName": "Name 18",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000020",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-15T16:54:14.907+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-14@domain-14.example",
+              "prospectName": "Name 19",
+              "prospectTimezone": "America/Los_Angeles",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000021",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-15T15:35:48+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-15@domain-15.example",
+              "prospectName": "Name 20",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000022",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-15T15:19:00+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-16@domain-16.example",
+              "prospectName": "Name 21",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": true
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000023",
+              "interestLevel": "medium",
+              "isOutOfOffice": false,
+              "lastMessageAt": "2026-09-14T16:20:08+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-17@domain-17.example",
+              "prospectName": "Name 22",
+              "prospectTimezone": "America/Chicago",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            },
+            {
+              "campaignId": "00000000-0000-4000-8000-000000000002",
+              "controlLevel": null,
+              "id": "00000000-0000-4000-8000-000000000024",
+              "interestLevel": null,
+              "isOutOfOffice": true,
+              "lastMessageAt": "2026-09-14T15:38:15+00:00",
+              "lifecycle": "replied",
+              "nextFollowupAt": null,
+              "prospectEmail": "person-18@domain-18.example",
+              "prospectName": "Name 23",
+              "prospectTimezone": "America/New_York",
+              "hasActiveAppointment": false,
+              "hasPendingFollowup": false
+            }
+          ],
+          "workspace": {
+            "aiSdrEnabled": true,
+            "aiSdrV2Enabled": false,
+            "hasSettings": true,
+            "host": {
+              "calendarAccounts": [
+                {
+                  "activeOn": "person-19@domain-19.example",
+                  "checkFor": [
+                    "person-19@domain-19.example",
+                    "person-20@domain-19.example"
+                  ],
+                  "failureCount": 0,
+                  "invalid": false,
+                  "type": "google"
+                }
+              ],
+              "conferencingAccounts": [],
+              "conferencingLinkType": "static",
+              "email": "person-19@domain-19.example",
+              "hasStaticMeetingLink": true,
+              "id": "11111111-1111-4111-8111-111111111111",
+              "name": "Name 24",
+              "timezone": "America/Chicago",
+              "workHours": [
+                {
+                  "day": "friday",
+                  "end": "1970-01-01 09:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "friday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 19:00:00"
+                },
+                {
+                  "day": "monday",
+                  "end": "1970-01-01 09:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "monday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 19:00:00"
+                },
+                {
+                  "day": "saturday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "sunday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 12:00:00"
+                },
+                {
+                  "day": "thursday",
+                  "end": "1970-01-01 09:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "thursday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 19:00:00"
+                },
+                {
+                  "day": "tuesday",
+                  "end": "1970-01-01 09:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "tuesday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 19:00:00"
+                },
+                {
+                  "day": "wednesday",
+                  "end": "1970-01-01 09:00:00",
+                  "start": "1970-01-01 07:00:00"
+                },
+                {
+                  "day": "wednesday",
+                  "end": "1970-01-01 21:00:00",
+                  "start": "1970-01-01 19:00:00"
+                }
+              ],
+              "workHoursDays": [
+                "monday",
+                "tuesday",
+                "thursday",
+                "wednesday",
+                "sunday",
+                "saturday",
+                "friday"
+              ]
+            },
+            "hostResolution": "automatic"
+          }
+        },
+        "observedAt": "2026-10-07T14:18:07.129Z",
+        "source": "Acquisity product database; saved state, not a live calendar or provider check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T14:18:05.454Z",
+      "resultAt": "2026-10-07T14:18:07.837Z",
+      "status": "completed",
+      "tool": "widget_sdr_thread_status"
+    },
+    {
+      "input": {
+        "question": "Could you tell me which prospect's reply this is about (name or email), so I can look into that specific conversation?"
+      },
+      "output": {
+        "asked": "Could you tell me which prospect's reply this is about (name or email), so I can look into that specific conversation?"
+      },
+      "requestedAt": "2026-10-07T14:18:10.476Z",
+      "resultAt": "2026-10-07T14:18:10.478Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "The thread read for the campaign shows two very high interest threads: one where meeting slots were sent and a follow-up is pending, and one under human takeover with no pending follow-up. Nothing recorded shows a sending or delivery fault; the reads cannot say why those prospects have not replied.",
+    "causeType": "unclear",
+    "claims": [
+      "Reports what the threads show: slots were sent with a follow-up pending on one very high interest thread, and another is under human takeover with no follow-up pending.",
+      "Does not claim a sending or delivery fault.",
+      "Does not promise the prospects will reply or book."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI was hoping to hear back from them with a positive response to receive a call from me but have not heard back.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: My Name 2 campaign has had the best results of them all.  I would love to duplicate everything that that campaign did to achieve that success going forward for now.  Can we do that?\nSupport: Yes, you can duplicate that successful campaign. Here is how to do it:\n1. Open Cold Email Agent under Marketing.\n2. Find the campaign you want to duplicate in the list.\n3. Click the three-dot menu on the right side of that row.\n4. Click Duplicate Campaign.\n5. In the modal, enter a new campaign name with a minimum of 3 characters.\n6. Click Duplicate.\nCustomer: OK I have clicked on duplicate campaign.  What happens now?\nSupport: 1. In the modal, enter a new campaign name with a minimum of 3 characters.\n2. Click Duplicate.\n\nThe duplicate appears in your campaigns list within a few seconds and starts in Draft status without affecting the original.\nCustomer: I see that now\nSupport: Glad that helped! Let me know if you need help with anything else.\nCustomer: I have show several with VERY HIGH INTEREST that  we have replied to but not hearing back from them\nSupport: Which campaign is this about, and what did you expect to happen versus what actually happened?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4BBMSXR0GHVR3AQXG5E1GAS",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_outreach_health",
+      "widget_sdr_thread_status",
+      "widget_ask_customer"
+    ]
+  }
+}

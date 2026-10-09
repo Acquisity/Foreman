@@ -1,0 +1,429 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "consoleErrors": "{\"total\":0,\"returned\":0,\"hasMore\":false,\"nextCursor\":null,\"events\":[]}",
+        "details": "{\"jamId\":\"00000000-0000-4000-8000-000000000001\",\"type\":\"video\",\"teamId\":\"00000000-0000-4000-8000-000000000002\",\"origin\":\"recording_link\",\"author\":{\"id\":\"00000000-0000-4000-8000-000000000003\",\"name\":\"Name 3\",\"email\":\"person-1@acquisity.ai\"},\"description\":\"\",\"duration\":44983,\"systemInfo\":{\"browser\":{\"name\":\"Brave\",\"version\":\"154.0.0.0\"},\"os\":{\"name\":\"Windows (x86)\",\"version\":\"11\"},\"screenDimensions\":{\"height\":1018,\"width\":2133},\"extension\":{},\"jamClient\":{\"version\":\"jam-recording-links-0.1.0\"},\"battery\":{\"level\":1,\"charging\":true}},\"createdAt\":\"2026-10-07T22:00:54.616Z\",\"updatedAt\":\"2026-10-07T22:00:54.616Z\",\"integrations\":[],\"title\":\"Name 2 \u00b7 Aaron Fraga's Workspace\",\"folder\":null,\"comments\":[],\"metadata\":{\"country\":\"US\",\"isIncognito\":false,\"hasCustomJamMetadata\":true,\"fullstoryUrl\":\"\"},\"recorderFacets\":null,\"eventsSummary\":{\"total\":60,\"network\":{\"total\":53,\"httpStatus\":{\"200\":53},\"httpMethod\":{\"GET\":35,\"HEAD\":4,\"POST\":14},\"contentType\":{\"text/plain\":13,\"application/json\":40},\"host\":{\"domain-17.example\":32,\"app.acquisity.ai\":21},\"contentSizeBucket\":{\"<1kb\":17,\"<100kb\":29,\"<10kb\":3,\"empty\":4}},\"console\":{\"total\":0,\"level\":{}},\"interactivity\":{\"total\":0,\"mouse\":{\"total\":0},\"keyboard\":{\"total\":0}},\"navigation\":{\"total\":6,\"eventSources\":{\"onCommitted\":0,\"onHistoryStateUpdated\":0,\"focus\":4,\"visibilitychange\":2}},\"sdk\":{\"total\":1}},\"postprocessing\":{\"tasks\":[{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 44983ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-07T22:00:56.203Z\",\"hasPayload\":false},{\"workload\":\"ch-index\",\"version\":\"1\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-07T22:00:56.081Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.6.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-07T22:01:09.547Z\",\"hasPayload\":true},{\"workload\":\"transcript\",\"version\":\"2.2.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"Transcript skipped because the microphone was not enabled during recording\",\"updatedAt\":\"2026-10-07T22:00:54.955Z\",\"hasPayload\":false},{\"workload\":\"intents\",\"version\":\"1.5.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"hasPayload\":true}],\"byWorkload\":{\"chapters\":{\"workload\":\"chapters\",\"version\":\"1.1.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"too-short: 44983ms timeline is not longer than the 45000ms minimum\",\"updatedAt\":\"2026-10-07T22:00:56.203Z\",\"hasPayload\":false},\"ch-index\":{\"workload\":\"ch-index\",\"version\":\"1\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"2026-10-07T22:00:56.081Z\",\"hasPayload\":false},\"intents\":{\"workload\":\"intents\",\"version\":\"1.5.0\",\"status\":\"ready\",\"artifactUri\":null,\"error\":null,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"hasPayload\":true},\"transcript\":{\"workload\":\"transcript\",\"version\":\"2.2.0\",\"status\":\"skipped\",\"artifactUri\":null,\"error\":\"Transcript skipped because the microphone was not enabled during recording\",\"updatedAt\":\"2\u2026",
+        "failedRequests": "{\"total\":0,\"returned\":0,\"hasMore\":false,\"nextCursor\":null,\"events\":[]}",
+        "steps": "{\"total\":6,\"returned\":6,\"hasMore\":false,\"nextCursor\":null,\"events\":[{\"event_index\":2,\"ts\":\"2026-10-07 21:59:19.089\",\"elapsed_ms\":\"11896\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004\",\"navigation_event_source\":\"visibilitychange\",\"navigation_visibility_state\":\"visible\"},{\"event_index\":3,\"ts\":\"2026-10-07 21:59:19.212\",\"elapsed_ms\":\"12019\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":4,\"ts\":\"2026-10-07 21:59:19.212\",\"elapsed_ms\":\"12019\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":true},{\"event_index\":56,\"ts\":\"2026-10-07 22:00:00.507\",\"elapsed_ms\":\"53314\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":false},{\"event_index\":57,\"ts\":\"2026-10-07 22:00:00.509\",\"elapsed_ms\":\"53316\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004\",\"navigation_event_source\":\"focus\",\"navigation_is_visible\":false},{\"event_index\":58,\"ts\":\"2026-10-07 22:00:00.512\",\"elapsed_ms\":\"53319\",\"page_url\":\"https://domain-15.example/capture\",\"event_type\":\"navigation\",\"navigation_url\":\"https://app.acquisity.ai/dashboard/aaron-fragas-workspace-wMUMT/cold-email-campaign-agent/00000000-0000-4000-8000-000000000004?tab=sequences\",\"navigation_host\":\"app.acquisity.ai\",\"navigation_path\":\"/dashboard/\u2026",
+        "unavailable": ["transcript"]
+      },
+      "requestedAt": "2026-10-07T22:01:35.695Z",
+      "resultAt": "2026-10-07T22:01:38.495Z",
+      "status": "completed",
+      "tool": "widget_read_recording"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000004"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [
+                  {
+                    "connected": true,
+                    "email": "person-2@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000005",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-3@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000006",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-4@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000007",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-5@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000008",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-6@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000009",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-7@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000010",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-8@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000011",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-9@domain-7.example",
+                    "id": "00000000-0000-4000-8000-000000000012",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-10@domain-8.example",
+                    "id": "00000000-0000-4000-8000-000000000013",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-11@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000014",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-12@domain-9.example",
+                    "id": "00000000-0000-4000-8000-000000000015",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-13@domain-10.example",
+                    "id": "00000000-0000-4000-8000-000000000016",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-14@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000017",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-15@domain-11.example",
+                    "id": "00000000-0000-4000-8000-000000000018",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-16@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000019",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-17@domain-12.example",
+                    "id": "00000000-0000-4000-8000-000000000020",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-18@domain-11.example",
+                    "id": "00000000-0000-4000-8000-000000000021",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-19@domain-12.example",
+                    "id": "00000000-0000-4000-8000-000000000022",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-20@domain-13.example",
+                    "id": "00000000-0000-4000-8000-000000000023",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-21@domain-7.example",
+                    "id": "00000000-0000-4000-8000-000000000024",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-22@domain-8.example",
+                    "id": "00000000-0000-4000-8000-000000000025",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-23@domain-6.example",
+                    "id": "00000000-0000-4000-8000-000000000026",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-24@domain-14.example",
+                    "id": "00000000-0000-4000-8000-000000000027",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-25@domain-9.example",
+                    "id": "00000000-0000-4000-8000-000000000028",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-26@domain-10.example",
+                    "id": "00000000-0000-4000-8000-000000000029",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-27@domain-9.example",
+                    "id": "00000000-0000-4000-8000-000000000030",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-28@domain-13.example",
+                    "id": "00000000-0000-4000-8000-000000000031",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-29@domain-3.example",
+                    "id": "00000000-0000-4000-8000-000000000032",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-30@domain-14.example",
+                    "id": "00000000-0000-4000-8000-000000000033",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-31@domain-12.example",
+                    "id": "00000000-0000-4000-8000-000000000034",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-32@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000035",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-33@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000036",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-34@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000037",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-35@domain-7.example",
+                    "id": "00000000-0000-4000-8000-000000000038",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-36@domain-14.example",
+                    "id": "00000000-0000-4000-8000-000000000039",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-37@domain-10.example",
+                    "id": "00000000-0000-4000-8000-000000000040",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-38@domain-8.example",
+                    "id": "00000000-0000-4000-8000-000000000041",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-39@domain-4.example",
+                    "id": "00000000-0000-4000-8000-000000000042",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-40@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000043",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-14@domain-5.example",
+                    "id": "00000000-0000-4000-8000-000000000044",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-38@domain-13.example",
+                    "id": "00000000-0000-4000-8000-000000000045",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-41@domain-11.example",
+                    "id": "00000000-0000-4000-8000-000000000046",
+                    "status": "active"
+                  }
+                ],
+                "configuredCount": 42,
+                "healthyCount": 42,
+                "matchedCount": 42,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [
+                {
+                  "date": "2026-10-06",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 42,
+                  "emailsOpened": 0,
+                  "emailsSent": 42,
+                  "meetingsScheduled": 0,
+                  "newLeadsContacted": 42,
+                  "repliesReceived": 0,
+                  "updatedAt": "2026-10-07T19:56:04.165319+00:00"
+                },
+                {
+                  "date": "2026-10-07",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 735,
+                  "emailsOpened": 0,
+                  "emailsSent": 735,
+                  "meetingsScheduled": 0,
+                  "newLeadsContacted": 514,
+                  "repliesReceived": 0,
+                  "updatedAt": "2026-10-07T19:56:04.165319+00:00"
+                }
+              ],
+              "endDate": "2026-10-07",
+              "overview": {
+                "bounces": 2,
+                "emailsSent": 777,
+                "meetingsBooked": 0,
+                "opens": 0,
+                "replies": 0,
+                "snapshotAt": "2026-10-07T19:56:04.18+00:00",
+                "unsubscribes": 0
+              },
+              "sequenceStepDelays": [0, 3, 3],
+              "startDate": "2026-10-01",
+              "stepSends": [
+                {
+                  "sent": 556,
+                  "snapshotAt": "2026-10-07T19:56:04.172+00:00",
+                  "step": 0
+                },
+                {
+                  "sent": 221,
+                  "snapshotAt": "2026-10-07T19:56:04.172+00:00",
+                  "step": 1
+                }
+              ]
+            },
+            "id": "00000000-0000-4000-8000-000000000004",
+            "leadsNotPushedCount": 911,
+            "live": {
+              "available": false,
+              "reason": "The live campaign read failed; saved evidence remains available."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-07",
+                "emailsSent": 735
+              },
+              {
+                "date": "2026-10-06",
+                "emailsSent": 42
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 0,
+            "updatedAt": "2026-10-07T21:56:33.648+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-18.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 42,
+          "totalSendingAccounts": 42
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T22:01:41.660Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T22:01:40.169Z",
+      "resultAt": "2026-10-07T22:02:02.166Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    }
+  ],
+  "expectations": {
+    "cause": "The campaign's saved step delays are 0, 3 and 3 days, yet it first sent on Oct 6 (42 emails) and by Oct 7 had already sent 221 second-step emails, so follow-ups went out well before the 3-day delay. The customer's setting is correct and the platform did not honor it.",
+    "causeType": "bug",
+    "claims": [
+      "Says the campaign's follow-up steps are saved with a 3-day delay.",
+      "Says the step counts show 221 second-step emails sent by Oct 7 although the campaign only started sending on Oct 6, so follow-ups went out sooner than the delay.",
+      "Does not blame the customer's delay setting or tell them to set the 3-day delay again as the fix.",
+      "Does not promise when follow-up timing will be fixed."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\n(The customer sent the screen recording you asked for. Read it before answering.)\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Why is my campaign sending step 2 after step 1 right away on the same day?\nSupport: You can customize your follow-up timing when creating or editing a campaign by opening the campaign, going to the Sequences tab, and editing the delay input directly on the step.\nCustomer: You have already selected the \"Follow up: send next message in 3 days\" option, but it's still sending on the same day.\nSupport: Which campaign is this happening on, and what delay value do you see saved on that follow-up step when you open its Sequences tab?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4C65K460GV34YR42A4W6NAN",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_read_recording", "widget_outreach_health"]
+  }
+}

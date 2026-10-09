@@ -678,7 +678,7 @@ export function buildBillingAuthorizationQuery(context: WidgetContext): string {
   select (select count(*) = 1 from authorized) as authorized`;
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

@@ -1,0 +1,154 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "created_at": 1783032603843,
+            "fingerprint": null,
+            "stripe_id": null,
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [],
+            "purchases": [],
+            "licenses": [],
+            "balances": {},
+            "flags": {},
+            "config": {}
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": ["stripe: Autumn record has no stripe_id."]
+      },
+      "requestedAt": "2026-10-06T23:23:24.338Z",
+      "resultAt": "2026-10-06T23:23:35.185Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "query": "annual billing yearly plan Pro"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/ai-website-builder/domain-1.example",
+            "title": "Prompting Best Practices",
+            "url": "https://app.acquisity.ai/docs/ai-website-builder/prompting-best-practices"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/deliverability/domain-2.example",
+            "title": "What GDPR compliance language can I include in proposals for prospects?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/deliverability/what-gdpr-compliance-language-can-i-include-in-proposals-for-prospects"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/settings/domain-3.example",
+            "title": "Billing",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/settings/billing"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/domain-4.example",
+            "title": "Billing & Subscriptions",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions"
+          },
+          {
+            "path": "apps/web/content/docs/domain-5.example",
+            "title": "Growth Plan Creator",
+            "url": "https://app.acquisity.ai/docs/growth-plan-creator"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-06T23:23:37.618Z",
+      "resultAt": "2026-10-06T23:23:38.332Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions"
+      },
+      "output": {
+        "content": "<div className=\"mb-6\">\n  <InlineSearchBar placeholder=\"Search questions...\" />\n</div>\n\n## Credits & renewal\n\n<QuestionList>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset\">When do my credits reset?</QuestionItem>\n</QuestionList>\n\n## Subscriptions & cancellation\n\n<QuestionList>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/what-does-my-course-or-program-purchase-include-and-why-do-i-see-0-credits\">What does my course or program purchase include, and why do I see 0 credits?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/how-do-i-cancel-my-acquisity-workspace-and-stop-all-billing\">How do I cancel my Acquisity workspace and stop all billing?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/how-do-i-cancel-every-acquisity-subscription-and-third-party-service\">How do I cancel every Acquisity subscription and third-party service?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/does-pausing-a-campaign-stop-billing\">Does pausing a campaign stop billing?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/can-i-pause-billing-without-deleting-my-workspace\">Can I pause billing without deleting my workspace?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/can-i-pay-monthly-for-a-short-project\">Can I pay monthly for just a short project?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/what-does-the-legacy-pro-upgrade-fee-mean-during-workspace-setup\">What does the Legacy Pro upgrade fee mean during workspace setup?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/where-can-i-see-my-subscription-end-date-on-the-dashboard\">Where can I see my subscription end date on the dashboard?</QuestionItem>\n</QuestionList>\n\n## Payment methods & integrations\n\n<QuestionList>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity\">How do I disconnect Instantly from Acquisity?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/can-i-use-different-payment-cards-per-workspace\">Can I use different payment cards per workspace?</QuestionItem>\n</QuestionList>\n\n## Domains, inboxes & workspace limits\n\n<QuestionList>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/what-happens-to-my-domains-if-i-cancel\">What happens to my domains if I cancel?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/can-i-transfer-domainsinboxes-between-workspaces\">Can I transfer domains/inboxes between workspaces?</QuestionItem>\n  <QuestionItem href=\"/docs/workspace-settings/faq/billing-subscriptions/is-there-a-limit-on-how-many-leads-i-can-upload-or-store\">Is there a limit on how many leads I can upload or store?</QuestionItem>\n</QuestionList>",
+        "title": "Billing & Subscriptions",
+        "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions"
+      },
+      "requestedAt": "2026-10-06T23:23:40.449Z",
+      "resultAt": "2026-10-06T23:23:40.622Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The customer asks whether Pro is offered annually. The workspace has no subscription, and the help articles read do not document an annual Pro plan or price; nothing recorded says one exists or is planned.",
+    "causeType": "unclear",
+    "claims": [
+      "Says the help center articles checked do not document an annual billing option for Pro.",
+      "Does not promise that an annual Pro plan exists or will be offered, and does not quote an annual price.",
+      "Does not ask which feature or page the question is about; the question is clearly about the Pro plan."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nAcquisity Pro plan\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: If I am running a lean campaign, how many top-up credits is necessary for 1 campaign?\nSupport: For campaign performance learning, use enough volume to learn from: 1,000 to 1,500 leads for a quick test, or 2,000 to 2,500 when you already know the niche is worth testing.\nCustomer: Will Acquisity eventually offer a yearly plan?\nSupport: I could not find a help-center article that answers that. Which feature or page is your question about?\nCustomer: Will Acquisity offer an annual subscription of Pro\nSupport: I could not find a help-center article that answers that, so which feature or page is your question about?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M49RERP40GGM6JM66F4A1774",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_billing_summary",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

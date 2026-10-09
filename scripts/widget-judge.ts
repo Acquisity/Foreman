@@ -3,21 +3,31 @@
 //   pnpm widget:judge review [dir]  regenerate a run's review.md from its records
 //   pnpm widget:judge gold [dir]    turn the marks in review.md into evals/widget/judge-gold.json
 //   pnpm widget:judge rerun         judge every gold answer twice; agreement and flip rate per claim
+//   pnpm widget:judge scorecard [eval dir...]
+//                                   investigate scorecard (ENG-15024) over one or more replay runs
 //
-// [dir] defaults to the newest run under .eve/widget-judge/. rerun calls the
+// [dir] defaults to the newest run under .eve/widget-judge/; [eval dir] to the
+// newest `eve eval` run under .eve/evals/. rerun calls the
 // judge model through the gateway, so it needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
 import {
+  citedArticles,
   claimsFor,
   JUDGE_MODEL,
   JUDGE_OUTPUT,
   type JudgeRecord,
   judgeAnswer,
+  judgeRecordSchema,
   parseMarks,
+  type ReplayRow,
   readRecords,
   renderReview,
+  renderScorecard,
   reviewedSample,
+  type ScoredReplay,
+  saveRecord,
+  scorecard,
 } from "../agent/lib/widget-judge.js";
 
 import {
@@ -56,10 +66,14 @@ async function judgeGold(gold: GoldEntry[]) {
     const claims = claimsFor(recorded);
     try {
       // biome-ignore lint/performance/noAwaitInLoops: one judge call at a time keeps the run cheap to stop.
-      const verdicts = await judgeAnswer(recorded, sample.answer, claims);
+      const { gaps, verdicts } = await judgeAnswer(
+        recorded,
+        sample.answer,
+        claims
+      );
       run.set(
         sample.case,
-        reviewedSample(sample.case, recorded, sample.answer, verdicts)
+        reviewedSample(sample.case, recorded, sample.answer, verdicts, gaps)
       );
     } catch (error) {
       // The case stays out of the run, so its coverage counts as missing and the rerun fails.
@@ -69,56 +83,226 @@ async function judgeGold(gold: GoldEntry[]) {
   return run;
 }
 
+const EVALS = ".eve/evals";
+const ROW = "row: ";
+const REVIEW = "judge review: ";
+const RESULT_FILE = /^\d+\.json$/;
+const REVIEW_PAGE = /\/review\.md$/;
+const CASE_FILE = /\.json$/;
+
+/** Every investigate case one `eve eval` run replayed: its row, its case file and its judge record. */
+function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
+  const replay = `${dir}/evals/widget/replay`;
+  if (!existsSync(replay)) {
+    throw new Error(`${replay} has no widget replay results.`);
+  }
+  return readdirSync(replay)
+    .filter((file) => RESULT_FILE.test(file))
+    .flatMap((file) => {
+      const logs: string[] =
+        JSON.parse(readFileSync(`${replay}/${file}`, "utf8")).result?.logs ??
+        [];
+      const line = logs.find((log) => log.startsWith(ROW));
+      if (!line) {
+        return [];
+      }
+      const row = JSON.parse(line.slice(ROW.length)) as ReplayRow & {
+        case: string;
+      };
+      // Legacy rows keep the answer in the outcome log.
+      if (row.answer === undefined) {
+        const outcome = logs.find((log) => log.startsWith("outcome: "));
+        if (outcome) {
+          const saved = JSON.parse(outcome.slice("outcome: ".length));
+          row.answer = saved.message ?? null;
+          row.citations = (saved.citations ?? []).map(
+            ({ url }: { url: string }) => url
+          );
+        }
+      }
+      // A case moved to cases-pending since the run no longer counts.
+      if (!existsSync(row.case)) {
+        return [];
+      }
+      const recorded = widgetCaseSchema.parse(
+        JSON.parse(readFileSync(row.case, "utf8"))
+      );
+      if (recorded.mode !== "investigate") {
+        return [];
+      }
+      const review = logs
+        .find((log) => log.startsWith(REVIEW))
+        ?.slice(REVIEW.length)
+        .replace(REVIEW_PAGE, "");
+      const name = row.case.split("/").at(-1)?.replace(CASE_FILE, "");
+      const path = `${judgeDir ?? review}/records/${name}.json`;
+      return [
+        {
+          caseName: name,
+          record:
+            (judgeDir || review) && existsSync(path)
+              ? judgeRecordSchema.parse(JSON.parse(readFileSync(path, "utf8")))
+              : null,
+          recorded,
+          row,
+          runDir: dir,
+        },
+      ];
+    });
+}
+
 const percent = (part: number, whole: number) =>
   whole ? `${((part / whole) * 100).toFixed(1)}%` : "n/a";
 
+async function rejudgeReplay(replay: ScoredReplay, output: string) {
+  const recorded = replay.record?.recorded ?? replay.recorded;
+  const { answer } = replay.row;
+  if (!answer) {
+    throw new Error("Saved replay has no answer.");
+  }
+  const articles = await citedArticles(replay.row.citations ?? []);
+  const { verdicts, gaps } = await judgeAnswer(
+    recorded,
+    answer,
+    claimsFor(recorded),
+    undefined,
+    undefined,
+    articles
+  );
+  const name = (replay.row as ReplayRow & { case: string }).case
+    .split("/")
+    .at(-1)
+    ?.replace(CASE_FILE, "");
+  if (!name) {
+    throw new Error("Saved replay has no case name.");
+  }
+  saveRecord(output, reviewedSample(name, recorded, answer, verdicts, gaps));
+}
+
+async function rejudge(dirs: string[]) {
+  if (!dirs.length) {
+    throw new Error("rejudge requires eval directories.");
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  for (const [index, dir] of dirs.entries()) {
+    const output = `${JUDGE_OUTPUT}/${stamp}-rejudge-${index}`;
+    let judged = 0;
+    let failed = 0;
+    for (const replay of replaysIn(dir)) {
+      if (replay.row.scored === false || !replay.row.answer) {
+        continue;
+      }
+      try {
+        // biome-ignore lint/performance/noAwaitInLoops: keep paid judging sequential and cheap to stop.
+        await rejudgeReplay(replay, output);
+        judged += 1;
+      } catch {
+        failed += 1;
+        console.error(`Rejudge failed: ${replay.caseName} | ${dir}`);
+      }
+    }
+    console.log(`Rejudged ${judged} answers; ${failed} failed in ${dir}.`);
+    console.log(`pnpm widget:judge scorecard ${dir} --judge-dir ${output}`);
+  }
+}
+
+async function calibrateGold() {
+  const gold = readGold();
+  if (!gold.some((entry) => entry.labels.length)) {
+    throw new Error(`${GOLD} has no labels yet.`);
+  }
+  const scores = scoreAgainstGold(
+    gold,
+    await judgeGold(gold),
+    await judgeGold(gold)
+  );
+  let under = scores.size === 0;
+  console.log(`judge ${JUDGE_MODEL}, two runs against ${GOLD}`);
+  for (const [id, score] of scores) {
+    const { agree, total } = score.agreement;
+    const { flipped, total: pairs } = score.flips;
+    const low = !calibrated(score);
+    under ||= low;
+    console.log(
+      `${low ? "UNDER" : "ok   "} ${id}: agreement ${percent(agree, total)} (${agree}/${total}), flips ${percent(flipped, pairs)} (${flipped}/${pairs}), coverage ${score.coverage.measured}/${score.coverage.required} (stale ${score.coverage.stale}, missing ${score.coverage.missing}, unlabelled ${score.coverage.unlabelled})`
+    );
+  }
+  process.exitCode = under ? 1 : 0;
+}
+
+function scorecardInputs(args: string[]) {
+  const judgeDirs: string[] = [];
+  const runs: string[] = [];
+  const remaining = [...args];
+  while (remaining.length) {
+    const arg = remaining.shift() as string;
+    if (arg === "--judge-dir") {
+      const dir = remaining.shift();
+      if (!dir || dir.startsWith("--")) {
+        throw new Error("--judge-dir requires a directory.");
+      }
+      judgeDirs.push(dir);
+    } else {
+      runs.push(arg);
+    }
+  }
+  const dirs = runs.length
+    ? runs
+    : [`${EVALS}/${readdirSync(EVALS).sort().at(-1)}`];
+  if (judgeDirs.length && judgeDirs.length !== dirs.length) {
+    throw new Error(
+      "Provide one --judge-dir per original eval directory, in matching order."
+    );
+  }
+  return { dirs, judgeDirs };
+}
+
 async function main() {
-  const [command, dir = command === "rerun" ? "" : latestRun()] =
-    process.argv.slice(2);
-  if (command === "review") {
-    writeFileSync(`${dir}/review.md`, renderReview(readRecords(dir)));
-    console.log(`${dir}/review.md`);
+  const [command, requestedDir] = process.argv.slice(2);
+  if (command === "scorecard") {
+    const { dirs, judgeDirs } = scorecardInputs(process.argv.slice(3));
+    console.log(
+      renderScorecard(
+        scorecard(
+          dirs.flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+        )
+      )
+    );
     return;
   }
-  if (command === "gold") {
-    const records = readRecords(dir);
-    const marks = parseMarks(readFileSync(`${dir}/review.md`, "utf8"));
-    const next = toGold(records, marks);
-    const rows = records.reduce(
-      (sum, record) => sum + record.verdicts.length,
-      0
-    );
-    writeGold(GOLD, mergeGold(readGold(), next));
-    console.log(
-      `${GOLD}: ${marks.size} of ${rows} rows marked, ${next.length} case(s) written.`
-    );
+  if (command === "rejudge") {
+    await rejudge(process.argv.slice(3));
     return;
   }
   if (command === "rerun") {
-    const gold = readGold();
-    if (!gold.some((entry) => entry.labels.length)) {
-      throw new Error(`${GOLD} has no labels yet.`);
-    }
-    const scores = scoreAgainstGold(
-      gold,
-      await judgeGold(gold),
-      await judgeGold(gold)
-    );
-    let under = scores.size === 0;
-    console.log(`judge ${JUDGE_MODEL}, two runs against ${GOLD}`);
-    for (const [id, score] of scores) {
-      const { agree, total } = score.agreement;
-      const { flipped, total: pairs } = score.flips;
-      const low = !calibrated(score);
-      under ||= low;
-      console.log(
-        `${low ? "UNDER" : "ok   "} ${id}: agreement ${percent(agree, total)} (${agree}/${total}), flips ${percent(flipped, pairs)} (${flipped}/${pairs}), coverage ${score.coverage.measured}/${score.coverage.required} (stale ${score.coverage.stale}, missing ${score.coverage.missing}, unlabelled ${score.coverage.unlabelled})`
-      );
-    }
-    process.exitCode = under ? 1 : 0;
+    await calibrateGold();
     return;
   }
-  throw new Error("Usage: pnpm widget:judge review|gold [dir] | rerun");
+  if (command === "review" || command === "gold") {
+    const dir = requestedDir ?? latestRun();
+    if (command === "review") {
+      writeFileSync(`${dir}/review.md`, renderReview(readRecords(dir)));
+      console.log(`${dir}/review.md`);
+      return;
+    }
+    if (command === "gold") {
+      const records = readRecords(dir);
+      const marks = parseMarks(readFileSync(`${dir}/review.md`, "utf8"));
+      const next = toGold(records, marks);
+      const rows = records.reduce(
+        (sum, record) => sum + record.verdicts.length,
+        0
+      );
+      writeGold(GOLD, mergeGold(readGold(), next));
+      console.log(
+        `${GOLD}: ${marks.size} of ${rows} rows marked, ${next.length} case(s) written.`
+      );
+      return;
+    }
+  }
+  throw new Error(
+    "Usage: pnpm widget:judge review|gold [dir] | rerun | scorecard [eval dir...] [--judge-dir dir] | rejudge <eval dir...>"
+  );
 }
 
 await main();

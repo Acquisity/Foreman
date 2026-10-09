@@ -1,0 +1,3577 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "sinceDays": 90
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 33263,
+          "campaignsWithLeads": 14,
+          "ingestionCreditsUsed": 0,
+          "ingestionCreditTransactions": 0
+        },
+        "observedAt": "2026-10-07T18:46:39.700Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 33263,
+          "discrepancy": true,
+          "note": "Declared totals and persisted rows differ. This does not establish a processing failure or its cause; assess recorded run status and failures separately.",
+          "scrapeLeadStoredTotal": 70383,
+          "scrapeRunDeclaredTotal": 32916
+        },
+        "scrapeRuns": [
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000001",
+            "declaredLeadCount": 556,
+            "finishedAt": "2026-10-03T18:46:45.812+00:00",
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Name 1",
+            "runId": "00000000-0000-4000-8000-000000000003",
+            "source": "manual",
+            "startedAt": "2026-10-03T18:10:58.097+00:00",
+            "status": "completed",
+            "storedLeadCount": 481,
+            "stuck": false,
+            "unverifiedLeadCount": 73,
+            "updatedAt": "2026-10-03T18:46:45.812+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 408
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000001",
+            "declaredLeadCount": 500,
+            "finishedAt": "2026-10-03T18:46:56.512+00:00",
+            "id": "00000000-0000-4000-8000-000000000004",
+            "name": "Name 1",
+            "runId": "00000000-0000-4000-8000-000000000005",
+            "source": "manual",
+            "startedAt": "2026-10-03T18:10:55.745+00:00",
+            "status": "completed",
+            "storedLeadCount": 824,
+            "stuck": false,
+            "unverifiedLeadCount": 174,
+            "updatedAt": "2026-10-03T18:46:56.512+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 650
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 458,
+            "finishedAt": "2026-10-02T18:29:29.837+00:00",
+            "id": "00000000-0000-4000-8000-000000000007",
+            "name": "Name 2",
+            "runId": "00000000-0000-4000-8000-000000000008",
+            "source": "instantly",
+            "startedAt": "2026-10-02T18:18:42.526+00:00",
+            "status": "completed",
+            "storedLeadCount": 499,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-10-02T18:29:29.837+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 499
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 340,
+            "finishedAt": "2026-09-17T15:43:31.063+00:00",
+            "id": "00000000-0000-4000-8000-000000000009",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000010",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:36:16.858+00:00",
+            "status": "completed",
+            "storedLeadCount": 500,
+            "stuck": false,
+            "unverifiedLeadCount": 160,
+            "updatedAt": "2026-09-17T15:43:31.064+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 340
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 619,
+            "finishedAt": "2026-09-17T16:18:56.607+00:00",
+            "id": "00000000-0000-4000-8000-000000000011",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000012",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:36:13.071+00:00",
+            "status": "completed",
+            "storedLeadCount": 898,
+            "stuck": false,
+            "unverifiedLeadCount": 277,
+            "updatedAt": "2026-09-17T16:18:56.607+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 621
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 499,
+            "finishedAt": "2026-09-17T16:29:57.172+00:00",
+            "id": "00000000-0000-4000-8000-000000000013",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000014",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:29:09.225+00:00",
+            "status": "completed",
+            "storedLeadCount": 529,
+            "stuck": false,
+            "unverifiedLeadCount": 167,
+            "updatedAt": "2026-09-17T16:29:57.173+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 362
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 471,
+            "finishedAt": "2026-09-17T16:28:12.973+00:00",
+            "id": "00000000-0000-4000-8000-000000000015",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000016",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:29:06.273+00:00",
+            "status": "completed",
+            "storedLeadCount": 908,
+            "stuck": false,
+            "unverifiedLeadCount": 297,
+            "updatedAt": "2026-09-17T16:28:12.974+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 611
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 438,
+            "finishedAt": "2026-09-17T16:07:14.519+00:00",
+            "id": "00000000-0000-4000-8000-000000000017",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000018",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:23:14.264+00:00",
+            "status": "completed",
+            "storedLeadCount": 446,
+            "stuck": false,
+            "unverifiedLeadCount": 149,
+            "updatedAt": "2026-09-17T16:07:14.519+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 297
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 186,
+            "finishedAt": "2026-09-17T16:06:24.266+00:00",
+            "id": "00000000-0000-4000-8000-000000000019",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000020",
+            "source": "manual",
+            "startedAt": "2026-09-17T15:23:11.516+00:00",
+            "status": "completed",
+            "storedLeadCount": 590,
+            "stuck": false,
+            "unverifiedLeadCount": 261,
+            "updatedAt": "2026-09-17T16:06:24.266+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 329
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 1249,
+            "finishedAt": "2026-08-30T20:43:11.072+00:00",
+            "id": "00000000-0000-4000-8000-000000000022",
+            "name": "Name 4",
+            "runId": "00000000-0000-4000-8000-000000000023",
+            "source": "manual",
+            "startedAt": "2026-08-30T20:34:25.588+00:00",
+            "status": "completed",
+            "storedLeadCount": 911,
+            "stuck": false,
+            "unverifiedLeadCount": 249,
+            "updatedAt": "2026-08-30T20:43:11.073+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 662
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 3,
+            "finishedAt": "2026-08-30T20:44:13.258+00:00",
+            "id": "00000000-0000-4000-8000-000000000024",
+            "name": "Name 4",
+            "runId": "00000000-0000-4000-8000-000000000025",
+            "source": "manual",
+            "startedAt": "2026-08-30T20:34:17.279+00:00",
+            "status": "completed",
+            "storedLeadCount": 908,
+            "stuck": false,
+            "unverifiedLeadCount": 283,
+            "updatedAt": "2026-08-30T20:44:13.258+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 625
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 637,
+            "finishedAt": "2026-08-18T15:17:21.152+00:00",
+            "id": "00000000-0000-4000-8000-000000000026",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000027",
+            "source": "manual",
+            "startedAt": "2026-08-18T14:33:26.219+00:00",
+            "status": "completed",
+            "storedLeadCount": 883,
+            "stuck": false,
+            "unverifiedLeadCount": 245,
+            "updatedAt": "2026-08-18T15:17:21.153+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 638
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000006",
+            "declaredLeadCount": 687,
+            "finishedAt": "2026-08-18T15:18:54.091+00:00",
+            "id": "00000000-0000-4000-8000-000000000028",
+            "name": "Name 3",
+            "runId": "00000000-0000-4000-8000-000000000029",
+            "source": "manual",
+            "startedAt": "2026-08-18T14:33:20.844+00:00",
+            "status": "completed",
+            "storedLeadCount": 947,
+            "stuck": false,
+            "unverifiedLeadCount": 260,
+            "updatedAt": "2026-08-18T15:18:54.092+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 687
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 1279,
+            "finishedAt": "2026-07-27T17:09:20.515+00:00",
+            "id": "00000000-0000-4000-8000-000000000030",
+            "name": "Name 5",
+            "runId": "00000000-0000-4000-8000-000000000031",
+            "source": "instantly",
+            "startedAt": "2026-07-27T17:01:09.32+00:00",
+            "status": "completed",
+            "storedLeadCount": 1470,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-27T17:09:20.515+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1470
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 70,
+            "finishedAt": "2026-07-21T20:41:16.295+00:00",
+            "id": "00000000-0000-4000-8000-000000000032",
+            "name": "Name 5",
+            "runId": "00000000-0000-4000-8000-000000000033",
+            "source": "instantly",
+            "startedAt": "2026-07-21T20:36:20.495+00:00",
+            "status": "completed",
+            "storedLeadCount": 1571,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-21T20:43:37.09+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1571
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 33,
+            "finishedAt": "2026-07-18T13:57:38.83+00:00",
+            "id": "00000000-0000-4000-8000-000000000034",
+            "name": "Name 6",
+            "runId": "00000000-0000-4000-8000-000000000035",
+            "source": "instantly",
+            "startedAt": "2026-07-18T13:52:00.503+00:00",
+            "status": "completed",
+            "storedLeadCount": 1569,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-18T13:59:50.526+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1569
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 12,
+            "finishedAt": "2026-07-17T18:24:09.052+00:00",
+            "id": "00000000-0000-4000-8000-000000000036",
+            "name": "Name 7",
+            "runId": "00000000-0000-4000-8000-000000000037",
+            "source": "instantly",
+            "startedAt": "2026-07-17T18:18:33.294+00:00",
+            "status": "completed",
+            "storedLeadCount": 1573,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-17T18:26:39.669+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1573
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 602,
+            "finishedAt": "2026-07-15T21:55:31.306+00:00",
+            "id": "00000000-0000-4000-8000-000000000038",
+            "name": "Name 7",
+            "runId": "00000000-0000-4000-8000-000000000039",
+            "source": "instantly",
+            "startedAt": "2026-07-15T21:39:45.16+00:00",
+            "status": "completed",
+            "storedLeadCount": 1983,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-15T21:57:34.735+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1983
+          }
+        ],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 90,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T18:46:38.175Z",
+      "resultAt": "2026-10-07T18:46:43.967Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000040",
+            "created_at": 1764781354955,
+            "fingerprint": null,
+            "stripe_id": "cus_x1",
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [
+              {
+                "id": "cus_prod_x2",
+                "plan": {
+                  "id": "legacy",
+                  "internal_id": "prod_x3",
+                  "name": "Legacy",
+                  "description": null,
+                  "group": null,
+                  "version": 3,
+                  "version_slug": "v3",
+                  "active": true,
+                  "add_on": false,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 1,
+                    "interval": "month",
+                    "price_id": "pr_x4",
+                    "display": {
+                      "primary_text": "$1",
+                      "secondary_text": "per month"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x5"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 1,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "1 credit"
+                      },
+                      "entitlement_id": "ent_x6"
+                    },
+                    {
+                      "feature_id": "website_credit",
+                      "included": 500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "500 website credits"
+                      },
+                      "entitlement_id": "ent_x7"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x8"
+                    }
+                  },
+                  "created_at": 1774478699745,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "legacy",
+                "auto_enable": false,
+                "add_on": false,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1764781591518,
+                "current_period_start": 1791047173000,
+                "current_period_end": 1793725573000,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "id": "domain-2.example",
+                "plan": {
+                  "id": "domain",
+                  "internal_id": "prod_x9",
+                  "name": "Domain",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": null,
+                  "items": [
+                    {
+                      "feature_id": "domains",
+                      "included": 0,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": null,
+                      "price": {
+                        "amount": 18,
+                        "interval": "year",
+                        "billing_units": 1,
+                        "billing_method": "prepaid",
+                        "max_purchase": null,
+                        "processors": {
+                          "stripe": {
+                            "price_id": "price_x10"
+                          }
+                        }
+                      },
+                      "display": {
+                        "primary_text": "$18 per domain"
+                      },
+                      "proration": {
+                        "on_increase": "prorate_immediately",
+                        "on_decrease": "prorate_immediately"
+                      },
+                      "entitlement_id": "ent_x11",
+                      "price_id": "pr_x12"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x13"
+                    }
+                  },
+                  "created_at": 1764029047554,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "domain",
+                "auto_enable": false,
+                "add_on": true,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1775066681628,
+                "current_period_start": 1790877882000,
+                "current_period_end": 1793556282000,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "id": "domain-2.example-inboxes",
+                "plan": {
+                  "id": "inbox",
+                  "internal_id": "prod_x14",
+                  "name": "Inbox",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": null,
+                  "items": [
+                    {
+                      "feature_id": "inboxes",
+                      "included": 0,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": null,
+                      "price": {
+                        "amount": 8,
+                        "interval": "month",
+                        "billing_units": 1,
+                        "billing_method": "prepaid",
+                        "max_purchase": null,
+                        "processors": {
+                          "stripe": {
+                            "price_id": "price_x15"
+                          }
+                        }
+                      },
+                      "display": {
+                        "primary_text": "$8 per inbox"
+                      },
+                      "proration": {
+                        "on_increase": "prorate_immediately",
+                        "on_decrease": "prorate_immediately"
+                      },
+                      "entitlement_id": "ent_x16",
+                      "price_id": "pr_x17"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x18"
+                    }
+                  },
+                  "created_at": 1764029160966,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "inbox",
+                "auto_enable": false,
+                "add_on": true,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1775066681628,
+                "current_period_start": 1790877882000,
+                "current_period_end": 1793556282000,
+                "quantity": 1,
+                "scope": "customer"
+              }
+            ],
+            "purchases": [
+              {
+                "plan": {
+                  "id": "2500_credits",
+                  "internal_id": "prod_x19",
+                  "name": "Name 8",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 23.75,
+                    "interval": "one_off",
+                    "price_id": "pr_x20",
+                    "display": {
+                      "primary_text": "$23.75",
+                      "secondary_text": "one-off"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x21"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 2500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "Name 8"
+                      },
+                      "entitlement_id": "ent_x22"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x23"
+                    }
+                  },
+                  "created_at": 1763906298128,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "2500_credits",
+                "expires_at": null,
+                "started_at": 1767711571407,
+                "quantity": 6,
+                "scope": "customer"
+              }
+            ],
+            "licenses": [],
+            "balances": {
+              "credits": {
+                "feature_id": "credits",
+                "feature": {
+                  "id": "credits",
+                  "internal_id": "fe_x24",
+                  "name": "Credits",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "display": {
+                    "singular": "credit",
+                    "plural": "credits"
+                  },
+                  "archived": false
+                },
+                "granted": 15001,
+                "remaining": 379,
+                "usage": 14622,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x25",
+                    "plan_id": "legacy",
+                    "included_grant": 1,
+                    "prepaid_grant": 0,
+                    "remaining": 0,
+                    "usage": 1,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  },
+                  {
+                    "id": "cus_ent_x26",
+                    "plan_id": "2500_credits",
+                    "included_grant": 15000,
+                    "prepaid_grant": 0,
+                    "remaining": 379,
+                    "usage": 14621,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "website_credit": {
+                "feature_id": "website_credit",
+                "feature": {
+                  "id": "website_credit",
+                  "internal_id": "fe_x27",
+                  "name": "Website Credit",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "credit_schema": [
+                    {
+                      "metered_feature_id": "",
+                      "credit_cost": 0
+                    }
+                  ],
+                  "display": {
+                    "singular": "website credit",
+                    "plural": "website credits"
+                  },
+                  "archived": false
+                },
+                "granted": 500,
+                "remaining": 500,
+                "usage": 0,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x28",
+                    "plan_id": "legacy",
+                    "included_grant": 500,
+                    "prepaid_grant": 0,
+                    "remaining": 500,
+                    "usage": 0,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "domains": {
+                "feature_id": "domains",
+                "feature": {
+                  "id": "domains",
+                  "internal_id": "fe_x29",
+                  "name": "Domains",
+                  "type": "metered",
+                  "consumable": false,
+                  "event_names": [],
+                  "display": {
+                    "singular": "domain",
+                    "plural": "domains"
+                  },
+                  "archived": false
+                },
+                "granted": 1,
+                "remaining": 0,
+                "usage": 1,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x30",
+                    "plan_id": "domain",
+                    "included_grant": 0,
+                    "prepaid_grant": 1,
+                    "remaining": 0,
+                    "usage": 1,
+                    "unlimited": false,
+                    "reset": null,
+                    "price": {
+                      "amount": 18,
+                      "billing_units": 1,
+                      "billing_method": "prepaid",
+                      "max_purchase": null
+                    },
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "inboxes": {
+                "feature_id": "inboxes",
+                "feature": {
+                  "id": "inboxes",
+                  "internal_id": "fe_x31",
+                  "name": "Inboxes",
+                  "type": "metered",
+                  "consumable": false,
+                  "event_names": [],
+                  "display": {
+                    "singular": "inbox",
+                    "plural": "inboxes"
+                  },
+                  "archived": false
+                },
+                "granted": 3,
+                "remaining": 0,
+                "usage": 3,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x32",
+                    "plan_id": "inbox",
+                    "included_grant": 0,
+                    "prepaid_grant": 3,
+                    "remaining": 0,
+                    "usage": 3,
+                    "unlimited": false,
+                    "reset": null,
+                    "price": {
+                      "amount": 8,
+                      "billing_units": 1,
+                      "billing_method": "prepaid",
+                      "max_purchase": null
+                    },
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              }
+            },
+            "flags": {},
+            "config": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            }
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": -269,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 269,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [
+            {
+              "domain": "domain-1.example",
+              "kind": "domain",
+              "orderId": "00000000-0000-4000-8000-000000000041",
+              "status": "active"
+            },
+            {
+              "domain": "domain-1.example",
+              "kind": "inboxes",
+              "orderId": "00000000-0000-4000-8000-000000000041",
+              "status": "active"
+            }
+          ],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": "inactive"
+        },
+        "recentCharges": [
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-03T18:08:15.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x33",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-01T19:07:17.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x34",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-03T18:07:55.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x35",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-01T19:06:30.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x36",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-03T18:06:48.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x37",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-01T19:06:30.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x38",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-03T18:06:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x39",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-03T14:16:04.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x40",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-01T19:06:21.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x41",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-03T18:09:04.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x42",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-02T20:14:55.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x43",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-01T19:09:07.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x44",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-06T19:05:23.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x45",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-03T18:07:58.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x46",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-01T19:06:21.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x47",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-03T18:07:02.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x48",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 4200,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-01T18:04:45.000Z",
+            "currency": "usd",
+            "description": "Subscription creation",
+            "id": "py_x49",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-01T15:16:02.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x50",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-03-03T18:09:24.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x51",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-03T18:10:19.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x52",
+            "refunded": false,
+            "status": "succeeded"
+          }
+        ],
+        "recentInvoices": [
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-10-03T17:07:10.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x53",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-11-03T17:06:13.000Z",
+                "periodStart": "2026-10-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-03T18:08:11.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-10-01T18:06:59.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x54",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-11-01T18:04:42.000Z",
+                "periodStart": "2026-10-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-01T19:07:12.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-03T17:07:02.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x55",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-10-03T17:06:13.000Z",
+                "periodStart": "2026-09-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-03T18:07:51.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-01T18:05:05.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x56",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-10-01T18:04:42.000Z",
+                "periodStart": "2026-09-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-01T19:06:25.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-03T17:06:21.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x57",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-09-03T17:06:13.000Z",
+                "periodStart": "2026-08-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-03T18:06:43.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-01T18:05:38.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x58",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-09-01T18:04:42.000Z",
+                "periodStart": "2026-08-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-01T19:06:20.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-03T17:06:18.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x59",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-08-03T17:06:13.000Z",
+                "periodStart": "2026-07-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-03T18:06:31.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-07-03T14:15:56.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x60",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-07-03T14:15:57.000Z",
+                "periodStart": "2026-07-03T14:15:57.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-03T14:16:02.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-01T18:05:16.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x61",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-08-01T18:04:42.000Z",
+                "periodStart": "2026-07-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-01T19:06:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-03T17:08:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x62",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-07-03T17:06:13.000Z",
+                "periodStart": "2026-06-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-03T18:08:58.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-06-02T20:14:48.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x63",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-06-02T20:14:48.000Z",
+                "periodStart": "2026-06-02T20:14:48.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-02T20:14:53.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-01T18:08:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x64",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-07-01T18:04:42.000Z",
+                "periodStart": "2026-06-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-01T19:09:01.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-05-06T19:05:15.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x65",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-05-06T19:05:15.000Z",
+                "periodStart": "2026-05-06T19:05:15.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-06T19:05:20.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-03T17:07:01.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x66",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-06-03T17:06:13.000Z",
+                "periodStart": "2026-05-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-03T18:07:52.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-01T18:05:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x67",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-06-01T18:04:42.000Z",
+                "periodStart": "2026-05-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-01T19:06:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-04-03T17:06:47.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x68",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-05-03T17:06:13.000Z",
+                "periodStart": "2026-04-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-03T18:06:56.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 4200,
+            "amountPaidCents": 4200,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_create",
+            "chargeId": null,
+            "createdAt": "2026-04-01T18:04:42.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x69",
+            "lines": [
+              {
+                "amountCents": 1800,
+                "description": "1 × Domain - Domains (at $18.00 / year)",
+                "periodEnd": "2027-04-01T18:04:42.000Z",
+                "periodStart": "2026-04-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 1
+              },
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-05-01T18:04:42.000Z",
+                "periodStart": "2026-04-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-01T18:04:42.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 4200
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-04-01T15:15:55.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x70",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-04-01T15:15:56.000Z",
+                "periodStart": "2026-04-01T15:15:56.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-01T15:15:59.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-03-03T17:08:34.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x71",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-04-03T17:06:13.000Z",
+                "periodStart": "2026-03-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-03-03T18:09:19.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-02-03T17:06:57.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x72",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-03-03T17:06:13.000Z",
+                "periodStart": "2026-02-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-03T18:10:14.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          }
+        ],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": true,
+          "notes": [
+            "Stripe shows a succeeded charge, but the product database has no active subscription status. Check whether this organization was charged without being provisioned."
+          ]
+        },
+        "stripeSubscriptions": [
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x73",
+            "status": "active",
+            "trialEnd": null
+          },
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x74",
+            "status": "active",
+            "trialEnd": null
+          }
+        ],
+        "truncated": [
+          "domain-3.example: older rows exist beyond the ones shown",
+          "domain-4.example: older rows exist beyond the ones shown"
+        ],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-07T18:46:46.257Z",
+      "resultAt": "2026-10-07T18:46:58.960Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000021",
+        "sinceDays": 90
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 33263,
+          "campaignsWithLeads": 14,
+          "ingestionCreditsUsed": 0,
+          "ingestionCreditTransactions": 0
+        },
+        "observedAt": "2026-10-07T18:47:04.128Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 33263,
+          "discrepancy": true,
+          "note": "Declared totals and persisted rows differ. This does not establish a processing failure or its cause; assess recorded run status and failures separately.",
+          "scrapeLeadStoredTotal": 70383,
+          "scrapeRunDeclaredTotal": 32916
+        },
+        "scrapeRuns": [
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 1249,
+            "finishedAt": "2026-08-30T20:43:11.072+00:00",
+            "id": "00000000-0000-4000-8000-000000000022",
+            "name": "Name 4",
+            "runId": "00000000-0000-4000-8000-000000000023",
+            "source": "manual",
+            "startedAt": "2026-08-30T20:34:25.588+00:00",
+            "status": "completed",
+            "storedLeadCount": 911,
+            "stuck": false,
+            "unverifiedLeadCount": 249,
+            "updatedAt": "2026-08-30T20:43:11.073+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 662
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 3,
+            "finishedAt": "2026-08-30T20:44:13.258+00:00",
+            "id": "00000000-0000-4000-8000-000000000024",
+            "name": "Name 4",
+            "runId": "00000000-0000-4000-8000-000000000025",
+            "source": "manual",
+            "startedAt": "2026-08-30T20:34:17.279+00:00",
+            "status": "completed",
+            "storedLeadCount": 908,
+            "stuck": false,
+            "unverifiedLeadCount": 283,
+            "updatedAt": "2026-08-30T20:44:13.258+00:00",
+            "verificationJobs": {
+              "completed": 2,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 625
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 1279,
+            "finishedAt": "2026-07-27T17:09:20.515+00:00",
+            "id": "00000000-0000-4000-8000-000000000030",
+            "name": "Name 5",
+            "runId": "00000000-0000-4000-8000-000000000031",
+            "source": "instantly",
+            "startedAt": "2026-07-27T17:01:09.32+00:00",
+            "status": "completed",
+            "storedLeadCount": 1470,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-27T17:09:20.515+00:00",
+            "verificationJobs": {
+              "completed": 1,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1470
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 70,
+            "finishedAt": "2026-07-21T20:41:16.295+00:00",
+            "id": "00000000-0000-4000-8000-000000000032",
+            "name": "Name 5",
+            "runId": "00000000-0000-4000-8000-000000000033",
+            "source": "instantly",
+            "startedAt": "2026-07-21T20:36:20.495+00:00",
+            "status": "completed",
+            "storedLeadCount": 1571,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-21T20:43:37.09+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1571
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 33,
+            "finishedAt": "2026-07-18T13:57:38.83+00:00",
+            "id": "00000000-0000-4000-8000-000000000034",
+            "name": "Name 6",
+            "runId": "00000000-0000-4000-8000-000000000035",
+            "source": "instantly",
+            "startedAt": "2026-07-18T13:52:00.503+00:00",
+            "status": "completed",
+            "storedLeadCount": 1569,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-18T13:59:50.526+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1569
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 12,
+            "finishedAt": "2026-07-17T18:24:09.052+00:00",
+            "id": "00000000-0000-4000-8000-000000000036",
+            "name": "Name 7",
+            "runId": "00000000-0000-4000-8000-000000000037",
+            "source": "instantly",
+            "startedAt": "2026-07-17T18:18:33.294+00:00",
+            "status": "completed",
+            "storedLeadCount": 1573,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-17T18:26:39.669+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1573
+          },
+          {
+            "action": "none",
+            "campaignId": "00000000-0000-4000-8000-000000000021",
+            "declaredLeadCount": 602,
+            "finishedAt": "2026-07-15T21:55:31.306+00:00",
+            "id": "00000000-0000-4000-8000-000000000038",
+            "name": "Name 7",
+            "runId": "00000000-0000-4000-8000-000000000039",
+            "source": "instantly",
+            "startedAt": "2026-07-15T21:39:45.16+00:00",
+            "status": "completed",
+            "storedLeadCount": 1983,
+            "stuck": false,
+            "unverifiedLeadCount": 0,
+            "updatedAt": "2026-07-15T21:57:34.735+00:00",
+            "verificationJobs": {
+              "completed": 12,
+              "failed": 0,
+              "pending": 0,
+              "unknown": 0
+            },
+            "verifiedLeadCount": 1983
+          }
+        ],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 90,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T18:47:02.073Z",
+      "resultAt": "2026-10-07T18:47:05.480Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
+      "input": {
+        "area": "scrape",
+        "since": "30d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["scrape"],
+        "failures": [],
+        "observedAt": "2026-10-07T18:47:09.939Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T18:47:07.614Z",
+      "resultAt": "2026-10-07T18:47:09.940Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000021"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [
+                  {
+                    "connected": true,
+                    "email": "person-1@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000042",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-2@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000043",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-3@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000044",
+                    "status": "active"
+                  }
+                ],
+                "configuredCount": 27,
+                "healthyCount": 3,
+                "matchedCount": 3,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [],
+              "endDate": "2026-10-07",
+              "overview": {
+                "bounces": 90,
+                "emailsSent": 15512,
+                "meetingsBooked": 92,
+                "opens": 0,
+                "replies": 755,
+                "snapshotAt": "2026-10-02T21:41:58.508+00:00",
+                "unsubscribes": 0
+              },
+              "sequenceStepDelays": [2, 3],
+              "startDate": "2026-10-01",
+              "stepSends": [
+                {
+                  "sent": 7802,
+                  "snapshotAt": "2026-10-02T21:41:58.425+00:00",
+                  "step": 0
+                },
+                {
+                  "sent": 7710,
+                  "snapshotAt": "2026-10-02T21:41:58.425+00:00",
+                  "step": 1
+                }
+              ]
+            },
+            "id": "00000000-0000-4000-8000-000000000021",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "No ownership-verified Acquisity-provisioned Instantly connection for this campaign."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-09-29",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-23",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-09-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-18",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-17",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-16",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-09-15",
+                "emailsSent": 0
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 1500,
+            "updatedAt": "2026-10-02T18:24:43.656+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-5.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 3,
+          "totalSendingAccounts": 3
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T18:47:14.498Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T18:47:12.528Z",
+      "resultAt": "2026-10-07T18:47:15.256Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "creditWindow": {
+          "from": "2026-07-20T00:00:00Z",
+          "to": "2026-10-08T00:00:00Z"
+        }
+      },
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "id": "00000000-0000-4000-8000-000000000040",
+            "created_at": 1764781354955,
+            "fingerprint": null,
+            "stripe_id": "cus_x1",
+            "env": "live",
+            "metadata": {},
+            "send_email_receipts": false,
+            "billing_controls": {},
+            "subscriptions": [
+              {
+                "id": "cus_prod_x2",
+                "plan": {
+                  "id": "legacy",
+                  "internal_id": "prod_x3",
+                  "name": "Legacy",
+                  "description": null,
+                  "group": null,
+                  "version": 3,
+                  "version_slug": "v3",
+                  "active": true,
+                  "add_on": false,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 1,
+                    "interval": "month",
+                    "price_id": "pr_x4",
+                    "display": {
+                      "primary_text": "$1",
+                      "secondary_text": "per month"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x5"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 1,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "1 credit"
+                      },
+                      "entitlement_id": "ent_x6"
+                    },
+                    {
+                      "feature_id": "website_credit",
+                      "included": 500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "500 website credits"
+                      },
+                      "entitlement_id": "ent_x7"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x8"
+                    }
+                  },
+                  "created_at": 1774478699745,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "legacy",
+                "auto_enable": false,
+                "add_on": false,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1764781591518,
+                "current_period_start": 1791047173000,
+                "current_period_end": 1793725573000,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "id": "domain-2.example",
+                "plan": {
+                  "id": "domain",
+                  "internal_id": "prod_x9",
+                  "name": "Domain",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": null,
+                  "items": [
+                    {
+                      "feature_id": "domains",
+                      "included": 0,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": null,
+                      "price": {
+                        "amount": 18,
+                        "interval": "year",
+                        "billing_units": 1,
+                        "billing_method": "prepaid",
+                        "max_purchase": null,
+                        "processors": {
+                          "stripe": {
+                            "price_id": "price_x10"
+                          }
+                        }
+                      },
+                      "display": {
+                        "primary_text": "$18 per domain"
+                      },
+                      "proration": {
+                        "on_increase": "prorate_immediately",
+                        "on_decrease": "prorate_immediately"
+                      },
+                      "entitlement_id": "ent_x11",
+                      "price_id": "pr_x12"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x13"
+                    }
+                  },
+                  "created_at": 1764029047554,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "domain",
+                "auto_enable": false,
+                "add_on": true,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1775066681628,
+                "current_period_start": 1790877882000,
+                "current_period_end": 1793556282000,
+                "quantity": 1,
+                "scope": "customer"
+              },
+              {
+                "id": "domain-2.example-inboxes",
+                "plan": {
+                  "id": "inbox",
+                  "internal_id": "prod_x14",
+                  "name": "Inbox",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": null,
+                  "items": [
+                    {
+                      "feature_id": "inboxes",
+                      "included": 0,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": null,
+                      "price": {
+                        "amount": 8,
+                        "interval": "month",
+                        "billing_units": 1,
+                        "billing_method": "prepaid",
+                        "max_purchase": null,
+                        "processors": {
+                          "stripe": {
+                            "price_id": "price_x15"
+                          }
+                        }
+                      },
+                      "display": {
+                        "primary_text": "$8 per inbox"
+                      },
+                      "proration": {
+                        "on_increase": "prorate_immediately",
+                        "on_decrease": "prorate_immediately"
+                      },
+                      "entitlement_id": "ent_x16",
+                      "price_id": "pr_x17"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x18"
+                    }
+                  },
+                  "created_at": 1764029160966,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "inbox",
+                "auto_enable": false,
+                "add_on": true,
+                "status": "active",
+                "past_due": false,
+                "canceled_at": null,
+                "expires_at": null,
+                "trial_ends_at": null,
+                "started_at": 1775066681628,
+                "current_period_start": 1790877882000,
+                "current_period_end": 1793556282000,
+                "quantity": 1,
+                "scope": "customer"
+              }
+            ],
+            "purchases": [
+              {
+                "plan": {
+                  "id": "2500_credits",
+                  "internal_id": "prod_x19",
+                  "name": "Name 8",
+                  "description": null,
+                  "group": null,
+                  "version": 1,
+                  "version_slug": "v1",
+                  "active": true,
+                  "add_on": true,
+                  "auto_enable": false,
+                  "price": {
+                    "amount": 23.75,
+                    "interval": "one_off",
+                    "price_id": "pr_x20",
+                    "display": {
+                      "primary_text": "$23.75",
+                      "secondary_text": "one-off"
+                    },
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x21"
+                      }
+                    }
+                  },
+                  "items": [
+                    {
+                      "feature_id": "credits",
+                      "included": 2500,
+                      "unlimited": false,
+                      "pooled": false,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "price": null,
+                      "display": {
+                        "primary_text": "Name 8"
+                      },
+                      "entitlement_id": "ent_x22"
+                    }
+                  ],
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x23"
+                    }
+                  },
+                  "created_at": 1763906298128,
+                  "env": "live",
+                  "archived": false,
+                  "config": {
+                    "ignore_past_due": false,
+                    "anchor_to_month_start": false
+                  },
+                  "billing_controls": {},
+                  "metadata": {},
+                  "base_variant_id": null
+                },
+                "plan_id": "2500_credits",
+                "expires_at": null,
+                "started_at": 1767711571407,
+                "quantity": 6,
+                "scope": "customer"
+              }
+            ],
+            "licenses": [],
+            "balances": {
+              "credits": {
+                "feature_id": "credits",
+                "feature": {
+                  "id": "credits",
+                  "internal_id": "fe_x24",
+                  "name": "Credits",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "display": {
+                    "singular": "credit",
+                    "plural": "credits"
+                  },
+                  "archived": false
+                },
+                "granted": 15001,
+                "remaining": 379,
+                "usage": 14622,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x25",
+                    "plan_id": "legacy",
+                    "included_grant": 1,
+                    "prepaid_grant": 0,
+                    "remaining": 0,
+                    "usage": 1,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  },
+                  {
+                    "id": "cus_ent_x26",
+                    "plan_id": "2500_credits",
+                    "included_grant": 15000,
+                    "prepaid_grant": 0,
+                    "remaining": 379,
+                    "usage": 14621,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "website_credit": {
+                "feature_id": "website_credit",
+                "feature": {
+                  "id": "website_credit",
+                  "internal_id": "fe_x27",
+                  "name": "Website Credit",
+                  "type": "metered",
+                  "consumable": true,
+                  "event_names": [],
+                  "credit_schema": [
+                    {
+                      "metered_feature_id": "",
+                      "credit_cost": 0
+                    }
+                  ],
+                  "display": {
+                    "singular": "website credit",
+                    "plural": "website credits"
+                  },
+                  "archived": false
+                },
+                "granted": 500,
+                "remaining": 500,
+                "usage": 0,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x28",
+                    "plan_id": "legacy",
+                    "included_grant": 500,
+                    "prepaid_grant": 0,
+                    "remaining": 500,
+                    "usage": 0,
+                    "unlimited": false,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "price": null,
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "domains": {
+                "feature_id": "domains",
+                "feature": {
+                  "id": "domains",
+                  "internal_id": "fe_x29",
+                  "name": "Domains",
+                  "type": "metered",
+                  "consumable": false,
+                  "event_names": [],
+                  "display": {
+                    "singular": "domain",
+                    "plural": "domains"
+                  },
+                  "archived": false
+                },
+                "granted": 1,
+                "remaining": 0,
+                "usage": 1,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x30",
+                    "plan_id": "domain",
+                    "included_grant": 0,
+                    "prepaid_grant": 1,
+                    "remaining": 0,
+                    "usage": 1,
+                    "unlimited": false,
+                    "reset": null,
+                    "price": {
+                      "amount": 18,
+                      "billing_units": 1,
+                      "billing_method": "prepaid",
+                      "max_purchase": null
+                    },
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              },
+              "inboxes": {
+                "feature_id": "inboxes",
+                "feature": {
+                  "id": "inboxes",
+                  "internal_id": "fe_x31",
+                  "name": "Inboxes",
+                  "type": "metered",
+                  "consumable": false,
+                  "event_names": [],
+                  "display": {
+                    "singular": "inbox",
+                    "plural": "inboxes"
+                  },
+                  "archived": false
+                },
+                "granted": 3,
+                "remaining": 0,
+                "usage": 3,
+                "unlimited": false,
+                "overage_allowed": false,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "breakdown": [
+                  {
+                    "id": "cus_ent_x32",
+                    "plan_id": "inbox",
+                    "included_grant": 0,
+                    "prepaid_grant": 3,
+                    "remaining": 0,
+                    "usage": 3,
+                    "unlimited": false,
+                    "reset": null,
+                    "price": {
+                      "amount": 8,
+                      "billing_units": 1,
+                      "billing_method": "prepaid",
+                      "max_purchase": null
+                    },
+                    "expires_at": null,
+                    "source": "customer"
+                  }
+                ]
+              }
+            },
+            "flags": {},
+            "config": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            }
+          }
+        },
+        "available": true,
+        "creditHistory": {
+          "available": true,
+          "completedManualGrants": [],
+          "transactionTotals": [],
+          "truncated": false,
+          "window": {
+            "from": "2026-07-20T00:00:00Z",
+            "to": "2026-10-08T00:00:00Z"
+          }
+        },
+        "credits": {
+          "balance": -269,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 269,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [
+            {
+              "domain": "domain-1.example",
+              "kind": "domain",
+              "orderId": "00000000-0000-4000-8000-000000000041",
+              "status": "active"
+            },
+            {
+              "domain": "domain-1.example",
+              "kind": "inboxes",
+              "orderId": "00000000-0000-4000-8000-000000000041",
+              "status": "active"
+            }
+          ],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": "inactive"
+        },
+        "recentCharges": [
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-03T18:08:15.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x33",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-01T19:07:17.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x34",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-03T18:07:55.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x35",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-01T19:06:30.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x36",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-03T18:06:48.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x37",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-01T19:06:30.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x38",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-03T18:06:37.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x39",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-03T14:16:04.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x40",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-01T19:06:21.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x41",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-03T18:09:04.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x42",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-02T20:14:55.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x43",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-01T19:09:07.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x44",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-06T19:05:23.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x45",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-03T18:07:58.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x46",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2400,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-01T19:06:21.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x47",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-03T18:07:02.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x48",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 4200,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-01T18:04:45.000Z",
+            "currency": "usd",
+            "description": "Subscription creation",
+            "id": "py_x49",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 2375,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-01T15:16:02.000Z",
+            "currency": "usd",
+            "description": "Payment for Invoice",
+            "id": "py_x50",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-03-03T18:09:24.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x51",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-03T18:10:19.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x52",
+            "refunded": false,
+            "status": "succeeded"
+          }
+        ],
+        "recentInvoices": [
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-10-03T17:07:10.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x53",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-11-03T17:06:13.000Z",
+                "periodStart": "2026-10-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-03T18:08:11.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-10-01T18:06:59.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x54",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-11-01T18:04:42.000Z",
+                "periodStart": "2026-10-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-01T19:07:12.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-03T17:07:02.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x55",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-10-03T17:06:13.000Z",
+                "periodStart": "2026-09-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-03T18:07:51.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-01T18:05:05.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x56",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-10-01T18:04:42.000Z",
+                "periodStart": "2026-09-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-01T19:06:25.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-03T17:06:21.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x57",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-09-03T17:06:13.000Z",
+                "periodStart": "2026-08-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-03T18:06:43.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-01T18:05:38.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x58",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-09-01T18:04:42.000Z",
+                "periodStart": "2026-08-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-01T19:06:20.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-03T17:06:18.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x59",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-08-03T17:06:13.000Z",
+                "periodStart": "2026-07-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-03T18:06:31.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-07-03T14:15:56.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x60",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-07-03T14:15:57.000Z",
+                "periodStart": "2026-07-03T14:15:57.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-03T14:16:02.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-01T18:05:16.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x61",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-08-01T18:04:42.000Z",
+                "periodStart": "2026-07-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-01T19:06:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-03T17:08:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x62",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-07-03T17:06:13.000Z",
+                "periodStart": "2026-06-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-03T18:08:58.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-06-02T20:14:48.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x63",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-06-02T20:14:48.000Z",
+                "periodStart": "2026-06-02T20:14:48.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-02T20:14:53.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-01T18:08:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x64",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-07-01T18:04:42.000Z",
+                "periodStart": "2026-06-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-01T19:09:01.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-05-06T19:05:15.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x65",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-05-06T19:05:15.000Z",
+                "periodStart": "2026-05-06T19:05:15.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-06T19:05:20.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-03T17:07:01.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x66",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-06-03T17:06:13.000Z",
+                "periodStart": "2026-05-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-03T18:07:52.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 2400,
+            "amountPaidCents": 2400,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-01T18:05:09.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x67",
+            "lines": [
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-06-01T18:04:42.000Z",
+                "periodStart": "2026-05-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-01T19:06:15.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2400
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-04-03T17:06:47.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x68",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-05-03T17:06:13.000Z",
+                "periodStart": "2026-04-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-03T18:06:56.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 4200,
+            "amountPaidCents": 4200,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_create",
+            "chargeId": null,
+            "createdAt": "2026-04-01T18:04:42.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x69",
+            "lines": [
+              {
+                "amountCents": 1800,
+                "description": "1 × Domain - Domains (at $18.00 / year)",
+                "periodEnd": "2027-04-01T18:04:42.000Z",
+                "periodStart": "2026-04-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 1
+              },
+              {
+                "amountCents": 2400,
+                "description": "3 × Inbox - Inboxes (at $8.00 / month)",
+                "periodEnd": "2026-05-01T18:04:42.000Z",
+                "periodStart": "2026-04-01T18:04:42.000Z",
+                "proration": null,
+                "quantity": 3
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-01T18:04:42.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 4200
+          },
+          {
+            "amountDueCents": 2375,
+            "amountPaidCents": 2375,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-04-01T15:15:55.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x70",
+            "lines": [
+              {
+                "amountCents": 2375,
+                "description": "Name 8",
+                "periodEnd": "2026-04-01T15:15:56.000Z",
+                "periodStart": "2026-04-01T15:15:56.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-01T15:15:59.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 2375
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-03-03T17:08:34.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x71",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-04-03T17:06:13.000Z",
+                "periodStart": "2026-03-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-03-03T18:09:19.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-02-03T17:06:57.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x72",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-03-03T17:06:13.000Z",
+                "periodStart": "2026-02-03T17:06:13.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-03T18:10:14.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          }
+        ],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": true,
+          "notes": [
+            "Credit-window totals cover this workspace's stored ledger only, not lifetime balances or all provider activity. Transaction amounts are signed. Manual grants may also appear in transactions; do not add the two sources. Manual grants without a completed_at timestamp are not included.",
+            "Stripe shows a succeeded charge, but the product database has no active subscription status. Check whether this organization was charged without being provisioned."
+          ]
+        },
+        "stripeSubscriptions": [
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x73",
+            "status": "active",
+            "trialEnd": null
+          },
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x74",
+            "status": "active",
+            "trialEnd": null
+          }
+        ],
+        "truncated": [
+          "domain-3.example: older rows exist beyond the ones shown",
+          "domain-4.example: older rows exist beyond the ones shown"
+        ],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-07T18:47:17.595Z",
+      "resultAt": "2026-10-07T18:47:32.195Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "query": "automatic cleanup finished campaigns leads deleted"
+      },
+      "output": {
+        "issues": []
+      },
+      "requestedAt": "2026-10-07T18:47:35.001Z",
+      "resultAt": "2026-10-07T18:47:37.761Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    }
+  ],
+  "expectations": {
+    "cause": "The campaign is marked completed and now holds 1,500 leads; its saved sends show the first email went to 7,802 leads and the follow-up to 7,710, and its saved lead-search runs since mid-July still record about 10,000 stored leads. So a record of the bought leads exists although they are no longer in the campaign, and nothing recorded shows a customer setting that turns the cleanup off or a known issue for it.",
+    "causeType": "platform_limitation",
+    "claims": [
+      "Says the saved lead-search runs for this campaign still record the leads that were bought, so a purchase record exists.",
+      "Says the campaign is marked completed, with the first email sent to 7,802 leads and the follow-up to 7,710.",
+      "Does not claim there is a setting the customer can switch to turn off the automatic cleanup.",
+      "Does not tell the customer to re-upload a CSV or pay for a new AI lead search as the fix, and does not say the leads are already restored."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nyes\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: my campaign leads\nSupport: Which campaign are you asking about — the one from the cleanup earlier, or a different one? And what's happening with its leads (missing, not sending, something else)?\nCustomer: Name 4 campaign in Aaron Fraga's Workspace. Now there are 7802 leads missing. It has been well over a month and still no resolution. All the leads were purchased through AIA, is there a record of the leads I bought? This is the response I got from support \"Hey Name 9. Thanks for your patience, we found it. Our automatic cleanup of finished campaigns removed the leads from that campaign: 5,686 of them on 27 July right after you bought more, and the remaining 2,630 on 2 October, because the campaign counted as finished internally even though it looked active to you. Your purchase record is intact, all 18 batches and 7,969 leads, and you can rebuild the list by resuming the campaign and adding the leads again; re-uploading a CSV costs nothing, while a fresh AI lead search uses credits again.\"  I purchased the leads on this platform and do not have a csv of them\nCustomer: how do i turn off the automatic cleanup so the platform does not delete my leads again without permission\nSupport: Could you confirm the exact name of the campaign this purchase was tied to — is it the \"Name 4\" campaign specifically, or a related one like the August one? That'll help me track down the right purchase record.\nSupport: I could not find a help-center article covering how to turn off automatic lead cleanup, so could you tell me which settings page or menu you are currently viewing to look for that option?\nCustomer: Name 4 campaign in Aaron Fraga's Workspace. Now there are 7802 leads missing. It has been well over a month and still no resolution. All the leads were purchased through AIA, is there a record of the leads I bought? This is the response I got from support \"Hey Name 9. Thanks for your patience, we found it. Our automatic cleanup of finished campaigns removed the leads from that campaign: 5,686 of them on 27 July right after you bought more, and the remaining 2,630 on 2 October, because the campaign counted as finished internally even though it looked active to you. Your purchase record is intact, all 18 batches and 7,969 leads, and you can rebuild the list by resuming the campaign and adding the leads again; re-uploading a CSV costs nothing, while a fresh AI lead search uses credits again.\"  I purchased the leads on this platform and do not have a csv of them\nSupport: Just to confirm the exact campaign name so I can match it to your purchase record: is it the \"Company One\" campaign, or the May 2026 one you originally mentioned?",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4BV0PEE0GHCKQ9D2E8SG3KW",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_lead_pipeline_status",
+      "widget_billing_summary",
+      "widget_job_failures",
+      "widget_outreach_health",
+      "widget_known_issues"
+    ]
+  }
+}

@@ -20,7 +20,7 @@ import { isWidgetSupport } from "../lib/widget-scope.js";
  * cannot carry the contract. `validAsk` is applied here, where the tool runs,
  * and a rejected question comes back as an error the model can correct.
  */
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

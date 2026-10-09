@@ -6,6 +6,7 @@ import {
   answeredLane,
   type GradedRun,
   gradeRun,
+  handedOff,
   repeatsPreviousReply,
   replayAssessment,
   stepUsage,
@@ -377,5 +378,15 @@ test("a reply that repeats the previous one fails, ignoring case, spacing and pu
       question: "Why same day?",
     }),
     "not set"
+  );
+});
+
+test("a handoff is the human lane, a reply held for a person, or a filed ticket", () => {
+  assert.equal(handedOff("human", null, []), true);
+  assert.equal(handedOff("investigate", "needs_human", []), true);
+  assert.equal(handedOff("investigate", "allow", ["widget_file_ticket"]), true);
+  assert.equal(
+    handedOff("investigate", "allow", ["widget_inbox_health"]),
+    false
   );
 });

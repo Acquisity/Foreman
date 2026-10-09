@@ -1,0 +1,240 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-06",
+                "emailsSent": 90
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 8999,
+            "updatedAt": "2026-10-06T11:06:23.687+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 6,
+          "totalSendingAccounts": 6
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-06T17:41:21.029Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T17:40:56.968Z",
+      "resultAt": "2026-10-06T17:41:26.904Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000001"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [
+                  {
+                    "connected": true,
+                    "email": "person-1@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000002",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-2@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000003",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-3@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000004",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-4@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000005",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-5@domain-2.example",
+                    "id": "00000000-0000-4000-8000-000000000006",
+                    "status": "active"
+                  },
+                  {
+                    "connected": true,
+                    "email": "person-6@domain-1.example",
+                    "id": "00000000-0000-4000-8000-000000000007",
+                    "status": "active"
+                  }
+                ],
+                "configuredCount": 6,
+                "healthyCount": 6,
+                "matchedCount": 6,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [
+                {
+                  "date": "2026-10-06",
+                  "emailsBounced": 0,
+                  "emailsDelivered": 90,
+                  "emailsOpened": 0,
+                  "emailsSent": 90,
+                  "meetingsScheduled": 0,
+                  "repliesReceived": 1,
+                  "updatedAt": "2026-10-06T17:29:31.621898+00:00"
+                }
+              ],
+              "endDate": "2026-10-06",
+              "overview": {
+                "bounces": 0,
+                "emailsSent": 90,
+                "meetingsBooked": 0,
+                "opens": 0,
+                "replies": 1,
+                "snapshotAt": "2026-10-06T17:29:31.641+00:00",
+                "unsubscribes": 0
+              },
+              "startDate": "2026-09-30"
+            },
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": true,
+              "campaignDailyLimit": 210,
+              "notSendingReason": null,
+              "notSendingReasonCode": null,
+              "observedAt": "2026-10-06T17:41:46.643Z",
+              "statusCode": 1,
+              "updatedAt": "2026-10-06T14:23:22.756Z"
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-06",
+                "emailsSent": 90
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "sunday": false,
+                "monday": true,
+                "tuesday": true,
+                "wednesday": true,
+                "thursday": true,
+                "friday": true,
+                "saturday": false
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 8999,
+            "updatedAt": "2026-10-06T11:06:23.687+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 6,
+          "totalSendingAccounts": 6
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-06T17:41:30.633Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-06T17:41:28.765Z",
+      "resultAt": "2026-10-06T17:41:46.644Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    }
+  ],
+  "expectations": {
+    "cause": "The campaign is active and has already sent 90 emails on 2026-10-06, with all 6 assigned inboxes connected and healthy and 1 reply received, so it is not true that it has sent nothing.",
+    "causeType": "user_error",
+    "claims": [
+      "Says the campaign has sent 90 emails so far, on 2026-10-06.",
+      "Says the campaign is active and all 6 assigned inboxes are connected and healthy.",
+      "Does not say the campaign is broken or not sending.",
+      "Tells the customer how to see the campaign's sent counts in the product."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "how come my campaign has sent no emails so far",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M494VNKP0GRWGWTXPHBY5AT2",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_outreach_health"]
+  }
+}

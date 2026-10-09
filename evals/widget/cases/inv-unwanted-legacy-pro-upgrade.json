@@ -1,0 +1,391 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {
+              "credits": {
+                "breakdown": [
+                  {
+                    "expires_at": null,
+                    "id": "cus_ent_x12",
+                    "included_grant": 10000,
+                    "plan_id": "legacy_pro",
+                    "prepaid_grant": 0,
+                    "price": null,
+                    "remaining": 10000,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "source": "customer",
+                    "unlimited": false,
+                    "usage": 0
+                  }
+                ],
+                "feature": {
+                  "archived": false,
+                  "consumable": true,
+                  "display": {
+                    "plural": "credits",
+                    "singular": "credit"
+                  },
+                  "event_names": [],
+                  "id": "credits",
+                  "internal_id": "fe_x11",
+                  "name": "Credits",
+                  "type": "metered"
+                },
+                "feature_id": "credits",
+                "granted": 10000,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "overage_allowed": false,
+                "remaining": 10000,
+                "unlimited": false,
+                "usage": 0
+              },
+              "website_credit": {
+                "breakdown": [
+                  {
+                    "expires_at": null,
+                    "id": "cus_ent_x10",
+                    "included_grant": 500,
+                    "plan_id": "legacy_pro",
+                    "prepaid_grant": 0,
+                    "price": null,
+                    "remaining": 500,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "source": "customer",
+                    "unlimited": false,
+                    "usage": 0
+                  }
+                ],
+                "feature": {
+                  "archived": false,
+                  "consumable": true,
+                  "credit_schema": [
+                    {
+                      "credit_cost": 0,
+                      "metered_feature_id": ""
+                    }
+                  ],
+                  "display": {
+                    "plural": "website credits",
+                    "singular": "website credit"
+                  },
+                  "event_names": [],
+                  "id": "website_credit",
+                  "internal_id": "fe_x9",
+                  "name": "Website Credit",
+                  "type": "metered"
+                },
+                "feature_id": "website_credit",
+                "granted": 500,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "overage_allowed": false,
+                "remaining": 500,
+                "unlimited": false,
+                "usage": 0
+              }
+            },
+            "billing_controls": {},
+            "config": {},
+            "created_at": 1785788749967,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            },
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": "cus_x1",
+            "subscriptions": [
+              {
+                "add_on": false,
+                "auto_enable": false,
+                "canceled_at": null,
+                "current_period_end": 1794056911000,
+                "current_period_start": 1791378511000,
+                "expires_at": null,
+                "id": "cus_prod_x2",
+                "past_due": false,
+                "plan": {
+                  "active": true,
+                  "add_on": false,
+                  "archived": false,
+                  "auto_enable": false,
+                  "base_variant_id": null,
+                  "billing_controls": {},
+                  "config": {
+                    "anchor_to_month_start": false,
+                    "ignore_past_due": false
+                  },
+                  "created_at": 1774541342738,
+                  "description": null,
+                  "env": "live",
+                  "group": null,
+                  "id": "legacy_pro",
+                  "internal_id": "prod_x3",
+                  "items": [
+                    {
+                      "display": {
+                        "primary_text": "10,000 credits"
+                      },
+                      "entitlement_id": "ent_x6",
+                      "feature_id": "credits",
+                      "included": 10000,
+                      "pooled": false,
+                      "price": null,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "unlimited": false
+                    },
+                    {
+                      "display": {
+                        "primary_text": "500 website credits"
+                      },
+                      "entitlement_id": "ent_x7",
+                      "feature_id": "website_credit",
+                      "included": 500,
+                      "pooled": false,
+                      "price": null,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "unlimited": false
+                    }
+                  ],
+                  "metadata": {},
+                  "name": "Legacy Pro",
+                  "price": {
+                    "amount": 129,
+                    "display": {
+                      "primary_text": "$129",
+                      "secondary_text": "per month"
+                    },
+                    "interval": "month",
+                    "price_id": "pr_x4",
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x5"
+                      }
+                    }
+                  },
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x8"
+                    }
+                  },
+                  "version": 3,
+                  "version_slug": "v3"
+                },
+                "plan_id": "legacy_pro",
+                "quantity": 1,
+                "scope": "customer",
+                "started_at": 1791378543221,
+                "status": "active",
+                "trial_ends_at": null
+              }
+            ]
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [
+          {
+            "amountCents": 12800,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-07T13:09:09.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "ch_x13",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-10-07T13:08:33.000Z",
+            "currency": "usd",
+            "description": "Subscription creation",
+            "id": "ch_x14",
+            "refunded": false,
+            "status": "succeeded"
+          }
+        ],
+        "recentInvoices": [
+          {
+            "amountDueCents": 12800,
+            "amountPaidCents": 12800,
+            "amountRemainingCents": 0,
+            "billingReason": "manual",
+            "chargeId": null,
+            "createdAt": "2026-10-07T13:09:03.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x15",
+            "lines": [
+              {
+                "amountCents": -100,
+                "description": "Unused Legacy (from 07 Oct 2026 to 07 Nov 2026)",
+                "periodEnd": "2026-11-07T13:08:31.000Z",
+                "periodStart": "2026-10-07T13:09:03.000Z",
+                "proration": null,
+                "quantity": 1
+              },
+              {
+                "amountCents": 12900,
+                "description": "Legacy Pro (from 07 Oct 2026 to 07 Nov 2026)",
+                "periodEnd": "2026-11-07T13:08:31.000Z",
+                "periodStart": "2026-10-07T13:09:03.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-07T13:09:08.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 12800
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_create",
+            "chargeId": null,
+            "createdAt": "2026-10-07T13:08:31.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x16",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-11-07T13:08:31.000Z",
+                "periodStart": "2026-10-07T13:08:31.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-10-07T13:08:34.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          }
+        ],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": true,
+          "notes": [
+            "Stripe shows a succeeded charge, but the product database has no active subscription status. Check whether this organization was charged without being provisioned."
+          ]
+        },
+        "stripeSubscriptions": [
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x17",
+            "status": "active",
+            "trialEnd": null
+          }
+        ],
+        "truncated": [],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-07T13:11:23.802Z",
+      "resultAt": "2026-10-07T13:12:02.046Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "summary": "Customer enabled Acquisity at the $1/month Legacy plan but was billed $129/month (Legacy Pro). Billing records show: a $1.00 charge (ch_x14) for Legacy plan subscription creation on 2026-10-07, followed minutes later by a $128.00 \"Subscription update\" charge (ch_x13) same day, which corresponds to an invoice crediting back the unused $1 Legacy amount (-$100) and charging $129 for Legacy Pro for the period 2026-10-07 to 2026-11-07. The active Autumn/Stripe subscription is currently Legacy Pro at $129/month (sub_x17, status active). No refunds have been recorded against either charge. Customer states they only want the $1/month Acquisity charge and did not intend the upgrade to Legacy Pro. Requesting billing team review to refund the $128 upgrade charge and restore/confirm the customer on the $1/month Legacy plan.",
+        "title": "Refund request: unwanted upgrade from $1/mo to $129/mo Legacy Pro"
+      },
+      "output": {
+        "existing": false,
+        "identifier": "ENG-1",
+        "refund": true,
+        "url": "https://internal.example/1"
+      },
+      "requestedAt": "2026-10-07T13:12:08.355Z",
+      "resultAt": "2026-10-07T13:12:12.613Z",
+      "status": "completed",
+      "tool": "widget_file_ticket"
+    }
+  ],
+  "expectations": {
+    "cause": "On October 7 a $1 Legacy subscription was created and about half a minute later updated to Legacy Pro, charging $128 ($129 less the unused $1). Legacy Pro at $129/month is the active subscription and no refund is recorded; nothing recorded shows what triggered the upgrade.",
+    "causeType": "unclear",
+    "claims": [
+      "Says the account was moved from the $1 Legacy plan to Legacy Pro at $129/month with a $128 charge on October 7.",
+      "Says no refund has been recorded yet and the refund request has been passed on for review.",
+      "Does not promise a refund amount or timeline.",
+      "Does not say the customer chose the upgrade themselves."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "I just enabled acquisity for $1/month, but it looks likeit upgraded to $129/month, which I don't want, can you please check and refund if needed? I want only the $1/month acquisity charge. thanks",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4B7TTYQ0GJC0XB3WZNQ57KK",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_billing_summary", "widget_file_ticket"]
+  }
+}

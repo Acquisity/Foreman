@@ -1,0 +1,203 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000001",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-10-08",
+                "emailsSent": 89
+              },
+              {
+                "date": "2026-10-07",
+                "emailsSent": 147
+              },
+              {
+                "date": "2026-10-06",
+                "emailsSent": 147
+              }
+            ],
+            "savedDailyLimitPerInbox": null,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": true,
+                "sunday": true,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Chicago",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 5000,
+            "updatedAt": "2026-10-08T17:23:21.944+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-1.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 12,
+          "totalSendingAccounts": 12
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-08T17:23:27.438Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T17:23:22.274Z",
+      "resultAt": "2026-10-08T17:23:28.376Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "query": "daily lead limit campaign"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/domain-2.example",
+            "title": "Lead Magnet Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/lead-magnet-campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/concepts/domain-3.example",
+            "title": "Lead lifecycle",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/lead-lifecycle"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns.mdx",
+            "title": "Campaigns",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/domain-4.example",
+            "title": "Leads",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/campaigns/managing-campaigns/leads"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-5.example",
+            "title": "Can I set a per-inbox daily sending limit?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-08T17:23:31.372Z",
+      "resultAt": "2026-10-08T17:23:32.573Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "query": "sending limits per inbox"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/concepts/domain-6.example",
+            "title": "Personalization",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/concepts/personalization"
+          },
+          {
+            "path": "apps/web/content/docs/ai-website-builder/faq/domain-7.example",
+            "title": "Are there generation limits?",
+            "url": "https://app.acquisity.ai/docs/ai-website-builder/faq/are-there-generation-limits"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-5.example",
+            "title": "Can I set a per-inbox daily sending limit?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/domain-8.example",
+            "title": "Inbox",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/inbox"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/domain-9.example",
+            "title": "Inbox & Replies",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/inbox-replies"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-08T17:23:31.374Z",
+      "resultAt": "2026-10-08T17:23:32.972Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit"
+      },
+      "output": {
+        "content": "There's no user-facing control for daily sending limits. The platform sets the per-inbox daily cap for you based on the inbox's state and how many campaigns it's sending for. You can see the current cap in the Email Accounts table — it's the second number in the **Emails Sent** column (e.g. `12 of 35`).\n\nThe maximum cap is **35 campaign emails per inbox per day**. DFY inboxes ramp gradually after warmup until they reach that full capacity. The platform can throttle below 35 when needed, but it never raises an inbox above 35.\n\n## Where to see the current limit\n\n1. **Cold Email Agent** → **Email Accounts**.\n2. Scan the **Emails Sent** column. Every row reads `X of Y` where `Y` is today's limit for that inbox.\n3. Adjacent columns give you the signal about why the limit is what it is:\n   - **Warmup emails** — recent warmup activity count\n   - **Health score** — deliverability percentage (aim for 80%+)\n\n## Why it's automatic\n\nDaily limits move in lockstep with three things the platform watches:\n\n| Signal | Effect on daily limit |\n|---|---|\n| **Warmup duration** | DFY inboxes start lower and ramp up toward 35 after initial warmup |\n| **Health score** | A drop in health reduces the daily cap until it recovers |\n| **Active campaigns sharing the inbox** | The platform splits the cap across campaigns so one campaign can't starve another |\n\nAn Inngest job (`process-daily-email-sent`) recalculates this when campaigns change, inboxes are added/removed, or settings update. The recalculation runs behind the scenes — there's nothing for you to click.\n\n## If the cap feels too low\n\n- **Give it time.** A newly-provisioned DFY inbox ramps gradually after warmup before it reaches the full 35/day capacity.\n- **Improve the health score.** If the inbox is landing in spam on warmup, the cap won't rise. Check the warmup folder in Gmail/Outlook and mark any warmup mail as \"Not spam.\"\n- **Add more inboxes.** Since limits are per-inbox, additional inboxes linearly raise your total daily send capacity. Buy them in **Cold Email Agent → Email Accounts → Add New Inboxes**.\n\n<Callout title=\"Don't try to push beyond the cap\" type=\"warning\">\nTrying to work around the cap damages deliverability. High volume from a cold inbox is the single fastest way to get flagged by Gmail.\n</Callout>\n\n## Related\n\n- [Where is the bounce protection toggle for a paused campaign?](/docs/cold-email-agent/faq/campaigns/where-is-the-bounce-protection-toggle-for-a-paused-campaign)\n- [Email Accounts](/docs/cold-email-agent/email-accounts)\n- [Deliverability concepts](/docs/cold-email-agent/concepts/deliverability)",
+        "title": "Can I set a per-inbox daily sending limit?",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit"
+      },
+      "requestedAt": "2026-10-08T17:23:35.040Z",
+      "resultAt": "2026-10-08T17:23:35.108Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "There is no user setting for a daily limit: the platform sets each inbox's cap automatically, up to 35 campaign emails per inbox per day, based on warmup, health score and how many campaigns share the inbox. The one active campaign has 12 healthy inboxes and sent 89-147 emails a day.",
+    "causeType": "platform_limitation",
+    "claims": [
+      "Says there is no setting to raise a campaign's daily limit; the platform sets it per inbox automatically, up to 35 a day.",
+      "Tells the customer that adding inboxes (Cold Email Agent, Email Accounts, Add New Inboxes) is how to raise total daily volume.",
+      "Does not tell the customer to change a daily limit setting."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nhow do I increase a campaigns daily lead limit\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: how do I increase a campaigns daily lead limit\nSupport: I have not looked into your workspace yet. If you tap the magnifying glass next to the message box and send your message again, I will dig into it.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4E8MWCQ0GR3QMC8EWT374SK",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_outreach_health",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

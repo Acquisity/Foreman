@@ -1,0 +1,264 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "orderId": null
+      },
+      "output": {
+        "caveats": [
+          "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost. paidAt is the order's own saved paid date, not a link to an invoice or charge: say the order records a paid date, call an order paid only when a billing record ties a payment to that order, and otherwise say payment for it could not be confirmed.",
+          "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
+          "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
+          "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
+          "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+          "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders."
+        ],
+        "observedAt": "2026-10-03T01:05:55.446Z",
+        "orders": [],
+        "source": "Acquisity product database; saved order state, not a live provisioning or billing check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-03T01:05:53.494Z",
+      "resultAt": "2026-10-03T01:05:55.963Z",
+      "status": "completed",
+      "tool": "widget_provisioning_status"
+    },
+    {
+      "input": {
+        "area": "provisioning",
+        "since": "7d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["provisioning"],
+        "failures": [],
+        "observedAt": "2026-10-03T01:06:00.129Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-03T01:05:57.803Z",
+      "resultAt": "2026-10-03T01:06:00.130Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {},
+            "billing_controls": {
+              "balance_allocations": []
+            },
+            "config": {},
+            "created_at": 1764083720735,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            },
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": "cus_x1",
+            "subscriptions": []
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-03T01:06:02.036Z",
+      "resultAt": "2026-10-03T01:06:15.220Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": false,
+          "reason": "No Instantly connection is configured for this organization."
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": null,
+        "observedAt": "2026-10-03T01:06:18.590Z",
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": null,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-03T01:06:16.610Z",
+      "resultAt": "2026-10-03T01:06:19.374Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {
+        "query": "inboxes stopped provisioning"
+      },
+      "output": {
+        "issues": [
+          {
+            "identifier": "ENG-1",
+            "status": "To Code Review",
+            "title": "Bulk cancel unlinked CMR domains from provisioning gaps"
+          },
+          {
+            "identifier": "ENG-2",
+            "status": "Todo",
+            "title": "Paid DFY order for 3 domains and 9 inboxes stuck in \"provisioning\" for 13 days: the provisioning run stopped mid-poll and the state has no recovery path"
+          },
+          {
+            "identifier": "ENG-3",
+            "status": "Todo",
+            "title": "Master: billing stays in step with what customers pay, with no surprises"
+          },
+          {
+            "identifier": "ENG-4",
+            "status": "Canceled",
+            "title": "Provisioning order stuck at 2/6 domains, 6/18 inboxes despite full charge"
+          },
+          {
+            "identifier": "ENG-5",
+            "status": "Canceled",
+            "title": "Paid 6-domain DFY order stalled at 0/6, no recorded errors"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-03T01:06:21.194Z",
+      "resultAt": "2026-10-03T01:06:23.132Z",
+      "status": "completed",
+      "tool": "widget_known_issues"
+    },
+    {
+      "input": {
+        "query": "inbox provisioning stuck"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/ai-sdr/domain-1.example",
+            "title": "Inbox",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/inbox"
+          },
+          {
+            "path": "apps/web/content/docs/ai-sdr/faq/domain-2.example",
+            "title": "Inbox & Replies",
+            "url": "https://app.acquisity.ai/docs/ai-sdr/faq/inbox-replies"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-3.example",
+            "title": "Domain provisioning",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/domain-provisioning"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-4.example",
+            "title": "Inbox warmup",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/warmup"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/email-accounts/domain-5.example",
+            "title": "Buying inboxes",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/email-accounts/buying-inboxes"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-03T01:06:25.923Z",
+      "resultAt": "2026-10-03T01:06:26.616Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace has no provisioning orders, no recorded provisioning failures in the last 7 days, no subscription or inbox charges, and no Instantly connection. Nothing recorded shows inboxes ever being ordered or provisioned in this workspace, so the reads do not explain what stopped.",
+    "causeType": "unclear",
+    "claims": [
+      "Says no inbox or domain orders were found in this workspace.",
+      "Says no provisioning failures are recorded.",
+      "Does not claim an order is stuck, failed or will finish, since no order exists here.",
+      "Asks which order or purchase the customer means, or whether it was made in a different workspace."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "my inboxes stopped provisioning",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M3ZMQGHB0GXV1NQEKP0BS9J7",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_provisioning_status",
+      "widget_job_failures",
+      "widget_billing_summary",
+      "widget_inbox_health",
+      "widget_known_issues",
+      "widget_help_article"
+    ]
+  }
+}

@@ -63,7 +63,7 @@ export async function searchKnownIssues(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

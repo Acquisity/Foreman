@@ -1,0 +1,217 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {},
+            "billing_controls": {},
+            "config": {},
+            "created_at": 1790885246406,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": null,
+            "subscriptions": []
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": ["stripe: Autumn record has no stripe_id."]
+      },
+      "requestedAt": "2026-10-08T18:03:23.654Z",
+      "resultAt": "2026-10-08T18:04:22.956Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banReason": null,
+          "banned": false,
+          "emailVerified": true,
+          "lastLoginAt": "2026-09-30T21:26:50.773+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-10-01T20:07:23.982+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2026-10-01T20:07:23.775+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-08T18:04:26.252Z",
+        "onboarding": null,
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "completed",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-08T18:04:24.406Z",
+      "resultAt": "2026-10-08T18:04:26.927Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "query": "Billing menu not visible workspace owner"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/domain-1.example",
+            "title": "Workspace Management",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/workspace-management"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/settings/domain-2.example",
+            "title": "Billing",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/settings/billing"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/domain-3.example",
+            "title": "Billing & Subscriptions",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/domain-2.example",
+            "title": "Billing & Credits",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/billing"
+          },
+          {
+            "path": "apps/web/content/docs/domain-4.example",
+            "title": "Switch Between Workspaces",
+            "url": "https://app.acquisity.ai/docs/workspace-switcher"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-08T18:04:30.591Z",
+      "resultAt": "2026-10-08T18:04:31.588Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/workspace-settings/billing"
+      },
+      "output": {
+        "content": "The billing page shows your current plan, credit balances, and email account information. Only **Owners** can see this page.\n\n## How to Get Here\n\n1. Click your workspace name in the top-left corner.\n2. Click **Settings** in the menu that opens.\n3. Click **Billing** under \"Workspace\" in the left menu.\n\n<Callout title=\"Who can see this?\" type=\"warning\">\nOnly workspace **Owners** can see and access the Billing page. Owners can open it on any plan, even before the workspace has a subscription. Admins, Members, and Clients will not see it in the left menu.\n</Callout>\n\n<Callout title=\"Important\" type=\"warning\">\nAll features need a paid subscription. There is no free tier. Lead credits are used when AI Lead Search delivers verified leads. Uploading existing leads or sending campaign emails does not spend lead credits.\n</Callout>\n\n<Callout title=\"Bought a course or program?\">\nA paid course or education program is a separate purchase from the platform subscription and credits. New workspaces start with no subscription and 0 credits. See [What does my course or program purchase include?](/docs/workspace-settings/faq/billing-subscriptions/what-does-my-course-or-program-purchase-include-and-why-do-i-see-0-credits)\n</Callout>\n\n## Your Current Plan\n\n### What You See\n\nThe top of the billing page shows:\n\n| Information | What It Means |\n| --- | --- |\n| **Plan Name** | The subscription you are on right now |\n| **Next Billing Date** | When your next billing cycle starts |\n\nClick **Manage Billing** to see your monthly price and full billing breakdown.\n\n## Understanding Lead Credits\n\nLead credits are used when AI Lead Search delivers verified leads for campaigns. Each verified lead delivered uses 1 lead credit.\n\n### Check Your Credit Balance\n\n1. Click **Billing** in the left menu.\n2. Look at **Credit Balances**.\n3. Review the balances shown, such as **Lead credits** or **Website credits** if they are included in your workspace.\n\n### Do credits renew?\n\nPlan-included credits and one-time topups never reset and never expire. Whatever you haven't spent carries forward. Recurring credit packs work differently: they refill back up to their full pack amount each month, and unused recurring-pack credits don't stack above that amount.\n\n- **Next Billing Date** is when your subscription renews. It doesn't change your credit balance.\n- **Credit packs** bought through **Buy More** come as **One-Time Topups** (stay until used) or **Recurring Credits** (refill back up to their full amount each billing cycle, capped at the pack amount). In workspaces billed through a partner, the available pack types depend on how your partner has set up billing.\n- **Running low?** Buy more rather than waiting for a reset that won't come.\n\n### Things to Know\n\n- Your plan, purchase, or credit pack determines which credits are included.\n- **Lead credits** are for verified leads delivered by AI Lead Search.\n- Uploading leads from a CSV or sending emails does not use lead credits.\n- Other balances, such as **Website credits**, may appear if your plan includes them.\n- When you run out of lead credits, you cannot import more AI-found leads until you top up or your plan provides more.\n\n## Manage Your Subscription\n\n### See Billing Details\n\n1. Click **Billing** in the left menu.\n2. Click **Manage Billing** to see:\n   - Your subscription charges\n   - Domain and inbox charges (billed separately)\n   - Payment history\n\n<Callout title=\"Note\">\nInbox charges and subscription charges show up separately. Click **Manage Billing** to see everything.\n</Callout>\n\n### Understanding your billing history statuses\n\n**Manage Billing** opens your billing portal outside Acquisity. There you can see every invoice on your account along with its status, which tells you whether money was actually collected:\n\n| Status | What It Means |\n| --- | --- |\n| **Paid** | The payment went through and you were charged this amount. |\n| **Open** | The invoice hasn't been paid. No money has been collected for it. |\n| **Void** | The invoice was canceled. You were not charged. |\n| **Uncollectible** | The invoice was written off after payment could not be collected. You were not charged. |\n\n<Callout title=\"Open does not mean charged\" type=\"warning\">\nAn invoice marked **Open** is an unpaid invoice, not money you paid. If a subscription renewal payment fails, that unpaid invoice stays visible as **Open** in your billing history, even after you subscribe again later.\n\nThis can look like two charges for the same plan on different dates, but only the invoice marked **Paid** was actually collected.\n</Callout>\n\nIn workspaces billed through a partner, use **Manage Subscription** instead. Your partner's billing system shows your invoices.\n\n### Cancel Your Subscription\n\n1. Click **Billing** in the left menu.\n2. Click **Cancel Subscription**.\n3. Confirm the cancellation.\n4. You keep access until the end of your current billing period.\n\n## Buy More Credits\n\nIf you run out of credits:\n\n1. Click **Billing** in the left menu.\n2. Find the credits section.\n3. Click **Buy More** next to the credit balance.\n4. Pick a credit pack.\n5. Finish the checkout.\n6. Credits are added to your account right away.\n\n<Callout title=\"Tip\">\nReview the checkout screen before confirming a credit purchase. It shows whether the purchase is one-time or recurring and what you will be charged.\n</Callout>\n\n## Pre-Warmed Domains and Inboxes\n\nYou can buy ready-to-use email accounts for cold email campaigns.\n\n### What You Get\n\n| Item | Price | Details |\n| --- | --- | --- |\n| **Pre-warmed domain** | Shown at checkout / billing | Comes with 3 inboxes |\n| **Pre-warmed inbox** | Shown at checkout / billing | Billed monthly |\n\n<Callout title=\"Note\">\nEach domain comes with exactly **3 inboxes**. You cannot change this number. Buy more domains if you need more inboxes.\n</Callout>\n\n### Why This Helps\n\n- **Already warmed:** The domains and inboxes have a good sending reputation.\n- **Ready to send:** No warmup period needed. Start campaigns right away.\n- **Managed for you:** Deliverability is monitored.\n\n### How to Buy\n\n1. Go to **Cold Email Agent** in the left menu of the main dashboard.\n2. Click **Email Accounts**.\n\n3. Click **Add New Inboxes** (top right of the Email Accounts table).\n4. Pick **Pre-Warmed Inboxes** and **Continue**.\n5. Select the domains you want — each comes with 3 inboxes bundled.\n6. Finish checkout.\n7. Accounts are ready within 30 to 60 minutes.\n\nReview the checkout screen carefully before purchasing. It shows the current yearly domain cost and monthly inbox cost before you confirm.\n\n<Callout title=\"Important\" type=\"warning\">\nBuy domains and inboxes through **Cold Email Agent**, not through the Billing page.\n</Callout>\n\n## Email Accounts & Domains\n\nThe billing page includes an **Email Accounts & Domains** card:\n\n1. Click **Billing** in the left menu.\n2. Find **Email Accounts & Domains**.\n3. Review total domains, total inboxes, and current yearly/monthly charges.\n4. Use **Buy More** to open the Email Accounts page if you need more inboxes.\n5. Use **Cancel** next to a domain, or **Cancel all**, only if you want to stop billing for those managed domains/inboxes at the end of the current period.\n6. Use **Manage Billing** for full subscription and payment details.\n\n## Troubleshooting\n\n<Accordions type=\"single\">\n  <Accordion title=\"My payment failed\">\n    **Common reasons:**\n    - Not enough money on the card\n    - Card expired\n    - Bank blocked the charge\n\n    **What to do:**\n    1. Check that your card has enough funds.\n    2. Make sure the card has not expired.\n    3. Call your bank to allow the charge.\n    4. Update your payment method with a different card.\n    5. The system will try again automatically.\n\n    **What happens if every retry fails (subscription renewals):**\n    - Your subscription is canceled and you lose access to paid features.\n    - Check **Current Plan** on the Billing page first. It shows a **Past Due**, **Canceled**, or **Expired** badge, or \"No active subscription found.\"\n    - The unpaid invoice stays in your billing history with an **Open** status. No money has been collected for it.\n    - **Manage Billing** only appears while a subscription is active. If yours has ended, subscribe again first, or contact support with the invoice date and amount.\n    - To keep using the platform, click **Billing** in the left menu and click **Enable Acquisity**. That starts a new subscription and creates a new, separate invoice.\n    - A failed one-time purchase, such as a credit pack, does not affect your subscription. Buy the credit pack again from **Buy More** once your payment method works.\n\n    See [Understanding your billing history statuses](/docs/workspace-settings/billing#understanding-your-billing-history-statuses) for what each invoice status means.\n  </Accordion>\n  <Accordion title=\"I was charged twice\">\n    **Common reasons:**\n    - One of the \"charges\" is an unpaid invoice, not a real charge. If a charge is marked **Open**, no money was collected for it. See [Understanding your billing history statuses](/docs/workspace-settings/billing#understanding-your-billing-history-statuses).\n    - A renewal payment failed and you subscribed again later. The failed renewal stays visible as a separate **Open** invoice on an earlier date, next to the **Paid** invoice for your new subscription. Only one payment was collected.\n    - You upgraded or downgraded mid-cycle (the extra charge is a prorated adjustment)\n    - You bought a credit pack and your subscription renewed on the same day\n\n    **What to do:**\n    1. Check the charges in **Manage Billing** to see what each one is for.\n    2. Check the status of each charge. If one is marked **Open**, no money was collected for it and you aren't paying for two subscriptions.\n    3. Prorated charges for plan changes are normal.\n    4. If two charges are both marked **Paid** and you can't tell what the second one is for, contact support with the transaction dates and amounts.\n  </Accordion>\n  <Accordion title=\"My credits did not reset on my billing date\">\n    **Why this happens:** Credits aren't meant to reset. Your balance carries forward until you spend it, and a subscription renewal doesn't change it.\n\n    **What to do:**\n    1. Open **Settings → Billing → Credit Balances** to see what you have left.\n    2. Click **Buy More** if you need additional credits.\n    3. If you bought a recurring credit pack and it hasn't refilled this month, contact support with your workspace name.\n  </Accordion>\n  <Accordion title=\"I cannot find the billing page\">\n    **Why this happens:** Only **Owners** can see the Billing page.\n\n    **What to do:**\n    1. Check your role on the **Members** page.\n    2. If you need billing access, ask the workspace Owner to make you an Owner.\n    3. If you are an Owner and still cannot see it, try refreshing the page or logging out and back in.\n  </Accordion>\n</Accordions>",
+        "title": "Billing & Credits",
+        "url": "https://app.acquisity.ai/docs/workspace-settings/billing"
+      },
+      "requestedAt": "2026-10-08T18:04:33.654Z",
+      "resultAt": "2026-10-08T18:04:33.783Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The customer is the workspace owner, so Billing is available to them, and the workspace has no subscription and 0 credits. Billing sits under Settings, and every feature, including connecting an email provider, needs a paid subscription.",
+    "causeType": "user_error",
+    "claims": [
+      "Says the customer is the owner of this workspace.",
+      "Says the workspace has no active subscription, which is why the upgrade notice appears.",
+      "Tells the customer to click the workspace name in the top-left corner, click Settings, then click Billing under Workspace.",
+      "Does not claim the Billing page is hidden by a bug."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI am already in the only workspace but not link for billing\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: Where do I set up my cold email details\nSupport: You can find the Cold Email Agent in the left menu under the Outreach group by clicking Cold Email Agent [1]. From the main page, click Email Accounts at the top to customize your sender name and update your sender domain [2].\nCustomer: I clicked on connect to provider but I received th same screen I started on. There is an upgrade notice on the bottom. What am I to do\nSupport: 1. In the left sidebar, click Billing under the Workspace section, which is only visible to workspace Owners.\n2. Click Manage Billing to see your current plan details.\n3. Look for an upgrade or migration option to move to the current Pro plan.\nCustomer: There is no Billing and no workspace to click\nSupport: 1. Click the workspace name in the top-left corner.\n2. Look at the list of workspaces you belong to.\n3. Click the correct one.\nCustomer: I am in the correct workspace already\nSupport: I have not looked into your workspace yet. If you tap the magnifying glass next to the message box and send your message again, I will dig into it.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4EAY7S00GY2JV1ZTKD1X1XY",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_billing_summary",
+      "widget_account_access",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

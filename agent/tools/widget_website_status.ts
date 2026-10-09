@@ -444,7 +444,7 @@ export async function readWidgetWebsiteStatus(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   description:
     "Read the verified workspace's Website and Funnel Builder projects to explain publish or build failures. Returns up to 30 recent projects with current build status, whether each has EVER successfully published (a connected custom domain plus never-published is the usual cause of a 404), the last build failure reason, connected custom domains with their saved verification/DNS state, the last deployment id and state, and purchased domains not connected to any website (listed apart: bought is not connected). The three most recent projects also carry a read-only live hosting check (latest deployment state and error, whether each saved domain is attached, verified and correctly pointed); everything else is saved product state. Never present saved state as live, and when live is not_checked, inaccessible or unavailable say so. Unavailable is not empty. To investigate a particular returned website, pass its id as inspectWebsiteId. This checks that website instead of the three recent projects, and adds independent public DNS answers and an HTTPS root-page status for its first hosting-assigned custom domain. Recommended DNS records come from live domain configuration. Selected websites also request an independent, credential-free browser DOM read through Acquisity; render contains current title/body text or an explicit unavailable/not-linked result. Its cross-origin restrictions can affect the result. HTTP status does not verify browser rendering. No arbitrary URL, SQL or workspace override is accepted.",
   execute: (input, ctx) =>

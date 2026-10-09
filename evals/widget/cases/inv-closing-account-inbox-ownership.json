@@ -1,0 +1,1379 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "accounts": {
+          "available": false,
+          "reason": "This organization's Instantly workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections."
+        },
+        "caveats": [
+          "Connection and webhook facts are saved product state, not a live provider check.",
+          "A saved connection error does not establish a current failure by itself.",
+          "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+          "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
+          "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+          "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization."
+        ],
+        "connection": {
+          "accountType": "user_owned",
+          "hasConnectionError": true,
+          "isActive": true,
+          "updatedAt": "2026-10-07T12:13:11.303Z"
+        },
+        "observedAt": "2026-10-07T12:14:09.428Z",
+        "reconnectAttempts": [],
+        "source": "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "status": "ok",
+        "webhook": {
+          "lastEventAt": "2026-05-13T23:11:02.160Z",
+          "recentErrorCount": 0,
+          "recentEventCount": 0,
+          "registeredCount": 1
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:14:07.529Z",
+      "resultAt": "2026-10-07T12:14:11.004Z",
+      "status": "completed",
+      "tool": "widget_inbox_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {
+              "credits": {
+                "breakdown": [
+                  {
+                    "expires_at": null,
+                    "id": "cus_ent_x10",
+                    "included_grant": 1,
+                    "plan_id": "legacy",
+                    "prepaid_grant": 0,
+                    "price": null,
+                    "remaining": 1,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "source": "customer",
+                    "unlimited": false,
+                    "usage": 0
+                  }
+                ],
+                "feature": {
+                  "archived": false,
+                  "consumable": true,
+                  "display": {
+                    "plural": "credits",
+                    "singular": "credit"
+                  },
+                  "event_names": [],
+                  "id": "credits",
+                  "internal_id": "fe_x9",
+                  "name": "Credits",
+                  "type": "metered"
+                },
+                "feature_id": "credits",
+                "granted": 1,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "overage_allowed": false,
+                "remaining": 1,
+                "unlimited": false,
+                "usage": 0
+              },
+              "website_credit": {
+                "breakdown": [
+                  {
+                    "expires_at": null,
+                    "id": "cus_ent_x12",
+                    "included_grant": 500,
+                    "plan_id": "legacy",
+                    "prepaid_grant": 0,
+                    "price": null,
+                    "remaining": 500,
+                    "reset": {
+                      "interval": "one_off",
+                      "resets_at": null
+                    },
+                    "source": "customer",
+                    "unlimited": false,
+                    "usage": 0
+                  }
+                ],
+                "feature": {
+                  "archived": false,
+                  "consumable": true,
+                  "credit_schema": [
+                    {
+                      "credit_cost": 0,
+                      "metered_feature_id": ""
+                    }
+                  ],
+                  "display": {
+                    "plural": "website credits",
+                    "singular": "website credit"
+                  },
+                  "event_names": [],
+                  "id": "website_credit",
+                  "internal_id": "fe_x11",
+                  "name": "Website Credit",
+                  "type": "metered"
+                },
+                "feature_id": "website_credit",
+                "granted": 500,
+                "max_purchase": null,
+                "next_reset_at": null,
+                "overage_allowed": false,
+                "remaining": 500,
+                "unlimited": false,
+                "usage": 0
+              }
+            },
+            "billing_controls": {},
+            "config": {},
+            "created_at": 1764763117217,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            },
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": "cus_x1",
+            "subscriptions": [
+              {
+                "add_on": false,
+                "auto_enable": false,
+                "canceled_at": null,
+                "current_period_end": 1791469985000,
+                "current_period_start": 1788877985000,
+                "expires_at": null,
+                "id": "cus_prod_x2",
+                "past_due": false,
+                "plan": {
+                  "active": true,
+                  "add_on": false,
+                  "archived": false,
+                  "auto_enable": false,
+                  "base_variant_id": null,
+                  "billing_controls": {},
+                  "config": {
+                    "anchor_to_month_start": false,
+                    "ignore_past_due": false
+                  },
+                  "created_at": 1774478699745,
+                  "description": null,
+                  "env": "live",
+                  "group": null,
+                  "id": "legacy",
+                  "internal_id": "prod_x3",
+                  "items": [
+                    {
+                      "display": {
+                        "primary_text": "1 credit"
+                      },
+                      "entitlement_id": "ent_x6",
+                      "feature_id": "credits",
+                      "included": 1,
+                      "pooled": false,
+                      "price": null,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "unlimited": false
+                    },
+                    {
+                      "display": {
+                        "primary_text": "500 website credits"
+                      },
+                      "entitlement_id": "ent_x7",
+                      "feature_id": "website_credit",
+                      "included": 500,
+                      "pooled": false,
+                      "price": null,
+                      "reset": {
+                        "interval": "one_off"
+                      },
+                      "unlimited": false
+                    }
+                  ],
+                  "metadata": {},
+                  "name": "Legacy",
+                  "price": {
+                    "amount": 1,
+                    "display": {
+                      "primary_text": "$1",
+                      "secondary_text": "per month"
+                    },
+                    "interval": "month",
+                    "price_id": "pr_x4",
+                    "processors": {
+                      "stripe": {
+                        "price_id": "price_x5"
+                      }
+                    }
+                  },
+                  "processors": {
+                    "stripe": {
+                      "product_id": "prod_x8"
+                    }
+                  },
+                  "version": 3,
+                  "version_slug": "v3"
+                },
+                "plan_id": "legacy",
+                "quantity": 1,
+                "scope": "customer",
+                "started_at": 1765204393463,
+                "status": "active",
+                "trial_ends_at": null
+              }
+            ]
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-09-08T15:34:18.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x13",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-08-08T15:34:22.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x14",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-07-08T15:33:46.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x15",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-06-08T15:36:18.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x16",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-05-08T15:33:36.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x17",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-04-08T15:34:42.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x18",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-03-08T15:34:33.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x19",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-02-08T15:36:54.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x20",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2026-01-10T12:27:03.000Z",
+            "currency": "usd",
+            "description": "Subscription update",
+            "id": "py_x21",
+            "refunded": false,
+            "status": "succeeded"
+          },
+          {
+            "amountCents": 100,
+            "amountRefundedCents": 0,
+            "createdAt": "2025-12-08T14:33:08.000Z",
+            "currency": "usd",
+            "description": "Subscription creation",
+            "id": "py_x22",
+            "refunded": false,
+            "status": "succeeded"
+          }
+        ],
+        "recentInvoices": [
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-09-08T14:33:51.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x23",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-10-08T14:33:05.000Z",
+                "periodStart": "2026-09-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-09-08T15:34:13.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-08-08T14:33:13.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x24",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-09-08T14:33:05.000Z",
+                "periodStart": "2026-08-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-08-08T15:34:17.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-07-08T14:33:31.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x25",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-08-08T14:33:05.000Z",
+                "periodStart": "2026-07-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-07-08T15:33:40.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-06-08T14:35:21.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x26",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-07-08T14:33:05.000Z",
+                "periodStart": "2026-06-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-06-08T15:36:12.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-05-08T14:33:13.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x27",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-06-08T14:33:05.000Z",
+                "periodStart": "2026-05-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-05-08T15:33:30.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-04-08T14:33:41.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x28",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-05-08T14:33:05.000Z",
+                "periodStart": "2026-04-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-04-08T15:34:36.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-03-08T14:33:25.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x29",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-04-08T14:33:05.000Z",
+                "periodStart": "2026-03-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-03-08T15:34:28.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-02-08T14:34:15.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x30",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-03-08T14:33:05.000Z",
+                "periodStart": "2026-02-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-02-08T15:36:49.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_cycle",
+            "chargeId": null,
+            "createdAt": "2026-01-08T14:34:07.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x31",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-02-08T14:33:05.000Z",
+                "periodStart": "2026-01-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2026-01-10T12:26:59.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          },
+          {
+            "amountDueCents": 100,
+            "amountPaidCents": 100,
+            "amountRemainingCents": 0,
+            "billingReason": "subscription_create",
+            "chargeId": null,
+            "createdAt": "2025-12-08T14:33:05.000Z",
+            "currency": "usd",
+            "customerBalanceAppliedCents": 0,
+            "discountCents": 0,
+            "id": "in_x32",
+            "lines": [
+              {
+                "amountCents": 100,
+                "description": "1 × Legacy (at $1.00 / month)",
+                "periodEnd": "2026-01-08T14:33:05.000Z",
+                "periodStart": "2025-12-08T14:33:05.000Z",
+                "proration": null,
+                "quantity": 1
+              }
+            ],
+            "linesTruncated": false,
+            "paidAt": "2025-12-08T14:33:08.000Z",
+            "settlement": "money_collected",
+            "status": "paid",
+            "totalCents": 100
+          }
+        ],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": true,
+          "notes": [
+            "Stripe shows a succeeded charge, but the product database has no active subscription status. Check whether this organization was charged without being provisioned."
+          ]
+        },
+        "stripeSubscriptions": [
+          {
+            "cancelAtPeriodEnd": false,
+            "currentPeriodEnd": null,
+            "id": "sub_x33",
+            "status": "active",
+            "trialEnd": null
+          }
+        ],
+        "truncated": [],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-07T12:14:12.536Z",
+      "resultAt": "2026-10-07T12:14:29.784Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    },
+    {
+      "input": {
+        "orderId": null
+      },
+      "output": {
+        "caveats": [
+          "Saved order state is not a live provisioning or billing check; a stalled or failed status here is a lead to verify, not proof a charge was lost. paidAt is the order's own saved paid date, not a link to an invoice or charge: say the order records a paid date, call an order paid only when a billing record ties a payment to that order, and otherwise say payment for it could not be confirmed.",
+          "billingAccountId is the Autumn customer link and providerOrderId the mail-provider order; check the charge and entitlement with widget_billing_summary, which covers bounded recent billing history, before saying anything about a refund.",
+          "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
+          "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
+          "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+          "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders."
+        ],
+        "observedAt": "2026-10-07T12:14:34.229Z",
+        "orders": [],
+        "source": "Acquisity product database; saved order state, not a live provisioning or billing check",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:14:31.518Z",
+      "resultAt": "2026-10-07T12:14:37.857Z",
+      "status": "completed",
+      "tool": "widget_provisioning_status"
+    },
+    {
+      "input": {
+        "campaignId": null
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000002",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-01-12",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-01-07",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-01-06",
+                "emailsSent": 1
+              },
+              {
+                "date": "2026-01-05",
+                "emailsSent": 6
+              },
+              {
+                "date": "2026-01-02",
+                "emailsSent": 6
+              },
+              {
+                "date": "2026-01-01",
+                "emailsSent": 1902
+              },
+              {
+                "date": "2025-12-30",
+                "emailsSent": 1
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 0,
+            "updatedAt": "2026-09-22T03:43:40.404+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-01-16",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-24",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-22",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-20",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-19",
+                "emailsSent": 5180
+              },
+              {
+                "date": "2025-12-18",
+                "emailsSent": 2590
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 0,
+            "updatedAt": "2026-09-22T06:51:57.696+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000004",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 3",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-02-26",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-01-13",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-18",
+                "emailsSent": 112
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "completed",
+            "totalLeads": 0,
+            "updatedAt": "2026-02-26T17:59:12.607+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000005",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 1",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "draft",
+            "totalLeads": 0,
+            "updatedAt": "2026-02-05T15:52:16.628+00:00"
+          },
+          {
+            "diagnostics": null,
+            "id": "00000000-0000-4000-8000-000000000006",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "Select this campaignId to check the provider."
+            },
+            "name": "Name 4",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-03-13",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-12",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-11",
+                "emailsSent": 5363
+              },
+              {
+                "date": "2026-03-10",
+                "emailsSent": 2973
+              },
+              {
+                "date": "2026-03-06",
+                "emailsSent": 0
+              },
+              {
+                "date": "2026-03-05",
+                "emailsSent": 510
+              },
+              {
+                "date": "2026-03-04",
+                "emailsSent": 2623
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "08:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "active",
+            "totalLeads": 0,
+            "updatedAt": "2026-09-22T04:41:23.975+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-1.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 0
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T12:15:15.055Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:14:39.695Z",
+      "resultAt": "2026-10-07T12:15:28.495Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000003"
+      },
+      "output": {
+        "campaigns": [
+          {
+            "diagnostics": {
+              "assignedInboxes": {
+                "accounts": [],
+                "configuredCount": 148,
+                "healthyCount": 0,
+                "matchedCount": 0,
+                "nextAfterInboxId": null
+              },
+              "dailyMetrics": [],
+              "endDate": "2026-10-07",
+              "overview": {
+                "bounces": 565,
+                "emailsSent": 10360,
+                "meetingsBooked": 0,
+                "opens": 0,
+                "replies": 20,
+                "snapshotAt": "2026-02-05T15:52:02.915+00:00",
+                "unsubscribes": 0
+              },
+              "sequenceStepDelays": [1],
+              "startDate": "2026-10-01",
+              "stepSends": [
+                {
+                  "sent": 10360,
+                  "snapshotAt": "2026-02-05T15:52:02.911+00:00",
+                  "step": 0
+                }
+              ]
+            },
+            "id": "00000000-0000-4000-8000-000000000003",
+            "leadsNotPushedCount": 0,
+            "live": {
+              "available": false,
+              "reason": "No ownership-verified Acquisity-provisioned Instantly connection for this campaign."
+            },
+            "name": "Name 2",
+            "notSendingReason": null,
+            "notSendingReasonCode": null,
+            "recentSends": [
+              {
+                "date": "2026-01-16",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-24",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-22",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-21",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-20",
+                "emailsSent": 0
+              },
+              {
+                "date": "2025-12-19",
+                "emailsSent": 5180
+              },
+              {
+                "date": "2025-12-18",
+                "emailsSent": 2590
+              }
+            ],
+            "savedDailyLimitPerInbox": 35,
+            "schedule": {
+              "days": {
+                "friday": true,
+                "monday": true,
+                "saturday": false,
+                "sunday": false,
+                "thursday": true,
+                "tuesday": true,
+                "wednesday": true
+              },
+              "fromTime": "09:00",
+              "invertedWindow": false,
+              "timezone": "America/Detroit",
+              "toTime": "18:00"
+            },
+            "status": "paused",
+            "totalLeads": 0,
+            "updatedAt": "2026-09-22T06:51:57.696+00:00"
+          }
+        ],
+        "caveats": [
+          "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+          "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
+          "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
+          "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
+          "domain-1.example counts saved cumulative sends per sequence step (step 0 is the first email, step 1 the first follow-up; never say 'step 0' to the customer, say 'first email' and 'first follow-up'); sequenceStepDelays is the configured delay in days on each step. A campaign whose stepSends has only step 0, after its first sends are older than the configured delay, has no saved numeric-step evidence of follow-up sends. Say so plainly: only first emails have been sent and no follow-up has gone out. A dailyMetrics day where emailsSent equals newLeadsContacted means every send that day was a first email. For a question about a whole campaign's follow-ups, answer from these campaign figures before reading any single thread, and do not ask the customer for a prospect name these figures already answer. This is a saved snapshot, not a live dispatch check; an empty stepSends means unknown, not zero.",
+          "Inbox health and assignments are saved state, not a live send test or confirmed provider assignment. Assignment counts cover the entire saved selection; accounts are paginated with nextAfterInboxId. configuredCount null means no readable saved selection; a mismatch with matchedCount can indicate duplicate entries or entries that could not be matched to owned inboxes."
+        ],
+        "inboxes": {
+          "healthyAccounts": 0,
+          "totalSendingAccounts": 0
+        },
+        "nextAfter": null,
+        "observedAt": "2026-10-07T12:15:53.235Z",
+        "source": "Acquisity product database; live Instantly evidence only for a selected campaign",
+        "status": "ok",
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:15:31.079Z",
+      "resultAt": "2026-10-07T12:15:55.499Z",
+      "status": "completed",
+      "tool": "widget_outreach_health"
+    },
+    {
+      "input": {},
+      "output": {
+        "account": {
+          "banExpiresAt": null,
+          "banReason": null,
+          "banned": false,
+          "emailVerified": true,
+          "lastLoginAt": "2026-10-07T07:59:50.766+00:00",
+          "onboardingCallScheduled": false,
+          "onboardingComplete": true,
+          "onboardingCompletedAt": "2026-04-21T23:47:51.216+00:00",
+          "partnerEligible": false,
+          "twoFactorEnabled": false
+        },
+        "caveats": [
+          "Saved product state, not a live authentication or billing check.",
+          "Seat counts are active members of this workspace. No plan seat limit is established by this read; null does not mean unlimited.",
+          "Pending invitations are this workspace's own outbound invites; the invited email is shown so an invite-login report can be matched.",
+          "userErrorSignals are all unresolved Sentry errors recorded for this user in the window, from any part of the product. Sign-in failures are not tagged in Sentry, so they neither prove nor rule out a failed sign-in."
+        ],
+        "membership": {
+          "memberSince": "2025-09-29T15:04:57.862+00:00",
+          "role": "owner"
+        },
+        "observedAt": "2026-10-07T12:16:00.730Z",
+        "onboarding": {
+          "businessInfo": false,
+          "coldEmail": false,
+          "flowType": "workspace",
+          "goals": false,
+          "icp": false,
+          "lead": false,
+          "niche": false,
+          "offer": false,
+          "personalInfo": false,
+          "updatedAt": "2026-04-21T23:47:38.413802+00:00"
+        },
+        "organization": {
+          "name": "Aaron Fraga's Workspace",
+          "onboardingStatus": "reset",
+          "partnerManaged": false,
+          "slug": "aaron-fragas-workspace-wMUMT"
+        },
+        "partnerAccess": {
+          "menuVisible": false,
+          "reason": "not_eligible"
+        },
+        "pendingInvitations": [],
+        "seats": {
+          "byRole": [
+            {
+              "count": 1,
+              "role": "owner"
+            }
+          ],
+          "planLimit": null,
+          "used": 1
+        },
+        "source": "Acquisity product database; saved account and onboarding state, not a live auth or billing check",
+        "status": "ok",
+        "userErrorSignals": {
+          "reason": "sentry_unconfigured",
+          "status": "unavailable"
+        },
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:15:57.967Z",
+      "resultAt": "2026-10-07T12:16:01.728Z",
+      "status": "completed",
+      "tool": "widget_account_access"
+    },
+    {
+      "input": {
+        "area": "provisioning",
+        "since": "30d"
+      },
+      "output": {
+        "caveats": [
+          "Campaign sending problems are covered by widget_outreach_health.",
+          "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
+          "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred."
+        ],
+        "coveredAreas": ["provisioning"],
+        "failures": [],
+        "observedAt": "2026-10-07T12:16:06.186Z",
+        "source": "Acquisity product database; per-org failed job records, not a live Inngest run scan.",
+        "status": "ok",
+        "truncated": false,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:16:03.444Z",
+      "resultAt": "2026-10-07T12:16:06.187Z",
+      "status": "completed",
+      "tool": "widget_job_failures"
+    },
+    {
+      "input": {
+        "campaignId": "00000000-0000-4000-8000-000000000003",
+        "sinceDays": 90
+      },
+      "output": {
+        "caveats": [
+          "Saved product state is not a live scraper, verification or Inngest run check.",
+          "declaredLeadCount is the run's tally; storedLeadCount counts persisted rows. A difference in either direction is a count discrepancy, not proof that scraping or verification failed or never finished. verifiedLeadCount follows Acquisity: all Instantly-sourced rows count as verified; other sources require is_email_verified.",
+          "A stuck run is inferred from status and age, not confirmed. runId is a source-provider reference, or a submission ID for manual uploads; it is not an established Inngest run ID. widget_job_failures lists recorded failures. A scrapeRunId selects that owned run regardless of age; campaignId filters runs within the date window. Import activity and reconciliation remain workspace-wide.",
+          "ingestionCreditsUsed covers campaign lead ingestion and lead-capacity reservations, not scrape runs, so compare it against stored leads to explain 'credits used but no leads'.",
+          "The dashboard 'Leads Uploaded' counter is a separate accounting metric; campaignLeadStoredTotal is the true count of leads in campaigns.",
+          "verificationJobs counts saved verification jobs by status, not individual email verdicts. unverifiedLeadCount follows the same source-specific product rule as verifiedLeadCount; it does not mean those addresses are invalid. Import step details and campaign launch gating are not established by these counts."
+        ],
+        "importActivity": {
+          "campaignLeadCount": 91128,
+          "campaignsWithLeads": 7,
+          "ingestionCreditTransactions": 0,
+          "ingestionCreditsUsed": 0
+        },
+        "observedAt": "2026-10-07T12:16:16.531Z",
+        "reconciliation": {
+          "campaignLeadStoredTotal": 91128,
+          "discrepancy": false,
+          "note": "Declared run totals reconcile with persisted scrape leads; a low dashboard 'Leads Uploaded' figure is an accounting metric, not a missing-leads fact.",
+          "scrapeLeadStoredTotal": 0,
+          "scrapeRunDeclaredTotal": 0
+        },
+        "scrapeRuns": [],
+        "source": "Acquisity product database; saved state, not a live scraper or provider check",
+        "status": "ok",
+        "windowDays": 90,
+        "workspace": "Aaron Fraga's Workspace"
+      },
+      "requestedAt": "2026-10-07T12:16:08.579Z",
+      "resultAt": "2026-10-07T12:16:22.906Z",
+      "status": "completed",
+      "tool": "widget_lead_pipeline_status"
+    },
+    {
+      "input": {
+        "query": "closing account cancel subscription sending accounts"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/account-settings/faq/domain-2.example",
+            "title": "Where is the Billing cancel option for email subscriptions?",
+            "url": "https://app.acquisity.ai/docs/account-settings/faq/where-is-the-billing-cancel-option-for-email-subscriptions"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/domain-3.example",
+            "title": "Billing & Subscriptions",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/billing-domains/domain-4.example",
+            "title": "Can I pause my account instead of cancelling?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/billing-domains/can-i-pause-my-account-instead-of-cancelling"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-5.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-07T12:16:26.228Z",
+      "resultAt": "2026-10-07T12:16:27.277Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "query": "connecting your own email sending accounts Instantly legacy plan"
+      },
+      "output": {
+        "articles": [
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts.mdx",
+            "title": "Email Accounts & Domains",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/email-accounts/domain-5.example",
+            "title": "How many email accounts do I need?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need"
+          },
+          {
+            "path": "apps/web/content/docs/cold-email-agent/faq/campaigns/domain-6.example",
+            "title": "Why is my campaign Active but not sending when I use my own Instantly account?",
+            "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/domain-7.example",
+            "title": "Email Templates",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/email-templates"
+          },
+          {
+            "path": "apps/web/content/docs/workspace-settings/faq/billing-subscriptions/domain-8.example",
+            "title": "How do I disconnect Instantly from Acquisity?",
+            "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-07T12:16:26.230Z",
+      "resultAt": "2026-10-07T12:16:27.647Z",
+      "status": "completed",
+      "tool": "widget_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity"
+      },
+      "output": {
+        "content": "For most workspaces, **Settings → Cold Email Agent** controls sending schedule, AI campaign management defaults, credits, and workspace contact capacity. There is no Instantly connection to manage.\n\nWorkspaces with a **legacy direct Instantly connection** also see an **Outreach Providers** card on that page. It is only visible to workspace owners and admins, and it lets an admin update the connection's API key (via **Edit**), test the connection, and sync campaigns. Updating credentials is different from disconnecting: do not disconnect or replace sending infrastructure without checking with support first, because it can stop active campaigns from sending.\n\n## What to do\n\n1. Open **Feedback** in the bottom-left sidebar, or the chat bubble if it is visible.\n2. Type **\"human agent\"**.\n3. Tell support the workspace name and that you need help disconnecting or replacing a legacy Instantly connection.\n\n## What you can manage yourself\n\n- **Current inboxes:** open **Cold Email Agent → Email Accounts**.\n- **Domain forwarding:** open **Cold Email Agent → Email Accounts → Domain Forwarding**.\n- **Domain/inbox billing:** open **Cold Email Agent → Email Accounts → Manage Billing**.\n- **Default sending schedule:** open **Settings → Cold Email Agent**.\n\n## Related\n\n- [Cold Email Agent Settings](/docs/cold-email-agent/settings)\n- [Billing & Credits](/docs/workspace-settings/billing)\n- [Why is my campaign Active but not sending when I use my own Instantly account?](/docs/cold-email-agent/faq/campaigns/my-campaign-is-active-but-not-sending-and-i-use-my-own-instantly-account)",
+        "title": "How do I disconnect Instantly from Acquisity?",
+        "url": "https://app.acquisity.ai/docs/workspace-settings/faq/billing-subscriptions/how-do-i-disconnect-instantly-from-acquisity"
+      },
+      "requestedAt": "2026-10-07T12:16:30.737Z",
+      "resultAt": "2026-10-07T12:16:30.820Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    },
+    {
+      "input": {
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+      },
+      "output": {
+        "content": "<div className=\"mb-6\">\n  <InlineSearchBar placeholder=\"Search questions...\" />\n</div>\n\n<QuestionList>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-get-email-accounts-to-send-from\">How do I get email accounts to send from?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-are-pre-warmed-inboxes\">What are pre-warmed inboxes?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-much-do-inboxes-cost\">How much do inboxes cost?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-many-email-accounts-do-i-need\">How many email accounts do I need?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-set-a-per-inbox-daily-sending-limit\">Can I set a per-inbox daily sending limit?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-distribute-volume-across-multiple-inboxes-and-campaigns\">How do I distribute volume across multiple inboxes and campaigns safely?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-temporarily-holdpause-my-email-accounts-while-im-away\">Can I temporarily hold/pause my email accounts while I'm away?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/can-i-move-email-accounts-between-workspaces\">Can I move email accounts between workspaces?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/my-pre-warmed-inboxes-dont-appear-after-purchase-how-long-does-provisioning-take\">My pre-warmed inboxes don't appear after purchase — how long does provisioning take?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/my-inbox-warmup-shows-0-emails-and-no-health-score-how-do-i-initialize-it\">My inbox warmup shows 0 emails and no health score — how do I initialize it?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-is-the-warmup-period\">What is the warmup period?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-does-the-health-score-mean\">What does the health score mean?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/what-do-the-account-statuses-mean\">What do the account statuses mean?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-fix-an-account-with-an-error\">How do I fix an account with an error?</QuestionItem>\n  <QuestionItem href=\"/docs/cold-email-agent/faq/email-accounts/how-do-i-replace-burntspam-flagged-outreach-inboxes\">How do I replace burnt/spam-flagged outreach inboxes?</QuestionItem>\n</QuestionList>\n\n<Callout>\nFor the full setup guides, see the [Email Accounts section](/docs/cold-email-agent/email-accounts) — [buying inboxes](/docs/cold-email-agent/email-accounts/buying-inboxes), [domain provisioning](/docs/cold-email-agent/email-accounts/domain-provisioning), [warmup](/docs/cold-email-agent/email-accounts/warmup), and [health & troubleshooting](/docs/cold-email-agent/email-accounts/health-and-troubleshooting).\n</Callout>",
+        "title": "Email Accounts & Domains",
+        "url": "https://app.acquisity.ai/docs/cold-email-agent/faq/email-accounts"
+      },
+      "requestedAt": "2026-10-07T12:16:30.738Z",
+      "resultAt": "2026-10-07T12:16:30.840Z",
+      "status": "completed",
+      "tool": "widget_read_help_article"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace's Instantly connection is a user-owned, legacy direct connection rather than Acquisity-provisioned, and there are no provisioning orders, so the 148 addresses saved in the campaign were not bought through Acquisity; none of them match inboxes Acquisity can read. The only billing is a $1/month Legacy plan. Nothing recorded shows who created the addresses, when, or where the unfamiliar business name came from.",
+    "causeType": "platform_limitation",
+    "claims": [
+      "Says the sending connection is the customer's own (user-managed) Instantly workspace, not Acquisity-provisioned, and that no inbox or domain orders exist for this workspace.",
+      "Says the records cannot show who created the addresses, when, or why some use the unfamiliar business name, and does not invent an answer.",
+      "Tells the customer to contact support through Feedback and type \"human agent\" to disconnect the legacy Instantly connection before closing, and that the mailboxes themselves live in that Instantly account.",
+      "Does not claim Acquisity bills for, owns or will delete these mailboxes or domains."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "Hi, I’m closing Company One’s Acquisity account and found 148 sending email addresses across 45 domains saved in the Name 2 campaign.\n\nPlease verify:\n- Who created or connected these addresses, and when?\n- Were the domains and mailboxes provided by Acquisity or connected by someone at our company?\n- Who owns and controls them, which email provider hosts them, and are there any separate charges?\n- Will closing Acquisity stop all sending, including automated replies and warmup? Will the domains or mailboxes remain active or billable elsewhere?\n\nSome addresses use “Company Two,” which is not a name associated with our company. Please explain where those came from.\n\nI can provide the full address list. Please preserve the account records needed to investigate and confirm these details in writing.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M4B4HZ210GZN0XYACFJEYZAX",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": [
+      "widget_inbox_health",
+      "widget_billing_summary",
+      "widget_provisioning_status",
+      "widget_outreach_health",
+      "widget_account_access",
+      "widget_job_failures",
+      "widget_lead_pipeline_status",
+      "widget_help_article",
+      "widget_read_help_article"
+    ]
+  }
+}

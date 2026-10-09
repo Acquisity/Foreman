@@ -1,0 +1,46 @@
+{
+  "cassette": [
+    {
+      "input": {
+        "question": "Could you check your connected calendar for that day and let me know what busy times it shows (just the time blocks, no need for event titles)?"
+      },
+      "output": {
+        "asked": "Could you check your connected calendar for that day and let me know what busy times it shows (just the time blocks, no need for event titles)?"
+      },
+      "requestedAt": "2026-10-05T18:07:01.010Z",
+      "resultAt": "2026-10-05T18:07:01.012Z",
+      "status": "completed",
+      "tool": "widget_ask_customer"
+    }
+  ],
+  "expectations": {
+    "cause": "The customer only asked for a human agent and gave no problem; the run recorded nothing about the workspace beyond an unrelated clarifying question about calendar busy times.",
+    "causeType": "unclear",
+    "claims": [
+      "Connects the customer with a human support agent, or tells them how to reach one, as they asked.",
+      "Does not ask about calendar busy times or any other question unrelated to what the customer wrote.",
+      "Does not claim to have found a problem in the workspace."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "human",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "Human agent",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M46KYGGA0GHAM7E42JJR00G9",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_ask_customer"]
+  }
+}

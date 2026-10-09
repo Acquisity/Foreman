@@ -1,0 +1,103 @@
+{
+  "cassette": [
+    {
+      "input": {},
+      "output": {
+        "autumn": {
+          "available": true,
+          "data": {
+            "balances": {},
+            "billing_controls": {},
+            "config": {},
+            "created_at": 1791245479376,
+            "env": "live",
+            "fingerprint": null,
+            "flags": {},
+            "id": "00000000-0000-4000-8000-000000000001",
+            "licenses": [],
+            "metadata": {},
+            "processors": {
+              "stripe": {
+                "id": "cus_x1"
+              }
+            },
+            "purchases": [],
+            "send_email_receipts": false,
+            "stripe_id": "cus_x1",
+            "subscriptions": []
+          }
+        },
+        "available": true,
+        "creditHistory": null,
+        "credits": {
+          "balance": 0,
+          "lifetimeGranted": 0,
+          "lifetimePurchased": 0,
+          "lifetimeUsed": 0,
+          "renewsAt": null
+        },
+        "discount": null,
+        "failedPayments": [],
+        "orderSubscriptions": {
+          "available": true,
+          "items": [],
+          "truncated": false
+        },
+        "organization": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Aaron Fraga's Workspace",
+          "partnerGoverned": false
+        },
+        "plan": {
+          "name": null,
+          "provider": "autumn",
+          "status": null
+        },
+        "recentCharges": [],
+        "recentInvoices": [],
+        "recentRefunds": [],
+        "reconciliation": {
+          "chargedButNoActiveSubscription": false,
+          "notes": []
+        },
+        "stripeSubscriptions": [],
+        "truncated": [],
+        "unavailable": []
+      },
+      "requestedAt": "2026-10-06T00:48:05.124Z",
+      "resultAt": "2026-10-06T00:48:17.811Z",
+      "status": "completed",
+      "tool": "widget_billing_summary"
+    }
+  ],
+  "expectations": {
+    "cause": "The workspace has no active plan: the billing read shows no subscription, no plan name, 0 credits and no charges, so paid features and settings stay locked until a plan is enabled.",
+    "causeType": "user_error",
+    "claims": [
+      "Answers yes: a paid plan is required, and says the workspace currently has no active plan and 0 credits.",
+      "Tells the customer to enable a plan from Settings, then Billing, then Enable Acquisity (owners only).",
+      "Does not say the customer already has a plan or credits, or that the feature is free."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": null
+  },
+  "mode": "investigate",
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nGOD YOUR FUCLING COULD OF SAID THAT 9 NYEARS AFO\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: do i need pro do access this\nSupport: A brand-new workspace starts with no active subscription and 0 credits, and the platform subscription unlocks AI tools such as the Cold Email Agent and AI SDR.\nCustomer: not your understanding me do i need pro to acess the seting why is it nit working\nSupport: Only workspace Owners can see the Billing page and make these purchases.\n1. Click your workspace name in the top-left corner, then click Settings.\n2. Click Billing under Workspace in the left menu.\n3. Under Current Plan, click Enable Acquisity.\n4. Review the plan and price in the checkout window, then confirm.\nCustomer: DO I NEED PRO OR NOT FUCK HEAD\nSupport: I apologize, but I am not able to make changes to your account. All features need a paid subscription, and there is no free tier.\nCustomer: DO I NEED RPRO\nSupport: Yes, all features need a paid subscription, and there is no free tier.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": "wrun_41M47AX2ZR0GRQZGXV5XPSNF1Y",
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_billing_summary"]
+  }
+}
