@@ -413,6 +413,10 @@ export type JudgeRunner = (
   signal: AbortSignal
 ) => Promise<unknown>;
 
+// Claude Code's validator does not load the draft 2020-12 meta-schema $schema names.
+const { $schema: _draft, ...judgeJsonSchema } = z.toJSONSchema(judgeSchema);
+const JUDGE_JSON_SCHEMA = JSON.stringify(judgeJsonSchema);
+
 let running = 0;
 const queued: (() => void)[] = [];
 
@@ -453,7 +457,7 @@ export const claudeJudge: JudgeRunner = async (system, input, signal) => {
         "--output-format",
         "json",
         "--json-schema",
-        JSON.stringify(z.toJSONSchema(judgeSchema)),
+        JUDGE_JSON_SCHEMA,
       ],
       { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
     );
