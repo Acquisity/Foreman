@@ -1,6 +1,6 @@
 const LONE_DASH =
   /(?<=[(["'\u201c\u2018])\u2014|\u2014(?=[)\]"'\u201d\u2019])/gu;
-const DASH = /\s*\u2014\s*/gu;
+const DASH = /[ \t]*\u2014[ \t]*/gu;
 const SECTION = /^### .+ \{slug: ([^}\n]+)\}$/u;
 const HEADINGS = /^### .*$/gmu;
 
