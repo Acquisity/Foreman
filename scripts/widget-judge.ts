@@ -92,6 +92,21 @@ const RESULT_FILE = /^\d+\.json$/;
 const REVIEW_PAGE = /\/review\.md$/;
 const CASE_FILE = /\.json$/;
 
+/** Legacy rows keep the answer in the outcome log. */
+function recoverLegacyAnswer(row: ReplayRow, logs: string[]) {
+  if (row.answer !== undefined) {
+    return;
+  }
+  const outcome = logs.find((log) => log.startsWith("outcome: "));
+  if (outcome) {
+    const saved = JSON.parse(outcome.slice("outcome: ".length));
+    row.answer = saved.message ?? null;
+    row.citations = (saved.citations ?? []).map(
+      ({ url }: { url: string }) => url
+    );
+  }
+}
+
 /** Every investigate case one `eve eval` run replayed: its row, its case file and its judge record. */
 function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
   const replay = `${dir}/evals/widget/replay`;
@@ -116,17 +131,7 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
       };
       row.run ??= seen.get(row.case) ?? 0;
       seen.set(row.case, row.run + 1);
-      // Legacy rows keep the answer in the outcome log.
-      if (row.answer === undefined) {
-        const outcome = logs.find((log) => log.startsWith("outcome: "));
-        if (outcome) {
-          const saved = JSON.parse(outcome.slice("outcome: ".length));
-          row.answer = saved.message ?? null;
-          row.citations = (saved.citations ?? []).map(
-            ({ url }: { url: string }) => url
-          );
-        }
-      }
+      recoverLegacyAnswer(row, logs);
       // A case moved to cases-pending since the run no longer counts.
       if (!existsSync(row.case)) {
         return [];
