@@ -1146,3 +1146,54 @@ test("the live gate blocks stacked extensions in composed replies and removes th
   assert.equal(allowed.decision, "allow");
   assert.equal(allowed.message, text);
 });
+
+const CLAIMED =
+  "Your campaign paused because its inbox disconnected. I've reported this to the engineering team as a ticket.";
+const claimingDeps = (replies: string[]) => {
+  const { calls, deps: d } = deps({
+    compose: (input) => {
+      calls.compose.push(input);
+      return Promise.resolve(replies[calls.compose.length - 1] ?? "");
+    },
+  });
+  return { calls, d };
+};
+const corrections = (calls: { compose: unknown[] }) =>
+  calls.compose.map((input) => (input as { correction?: string }).correction);
+
+test("a filed ticket keeps the reply's report sentence and needs no recompose", async () => {
+  const { calls, d } = claimingDeps([CLAIMED]);
+  const result = await gate(
+    scope,
+    question,
+    findings({
+      ticket: { id: "ENG-1", url: "https://linear.app/acquisity/issue/ENG-1" },
+    }),
+    d
+  );
+  assert.equal(result.message, CLAIMED);
+  assert.deepEqual(corrections(calls), [undefined]);
+});
+
+test("an unfiled ticket claim is recomposed once with the correction", async () => {
+  const { calls, d } = claimingDeps([
+    CLAIMED,
+    "Your campaign paused because its inbox disconnected. Reconnect it, then resume.",
+  ]);
+  const result = await gate(scope, question, findings(), d);
+  assert.match(result.message ?? "", RECONNECT);
+  assert.equal(calls.compose.length, 2);
+  assert.ok(corrections(calls)[1]?.includes("No ticket was filed"));
+});
+
+test("a claim the recompose repeats is deleted, and a conditional promise stays", async () => {
+  const conditional =
+    "Send me the exact error and I'll report it to engineering if it is a fault on our side.";
+  const { d } = claimingDeps([CLAIMED, `${CLAIMED} ${conditional}`]);
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.reason, "in scope");
+  assert.equal(
+    result.message,
+    `Your campaign paused because its inbox disconnected. ${conditional}`
+  );
+});

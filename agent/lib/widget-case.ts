@@ -116,6 +116,8 @@ const AUTHORED_REFERENCES = new Set([
   "the-growth-plan-creator-shows-an-application-error.mdx",
 ]);
 const LINEAR_REF = /^ENG-\d+$/;
+const TICKET_LINK =
+  /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
 const isInternalLink = (value: string) =>
   LINEAR_REF.test(value) || value.startsWith("http");
 const OPS_ID = /^(?:[a-z]+_[a-z0-9]+|01[0-9a-z]{24})$/;
@@ -394,12 +396,22 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   }
   // Internal ticket refs and internal links (a filed ticket's Linear URL) are not customer data,
   // but a ticket URL's slug repeats the customer's wording, so neither is kept.
+  // A filed ticket's own link keeps its shape, without the slug, so a replay of
+  // the filing still reads as a real ticket.
+  const ticketRef = (value: string) => {
+    add(value, () => `ENG-${next("ticket")}`);
+    return replacements.get(value.toLowerCase());
+  };
   for (const value of internal.filter(isInternalLink)) {
-    add(value, () =>
-      LINEAR_REF.test(value)
-        ? `ENG-${next("ticket")}`
-        : `https://internal.example/${next("link")}`
-    );
+    const linked = TICKET_LINK.exec(value)?.[1];
+    add(value, () => {
+      if (LINEAR_REF.test(value)) {
+        return `ENG-${next("ticket")}`;
+      }
+      return linked
+        ? `https://linear.app/acquisity/issue/${ticketRef(linked)}`
+        : `https://internal.example/${next("link")}`;
+    });
   }
   const catalogNames = billingCatalogNames(raw);
   for (const [name, count] of found.names) {

@@ -27,6 +27,8 @@ export interface GateDeps {
   compose: (input: {
     /** Jev read the conversation as a request to change something on the account. */
     askedForChange?: boolean;
+    /** Set on the one recompose after a reply claimed an unfiled ticket. */
+    correction?: string;
     findings: ComposerInput;
     organizationName: string;
     question: string;
@@ -562,6 +564,19 @@ const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
   askedForChange ? composed : composed.replace(CANT_CHANGE, "").trim();
 
 /**
+ * A reply saying this was reported, filed or passed on. Without a filed ticket
+ * it is false, and a prompt rule did not stop it (ENG-15044: 6 of 159 replies),
+ * so the gate recomposes once with NO_TICKET_CORRECTION and then deletes any
+ * such sentence left. "I'll report it to engineering if..." is not a claim.
+ */
+const TICKET_CLAIM =
+  /[^.!?\n]*\b(?:I(?:'|’)ve|I have|I(?:'|’)m|I am|we(?:'|’)ve|we have|has been|have been|was|is now)\s+(?:also\s+)?(?:reported|passed|filed|sent|flagged|escalated|raised|logged|opened|submitted|reporting|passing|filing|escalating|flagging)\b[^.!?\n]{0,100}?\b(?:engineering|ticket|billing team|team)\b[^.!?\n]*[.!?]?/giu;
+const withoutTicketClaims = (text: string) =>
+  text.replace(TICKET_CLAIM, "").trim();
+const NO_TICKET_CORRECTION =
+  "No ticket was filed and nothing was reported or passed on to anyone. Rewrite the reply without saying or suggesting that it was reported, filed, escalated or passed to engineering, billing or a person.";
+
+/**
  * A stalled model call must fail closed as gate_unavailable, not hold the reply
  * past the app's last poll. The judge gets what the finish has left less the
  * composer's time (see `judgeBudgetMs`).
@@ -571,6 +586,7 @@ const COMPOSE_TIMEOUT_MS = 25_000;
 export const defaultGateDeps: GateDeps = {
   async compose({
     askedForChange,
+    correction,
     findings,
     organizationName,
     question,
@@ -583,6 +599,7 @@ export const defaultGateDeps: GateDeps = {
       model: gateway(model),
       prompt: JSON.stringify({
         askedForChange: askedForChange === true,
+        ...(correction ? { correction } : {}),
         findings,
         question,
         recordingOffered,
@@ -675,6 +692,24 @@ function itemsCarrying(
         : Object.values(candidates).some((ids) => ids.includes(found));
     })
     .map((item) => item.n);
+}
+
+/** The composed reply; one claiming a ticket nobody filed is recomposed once, then trimmed. */
+async function composedReply(
+  compose: GateDeps["compose"],
+  input: Parameters<GateDeps["compose"]>[0],
+  ticketFiled: boolean
+) {
+  const reply = async (correction?: string) =>
+    unaskedChangeRemoved(
+      await compose(correction ? { ...input, correction } : input),
+      input.askedForChange === true
+    );
+  const message = await reply();
+  if (ticketFiled || withoutTicketClaims(message) === message) {
+    return message;
+  }
+  return withoutTicketClaims(await reply(NO_TICKET_CORRECTION));
 }
 
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
@@ -773,17 +808,20 @@ export async function gate(
         return done(blocked(findings, again));
       }
     }
-    const composed = await timed("compose", () =>
-      deps.compose({
-        askedForChange,
-        findings: composerInput(gated),
-        organizationName: scope.organizationName,
-        question: conversation,
-        recordingOffered,
-        signal,
-      })
+    const message = await timed("compose", () =>
+      composedReply(
+        deps.compose,
+        {
+          askedForChange,
+          findings: composerInput(gated),
+          organizationName: scope.organizationName,
+          question: conversation,
+          recordingOffered,
+          signal,
+        },
+        Boolean(gated.ticket)
+      )
     );
-    const message = unaskedChangeRemoved(composed, askedForChange);
     if (!message) {
       return done(blocked(findings, "empty_reply"));
     }

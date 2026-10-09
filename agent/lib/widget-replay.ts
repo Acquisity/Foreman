@@ -95,6 +95,9 @@ export function replayCase(caseId?: string): WidgetCase {
  * (ids, dates, urls) must still match exactly.
  */
 const FREE_TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  // A filing is replayed whatever the investigator wrote in it, so a case that
+  // recorded a real ticket replays as filed.
+  widget_file_ticket: ["summary", "title"],
   widget_help_article: ["query"],
   widget_known_issues: ["query"],
 };

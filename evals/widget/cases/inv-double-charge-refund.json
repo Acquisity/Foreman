@@ -1842,7 +1842,7 @@
         "existing": false,
         "refund": true,
         "identifier": "ENG-1",
-        "url": "https://internal.example/1"
+        "url": "https://linear.app/acquisity/issue/ENG-1"
       },
       "requestedAt": "2026-10-08T21:27:24.677Z",
       "resultAt": "2026-10-08T21:27:37.197Z",

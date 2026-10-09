@@ -383,6 +383,9 @@ test("internal ticket refs and links are replaced", () => {
   );
   assert.ok(!text.includes("ENG-14665"));
   assert.ok(!text.includes("spring-promo"));
+  // The filed ticket's link keeps a ticket's shape and agrees with its ref.
+  const { ticket, url } = JSON.parse(text).cassette[0].output;
+  assert.equal(url, `https://linear.app/acquisity/issue/${ticket}`);
 });
 
 test("an id joined to a domain with hyphens is replaced inside the composite", () => {
