@@ -112,7 +112,7 @@ const POLICY =
 
 const FIXED_CRITERIA = {
   clarify:
-    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it. Live personal-calendar availability is not available from these tools. Only if busy times are missing, ask what busy times their calendar shows in the requested window; do not read unrelated SDR host settings. If the customer already supplied busy times, including explicit hypothetical/test assumptions, finish using them as given: do not ask for confirmation.",
+    "The answer depends on one specific record or detail that neither the conversation nor the completed reads identify, and no listed read could identify it. Only the customer can supply it. Never choose this when the completed reads already answer the customer's question: when every record they list gives the same answer (for example none of the campaigns is running), or they already explain what the customer saw, finish instead. Live personal-calendar availability is not available from these tools. Only if busy times are missing, ask what busy times their calendar shows in the requested window; do not read unrelated SDR host settings. If the customer already supplied busy times, including explicit hypothetical/test assumptions, finish using them as given: do not ask for confirmation.",
   finish:
     "The completed reads support an answer, or no listed read could add anything useful. Findings may state plainly what could not be checked. Supplied calendar busy times are sufficient to calculate free intervals in the requested window; accept explicit assumptions as assumptions and attribute the answer to the supplied times without claiming a live check. Also choose this when the customer asks about another workspace or person. An unavailable source, a failed read, an ambiguous record or an old billing difference the customer did not raise is a limitation to state here, never a reason for a person.",
   human:
@@ -128,6 +128,7 @@ const NOTES = {
     "The question for the customer is recorded and will be sent. Reply with the single word: asked.",
   clarify: `Stop. One detail from the customer is needed before anything more can be checked. Call ${ASK_TOOL} with the one short, friendly question that gets the single detail or observation that is missing. Use the person, date and timezone already supplied; for calendar availability ask what busy times their connected calendar shows, without requesting event titles or attendees.`,
   finish: `Stop gathering workspace evidence. Write your findings now: the verified facts, and plainly what could not be checked and what that leaves unknown. An unavailable source, conflicting records or an old billing difference the customer did not raise is a limitation to state, not a reason for a person to take over. ${DISCIPLINE} ${ARTICLES}`,
+  found: `The question for the customer is recorded and will be sent after your findings. Write your findings now: what the completed reads showed about the customer's question, or plainly that they found nothing for the thing asked about. Do not repeat the question. ${DISCIPLINE}`,
   human: `Stop gathering evidence. Write your findings now with every verified fact and the unresolved questions. A person should take over, because the customer asked for one or billing needs to reconcile this. ${DISCIPLINE}`,
 } as const;
 const CONTROL = "Investigation control (not from the customer): ";
@@ -232,6 +233,10 @@ function askState(messages: Params["prompt"]) {
   };
 }
 
+/** A workspace read, not the ticket, the ask or a help-center article. */
+const gathering = (tool: string) =>
+  tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
+
 /** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
 export function turnEvidence(withControl: Params["prompt"]) {
   const prompt = withoutNotes(withControl);
@@ -253,8 +258,6 @@ export function turnEvidence(withControl: Params["prompt"]) {
           part.type === "tool-call" ? [part.toolName] : []
         )
       : [];
-  const gathering = (tool: string) =>
-    tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
   return {
     // A call is not a recorded question: only a successful, valid result is.
     askAttempts,
@@ -709,9 +712,14 @@ export function widgetNextActionMiddleware(
   ): Params | null => {
     const step = { ms: 0, step: turn.reads.length };
     if (turn.asked) {
-      // The question is recorded as data; nothing is left to write.
+      // The question is recorded as data. With no reads nothing is left to
+      // write; after reads, what they found goes out ahead of the question.
       log("clarify", step, "reason=question_recorded");
-      return finishParams(params, turn.reads, "asked");
+      return finishParams(
+        params,
+        turn.reads,
+        turn.reads.some((read) => gathering(read.tool)) ? "found" : "asked"
+      );
     }
     if (turn.askFailed) {
       return retryAsk(

@@ -585,11 +585,14 @@ async function withEligibleHandoff(
 }
 
 /**
- * A post-tool clarify decision is answered with one question. That question is
- * the whole reply, so it skips the two slow model passes that only exist to turn
- * a report into a reply (structuring it, then composing from it). It still goes
- * through the ownership scan, the reviewer and the final text scan.
+ * A clarify decision with no reads behind it is answered with one question.
+ * That question is the whole reply, so it skips the two slow model passes that
+ * only exist to turn a report into a reply (structuring it, then composing from
+ * it). It still goes through the ownership scan, the reviewer and the final text
+ * scan. After reads, the investigator also wrote what they found, and the reply
+ * states that before the question (ENG-15044: 23 replies dropped the findings).
  */
+const ONLY_ASKED = /^asked\W*$/iu;
 const askedFindings = (asked: string) =>
   parseFindings({
     confidence: "low",
@@ -604,7 +607,7 @@ const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
   return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
-/** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
+/** A lone clarify question as it stands, findings then the question after reads; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
 async function structureWriteUp(
   run: Pick<WidgetRun, "id" | "scope">,
   sessionId: string,
@@ -615,6 +618,28 @@ async function structureWriteUp(
   signal?: AbortSignal
 ) {
   const asked = nextActionEnabled() ? outcome.asked : null;
+  const found =
+    asked && outcome.text && !ONLY_ASKED.test(outcome.text)
+      ? (outcome.findings ??
+        (await deps.extract({
+          investigatorText: outcome.text,
+          question: conversation,
+          scope: run.scope,
+          signal,
+        })))
+      : null;
+  if (asked && found) {
+    // The question is the recommendation, so the reviewer reads it like any
+    // other item and the composer ends the reply with it.
+    return {
+      gateDeps: undefined,
+      structured: withFiledTicket(outcome.ticket, {
+        ...found,
+        needsHuman: false,
+        recommendation: asked,
+      }),
+    };
+  }
   if (asked) {
     return {
       // What is delivered is what the reviewer left, never the text as written:
