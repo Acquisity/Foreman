@@ -27,6 +27,7 @@
     "verify:built-github": "tsx scripts/verify-built-github.mjs",
     "widget:candidates": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-candidates.ts",
     "widget:case": "tsx scripts/widget-case-from-run.ts",
+    "widget:guide": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-product-guide.ts",
     "widget:judge": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-judge.ts"
   },
   "dependencies": {

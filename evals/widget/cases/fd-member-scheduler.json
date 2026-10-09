@@ -1,0 +1,30 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Tells the customer where to set the available times the AI SDR offers prospects.",
+      "Does not answer the earlier bounce-rate question again."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nI can't find scheduler to see the available time we can give to the prospect?\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: I cannot see the bounce rate here?\nSupport: Bounce rate isn't on the main Dashboard, but you can find it inside each campaign by opening the campaign from Cold Email Agent in the left sidebar and clicking the Leads tab at the top, where the bounce percentage shows in the header alongside other campaign stats.",
+  "scope": {
+    "role": "member",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "member",
+    "safety": [],
+    "tools": []
+  }
+}

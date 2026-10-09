@@ -35,6 +35,8 @@ const ok = (answers: object) =>
     status: 200,
   });
 
+const SECTIONS = /LATEST CUSTOMER MESSAGE|EARLIER TURNS/u;
+
 async function routerState(latest: string, history: Turn[]) {
   let state = "";
   await routeWidgetMessage(toWidgetAsk(latest, history), {
@@ -147,7 +149,7 @@ test("the longest accepted history cannot cut off the latest question, for the r
   assert.equal(eligibility.includes(latest), true);
 });
 
-test('"that campaign" arrives with the exchange that names it, roles kept, in the same words for the router and the selector', async () => {
+test('"that campaign" arrives with the exchange that names it, roles kept, for the router and the selector', async () => {
   const history: Turn[] = [
     { role: "customer", text: "My Spring Promo campaign looks stuck." },
     { role: "assistant", text: "Spring Promo is paused. Do you want details?" },
@@ -155,13 +157,20 @@ test('"that campaign" arrives with the exchange that names it, roles kept, in th
   const latest = "yes, why did that campaign stop?";
   const router = await routerState(latest, history);
   const { conversation } = await selector(latest, history);
-  assert.equal(router, conversation);
   assert.equal(
     router.includes("Customer: My Spring Promo campaign looks stuck."),
     true
   );
-  assert.equal(router.includes("Support: Spring Promo is paused."), true);
-  assert.equal(router.startsWith("LATEST CUSTOMER MESSAGE"), true);
+  // The router reads the latest message as the answer to Foreman's previous
+  // reply (ENG-14932); the selector keeps the shared format.
+  assert.equal(
+    router.startsWith(
+      "FOREMAN'S PREVIOUS REPLY, which the latest message answers:\nSpring Promo is paused."
+    ),
+    true
+  );
+  assert.equal(conversation.includes("Support: Spring Promo is paused."), true);
+  assert.equal(conversation.startsWith("LATEST CUSTOMER MESSAGE"), true);
 });
 
 test("a detail given more than four messages earlier is still there when Acquisity supplied it", async () => {
@@ -201,7 +210,8 @@ test("a topic change keeps the old identifier out of the latest message and says
     { role: "customer", text: "Campaign Spring Promo stopped sending." },
     { role: "assistant", text: "Spring Promo hit its daily limit." },
   ]);
-  const [latestPart, earlierPart] = state.split("EARLIER TURNS");
+  const [replyPart, latestPart, earlierPart] = state.split(SECTIONS);
+  assert.equal(replyPart.includes("Spring Promo hit its daily limit."), true);
   assert.equal(latestPart.includes("Spring Promo"), false);
   assert.equal(earlierPart.includes("Spring Promo"), true);
   assert.equal(earlierPart.includes("do not carry over"), true);

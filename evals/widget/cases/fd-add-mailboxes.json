@@ -1,0 +1,27 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": ["Tells the customer where to buy more inboxes."],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "Hi- I wan't to add 3 more mailboxes - how to proceed",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

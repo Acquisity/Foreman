@@ -1,0 +1,31 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Reads the screenshot as the Campaign One campaign the conversation says is not sending yet.",
+      "Does not ask again for the campaign name or which campaign.",
+      "Does not claim to have checked the account."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nneeds a jump start\n\n[Screenshot the customer attached, as read by an image model]\nScreen: Campaign Analytics Dashboard\nWhat stands out: The campaign is marked as Active, but all analytics metrics (Leads Contacted, Replies, Positive Replies, and Booked Calls) are at zero. The Analytics tab is highlighted.\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: No, I am using aquisity\nSupport: Thanks for clarifying that you're on Acquisity's own sending infrastructure, not an external account. That changes things a bit, so here's what the records show.\n\nFor the campaign Campaign One, the saved setup shows 12 inboxes assigned, all 12 matched and healthy, and all showing connected and active. The campaign's status is also active, with no reason for not sending on record. So on paper, this campaign looks correctly configured.\n\nThat said, a live check of this campaign's current dispatch status didn't come back, so I can't confirm right now whether it's actually sending in real time, and no send activity was recorded for the period checked either.\n\nGiven the setup looks correct on our side, it would help to pin down the exact \"no email accounts connected\" message you're seeing, since it doesn't match any recorded error. Could you reopen the campaign, check the inbox assignment screen again, and if the message still appears, send the exact wording or a screenshot of where it shows up?\n\nAlso, you mentioned two new campaigns with 12 inboxes each, but only one matching campaign was found in the records. Could you let me know the name of the second one so it can be checked too?\nCustomer: Hey there, apologies for the delay but it might have been a good thing. The two campaigns were brand new, and the nag pop-up disappeared...I still see no emails sent and it's been an hour or so and we are well within sending times...\nSupport: Could you tell me the name of the second new campaign (the one besides \"Campaign One\") so I can check it too?\nCustomer: Campaign Two\nSupport: Thanks for the campaign name! Quick check on this one: when you open it, does it also show that \"no email accounts connected\" warning, or is that gone here too? And just to confirm, is this the second campaign you meant, or is there a different one still to check?\nCustomer: The nag is gone from both, and Campaign Two is sending, the Campaign One is not sending yet\nSupport: Good news on the Campaign Two campaign, it's sending as expected: 112 emails went out today and its inboxes are all showing connected and active.\n\nFor Campaign One, the saved setup looks fine too, all 12 inboxes connected, status active, no error recorded, but there's no send activity recorded for it yet. What I can't confirm from here is whether it's actively sending, queued, or stuck right now, since that real-time check wasn't available.\n\nCould you reopen the Campaign One campaign and let me know what the status indicator and sent count show right now, and whether any warning or error is showing on it specifically? If you're not sure what you're looking at, a quick screenshot of that campaign screen would help, or you can use the Record my screen button below if that's easier to show.",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

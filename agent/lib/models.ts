@@ -15,11 +15,16 @@ export const MODELS = {
   // against 26 to 71s. Its 3 whole-answer blocks are retried with blocking off
   // (`guardedJudge` in widget-egress.ts).
   gate: "openai/gpt-5.6-sol",
-  // Support widget knowledge-base lane: one grounded answer over a few public
-  // help articles, and the lane's short chat, clarify and explain replies.
+  // Support widget help-center writer, grounded in a few public help articles:
+  // the front door only with WIDGET_CHAT=legacy (ENG-14932).
   // Measured through the gateway 2026-09-28 on a full-size answer: flash-lite
   // p50 1.0s, flash p50 8.7s (4 to 16s), and 4 to 39s live on the preview.
   kb: "google/gemini-3.5-flash-lite",
+  // Front-door chat (widget-chat.ts): one streamed reply with the whole product
+  // guide in a cached system prefix, Google AI Studio first. Round 4 (ENG-14932,
+  // 2026-10-08, 165 replies): p50 2.0s, p90 2.9s; 3.5-flash with low thinking
+  // and Claude Haiku 5.5 both took p50 4.8s.
+  kbChat: "google/gemini-3.6-flash",
   // The same answer when the customer's message carries screenshots. On the
   // #6627 preview's real conversations flash-lite answered a screenshot's
   // warning instead of the customer's request; flash followed the request.

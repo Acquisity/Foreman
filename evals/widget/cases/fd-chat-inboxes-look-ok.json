@@ -1,0 +1,29 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Reads the message as confirmation that the new inboxes are ready, and gives the next step toward finishing the first campaign's setup."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": null,
+    "lane": null,
+    "toolBudget": null
+  },
+  "question": "LATEST CUSTOMER MESSAGE (the one to work on):\nAll of those look ok\n\nEARLIER TURNS (context only: they resolve what \"it\", \"that\" or a follow-up refers to while the subject is the same, and do not carry over once the latest message changes subject. Only recent messages are shown and some may be cut, so a detail missing here is not proof the customer never gave it):\nCustomer: My campaign isn't named\nSupport: 1. Click **Cold Email Agent** in the left sidebar under the **Marketing** group to reach the Campaigns list. [1][2]\n2. Click the name of your campaign in the table to open its settings panel. [3][4]\nCustomer: This is the error I keep getting on my first campaign, which is unnamed and apparently needs cold email setup completed.  When I try to do that, it tries to create a new campaign for me\nSupport: 1. Reach the Email Accounts section from the left sidebar via Marketing, then Cold Email Agent, and click Email Accounts at the top.\n2. Click any row in the email accounts table to open the account settings panel and edit it.\nCustomer: It's asking for sending info, which starts a new campaign niche finder.\nSupport: 1. Click **Add New Inboxes** in the top-right of the Email Accounts page.\n2. On the **Add inboxes to your workspace** screen, use the **Pre-warmed Inboxes** card and click **Continue**.\n3. Select your desired domains from the available pills and click **Next**.\n4. Review your order details and click **Place Order**.\nCustomer: Ok I found the email accounts and already placed the order.  The mailboxes show up on my all inboxes screen.  What's next\nSupport: 1. In the left sidebar, click Cold Email Agent under Marketing, then Email Accounts at the top.\n2. Look for your accounts in the table. [1]\n3. Check that the provisioning status badge is gone and Active status shows, and the flame icon is green. [2][1]",
+  "scope": {
+    "role": "owner",
+    "workspace": "aaron-fragas-workspace-wMUMT"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "chat",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

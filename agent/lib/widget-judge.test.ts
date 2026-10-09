@@ -1,14 +1,22 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
+  citedArticles,
   claimsFor,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
   judgeAnswer,
+  judgeInput,
   judgeRecordSchema,
   parseMarks,
   parseVerdicts,
@@ -70,6 +78,7 @@ test("shared claims cover every answered case; the member claim only member and 
     "steps",
     "jargon",
     "caveats",
+    "invented",
   ]);
   assert.ok(claimsFor(withRole("member")).some((c) => c.id === "member"));
   assert.ok(claimsFor(withRole("client")).some((c) => c.id === "member"));
@@ -79,6 +88,13 @@ test("shared claims cover every answered case; the member claim only member and 
   );
   assert.match(own[0]?.text ?? "", CAUSE_TEXT);
   assert.deepEqual(own.at(-1), { id: "case-1", text: "X" });
+  const conversation = claimsFor({
+    ...withRole("owner"),
+    question:
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nAnd for campaigns?\n\nEARLIER TURNS (context):\nCustomer: Where is billing?\nSupport: Under Settings.",
+  }).map((claim) => claim.id);
+  assert.deepEqual(conversation.slice(-2), ["reask", "context"]);
+  assert.ok(!owner.includes("reask"));
 });
 
 const claims = claimsFor(withRole("owner"));
@@ -430,3 +446,106 @@ for (const cancellation of ["deadline", "caller"] as const) {
     assert.equal(model.doGenerateCalls.length, 1);
   });
 }
+
+test("a cited run's judge input carries the cited article text and the widget affordances", async () => {
+  const urls: string[] = [];
+  const articles = await citedArticles(
+    [
+      "https://help.acquisity.ai/docs/mailboxes",
+      "https://help.acquisity.ai/docs/mailboxes",
+      "https://example.com/docs/elsewhere",
+    ],
+    {
+      baseUrl: "https://help.acquisity.ai",
+      fetch: (url) => {
+        urls.push(url);
+        return Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              content: `Click Add New Inboxes.${"x".repeat(41_000)}`,
+              title: "Add mailboxes",
+              url,
+            }),
+          ok: true,
+          status: 200,
+        });
+      },
+    }
+  );
+  assert.equal(
+    urls.length,
+    1,
+    "each cited article is read once, off-site urls never"
+  );
+  const input = JSON.parse(
+    judgeInput(recorded, "An answer.", claims, articles)
+  );
+  assert.equal(input.citedArticles.length, 1);
+  assert.equal(input.citedArticles[0].title, "Add mailboxes");
+  assert.ok(
+    input.citedArticles[0].content.startsWith("Click Add New Inboxes.")
+  );
+  assert.equal(input.citedArticles[0].content.length, 40_000);
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("magnifying glass")
+    )
+  );
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("AI Consultant")
+    )
+  );
+  assert.ok(
+    input.widgetAffordances.some((line: string) =>
+      line.includes("Report a problem")
+    )
+  );
+});
+
+test("WIDGET_JUDGE_DOCS reads cited articles from a local docs folder instead of the help center", async () => {
+  const docs = mkdtempSync(`${tmpdir()}/judge-docs-`);
+  mkdirSync(`${docs}/crm`);
+  writeFileSync(
+    `${docs}/crm/index.mdx`,
+    '---\ntitle: "CRM"\n---\nimport X from "x";\nOpen "CRM" in the left sidebar.\n'
+  );
+  process.env.WIDGET_JUDGE_DOCS = docs;
+  try {
+    const articles = await citedArticles([
+      "https://app.acquisity.ai/docs/crm",
+      "https://app.acquisity.ai/docs/missing",
+    ]);
+    assert.deepEqual(articles, [
+      {
+        content: 'Open "CRM" in the left sidebar.',
+        title: "CRM",
+        url: "/docs/crm",
+      },
+    ]);
+  } finally {
+    delete process.env.WIDGET_JUDGE_DOCS;
+  }
+});
+
+test("WIDGET_JUDGE_NAV adds the app's navigation as one more source, cited or not", async () => {
+  const dir = mkdtempSync(`${tmpdir()}/judge-nav-`);
+  writeFileSync(
+    `${dir}/nav.txt`,
+    'Under the "Outreach" heading: "Cold Email Agent"'
+  );
+  process.env.WIDGET_JUDGE_DOCS = dir;
+  process.env.WIDGET_JUDGE_NAV = `${dir}/nav.txt`;
+  try {
+    assert.deepEqual(await citedArticles([]), [
+      {
+        content: 'Under the "Outreach" heading: "Cold Email Agent"',
+        title: "App navigation (sidebar and menus)",
+        url: "/docs",
+      },
+    ]);
+  } finally {
+    delete process.env.WIDGET_JUDGE_DOCS;
+    delete process.env.WIDGET_JUDGE_NAV;
+  }
+});

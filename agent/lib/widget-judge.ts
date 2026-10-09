@@ -1,7 +1,14 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { gateway, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
+import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
@@ -92,6 +99,22 @@ const SHARED: Claim[] = [
     id: "caveats",
     text: "The message mentions something that could not be checked only when the customer asked about that thing.",
   },
+  // ENG-14931: must hold on every case.
+  {
+    id: "invented",
+    text: "The message invents no Acquisity product fact (a feature, page, setting, plan, price or limit that neither the tool results, the conversation nor a cited help-center article supports) and promises nothing about what Acquisity or its team will do.",
+  },
+];
+/** Only a case with earlier turns can re-ask or lose the thread. */
+const CONVERSATION: Claim[] = [
+  {
+    id: "reask",
+    text: "The message does not ask for a detail the customer already gave in the earlier turns, such as which feature, page, campaign or plan they mean.",
+  },
+  {
+    id: "context",
+    text: "The message answers the latest customer message, reading the earlier turns only to resolve what it refers to.",
+  },
 ];
 const LIMITED: Claim = {
   id: "member",
@@ -113,6 +136,7 @@ export function claimsFor(recorded: WidgetCase): Claim[] {
     },
     ...SHARED,
     ...(limited ? [LIMITED] : []),
+    ...(toRequest(recorded.question).history?.length ? CONVERSATION : []),
     ...claims.map((text, n) => ({ id: `case-${n + 1}`, text })),
   ];
 }
@@ -121,7 +145,111 @@ const JUDGE_PROMPT = `You check one customer support answer against a list of cl
 The tool results are the ground truth for the customer's account. The customer cannot see them.
 For each claim, answer yes only when the claim holds for the answer, and no otherwise. Give a one-line reason that points at the sentence or tool result that decides it.
 Internal jargon means words a customer would not know: raw field names, status codes, database or vendor names, ticket ids, or tool names.
-Return exactly one verdict per claim id, in the order given.`;
+Return exactly one verdict per claim id, in the order given.
+citedArticles is the text of the help-center articles the answer cited; a fact one of them states is supported only for the situation the article states it for, so an article sentence applied to a different situation is unsupported. An Acquisity product fact no cited article, tool result or conversation turn states is unsupported.
+widgetAffordances are real parts of the support widget the answer may mention.`;
+
+/** The support widget's own affordances the judge may treat as real. Nothing else. */
+const WIDGET_AFFORDANCES = [
+  "The magnifying glass next to the message box, for owners and admins, starts a look at their workspace.",
+  "The AI Consultant is under the Chat toggle at the top of the left sidebar.",
+  'The "Report a problem" link.',
+];
+
+/**
+ * Every help-center article fits whole (the longest was 17,297 characters on
+ * 2026-10-08). At 8,000 the judge flagged true facts that sat past the cut in
+ * the very article a reply cited (ENG-14932 round 3).
+ */
+const MAX_ARTICLE_CHARS = 40_000;
+
+export interface CitedArticle {
+  content: string;
+  title?: string;
+  url: string;
+}
+
+const FRONTMATTER = /^---\n[\s\S]*?\n---\n?/u;
+const MDX_IMPORTS = /^(import|export) .*$/gmu;
+const TITLE = /^title:\s*["']?(.*?)["']?\s*$/mu;
+
+/**
+ * One article from a local copy of apps/web/content/docs (WIDGET_JUDGE_DOCS),
+ * so the judge can read the docs a change is built from before they ship.
+ */
+function localArticle(url: string, docs: string) {
+  const slug = helpArticleSlug(url);
+  const path = [`${docs}/${slug}.mdx`, `${docs}/${slug}/index.mdx`].find(
+    (candidate) => slug && existsSync(candidate)
+  );
+  if (!path) {
+    return { error: "Article not found.", url };
+  }
+  const raw = readFileSync(path, "utf8");
+  return {
+    content: raw.replace(FRONTMATTER, "").replace(MDX_IMPORTS, "").trim(),
+    title: raw.match(TITLE)?.[1],
+    url: `/docs/${slug}`,
+  };
+}
+
+/**
+ * The text of each cited help-center article; an unreadable one is left out.
+ * Live from the help center unless WIDGET_JUDGE_DOCS names a local docs folder.
+ * WIDGET_JUDGE_NAV names a file holding the app's navigation as checked in the
+ * real app (the product guide's sidebar map); it is added as one more source,
+ * so a path it supports is not counted as invented.
+ */
+export async function citedArticles(
+  urls: readonly string[],
+  opts?: Parameters<typeof getHelpArticleContent>[1]
+): Promise<CitedArticle[]> {
+  const docs = process.env.WIDGET_JUDGE_DOCS;
+  const read = await Promise.all(
+    [...new Set(urls)].map((url) =>
+      docs ? localArticle(url, docs) : getHelpArticleContent(url, opts)
+    )
+  );
+  const nav = process.env.WIDGET_JUDGE_NAV;
+  return [
+    ...read.flatMap((article) =>
+      "error" in article
+        ? []
+        : [{ ...article, content: article.content.slice(0, MAX_ARTICLE_CHARS) }]
+    ),
+    ...(nav
+      ? [
+          {
+            content: readFileSync(nav, "utf8").slice(0, MAX_ARTICLE_CHARS),
+            title: "App navigation (sidebar and menus)",
+            url: "/docs",
+          },
+        ]
+      : []),
+  ];
+}
+
+/** The judge's user message: the answer, its claims and every piece of evidence it may rely on. */
+export const judgeInput = (
+  recorded: WidgetCase,
+  answer: string,
+  claims: Claim[],
+  articles: CitedArticle[] = []
+) =>
+  JSON.stringify({
+    answer,
+    citedArticles: articles,
+    claims,
+    question: recorded.question,
+    role: recorded.scope.role,
+    toolResults: recorded.cassette.map(({ input, output, status, tool }) => ({
+      input,
+      output,
+      status,
+      tool,
+    })),
+    widgetAffordances: WIDGET_AFFORDANCES,
+  });
 
 const judgeSchema = z.strictObject({ verdicts: z.array(verdictSchema) });
 
@@ -157,7 +285,8 @@ export async function judgeAnswer(
   answer: string,
   claims: Claim[],
   abortSignal?: AbortSignal,
-  model: LanguageModel = gateway(JUDGE_MODEL)
+  model: LanguageModel = gateway(JUDGE_MODEL),
+  articles: CitedArticle[] = []
 ): Promise<Verdict[]> {
   const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
   const { object } = await generateObject({
@@ -165,18 +294,7 @@ export async function judgeAnswer(
       ? AbortSignal.any([abortSignal, deadline])
       : deadline,
     model,
-    prompt: JSON.stringify({
-      answer,
-      claims,
-      question: recorded.question,
-      role: recorded.scope.role,
-      toolResults: recorded.cassette.map(({ input, output, status, tool }) => ({
-        input,
-        output,
-        status,
-        tool,
-      })),
-    }),
+    prompt: judgeInput(recorded, answer, claims, articles),
     schema: judgeSchema,
     system: JUDGE_PROMPT,
   });
