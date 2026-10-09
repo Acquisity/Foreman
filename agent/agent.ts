@@ -53,7 +53,16 @@ export default defineAgent({
           ),
           // Jev decides each widget step, so the widget model only acts: on its
           // default reasoning each step ran past the 15s model-call timeout.
-          modelOptions: widget ? fastCallOptions(id) : gatewayRouting(id),
+          // A wrapped gateway model gets no prompt caching from eve, so the widget
+          // asks the gateway for it: the product guide is a long stable prefix.
+          modelOptions: widget
+            ? {
+                providerOptions: {
+                  ...fastCallOptions(id).providerOptions,
+                  gateway: { caching: "auto" },
+                },
+              }
+            : gatewayRouting(id),
         };
       },
     },
