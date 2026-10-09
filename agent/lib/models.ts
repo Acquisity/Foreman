@@ -1,9 +1,11 @@
-import { gateway } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { gateway, type LanguageModel } from "ai";
 import { z } from "zod";
 import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
-// so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
+// so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends
+// anthropic/ ids to the CLI Proxy when it is configured (ENG-15082).
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
@@ -43,7 +45,9 @@ export const MODELS = {
   // write-up: sonnet-5 12 to 20s, haiku-4.5 10 to 16s, the orchestrator's
   // deepseek 39 to 41s, which with a deepseek call on every step ran 3 of 14
   // investigations past the widget deadline. The egress reviewer stays on `gate`.
-  widget: "anthropic/claude-sonnet-5",
+  // ENG-15082 moved it from sonnet-5 to sonnet-5.5 when Claude calls moved to
+  // the CLI Proxy (see modelFor); the timings above predate both changes.
+  widget: "anthropic/claude-sonnet-5.5",
   // Support widget steps: Jev picks each read, so this only fills in its
   // arguments. ~1s a call; gemini-3.5-flash took ~15s a call the same afternoon.
   widgetSteps: "anthropic/claude-haiku-4.5",
@@ -124,6 +128,21 @@ export const writeModelOverrides = async (
 // start after it, never mid-conversation.
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
+
+// The model instance for an id. anthropic/ ids go to the CLI Proxy, an Anthropic-compatible
+// endpoint, when CLIPROXY_BASE_URL and CLIPROXY_API_KEY are both set; the proxy names models with
+// dashes (claude-sonnet-5-5). Everything else, and Claude without the proxy, stays on the gateway.
+// A failed proxy call fails like any other model call: there is no gateway fallback.
+export const modelFor = (id: string): Exclude<LanguageModel, string> => {
+  const baseURL = process.env.CLIPROXY_BASE_URL;
+  const apiKey = process.env.CLIPROXY_API_KEY;
+  if (id.startsWith("anthropic/") && baseURL && apiKey) {
+    return createAnthropic({ apiKey, baseURL })(
+      id.slice("anthropic/".length).replaceAll(".", "-")
+    );
+  }
+  return gateway(id);
+};
 
 // Gateway routing for the root's DeepSeek calls. Every rejection found on ENG-13730 and
 // ENG-13732 was a baseten call on a mixed-provider history ("reasoning_content in the thinking

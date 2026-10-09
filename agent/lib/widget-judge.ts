@@ -5,9 +5,10 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { gateway, generateObject, type LanguageModel } from "ai";
+import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
+import { modelFor } from "./models.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
 
@@ -338,7 +339,7 @@ export async function judgeAnswer(
   answer: string,
   claims: Claim[],
   abortSignal?: AbortSignal,
-  model: LanguageModel = gateway(JUDGE_MODEL),
+  model: LanguageModel = modelFor(JUDGE_MODEL),
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
   const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);

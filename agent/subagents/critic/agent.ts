@@ -1,5 +1,5 @@
 import { defineAgent, defineDynamic } from "eve";
-import { resolveModel } from "../../lib/models.js";
+import { modelFor, resolveModel } from "../../lib/models.js";
 
 /**
  * The twelve review criteria, in the order the critic judges them. A review
@@ -49,9 +49,11 @@ export default defineAgent({
     "(classification, unblock, handling path, state, priority, labels, hotlane proposal, master candidate). " +
     "Returns APPROVE, CHALLENGE, or INSUFFICIENT_EVIDENCE with a result for each of twelve criteria. " +
     "Read-only: never writes to Linear, repositories, databases, providers, Slack, or memory.",
+  // A model instance (modelFor routes Claude through the CLI Proxy) can only be
+  // returned at step start; Eve cannot serialize one into a session selection.
   model: defineDynamic({
     events: {
-      "session.started": () => resolveModel("critic"),
+      "step.started": async () => modelFor(await resolveModel("critic")),
     },
   }),
   outputSchema: {

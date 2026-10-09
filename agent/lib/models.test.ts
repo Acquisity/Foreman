@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { gatewayRouting, parseModelOverrides } = await import("./models.js");
+const { gatewayRouting, modelFor, parseModelOverrides } = await import(
+  "./models.js"
+);
 
 describe("gatewayRouting", () => {
   it("orders a deepseek id onto the providers that accept a mixed history", () => {
@@ -76,5 +78,71 @@ describe("parseModelOverrides", () => {
       })
     );
     assert.deepEqual(overrides, { critic: "anthropic/claude-opus-4.8" });
+  });
+});
+
+describe("modelFor", () => {
+  const withProxy = (
+    env: { CLIPROXY_API_KEY?: string; CLIPROXY_BASE_URL?: string },
+    run: () => void
+  ) => {
+    const saved = {
+      CLIPROXY_API_KEY: process.env.CLIPROXY_API_KEY,
+      CLIPROXY_BASE_URL: process.env.CLIPROXY_BASE_URL,
+    };
+    for (const key of ["CLIPROXY_API_KEY", "CLIPROXY_BASE_URL"] as const) {
+      if (env[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = env[key];
+      }
+    }
+    try {
+      run();
+    } finally {
+      for (const key of ["CLIPROXY_API_KEY", "CLIPROXY_BASE_URL"] as const) {
+        if (saved[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = saved[key];
+        }
+      }
+    }
+  };
+  const proxy = {
+    CLIPROXY_API_KEY: "test-key",
+    CLIPROXY_BASE_URL: "https://proxy.test/v1",
+  };
+  const describeModel = (id: string) => {
+    const { modelId, provider } = modelFor(id);
+    return { modelId, provider };
+  };
+
+  it("sends a Claude id to the proxy with its dashed name", () => {
+    withProxy(proxy, () => {
+      const { modelId, provider } = describeModel(
+        "anthropic/claude-sonnet-5.5"
+      );
+      assert.equal(provider, "anthropic.messages");
+      assert.equal(modelId, "claude-sonnet-5-5");
+    });
+  });
+
+  it("keeps a Claude id on the gateway when the proxy is not fully set", () => {
+    withProxy({ CLIPROXY_BASE_URL: proxy.CLIPROXY_BASE_URL }, () => {
+      assert.deepEqual(describeModel("anthropic/claude-sonnet-5.5"), {
+        modelId: "anthropic/claude-sonnet-5.5",
+        provider: "gateway",
+      });
+    });
+  });
+
+  it("keeps every other id on the gateway", () => {
+    withProxy(proxy, () => {
+      assert.deepEqual(describeModel("deepseek/deepseek-v4-pro-0813"), {
+        modelId: "deepseek/deepseek-v4-pro-0813",
+        provider: "gateway",
+      });
+    });
   });
 });
