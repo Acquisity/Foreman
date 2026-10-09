@@ -33,7 +33,7 @@ export const widgetOutcomeSchema = z.object({
 });
 export type WidgetOutcome = z.infer<typeof widgetOutcomeSchema>;
 
-const runSchema = z.object({
+export const widgetRunSchema = z.object({
   completed_at: z.coerce.date().nullable(),
   created_at: z.coerce.date(),
   decision: z.string().nullable(),
@@ -47,7 +47,7 @@ const runSchema = z.object({
   session_id: z.string().nullable(),
   stream_index: z.number().int().nonnegative(),
 });
-export type WidgetRun = z.infer<typeof runSchema>;
+export type WidgetRun = z.infer<typeof widgetRunSchema>;
 
 export function assertWidgetRunOwner(
   run: WidgetRun,
@@ -125,7 +125,7 @@ export async function claimWidgetRun(
     ]
   );
   if (inserted.length) {
-    return { fresh: true, run: runSchema.parse(inserted[0]) };
+    return { fresh: true, run: widgetRunSchema.parse(inserted[0]) };
   }
   const rows = await db.query(
     `SELECT * FROM widget_support_runs WHERE organization_id = $1 AND conversation_id = $2
@@ -139,7 +139,7 @@ export async function claimWidgetRun(
     }
     throw new Error("Investigation run could not be claimed.");
   }
-  const run = runSchema.parse(rows[0]);
+  const run = widgetRunSchema.parse(rows[0]);
   assertWidgetRunOwner(run, scope);
   // Another message's run is still open. Its answer belongs to that message, so
   // this caller is told to wait and claim again, never handed the same reply.
@@ -151,7 +151,7 @@ export async function readWidgetRun(id: string): Promise<WidgetRun> {
     "SELECT * FROM widget_support_runs WHERE id = $1",
     [z.uuid().parse(id)]
   );
-  return runSchema.parse(rows[0]);
+  return widgetRunSchema.parse(rows[0]);
 }
 
 /** The stream index marks where this turn starts, so recovery on a multi-turn session never replays an older completion. */

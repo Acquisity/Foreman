@@ -19,6 +19,7 @@ import {
   callPlanetscaleReadQuery,
   parseReadQueryResult,
 } from "#lib/planetscale.js";
+import { liveToolInput } from "#lib/widget-live-policy.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
@@ -729,7 +730,7 @@ const tool = defineTool({
           return row?.authorized === true;
         },
       },
-      input
+      liveToolInput("widget_billing_summary", input, scope.liveAsOf)
     );
   },
   inputSchema: widgetBillingSummaryInputSchema,
