@@ -194,16 +194,21 @@ async function rejudgeReplay(replay: ScoredReplay, output: string) {
   });
 }
 
+/** WIDGET_REPLAY_CASES limits re-judging and the scorecard to the named cases, as it limits replay. */
+const selected = (() => {
+  const names = process.env.WIDGET_REPLAY_CASES?.split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names?.length
+    ? ({ caseName }: ScoredReplay) => names.includes(caseName ?? "")
+    : () => true;
+})();
+
 async function rejudge(dirs: string[]) {
   if (!dirs.length) {
     throw new Error("rejudge requires eval directories.");
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  // WIDGET_REPLAY_CASES limits re-judging to the named cases, as it limits replay.
-  const names = process.env.WIDGET_REPLAY_CASES?.split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
-  const only = names?.length ? new Set(names) : null;
   for (const [index, dir] of dirs.entries()) {
     const output = `${JUDGE_OUTPUT}/${stamp}-rejudge-${index}`;
     let judged = 0;
@@ -212,7 +217,7 @@ async function rejudge(dirs: string[]) {
       if (
         replay.row.scored === false ||
         !replay.row.answer ||
-        (only && !only.has(replay.caseName ?? ""))
+        !selected(replay)
       ) {
         continue;
       }
@@ -288,7 +293,9 @@ async function main() {
     console.log(
       renderScorecard(
         scorecard(
-          dirs.flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+          dirs
+            .flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+            .filter(selected)
         )
       )
     );
