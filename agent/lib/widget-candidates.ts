@@ -64,6 +64,10 @@ export const parseExcludedOrgs = (value: string | undefined) =>
   new Set([
     "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5",
     "af11d514-3fbd-459c-8425-81b6b80929a0",
+    // Internal, not customers (Aaron, 2026-10-09).
+    "196e6aca-a8d4-4531-bbd0-babd8aa2f26f",
+    "900f11b4-8949-4a3a-8e8a-19eaceae72df",
+    "b99fe507-7226-4878-90c4-006b16e7bddd",
     ...z.array(z.uuid()).parse(
       (value ?? "")
         .split(",")
