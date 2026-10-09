@@ -1257,7 +1257,10 @@ async function answerFreshRun(
         run,
         input.recording ? { ...scope, recordingId: input.recording.id } : scope,
         input.staff
-          ? withTeamThread(message, (await deps.inboxHistory?.(run)) ?? [])
+          ? withTeamThread(
+              message,
+              (await deps.inboxHistory?.(run).catch(() => [])) ?? []
+            )
           : message,
         handlers,
         responseWaitMs,

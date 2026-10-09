@@ -2268,6 +2268,26 @@ test("a teammate's follow-up reaches the investigator with the earlier team-only
   );
 });
 
+test("a teammate's request still investigates when the team-only exchange cannot be read", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const inbox = { ...scope, source: "inbox" as const };
+  run.scope = inbox;
+  deps.inboxHistory = () => Promise.reject(new Error("database down"));
+  const { args, sends } = startedSessions();
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "Check campaign B too.", staff: true }),
+    args,
+    200,
+    () => Promise.resolve(inbox),
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(sends.length, 1);
+  assert.ok(sends[0].startsWith("Check campaign B too."));
+  assert.ok(!sends[0].includes("EARLIER TEAM-ONLY CONVERSATION"));
+});
+
 test("a customer's investigation never reads the team-only exchange", async (t) => {
   enabled(t);
   const { deps } = dependencies();
