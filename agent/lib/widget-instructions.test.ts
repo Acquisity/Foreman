@@ -36,7 +36,7 @@ const B = "00000000-0000-4000-8000-00000000000b";
 
 test("two workspaces share one cached system block that ends with the guide", () => {
   const split = (userId: string) =>
-    cacheGuide([
+    cacheGuide<{ content: string; providerOptions?: unknown; role: string }>([
       {
         content: composePrompt(sessionLane(widgetAuth({ ...scope, userId }))),
         role: "system",
