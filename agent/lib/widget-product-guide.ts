@@ -3667,6 +3667,3 @@ Same as support slug.
 - No separate ticket portal; conversation history is in the chat itself.
 - AI Consultant ("Chat" toggle) is separate and has no ticket history.
 `;
-
-/** Each model call's output by a hash of its inputs; the script reuses an unchanged call's output. */
-export const PRODUCT_GUIDE_CACHE: Record<string, string> = {};

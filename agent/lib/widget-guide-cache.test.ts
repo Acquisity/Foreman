@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  assertGuideCallStopped,
   cachedGuideText,
   checkedGuideCall,
+  countedGuideAttempt,
+  guideArtifactsEqual,
   guideCallKey,
+  parseGuideCache,
 } from "./widget-guide-cache.js";
 
+const FAILED_BATCH =
+  /batch 7: Error: (transport|distill call ended with length)/u;
 const BAD_BATCH = /batch 3: Error: bad slug/u;
 
 test("only a batch whose prompt, model or articles changed calls the model again", () => {
@@ -68,4 +74,102 @@ test("a batch that fails its check is distilled again, alone and at most the giv
     BAD_BATCH
   );
   assert.equal(cached.calls(), 1);
+});
+
+test("guide cache accepts only hash-to-text data and compares pending artifacts", () => {
+  const key = guideCallKey("batch");
+  const source = JSON.stringify({ [key]: "text" });
+  assert.deepEqual(parseGuideCache(source), { [key]: "text" });
+  for (const invalid of [
+    "[]",
+    "null",
+    '{"not-a-hash":"text"}',
+    JSON.stringify({ [key]: 42 }),
+  ]) {
+    assert.throws(() => parseGuideCache(invalid));
+  }
+  const before = { cache: source, guide: "guide" };
+  assert.equal(
+    guideArtifactsEqual(before, {
+      cache: JSON.stringify({ [key]: "text" }, null, 2),
+      guide: "guide",
+    }),
+    true
+  );
+  assert.equal(
+    guideArtifactsEqual(before, { cache: source, guide: "changed" }),
+    false
+  );
+  assert.equal(
+    guideArtifactsEqual(before, { cache: "{}", guide: "guide" }),
+    false
+  );
+  assert.equal(
+    guideArtifactsEqual(
+      {
+        cache: source,
+        guide: "// from Acquisity aaaaaaaaaaaa.\nGuide at aaaaaaaaaaaa",
+      },
+      {
+        cache: source,
+        guide: "// from Acquisity bbbbbbbbbbbb.\nGuide at bbbbbbbbbbbb",
+      }
+    ),
+    true
+  );
+});
+
+test("transport rejection and truncation retry within one labelled batch budget", async () => {
+  for (const failure of ["transport", "length"]) {
+    let calls = 0;
+    const distill = () => {
+      calls += 1;
+      if (failure === "transport") {
+        return Promise.reject(new Error("transport"));
+      }
+      assertGuideCallStopped(failure);
+      return Promise.resolve({ fresh: true, text: "truncated" });
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: exercise each independent failure case.
+    await assert.rejects(
+      checkedGuideCall("batch 7", 3, distill, (text) => text),
+      FAILED_BATCH
+    );
+    assert.equal(calls, 3);
+  }
+  let calls = 0;
+  const result = await checkedGuideCall(
+    "batch 8",
+    3,
+    () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.reject(new Error("transport"));
+      }
+      assertGuideCallStopped("stop");
+      return Promise.resolve({ fresh: true, text: "recovered" });
+    },
+    (text) => text
+  );
+  assert.equal(result.text, "recovered");
+  assert.equal(calls, 2);
+});
+
+test("model attempt counts include failures and successful calls count resolved responses", async () => {
+  const stats = { attempts: 0, successfulCalls: 0 };
+  let attempts = 0;
+  await checkedGuideCall(
+    "batch 9",
+    3,
+    () =>
+      countedGuideAttempt(stats, () => {
+        attempts += 1;
+        if (attempts < 3) {
+          return Promise.reject(new Error("transport"));
+        }
+        return Promise.resolve({ fresh: true, text: "success" });
+      }),
+    (text) => text
+  );
+  assert.deepEqual(stats, { attempts: 3, successfulCalls: 1 });
 });

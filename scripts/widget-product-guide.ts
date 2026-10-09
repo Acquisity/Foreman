@@ -9,7 +9,7 @@
 // Each section opens with a "Get here:" line built from the article and the
 // sidebar in apps/web/lib/sidebar/catalog.ts at the same ref, so a step's path
 // sits in the section it cites.
-// Each model call's output is stored in the generated file under a hash of its
+// Each model call's output is stored in a separate JSON cache under a hash of its
 // inputs (model, prompt, sidebar, articles), so a rerun calls the model only
 // for the batches whose inputs changed; --full ignores those stored outputs.
 // A run that changes nothing but the commit leaves the file as it was.
@@ -30,16 +30,20 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
 import {
+  assertGuideCallStopped,
   cachedGuideText,
   checkedGuideCall,
+  countedGuideAttempt,
+  guideArtifactsEqual,
   guideCallKey,
+  parseGuideCache,
 } from "../agent/lib/widget-guide-cache.js";
+import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
   assertGuideSections,
   frontmatterField,
   plainDashes,
 } from "../agent/lib/widget-guide-validation.js";
-import { PRODUCT_GUIDE_CACHE } from "../agent/lib/widget-product-guide.js";
 
 const MODEL = "anthropic/claude-sonnet-5";
 /** The limits pass only collects what the distilled guide already says. */
@@ -52,7 +56,9 @@ const INDEX_PAGE = /(^|\/)index$/u;
 const WHITESPACE = /\s+/u;
 const SHORTENED = /^\.\.\.\//u;
 const OUT = "agent/lib/widget-product-guide.ts";
-const GENERATED_FROM = /from Acquisity ([0-9a-f]{12})\./u;
+const CACHE_FILE = "scripts/widget-product-guide.cache.json";
+const previousCache = readFileSync(CACHE_FILE, "utf8");
+const productGuideCache = parseGuideCache(previousCache);
 const CALL_TIMEOUT_MS = 240_000;
 const GIT_TIMEOUT_MS = 60_000;
 const CONCURRENCY = 6;
@@ -200,30 +206,34 @@ interface Article {
   title: string;
 }
 
-const files = (path: string): string[] =>
-  readdirSync(path).flatMap((name) => {
-    const full = join(path, name);
-    return statSync(full).isDirectory() ? files(full) : [full];
-  });
-
 /** The help-center sidebar order, from each folder's meta.json. */
 const order = (path: string): string[] => {
-  const meta = join(path, "meta.json");
+  const directory = guideSourcePath(root, path);
+  const entries = readdirSync(directory).map((name) => {
+    guideSourcePath(root, join(directory, name));
+    return name;
+  });
+  const meta = join(directory, "meta.json");
   const pages: string[] = existsSync(meta)
     ? (JSON.parse(readFileSync(meta, "utf8")).pages ?? [])
     : [];
   const names = [
     ...pages.filter((page) => !page.startsWith("---")),
-    ...readdirSync(path)
+    ...entries
       .map((name) => name.replace(MDX, ""))
       .filter((name) => name !== "meta.json"),
   ];
   return [...new Set(names)].flatMap((name) => {
-    const full = join(path, name);
-    if (existsSync(full) && statSync(full).isDirectory()) {
+    const full = join(directory, name);
+    if (
+      existsSync(full) &&
+      statSync(guideSourcePath(root, full)).isDirectory()
+    ) {
       return order(full);
     }
-    return existsSync(`${full}.mdx`) ? [`${full}.mdx`] : [];
+    return existsSync(`${full}.mdx`)
+      ? [guideSourcePath(root, `${full}.mdx`)]
+      : [];
   });
 };
 
@@ -316,7 +326,7 @@ Every explicit limit and unsupported thing the guide states, one line each with 
 Only what the guide states; never generalise one line to other features or roles. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
-let calls = 0;
+const stats = { attempts: 0, successfulCalls: 0 };
 /** This run's outputs by key, in guide order: the next run's cache. */
 const cache = new Map<string, string>();
 const call = async (
@@ -326,20 +336,11 @@ const call = async (
   model = MODEL
 ): Promise<{ fresh: boolean; key: string; text: string }> => {
   const key = guideCallKey(model, String(maxOutputTokens), system, prompt);
-  const reused = cachedGuideText(
-    PRODUCT_GUIDE_CACHE,
-    key,
-    values.full ?? false
-  );
+  const reused = cachedGuideText(productGuideCache, key, values.full ?? false);
   if (reused !== undefined) {
     return { fresh: false, key, text: reused };
   }
-  calls += 1;
-  // Each try gets its own deadline; the SDK's retries would share one.
-  const attempt = (
-    tries: number
-  ): Promise<Awaited<ReturnType<typeof generateText>>> =>
-    // A stalled response once ignored the abort, so the deadline is raced too.
+  const result = await countedGuideAttempt(stats, () =>
     Promise.race([
       generateText({
         abortSignal: AbortSignal.timeout(CALL_TIMEOUT_MS),
@@ -347,7 +348,6 @@ const call = async (
         maxRetries: 0,
         model: gateway(model),
         prompt,
-        // Gemini otherwise spends its whole output budget on hidden reasoning.
         providerOptions: {
           google: { thinkingConfig: { thinkingLevel: "minimal" } },
         },
@@ -356,14 +356,8 @@ const call = async (
       sleep(CALL_TIMEOUT_MS + 5000).then(() => {
         throw new Error("deadline");
       }),
-    ]).catch((error: unknown) => {
-      if (tries <= 1) {
-        throw error;
-      }
-      console.log(`  retry after ${String(error).slice(0, 80)}`);
-      return attempt(tries - 1);
-    });
-  const result = await attempt(3);
+    ])
+  );
   const cost = Number(
     (result.providerMetadata?.gateway as { cost?: string } | undefined)?.cost ??
       0
@@ -373,9 +367,7 @@ const call = async (
     `  out=${result.usage.outputTokens} reasoning=${result.usage.outputTokenDetails?.reasoningTokens ?? 0} words=${result.text.split(WHITESPACE).length}`
   );
   // A cut-off section silently drops every article after it.
-  if (result.finishReason !== "stop") {
-    throw new Error(`distill call ended with ${result.finishReason}`);
-  }
+  assertGuideCallStopped(result.finishReason);
   return { fresh: true, key, text: result.text.trim() };
 };
 
@@ -511,7 +503,12 @@ const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
 assertGuideSections(body, slugs);
-const limitsCall = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
+const limitsCall = await checkedGuideCall(
+  "role and limit summary",
+  BATCH_TRIES,
+  () => call(LIMITS_PROMPT, body, 8000, NAV_MODEL),
+  (text) => text
+);
 const limits = limitsCall.text;
 for (const [index, key] of keys.entries()) {
   cache.set(key, sections[index]);
@@ -556,7 +553,7 @@ const escaped = plain
   .replace(/`/gu, "\\`")
   .replace(/\$\{/gu, "\\${");
 const short = sha.slice(0, 12);
-const generated = `// Generated by scripts/widget-product-guide.ts from Acquisity ${short}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n\n/** Each model call's output by a hash of its inputs; the script reuses an unchanged call's output. */\nexport const PRODUCT_GUIDE_CACHE: Record<string, string> = ${JSON.stringify(Object.fromEntries(cache))};\n`;
+const generated = `// Generated by scripts/widget-product-guide.ts from Acquisity ${short}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n`;
 // Written as the formatter leaves it, so an unchanged rerun is byte-identical.
 const formatted = execFileSync(
   "pnpm",
@@ -564,15 +561,21 @@ const formatted = execFileSync(
   { encoding: "utf8", input: generated, maxBuffer: 64 * 1024 * 1024 }
 );
 const previous = readFileSync(OUT, "utf8");
-const previousSha = previous.match(GENERATED_FROM)?.[1] ?? short;
-if (previous.replaceAll(previousSha, short) === formatted) {
+const cacheJson = `${JSON.stringify(Object.fromEntries(cache), null, 2)}\n`;
+if (
+  guideArtifactsEqual(
+    { cache: previousCache, guide: previous },
+    { cache: cacheJson, guide: formatted }
+  )
+) {
   console.log("guide unchanged: only the commit differs, file left as it was");
 } else {
   writeFileSync(OUT, formatted);
+  writeFileSync(CACHE_FILE, cacheJson);
 }
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
 console.log(
-  `calls=${calls} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} reported_cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
