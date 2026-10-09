@@ -7,9 +7,11 @@ import { withoutGuide } from "./widget-instructions.js";
 /**
  * Preview pilot: at the first investigation step and after results, Jev picks the
  * investigator's next action, and the pick is enforced on the model request.
- * A read advertises and forces exactly that tool, so the investigator only
- * writes one call's arguments, which the tool's own schema validates. Every other
- * pick removes the evidence tools, so the investigator has to write findings.
+ * A read forces exactly that tool, so the investigator only writes one call's
+ * arguments, which the tool's own schema validates. Every other pick refuses the
+ * evidence tools, so the investigator has to write findings. The tools array
+ * itself never changes within a session: the provider caches the prompt from the
+ * tools onward, so steering is done with toolChoice and by refusing calls.
  *
  * This sits inside the widget tool allowlist and tool budget and changes
  * neither. It never sees model reasoning or the investigator's own prose, and
@@ -51,6 +53,15 @@ const ARTICLE_TOOLS = new Set([
   "widget_read_help_article",
 ]);
 export const ASK_TOOL = "widget_ask_customer";
+/** Past this many tool calls the model is told to stop gathering and answer. */
+export const MAX_WIDGET_TOOL_CALLS = 14;
+// A ticket the instructions require must stay possible after the last workspace read.
+export const LATE_TOOLS = new Set([...ARTICLE_TOOLS, TICKET_TOOL]);
+export const MAX_WORKSPACE_CALLS = MAX_WIDGET_TOOL_CALLS - 2;
+/** Whether a turn that already made `used` tool calls may still call `tool`. */
+export const withinBudget = (tool: string, used: number) =>
+  used < MAX_WIDGET_TOOL_CALLS &&
+  (used < MAX_WORKSPACE_CALLS || LATE_TOOLS.has(tool));
 /**
  * The one contract for a recorded clarification, used by the tool when it runs,
  * by the selector before it ends the turn, by the finish when it reads the
@@ -597,7 +608,6 @@ function forcedParams(
           ),
         ],
         toolChoice: { toolName: next.tool, type: "tool" },
-        tools: params.tools?.filter((tool) => tool.name === next.tool),
       },
       tool: next.tool,
     };
@@ -610,15 +620,15 @@ function forcedParams(
       ...params,
       prompt: [...params.prompt, note(NOTES.clarify)],
       toolChoice: { toolName: ASK_TOOL, type: "tool" },
-      tools: [askTool],
     },
     tool: ASK_TOOL,
   };
 }
 
 /**
- * Inner to the widget guard, so `params.tools` is already the allowlist and is
- * already empty once the tool budget is spent, in which case there is nothing to choose.
+ * Inner to the widget guard, so `params.tools` is already the allowlist. The
+ * budget and each pick decide which of those tools a step may call; the rest
+ * stay listed and their calls are refused (see `offers`).
  */
 export function widgetNextActionMiddleware(
   opts: SelectorOptions & {
@@ -630,6 +640,19 @@ export function widgetNextActionMiddleware(
   } = {}
 ): LanguageModelMiddleware {
   const plans = new WeakMap<object, Plan>();
+  /** The tools an unforced step may call. A call to any other listed tool is refused. */
+  const offers = new WeakMap<object, Set<string>>();
+  const offer = (params: Params, allowed: (tool: string) => boolean) => {
+    offers.set(
+      params,
+      new Set(
+        (params.tools ?? []).flatMap((tool) =>
+          allowed(tool.name) ? [tool.name] : []
+        )
+      )
+    );
+    return params;
+  };
   const remember = (
     forced: { params: Params; tool: string },
     original: Params,
@@ -662,20 +685,27 @@ export function widgetNextActionMiddleware(
     params: Params,
     reads: Read[],
     action: keyof typeof NOTES
-  ): Params => ({
-    ...params,
-    prompt: [...params.prompt, note(NOTES[action])],
-    toolChoice: undefined,
+  ): Params => {
     // A ticket is the investigator's call, not the selector's, and stays possible
     // once. Advice to act in the product has to rest on an article, so the help
     // center stays readable unless the run is going to a person.
-    tools: params.tools?.filter((tool) =>
-      tool.name === TICKET_TOOL
+    const allowed = (tool: string) =>
+      withinBudget(tool, reads.length) &&
+      (tool === TICKET_TOOL
         ? (action === "finish" || action === "human") &&
           !reads.some((read) => read.tool === TICKET_TOOL)
-        : action === "finish" && ARTICLE_TOOLS.has(tool.name)
-    ),
-  });
+        : action === "finish" && ARTICLE_TOOLS.has(tool));
+    return offer(
+      {
+        ...params,
+        prompt: [...params.prompt, note(NOTES[action])],
+        // Even with no tool left the tools stay listed (toolChoice none would
+        // make the provider drop them): a call is refused instead.
+        toolChoice: undefined,
+      },
+      allowed
+    );
+  };
   // The tool said why the question was not recorded. One more try, then the
   // ordinary write-up: never an "asked" with no question behind it.
   const retryAsk = (
@@ -738,21 +768,6 @@ export function widgetNextActionMiddleware(
   return {
     specificationVersion: "v4",
     async transformParams({ params: incoming }) {
-      // The ask tool is the selector's alone: the investigator is only ever
-      // offered it, forced, on a clarify decision.
-      const askTool = incoming.tools?.find((tool) => tool.name === ASK_TOOL);
-      const params: Params = {
-        ...incoming,
-        tools: incoming.tools?.filter((tool) => tool.name !== ASK_TOOL),
-      };
-      const tools = (params.tools ?? []).flatMap((tool) =>
-        tool.type === "function" &&
-        tool.name !== TICKET_TOOL &&
-        tool.name !== ASK_TOOL &&
-        !ARTICLE_TOOLS.has(tool.name)
-          ? [{ description: tool.description ?? "", name: tool.name }]
-          : []
-      );
       const {
         askAttempts,
         asked,
@@ -761,7 +776,23 @@ export function widgetNextActionMiddleware(
         finishing,
         question,
         reads,
-      } = turnEvidence(params.prompt);
+      } = turnEvidence(incoming.prompt);
+      // The ask tool is the selector's alone: the investigator may only call it
+      // forced, on a clarify decision.
+      const params = offer(
+        { ...incoming },
+        (tool) => tool !== ASK_TOOL && withinBudget(tool, reads.length)
+      );
+      const askTool = withinBudget(ASK_TOOL, reads.length)
+        ? params.tools?.find((tool) => tool.name === ASK_TOOL)
+        : undefined;
+      const tools = (params.tools ?? []).flatMap((tool) =>
+        tool.type === "function" &&
+        gathering(tool.name) &&
+        withinBudget(tool.name, reads.length)
+          ? [{ description: tool.description ?? "", name: tool.name }]
+          : []
+      );
       const initial =
         reads.length === 0 &&
         withoutNotes(params.prompt).at(-1)?.role === "user";
@@ -812,7 +843,7 @@ export function widgetNextActionMiddleware(
       const plan = plans.get(params);
       // The unforced write-up can stall too. Bound each attempt and retry a
       // timed-out model request once. This never replays a tool execution.
-      const unforced = async (input: Params) => {
+      const request = async (input: Params) => {
         for (let attempt = 0; ; attempt += 1) {
           const timeout = AbortSignal.timeout(WRITE_CALL_TIMEOUT_MS);
           const abortSignal = input.abortSignal
@@ -833,6 +864,27 @@ export function widgetNextActionMiddleware(
             );
           }
         }
+      };
+      // A call to a tool this step does not offer is refused before it runs.
+      // When that leaves the step with nothing, it is asked once more with no tool.
+      const unforced = async (input: Params) => {
+        const generated = await request(input);
+        const allowed = offers.get(input);
+        const content = generated.content.filter(
+          (part) => part.type !== "tool-call" || allowed?.has(part.toolName)
+        );
+        if (!allowed || content.length === generated.content.length) {
+          return generated;
+        }
+        const redo = !content.some((part) => part.type === "tool-call");
+        log(
+          "fallback",
+          { ms: 0, step: plan?.reads.length ?? 0 },
+          redo ? "reason=refused_call_redo" : "reason=refused_call"
+        );
+        return redo
+          ? request({ ...input, toolChoice: { type: "none" } })
+          : { ...generated, content };
       };
       if (!plan) {
         return unforced(params);

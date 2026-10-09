@@ -21,7 +21,6 @@ import {
   stepUsage,
   unrecordedReads,
 } from "#lib/widget-graders.js";
-import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-investigation-model.js";
 import {
   citedArticles,
   claimsFor,
@@ -30,6 +29,7 @@ import {
   reviewedSample,
   saveRecord,
 } from "#lib/widget-judge.js";
+import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-next-action.js";
 import { replayRecording } from "#lib/widget-replay.js";
 import { replyElapsed } from "#lib/widget-replay-timing.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";

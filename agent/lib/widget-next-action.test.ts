@@ -156,11 +156,11 @@ const RE_8 = /not a reason for a person/;
 const RE_9 = /A person should take over/;
 const RE_10 = /Stop gathering/;
 
-const WRITE_UP_TOOLS = [
-  "widget_file_ticket",
-  "widget_help_article",
-  "widget_read_help_article",
-];
+/** Every step lists the same tools, the allowlisted ones, in order. */
+const LISTED = TOOLS.map((tool) => tool.name).filter(
+  (name) => name !== "web_fetch"
+);
+const forced = (toolName: string) => ({ toolName, type: "tool" });
 
 const campaigns = {
   campaigns: [
@@ -196,7 +196,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Why was I charged?", []),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, ["widget_billing_summary"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_billing_summary"));
     assert.equal(seen.length, 1);
     assert.equal(seen[0].questions?.handoff_eligible, undefined);
     assert.equal("clarify" in (seen[0].questions?.action.criteria ?? {}), true);
@@ -221,7 +221,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Is my calendar free tomorrow from 9 to 5 Eastern?", []),
       tools: [...TOOLS, ask],
     });
-    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().tools, [...LISTED, "widget_ask_customer"]);
     assert.deepEqual(sent().toolChoice, {
       toolName: "widget_ask_customer",
       type: "tool",
@@ -319,7 +319,7 @@ describe("widget next-action selector", () => {
         ]),
         tools: TOOLS,
       });
-      assert.deepEqual(sent().tools, [pick]);
+      assert.deepEqual(sent().tools, LISTED);
       assert.deepEqual(sent().toolChoice, { toolName: pick, type: "tool" });
       assert.equal(out.content[0]?.type, "tool-call");
     });
@@ -393,7 +393,7 @@ describe("widget next-action selector", () => {
       ]),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent().tools, LISTED);
     assert.equal(sent().toolChoice, undefined);
     assert.equal(first.content[0]?.type, "tool-call");
     await model.doGenerate({
@@ -409,7 +409,7 @@ describe("widget next-action selector", () => {
     });
     // wrun_41M32MCAVG0GN0CZ5AYEW3AYV8: finish, finish, then a forced outreach read.
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent(1).tools, LISTED);
     assert.equal(sent(1).toolChoice, undefined);
   });
 
@@ -430,7 +430,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent().tools, ["widget_outreach_health"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_outreach_health"));
   });
 
   it("a tool that has already run is offered to Jev as a re-read with its own bar, for every tool alike", async () => {
@@ -506,7 +506,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Why did my campaign stop?", reads),
       tools: [...TOOLS, ASK],
     });
-    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().tools, [...LISTED, "widget_ask_customer"]);
     assert.deepEqual(sent().toolChoice, {
       toolName: "widget_ask_customer",
       type: "tool",
@@ -527,14 +527,20 @@ describe("widget next-action selector", () => {
       tools: [...TOOLS, ASK],
     });
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent(1).tools, []);
-    // A read or a fallback step never exposes it.
-    const other = harness(() => Promise.reject(new Error("down")));
-    await other.model.doGenerate({
+    assert.equal(sent(1).toolChoice, undefined);
+    // A read or a fallback step refuses it: that step is asked again with no tool.
+    const other = harness(
+      () => Promise.reject(new Error("down")),
+      call("widget_ask_customer", { question: "Which campaign do you mean?" }),
+      text("findings")
+    );
+    const out = await other.model.doGenerate({
       prompt: prompt("Why did my campaign stop?", reads),
       tools: [...TOOLS, ASK],
     });
-    assert.equal(other.sent().tools.includes("widget_ask_customer"), false);
+    assert.deepEqual(out.content, [{ text: "findings", type: "text" }]);
+    assert.equal(other.sent(0).toolChoice, undefined);
+    assert.deepEqual(other.sent(1).toolChoice, { type: "none" });
   });
 
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
@@ -559,7 +565,11 @@ describe("widget next-action selector", () => {
       "Please connect me with a person.",
       "I was charged twice for the same inbox order across my workspaces.",
     ]) {
-      const { model, sent } = harness(jev("human", 0.9));
+      const { base, model, sent } = harness(
+        jev("human", 0.9),
+        call("widget_billing_summary", {}),
+        text("findings")
+      );
       // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh harness, in order.
       await model.doGenerate({
         prompt: prompt(question, [
@@ -568,8 +578,10 @@ describe("widget next-action selector", () => {
         tools: TOOLS,
       });
       assert.match(sent().note, RE_9);
-      // Reconciling never widens the reads: no evidence tool is left to call.
-      assert.deepEqual(sent().tools, ["widget_file_ticket"]);
+      // Reconciling never widens the reads: an evidence call is refused and
+      // the step is asked again with no tool.
+      assert.equal(base.doGenerateCalls.length, 2);
+      assert.deepEqual(sent(1).toolChoice, { type: "none" });
     }
   });
 
@@ -606,7 +618,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(base.doGenerateCalls.length, 2);
-    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent(1).tools, LISTED);
     assert.match(sent(1).note, RE_10);
     assert.deepEqual(out.content, [{ text: "findings", type: "text" }]);
   });
@@ -894,7 +906,8 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(called, false);
-    assert.deepEqual(sent().tools, []);
+    assert.deepEqual(sent().tools, LISTED);
+    assert.equal(sent().toolChoice, undefined);
   });
 
   it("the decision holds on the streaming path Eve uses", async () => {
@@ -914,7 +927,7 @@ describe("widget next-action selector", () => {
     }>) {
       types.push(part.type);
     }
-    assert.deepEqual(sent().tools, ["widget_website_status"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_website_status"));
     assert.equal(types.includes("tool-call"), true);
   });
 });
@@ -1024,8 +1037,8 @@ describe("step model", () => {
     });
     assert.equal(step.doGenerateCalls.length, 1);
     assert.deepEqual(
-      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
-      ["widget_billing_summary"]
+      step.doGenerateCalls[0].toolChoice,
+      forced("widget_billing_summary")
     );
     assert.equal(main.doGenerateCalls.length, 0);
   });

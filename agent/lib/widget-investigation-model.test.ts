@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   generateText,
   simulateStreamingMiddleware,
@@ -8,7 +9,13 @@ import {
 } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
+import { composePrompt } from "./prompts.js";
+import { sessionLane } from "./session-lane.js";
+import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
+import { widgetNextActionMiddleware } from "./widget-next-action.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
+import { widgetAuth } from "./widget-scope.js";
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
@@ -23,6 +30,12 @@ const toolCall = (toolName: string) => ({
   toolCallId: "call-1",
   toolName,
   type: "tool-call" as const,
+});
+const text = (value: string) => ({
+  content: [{ text: value, type: "text" as const }],
+  finishReason: { raw: "stop", unified: "stop" as const },
+  usage,
+  warnings: [],
 });
 const result = (toolName: string) => ({
   content: [toolCall(toolName)],
@@ -121,7 +134,7 @@ describe("widget support investigation model boundary", () => {
     });
   }
 
-  it("stops advertising tools once this turn's tool calls, counted across steps, spend the budget", async () => {
+  it("keeps the tools listed and unforced at every point of this turn's budget, counted across steps", async () => {
     const call = { toolName: "widget_sdr_thread_status", type: "tool-call" };
     const calls = (count: number) => ({
       content: Array.from({ length: count }, () => call),
@@ -144,14 +157,21 @@ describe("widget support investigation model boundary", () => {
           },
           type: "generate",
         } as never);
-      return (transformed as { tools?: unknown[] }).tools?.length;
+      const { toolChoice, tools } = transformed as {
+        toolChoice?: { type: string };
+        tools?: unknown[];
+      };
+      assert.equal(tools?.length, 1);
+      return toolChoice?.type;
     };
     const user = { content: [], role: "user" };
-    assert.equal(await advertised([user, calls(7), calls(7)]), 0);
-    assert.equal(await advertised([user, calls(11)]), 1);
-    assert.equal(await advertised([user, calls(12)]), 0);
+    assert.equal(await advertised([user, calls(7), calls(7)]), "auto");
+    assert.equal(await advertised([user, calls(11)]), "auto");
+    // Past the budget, or a workspace read in the last two calls, is refused
+    // when generated (see "reserves the final two calls").
+    assert.equal(await advertised([user, calls(12)]), "auto");
     // An earlier turn's calls do not starve the follow-up.
-    assert.equal(await advertised([user, calls(14), user, calls(2)]), 1);
+    assert.equal(await advertised([user, calls(14), user, calls(2)]), "auto");
   });
 
   it("drops the calls of a parallel batch that would pass the budget, before the SDK runs them", async () => {
@@ -247,9 +267,10 @@ for (const mode of ["generate", "stream"] as const) {
       "widget_help_article",
       "widget_read_help_article",
     ]);
+    // The tools stay listed; the budget refuses the workspace read instead.
     assert.deepEqual(
       base.doGenerateCalls[0].tools?.map((entry) => entry.name),
-      received
+      names.slice(0, 3)
     );
     assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
     const logged = lines.map((line) => JSON.parse(line));
@@ -317,13 +338,17 @@ for (const mode of ["generate", "stream"] as const) {
     assert.deepEqual(received, ["widget_file_ticket"]);
     assert.deepEqual(
       base.doGenerateCalls[0].tools?.map((entry) => entry.name),
-      ["widget_file_ticket"]
+      names
     );
-    const spent = await widgetInvestigationMiddleware().transformParams?.({
+    const spent = (await widgetInvestigationMiddleware().transformParams?.({
       params: params(14),
       type: "generate",
-    } as never);
-    assert.deepEqual((spent as { tools?: unknown[] }).tools, []);
+    } as never)) as { toolChoice?: unknown; tools?: { name: string }[] };
+    assert.deepEqual(
+      spent.tools?.map((entry) => entry.name),
+      names
+    );
+    assert.equal(spent.toolChoice, undefined);
   });
 }
 
@@ -457,3 +482,251 @@ for (const end of ["error", "cancel", "close"] as const) {
     assert.equal(lines.join("").includes("private"), false);
   });
 }
+
+for (const mode of ["generate", "stream"] as const) {
+  it(`${mode}: past the budget a call is refused and the step asked once more with no tool`, async () => {
+    const replies = [result("widget_file_ticket"), text("findings")];
+    const base = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(replies.shift() ?? text("findings")),
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+      ],
+      model: base,
+    });
+    const params = {
+      prompt: [
+        {
+          content: [{ text: "Refund my last charge", type: "text" as const }],
+          role: "user" as const,
+        },
+        {
+          content: Array.from({ length: 14 }, (_, n) => ({
+            ...toolCall("widget_billing_summary"),
+            input: {},
+            toolCallId: `old${n}`,
+          })),
+          role: "assistant" as const,
+        },
+      ],
+      tools: [
+        {
+          inputSchema: { type: "object" },
+          name: "widget_file_ticket",
+          type: "function" as const,
+        },
+      ],
+    };
+    const types: string[] = [];
+    if (mode === "generate") {
+      const output = await model.doGenerate(params);
+      types.push(...output.content.map((part) => part.type));
+    } else {
+      const { stream } = await model.doStream(params);
+      for await (const part of stream) {
+        types.push(part.type);
+      }
+    }
+    assert.equal(types.includes("tool-call"), false);
+    assert.equal(types.includes("text-delta") || types.includes("text"), true);
+    assert.equal(base.doGenerateCalls.length, 2);
+    assert.equal(base.doGenerateCalls[0].tools?.length, 1);
+    assert.deepEqual(base.doGenerateCalls[1].toolChoice, { type: "none" });
+  });
+}
+
+describe("what the CLI Proxy receives for a widget investigation", () => {
+  // What eve sends an anthropic.messages model: its last tool, its last system
+  // message, and the last message and last assistant message carry a marker.
+  const MARK = { anthropic: { cacheControl: { type: "ephemeral" } } } as const;
+  const LISTED = [
+    "widget_account_access",
+    "widget_billing_summary",
+    "widget_file_ticket",
+    "widget_help_article",
+    "widget_read_help_article",
+  ];
+  const tools = ["bash", ...LISTED].map((name, n, all) => ({
+    description: `Reads ${name}.`,
+    inputSchema: { type: "object" as const },
+    name,
+    type: "function" as const,
+    ...(n === all.length - 1 ? { providerOptions: MARK } : {}),
+  }));
+  const READS = [
+    "widget_billing_summary",
+    "widget_account_access",
+    "widget_read_help_article",
+  ];
+  const eveParams = (userId: string, reads: number) => {
+    const history = READS.slice(0, reads).flatMap((toolName, n) => [
+      {
+        content: [
+          {
+            input: {},
+            toolCallId: `c${n}`,
+            toolName,
+            type: "tool-call" as const,
+          },
+        ],
+        role: "assistant" as const,
+      },
+      {
+        content: [
+          {
+            output: { type: "json" as const, value: { ok: true } },
+            toolCallId: `c${n}`,
+            toolName,
+            type: "tool-result" as const,
+          },
+        ],
+        role: "tool" as const,
+      },
+    ]);
+    const messages = [
+      {
+        content: [{ text: "Why was I charged?", type: "text" as const }],
+        role: "user" as const,
+      },
+      ...history,
+    ];
+    const lastAssistant = messages.map((m) => m.role).lastIndexOf("assistant");
+    return {
+      prompt: [
+        {
+          content: composePrompt(sessionLane(widgetAuth({ ...scope, userId }))),
+          providerOptions: MARK,
+          role: "system" as const,
+        },
+        ...messages.map((message, n) =>
+          n === messages.length - 1 || n === lastAssistant
+            ? { ...message, providerOptions: MARK }
+            : message
+        ),
+      ],
+      tools,
+    } as Parameters<ReturnType<typeof wrapLanguageModel>["doGenerate"]>[0];
+  };
+  interface Body {
+    model: string;
+    system: { cache_control?: unknown; text: string }[];
+    tools?: unknown[];
+  }
+  const session = async (userId: string, picks: string[], steps: number[]) => {
+    const bodies: Body[] = [];
+    const warnings: unknown[] = [];
+    const provider = createAnthropic({
+      apiKey: "test",
+      baseURL: "https://proxy.test/v1",
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        bodies.push(body);
+        const forced =
+          body.tool_choice?.type === "tool" ? body.tool_choice.name : undefined;
+        return Promise.resolve(
+          Response.json({
+            content: forced
+              ? [{ id: "t", input: {}, name: forced, type: "tool_use" }]
+              : [{ text: "findings", type: "text" }],
+            id: "msg",
+            model: body.model,
+            role: "assistant",
+            stop_reason: forced ? "tool_use" : "end_turn",
+            stop_sequence: null,
+            type: "message",
+            usage: { input_tokens: 1, output_tokens: 1 },
+          })
+        );
+      },
+    });
+    const jev = () =>
+      Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            answers: {
+              action: { choice: picks.shift(), confidence: 0.9 },
+              handoff_eligible: { noul: 0 },
+            },
+          }),
+        ok: true,
+        status: 200,
+      });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        simulateStreamingMiddleware(),
+        widgetNextActionMiddleware({
+          apiKey: "k",
+          fetch: jev,
+          stepModel: wrapLanguageModel({
+            middleware: [],
+            model: provider("claude-haiku-5-5"),
+          }),
+        }),
+      ],
+      model: provider("claude-sonnet-5-5"),
+    });
+    for (const reads of steps) {
+      // biome-ignore lint/performance/noAwaitInLoops: one session's steps run in order.
+      const output = await model.doGenerate(eveParams(userId, reads));
+      warnings.push(...output.warnings);
+    }
+    return Object.assign(bodies, { warnings });
+  };
+  const A = "00000000-0000-4000-8000-00000000000a";
+  const B = "00000000-0000-4000-8000-00000000000b";
+
+  it("lists the same tools at every act step, so a step reads the one before it from cache", async () => {
+    // Two picked reads on the step model, then the write-up and an article read
+    // before the finish on the main model.
+    const bodies = await session(
+      A,
+      ["widget_billing_summary", "widget_account_access", "finish"],
+      [0, 1, 2, 3]
+    );
+    assert.deepEqual(
+      bodies.map((body) => body.model),
+      [
+        "claude-haiku-5-5",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-sonnet-5-5",
+      ]
+    );
+    for (const body of bodies) {
+      assert.deepEqual(body.tools, bodies[0].tools);
+    }
+    assert.deepEqual(
+      (bodies[0].tools as { name: string }[]).map((entry) => entry.name),
+      LISTED
+    );
+  });
+
+  it("asks for at most four cache breakpoints, none of them on a tool", async () => {
+    const bodies = await session(
+      A,
+      ["widget_billing_summary", "widget_account_access", "finish"],
+      [0, 1, 2, 3]
+    );
+    for (const body of bodies) {
+      const marks = JSON.stringify(body).match(/"cache_control"/g) ?? [];
+      assert.ok(marks.length <= 4, `${body.model}: ${marks.length}`);
+      assert.equal(JSON.stringify(body.tools).includes("cache_control"), false);
+    }
+    // The provider drops a fifth breakpoint with a warning, whichever it is.
+    assert.equal(JSON.stringify(bodies.warnings).includes("breakpoint"), false);
+  });
+
+  it("caches the shared guide prefix ahead of the workspace scope, the same for two workspaces", async () => {
+    const [first] = await session(A, ["finish"], [1]);
+    const [second] = await session(B, ["finish"], [1]);
+    assert.deepEqual(second.system[0], first.system[0]);
+    assert.ok(first.system[0].cache_control);
+    assert.ok(first.system[0].text.endsWith(PRODUCT_GUIDE));
+    assert.equal(first.system[0].text.includes(A), false);
+    assert.ok(first.system[1].text.includes(A));
+    assert.ok(second.system[1].text.includes(B));
+  });
+});

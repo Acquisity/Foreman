@@ -243,7 +243,12 @@ test("the exact live ask payload is recorded by the tool, ends the turn, and rea
   assert.deepEqual(output, { asked: LIVE });
 
   const step = await nextStep([output]);
-  assert.deepEqual(step.tools, []);
+  // The tools stay listed for the cache; a call to any of them is refused.
+  assert.deepEqual(step.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
+  assert.equal(step.toolChoice, undefined);
   assert.equal(step.jevCalls, 0);
 
   const { extracted, response, stages } = await deliver(output, "asked");
@@ -261,7 +266,10 @@ test("a question the tool does not record comes back as an error, is retried onc
 
   // First failure: the ask tool is forced again, not an empty last step.
   const retry = await nextStep([rejected]);
-  assert.deepEqual(retry.tools, ["widget_ask_customer"]);
+  assert.deepEqual(retry.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
   assert.deepEqual(retry.toolChoice, {
     toolName: "widget_ask_customer",
     type: "tool",
@@ -269,7 +277,6 @@ test("a question the tool does not record comes back as an error, is retried onc
 
   // Second failure: the ordinary write-up, with its note, and no "asked" step.
   const gaveUp = await nextStep([rejected, rejected]);
-  assert.equal(gaveUp.tools.includes("widget_ask_customer"), false);
   assert.equal(gaveUp.toolChoice, undefined);
   assert.equal(gaveUp.note.includes("Write your findings now"), true);
 
@@ -311,7 +318,12 @@ test("an errored tool call is not a recorded question either", async () => {
 test("a question after reads goes out after what the reads found, as the composed reply's ending", async () => {
   const output = await execute(LIVE);
   const step = await nextStep([output]);
-  assert.deepEqual(step.tools, []);
+  // The tools stay listed for the cache; a call to any of them is refused.
+  assert.deepEqual(step.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
+  assert.equal(step.toolChoice, undefined);
   assert.equal(step.note.includes("what the completed reads showed"), true);
 
   const found: WidgetFindings = {

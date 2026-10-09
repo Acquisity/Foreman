@@ -611,12 +611,13 @@ export const defaultGateDeps: GateDeps = {
         recordingOffered,
         workspace: organizationName,
       }),
-      // The guide makes this a long stable prefix: ask the gateway to cache it.
-      providerOptions: {
-        ...fastCallOptions(model).providerOptions,
-        gateway: { caching: "auto" },
+      // The prompt and its guide are the same for every reply: one breakpoint
+      // at their end lets each reply read them from the provider's cache.
+      system: {
+        content: COMPOSER_PROMPT,
+        providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+        role: "system",
       },
-      system: COMPOSER_PROMPT,
     });
     return text.trim();
   },
