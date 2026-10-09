@@ -34,6 +34,41 @@ export const withoutGuide = <
   ),
 });
 
+/**
+ * The system message split right after the guide, with a cache breakpoint on
+ * the first part. The per-session scope follows the guide, and Anthropic only
+ * caches at block boundaries, so as one block every new workspace re-wrote the
+ * whole ~105k-token prefix; split, it reads the shared part and writes ~4k.
+ */
+export const cacheGuide = <
+  T extends { content: unknown; providerOptions?: unknown; role: string },
+>(
+  prompt: readonly T[]
+): T[] =>
+  prompt.flatMap((message) => {
+    const at =
+      message.role === "system" && typeof message.content === "string"
+        ? message.content.indexOf(WIDGET_GUIDE)
+        : -1;
+    if (at < 0) {
+      return [message];
+    }
+    const end = at + WIDGET_GUIDE.length;
+    const content = message.content as string;
+    return [
+      {
+        ...message,
+        content: content.slice(0, end),
+        providerOptions: {
+          anthropic: { cacheControl: { type: "ephemeral" } },
+        },
+      },
+      ...(end < content.length
+        ? [{ ...message, content: content.slice(end) }]
+        : []),
+    ];
+  });
+
 const RECORDING_NOTE =
   "\n\nThe customer sent the screen recording an earlier reply asked for. Read it first with widget_read_recording, then check the workspace evidence it points to. An app error, a failed request or a step that fails the way the customer describes is evidence of a platform fault. When the recording shows nothing wrong, say so and recommend the one detail that would pin the problem down. When it cannot be read, answer from the conversation. Refer to it as the customer's screen recording, never by the tool or service behind it.";
 
