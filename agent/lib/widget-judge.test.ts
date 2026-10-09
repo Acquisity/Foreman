@@ -8,7 +8,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { MockLanguageModelV4 } from "ai/test";
 import { tool as sdrTool } from "../tools/widget_sdr_thread_status.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
@@ -16,6 +15,7 @@ import {
   claimsFor,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
+  type JudgeRunner,
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
@@ -423,24 +423,21 @@ for (const cancellation of ["deadline", "caller"] as const) {
     const ready = new Promise<void>((resolve) => {
       started = resolve;
     });
-    const model = new MockLanguageModelV4({
-      doGenerate: ({ abortSignal }) =>
-        new Promise((_resolve, reject) => {
-          assert.ok(abortSignal);
-          abortSignal.addEventListener(
-            "abort",
-            () => reject(abortSignal.reason),
-            { once: true }
-          );
-          started();
-        }),
-    });
+    let calls = 0;
+    const run: JudgeRunner = (_system, _input, signal) =>
+      new Promise((_resolve, reject) => {
+        calls += 1;
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+        started();
+      });
     const pending = judgeAnswer(
       recorded,
       "An answer.",
       claims,
       cancellation === "caller" ? caller.signal : undefined,
-      model
+      run
     );
     const rejected = assert.rejects(
       pending,
@@ -451,7 +448,7 @@ for (const cancellation of ["deadline", "caller"] as const) {
       new DOMException("Cancelled", "AbortError")
     );
     await rejected;
-    assert.equal(model.doGenerateCalls.length, 1);
+    assert.equal(calls, 1);
   });
 }
 
@@ -932,24 +929,22 @@ test("leak failures identify each replay and failed check without exposing reply
 });
 
 test("the judge reads the product guide for investigate replies only", async () => {
-  const systems: string[] = [];
-  const model = new MockLanguageModelV4({
-    doGenerate: ({ prompt }) => {
-      systems.push(String(prompt[0]?.content));
-      return Promise.reject(new Error("captured"));
-    },
-  });
+  const inputs: string[] = [];
+  const run: JudgeRunner = (_system, input) => {
+    inputs.push(input);
+    return Promise.reject(new Error("captured"));
+  };
   for (const replay of [
     { ...smoke, mode: undefined },
     { ...smoke, mode: "investigate" as const },
   ]) {
     // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
     await assert.rejects(
-      judgeAnswer(replay, "An answer.", [], undefined, model)
+      judgeAnswer(replay, "An answer.", [], undefined, run)
     );
   }
-  assert.ok(!systems[0]?.includes(PRODUCT_GUIDE));
-  assert.ok(systems[1]?.includes(PRODUCT_GUIDE));
+  assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
+  assert.equal(JSON.parse(present(inputs[1])).productGuide, PRODUCT_GUIDE);
 });
 
 test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {

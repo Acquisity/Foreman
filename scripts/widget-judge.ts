@@ -7,8 +7,9 @@
 //                                   investigate scorecard (ENG-15024) over one or more replay runs
 //
 // [dir] defaults to the newest run under .eve/widget-judge/; [eval dir] to the
-// newest `eve eval` run under .eve/evals/. rerun calls the
-// judge model through the gateway, so it needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
+// newest `eve eval` run under .eve/evals/. rerun and rejudge call the judge
+// through headless Claude Code (`claude -p`), so they need a local Claude Code
+// login and never the AI Gateway.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
 import {

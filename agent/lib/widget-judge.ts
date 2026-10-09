@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -5,7 +6,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { gateway, generateObject, type LanguageModel } from "ai";
+import { tmpdir } from "node:os";
 import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
@@ -15,12 +16,14 @@ import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
  * and its egress gate reviews with openai/gpt-5.6-sol, so the judge is a tier
- * above both and from neither the gate's vendor nor the composer's model:
- * Opus 5.5 is the strongest Anthropic model the gateway serves, at the gate's
- * price ($4/$20 per million tokens on 2026-10-04). A change here reruns
- * against the gold file first (`pnpm widget:judge rerun`).
+ * above both and from neither the gate's vendor nor the composer's model.
+ * It runs through headless Claude Code on the local machine (`claude -p`, the
+ * operator's subscription), never the AI Gateway: the Gateway key is for
+ * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it). A
+ * change here reruns against the gold file first (`pnpm widget:judge rerun`).
  */
-export const JUDGE_MODEL = "anthropic/claude-opus-5.5";
+const CLAUDE_MODEL = "opus";
+export const JUDGE_MODEL = `claude-code/${CLAUDE_MODEL}`;
 
 export interface Claim {
   /** Stable across runs: a shared claim's name, or `case-<n>` for a case's own claim. */
@@ -184,13 +187,12 @@ In gaps, list every answer sentence that says something could not be confirmed, 
 
 /**
  * Investigate replies are written with the product guide in hand (ENG-15044), so
- * the judge reads the same guide as a source for product and UI facts. It sits
- * in the system prompt so the gateway can cache it across judge calls.
+ * the judge reads the same guide as a source for product and UI facts. The
+ * guide travels in the input as productGuide: a command-line system prompt
+ * cannot hold it.
  */
 const INVESTIGATE_JUDGE_PROMPT = `${JUDGE_PROMPT}
-The product guide below is the help center, distilled. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.
-
-${PRODUCT_GUIDE}`;
+productGuide is the help center, distilled. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
@@ -283,6 +285,7 @@ export const judgeInput = (
     answer,
     citedArticles: articles,
     claims,
+    ...(recorded.mode === "investigate" ? { productGuide: PRODUCT_GUIDE } : {}),
     question: recorded.question,
     role: recorded.scope.role,
     toolResults: recorded.cassette.map(({ input, output, status, tool }) => ({
@@ -300,7 +303,95 @@ const judgeSchema = z.strictObject({
   verdicts: z.array(verdictSchema),
 });
 
-export const JUDGE_TIMEOUT_MS = 60_000;
+/** A headless Claude Code start plus an Opus answer on a large input. */
+export const JUDGE_TIMEOUT_MS = 240_000;
+/** Concurrent `claude -p` processes; a replay batch runs up to eight cases at once. */
+const JUDGE_CONCURRENCY = 3;
+
+/** One judge call: the system prompt and input in, the structured object out. */
+export type JudgeRunner = (
+  system: string,
+  input: string,
+  signal: AbortSignal
+) => Promise<unknown>;
+
+let running = 0;
+const queued: (() => void)[] = [];
+
+/**
+ * `claude -p` with no tools, settings, MCP servers or saved session, the input
+ * on stdin and the reply held to the judge schema. Anthropic credentials are
+ * stripped so it can only use the local Claude Code login.
+ */
+export const claudeJudge: JudgeRunner = async (system, input, signal) => {
+  while (running >= JUDGE_CONCURRENCY) {
+    // biome-ignore lint/performance/noAwaitInLoops: wait for a free slot.
+    await new Promise<void>((resolve) => queued.push(resolve));
+  }
+  running += 1;
+  try {
+    const env = { ...process.env };
+    for (const key of [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_AUTH_TOKEN",
+      "ANTHROPIC_BASE_URL",
+    ]) {
+      delete env[key];
+    }
+    const child = spawn(
+      "claude",
+      [
+        "-p",
+        "--model",
+        CLAUDE_MODEL,
+        "--system-prompt",
+        system,
+        "--tools",
+        "",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--no-session-persistence",
+        "--output-format",
+        "json",
+        "--json-schema",
+        JSON.stringify(z.toJSONSchema(judgeSchema)),
+      ],
+      { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
+    );
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(input);
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    const text = Buffer.concat(out).toString("utf8");
+    const result = (() => {
+      try {
+        return JSON.parse(text) as {
+          is_error?: boolean;
+          result?: string;
+          structured_output?: unknown;
+        };
+      } catch {
+        return null;
+      }
+    })();
+    if (code !== 0 || !result || result.is_error || !result.structured_output) {
+      throw new Error(
+        `claude -p failed (exit ${code}): ${(result?.result ?? Buffer.concat(err).toString("utf8")).slice(0, 300)}`
+      );
+    }
+    return result.structured_output;
+  } finally {
+    running -= 1;
+    queued.shift()?.();
+  }
+};
 
 const MAX_REASON = 240;
 
@@ -349,21 +440,17 @@ export async function judgeAnswer(
   answer: string,
   claims: Claim[],
   abortSignal?: AbortSignal,
-  model: LanguageModel = gateway(JUDGE_MODEL),
+  run: JudgeRunner = claudeJudge,
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
   const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
-  const { object } = await generateObject({
-    abortSignal: abortSignal
-      ? AbortSignal.any([abortSignal, deadline])
-      : deadline,
-    model,
-    prompt: judgeInput(recorded, answer, claims, articles),
-    providerOptions: { gateway: { caching: "auto" } },
-    schema: judgeSchema,
-    system:
+  const object = judgeSchema.parse(
+    await run(
       recorded.mode === "investigate" ? INVESTIGATE_JUDGE_PROMPT : JUDGE_PROMPT,
-  });
+      judgeInput(recorded, answer, claims, articles),
+      abortSignal ? AbortSignal.any([abortSignal, deadline]) : deadline
+    )
+  );
   return { gaps: parseGaps(object), verdicts: parseVerdicts(claims, object) };
 }
 
