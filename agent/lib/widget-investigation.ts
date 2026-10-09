@@ -20,6 +20,7 @@ import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
 import {
   askedResult,
+  gathering,
   handoffEligible,
   nextActionEnabled,
   validAsk,
@@ -204,6 +205,8 @@ export type WaitOutcome =
   | {
       /** The question widget_ask_customer recorded during this turn, if a clarify decision ran. */
       asked?: string;
+      /** The turn read the workspace, so a question goes out after what the reads found. */
+      afterReads?: true;
       findings: WidgetFindings | null;
       status: "completed";
       text: string | null;
@@ -284,17 +287,29 @@ const withFiledTicket = (
 
 interface Recorded {
   asked: string | null;
+  read: boolean;
   ticket: FiledTicket | null;
 }
-/** What the turn's own tool results recorded: a filed ticket, a question for the customer. */
-const recorded = (result: unknown, so: Recorded): Recorded => ({
-  asked: askedResult(result) ?? so.asked,
-  ticket: filedTicketResult(result) ?? so.ticket,
-});
+/** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
+const recorded = (result: unknown, so: Recorded): Recorded => {
+  const action = result as { kind?: string; toolName?: unknown } | null;
+  return {
+    asked: askedResult(result) ?? so.asked,
+    read:
+      so.read ||
+      (action?.kind === "tool-result" &&
+        typeof action.toolName === "string" &&
+        gathering(action.toolName)),
+    ticket: filedTicketResult(result) ?? so.ticket,
+  };
+};
 const completed = (
-  asked: string | null,
+  { asked, read }: Pick<Recorded, "asked" | "read">,
   outcome: Extract<WaitOutcome, { status: "completed" }>
-): WaitOutcome => (asked ? { ...outcome, asked } : outcome);
+): WaitOutcome =>
+  asked
+    ? { ...outcome, asked, ...(read ? { afterReads: true } : {}) }
+    : outcome;
 
 /**
  * Task completion owns the answer. The structured result is the findings
@@ -318,6 +333,7 @@ export async function waitForWidgetInvestigation(
   let text: string | null = null;
   let ticket: FiledTicket | null = null;
   let asked: string | null = null;
+  let read = false;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -334,19 +350,27 @@ export async function waitForWidgetInvestigation(
         text = null;
         ticket = null;
         asked = null;
+        read = false;
       } else if (event.type === "action.result") {
-        ({ asked, ticket } = recorded(event.data.result, { asked, ticket }));
+        ({ asked, read, ticket } = recorded(event.data.result, {
+          asked,
+          read,
+          ticket,
+        }));
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return completed(asked, {
-          findings,
-          status: "completed",
-          text,
-          ticket,
-        });
+        return completed(
+          { asked, read },
+          {
+            findings,
+            status: "completed",
+            text,
+            ticket,
+          }
+        );
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -592,7 +616,6 @@ async function withEligibleHandoff(
  * scan. After reads, the investigator also wrote what they found, and the reply
  * states that before the question (ENG-15044: 23 replies dropped the findings).
  */
-const ONLY_ASKED = /^asked\W*$/iu;
 const askedFindings = (asked: string) =>
   parseFindings({
     confidence: "low",
@@ -619,7 +642,7 @@ async function structureWriteUp(
 ) {
   const asked = nextActionEnabled() ? outcome.asked : null;
   const found =
-    asked && outcome.text && !ONLY_ASKED.test(outcome.text)
+    asked && outcome.afterReads && outcome.text
       ? (outcome.findings ??
         (await deps.extract({
           investigatorText: outcome.text,

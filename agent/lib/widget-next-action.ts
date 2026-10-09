@@ -234,7 +234,7 @@ function askState(messages: Params["prompt"]) {
 }
 
 /** A workspace read, not the ticket, the ask or a help-center article. */
-const gathering = (tool: string) =>
+export const gathering = (tool: string) =>
   tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
 
 /** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */

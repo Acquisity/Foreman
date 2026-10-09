@@ -129,6 +129,21 @@ async function deliver(
 ) {
   const events = [
     { data: {}, type: "turn.started" },
+    ...(found
+      ? [
+          {
+            data: {
+              result: {
+                callId: "r",
+                kind: "tool-result",
+                output: { campaigns: ["A", "B"] },
+                toolName: "widget_outreach_health",
+              },
+            },
+            type: "action.result",
+          },
+        ]
+      : []),
     {
       data: {
         result: {
