@@ -938,13 +938,13 @@ test("the judge reads the product guide for investigate replies only", async () 
       return Promise.reject(new Error("captured"));
     },
   });
-  for (const recorded of [
+  for (const replay of [
     { ...smoke, mode: undefined },
     { ...smoke, mode: "investigate" as const },
   ]) {
     // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
     await assert.rejects(
-      judgeAnswer(recorded, "An answer.", [], undefined, model)
+      judgeAnswer(replay, "An answer.", [], undefined, model)
     );
   }
   assert.ok(!systems[0]?.includes(PRODUCT_GUIDE));
