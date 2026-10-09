@@ -79,22 +79,63 @@ export function readResult(output: unknown, status?: string): ReadResult {
 // with replay and only observedAt (read time) removed. Failed/partial reads carry
 // no comparable state. Movement requires a real change; steady requires complete,
 // nonempty comparison evidence. Cause grading is permitted only for steady cases.
-const comparable = (output: unknown) =>
-  JSON.stringify(
-    normalize(
-      JSON.parse(JSON.stringify(output), (key, value) =>
-        key === "observedAt" ||
-        (value && typeof value === "object" && value.available === false)
-          ? undefined
-          : value
-      )
-    )
-  );
-
-const hasDropped = (value: unknown): boolean =>
+const isDropped = (value: unknown) =>
   Boolean(value) &&
   typeof value === "object" &&
-  ((value as { available?: unknown }).available === false ||
+  (value as { available?: unknown }).available === false;
+
+/**
+ * A part marked unavailable on either side leaves both sides, so a source
+ * that was readable when recorded and unavailable on the re-read (or the
+ * reverse) is never counted as movement.
+ */
+const pruneBoth = (a: unknown, b: unknown): [unknown, unknown] => {
+  if (isDropped(a) || isDropped(b)) {
+    return [undefined, undefined];
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const pairs = a.map((item, index) => pruneBoth(item, b[index]));
+    return [
+      pairs.map(([left]) => left),
+      [...pairs.map(([, right]) => right), ...b.slice(a.length)],
+    ];
+  }
+  if (
+    a &&
+    b &&
+    typeof a === "object" &&
+    typeof b === "object" &&
+    !Array.isArray(a) &&
+    !Array.isArray(b)
+  ) {
+    const left: Record<string, unknown> = {};
+    const right: Record<string, unknown> = {};
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (key === "observedAt") {
+        continue;
+      }
+      [left[key], right[key]] = pruneBoth(
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key]
+      );
+    }
+    return [left, right];
+  }
+  return [a, b];
+};
+
+const comparable = (output: unknown) =>
+  JSON.stringify(normalize(JSON.parse(JSON.stringify(output ?? null))));
+
+const sameState = (recorded: unknown, reread: unknown) => {
+  const [left, right] = pruneBoth(recorded, reread);
+  return comparable(left) === comparable(right);
+};
+
+const hasDropped = (value: unknown): boolean =>
+  isDropped(value) ||
+  (Boolean(value) &&
+    typeof value === "object" &&
     Object.values(value as object).some(hasDropped));
 
 export function driftVerdict(
@@ -110,7 +151,7 @@ export function driftVerdict(
       continue;
     }
     compared += 1;
-    if (comparable(read.recorded.output) !== comparable(read.reread.output)) {
+    if (!sameState(read.recorded.output, read.reread.output)) {
       changed.push(read.tool);
     }
     if (hasDropped(read.recorded.output) || hasDropped(read.reread.output)) {

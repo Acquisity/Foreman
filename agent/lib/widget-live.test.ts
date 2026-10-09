@@ -172,6 +172,15 @@ test("a sub-object marked unavailable on purpose is left out, and the rest is st
     driftVerdict([read(listing(true), listing(false))]).verdict,
     "state moved"
   );
+  // Readable when recorded, unavailable on the re-read: not movement.
+  const oneSided = driftVerdict([
+    read(
+      { campaigns: [{ live: { status: "active" }, sending: true }] },
+      listing(true)
+    ),
+  ]);
+  assert.equal(oneSided.verdict, "unverifiable");
+  assert.deepEqual(oneSided.changed, []);
 });
 
 test("live tool boundary enforces historical date windows and preserves explicit windows", async (t) => {
