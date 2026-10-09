@@ -199,12 +199,21 @@ async function rejudge(dirs: string[]) {
     throw new Error("rejudge requires eval directories.");
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  // WIDGET_REPLAY_CASES limits re-judging to the named cases, as it limits replay.
+  const names = process.env.WIDGET_REPLAY_CASES?.split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const only = names?.length ? new Set(names) : null;
   for (const [index, dir] of dirs.entries()) {
     const output = `${JUDGE_OUTPUT}/${stamp}-rejudge-${index}`;
     let judged = 0;
     let failed = 0;
     for (const replay of replaysIn(dir)) {
-      if (replay.row.scored === false || !replay.row.answer) {
+      if (
+        replay.row.scored === false ||
+        !replay.row.answer ||
+        (only && !only.has(replay.caseName ?? ""))
+      ) {
         continue;
       }
       try {
