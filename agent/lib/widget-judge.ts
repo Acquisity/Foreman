@@ -489,7 +489,17 @@ export interface ScoredReplay {
 }
 
 /** Goals with an agreed target (a pass rate from 0 to 1). None is set yet (ENG-15024). */
-export const SCORECARD_TARGETS: Partial<Record<string, number>> = {};
+// Agreed with Aaron 2026-10-09 against the first baseline; revisit as the set grows.
+// No tool gaps gets a target once its own trend is known. Reply time is read
+// against final reply under 60 s typical and 120 s slowest.
+export const SCORECARD_TARGETS: Partial<Record<string, number>> = {
+  "answered what was needed": 0.9,
+  "found the real cause": 0.9,
+  "handed off only when needed": 0.9,
+  "no leaks": 1,
+  "nothing made up": 0.95,
+  "stayed in budget": 0.95,
+};
 
 interface Rate {
   goal: string;

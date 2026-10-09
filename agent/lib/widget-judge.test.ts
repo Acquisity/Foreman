@@ -47,7 +47,7 @@ const present = <T>(value: T | undefined): T => {
   return value;
 };
 
-const LEAK_RATE_ROW = /\| no leaks \| 66\.7% \| 3 \| {2}\| {2}\|/;
+const LEAK_RATE_ROW = /\| no leaks \| 66\.7% \| 3 \| 100\.0% \| miss \|/;
 const TOP_GAP_ROW = /2 {2}sequence content/;
 const CAUSE_TEXT = /two inboxes disconnected/;
 const CAUSE_ROW = /\| a#cause \| .* \| yes \| a \\\| b \| {2}\|/;
