@@ -283,9 +283,11 @@ const PATH = /[A-Z][\w&' -]*(?:\s*>\s*[A-Z][\w&' -]*)+/gu;
 const TITLE_PHRASE = /\b[A-Z][\w'-]*(?: [A-Z][\w'-]*)+/gu;
 const MAX_TERMS = 40;
 
+const H2 = /\n(?=## )/u;
+const H3 = /\n(?=### )/u;
 const guideParts = (() => {
   const [head = "", articles = ""] = PRODUCT_GUIDE.split("\n## Articles\n");
-  const sections = head.split(/\n(?=## )/u).slice(1);
+  const sections = head.split(H2).slice(1);
   const isLimits = (section: string) =>
     section.startsWith("## What Acquisity cannot do");
   return {
@@ -295,7 +297,7 @@ const guideParts = (() => {
         .filter(isLimits)
         .flatMap((section) => section.split("\n"))
         .filter((line) => line.startsWith("* ")),
-      ...articles.split(/\n(?=### )/u).filter((a) => a.startsWith("### ")),
+      ...articles.split(H3).filter((a) => a.startsWith("### ")),
     ].map((text) => ({
       lower: text.toLowerCase(),
       slugs: [...text.matchAll(SLUG)].map((m) => m[1] as string),

@@ -426,7 +426,7 @@ for (const cancellation of ["deadline", "caller"] as const) {
       started = resolve;
     });
     let calls = 0;
-    const run: JudgeRunner = (_system, _input, signal) =>
+    const pendingRun: JudgeRunner = (_system, _input, signal) =>
       new Promise((_resolve, reject) => {
         calls += 1;
         signal.addEventListener("abort", () => reject(signal.reason), {
@@ -439,7 +439,7 @@ for (const cancellation of ["deadline", "caller"] as const) {
       "An answer.",
       claims,
       cancellation === "caller" ? caller.signal : undefined,
-      run
+      pendingRun
     );
     const rejected = assert.rejects(
       pending,
@@ -932,7 +932,7 @@ test("leak failures identify each replay and failed check without exposing reply
 
 test("the judge reads the product guide for investigate replies only", async () => {
   const inputs: string[] = [];
-  const run: JudgeRunner = (_system, input) => {
+  const capture: JudgeRunner = (_system, input) => {
     inputs.push(input);
     return Promise.reject(new Error("captured"));
   };
@@ -941,7 +941,9 @@ test("the judge reads the product guide for investigate replies only", async () 
     { ...smoke, mode: "investigate" as const },
   ]) {
     // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
-    await assert.rejects(judgeAnswer(replay, "An answer.", [], undefined, run));
+    await assert.rejects(
+      judgeAnswer(replay, "An answer.", [], undefined, capture)
+    );
   }
   assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
   assert.equal(
