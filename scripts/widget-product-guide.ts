@@ -37,6 +37,7 @@ import {
 import {
   assertGuideSections,
   frontmatterField,
+  plainDashes,
 } from "../agent/lib/widget-guide-validation.js";
 import { PRODUCT_GUIDE_CACHE } from "../agent/lib/widget-product-guide.js";
 
@@ -542,8 +543,7 @@ ${limits}
 ${body}
 `;
 rmSync(dir, { force: true, recursive: true });
-// Agent-facing text carries no em dashes; the docs use them freely.
-const plain = guide.replace(/\s*\u2014\s*/gu, ", ");
+const plain = plainDashes(guide);
 const vendors = plain.match(VENDOR_LEFT) ?? [];
 if (vendors.length) {
   throw new Error(`vendor names left in the guide: ${vendors.join(", ")}`);
