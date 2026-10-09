@@ -3,9 +3,11 @@ import { test } from "node:test";
 import { composePrompt } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
+import { CHAT_PROMPT } from "./widget-chat.js";
 import { COMPOSER_PROMPT } from "./widget-egress.js";
 import {
   cacheGuide,
+  WIDGET_VOICE,
   widgetInstructions,
   withoutGuide,
 } from "./widget-instructions.js";
@@ -49,4 +51,10 @@ test("two workspaces share one cached system block that ends with the guide", ()
     anthropic: { cacheControl: { type: "ephemeral" } },
   });
   assert.ok(String(first[1]?.content).includes(A));
+});
+
+test("the chat and the reply composer share one voice", () => {
+  assert.ok(CHAT_PROMPT.includes(WIDGET_VOICE));
+  assert.ok(COMPOSER_PROMPT.includes(WIDGET_VOICE));
+  assert.ok(!COMPOSER_PROMPT.includes("No greetings"));
 });
