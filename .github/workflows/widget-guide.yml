@@ -1,0 +1,112 @@
+name: widget-guide
+
+# Regenerates the widget product guide (agent/lib/widget-product-guide.ts)
+# from the Acquisity help center and opens or updates one PR on
+# bot/widget-guide (ENG-15025). Acquisity's docs-guide-trigger workflow sends
+# `docs-changed` with the commit SHA whenever the docs or the sidebar catalog
+# change on main. The generator reuses every section whose sources did not
+# change; `full` regenerates them all. A person reviews and merges the PR.
+#
+# Secrets: AI_GATEWAY_API_KEY, and WIDGET_GUIDE_TOKEN (read Acquisity/Acquisity
+# contents; write Acquisity/Foreman contents and pull requests). The default
+# GITHUB_TOKEN cannot read the private Acquisity repo, and a PR it opens would
+# not start the validate workflow.
+
+on:
+  repository_dispatch:
+    types: [docs-changed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Acquisity commit (default main)
+        required: false
+      full:
+        description: Regenerate every section, ignoring the stored outputs
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One run at a time; a newer request replaces one still queued.
+concurrency:
+  group: widget-guide
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  regenerate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SHA: ${{ github.event.client_payload.sha || inputs.sha || 'main' }}
+      FULL: ${{ inputs.full && '--full' || '' }}
+    steps:
+      - name: Check the requested commit
+        run: |
+          if ! [[ "$SHA" =~ ^([0-9a-f]{7,40}|main)$ ]]; then
+            echo "Not a commit SHA: $SHA" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          token: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+      - uses: actions/checkout@v5
+        with:
+          repository: Acquisity/Acquisity
+          ref: ${{ env.SHA }}
+          path: acquisity
+          token: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate the guide
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        # $FULL is unquoted so an empty value passes no argument.
+        run: pnpm widget:guide --repo acquisity --ref HEAD $FULL | tee "$RUNNER_TEMP/guide.log"
+      - name: Open or update the PR
+        env:
+          GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if git diff --quiet -- agent/lib/widget-product-guide.ts; then
+            echo "Guide unchanged; no PR."
+            exit 0
+          fi
+          commit=$(git -C acquisity rev-parse HEAD)
+          changed=$(grep -m1 '^regenerated=' "$RUNNER_TEMP/guide.log" | cut -d= -f2- | sed 's/,/, /g')
+          calls=$(grep -o 'calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
+          cost=$(grep -o 'cost=\$[0-9.]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
+          title="chore(widget): regenerate the product guide from Acquisity ${commit:0:12}"
+          git config user.name "foreman-widget-guide"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c bot/widget-guide
+          git commit -m "$title" -- agent/lib/widget-product-guide.ts
+          git push --force origin bot/widget-guide
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Regenerated from Acquisity [${commit:0:12}](https://github.com/Acquisity/Acquisity/commit/$commit) by [this run]($RUN_URL).
+
+          Regenerated sections: $changed
+
+          Run cost: $cost over $calls model calls.
+
+          If this change touched the sidebar catalog or apps/web/lib/features.ts, check the hardcoded facts at the top of scripts/widget-product-guide.ts (AVAILABILITY, ENTRY_POINTS) in the app; this workflow cannot verify them.
+
+          Review and merge by hand; nothing merges this automatically.
+          EOF
+          number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -f title="$title" -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-guide -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
+          fi

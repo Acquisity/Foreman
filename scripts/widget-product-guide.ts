@@ -1,6 +1,6 @@
 // Distill the Acquisity help center into the widget chat lane's product guide (ENG-14932).
 //
-//   pnpm widget:guide --repo <acquisity checkout> --ref <commit or branch>
+//   pnpm widget:guide --repo <acquisity checkout> --ref <commit or branch> [--full]
 //
 // Reads apps/web/content/docs at <ref> with `git archive` (nothing in the
 // checkout changes), has a gateway model rewrite each group of articles as
@@ -9,6 +9,10 @@
 // Each section opens with a "Get here:" line built from the article and the
 // sidebar in apps/web/lib/sidebar/catalog.ts at the same ref, so a step's path
 // sits in the section it cites.
+// Each model call's output is stored in the generated file under a hash of its
+// inputs (model, prompt, sidebar, articles), so a rerun calls the model only
+// for the batches whose inputs changed; --full ignores those stored outputs.
+// A run that changes nothing but the commit leaves the file as it was.
 // Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
 import { execFileSync } from "node:child_process";
 import {
@@ -26,9 +30,14 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
 import {
+  cachedGuideText,
+  guideCallKey,
+} from "../agent/lib/widget-guide-cache.js";
+import {
   assertGuideSections,
   frontmatterField,
 } from "../agent/lib/widget-guide-validation.js";
+import { PRODUCT_GUIDE_CACHE } from "../agent/lib/widget-product-guide.js";
 
 const MODEL = "anthropic/claude-sonnet-5";
 /** The limits pass only collects what the distilled guide already says. */
@@ -41,6 +50,7 @@ const INDEX_PAGE = /(^|\/)index$/u;
 const WHITESPACE = /\s+/u;
 const SHORTENED = /^\.\.\.\//u;
 const OUT = "agent/lib/widget-product-guide.ts";
+const GENERATED_FROM = /from Acquisity ([0-9a-f]{12})\./u;
 const CALL_TIMEOUT_MS = 240_000;
 const GIT_TIMEOUT_MS = 60_000;
 const CONCURRENCY = 6;
@@ -96,7 +106,11 @@ const scrub = (text: string) =>
   VENDORS.reduce((out, [pattern, word]) => out.replace(pattern, word), text);
 
 const { values } = parseArgs({
-  options: { ref: { type: "string" }, repo: { type: "string" } },
+  options: {
+    full: { type: "boolean" },
+    ref: { type: "string" },
+    repo: { type: "string" },
+  },
 });
 if (!(values.repo && values.ref)) {
   throw new Error("Usage: --repo <acquisity checkout> --ref <commit>");
@@ -298,12 +312,25 @@ Every explicit limit and unsupported thing the guide states, one line each with 
 Only what the guide states; never generalise one line to other features or roles. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
+let calls = 0;
+/** This run's outputs by key, in guide order: the next run's cache. */
+const cache = new Map<string, string>();
 const call = async (
   system: string,
   prompt: string,
   maxOutputTokens: number,
   model = MODEL
-): Promise<string> => {
+): Promise<{ fresh: boolean; key: string; text: string }> => {
+  const key = guideCallKey(model, String(maxOutputTokens), system, prompt);
+  const reused = cachedGuideText(
+    PRODUCT_GUIDE_CACHE,
+    key,
+    values.full ?? false
+  );
+  if (reused !== undefined) {
+    return { fresh: false, key, text: reused };
+  }
+  calls += 1;
   // Each try gets its own deadline; the SDK's retries would share one.
   const attempt = (
     tries: number
@@ -345,11 +372,13 @@ const call = async (
   if (result.finishReason !== "stop") {
     throw new Error(`distill call ended with ${result.finishReason}`);
   }
-  return result.text.trim();
+  return { fresh: true, key, text: result.text.trim() };
 };
 
 const startedAt = Date.now();
 const sections: string[] = new Array(batches.length);
+const keys: string[] = new Array(batches.length);
+const fresh: boolean[] = new Array(batches.length);
 let next = 0;
 await Promise.all(
   Array.from({ length: CONCURRENCY }, async () => {
@@ -360,7 +389,7 @@ await Promise.all(
       const chars = batch.reduce((sum, a) => sum + a.text.length, 0);
       const words = Math.max(60, Math.round(chars * RATIO));
       // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
-      sections[index] = await call(
+      const out = await call(
         DISTILL_PROMPT.replace("WORDS", String(words)).replace(
           "SIDEBAR_BLOCK",
           SIDEBAR
@@ -370,7 +399,12 @@ await Promise.all(
           .join("\n\n=====\n\n"),
         32_000
       );
-      console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
+      sections[index] = out.text;
+      keys[index] = out.key;
+      fresh[index] = out.fresh;
+      if (out.fresh) {
+        console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
+      }
     }
   })
 );
@@ -456,7 +490,19 @@ const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
 assertGuideSections(body, slugs);
-const limits = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
+const limitsCall = await call(LIMITS_PROMPT, body, 8000, NAV_MODEL);
+const limits = limitsCall.text;
+for (const [index, key] of keys.entries()) {
+  cache.set(key, sections[index]);
+}
+cache.set(limitsCall.key, limits);
+const regenerated = [
+  ...batches
+    .filter((_, index) => fresh[index])
+    .flat()
+    .map((a) => a.slug),
+  ...(limitsCall.fresh ? ["(role and limit summary)"] : []),
+];
 const availability = AVAILABILITY.map((line) => `- ${line}`).join("\n");
 const guide = `# Acquisity product guide
 
@@ -489,12 +535,24 @@ const escaped = plain
   .replace(/\\/gu, "\\\\")
   .replace(/`/gu, "\\`")
   .replace(/\$\{/gu, "\\${");
-writeFileSync(
-  OUT,
-  `// Generated by scripts/widget-product-guide.ts from Acquisity ${sha.slice(0, 12)}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n`
+const short = sha.slice(0, 12);
+const generated = `// Generated by scripts/widget-product-guide.ts from Acquisity ${short}. Do not edit by hand; rerun the script.\n\n/** Every distilled article's slug and title: the slugs the guide may cite. */\nexport const PRODUCT_GUIDE_ARTICLES: Record<string, string> = ${JSON.stringify(Object.fromEntries(available.map((a) => [a.slug, a.title])))};\n\nexport const PRODUCT_GUIDE = \`${escaped}\`;\n\n/** Each model call's output by a hash of its inputs; the script reuses an unchanged call's output. */\nexport const PRODUCT_GUIDE_CACHE: Record<string, string> = ${JSON.stringify(Object.fromEntries(cache))};\n`;
+// Written as the formatter leaves it, so an unchanged rerun is byte-identical.
+const formatted = execFileSync(
+  "pnpm",
+  ["exec", "biome", "format", `--stdin-file-path=${OUT}`],
+  { encoding: "utf8", input: generated, maxBuffer: 64 * 1024 * 1024 }
 );
+const previous = readFileSync(OUT, "utf8");
+const previousSha = previous.match(GENERATED_FROM)?.[1] ?? short;
+if (previous.replaceAll(previousSha, short) === formatted) {
+  console.log("guide unchanged: only the commit differs, file left as it was");
+} else {
+  writeFileSync(OUT, formatted);
+}
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
+console.log(`regenerated=${regenerated.join(",") || "none"}`);
 console.log(
-  `get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `calls=${calls} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} cost=$${spent.toFixed(2)} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
