@@ -53,6 +53,7 @@ import {
   FINISH_CLAIM_SECONDS,
   latestWidgetScope,
   readWidgetRun,
+  recentInboxTurns,
   recentWidgetTurns,
   requestWidgetRecording,
   saveWidgetProgress,
@@ -106,6 +107,20 @@ export const withHistory = (
   screenshots?: string[]
 ): string =>
   renderConversation(question, history, DECISION_CONTEXT, screenshots);
+
+/** A teammate's message with the earlier team-only exchange on this conversation after it. */
+export const withTeamThread = (
+  message: string,
+  turns: { role: "teammate" | "foreman"; text: string }[]
+): string =>
+  turns.length
+    ? `${message}\n\nEARLIER TEAM-ONLY CONVERSATION (a support teammate and Foreman discussed this customer conversation before this message; the customer never saw it. Build on it when the latest message follows up, and recheck anything that may have changed since):\n${turns
+        .map(
+          (turn) =>
+            `${turn.role === "teammate" ? "Teammate" : "Foreman"}: ${turn.text}`
+        )
+        .join("\n")}`
+    : message;
 
 /**
  * The message as the front door reads it: the latest message on its own, the
@@ -375,6 +390,7 @@ export const defaultWidgetDependencies = {
   gate: egressGate,
   handoffEligible,
   history: recentWidgetTurns,
+  inboxHistory: recentInboxTurns,
   latestScope: latestWidgetScope,
   plan: planWidgetChecks,
   progress: saveWidgetProgress,
@@ -387,13 +403,19 @@ export const defaultWidgetDependencies = {
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
-  "answerChat" | "changeRequested" | "plan" | "progress" | "requestRecording"
+  | "answerChat"
+  | "changeRequested"
+  | "inboxHistory"
+  | "plan"
+  | "progress"
+  | "requestRecording"
 > &
   Partial<
     Pick<
       typeof defaultWidgetDependencies,
       | "answerChat"
       | "changeRequested"
+      | "inboxHistory"
       | "plan"
       | "progress"
       | "requestRecording"
@@ -1235,7 +1257,12 @@ async function answerFreshRun(
       await startInvestigation(
         run,
         input.recording ? { ...scope, recordingId: input.recording.id } : scope,
-        message,
+        input.staff
+          ? withTeamThread(
+              message,
+              (await deps.inboxHistory?.(run).catch(() => [])) ?? []
+            )
+          : message,
         handlers,
         responseWaitMs,
         deps
