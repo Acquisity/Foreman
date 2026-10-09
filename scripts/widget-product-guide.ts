@@ -31,6 +31,7 @@ import { parseArgs } from "node:util";
 import { gateway, generateText } from "ai";
 import {
   cachedGuideText,
+  checkedGuideCall,
   guideCallKey,
 } from "../agent/lib/widget-guide-cache.js";
 import {
@@ -54,6 +55,8 @@ const GENERATED_FROM = /from Acquisity ([0-9a-f]{12})\./u;
 const CALL_TIMEOUT_MS = 240_000;
 const GIT_TIMEOUT_MS = 60_000;
 const CONCURRENCY = 6;
+/** Distill tries per batch before the run fails, naming the batch. */
+const BATCH_TRIES = 3;
 /** Source characters per distill call. */
 const BATCH_CHARS = 30_000;
 /**
@@ -375,6 +378,21 @@ const call = async (
   return { fresh: true, key, text: result.text.trim() };
 };
 
+/**
+ * The model sometimes shortens a slug to ".../tail"; a tail that names exactly
+ * one article is restored. Each batch must then head every one of its own
+ * articles, or that batch is distilled again.
+ */
+const slugs = available.map((a) => a.slug);
+const relink = (text: string) =>
+  text.replace(/\{slug: ([^}]+)\}/gu, (marker, slug: string) => {
+    const tail = slug.trim().replace(SHORTENED, "/");
+    const matches = slugs.filter((known) => `/${known}`.endsWith(tail));
+    return slugs.includes(slug.trim()) || matches.length !== 1
+      ? marker
+      : `{slug: ${matches[0]}}`;
+  });
+
 const startedAt = Date.now();
 const sections: string[] = new Array(batches.length);
 const keys: string[] = new Array(batches.length);
@@ -389,15 +407,30 @@ await Promise.all(
       const chars = batch.reduce((sum, a) => sum + a.text.length, 0);
       const words = Math.max(60, Math.round(chars * RATIO));
       // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
-      const out = await call(
-        DISTILL_PROMPT.replace("WORDS", String(words)).replace(
-          "SIDEBAR_BLOCK",
-          SIDEBAR
-        ),
-        batch
-          .map((a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`)
-          .join("\n\n=====\n\n"),
-        32_000
+      const out = await checkedGuideCall(
+        `batch ${index + 1}/${batches.length} ${batch[0].slug}`,
+        BATCH_TRIES,
+        () =>
+          call(
+            DISTILL_PROMPT.replace("WORDS", String(words)).replace(
+              "SIDEBAR_BLOCK",
+              SIDEBAR
+            ),
+            batch
+              .map(
+                (a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`
+              )
+              .join("\n\n=====\n\n"),
+            32_000
+          ),
+        (text) => {
+          const repaired = relink(text);
+          assertGuideSections(
+            repaired,
+            batch.map((a) => a.slug)
+          );
+          return repaired;
+        }
       );
       sections[index] = out.text;
       keys[index] = out.key;
@@ -409,20 +442,7 @@ await Promise.all(
   })
 );
 
-/**
- * The model sometimes shortens a slug to ".../tail"; a tail that names exactly
- * one article is restored, and em dashes copied from the docs become commas.
- */
-const slugs = available.map((a) => a.slug);
-const linked = sections
-  .join("\n\n")
-  .replace(/\{slug: ([^}]+)\}/gu, (marker, slug: string) => {
-    const tail = slug.trim().replace(SHORTENED, "/");
-    const matches = slugs.filter((known) => `/${known}`.endsWith(tail));
-    return slugs.includes(slug.trim()) || matches.length !== 1
-      ? marker
-      : `{slug: ${matches[0]}}`;
-  });
+const linked = sections.join("\n\n");
 /**
  * Each section keeps its own "Get here:" line when it is a usable path: it
  * quotes at least one label, every quoted label appears in the article or the
