@@ -546,3 +546,21 @@ test("a front-door conversation replays as the message plus its earlier turns", 
   assert.deepEqual(history.at(-1), { role: "assistant", text: "r4" });
   assert.ok(history.every((turn) => turn.text.length <= 2000));
 });
+
+test("causeType is optional and limited to the four cause types", () => {
+  const base = widgetCaseSchema.parse(
+    JSON.parse(
+      readFileSync("evals/widget/cases/local-widget-smoke.json", "utf8")
+    )
+  );
+  const withType = (causeType: unknown) =>
+    widgetCaseSchema.safeParse({
+      ...base,
+      expectations: { ...base.expectations, causeType },
+    }).success;
+  assert.ok(widgetCaseSchema.safeParse(base).success);
+  for (const type of ["user_error", "platform_limitation", "bug", "unclear"]) {
+    assert.ok(withType(type));
+  }
+  assert.ok(!withType("misconfiguration"));
+});

@@ -16,10 +16,12 @@ import {
 import {
   answeredLane,
   gradeRun,
+  handedOff,
   replayAssessment,
   stepUsage,
   unrecordedReads,
 } from "#lib/widget-graders.js";
+import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-investigation-model.js";
 import {
   citedArticles,
   claimsFor,
@@ -85,6 +87,7 @@ export default readdirSync("evals/widget/cases")
           });
           return (await response.json()) as Record<string, unknown>;
         };
+        const sent = Date.now();
         let result = await post({
           ...toRequest(recorded.question),
           ...(recorded.mode ? { mode: recorded.mode } : {}),
@@ -96,11 +99,20 @@ export default readdirSync("evals/widget/cases")
           satisfies((id) => typeof id === "string", "the route started a run")
         );
         const deadline = Date.now() + DEADLINE_MS;
+        // What the widget shows first: progress or a message. Measured at poll resolution.
+        const shows = (response: Record<string, unknown>) =>
+          Boolean(response.progress || response.message);
+        let firstReplyMs = shows(result) ? Date.now() - sent : null;
         while (result.status === "pending" && Date.now() < deadline) {
           // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
           await sleep(POLL_MS, undefined, { signal: t.signal });
           result = await post({ action: "result", run_id: runId });
+          firstReplyMs ??= shows(result) ? Date.now() - sent : null;
         }
+        const replyTimes = {
+          finalReplyMs: result.status === "pending" ? null : Date.now() - sent,
+          firstReplyMs,
+        };
         t.log(`outcome: ${JSON.stringify(result)}`);
         t.log(
           "The front door's help-center index and article fetch, if it ran, was a live read of the public docs."
@@ -119,7 +131,8 @@ export default readdirSync("evals/widget/cases")
           t,
           await readWidgetRun(String(runId)),
           recorded,
-          path
+          path,
+          replyTimes
         );
       },
     })
@@ -129,7 +142,8 @@ async function gradeReplay(
   t: EveEvalContext,
   run: WidgetRun,
   recorded: WidgetCase,
-  path: string
+  path: string,
+  replyTimes: { finalReplyMs: number | null; firstReplyMs: number | null }
 ) {
   const lane = answeredLane(run);
   const session =
@@ -171,8 +185,12 @@ async function gradeReplay(
             rawFields: grades.rawFields,
             unrecordedReads: unrecorded,
           }),
+      budgetHit: tools.length >= MAX_WIDGET_TOOL_CALLS,
       // The gate's reason names the items a rewrite removed, e.g. jev:remove_items:2,3.
       gateReason: run.outcome?.reason ?? null,
+      handedOff: handedOff(lane, run.outcome?.reason ?? null, tools),
+      toolCalls: tools.length,
+      ...replyTimes,
       ...usageRow(events),
     })}`
   );
@@ -223,14 +241,14 @@ async function judgeClaims(
     return;
   }
   const claims = claimsFor(recorded);
-  let verdicts: Awaited<ReturnType<typeof judgeAnswer>>;
+  let judged: Awaited<ReturnType<typeof judgeAnswer>>;
   try {
     // The judge reads the articles live, like the front door did.
     const articles = await citedArticles(
       (run.outcome?.citations ?? []).map(({ url }) => url),
       { signal: t.signal }
     );
-    verdicts = await judgeAnswer(
+    judged = await judgeAnswer(
       recorded,
       answer,
       claims,
@@ -247,8 +265,15 @@ async function judgeClaims(
     return;
   }
   const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
-  saveRecord(REVIEW_DIR, reviewedSample(name, recorded, answer, verdicts));
+  const { gaps, verdicts } = judged;
+  saveRecord(
+    REVIEW_DIR,
+    reviewedSample(name, recorded, answer, verdicts, gaps)
+  );
   t.log(`judge review: ${REVIEW_DIR}/review.md`);
+  for (const gap of gaps) {
+    t.log(`judge gap ${gap.kind}: ${gap.capability ?? ""}`);
+  }
   for (const verdict of verdicts) {
     t.log(`judge ${verdict.id}: ${verdict.verdict} (${verdict.reason})`);
     t.check(

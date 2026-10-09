@@ -22,6 +22,10 @@ export const widgetCaseSchema = z.strictObject({
   ),
   expectations: z.strictObject({
     cause: z.string().nullable(),
+    /** What the recorded evidence shows the cause to be; investigate cases carry it (ENG-15024). */
+    causeType: z
+      .enum(["user_error", "platform_limitation", "bug", "unclear"])
+      .optional(),
     claims: z.array(z.string()),
     fileTicket: z.boolean().nullable(),
     foreignIdentifiers: z

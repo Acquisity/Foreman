@@ -3,8 +3,11 @@
 //   pnpm widget:judge review [dir]  regenerate a run's review.md from its records
 //   pnpm widget:judge gold [dir]    turn the marks in review.md into evals/widget/judge-gold.json
 //   pnpm widget:judge rerun         judge every gold answer twice; agreement and flip rate per claim
+//   pnpm widget:judge scorecard [eval dir...]
+//                                   investigate scorecard (ENG-15024) over one or more replay runs
 //
-// [dir] defaults to the newest run under .eve/widget-judge/. rerun calls the
+// [dir] defaults to the newest run under .eve/widget-judge/; [eval dir] to the
+// newest `eve eval` run under .eve/evals/. rerun calls the
 // judge model through the gateway, so it needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
@@ -14,10 +17,15 @@ import {
   JUDGE_OUTPUT,
   type JudgeRecord,
   judgeAnswer,
+  judgeRecordSchema,
   parseMarks,
+  type ReplayRow,
   readRecords,
   renderReview,
+  renderScorecard,
   reviewedSample,
+  type ScoredReplay,
+  scorecard,
 } from "../agent/lib/widget-judge.js";
 
 import {
@@ -56,10 +64,14 @@ async function judgeGold(gold: GoldEntry[]) {
     const claims = claimsFor(recorded);
     try {
       // biome-ignore lint/performance/noAwaitInLoops: one judge call at a time keeps the run cheap to stop.
-      const verdicts = await judgeAnswer(recorded, sample.answer, claims);
+      const { gaps, verdicts } = await judgeAnswer(
+        recorded,
+        sample.answer,
+        claims
+      );
       run.set(
         sample.case,
-        reviewedSample(sample.case, recorded, sample.answer, verdicts)
+        reviewedSample(sample.case, recorded, sample.answer, verdicts, gaps)
       );
     } catch (error) {
       // The case stays out of the run, so its coverage counts as missing and the rerun fails.
@@ -69,12 +81,71 @@ async function judgeGold(gold: GoldEntry[]) {
   return run;
 }
 
+const EVALS = ".eve/evals";
+const ROW = "row: ";
+const REVIEW = "judge review: ";
+const RESULT_FILE = /^\d+\.json$/;
+const REVIEW_PAGE = /\/review\.md$/;
+const CASE_FILE = /\.json$/;
+
+/** Every investigate case one `eve eval` run replayed: its row, its case file and its judge record. */
+function replaysIn(dir: string): ScoredReplay[] {
+  const replay = `${dir}/evals/widget/replay`;
+  if (!existsSync(replay)) {
+    throw new Error(`${replay} has no widget replay results.`);
+  }
+  return readdirSync(replay)
+    .filter((file) => RESULT_FILE.test(file))
+    .flatMap((file) => {
+      const logs: string[] =
+        JSON.parse(readFileSync(`${replay}/${file}`, "utf8")).result?.logs ??
+        [];
+      const line = logs.find((log) => log.startsWith(ROW));
+      if (!line) {
+        return [];
+      }
+      const row = JSON.parse(line.slice(ROW.length)) as ReplayRow & {
+        case: string;
+      };
+      const recorded = widgetCaseSchema.parse(
+        JSON.parse(readFileSync(row.case, "utf8"))
+      );
+      if (recorded.mode !== "investigate") {
+        return [];
+      }
+      const review = logs
+        .find((log) => log.startsWith(REVIEW))
+        ?.slice(REVIEW.length)
+        .replace(REVIEW_PAGE, "");
+      const name = row.case.split("/").at(-1)?.replace(CASE_FILE, "");
+      const path = `${review}/records/${name}.json`;
+      return [
+        {
+          record:
+            review && existsSync(path)
+              ? judgeRecordSchema.parse(JSON.parse(readFileSync(path, "utf8")))
+              : null,
+          recorded,
+          row,
+        },
+      ];
+    });
+}
+
 const percent = (part: number, whole: number) =>
   whole ? `${((part / whole) * 100).toFixed(1)}%` : "n/a";
 
 async function main() {
   const [command, dir = command === "rerun" ? "" : latestRun()] =
     process.argv.slice(2);
+  if (command === "scorecard") {
+    const runs = process.argv.slice(3);
+    const dirs = runs.length
+      ? runs
+      : [`${EVALS}/${readdirSync(EVALS).sort().at(-1)}`];
+    console.log(renderScorecard(scorecard(dirs.flatMap(replaysIn))));
+    return;
+  }
   if (command === "review") {
     writeFileSync(`${dir}/review.md`, renderReview(readRecords(dir)));
     console.log(`${dir}/review.md`);
@@ -118,7 +189,9 @@ async function main() {
     process.exitCode = under ? 1 : 0;
     return;
   }
-  throw new Error("Usage: pnpm widget:judge review|gold [dir] | rerun");
+  throw new Error(
+    "Usage: pnpm widget:judge review|gold [dir] | rerun | scorecard [eval dir...]"
+  );
 }
 
 await main();

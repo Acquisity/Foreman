@@ -18,12 +18,15 @@ import {
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
+  parseGaps,
   parseMarks,
   parseVerdicts,
   readRecords,
   renderReview,
+  renderScorecard,
   reviewedSample,
   saveRecord,
+  scorecard,
 } from "./widget-judge.js";
 
 import {
@@ -42,6 +45,8 @@ const present = <T>(value: T | undefined): T => {
   return value;
 };
 
+const LEAK_RATE_ROW = /\| no leaks \| 66\.7% \| 3 \| {2}\| {2}\|/;
+const TOP_GAP_ROW = /2 {2}sequence content/;
 const CAUSE_TEXT = /two inboxes disconnected/;
 const CAUSE_ROW = /\| a#cause \| .* \| yes \| a \\\| b \| {2}\|/;
 const CAUSE_MARK = /(\| a#cause \|.*\|) {2}\|/;
@@ -548,4 +553,138 @@ test("WIDGET_JUDGE_NAV adds the app's navigation as one more source, cited or no
     delete process.env.WIDGET_JUDGE_DOCS;
     delete process.env.WIDGET_JUDGE_NAV;
   }
+});
+
+test("a user error or limitation case also needs the fix claim; a bug does not", () => {
+  const ids = (causeType: WidgetCase["expectations"]["causeType"]) =>
+    claimsFor(withRole("owner", { causeType })).map((claim) => claim.id);
+  assert.ok(ids("user_error").includes("fix"));
+  assert.ok(ids("platform_limitation").includes("fix"));
+  assert.ok(!ids("bug").includes("fix"));
+  assert.ok(!ids(undefined).includes("fix"));
+});
+
+test("parseGaps keeps a capability only on a tool gap and bounds each sentence", () => {
+  assert.deepEqual(
+    parseGaps({
+      gaps: [
+        {
+          capability: " sequence content ",
+          kind: "tool_gap",
+          sentence: "I could\n not see it.",
+        },
+        { capability: "x", kind: "tool_failure", sentence: "The read failed." },
+        { capability: null, kind: "tool_gap", sentence: "Not available." },
+      ],
+      verdicts: [],
+    }),
+    [
+      {
+        capability: "sequence content",
+        kind: "tool_gap",
+        sentence: "I could not see it.",
+      },
+      { capability: null, kind: "tool_failure", sentence: "The read failed." },
+      { capability: "unnamed", kind: "tool_gap", sentence: "Not available." },
+    ]
+  );
+  assert.throws(() =>
+    parseGaps({ gaps: [{ capability: null, kind: "other", sentence: "" }] })
+  );
+});
+
+test("scorecard reports pass rates per goal and ranks tool gaps", () => {
+  const userError = withRole("owner", {
+    causeType: "user_error",
+    claims: ["Says where to fix it."],
+  });
+  const all = (list: ReturnType<typeof claimsFor>, no: string[] = []) =>
+    list.map((claim) =>
+      verdict(claim.id, no.includes(claim.id) ? "no" : "yes")
+    );
+  const good = reviewedSample(
+    "a",
+    userError,
+    "Answer.",
+    all(claimsFor(userError)),
+    [{ capability: "Sequence content", kind: "tool_gap", sentence: "s" }]
+  );
+  const bad = reviewedSample(
+    "b",
+    userError,
+    "Answer.",
+    all(claimsFor(userError), ["fix", "invented"]),
+    [
+      { capability: "sequence content", kind: "tool_gap", sentence: "s" },
+      { capability: "billing history", kind: "tool_gap", sentence: "t" },
+      { capability: null, kind: "real_unknown", sentence: "u" },
+    ]
+  );
+  const row = {
+    budgetHit: false,
+    finalReplyMs: 20_000,
+    firstReplyMs: 1000,
+    handedOff: false,
+    leaks: "pass",
+    rawFields: "pass",
+  };
+  const card = scorecard([
+    { record: good, recorded: userError, row },
+    {
+      record: bad,
+      recorded: userError,
+      row: { ...row, budgetHit: true, finalReplyMs: 40_000 },
+    },
+    {
+      record: null,
+      recorded: userError,
+      row: { leaks: "fail", rawFields: "pass", scored: false },
+    },
+  ]);
+  const rate = (goal: string) => card.rates.find((r) => r.goal === goal);
+  assert.deepEqual(rate("found the real cause"), {
+    goal: "found the real cause",
+    pass: 2,
+    total: 2,
+  });
+  assert.deepEqual(rate("nothing made up"), {
+    goal: "nothing made up",
+    pass: 1,
+    total: 2,
+  });
+  assert.deepEqual(rate("answered what was needed (user_error)"), {
+    goal: "answered what was needed (user_error)",
+    pass: 1,
+    total: 2,
+  });
+  assert.equal(rate("answered what was needed (bug)")?.total, 0);
+  assert.deepEqual(rate("handed off only when needed"), {
+    goal: "handed off only when needed",
+    pass: 2,
+    total: 2,
+  });
+  assert.deepEqual(rate("no leaks"), { goal: "no leaks", pass: 2, total: 3 });
+  assert.deepEqual(rate("stayed in budget"), {
+    goal: "stayed in budget",
+    pass: 1,
+    total: 2,
+  });
+  assert.deepEqual(rate("no tool gaps"), {
+    goal: "no tool gaps",
+    pass: 0,
+    total: 2,
+  });
+  assert.deepEqual(card.gaps, [
+    ["sequence content", 2],
+    ["billing history", 1],
+  ]);
+  assert.deepEqual(card.replies[1], {
+    key: "final reply",
+    p50: 20,
+    p90: 40,
+    samples: 2,
+  });
+  const text = renderScorecard(card);
+  assert.match(text, LEAK_RATE_ROW);
+  assert.match(text, TOP_GAP_ROW);
 });
