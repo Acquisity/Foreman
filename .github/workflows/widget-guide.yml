@@ -84,7 +84,7 @@ jobs:
           elif [[ "$status" != 2 ]]; then
             exit "$status"
           fi
-          pnpm exec tsx --eval 'import { readFileSync } from "node:fs"; import { parseGuideCache } from "./agent/lib/widget-guide-cache.ts"; const cache = parseGuideCache(readFileSync("scripts/widget-product-guide.cache.json", "utf8")); console.log(Object.keys(cache).length === 0 ? "First run: full bootstrap (about $2 reported cost)." : "Loaded validated guide cache.");'
+          pnpm exec tsx --eval 'import { readFileSync } from "node:fs"; import { parseGuideCache } from "./agent/lib/widget-guide-cache.ts"; const cache = parseGuideCache(readFileSync("scripts/widget-product-guide.cache.json", "utf8")); console.log(Object.keys(cache).length === 0 ? "First run: full bootstrap regenerates every section." : "Loaded validated guide cache.");'
       - name: Regenerate the guide
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
@@ -126,7 +126,7 @@ jobs:
 
           Reported cost: $cost for gateway calls only ($unpriced CLI Proxy calls report no cost) over $calls successful responses and $attempts model attempts. Failed requests may have incurred additional cost.
 
-          The first automated run is a full bootstrap (about \$2); later runs reuse the JSON cache, including outputs in the pending bot PR.
+          The first automated run regenerates every section; later runs reuse the JSON cache, including outputs in the pending bot PR.
 
           If this change touched the sidebar catalog or apps/web/lib/features.ts, check the hardcoded facts at the top of scripts/widget-product-guide.ts (AVAILABILITY, ENTRY_POINTS) in the app; this workflow cannot verify them.
 

@@ -5,9 +5,11 @@ import {
   AGENT_MODEL_SLOTS,
   isValidModelId,
   listGatewayModels,
+  listProxyModels,
   loadModelOverrides,
   MODELS,
   type ModelOverrides,
+  proxyModelName,
   writeModelOverrides,
 } from "#lib/models.js";
 
@@ -31,24 +33,45 @@ export default defineTool({
     });
     if (requested.some(({ id }) => !isValidModelId(id))) {
       return {
-        error: "Every override must be a valid provider/model gateway id.",
+        error: "Every override must be a valid provider/model id.",
         success: false as const,
       };
     }
-    if (requested.length > 0) {
+    const catalogs = [
+      {
+        ids: requested.filter(({ id }) => id.startsWith("anthropic/")),
+        label: "CLI Proxy",
+        modelName: proxyModelName,
+        read: listProxyModels,
+      },
+      {
+        ids: requested.filter(({ id }) => !id.startsWith("anthropic/")),
+        label: "gateway",
+        modelName: (id: string) => id,
+        read: async () =>
+          new Set((await listGatewayModels()).map(({ id }) => id)),
+      },
+    ];
+    for (const catalog of catalogs) {
+      if (catalog.ids.length === 0) {
+        continue;
+      }
       let known: Set<string>;
       try {
-        known = new Set((await listGatewayModels()).map(({ id }) => id));
+        // biome-ignore lint/performance/noAwaitInLoops: Refuse before reading the next catalog when validation fails.
+        known = await catalog.read();
       } catch {
         return {
-          error: "Could not verify model ids against the gateway catalog.",
+          error: `Could not verify model ids against the ${catalog.label} catalog.`,
           success: false as const,
         };
       }
-      const unknown = requested.filter(({ id }) => !known.has(id));
+      const unknown = catalog.ids.filter(
+        ({ id }) => !known.has(catalog.modelName(id))
+      );
       if (unknown.length > 0) {
         return {
-          error: `Not in the gateway catalog: ${unknown.map(({ id }) => id).join(", ")}.`,
+          error: `Not in the ${catalog.label} catalog: ${unknown.map(({ id }) => id).join(", ")}.`,
           success: false as const,
         };
       }

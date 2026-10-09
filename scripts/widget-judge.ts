@@ -7,8 +7,8 @@
 //                                   investigate scorecard (ENG-15024) over one or more replay runs
 //
 // [dir] defaults to the newest run under .eve/widget-judge/; [eval dir] to the
-// newest `eve eval` run under .eve/evals/. rerun calls the
-// judge model through the gateway, so it needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.
+// newest `eve eval` run under .eve/evals/. rerun calls the default Opus 5.5
+// judge through the CLI Proxy, so it needs CLIPROXY_BASE_URL and CLIPROXY_API_KEY.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
 import {

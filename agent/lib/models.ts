@@ -130,24 +130,51 @@ export const writeModelOverrides = async (
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
 
-// The model instance for an id. anthropic/ ids go to the CLI Proxy, an Anthropic-compatible
-// endpoint that names models with dashes (claude-sonnet-5-5); every other id stays on the gateway.
-// No Claude call goes through the gateway: without CLIPROXY_BASE_URL and CLIPROXY_API_KEY a Claude
-// id throws, and a failed proxy call fails like any other model call.
-export const modelFor = (id: string): Exclude<LanguageModel, string> => {
+const proxyConfig = () => {
   const baseURL = process.env.CLIPROXY_BASE_URL;
   const apiKey = process.env.CLIPROXY_API_KEY;
-  if (!id.startsWith("anthropic/")) {
-    return gateway(id);
-  }
   if (!(baseURL && apiKey)) {
     throw new Error(
-      `${id} needs the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY`
+      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
     );
   }
-  return createAnthropic({ apiKey, baseURL })(
-    id.slice("anthropic/".length).replaceAll(".", "-")
-  );
+  return { apiKey, baseURL };
+};
+
+export const proxyModelName = (id: string): string =>
+  id.slice("anthropic/".length).replaceAll(".", "-");
+
+// Claude ids use the CLI Proxy's dashed names and require its credentials.
+// Every other id stays on the gateway; a failed proxy call has no gateway fallback.
+export const modelFor = (id: string): Exclude<LanguageModel, string> =>
+  id.startsWith("anthropic/")
+    ? createAnthropic(proxyConfig())(proxyModelName(id))
+    : gateway(id);
+
+const proxyCatalogSchema = z.object({
+  data: z.array(z.object({ id: z.string().min(1) })),
+});
+const TRAILING_SLASHES = /\/+$/u;
+
+export const listProxyModels = async (): Promise<Set<string>> => {
+  const { apiKey, baseURL } = proxyConfig();
+  try {
+    const response = await fetch(
+      `${baseURL.replace(TRAILING_SLASHES, "")}/models`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!response.ok) {
+      throw new Error("CLI Proxy catalog request failed.");
+    }
+    const { data } = proxyCatalogSchema.parse(await response.json());
+    return new Set(data.map(({ id }) => id));
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Provider errors can include credentials or response bodies.
+    throw new Error("Could not read the CLI Proxy model catalog.");
+  }
 };
 
 // Gateway routing for the root's DeepSeek calls. Every rejection found on ENG-13730 and
@@ -186,8 +213,7 @@ export const fastCallOptions = (modelId: string) => ({
 });
 
 // The gateway catalog, through the same authenticated provider eve's model calls use.
-// set_agent_models checks membership here before storing an id: a stored id the gateway
-// doesn't know would fail every future session at start, with no session left to undo it.
+// set_agent_models checks non-Claude ids here; Claude ids use listProxyModels instead.
 export const listGatewayModels = async (): Promise<
   { id: string; name: string }[]
 > => {
