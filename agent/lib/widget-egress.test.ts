@@ -789,13 +789,21 @@ test("a foreign hostname inside a url is checked for ownership; the customer's o
 test("the default judge and composer run under a deadline, so a stalled model call fails closed", async () => {
   const signals: (AbortSignal | null | undefined)[] = [];
   const realFetch = globalThis.fetch;
-  const realKey = process.env.AI_GATEWAY_API_KEY;
+  // The gate model is on the gateway; the composer is Claude, so it goes to the CLI Proxy.
+  const keys = [
+    "AI_GATEWAY_API_KEY",
+    "CLIPROXY_API_KEY",
+    "CLIPROXY_BASE_URL",
+  ] as const;
+  const realEnv = keys.map((key) => process.env[key]);
   process.env.AI_GATEWAY_API_KEY = "test";
+  process.env.CLIPROXY_API_KEY = "test";
+  process.env.CLIPROXY_BASE_URL = "https://cliproxy.test/v1";
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
     if (
-      String(input instanceof Request ? input.url : input).includes(
-        "ai-gateway"
-      )
+      url.includes("ai-gateway") ||
+      url.startsWith("https://cliproxy.test/")
     ) {
       signals.push(init?.signal);
     }
@@ -820,11 +828,14 @@ test("the default judge and composer run under a deadline, so a stalled model ca
     );
   } finally {
     globalThis.fetch = realFetch;
-    if (realKey === undefined) {
-      delete process.env.AI_GATEWAY_API_KEY;
-    } else {
-      process.env.AI_GATEWAY_API_KEY = realKey;
-    }
+    keys.forEach((key, index) => {
+      const value = realEnv[index];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    });
   }
   assert.equal(signals.length, 2);
   assert.ok(signals.every((signal) => signal instanceof AbortSignal));

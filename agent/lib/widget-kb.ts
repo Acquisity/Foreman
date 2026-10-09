@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { gateway, generateObject } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import {
@@ -7,7 +7,7 @@ import {
   HELP_CENTER_BASE_URL,
   helpArticleSlug,
 } from "./help-center.js";
-import { fastCallOptions, resolveModel } from "./models.js";
+import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   DECISION_CONTEXT,
@@ -437,7 +437,7 @@ export const defaultKbDeps: KbDeps = {
         abortSignal,
         maxRetries: 0,
         messages: withImageParts(input, images),
-        model: gateway(model),
+        model: modelFor(model),
         ...fastCallOptions(model),
         schema: replySchema,
         system: withImages(REPLY_PROMPT, images),
@@ -451,7 +451,7 @@ export const defaultKbDeps: KbDeps = {
       generateObject({
         abortSignal,
         maxRetries: 0,
-        model: gateway(model),
+        model: modelFor(model),
         prompt: JSON.stringify({
           articles: articleInput(articles),
           conversation: question,
@@ -500,7 +500,7 @@ export const defaultKbDeps: KbDeps = {
       generateObject({
         abortSignal,
         maxRetries: 0,
-        model: gateway(model),
+        model: modelFor(model),
         prompt: question,
         ...fastCallOptions(model),
         schema: rewriteSchema,
@@ -546,7 +546,7 @@ export const defaultKbDeps: KbDeps = {
           `${index.map(indexLine).join("\n")}\n\nConversation:\n${question}`,
           images
         ),
-        model: gateway(model),
+        model: modelFor(model),
         ...fastCallOptions(model),
         schema: selectSchema,
         system: SELECT_PROMPT,

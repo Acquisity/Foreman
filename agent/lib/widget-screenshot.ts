@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
-import { gateway, generateObject } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import { readRequestBody } from "./bounded-body.js";
-import { fastCallOptions, resolveModel } from "./models.js";
+import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import { serviceSecretRefusal } from "./widget-service-secret.js";
@@ -126,7 +126,7 @@ async function readOnce(
         role: "user",
       },
     ],
-    model: gateway(model),
+    model: modelFor(model),
     schema: readingSchema,
     system: READ_PROMPT,
     ...fastCallOptions(model),

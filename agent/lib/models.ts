@@ -1,9 +1,11 @@
-import { gateway } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { gateway, type LanguageModel } from "ai";
 import { z } from "zod";
 import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
-// so routing, credentials, and fallbacks stay on the gateway and no provider SDK is wired in.
+// so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends every
+// anthropic/ id to the CLI Proxy (ENG-15082).
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
@@ -43,10 +45,13 @@ export const MODELS = {
   // write-up: sonnet-5 12 to 20s, haiku-4.5 10 to 16s, the orchestrator's
   // deepseek 39 to 41s, which with a deepseek call on every step ran 3 of 14
   // investigations past the widget deadline. The egress reviewer stays on `gate`.
-  widget: "anthropic/claude-sonnet-5",
+  // ENG-15082 moved it from sonnet-5 to sonnet-5.5 when Claude calls moved to
+  // the CLI Proxy (see modelFor); the timings above predate both changes.
+  widget: "anthropic/claude-sonnet-5.5",
   // Support widget steps: Jev picks each read, so this only fills in its
-  // arguments. ~1s a call; gemini-3.5-flash took ~15s a call the same afternoon.
-  widgetSteps: "anthropic/claude-haiku-4.5",
+  // arguments. haiku-4.5 took ~1s a call; gemini-3.5-flash took ~15s a call the
+  // same afternoon. Moved to haiku-5.5 on Aaron's call with the CLI Proxy (ENG-15082).
+  widgetSteps: "anthropic/claude-haiku-5.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;
@@ -120,10 +125,57 @@ export const writeModelOverrides = async (
 };
 
 // What a session actually runs on: the live override when one is saved, the compiled default
-// otherwise. Resolved once per session (session.started), so a swap applies to sessions that
-// start after it, never mid-conversation.
+// otherwise. The root, critic and vision resolve it at every step (step.started), so a swap
+// reaches running sessions on their next step, after the cache window above.
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
+
+const proxyConfig = () => {
+  const baseURL = process.env.CLIPROXY_BASE_URL;
+  const apiKey = process.env.CLIPROXY_API_KEY;
+  if (!(baseURL && apiKey)) {
+    throw new Error(
+      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
+    );
+  }
+  return { apiKey, baseURL };
+};
+
+export const proxyModelName = (id: string): string =>
+  id.slice("anthropic/".length).replaceAll(".", "-");
+
+// Claude ids use the CLI Proxy's dashed names and require its credentials.
+// Every other id stays on the gateway; a failed proxy call has no gateway fallback.
+export const modelFor = (id: string): Exclude<LanguageModel, string> =>
+  id.startsWith("anthropic/")
+    ? createAnthropic(proxyConfig())(proxyModelName(id))
+    : gateway(id);
+
+const proxyCatalogSchema = z.object({
+  data: z.array(z.object({ id: z.string().min(1) })),
+});
+const TRAILING_SLASHES = /\/+$/u;
+
+export const listProxyModels = async (): Promise<Set<string>> => {
+  const { apiKey, baseURL } = proxyConfig();
+  try {
+    const response = await fetch(
+      `${baseURL.replace(TRAILING_SLASHES, "")}/models`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!response.ok) {
+      throw new Error("CLI Proxy catalog request failed.");
+    }
+    const { data } = proxyCatalogSchema.parse(await response.json());
+    return new Set(data.map(({ id }) => id));
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Provider errors can include credentials or response bodies.
+    throw new Error("Could not read the CLI Proxy model catalog.");
+  }
+};
 
 // Gateway routing for the root's DeepSeek calls. Every rejection found on ENG-13730 and
 // ENG-13732 was a baseten call on a mixed-provider history ("reasoning_content in the thinking
@@ -161,8 +213,7 @@ export const fastCallOptions = (modelId: string) => ({
 });
 
 // The gateway catalog, through the same authenticated provider eve's model calls use.
-// set_agent_models checks membership here before storing an id: a stored id the gateway
-// doesn't know would fail every future session at start, with no session left to undo it.
+// set_agent_models checks non-Claude ids here; Claude ids use listProxyModels instead.
 export const listGatewayModels = async (): Promise<
   { id: string; name: string }[]
 > => {

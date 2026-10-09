@@ -1,6 +1,6 @@
-import { gateway, generateObject } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
-import { fastCallOptions, resolveModel } from "./models.js";
+import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -132,7 +132,7 @@ export const defaultExtractDeps: ExtractDeps = {
       abortSignal: signal
         ? AbortSignal.any([AbortSignal.timeout(EXTRACT_TIMEOUT_MS), signal])
         : AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
-      model: gateway(model),
+      model: modelFor(model),
       ...fastCallOptions(model),
       prompt: JSON.stringify({
         findings: investigatorText,

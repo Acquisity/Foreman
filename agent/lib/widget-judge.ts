@@ -14,7 +14,7 @@ import { judgeToolCapabilities } from "./widget-judge-tools.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 /**
- * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
+ * The claims judge's model. The widget writes with anthropic/claude-sonnet-5.5
  * and its egress gate reviews with openai/gpt-5.6-sol, so the judge is a tier
  * above both and from neither the gate's vendor nor the composer's model.
  * It runs through headless Claude Code on the local machine (`claude -p`, the

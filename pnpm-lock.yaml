@@ -14,6 +14,9 @@ importers:
       '@agent-browser/eve':
         specifier: 0.37.1
         version: 0.37.1(patch_hash=dba9e6b04227e504242cae660038d649db80138bf81194889af4e76dff3a4e23)(@vercel/sandbox@3.0.1)(eve@0.54.2(ai@7.0.97(zod@4.4.3)))
+      '@ai-sdk/anthropic':
+        specifier: 4.0.52
+        version: 4.0.52(zod@4.4.3)
       '@github-tools/eve-extension':
         specifier: 0.7.1
         version: 0.7.1(@vercel/connect@0.8.0(ai@7.0.97(zod@4.4.3))(eve@0.54.2(ai@7.0.97(zod@4.4.3))))(ai@7.0.97(zod@4.4.3))(eve@0.54.2(ai@7.0.97(zod@4.4.3)))
@@ -79,6 +82,12 @@ packages:
     peerDependenciesMeta:
       '@vercel/sandbox':
         optional: true
+
+  '@ai-sdk/anthropic@4.0.52':
+    resolution: {integrity: sha512-IQt/y++kSUdqa9EbFOJntxLGjZMURTm/MnTUikNBZ5X86K5l96t/BwsRsX/SrH5kx+7yRPrmJ1WBNlmE8quSVg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/gateway@4.0.78':
     resolution: {integrity: sha512-fcamzmFlcy+c/tIc7QcATLe/kArgSVGQ1QxaddMjhOSX8zypc2hmD5sHB2bp1DSFcSxDD32d6usF9a7xLCTULg==}
@@ -1291,6 +1300,12 @@ snapshots:
   '@agent-browser/sandbox@0.37.1(@vercel/sandbox@3.0.1)':
     optionalDependencies:
       '@vercel/sandbox': 3.0.1
+
+  '@ai-sdk/anthropic@4.0.52(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.13
+      '@ai-sdk/provider-utils': 5.0.39(zod@4.4.3)
+      zod: 4.4.3
 
   '@ai-sdk/gateway@4.0.78(zod@4.4.3)':
     dependencies:
