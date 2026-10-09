@@ -30,7 +30,6 @@ import {
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
-
 import {
   calibrated,
   type GoldEntry,
@@ -40,6 +39,7 @@ import {
   toGold,
   writeGold,
 } from "./widget-judge-calibration.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 const GOLD_REFUSAL = /Gold not saved/;
 const present = <T>(value: T | undefined): T => {
@@ -928,4 +928,25 @@ test("leak failures identify each replay and failed check without exposing reply
   assert.ok(rendered.includes("failed-both | run-c | leaks, rawFields"));
   assert.ok(!rendered.includes("private reply text"));
   assert.ok(!rendered.includes("passed | run-d"));
+});
+
+test("the judge reads the product guide for investigate replies only", async () => {
+  const systems: string[] = [];
+  const model = new MockLanguageModelV4({
+    doGenerate: ({ prompt }) => {
+      systems.push(String(prompt[0]?.content));
+      return Promise.reject(new Error("captured"));
+    },
+  });
+  for (const recorded of [
+    { ...smoke, mode: undefined },
+    { ...smoke, mode: "investigate" as const },
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
+    await assert.rejects(
+      judgeAnswer(recorded, "An answer.", [], undefined, model)
+    );
+  }
+  assert.ok(!systems[0]?.includes(PRODUCT_GUIDE));
+  assert.ok(systems[1]?.includes(PRODUCT_GUIDE));
 });

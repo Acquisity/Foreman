@@ -10,6 +10,7 @@ import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
@@ -181,6 +182,16 @@ citedArticles is the text of the help-center articles the answer cited; a fact o
 widgetAffordances are real parts of the support widget the answer may mention.
 In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: out_of_scope when the data is outside the customer’s own Acquisity workspace and the widget investigator must not have it (another workspace or organization, the customer’s external bank, card issuer or mailbox provider records, or Acquisity-internal operations such as ticket handling), tool_gap only for data about the customer’s own Acquisity workspace when no tool in widgetToolCapabilities reads it, unused_capability when a tool covers it but the investigation did not call it or lacked a required input it could have asked the customer for, tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. Use the authoritative widgetToolCapabilities descriptions and input schemas to establish coverage and prerequisites, not absence from toolResults. For a tool_gap, unused_capability or out_of_scope, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
 
+/**
+ * Investigate replies are written with the product guide in hand (ENG-15044), so
+ * the judge reads the same guide as a source for product and UI facts. It sits
+ * in the system prompt so the gateway can cache it across judge calls.
+ */
+const INVESTIGATE_JUDGE_PROMPT = `${JUDGE_PROMPT}
+The product guide below is the help center, distilled. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.
+
+${PRODUCT_GUIDE}`;
+
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
   "The magnifying glass next to the message box, for owners and admins, starts a look at their workspace.",
@@ -348,8 +359,10 @@ export async function judgeAnswer(
       : deadline,
     model,
     prompt: judgeInput(recorded, answer, claims, articles),
+    providerOptions: { gateway: { caching: "auto" } },
     schema: judgeSchema,
-    system: JUDGE_PROMPT,
+    system:
+      recorded.mode === "investigate" ? INVESTIGATE_JUDGE_PROMPT : JUDGE_PROMPT,
   });
   return { gaps: parseGaps(object), verdicts: parseVerdicts(claims, object) };
 }
