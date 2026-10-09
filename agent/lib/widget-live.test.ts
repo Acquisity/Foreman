@@ -111,7 +111,6 @@ test("failed and unavailable reads cannot masquerade as customer drift or steady
     { available: false },
     { status: "unavailable" },
     { ok: false },
-    { available: true, source: { available: false } },
   ]) {
     const failed = { ...steady, reread: readResult(failure) };
     assert.deepEqual(driftVerdict([steady, failed]), {
@@ -142,6 +141,31 @@ test("failed and unavailable reads cannot masquerade as customer drift or steady
     "state moved"
   );
   assert.equal(driftVerdict([moved]).causeGradeAllowed, false);
+});
+
+test("a sub-object marked unavailable on purpose is left out, and the rest is still compared", () => {
+  // An outreach listing marks each campaign's provider check unavailable until one is selected.
+  const listing = (sending: boolean) => ({
+    campaigns: [
+      {
+        live: { available: false, reason: "Select this campaignId." },
+        sending,
+      },
+    ],
+  });
+  const read = (recorded: unknown, reread: unknown) => ({
+    recorded: readResult(recorded),
+    reread: readResult(reread),
+    tool: "widget_outreach_health",
+  });
+  assert.equal(
+    driftVerdict([read(listing(true), listing(true))]).verdict,
+    "steady"
+  );
+  assert.equal(
+    driftVerdict([read(listing(true), listing(false))]).verdict,
+    "state moved"
+  );
 });
 
 test("live tool boundary enforces historical date windows and preserves explicit windows", async (t) => {

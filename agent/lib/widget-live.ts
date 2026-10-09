@@ -43,40 +43,32 @@ export type ReadResult =
   | { status: "ok"; output: unknown }
   | { status: "unverifiable" };
 
-/** A partial or failed source cannot establish that customer state stayed the same. */
-const unavailable = (value: unknown, root = true): boolean => {
-  if (Array.isArray(value)) {
-    return value.some(
-      (child) => child && typeof child === "object" && unavailable(child, false)
-    );
-  }
-  if (!value || typeof value !== "object") {
+/**
+ * A failed read cannot establish that customer state stayed the same. Only the
+ * read as a whole counts: tools also mark sub-objects `available: false` on
+ * purpose (an outreach listing's per-campaign `live`, billing's skipped
+ * Autumn), and those are dropped from the comparison instead.
+ */
+const failed = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return value === null || value === undefined;
   }
   const item = value as Record<string, unknown>;
-  if (
+  return (
     item.available === false ||
     item.success === false ||
     item.ok === false ||
     item.isError === true ||
-    item.status === "unavailable" ||
-    item.status === "denied" ||
-    (root &&
-      (["error", "failed", "cancelled"].includes(String(item.status)) ||
-        Boolean(item.error))) ||
-    (Array.isArray(item.unavailable) && item.unavailable.length)
-  ) {
-    return true;
-  }
-  // Only nested objects can carry source status; nullable data fields are legitimate.
-  return Object.values(item).some(
-    (child) => child && typeof child === "object" && unavailable(child, false)
+    ["unavailable", "denied", "error", "failed", "cancelled"].includes(
+      String(item.status)
+    ) ||
+    Boolean(item.error)
   );
 };
 
 export function readResult(output: unknown, status?: string): ReadResult {
   return ["error", "failed", "denied", "cancelled"].includes(status ?? "") ||
-    unavailable(output)
+    failed(output)
     ? { status: "unverifiable" }
     : { output, status: "ok" };
 }
@@ -89,7 +81,10 @@ const comparable = (output: unknown) =>
   JSON.stringify(
     normalize(
       JSON.parse(JSON.stringify(output), (key, value) =>
-        key === "observedAt" ? undefined : value
+        key === "observedAt" ||
+        (value && typeof value === "object" && value.available === false)
+          ? undefined
+          : value
       )
     )
   );
