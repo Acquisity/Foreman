@@ -13,7 +13,7 @@ import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
 
 /**
- * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
+ * The claims judge's model. The widget writes with anthropic/claude-sonnet-5.5
  * and its egress gate reviews with openai/gpt-5.6-sol, so the judge is a tier
  * above both and from neither the gate's vendor nor the composer's model:
  * Opus 5.5 is the strongest Anthropic model the gateway serves, at the gate's

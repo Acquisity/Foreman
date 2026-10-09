@@ -4,8 +4,8 @@ import { z } from "zod";
 import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
-// so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends
-// anthropic/ ids to the CLI Proxy when it is configured (ENG-15082).
+// so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends every
+// anthropic/ id to the CLI Proxy (ENG-15082).
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
@@ -49,8 +49,9 @@ export const MODELS = {
   // the CLI Proxy (see modelFor); the timings above predate both changes.
   widget: "anthropic/claude-sonnet-5.5",
   // Support widget steps: Jev picks each read, so this only fills in its
-  // arguments. ~1s a call; gemini-3.5-flash took ~15s a call the same afternoon.
-  widgetSteps: "anthropic/claude-haiku-4.5",
+  // arguments. haiku-4.5 took ~1s a call; gemini-3.5-flash took ~15s a call the
+  // same afternoon. Moved to haiku-5.5 on Aaron's call with the CLI Proxy (ENG-15082).
+  widgetSteps: "anthropic/claude-haiku-5.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;
@@ -124,24 +125,29 @@ export const writeModelOverrides = async (
 };
 
 // What a session actually runs on: the live override when one is saved, the compiled default
-// otherwise. Resolved once per session (session.started), so a swap applies to sessions that
-// start after it, never mid-conversation.
+// otherwise. The root, critic and vision resolve it at every step (step.started), so a swap
+// reaches running sessions on their next step, after the cache window above.
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
 
 // The model instance for an id. anthropic/ ids go to the CLI Proxy, an Anthropic-compatible
-// endpoint, when CLIPROXY_BASE_URL and CLIPROXY_API_KEY are both set; the proxy names models with
-// dashes (claude-sonnet-5-5). Everything else, and Claude without the proxy, stays on the gateway.
-// A failed proxy call fails like any other model call: there is no gateway fallback.
+// endpoint that names models with dashes (claude-sonnet-5-5); every other id stays on the gateway.
+// No Claude call goes through the gateway: without CLIPROXY_BASE_URL and CLIPROXY_API_KEY a Claude
+// id throws, and a failed proxy call fails like any other model call.
 export const modelFor = (id: string): Exclude<LanguageModel, string> => {
   const baseURL = process.env.CLIPROXY_BASE_URL;
   const apiKey = process.env.CLIPROXY_API_KEY;
-  if (id.startsWith("anthropic/") && baseURL && apiKey) {
-    return createAnthropic({ apiKey, baseURL })(
-      id.slice("anthropic/".length).replaceAll(".", "-")
+  if (!id.startsWith("anthropic/")) {
+    return gateway(id);
+  }
+  if (!(baseURL && apiKey)) {
+    throw new Error(
+      `${id} needs the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY`
     );
   }
-  return gateway(id);
+  return createAnthropic({ apiKey, baseURL })(
+    id.slice("anthropic/".length).replaceAll(".", "-")
+  );
 };
 
 // Gateway routing for the root's DeepSeek calls. Every rejection found on ENG-13730 and

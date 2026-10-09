@@ -81,6 +81,8 @@ describe("parseModelOverrides", () => {
   });
 });
 
+const PROXY_MISSING = /CLIPROXY_BASE_URL and CLIPROXY_API_KEY/;
+
 describe("modelFor", () => {
   const withProxy = (
     env: { CLIPROXY_API_KEY?: string; CLIPROXY_BASE_URL?: string },
@@ -128,12 +130,12 @@ describe("modelFor", () => {
     });
   });
 
-  it("keeps a Claude id on the gateway when the proxy is not fully set", () => {
+  it("refuses a Claude id when the proxy is not fully set", () => {
     withProxy({ CLIPROXY_BASE_URL: proxy.CLIPROXY_BASE_URL }, () => {
-      assert.deepEqual(describeModel("anthropic/claude-sonnet-5.5"), {
-        modelId: "anthropic/claude-sonnet-5.5",
-        provider: "gateway",
-      });
+      assert.throws(
+        () => modelFor("anthropic/claude-sonnet-5.5"),
+        PROXY_MISSING
+      );
     });
   });
 

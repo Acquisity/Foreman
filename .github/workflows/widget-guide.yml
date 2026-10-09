@@ -88,6 +88,8 @@ jobs:
       - name: Regenerate the guide
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CLIPROXY_BASE_URL: ${{ secrets.CLIPROXY_BASE_URL }}
+          CLIPROXY_API_KEY: ${{ secrets.CLIPROXY_API_KEY }}
         run: pnpm widget:guide --repo acquisity --ref HEAD $FULL | tee "$RUNNER_TEMP/guide.log"
       - name: Open or update the PR
         env:
@@ -110,6 +112,7 @@ jobs:
           calls=$(grep -o 'successful_calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           attempts=$(grep -o 'attempts=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           cost=$(grep -o 'reported_cost=\$[0-9.]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
+          unpriced=$(grep -o 'unpriced_calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           title="chore(widget): regenerate the product guide from Acquisity ${commit:0:12}"
           git config user.name "foreman-widget-guide"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -121,7 +124,7 @@ jobs:
 
           Regenerated sections: $changed
 
-          Reported cost: $cost over $calls successful responses and $attempts model attempts. Failed requests may have incurred additional cost.
+          Reported cost: $cost for gateway calls only ($unpriced CLI Proxy calls report no cost) over $calls successful responses and $attempts model attempts. Failed requests may have incurred additional cost.
 
           The first automated run is a full bootstrap (about \$2); later runs reuse the JSON cache, including outputs in the pending bot PR.
 
