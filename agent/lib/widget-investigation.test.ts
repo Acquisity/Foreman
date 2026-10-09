@@ -2232,3 +2232,55 @@ test("Investigate my workspace from a member, or an owner the live database no l
   );
   assert.equal(refused.status, 400);
 });
+
+test("a teammate's follow-up reaches the investigator with the earlier team-only exchange", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const inbox = { ...scope, source: "inbox" as const };
+  run.scope = inbox;
+  deps.route = () => assert.fail("must not route a teammate's request");
+  deps.inboxHistory = (asked) => {
+    assert.equal(asked.id, runId);
+    return Promise.resolve([
+      { role: "teammate", text: "Why did campaign A stop sending?" },
+      { role: "foreman", text: findings.report },
+    ]);
+  };
+  const { args, sends } = startedSessions();
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "Check campaign B too.", staff: true }),
+    args,
+    200,
+    () => Promise.resolve(inbox),
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.equal(sends.length, 1);
+  assert.ok(
+    sends[0].startsWith(
+      "Check campaign B too.\n\nEARLIER TEAM-ONLY CONVERSATION"
+    )
+  );
+  assert.ok(
+    sends[0].endsWith(
+      `\nTeammate: Why did campaign A stop sending?\nForeman: ${findings.report}`
+    )
+  );
+});
+
+test("a customer's investigation never reads the team-only exchange", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.inboxHistory = () =>
+    assert.fail("a customer run must not read inbox runs");
+  const { args, sends } = startedSessions();
+  const response = await receiveWidgetMessage(
+    request(investigate),
+    args,
+    200,
+    verify,
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(sends, [withHistory(investigate.question, undefined)]);
+});

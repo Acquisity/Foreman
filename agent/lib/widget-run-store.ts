@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { privateDatabase } from "./private-postgres.js";
+import { parseFindings } from "./widget-findings.js";
 import {
   type WidgetProgress,
   widgetProgressSchema,
@@ -100,6 +101,37 @@ export async function recentWidgetTurns(
     return [
       { role: "customer" as const, text: String(row.question) },
       ...(message ? [{ role: "assistant" as const, text: message }] : []),
+    ];
+  });
+}
+
+const TEAM_TURN_CHARS = 2000;
+const cutTeamTurn = (text: string) =>
+  text.length > TEAM_TURN_CHARS
+    ? `${text.slice(0, TEAM_TURN_CHARS)} [message cut here]`
+    : text;
+
+/**
+ * The earlier teammate and Foreman exchange on this conversation, oldest first:
+ * each inbox run's question and the report from its findings. Read only for a
+ * teammate's own run, so a team-only instruction never reaches a customer lane.
+ * A run with no report contributes only the question.
+ */
+export async function recentInboxTurns(
+  run: Pick<WidgetRun, "created_at" | "id" | "scope">
+): Promise<{ role: "teammate" | "foreman"; text: string }[]> {
+  const rows = await privateDatabase().query(
+    `SELECT question, findings FROM widget_support_runs
+     WHERE organization_id = $1 AND conversation_id = $2 AND id <> $3 AND created_at < $4
+       AND scope->>'source' = 'inbox'
+     ORDER BY created_at DESC LIMIT ${RECENT_TURNS}`,
+    [run.scope.organizationId, run.scope.conversationId, run.id, run.created_at]
+  );
+  return rows.reverse().flatMap((row) => {
+    const report = parseFindings(row.findings)?.report;
+    return [
+      { role: "teammate" as const, text: cutTeamTurn(String(row.question)) },
+      ...(report ? [{ role: "foreman" as const, text: report }] : []),
     ];
   });
 }
