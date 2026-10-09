@@ -6,6 +6,19 @@ Cases use scrubbed recorded tool results, except the hand-authored help-center c
 
 A run whose investigator made a read that no recording answers (a cassette miss, or any result not recorded verbatim) is not scored: the eval logs "not scored: N unrecorded reads: <tools>", the row carries `scored: false` and the tool names, and a tracked-only soft assertion named "replay coverage" states the unrecorded tools. Eve 0.54.2 rejects skipping after activity, so its verdict reflects the safety gates only; the loop counts only rows with `scored !== false`. Behavior checks are computed but are not asserted or counted for uncovered replays, and the claims judge does not run. Its leak and raw-field checks still run and still fail it, because a leak is a real failure whatever the replay coverage. A case that is often not scored should move to `cases-pending/` for re-recording.
 
+## Replay cost
+
+Only Foreman's own calls in the replay (investigator, extract, composer, gate) use the AI Gateway; the judge runs locally (see the investigate cases below). Two controls keep a measurement cheap:
+
+- Warm cache. The first replay to start in an `eve eval` invocation runs alone and the rest wait for it, so its investigator and composer calls write the shared prompt prefix before the parallel batch reads it. Parallel starts against a cold cache each paid the full write.
+- Subsets. `WIDGET_REPLAY_CASES` names the cases to replay (comma-separated, without `.json`; an unknown name fails the run) and `WIDGET_REPLAY_RUNS` replays each that many times in one invocation, so one eval directory holds every run and `pnpm widget:judge scorecard <dir>` pools them. Test a change on the fewest runs that answer its question; the full set three times is for confirming a winner only.
+
+```bash
+WIDGET_REPLAY=1 WIDGET_REPLAY_RUNS=2 \
+WIDGET_REPLAY_CASES=eng-14665-paused-campaign-inbox-errors,eng-14748-step-sends,inv-domain-purchase-error,inv-followup-delay-ignored \
+  pnpm eval widget/replay --url http://localhost:<port>
+```
+
 ## Pulling production candidates
 
 `pnpm widget:candidates [--since <ISO date>]` reads completed production `widget_support_runs` (point `FOREMAN_MEMORY_DATABASE_URL` at production). Acquisity's two test workspaces and three internal workspaces are excluded by default; `--exclude-orgs <uuid,uuid>` and `WIDGET_CANDIDATES_EXCLUDE_ORGS` add exclusions. Bounded SELECTs page by whole conversations and flag help-center misses, requests for a person, handoffs, gate rewrites, customer pushback and investigations that only asked a clarifying question. Each flagged conversation gets one entry in a review file under the gitignored `.eve/widget-candidates/`, which holds raw customer text. Each flagged investigation goes through the existing scrubber directly into `cases-pending/candidate-<run id>.json` with empty expectations, using `widget:case`'s `--output-dir` option; its default remains `cases/`. Terminal output shows run provenance, summary counts by signal, and fixed conversion failure classes, never child error text. Diagnostics and conversion recovery state stay under `.eve/widget-candidates/`: transient failures retry on the next pull without rewriting reviews, and leak refusals are recorded as terminal. `state.json` remembers the read cursor, so `--since` is needed only the first time. Each pull reads runs completed up to a minute before it starts, so a run still committing is picked up by the next pull. An immediate rerun after a successful pull flags no new conversations; it only retries conversions still pending from a transient failure, and runs that completed since add their own candidates.
