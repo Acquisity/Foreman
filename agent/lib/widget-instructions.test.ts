@@ -16,6 +16,8 @@ import { widgetAuth } from "./widget-scope.js";
 
 const FAILED_STEP_RULE =
   /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and set needsHuman true/;
+const NEXT_STEP_RULE =
+  /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
 const UNFILED_TICKET_RULE =
   /When ticketFiled is absent, nothing was reported[^.]*never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one/;
 
@@ -63,4 +65,9 @@ test("the chat and the reply composer share one voice", () => {
 
 test("without a filed ticket the composer never says it was reported", () => {
   assert.match(COMPOSER_PROMPT, UNFILED_TICKET_RULE);
+});
+
+test("the write-up and the reply both end with what the customer does next", () => {
+  assert.match(COMPOSER_PROMPT, NEXT_STEP_RULE);
+  assert.match(widgetInstructions(widgetAuth(scope)), NEXT_STEP_RULE);
 });
