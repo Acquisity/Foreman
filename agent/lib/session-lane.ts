@@ -6,11 +6,7 @@ import {
 } from "./fin-investigation-auth.js";
 import { isSupportAuth } from "./support/auth.js";
 import { SUPPORT_DISCOVERY, SUPPORT_PROMPT } from "./support/instructions.js";
-import {
-  WIDGET_DISCOVERY,
-  WIDGET_GUIDE,
-  widgetInstructions,
-} from "./widget-instructions.js";
+import { WIDGET_DISCOVERY, widgetInstructions } from "./widget-instructions.js";
 import { isWidgetSupport } from "./widget-scope.js";
 
 const customerInstructions = (auth: SessionAuthContext | null | undefined) => {
@@ -29,9 +25,7 @@ export function sessionLane(auth: SessionAuthContext | null | undefined) {
     return {
       broadExecutor: false,
       customer: true,
-      // The guide sits with the discovery text, ahead of the per-session scope,
-      // so the cached system prefix is the same for every widget session.
-      discovery: `${WIDGET_DISCOVERY}\n\n${WIDGET_GUIDE}`,
+      discovery: WIDGET_DISCOVERY,
       instructions: widgetInstructions(auth),
       repository: false,
     };

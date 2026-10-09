@@ -5,7 +5,6 @@ import {
 } from "ai";
 import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
-import { cacheGuide } from "./widget-instructions.js";
 import {
   nextActionEnabled,
   note,
@@ -151,7 +150,7 @@ export function widgetInvestigationMiddleware(
           : requestedToolChoice;
       return Promise.resolve({
         ...params,
-        prompt: cacheGuide(
+        prompt:
           used < MAX_WORKSPACE_CALLS
             ? params.prompt
             : [
@@ -161,8 +160,7 @@ export function widgetInvestigationMiddleware(
                     ? "The investigation tool budget is exhausted. State the verified findings and limitations. Do not give product steps unless an applicable article was actually read. If no article supports a step, acknowledge that documentation could not be confirmed."
                     : "Stop workspace reads. The remaining calls are reserved for searching and reading applicable Help Center instructions, or filing a ticket the instructions require. Product steps require an article actually read; otherwise report findings and the documentation gap."
                 ),
-              ]
-        ),
+              ],
         toolChoice,
         tools,
       });
