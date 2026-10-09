@@ -236,6 +236,11 @@ async function rerun(runId: string) {
       ...(drift.unverifiable.length
         ? [`unverifiable reads: ${drift.unverifiable.join(", ")}`]
         : []),
+      ...(drift.partial.length
+        ? [
+            `partly unavailable reads (compared, cannot prove steady): ${drift.partial.join(", ")}`,
+          ]
+        : []),
       `cause: ${drift.causeGradeAllowed ? "eligible once the classifier is wired" : "not graded"}`,
       ...reads
         .filter((read) => read.movingWindow)

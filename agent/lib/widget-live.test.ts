@@ -117,6 +117,7 @@ test("failed and unavailable reads cannot masquerade as customer drift or steady
       causeGradeAllowed: false,
       changed: [],
       compared: 1,
+      partial: [],
       unverifiable: [steady.tool],
       verdict: "unverifiable",
     });
@@ -158,10 +159,15 @@ test("a sub-object marked unavailable on purpose is left out, and the rest is st
     reread: readResult(reread),
     tool: "widget_outreach_health",
   });
-  assert.equal(
-    driftVerdict([read(listing(true), listing(true))]).verdict,
-    "steady"
-  );
+  // The dropped part may be a nested source that failed, so equality is not steady.
+  assert.deepEqual(driftVerdict([read(listing(true), listing(true))]), {
+    causeGradeAllowed: false,
+    changed: [],
+    compared: 1,
+    partial: ["widget_outreach_health"],
+    unverifiable: [],
+    verdict: "unverifiable",
+  });
   assert.equal(
     driftVerdict([read(listing(true), listing(false))]).verdict,
     "state moved"

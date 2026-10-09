@@ -47,7 +47,9 @@ export type ReadResult =
  * A failed read cannot establish that customer state stayed the same. Only the
  * read as a whole counts: tools also mark sub-objects `available: false` on
  * purpose (an outreach listing's per-campaign `live`, billing's skipped
- * Autumn), and those are dropped from the comparison instead.
+ * Autumn), and those are dropped from the comparison instead. A dropped part
+ * can also be a nested source that failed, so a read with one can show
+ * movement but never proves the state stayed the same.
  */
 const failed = (value: unknown): boolean => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -89,10 +91,17 @@ const comparable = (output: unknown) =>
     )
   );
 
+const hasDropped = (value: unknown): boolean =>
+  Boolean(value) &&
+  typeof value === "object" &&
+  ((value as { available?: unknown }).available === false ||
+    Object.values(value as object).some(hasDropped));
+
 export function driftVerdict(
   reads: readonly { recorded: ReadResult; reread: ReadResult; tool: string }[]
 ) {
   const changed: string[] = [];
+  const partial: string[] = [];
   const unverifiable: string[] = [];
   let compared = 0;
   for (const read of reads) {
@@ -104,17 +113,21 @@ export function driftVerdict(
     if (comparable(read.recorded.output) !== comparable(read.reread.output)) {
       changed.push(read.tool);
     }
+    if (hasDropped(read.recorded.output) || hasDropped(read.reread.output)) {
+      partial.push(read.tool);
+    }
   }
   let verdict: "state moved" | "steady" | "unverifiable" = "unverifiable";
   if (changed.length) {
     verdict = "state moved";
-  } else if (compared && !unverifiable.length) {
+  } else if (compared && !unverifiable.length && !partial.length) {
     verdict = "steady";
   }
   return {
     causeGradeAllowed: verdict === "steady",
     changed,
     compared,
+    partial,
     unverifiable,
     verdict,
   };
