@@ -973,3 +973,25 @@ test("a correct handoff answers what was needed, and a missing answer still fail
   assert.equal(answered(handoff), 1);
   assert.equal(answered(unexpected), 0);
 });
+
+test("a correct handoff does not fail found the real cause, and an unexpected one still does", () => {
+  const sample = scoredSample();
+  const silent = { ...sample, record: null };
+  const handoff = {
+    ...silent,
+    recorded: {
+      ...sample.recorded,
+      expectations: { ...sample.recorded.expectations, lane: "human" as const },
+    },
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const unexpected = {
+    ...silent,
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const cause = (replay: ScoredReplay) =>
+    scorecard([replay]).rates.find((r) => r.goal === "found the real cause")
+      ?.pass;
+  assert.equal(cause(handoff), 1);
+  assert.equal(cause(unexpected), 0);
+});

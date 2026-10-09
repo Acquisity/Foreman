@@ -579,9 +579,10 @@ export function scorecard(replays: readonly ScoredReplay[]) {
     goal: keyof ReturnType<typeof required>
   ) => {
     if (noAnswer(replay)) {
-      // A correct handoff answered what was needed: a person takes it from here.
+      // A correct handoff answered what was needed and did not miss the
+      // cause: a person takes it from here.
       return (
-        goal === "answered what was needed" &&
+        goal !== "nothing made up" &&
         replay.row.handedOff === true &&
         handoffExpected(replay.recorded)
       );
