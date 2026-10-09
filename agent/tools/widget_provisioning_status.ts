@@ -489,7 +489,7 @@ export async function readWidgetProvisioningStatus(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   description:
     "Diagnose stuck domain and inbox provisioning only in this chat's verified workspace, for the 'I paid but my domains/inboxes are still provisioning' problem. Lists up to 25 recent domain-purchase orders (pre-warmed and DFY) newest first, each with: order type, status and a derived run state (awaiting_payment, queued, running, stalled, completed, failed, cancelled), the current step such as 3/6, created/paid/started/completed timestamps, the order id plus its billing-account (Autumn customer) and provider-order links and background submission id, and a reconciliation of what was charged versus what is actually provisioned (domains and inboxes charged, provisioned counters, live active rows, connected inboxes, missing counts, and an invisibleInboxes flag for charged-but-absent inboxes). Saved order state, not a live provisioning or billing check. Unavailable is not empty. Pass an orderId from these results to inspect up to 10 saved domain log entries and 5 inbox connection/retry entries per domain, with sanitized errors and explicit truncation. These are saved diagnostic observations, not live Inngest traces. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>

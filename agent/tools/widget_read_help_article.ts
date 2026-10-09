@@ -5,7 +5,7 @@ import { getHelpArticleContent } from "#lib/help-center.js";
 import { replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

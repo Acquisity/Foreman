@@ -9,6 +9,7 @@ import { gateway, generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { judgeToolCapabilities } from "./widget-judge-tools.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5
@@ -45,7 +46,12 @@ const verdictSchema = z.strictObject({
  */
 const gapSchema = z.strictObject({
   capability: z.string().nullable(),
-  kind: z.enum(["tool_gap", "tool_failure", "real_unknown"]),
+  kind: z.enum([
+    "tool_gap",
+    "tool_failure",
+    "real_unknown",
+    "unused_capability",
+  ]),
   sentence: z.string(),
 });
 export type Gap = z.infer<typeof gapSchema>;
@@ -172,7 +178,7 @@ Internal jargon means words a customer would not know: raw field names, status c
 Return exactly one verdict per claim id, in the order given.
 citedArticles is the text of the help-center articles the answer cited; a fact one of them states is supported only for the situation the article states it for, so an article sentence applied to a different situation is unsupported. An Acquisity product fact no cited article, tool result or conversation turn states is unsupported.
 widgetAffordances are real parts of the support widget the answer may mention.
-In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: tool_gap when no tool result covers that data (no widget tool read it), tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. For a tool_gap, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
+In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: tool_gap only when no tool in widgetToolCapabilities reads that data, unused_capability when a tool covers it but the investigation did not call it or lacked a required input it could have asked the customer for, tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. Use the authoritative widgetToolCapabilities descriptions and input schemas to establish coverage and prerequisites, not absence from toolResults. For a tool_gap or unused_capability, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
@@ -274,6 +280,7 @@ export const judgeInput = (
       tool,
     })),
     widgetAffordances: WIDGET_AFFORDANCES,
+    widgetToolCapabilities: judgeToolCapabilities,
   });
 
 const judgeSchema = z.strictObject({
@@ -316,7 +323,9 @@ export const parseGaps = (raw: unknown): Gap[] =>
     .parse(raw)
     .gaps.map((gap) => ({
       capability:
-        gap.kind === "tool_gap" ? gap.capability?.trim() || "unnamed" : null,
+        gap.kind === "tool_gap" || gap.kind === "unused_capability"
+          ? gap.capability?.trim() || "unnamed"
+          : null,
       kind: gap.kind,
       sentence: gap.sentence.replace(/\s+/g, " ").trim().slice(0, MAX_REASON),
     }));
@@ -456,7 +465,10 @@ export function parseMarks(review: string): Map<string, boolean> {
 
 /** What the replay eval's `row:` log line carries that the scorecard reads. */
 export interface ReplayRow {
+  /** Null means a completed replay produced no customer answer; absent on legacy rows. */
+  answer?: string | null;
   budgetHit?: boolean;
+  citations?: string[];
   finalReplyMs?: number | null;
   firstReplyMs?: number | null;
   handedOff?: boolean;
@@ -499,39 +511,64 @@ const percentile = (values: number[], p: number) => {
 export function scorecard(replays: readonly ScoredReplay[]) {
   const rates: Rate[] = [];
   const rate = (goal: string, outcomes: (boolean | undefined)[]) => {
-    const known = outcomes.filter((ok) => ok !== undefined);
     rates.push({
       goal,
-      pass: known.filter(Boolean).length,
-      total: known.length,
+      pass: outcomes.filter((ok) => ok === true).length,
+      total: outcomes.length,
     });
   };
   const scored = replays.filter(({ row }) => row.scored !== false);
   const judged = scored.flatMap(({ record }) => (record ? [record] : []));
-  const answered = (record: JudgeRecord) => {
-    const needed = record.verdicts.filter(
-      ({ id }) => id === "fix" || id.startsWith("case-")
-    );
-    return needed.length
-      ? needed.every(({ verdict }) => verdict === "yes")
-      : undefined;
+  const required = ({ recorded }: ScoredReplay) => {
+    const ids = claimsFor(recorded).map(({ id }) => id);
+    return {
+      "answered what was needed": ids.filter(
+        (id) =>
+          ["fix", "context", "reask"].includes(id) || id.startsWith("case-")
+      ),
+      "found the real cause": ["cause"],
+      "nothing made up": ["invented", "facts"],
+    };
   };
-  rate(
+  const noAnswer = ({ record, row }: ScoredReplay) =>
+    !record && row.answer === null;
+  const missingCoverage = scored.filter((replay) => {
+    if (noAnswer(replay)) {
+      return false;
+    }
+    const { record } = replay;
+    return (
+      !record ||
+      record.gaps === undefined ||
+      Object.values(required(replay))
+        .flat()
+        .some((id) => !verdictOf(record, id))
+    );
+  }).length;
+  const answerGoal = (
+    replay: ScoredReplay,
+    goal: keyof ReturnType<typeof required>
+  ) => {
+    if (noAnswer(replay)) {
+      return false;
+    }
+    const ids = required(replay)[goal];
+    const { record } = replay;
+    if (!(record && ids.length) || ids.some((id) => !verdictOf(record, id))) {
+      return;
+    }
+    return ids.every((id) => verdictOf(record, id) === "yes");
+  };
+  for (const goal of [
     "found the real cause",
-    judged.map((record) => {
-      const verdict = verdictOf(record, "cause");
-      return verdict && verdict === "yes";
-    })
-  );
-  rate(
     "nothing made up",
-    judged.map(
-      (record) =>
-        verdictOf(record, "invented") === "yes" &&
-        verdictOf(record, "facts") === "yes"
-    )
-  );
-  rate("answered what was needed", judged.map(answered));
+    "answered what was needed",
+  ] as const) {
+    rate(
+      goal,
+      scored.map((replay) => answerGoal(replay, goal))
+    );
+  }
   for (const type of [
     "user_error",
     "platform_limitation",
@@ -540,9 +577,9 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   ] as const) {
     rate(
       `answered what was needed (${type})`,
-      judged
-        .filter((record) => record.recorded.expectations.causeType === type)
-        .map(answered)
+      scored
+        .filter((replay) => replay.recorded.expectations.causeType === type)
+        .map((replay) => answerGoal(replay, "answered what was needed"))
     );
   }
   rate(
@@ -566,25 +603,30 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   );
   rate(
     "no tool gaps",
-    judged.map((record) =>
-      record.gaps
-        ? !record.gaps.some(({ kind }) => kind === "tool_gap")
-        : undefined
-    )
+    scored.map((replay) => {
+      if (noAnswer(replay)) {
+        return false;
+      }
+      const gaps = replay.record?.gaps;
+      return gaps ? !gaps.some(({ kind }) => kind === "tool_gap") : undefined;
+    })
   );
   const times = (key: "finalReplyMs" | "firstReplyMs") =>
-    replays.flatMap(({ row }) =>
+    scored.flatMap(({ row }) =>
       typeof row[key] === "number" ? [row[key]] : []
     );
   const gaps = new Map<string, number>();
+  const unused = new Map<string, number>();
   for (const gap of judged.flatMap((record) => record.gaps ?? [])) {
-    if (gap.kind === "tool_gap") {
-      const name = (gap.capability ?? "unnamed").toLowerCase();
-      gaps.set(name, (gaps.get(name) ?? 0) + 1);
+    if (gap.kind === "tool_gap" || gap.kind === "unused_capability") {
+      const counts = gap.kind === "tool_gap" ? gaps : unused;
+      const name = (gap.capability ?? "unnamed").trim().toLowerCase();
+      counts.set(name, (counts.get(name) ?? 0) + 1);
     }
   }
   return {
     gaps: [...gaps].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    missingCoverage,
     rates,
     replays: replays.length,
     replies: (["firstReplyMs", "finalReplyMs"] as const).map((key) => ({
@@ -594,6 +636,7 @@ export function scorecard(replays: readonly ScoredReplay[]) {
       samples: times(key).length,
     })),
     scored: scored.length,
+    unused: [...unused].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
   };
 }
 
@@ -604,13 +647,13 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
   const seconds = (value: number | null) =>
     value === null ? "n/a" : `${value.toFixed(1)}s`;
   return [
-    `${card.replays} replays, ${card.scored} scored`,
+    `${card.replays} replays, ${card.scored} scored, ${card.missingCoverage} missing judge coverage`,
     "",
     "| goal | pass rate | n | target | hit |",
     "| --- | --- | --- | --- | --- |",
     ...card.rates.map(({ goal, pass, total }) => {
       const target = SCORECARD_TARGETS[goal];
-      if (target === undefined || !total) {
+      if (target === undefined || !total || card.missingCoverage > 0) {
         return `| ${goal} | ${pct(pass, total)} | ${total} |  |  |`;
       }
       return `| ${goal} | ${pct(pass, total)} | ${total} | ${pct(target, 1)} | ${pass / total >= target ? "hit" : "miss"} |`;
@@ -623,6 +666,11 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
     "Tool gaps by missing capability:",
     ...(card.gaps.length
       ? card.gaps.map(([capability, count]) => `${count}  ${capability}`)
+      : ["none"]),
+    "",
+    "Unused capabilities (investigator misses):",
+    ...(card.unused.length
+      ? card.unused.map(([capability, count]) => `${count}  ${capability}`)
       : ["none"]),
     "",
   ].join("\n");

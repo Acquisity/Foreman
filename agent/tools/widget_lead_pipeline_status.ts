@@ -310,7 +310,7 @@ export async function readWidgetLeadPipelineStatus(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   description:
     "Diagnose lead scraping and CSV import problems only in this chat's verified workspace. Returns the last 20 lead-scrape runs (status, source, action, source-provider runId (manual uploads use a submission ID), run name, campaignId, saved verification-job status counts, unverified count, the run's declared lead count versus leads actually stored, verified leads, a stuck flag, and start/finish times), an import-activity summary (campaigns with leads, total campaign leads, and lead-ingestion credit transactions and credits used in the window), and a lead-count reconciliation (declared scrape totals versus persisted scrape leads versus campaign leads, with a discrepancy flag) so a low dashboard 'Leads Uploaded' figure or vanished leads can be explained. Optional scrapeRunId selects one owned run even outside the date window; campaignId narrows the recent runs to an owned campaign. Optional sinceDays (1-90, default 30) bounds the scrape-run and credit window; reconciliation totals span all time. Saved state, not a live scraper check; the live run trace and CSV import step detail cannot be read here, and runId is not a proven Inngest run ID. Import activity and reconciliation remain workspace-wide even when runs are filtered. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>

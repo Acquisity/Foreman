@@ -444,7 +444,7 @@ export async function readWidgetAccountAccess(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   description:
     "Diagnose login, access and onboarding problems only for the verified user in this chat's workspace. Returns that user's membership and role, whether their seat is active, the workspace's status, partner and used seat count by role, the verified user's partner eligibility and effective Become a Partner menu visibility (including the reason), the onboarding steps done versus pending, this workspace's pending invitations (with the invited email so an invite-login report can be matched), and, when Sentry is configured and reachable, sanitized counts of all unresolved errors recorded for that user in the last 14 days (any product area; not proof of a sign-in failure). Support-safe status and dates only, never a password hash, session or token, and never another member's email. Saved state, not a live auth or billing check. Unavailable is not empty. No SQL, workspace, user or field selector is accepted.",
   execute: async (_input, ctx: ToolContext) => readWidgetAccountAccess(ctx),

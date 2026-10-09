@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
+import { tool as sdrTool } from "../tools/widget_sdr_thread_status.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   citedArticles,
@@ -25,6 +26,7 @@ import {
   renderReview,
   renderScorecard,
   reviewedSample,
+  SCORECARD_TARGETS,
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
@@ -687,4 +689,161 @@ test("scorecard reports pass rates per goal and ranks tool gaps", () => {
   const text = renderScorecard(card);
   assert.match(text, LEAK_RATE_ROW);
   assert.match(text, TOP_GAP_ROW);
+});
+
+const scoredSample = () => {
+  const example = withRole("owner", {
+    causeType: "user_error",
+    claims: ["Answers the customer's request."],
+  });
+  return {
+    record: reviewedSample(
+      "scored",
+      example,
+      "Answer.",
+      claimsFor(example).map((c) => verdict(c.id)),
+      []
+    ),
+    recorded: example,
+    row: {
+      answer: "Answer.",
+      finalReplyMs: 20_000,
+      firstReplyMs: 1000,
+      scored: true,
+    },
+  };
+};
+
+test("gap judging receives authoritative tool schemas and ranks unused capabilities separately", () => {
+  const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
+  const sdr = input.widgetToolCapabilities.find(
+    (tool: { name: string }) => tool.name === "widget_sdr_thread_status"
+  );
+  assert.equal(sdr.description, sdrTool.description);
+  assert.ok(sdr.inputSchema.properties.threadId);
+  const gaps = parseGaps({
+    gaps: [
+      {
+        capability: " conferencing setup ",
+        kind: "unused_capability",
+        sentence: "I could not confirm the setup.",
+      },
+    ],
+  });
+  const sample = scoredSample();
+  sample.record.gaps = gaps;
+  const card = scorecard([sample]);
+  assert.deepEqual(card.gaps, []);
+  assert.deepEqual(card.unused, [["conferencing setup", 1]]);
+  assert.equal(card.rates.find((r) => r.goal === "no tool gaps")?.pass, 1);
+});
+
+test("scorecard keeps unanswered and unjudged scored replays in denominators and marks missing coverage", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    sample,
+    { ...sample, record: null, row: { ...sample.row, answer: null } },
+    { ...sample, record: null },
+  ]);
+  assert.equal(card.scored, 3);
+  assert.equal(card.missingCoverage, 1);
+  for (const goal of [
+    "found the real cause",
+    "nothing made up",
+    "answered what was needed",
+    "no tool gaps",
+  ]) {
+    const rate = card.rates.find((r) => r.goal === goal);
+    assert.equal(rate?.total, 3);
+    assert.equal(rate?.pass, 1);
+  }
+  assert.ok(renderScorecard(card).includes("1 missing judge coverage"));
+  const previousTarget = SCORECARD_TARGETS["found the real cause"];
+  SCORECARD_TARGETS["found the real cause"] = 1;
+  try {
+    const incomplete = renderScorecard(card);
+    assert.ok(
+      incomplete.includes("| found the real cause | 33.3% | 3 |  |  |")
+    );
+    const complete = renderScorecard(scorecard([sample]));
+    assert.ok(
+      complete.includes("| found the real cause | 100.0% | 1 | 100.0% | hit |")
+    );
+  } finally {
+    SCORECARD_TARGETS["found the real cause"] = previousTarget;
+  }
+});
+
+test("scorecard latency excludes unscored replays from nearest-rank percentiles", () => {
+  const sample = scoredSample();
+  const card = scorecard([
+    sample,
+    {
+      ...sample,
+      row: {
+        ...sample.row,
+        finalReplyMs: 900_000,
+        firstReplyMs: 900_000,
+        scored: false,
+      },
+    },
+  ]);
+  assert.deepEqual(card.replies, [
+    { key: "first reply", p50: 1, p90: 1, samples: 1 },
+    { key: "final reply", p50: 20, p90: 20, samples: 1 },
+  ]);
+});
+
+test("answered score requires context and reask and treats absent required verdicts as missing coverage", () => {
+  const base = scoredSample();
+  const example = {
+    ...base.recorded,
+    question:
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nAnd my invoice?\n\nEARLIER TURNS (context):\nCustomer: My invoice is missing.",
+  };
+  const sample = {
+    ...base,
+    record: reviewedSample(
+      "context",
+      example,
+      "Answer.",
+      claimsFor(example).map((c) => verdict(c.id)),
+      []
+    ),
+    recorded: example,
+  };
+  for (const id of ["context", "reask"]) {
+    const failed = {
+      ...sample,
+      record: {
+        ...sample.record,
+        verdicts: sample.record.verdicts.map((v) =>
+          v.id === id ? { ...v, verdict: "no" as const } : v
+        ),
+      },
+    };
+    assert.equal(
+      scorecard([failed]).rates.find(
+        (r) => r.goal === "answered what was needed"
+      )?.pass,
+      0
+    );
+    const missing = {
+      ...sample,
+      record: {
+        ...sample.record,
+        verdicts: sample.record.verdicts.filter((v) => v.id !== id),
+      },
+    };
+    const card = scorecard([missing]);
+    assert.equal(card.missingCoverage, 1);
+    assert.equal(
+      card.rates.find((r) => r.goal === "answered what was needed")?.pass,
+      0
+    );
+    assert.equal(
+      card.rates.find((r) => r.goal === "answered what was needed")?.total,
+      1
+    );
+  }
 });

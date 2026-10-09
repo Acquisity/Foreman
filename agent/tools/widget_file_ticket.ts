@@ -69,7 +69,7 @@ export const existingTicket = (
   url: issue.url,
 });
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"

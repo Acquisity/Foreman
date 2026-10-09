@@ -753,7 +753,7 @@ export async function readWidgetGenerationDiagnostics(
   }
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   description:
     "Pass threadId or executionId for owned final decision/error codes, current saved knowledge base/rules. Select an exact executionId from the thread results to read that copywriter draft; a thread listing returns codes and IDs without draft bodies. No hidden reasoning or raw prompts are returned. Diagnose AI-output quality problems only in this chat's verified workspace: SDR emails with fabricated or hallucinated content, wrong sign-off or language, and empty or looping Ask AI responses. Returns recent AI SDR agent decisions with copy-review gate outcomes (passes, blocks, and the fixed issue categories that blocked) from the product database, plus recent model-call error and empty-response signals reduced to an error class, kind, count and last-seen from Sentry and Axiom for this workspace. Optional selectors: since (24h, 7d, 30d), an agent name, or a thread UUID owned by this workspace. Sanitized for a support teammate: no raw logs, prompts, traces, model names or other workspaces' data. A source marked unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>

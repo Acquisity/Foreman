@@ -64,7 +64,7 @@ export async function readRecording(ctx: ProviderContext, jamId: string) {
     : { error: "The screen recording could not be read." };
 }
 
-const tool = defineTool({
+export const tool = defineTool({
   approval: (ctx) =>
     isWidgetSupport(ctx.session.auth.initiator)
       ? "not-applicable"
