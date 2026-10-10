@@ -281,6 +281,43 @@ const mapStrings = (
   return walk(value);
 };
 
+/**
+ * Every decoded string and key, one per line. JSON text writes a newline as
+ * backslash-n, so a line starting "wesley@x.com" scanned as "nwesley@x.com"
+ * and the real address was never replaced.
+ */
+const decodedText = (value: unknown) => {
+  const strings: string[] = [];
+  mapStrings(value, (text) => {
+    strings.push(text);
+    return text;
+  });
+  return strings.join("\n");
+};
+
+const LETTER = /[a-z]/;
+/**
+ * The value occurs other than inside a longer word ("gina" in "pagination"),
+ * which the scrub deliberately leaves. Joined by "_" or a digit ("li_us") it
+ * is still the value.
+ */
+const hasValue = (text: string, value: string) => {
+  const inWord = (at: number) =>
+    (LETTER.test(value[0] ?? "") && LETTER.test(text[at - 1] ?? "")) ||
+    (LETTER.test(value.at(-1) ?? "") &&
+      LETTER.test(text[at + value.length] ?? ""));
+  for (
+    let at = text.indexOf(value);
+    at >= 0;
+    at = text.indexOf(value, at + 1)
+  ) {
+    if (!inWord(at)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const OWN_DOMAIN_PERSON = /^person-\d+@(.+)$/;
 
 /** A screen recording is titled "<recorder's name> · <workspace name>", often inside a JSON-encoded string. */
@@ -361,7 +398,8 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     return replacements.get(value.toLowerCase()) as string;
   };
 
-  const { candidates, internal } = scanIdentifiers(JSON.stringify(draft));
+  const decoded = decodedText(draft);
+  const { candidates, internal } = scanIdentifiers(decoded);
   const localParts = new Map<string, string>();
   for (const email of candidates.emails) {
     const at = email.lastIndexOf("@");
@@ -387,7 +425,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     add(slug, () => `workspace-${next("workspace")}`);
   }
   const opaqueIds = new Set([
-    ...(JSON.stringify(draft).match(PROVIDER_ID) ?? []),
+    ...(decoded.match(PROVIDER_ID) ?? []),
     ...internal.filter((value) => OPS_ID.test(value)),
   ]);
   for (const id of opaqueIds) {
@@ -448,7 +486,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
 
 /** Everything identifier-shaped in a scrubbed case that is not a placeholder or a fixture value. */
 export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
-  const text = JSON.stringify(scrubbed);
+  const text = decodedText(scrubbed);
   const { candidates, internal } = scanIdentifiers(text);
   const leaks = [
     ...candidates.emails,
@@ -473,7 +511,7 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
               );
             }
           }
-          return rest.includes(original);
+          return hasValue(rest, original);
         })
       );
       return value;

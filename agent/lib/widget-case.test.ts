@@ -567,3 +567,26 @@ test("causeType is optional and limited to the four cause types", () => {
   }
   assert.ok(!withType("misconfiguration"));
 });
+
+test("an email that starts a line is replaced whole, and its placeholder is not read as a leak", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        rawCase({ page: "Sender email\nwesley@northwind.io\nPhone" }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.match(saved.page.split("\n")[1], EMAIL_PLACEHOLDER);
+});
+
+test("an original name inside a longer word is not a leak, but joined by an underscore it is", () => {
+  const scrubbed = scrubCase(
+    rawCase({ contact: { name: "Gina" } }, "Why is this broken?"),
+    scope
+  );
+  scrubbed.case.question = "Dates and inbox pagination need a campaign.";
+  serializeCase(scrubbed);
+  scrubbed.case.question = "Gina_2 cannot sign in";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
+});
