@@ -895,7 +895,10 @@ export function scorecard(replays: readonly ScoredReplay[]) {
 }
 
 /** The scorecard as text: one pass rate per goal, target and hit/miss only where a target is set. */
-export function renderScorecard(card: ReturnType<typeof scorecard>) {
+export function renderScorecard(
+  card: ReturnType<typeof scorecard>,
+  targets = SCORECARD_TARGETS
+) {
   const pct = (part: number, whole: number) =>
     whole ? `${((part / whole) * 100).toFixed(1)}%` : "n/a";
   const seconds = (value: number | null) =>
@@ -906,7 +909,7 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
     "| goal | pass rate | n | target | hit |",
     "| --- | --- | --- | --- | --- |",
     ...card.rates.map(({ goal, pass, total }) => {
-      const target = SCORECARD_TARGETS[goal];
+      const target = targets[goal];
       if (target === undefined || !total || card.missingCoverage > 0) {
         return `| ${goal} | ${pct(pass, total)} | ${total} |  |  |`;
       }
