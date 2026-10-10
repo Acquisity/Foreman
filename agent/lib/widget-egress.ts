@@ -196,7 +196,8 @@ function classifyDomains(
       domains.add(host);
     }
   }
-  for (const match of uniqueLower(text.match(DOMAIN))) {
+  // An email's dotted local part ("first.last@") is not a domain; its domain is in emailDomains.
+  for (const match of uniqueLower(text.replace(EMAIL, " ").match(DOMAIN))) {
     const domain = fileStem(match);
     if (domain === null) {
       continue;

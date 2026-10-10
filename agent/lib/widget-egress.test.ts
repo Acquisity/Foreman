@@ -1208,3 +1208,73 @@ test("a claim the recompose repeats is deleted, and a conditional promise stays"
     `Your campaign paused because its inbox disconnected. ${conditional}`
   );
 });
+
+test("an email's dotted local part is not read as a domain", () => {
+  // "jane.smith" ends in a TLD-shaped "smith"; no domain table can vouch for it.
+  assert.deepEqual(
+    scanIdentifiers("You sign in as jane.smith@acme-owned.com.").candidates
+      .domains,
+    []
+  );
+  assert.deepEqual(
+    scanIdentifiers("Send from jane.smith@acme-owned.com via other-tenant.com.")
+      .candidates.domains,
+    ["other-tenant.com"]
+  );
+});
+
+test("sending accounts this org's own provider webhooks report are vouched for only through the verified workspace", () => {
+  const query = buildOwnershipQuery(scope, {
+    emails: ["sender@followup-owned.co"],
+    slugs: [],
+    uuids: [],
+  });
+  assert.ok(
+    query.includes(
+      "lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id"
+    )
+  );
+});
+
+test("leads of this org's own campaigns are vouched for only through the verified workspace", () => {
+  const query = buildOwnershipQuery(scope, {
+    emails: ["lead@prospect.net"],
+    slugs: [],
+    uuids: [],
+  });
+  assert.ok(
+    query.includes(
+      "lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id"
+    )
+  );
+  assert.ok(
+    query.includes(
+      "lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id"
+    )
+  );
+});
+
+test("a sending account or lead from another org still blocks", async () => {
+  const other = "lead@other-org-campaign.net";
+  const { calls, deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set(["sender@followup-owned.co"]),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    question,
+    findings({
+      facts: [],
+      recommendation: `sender@followup-owned.co sent a follow-up early to ${other}.`,
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.equal(result.reason, `foreign_identifier:${other}`);
+  assert.equal(calls.compose.length, 0);
+});
