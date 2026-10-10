@@ -778,12 +778,11 @@ export function scorecard(replays: readonly ScoredReplay[]) {
     goal: keyof ReturnType<typeof required>
   ) => {
     if (noAnswer(replay)) {
-      // A correct handoff answered what was needed and did not miss the
-      // cause: a person takes it from here.
+      // A reply never sent made nothing up. A correct handoff answered what
+      // was needed and did not miss the cause: a person takes it from here.
       return (
-        goal !== "nothing made up" &&
-        replay.row.handedOff === true &&
-        handoffExpected(replay.recorded)
+        goal === "nothing made up" ||
+        (replay.row.handedOff === true && handoffExpected(replay.recorded))
       );
     }
     const ids = required(replay)[goal];

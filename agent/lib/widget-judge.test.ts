@@ -766,7 +766,6 @@ test("scorecard keeps unanswered and unjudged scored replays in denominators and
   assert.equal(card.missingCoverage, 1);
   for (const goal of [
     "found the real cause",
-    "nothing made up",
     "answered what was needed",
     "no tool gaps",
   ]) {
@@ -774,6 +773,11 @@ test("scorecard keeps unanswered and unjudged scored replays in denominators and
     assert.equal(rate?.total, 3);
     assert.equal(rate?.pass, 1);
   }
+  // A reply that was never sent made nothing up.
+  assert.deepEqual(
+    card.rates.find((r) => r.goal === "nothing made up"),
+    { goal: "nothing made up", pass: 2, total: 3 }
+  );
   assert.ok(renderScorecard(card).includes("1 missing judge coverage"));
   const previousTarget = SCORECARD_TARGETS["found the real cause"];
   SCORECARD_TARGETS["found the real cause"] = 1;
