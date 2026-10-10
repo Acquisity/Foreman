@@ -103,6 +103,22 @@ const ctx = {
   session: { auth: { current: null, initiator: widgetAuth(scope) } },
 } as unknown as ProviderContext;
 
+test("date-only rejection names campaignId and tells the investigator to list campaigns first", () => {
+  const result = widgetOutreachHealthInput.safeParse({
+    endDate: "2026-10-07",
+    startDate: "2026-10-01",
+  });
+  assert.equal(result.success, false);
+  if (result.success) {
+    assert.fail("Dates without campaignId must be rejected");
+  }
+  const { message } = result.error.issues[0];
+  assert.ok(message.includes("require campaignId"));
+  assert.ok(
+    message.includes("without dates first to list campaigns and their ids")
+  );
+});
+
 test("tool is exposed only for the widget support initiator", async () => {
   const resolve = definition.events["step.started"];
   assert.ok(resolve);
