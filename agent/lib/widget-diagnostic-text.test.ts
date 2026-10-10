@@ -106,6 +106,7 @@ async function diagnostics(t: TestContext, text: string) {
               nextAfterInboxId: null,
             },
             dailyMetrics: [],
+            earlyFollowUps: null,
             endDate: "2026-10-10",
             lead: null,
             overview: null,

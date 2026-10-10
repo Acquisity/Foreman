@@ -521,6 +521,7 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
             nextAfterInboxId: null,
           },
           dailyMetrics: [],
+          earlyFollowUps: null,
           endDate: "2026-09-30",
           lead: null,
           overview: null,
@@ -596,6 +597,7 @@ test("step sends, first-touch counts and step delays round-trip through the outp
         updatedAt: observedAt,
       },
     ],
+    earlyFollowUps: null,
     endDate: "2026-09-30",
     lead: null,
     overview: null,
@@ -658,6 +660,7 @@ test("a paused campaign carries its saved pause reason and dated status changes"
             nextAfterInboxId: null,
           },
           dailyMetrics: [],
+          earlyFollowUps: null,
           endDate: "2026-09-30",
           lead: null,
           overview: null,
@@ -715,7 +718,7 @@ test("a lead's own history is read only inside the selected owned campaign, with
   }
   assert.equal(
     buildWidgetOutreachHealthQuery(scope, { campaignId }).includes(
-      "outreach_webhook_event"
+      "e.lead_email = any("
     ),
     false
   );
@@ -750,6 +753,7 @@ test("a lead's own history is read only inside the selected owned campaign, with
             nextAfterInboxId: null,
           },
           dailyMetrics: [],
+          earlyFollowUps: null,
           endDate: "2026-09-30",
           lead,
           overview: null,
@@ -767,4 +771,94 @@ test("a lead's own history is read only inside the selected owned campaign, with
     assert.fail("Expected saved evidence");
   }
   assert.deepEqual(result.campaigns[0].diagnostics?.lead, lead);
+});
+
+test("early follow-ups are found across the selected campaign's leads without a lead email", () => {
+  // Live wrun_41M4C65K460GV34YR42A4W6NAN: follow-ups went out three hours after
+  // the first email on a 3-day delay, and the widget asked the customer for a
+  // lead email because only one named lead's history was readable.
+  assert.equal(
+    buildWidgetOutreachHealthQuery(scope, {}).includes(
+      "outreach_webhook_event"
+    ),
+    false
+  );
+  const query = buildWidgetOutreachHealthQuery(scope, {
+    campaignId,
+    endDate: "2026-10-07",
+    startDate: "2026-10-07",
+  });
+  for (const required of [
+    "e.organization_id = c.organization_id and e.provider_id = c.provider_id",
+    "e.provider_campaign_id = c.provider_campaign_id and e.event_type = 'email_sent'",
+    "e.created_at < ('2026-10-07'::date) + 1",
+    "s.at >= ('2026-10-07'::date)",
+    "p.step = s.step - 1 and p.at <= s.at",
+    "from s join d on d.step = s.step",
+    'f.at - f."previousAt" < make_interval(days => f.delay)',
+    "limit 10",
+    "join authorized a on a.id = c.organization_id",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  for (const forbidden of [
+    "email_text",
+    "reply_text",
+    "email_html",
+    "unibox_url",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  const earlyFollowUps = {
+    earlyCount: 221,
+    earlyLeads: 221,
+    examples: [
+      {
+        at: "2026-10-07T15:08:00.000Z",
+        configuredDelayDays: 3,
+        leadEmail: "lead@example.test",
+        previousAt: "2026-10-07T12:00:00.000Z",
+        sendingInbox: "jane@sender.example.test",
+        step: 2,
+      },
+    ],
+    followUpsChecked: 221,
+    sameDayCount: 221,
+    withoutPreviousSend: 0,
+  };
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          earlyFollowUps,
+          endDate: "2026-10-07",
+          lead: null,
+          overview: null,
+          sequenceStepDelays: [0, 3, 3],
+          startDate: "2026-10-07",
+          statusHistory: [],
+          stepSends: [],
+        },
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.deepEqual(
+    result.campaigns[0].diagnostics?.earlyFollowUps,
+    earlyFollowUps
+  );
+  assert.ok(result.caveats.some((text) => text.includes("sameDayCount")));
 });
