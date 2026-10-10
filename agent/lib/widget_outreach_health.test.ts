@@ -504,6 +504,7 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
           },
           dailyMetrics: [],
           endDate: "2026-09-30",
+          lead: null,
           overview: null,
           sequenceStepDelays: null,
           startDate: "2026-09-01",
@@ -578,6 +579,7 @@ test("step sends, first-touch counts and step delays round-trip through the outp
       },
     ],
     endDate: "2026-09-30",
+    lead: null,
     overview: null,
     sequenceStepDelays: [2, 2, 3],
     startDate: "2026-09-23",
@@ -639,6 +641,7 @@ test("a paused campaign carries its saved pause reason and dated status changes"
           },
           dailyMetrics: [],
           endDate: "2026-09-30",
+          lead: null,
           overview: null,
           sequenceStepDelays: null,
           startDate: "2026-09-24",
@@ -660,4 +663,90 @@ test("a paused campaign carries its saved pause reason and dated status changes"
     result.campaigns[0].diagnostics?.statusHistory,
     statusHistory
   );
+});
+
+test("a lead's own history is read only inside the selected owned campaign, without email text", () => {
+  assert.equal(
+    widgetOutreachHealthInput.safeParse({ leadEmail: "lead@example.test" })
+      .success,
+    false
+  );
+  const query = buildWidgetOutreachHealthQuery(scope, {
+    campaignId,
+    leadEmail: "O'Neil@Example.test",
+  });
+  for (const required of [
+    "from outreach_webhook_event e",
+    "e.organization_id = c.organization_id and e.provider_id = c.provider_id",
+    "e.provider_campaign_id = c.provider_campaign_id",
+    "array['O''Neil@Example.test', lower('O''Neil@Example.test')]",
+    "cl.organization_id = c.organization_id and cl.campaign_id = c.id",
+    "e.payload->>'email_account'",
+    "limit 25",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  for (const forbidden of [
+    "email_text",
+    "reply_text",
+    "email_html",
+    "unibox_url",
+    "email_subject",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  assert.equal(
+    buildWidgetOutreachHealthQuery(scope, { campaignId }).includes(
+      "outreach_webhook_event"
+    ),
+    false
+  );
+  const lead = {
+    bounceCount: 0,
+    email: "lead@example.test",
+    events: [
+      {
+        at: observedAt,
+        eventType: "email_sent",
+        sendingInbox: "jane@sender.example.test",
+        step: 2,
+        variant: 0,
+      },
+    ],
+    inCampaign: true,
+    openCount: 1,
+    pushedToProvider: true,
+    status: "contacted",
+    statusAt: observedAt,
+  };
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          endDate: "2026-09-30",
+          lead,
+          overview: null,
+          sequenceStepDelays: null,
+          startDate: "2026-09-24",
+          statusHistory: [],
+          stepSends: [],
+        },
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.deepEqual(result.campaigns[0].diagnostics?.lead, lead);
 });
