@@ -10,6 +10,7 @@ import {
   type Verdict,
 } from "./widget-judge.js";
 import { gapSentences } from "./widget-live.js";
+import { ELIGIBLE_INSTRUCTIONS } from "./widget-next-action.js";
 import { widgetContextSchema } from "./widget-scope.js";
 
 /**
@@ -154,11 +155,12 @@ export const LIVE_ANSWERED =
 
 /**
  * Decides the handoff expectation for a live run from the question and tool
- * results alone, so "handed off only when needed" needs no authored lane.
+ * results alone, so "handed off only when needed" needs no authored lane. It
+ * quotes the product's own handoff rule so the grade cannot drift from it.
  */
 export const NEEDS_HUMAN: Claim = {
   id: "needs_human",
-  text: "Judging only the customer's messages and the tool results, not the answer: the customer asked for a person, or the tool results show the fix needs the Acquisity team (a refund, a billing correction, or a fault the customer cannot repair).",
+  text: `Judging only the customer's messages and the tool results, not the answer, a person is needed only when this holds: ${ELIGIBLE_INSTRUCTIONS} A refund request on its own, a fault the customer cannot fix, and a billing correction the customer did not dispute are not this either: they are answered, and a refund request is filed to billing, not handed to a person.`,
 };
 
 /** A live run as a case: the question, the run's own tool results, and no authored expectations. */

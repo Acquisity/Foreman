@@ -116,7 +116,8 @@ export function askedResult(result: unknown): string | null {
   return validAsk((action.output as { asked?: unknown } | null)?.asked);
 }
 
-const ELIGIBLE_INSTRUCTIONS =
+/** When a person takes over; the live judge grades handoffs against this same text. */
+export const ELIGIBLE_INSTRUCTIONS =
   "The customer explicitly asked to talk to a person, or the state shows a concrete billing dispute that a person must reconcile, such as a suspected duplicate charge, a charge that may belong to another workspace, or a charged order whose payment or delivery the customer is disputing. Missing data, a failed read, an ambiguous record, conflicting or old records, or a billing difference the customer did not raise is NOT this.";
 
 /** Opt-in through WIDGET_NEXT_ACTION, on every environment. */

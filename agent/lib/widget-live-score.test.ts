@@ -23,6 +23,7 @@ import {
   topicOf,
   twoColumnScorecard,
 } from "./widget-live-score.js";
+import { ELIGIBLE_INSTRUCTIONS } from "./widget-next-action.js";
 
 const LIVE_CAUSE_ROW =
   /\| conclusion supported by the evidence read \| 100\.0% \| 2 \| 90\.0% \| hit \|/;
@@ -156,6 +157,16 @@ const live = (needsHuman?: boolean) =>
     },
     needsHuman
   );
+
+const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
+const OLD_TEAM_FIX = /needs the Acquisity team/;
+
+test("the live handoff criterion is the product's own handoff rule", () => {
+  // Aaron, 2026-10-10: a person only on an explicit ask or a concrete billing dispute.
+  assert.ok(NEEDS_HUMAN.text.includes(ELIGIBLE_INSTRUCTIONS));
+  assert.match(NEEDS_HUMAN.text, REFUND_NOT_A_HANDOFF);
+  assert.doesNotMatch(NEEDS_HUMAN.text, OLD_TEAM_FIX);
+});
 
 test("live judging needs no authored expectation and decides the handoff from the evidence", async () => {
   const claims = [...claimsFor(live()), NEEDS_HUMAN];
