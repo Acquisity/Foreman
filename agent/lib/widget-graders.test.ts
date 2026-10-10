@@ -302,6 +302,41 @@ test("bold labels and merge tags are not raw fields; a real field still is", () 
   }
 });
 
+test("bold raw keys and undocumented merge variables still fail the grader", () => {
+  for (const message of [
+    "**organization_id:** 123",
+    "**sendingAccountId:** abc",
+    "The internal field is {{sendingAccountId}}.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "fail",
+      message
+    );
+  }
+  for (const name of [
+    "firstName",
+    "lastName",
+    "companyName",
+    "industry",
+    "jobTitle",
+    "sendingAccountName",
+    "sendingAccountFirstName",
+  ]) {
+    const message = `Use {{${name}}} in the email.`;
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "pass",
+      message
+    );
+  }
+  assert.equal(
+    gradeRun(run({ message: "**Leads tab:** Check uploaded leads." }), recorded)
+      .rawFields,
+    "pass"
+  );
+});
+
 test("missing step usage is distinguishable from reported zero tokens", () => {
   const event = {
     data: {},

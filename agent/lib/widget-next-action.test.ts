@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import { WIDGET_GUIDE } from "./widget-instructions.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
   askJev,
@@ -640,6 +641,117 @@ describe("widget next-action selector", () => {
     );
   });
 
+  it("unforceable selections retain the single non-repeated call and ask-result contract", async () => {
+    const ASK = { ...TOOLS[0], name: "widget_ask_customer" };
+    const firstAsk = call("widget_ask_customer", {
+      question: "Which campaign?",
+    });
+    const twoAsks = {
+      ...firstAsk,
+      content: [
+        ...firstAsk.content,
+        ...call("widget_ask_customer", {
+          question: "Which inbox?",
+        }).content.map((part) => ({ ...part, toolCallId: "second" })),
+      ],
+    };
+    const reads = [
+      { input: {}, output: campaigns, tool: "widget_billing_summary" },
+    ];
+    await Promise.all(
+      [
+        {
+          choice: "clarify",
+          output: text("Which campaign?"),
+          reads: [],
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: twoAsks,
+          reads: [],
+          selected: firstAsk.content,
+        },
+        {
+          choice: "widget_billing_summary",
+          output: call("widget_billing_summary", {}),
+          reads,
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: call("widget_billing_summary", {}),
+          reads: [],
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: firstAsk,
+          reads: [],
+          selected: firstAsk.content,
+        },
+      ].map(async (scenario) => {
+        const seen: { state?: string }[] = [];
+        const results = [scenario.output, text("findings")];
+        const base = new MockLanguageModelV4({
+          doGenerate: () =>
+            Promise.resolve(results.shift() ?? text("findings")),
+          modelId: "claude-sonnet-5-5",
+        });
+        const model = wrapLanguageModel({
+          middleware: [
+            widgetInvestigationMiddleware(),
+            widgetNextActionMiddleware({
+              apiKey: "k",
+              fetch: jev(scenario.choice, 0, seen),
+            }),
+          ],
+          model: base,
+        });
+        const out = await model.doGenerate({
+          prompt: prompt("Why did my campaign stop?", scenario.reads),
+          tools: [...TOOLS, ASK],
+        });
+        assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+        assert.equal(
+          base.doGenerateCalls[0].providerOptions?.anthropic
+            ?.disableParallelToolUse,
+          true
+        );
+        assert.deepEqual(
+          out.content,
+          scenario.selected.length
+            ? scenario.selected
+            : text("findings").content
+        );
+        assert.equal(
+          base.doGenerateCalls.length,
+          scenario.selected.length ? 1 : 2
+        );
+        if (scenario.selected.length) {
+          const { question } = JSON.parse(scenario.selected[0].input);
+          const afterAsk = prompt("Why did my campaign stop?", [
+            {
+              input: { question },
+              output: { asked: question },
+              tool: "widget_ask_customer",
+            },
+          ]);
+          assert.equal(turnEvidence(afterAsk).asked, question);
+          await model.doGenerate({ prompt: afterAsk, tools: [...TOOLS, ASK] });
+          assert.equal(seen.length, 1);
+          const last = base.doGenerateCalls[1].prompt.at(-1);
+          assert.ok(last?.role === "user" && last.content[0]?.type === "text");
+          assert.ok(
+            last.content[0].text.includes(
+              "question for the customer is recorded"
+            )
+          );
+        }
+      })
+    );
+  });
+
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
     const { model, sent } = harness(jev("finish"));
     await model.doGenerate({
@@ -1154,11 +1266,100 @@ describe("step model", () => {
       tools: TOOLS,
     });
     const miss = lines.find((line) => line.includes("missing_pick"));
-    assert.ok(miss?.includes("finish=stop/stop parts=text calls="), miss);
+    assert.ok(miss?.includes("finish=stop parts=1 calls=0"), miss);
     assert.equal(miss?.includes("secret reply"), false);
     assert.equal(
       lines.some((line) => line.includes("repeated_read")),
       false
+    );
+  });
+
+  it("missing-pick logs contain only known categories and offered names", async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: unknown) => lines.push(String(line)));
+    const customerName = "customer_account_482";
+    const rawReason = "Acme renewal dispute";
+    const { model } = build("widget_billing_summary", {
+      ...call(customerName, { customer: "secret argument" }),
+      finishReason: { raw: rawReason, unified: "tool-calls" },
+    });
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      tools: TOOLS,
+    });
+    const logs = lines.join("\n");
+    assert.equal(logs.includes(customerName), false);
+    assert.equal(logs.includes(rawReason), false);
+    assert.equal(logs.includes("secret argument"), false);
+    const missing = lines.find((line) => line.includes("missing_pick"));
+    assert.ok(missing?.includes("finish=tool-calls"), missing);
+    assert.ok(missing?.includes("calls=1"), missing);
+    assert.ok(missing?.includes("unknown_tool"), missing);
+  });
+
+  it("unforceable filler overrides use the filler with a guide-free prompt", async () => {
+    const result = call("widget_billing_summary", {});
+    const main = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(result),
+    });
+    const step = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(result),
+      modelId: "claude-sonnet-5-5",
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        widgetNextActionMiddleware({
+          apiKey: "k",
+          fetch: jev("widget_billing_summary"),
+          stepModel: wrapLanguageModel({ middleware: [], model: step }),
+        }),
+      ],
+      model: main,
+    });
+    const out = await model.doGenerate({
+      prompt: [
+        { content: `instructions\n\n${WIDGET_GUIDE}`, role: "system" },
+        ...prompt("Why was I charged?", []).slice(1),
+      ],
+      tools: TOOLS,
+    });
+    assert.equal(main.doGenerateCalls.length, 0);
+    assert.equal(step.doGenerateCalls.length, 1);
+    assert.equal(step.doGenerateCalls[0].toolChoice, undefined);
+    assert.equal(
+      JSON.stringify(step.doGenerateCalls[0].prompt).includes(
+        "# Product guide"
+      ),
+      false
+    );
+    assert.deepEqual(out.content, result.content);
+    assert.deepEqual(
+      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
+      LISTED
+    );
+  });
+
+  it("steered filler requests disable parallel tool use and preserve provider options and tools", async () => {
+    const { model, step } = build(
+      "widget_billing_summary",
+      call("widget_billing_summary", {})
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      providerOptions: {
+        anthropic: { existing: "preserved" },
+        other: { value: 1 },
+      },
+      tools: TOOLS,
+    });
+    assert.deepEqual(step.doGenerateCalls[0].providerOptions, {
+      anthropic: { disableParallelToolUse: true, existing: "preserved" },
+      other: { value: 1 },
+    });
+    assert.deepEqual(
+      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
+      LISTED
     );
   });
 

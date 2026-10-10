@@ -913,26 +913,27 @@ export function widgetNextActionMiddleware(
       });
       const filler =
         opts.stepModel && plan.tool !== ASK_TOOL ? opts.stepModel : undefined;
-      if (UNFORCEABLE_MODELS.has((filler ?? model).modelId)) {
-        // A forced request is certain to fail here: ask unforced and admit
-        // only the picked tool's call, with the same tools listed.
-        return unforced(
-          offer(
-            {
-              ...params,
-              abortSignal: plan.original.abortSignal,
-              toolChoice: undefined,
-            },
-            (tool) => tool === plan.tool
-          )
-        );
-      }
+      const requestModel = filler ?? model;
+      // The filler only fills in the chosen read: it gets no guide.
+      const prepared = filler ? withoutGuide(params) : params;
+      const steered = {
+        ...prepared,
+        providerOptions: {
+          ...prepared.providerOptions,
+          anthropic: {
+            ...prepared.providerOptions?.anthropic,
+            disableParallelToolUse: true,
+          },
+        },
+        // Some proxy models reject forcing. Their response still passes the
+        // same single selected-call admission below.
+        toolChoice: UNFORCEABLE_MODELS.has(requestModel.modelId)
+          ? undefined
+          : prepared.toolChoice,
+      };
       let generated: Awaited<ReturnType<typeof doGenerate>>;
       try {
-        generated = filler
-          ? // The step-filler only fills in the chosen read: it gets no guide.
-            await filler.doGenerate(withoutGuide(params))
-          : await doGenerate();
+        generated = await requestModel.doGenerate(steered);
       } catch (error) {
         // A local request timeout can use the existing fallback. A cancelled
         // investigation must never restart work with another model request.
@@ -960,17 +961,23 @@ export function widgetNextActionMiddleware(
         return { ...generated, content: [selected] };
       }
       // The same read with the same arguments returns what is already known.
-      // With no call to the picked tool at all, say what came back instead:
-      // its shape only, never text or arguments.
-      const calls = generated.content.flatMap((part) =>
-        part.type === "tool-call" ? [part.toolName.slice(0, 40)] : []
+      // Log counts and normalized categories only. Unknown response names
+      // and raw finish reasons can carry customer text.
+      const calls = generated.content.filter(
+        (part) => part.type === "tool-call"
       );
+      const offered = new Set(params.tools?.map((tool) => tool.name));
       log(
         "fallback",
         step(),
-        calls.includes(plan.tool)
+        calls.some((part) => part.toolName === plan.tool)
           ? "reason=repeated_read"
-          : `reason=missing_pick model=${(filler ?? model).modelId} finish=${generated.finishReason.unified}/${String(generated.finishReason.raw).slice(0, 20)} parts=${[...new Set(generated.content.map((part) => part.type))].join(",")} calls=${calls.slice(0, 3).join(",")}`
+          : `reason=missing_pick finish=${generated.finishReason.unified} parts=${generated.content.length} calls=${calls.length} tools=${calls
+              .slice(0, 3)
+              .map((part) =>
+                offered.has(part.toolName) ? part.toolName : "unknown_tool"
+              )
+              .join(",")}`
       );
       return unforced(finishParams(plan.original, plan.reads, "finish"));
     },
