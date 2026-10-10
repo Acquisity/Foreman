@@ -960,7 +960,18 @@ export function widgetNextActionMiddleware(
         return { ...generated, content: [selected] };
       }
       // The same read with the same arguments returns what is already known.
-      log("fallback", step(), "reason=repeated_read");
+      // With no call to the picked tool at all, say what came back instead:
+      // its shape only, never text or arguments.
+      const calls = generated.content.flatMap((part) =>
+        part.type === "tool-call" ? [part.toolName.slice(0, 40)] : []
+      );
+      log(
+        "fallback",
+        step(),
+        calls.includes(plan.tool)
+          ? "reason=repeated_read"
+          : `reason=missing_pick model=${(filler ?? model).modelId} finish=${generated.finishReason.unified}/${String(generated.finishReason.raw).slice(0, 20)} parts=${[...new Set(generated.content.map((part) => part.type))].join(",")} calls=${calls.slice(0, 3).join(",")}`
+      );
       return unforced(finishParams(plan.original, plan.reads, "finish"));
     },
   };

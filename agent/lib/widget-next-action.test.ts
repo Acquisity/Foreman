@@ -1140,6 +1140,28 @@ describe("step model", () => {
     assert.equal(main.doGenerateCalls.length, 0);
   });
 
+  it("logs the shape of a step-filler reply that lacks the picked call, never its text", async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: unknown) => {
+      lines.push(JSON.stringify(line));
+    });
+    const { model } = build(
+      "widget_billing_summary",
+      text("secret reply") as unknown as ReturnType<typeof call>
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      tools: TOOLS,
+    });
+    const miss = lines.find((line) => line.includes("missing_pick"));
+    assert.ok(miss?.includes("finish=stop/stop parts=text calls="), miss);
+    assert.equal(miss?.includes("secret reply"), false);
+    assert.equal(
+      lines.some((line) => line.includes("repeated_read")),
+      false
+    );
+  });
+
   it("leaves a finish write-up to the main model", async () => {
     const { main, model, step } = build(
       "finish",
