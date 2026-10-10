@@ -246,7 +246,7 @@ export const widgetOutreachHealthOutput = z.union([
     nextAfter: z.uuid().nullable(),
     observedAt: timestamp,
     source: z.literal(
-      "Acquisity product database; live Instantly evidence only for a selected campaign"
+      "Acquisity product database; live sending-provider evidence only for a selected campaign"
     ),
     status: z.literal("ok"),
     workspace: z.string().max(500),
@@ -549,7 +549,7 @@ export function parseWidgetOutreachHealthEvidence(
     campaigns,
     caveats: [
       "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
-      "pauseReason is the reason Acquisity saved when it paused the campaign itself or the provider did (for example accounts unhealthy, bounce protection, a high bounce rate, a subscription ending, or completed with nothing sent); the customer also sees it on the campaign's status badge. null means no reason was saved, which is what a pause the customer made themselves looks like: say no automatic pause reason is recorded, never that the cause is unknown to everyone. diagnostics.statusHistory lists the campaign's last 10 saved status changes, newest first, with when each happened; it shows when a campaign was paused or resumed, not who did it. live.providerStatus names Instantly's current status code (accounts_unhealthy, bounce_protect and account_suspended are provider pauses).",
+      "pauseReason is the reason Acquisity saved when it paused the campaign itself or the provider did (for example accounts unhealthy, bounce protection, a high bounce rate, a subscription ending, or completed with nothing sent); the customer also sees it on the campaign's status badge. null means no reason was saved, which is what a pause the customer made themselves looks like: say no automatic pause reason is recorded, never that the cause is unknown to everyone. diagnostics.statusHistory lists the campaign's last 10 saved status changes, newest first, with when each happened; it shows when a campaign was paused or resumed, not who did it. live.providerStatus is the sending provider's current status code (accounts_unhealthy, bounce_protect and account_suspended are provider pauses).",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
@@ -562,7 +562,7 @@ export function parseWidgetOutreachHealthEvidence(
       rows.length > CAMPAIGN_PAGE_SIZE ? rows[CAMPAIGN_PAGE_SIZE - 1].id : null,
     observedAt: result.observedAt,
     source:
-      "Acquisity product database; live Instantly evidence only for a selected campaign",
+      "Acquisity product database; live sending-provider evidence only for a selected campaign",
     status: "ok",
     workspace: context.organizationName,
   });
@@ -589,7 +589,7 @@ async function readLiveCampaign(
     return {
       available: false,
       reason:
-        "No ownership-verified Acquisity-provisioned Instantly connection for this campaign.",
+        "No ownership-verified Acquisity-provisioned sending-provider connection for this campaign.",
     };
   }
   try {

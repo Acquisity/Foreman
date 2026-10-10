@@ -177,7 +177,7 @@ export const widgetInboxHealthOutput = z.union([
     reconnectAttempts,
     savedInboxes,
     source: z.literal(
-      "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections"
+      "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections"
     ),
     status: z.literal("ok"),
     webhook: webhook.nullable(),
@@ -299,12 +299,12 @@ const instantlyAccount = z.object({
 
 const CAVEATS = [
   "Connection and webhook facts are saved product state, not a live provider check.",
-  "A saved connection error does not establish a current failure by itself. connection.connectionError is the saved message for the whole Instantly connection (for example an API key Instantly rejected, or a webhook out of sync); savedInboxes[].connectionError is the saved reason one purchased inbox is not connected (for example cancelled by the user, removed when its domain subscription ended, or an OAuth failure), with retryCount and lastRetryAt for Acquisity's own reconnect retries. Describe these in plain words; never paste raw technical error text. accountErrors lists sending accounts the provider reported an account error for in the last 7 days (count and last time), from the connection's own webhook, so it works for user-managed workspaces too; it says which account errored and when, not why.",
-  "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+  "A saved connection error does not establish a current failure by itself. connection.connectionError is the saved message for the whole sending-provider connection (for example an API key the provider rejected, or a webhook out of sync); savedInboxes[].connectionError is the saved reason one purchased inbox is not connected (for example cancelled by the user, removed when its domain subscription ended, or an OAuth failure), with retryCount and lastRetryAt for Acquisity's own reconnect retries. Describe these in plain words; never paste raw technical error text. accountErrors lists sending accounts the provider reported an account error for in the last 7 days (count and last time), from the connection's own webhook, so it works for user-managed workspaces too; it says which account errored and when, not why.",
+  "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means the sending provider reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
   "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
-  "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
+  "Account details come from the live provider read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them anywhere.",
   "senderName is the From name each live account sends with (its saved first and last name). savedInboxes lists the inboxes the customer bought through Acquisity, from saved records (total counts all of them; at most 100 shown, disconnected first), with the first and last name each was provisioned with: that is the sender name recipients see, and it was set at purchase, not taken from the customer's profile. Signature text is not readable here.",
-  "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization.",
+  "Live account status is only checked for Acquisity-provisioned connections; a user-managed sending-provider workspace cannot be verified as belonging to this organization.",
 ];
 
 /** The From display name Instantly sends with: first and last name as saved on the account. */
@@ -438,19 +438,19 @@ async function readAccountsEvidence(
     return {
       available: false,
       reason:
-        "This organization's Instantly workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections.",
+        "This organization's sending-provider workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections.",
     };
   }
   if (row.isActive === false) {
     return {
       available: false,
-      reason: "This organization's Instantly connection is turned off.",
+      reason: "This organization's sending-provider connection is turned off.",
     };
   }
   if (!row.workspaceId) {
     return {
       available: false,
-      reason: "No Instantly workspace is linked to this connection.",
+      reason: "No sending-provider workspace is linked to this connection.",
     };
   }
   try {
@@ -501,8 +501,8 @@ async function readAccountsEvidence(
       available: false,
       reason:
         error instanceof InstantlyApiError
-          ? error.message
-          : "Instantly could not be read.",
+          ? `The sending provider read failed (${error.kind}).`
+          : "The sending provider could not be read.",
     };
   }
 }
@@ -586,7 +586,8 @@ export async function readWidgetInboxHealth(
       accountErrors: row.accountErrors,
       accounts: {
         available: false,
-        reason: "No Instantly connection is configured for this organization.",
+        reason:
+          "No sending-provider connection is configured for this organization.",
       },
       caveats: CAVEATS,
       connection: null,
@@ -594,7 +595,7 @@ export async function readWidgetInboxHealth(
       reconnectAttempts: sanitized.reconnectAttempts,
       savedInboxes: sanitized.savedInboxes,
       source:
-        "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
       status: "ok",
       webhook: null,
       workspace: scope.organizationName,
@@ -615,7 +616,7 @@ export async function readWidgetInboxHealth(
     reconnectAttempts: sanitized.reconnectAttempts,
     savedInboxes: sanitized.savedInboxes,
     source:
-      "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+      "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
     status: "ok",
     webhook: {
       lastEventAt: row.lastWebhookEventAt,

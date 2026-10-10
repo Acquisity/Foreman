@@ -418,6 +418,8 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
   assert.equal(campaign.live.notSendingReasonCode, 3);
   assert.equal(campaign.live.statusCode, 1);
   assert.equal(campaign.live.providerStatus, "active");
+  // A Pro customer must never see the provider's name, even in authored text.
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
 });
 
 test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {

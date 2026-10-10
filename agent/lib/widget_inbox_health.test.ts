@@ -43,7 +43,7 @@ after(() => {
   }
 });
 
-const NO_CONNECTION = /No Instantly connection/;
+const NO_CONNECTION = /No sending-provider connection/;
 const USER_MANAGED = /user-managed/;
 const TURNED_OFF = /turned off/;
 const observedAt = "2026-09-17T10:00:00.000Z";
@@ -382,6 +382,8 @@ test("a system-provisioned active connection runs a live check and flags the sta
   assert.equal(result.accounts.error, 3);
   assert.equal(result.accounts.unknown, 2);
   assert.ok(!JSON.stringify(result).includes("secret smtp"));
+  // A Pro customer must never see the provider's name, even in authored text.
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
   assert.equal(result.accounts.staleSyncAccounts.length, 1);
   assert.equal(
     result.accounts.staleSyncAccounts[0].email,
