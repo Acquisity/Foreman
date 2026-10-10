@@ -87,6 +87,11 @@ export const validAsk = (value: unknown): string | null => {
 export const ASK_ERROR = `Not recorded. Send one question for the customer, ${ASK_MIN} to ${ASK_MAX} characters, containing a question mark.`;
 /** How many times a turn may try to record its question before it writes findings the ordinary way. */
 const ASK_ATTEMPTS = 2;
+/**
+ * Models that answer a forced tool_choice (`tool` or `any`) with a 400. Through
+ * the CLI Proxy, claude-sonnet-5-5 does; claude-haiku-5-5 accepts it (2026-10-10).
+ */
+const UNFORCEABLE_MODELS = new Set(["claude-sonnet-5-5"]);
 
 /**
  * The question a clarify decision recorded, read from the tool's own result the
@@ -906,13 +911,28 @@ export function widgetNextActionMiddleware(
         step: plan.reads.length,
         tool: plan.tool,
       });
+      const filler =
+        opts.stepModel && plan.tool !== ASK_TOOL ? opts.stepModel : undefined;
+      if (UNFORCEABLE_MODELS.has((filler ?? model).modelId)) {
+        // A forced request is certain to fail here: ask unforced and admit
+        // only the picked tool's call, with the same tools listed.
+        return unforced(
+          offer(
+            {
+              ...params,
+              abortSignal: plan.original.abortSignal,
+              toolChoice: undefined,
+            },
+            (tool) => tool === plan.tool
+          )
+        );
+      }
       let generated: Awaited<ReturnType<typeof doGenerate>>;
       try {
-        generated =
-          opts.stepModel && plan.tool !== ASK_TOOL
-            ? // The step-filler only fills in the chosen read: it gets no guide.
-              await opts.stepModel.doGenerate(withoutGuide(params))
-            : await doGenerate();
+        generated = filler
+          ? // The step-filler only fills in the chosen read: it gets no guide.
+            await filler.doGenerate(withoutGuide(params))
+          : await doGenerate();
       } catch (error) {
         // A local request timeout can use the existing fallback. A cancelled
         // investigation must never restart work with another model request.

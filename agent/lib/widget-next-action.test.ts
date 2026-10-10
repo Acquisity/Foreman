@@ -597,6 +597,49 @@ describe("widget next-action selector", () => {
     assert.deepEqual(other.sent(1).toolChoice, { type: "none" });
   });
 
+  it("a model that rejects a forced tool_choice is asked unforced, with only the pick admitted", async () => {
+    const ASK = {
+      inputSchema: { type: "object" as const },
+      name: "widget_ask_customer",
+      type: "function" as const,
+    };
+    const base = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          ...call("widget_ask_customer", { question: "Which campaign?" }),
+          content: [
+            ...call("widget_billing_summary", {}).content,
+            ...call("widget_ask_customer", { question: "Which campaign?" })
+              .content,
+          ],
+        }),
+      modelId: "claude-sonnet-5-5",
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        widgetNextActionMiddleware({ apiKey: "k", fetch: jev("clarify") }),
+      ],
+      model: base,
+    });
+    const out = await model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: [...TOOLS, ASK],
+    });
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+    assert.deepEqual(
+      (base.doGenerateCalls[0].tools ?? []).map((tool) => tool.name),
+      [...LISTED, "widget_ask_customer"]
+    );
+    assert.deepEqual(
+      out.content.map((part) => part.type === "tool-call" && part.toolName),
+      ["widget_ask_customer"]
+    );
+  });
+
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
     const { model, sent } = harness(jev("finish"));
     await model.doGenerate({
