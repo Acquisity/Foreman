@@ -1,5 +1,5 @@
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
-import { toRequest, type WidgetCase } from "./widget-case.js";
+import { decodedText, toRequest, type WidgetCase } from "./widget-case.js";
 import { scanIdentifiers } from "./widget-egress.js";
 import { REPLAY_TICKET } from "./widget-replay.js";
 
@@ -24,7 +24,8 @@ export interface GradedRun {
 /** Help-center reads are the only tools a member or client run may reach. */
 const HELP_TOOLS = new Set(["widget_help_article", "widget_read_help_article"]);
 const CAMEL_CASE = /(?<![\w])[a-z]+[A-Z][A-Za-z0-9]*(?![\w])/;
-const KEY_VALUE = /(?:"[A-Za-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)\S/;
+// A quoted key starts lowercase: a capitalized one before a colon is a UI label (Open "Sites" > "Domains": ...).
+const KEY_VALUE = /(?:"[a-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)\S/;
 const SNAKE_CASE_PAIR = /\b[A-Za-z_]\w*_\w*:\s+\S/;
 const RAW_BLOCK = /{[^{}]*}|`[^`]*`/g;
 const SPACED_PAIR = /\b[A-Za-z_]\w*:\s+\S/;
@@ -90,9 +91,15 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
   const owned = new Set<string>(
     Object.values(fixture).map((value) => value.toLowerCase())
   );
-  const known = scanIdentifiers(JSON.stringify(recorded.cassette)).candidates;
+  // The customer's own message and the run's own evidence, including the domain of an address in it.
+  const known = scanIdentifiers(
+    decodedText([recorded.question, recorded.cassette])
+  ).candidates;
   for (const value of Object.values(known).flat()) {
     owned.add(value ?? "");
+  }
+  for (const email of known.emails) {
+    owned.add(email.slice(email.lastIndexOf("@") + 1));
   }
   const { candidates, internal } = scanIdentifiers(message);
   return [

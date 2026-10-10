@@ -286,7 +286,7 @@ const mapStrings = (
  * backslash-n, so a line starting "wesley@x.com" scanned as "nwesley@x.com"
  * and the real address was never replaced.
  */
-const decodedText = (value: unknown) => {
+export const decodedText = (value: unknown) => {
   const strings: string[] = [];
   mapStrings(value, (text) => {
     strings.push(text);

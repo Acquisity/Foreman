@@ -448,3 +448,42 @@ test("a handoff is the human lane, a reply held for a person, or a filed ticket"
     false
   );
 });
+
+test("leak scan owns the domain of an address in the evidence and what the customer wrote", () => {
+  const evidence: WidgetCase = {
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      { ...recorded.cassette[0], output: "Sender\nsam@shop-one.co" },
+    ],
+    question: "A prospect asked who deals-two.com is.",
+  };
+  for (const message of [
+    "The sam@shop-one.co inbox and other shop-one.co addresses are cancelled.",
+    "Tell them deals-two.com is the address you send from.",
+  ]) {
+    assert.equal(gradeRun(run({ message }), evidence).leaks, "pass", message);
+  }
+  assert.equal(
+    gradeRun(run({ message: "Write to other-company.com first." }), evidence)
+      .leaks,
+    "fail"
+  );
+});
+
+test("a capitalized quoted UI label before a colon is not a raw key", () => {
+  assert.equal(
+    gradeRun(
+      run({
+        message:
+          'The help center lists three options under "Sites" > "Domains": a live URL or your own domain.',
+      }),
+      recorded
+    ).rawFields,
+    "pass"
+  );
+  assert.equal(
+    gradeRun(run({ message: '{"status": "error"}' }), recorded).rawFields,
+    "fail"
+  );
+});
