@@ -24,12 +24,15 @@ export interface GradedRun {
 /** Help-center reads are the only tools a member or client run may reach. */
 const HELP_TOOLS = new Set(["widget_help_article", "widget_read_help_article"]);
 const CAMEL_CASE = /(?<![\w])[a-z]+[A-Z][A-Za-z0-9]*(?![\w])/;
-const KEY_VALUE = /(?:"[A-Za-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)\S/;
+// A colon closing a bold label ("**Leads tab:** ...") is markdown, not a key.
+const KEY_VALUE = /(?:"[A-Za-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)[^\s*]/;
 const SNAKE_CASE_PAIR = /\b[A-Za-z_]\w*_\w*:\s+\S/;
 const RAW_BLOCK = /{[^{}]*}|`[^`]*`/g;
 const SPACED_PAIR = /\b[A-Za-z_]\w*:\s+\S/;
 const URL = /\bhttps?:\/\/[^\s)>"']+/gi;
 const LITERAL = /\b(?:true|false|null)\b/;
+// The product's documented sequence variables, such as {{sendingAccountName}}.
+const MERGE_TAG = /\{\{\s*\w+\s*\}\}/g;
 
 const grade = (ok: boolean): Grade => (ok ? "pass" : "fail");
 const NOT_ALPHANUMERIC = /[^\p{L}\p{N}]+/gu;
@@ -106,7 +109,7 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
 
 /** The raw field names that show the reply was not rewritten for a person. */
 export const rawFields = (message: string | null) => {
-  const prose = message?.replace(URL, "") ?? "";
+  const prose = message?.replace(URL, "").replace(MERGE_TAG, "") ?? "";
   return [
     ...[CAMEL_CASE, KEY_VALUE, SNAKE_CASE_PAIR, LITERAL].flatMap(
       (pattern) => prose.match(pattern)?.[0] ?? []

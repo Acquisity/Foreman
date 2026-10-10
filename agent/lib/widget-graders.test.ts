@@ -279,6 +279,29 @@ test("raw-field checks cover quoted keys, spaced pairs and hyphen-adjacent camel
   }
 });
 
+test("bold labels and merge tags are not raw fields; a real field still is", () => {
+  for (const message of [
+    "1. **Leads tab:** Make sure Leads Uploaded is above zero.",
+    "Use {{sendingAccountFirstName}} in the signature, then click Save.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "pass",
+      message
+    );
+  }
+  for (const message of [
+    "The record shows organization_id: 123.",
+    "It saved sendingAccountId=abc.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "fail",
+      message
+    );
+  }
+});
+
 test("missing step usage is distinguishable from reported zero tokens", () => {
   const event = {
     data: {},
