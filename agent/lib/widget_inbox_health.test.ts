@@ -207,7 +207,13 @@ test("recent failed reconnect attempts reach the result without OAuth secrets", 
   const result = await readWidgetInboxHealth(ctx);
   assert.equal(result.status, "ok");
   if (result.status === "ok") {
-    assert.deepEqual(result.reconnectAttempts, [failed]);
+    assert.deepEqual(result.reconnectAttempts, [
+      {
+        ...failed,
+        error:
+          "A diagnostic was recorded; its technical details are unavailable",
+      },
+    ]);
   }
 });
 
@@ -774,7 +780,7 @@ test("saved connection error text and provider account errors reach the result, 
   }
   assert.equal(
     result.connection?.connectionError,
-    "The request was rejected by Instantly. Please verify your API key."
+    "The sending-account connection was rejected"
   );
   assert.deepEqual(result.savedInboxes.inboxes, [saved]);
   assert.deepEqual(result.accountErrors, accountErrors);

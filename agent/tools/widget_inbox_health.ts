@@ -13,6 +13,7 @@ import {
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
@@ -564,6 +565,22 @@ export async function readWidgetInboxHealth(
       status: "denied",
     };
   }
+  const sanitized = {
+    reconnectAttempts: row.reconnectAttempts.map((attempt) => ({
+      ...attempt,
+      error: diagnosticText(attempt.error, RECONNECT_ERROR_CHARS),
+    })),
+    savedInboxes: {
+      ...row.savedInboxes,
+      inboxes: row.savedInboxes.inboxes.map((inbox) => ({
+        ...inbox,
+        connectionError: diagnosticText(
+          inbox.connectionError,
+          SAVED_ERROR_CHARS
+        ),
+      })),
+    },
+  };
   if (row.accountType === null) {
     return widgetInboxHealthOutput.parse({
       accountErrors: row.accountErrors,
@@ -574,8 +591,8 @@ export async function readWidgetInboxHealth(
       caveats: CAVEATS,
       connection: null,
       observedAt: row.observedAt,
-      reconnectAttempts: row.reconnectAttempts,
-      savedInboxes: row.savedInboxes,
+      reconnectAttempts: sanitized.reconnectAttempts,
+      savedInboxes: sanitized.savedInboxes,
       source:
         "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
       status: "ok",
@@ -589,14 +606,14 @@ export async function readWidgetInboxHealth(
     caveats: CAVEATS,
     connection: {
       accountType: row.accountType,
-      connectionError: row.connectionError,
+      connectionError: diagnosticText(row.connectionError, SAVED_ERROR_CHARS),
       hasConnectionError: row.hasConnectionError ?? false,
       isActive: row.isActive ?? false,
       updatedAt: row.connectionUpdatedAt ?? row.observedAt,
     },
     observedAt: row.observedAt,
-    reconnectAttempts: row.reconnectAttempts,
-    savedInboxes: row.savedInboxes,
+    reconnectAttempts: sanitized.reconnectAttempts,
+    savedInboxes: sanitized.savedInboxes,
     source:
       "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
     status: "ok",

@@ -5,10 +5,10 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
-import { redact } from "#lib/investigation-memory/case.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
@@ -101,17 +101,6 @@ const reconciliation = z.object({
   invisibleInboxes: z.boolean(),
 });
 
-function diagnosticText(value: string | null): string | null {
-  return value === null
-    ? null
-    : redact(value)
-        .replace(/https?:\/\/[^\s"'<>]+/gi, "[redacted URL]")
-        .replace(
-          /"(?:api[_-]?key|secret|password|token)"\s*:\s*"[^"\n]*"/gi,
-          '"credential":"[redacted]"'
-        )
-        .slice(0, 500);
-}
 const inboxDiagnostic = z.object({
   connected: z.boolean().nullable(),
   connectionError: z.string().max(500).nullable(),

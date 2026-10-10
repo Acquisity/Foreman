@@ -10,6 +10,7 @@ import { readInstantlySubworkspace } from "#lib/instantly-api.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { liveToolInput } from "#lib/widget-live-policy.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
@@ -497,7 +498,15 @@ export function parseWidgetOutreachHealthEvidence(
       row.toTime !== null ||
       row.timezone !== null ||
       row.days !== null;
-    const { diagnostics } = row;
+    const diagnostics = row.diagnostics
+      ? {
+          ...row.diagnostics,
+          statusHistory: row.diagnostics.statusHistory.map((event) => ({
+            ...event,
+            message: diagnosticText(event.message, STATUS_MESSAGE_CHARS) ?? "",
+          })),
+        }
+      : null;
     if (diagnostics) {
       const { accounts } = diagnostics.assignedInboxes;
       diagnostics.assignedInboxes.nextAfterInboxId =
@@ -515,7 +524,7 @@ export function parseWidgetOutreachHealthEvidence(
       name: row.name,
       notSendingReason: reason,
       notSendingReasonCode: code,
-      pauseReason: row.pauseReason,
+      pauseReason: diagnosticText(row.pauseReason, PAUSE_REASON_CHARS),
       recentSends: row.recentSends,
       // 0 is the settings column's empty default, not a cap: live 2026-09-23 it
       // was read as "your limit is 0, which stops all sending".

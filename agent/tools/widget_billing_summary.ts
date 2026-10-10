@@ -19,6 +19,7 @@ import {
   callPlanetscaleReadQuery,
   parseReadQueryResult,
 } from "#lib/planetscale.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { liveToolInput } from "#lib/widget-live-policy.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
@@ -253,7 +254,7 @@ const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => {
     declineType: failed ? (declineType?.slice(0, 32) ?? null) : null,
     description: asText(row.description),
     failureMessage: failed
-      ? (asText(row.failure_message)?.slice(0, DECLINE_TEXT_CHARS) ?? null)
+      ? diagnosticText(asText(row.failure_message), DECLINE_TEXT_CHARS)
       : null,
     id: asText(row.id) ?? "",
     refunded: row.refunded === true,
