@@ -244,7 +244,7 @@ export function widgetInvestigationMiddleware(
       const used = toolCallsThisTurn(params.prompt);
       const spent = used >= MAX_WIDGET_TOOL_CALLS;
       const { toolChoice: requestedToolChoice } = params;
-      // eve marks its last tool for caching. The guide's system breakpoint
+      // eve marks its last tool for caching. The guide's breakpoint
       // already covers the tools, and that marker would be a fifth breakpoint.
       const tools = params.tools?.flatMap((tool) =>
         typeof tool.name === "string" &&

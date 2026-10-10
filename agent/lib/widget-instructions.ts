@@ -20,9 +20,8 @@ Every message deserves a natural reply, whatever shape it takes:
 
 /**
  * The chat's product guide (widget-product-guide.ts) for the investigator. The
- * lane puts it ahead of the per-session scope, so every widget session shares
- * one system prefix the provider can cache; withoutGuide keeps it from the
- * step-filler.
+ * lane writes it into the system prompt; cacheGuide moves it to the front of
+ * the first user message, and withoutGuide keeps it from the step-filler.
  */
 export const WIDGET_GUIDE = `# Product guide
 
@@ -30,7 +29,18 @@ What follows is the Acquisity help center, distilled. Each article heading carri
 
 ${PRODUCT_GUIDE}`;
 
-/** A model call's prompt with the guide taken out of its system message. */
+/** Cache breakpoint for a part every request carries unchanged. */
+export const CACHED = {
+  anthropic: { cacheControl: { type: "ephemeral" } },
+} as const;
+
+const GUIDE_PART = {
+  providerOptions: CACHED,
+  text: WIDGET_GUIDE,
+  type: "text",
+} as const;
+
+/** A model call's prompt with the guide part cacheGuide added taken out. */
 export const withoutGuide = <
   T extends { prompt: readonly { content: unknown; role: string }[] },
 >(
@@ -38,47 +48,48 @@ export const withoutGuide = <
 ): T => ({
   ...params,
   prompt: params.prompt.map((message) =>
-    message.role === "system" && typeof message.content === "string"
+    message.role === "user" && Array.isArray(message.content)
       ? {
           ...message,
-          content: message.content.replace(`\n\n${WIDGET_GUIDE}`, ""),
+          content: message.content.filter(
+            (part) => part?.text !== WIDGET_GUIDE
+          ),
         }
       : message
   ),
 });
 
 /**
- * Split the existing guide-first system message right after the guide, with a
- * cache breakpoint on the shared part. The per-session scope follows it.
+ * Move the guide out of the system message to the front of the first user
+ * message, with a cache breakpoint on it. The CLI Proxy moves system behind the
+ * first user message and fingerprints that message's first block, so only a
+ * guide-first user message is the same prefix for every customer question.
  */
-export const cacheGuide = <
-  T extends { content: unknown; providerOptions?: unknown; role: string },
->(
+export const cacheGuide = <T extends { content: unknown; role: string }>(
   prompt: readonly T[]
-): T[] =>
-  prompt.flatMap((message) => {
-    const at =
-      message.role === "system" && typeof message.content === "string"
-        ? message.content.indexOf(WIDGET_GUIDE)
-        : -1;
-    if (at < 0) {
-      return [message];
-    }
-    const end = at + WIDGET_GUIDE.length;
-    const content = message.content as string;
-    return [
-      {
+): T[] => {
+  const first = prompt.findIndex((message) => message.role === "user");
+  const system = prompt.find(
+    (message) =>
+      message.role === "system" &&
+      typeof message.content === "string" &&
+      message.content.includes(WIDGET_GUIDE)
+  );
+  if (!system || first < 0 || !Array.isArray(prompt[first].content)) {
+    return [...prompt];
+  }
+  return prompt.map((message, n) => {
+    if (message === system) {
+      return {
         ...message,
-        content: content.slice(0, end),
-        providerOptions: {
-          anthropic: { cacheControl: { type: "ephemeral" } },
-        },
-      },
-      ...(end < content.length
-        ? [{ ...message, content: content.slice(end) }]
-        : []),
-    ];
+        content: (message.content as string).replace(`\n\n${WIDGET_GUIDE}`, ""),
+      };
+    }
+    return n === first
+      ? { ...message, content: [GUIDE_PART, ...(message.content as unknown[])] }
+      : message;
   });
+};
 
 const RECORDING_NOTE =
   "\n\nThe customer sent the screen recording an earlier reply asked for. Read it first with widget_read_recording, then check the workspace evidence it points to. An app error, a failed request or a step that fails the way the customer describes is evidence of a platform fault. When the recording shows nothing wrong, say so and recommend the one detail that would pin the problem down. When it cannot be read, answer from the conversation. Refer to it as the customer's screen recording, never by the tool or service behind it.";

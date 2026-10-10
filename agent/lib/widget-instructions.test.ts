@@ -4,7 +4,7 @@ import { composePrompt } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { CHAT_PROMPT } from "./widget-chat.js";
-import { COMPOSER_PROMPT } from "./widget-egress.js";
+import { COMPOSER_PROMPT, composerRequest } from "./widget-egress.js";
 import {
   cacheGuide,
   WIDGET_VOICE,
@@ -27,36 +27,66 @@ test("a failed documented step is reported and handed to a person, never repeate
   assert.match(widgetInstructions(widgetAuth(scope)), FAILED_STEP_RULE);
 });
 
-test("the investigator and the composer carry the product guide, cached ahead of the scope, and the step-filler does not", () => {
-  const prompt = composePrompt(sessionLane(widgetAuth(scope)));
-  assert.ok(prompt.includes(PRODUCT_GUIDE));
-  assert.ok(prompt.indexOf(PRODUCT_GUIDE) < prompt.indexOf(scope.userId));
-  assert.ok(COMPOSER_PROMPT.endsWith(PRODUCT_GUIDE));
-  const { prompt: stripped } = withoutGuide({
-    prompt: [{ content: prompt, role: "system" }],
-  });
-  assert.ok(!String(stripped[0].content).includes(PRODUCT_GUIDE));
-  assert.ok(String(stripped[0].content).includes(scope.userId));
-});
-
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
 
-test("two workspaces share one cached system block that ends with the guide", () => {
-  const split = (userId: string) =>
-    cacheGuide<{ content: string; providerOptions?: unknown; role: string }>([
-      {
-        content: composePrompt(sessionLane(widgetAuth({ ...scope, userId }))),
-        role: "system",
-      },
-    ]);
-  const [first, second] = [split(A), split(B)];
-  assert.deepEqual(first[0], second[0]);
-  assert.ok(String(first[0]?.content).endsWith(PRODUCT_GUIDE));
-  assert.deepEqual(first[0]?.providerOptions, {
+const user = (text: string) => ({
+  content: [{ text, type: "text" }],
+  role: "user",
+});
+const investigator = (userId: string, question: string) =>
+  cacheGuide<{ content: unknown; role: string }>([
+    {
+      content: composePrompt(sessionLane(widgetAuth({ ...scope, userId }))),
+      role: "system",
+    },
+    user(question),
+  ]);
+
+test("the investigator leads the first user message with the cached guide, the same for every question and workspace", () => {
+  const [first, second] = [
+    investigator(A, "Why was I charged?"),
+    investigator(B, "My campaign stopped sending"),
+  ];
+  for (const [prompt, userId] of [
+    [first, A],
+    [second, B],
+  ] as const) {
+    assert.ok(!String(prompt[0].content).includes(PRODUCT_GUIDE));
+    assert.ok(String(prompt[0].content).includes(userId));
+  }
+  const [guide] = first[1].content as {
+    providerOptions?: unknown;
+    text: string;
+  }[];
+  assert.deepEqual(guide, (second[1].content as unknown[])[0]);
+  assert.ok(guide.text.endsWith(PRODUCT_GUIDE));
+  assert.deepEqual(guide.providerOptions, {
     anthropic: { cacheControl: { type: "ephemeral" } },
   });
-  assert.ok(String(first[1]?.content).includes(A));
+});
+
+test("the step-filler's prompt carries no guide", () => {
+  const { prompt } = withoutGuide({ prompt: investigator(A, "Why?") });
+  assert.ok(!JSON.stringify(prompt).includes(PRODUCT_GUIDE));
+  assert.deepEqual(prompt[1], user("Why?"));
+});
+
+test("every composer reply shares one cached guide-first prefix and keeps the guide out of system", () => {
+  const [first, second] = [
+    composerRequest({
+      findings: { facts: [] },
+      question: "Why was I charged?",
+    }),
+    composerRequest({ findings: { facts: [1] }, question: "Is my inbox ok?" }),
+  ];
+  assert.ok(!first.system.includes(PRODUCT_GUIDE));
+  assert.equal(first.system, second.system);
+  const [guide, rest] = first.messages[0].content;
+  assert.deepEqual(guide, second.messages[0].content[0]);
+  assert.equal(guide.text, PRODUCT_GUIDE);
+  assert.ok(guide.providerOptions);
+  assert.ok(rest.text.includes("Why was I charged?"));
 });
 
 test("the chat and the reply composer share one voice", () => {

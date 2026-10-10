@@ -13,7 +13,7 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { WIDGET_VOICE } from "./widget-instructions.js";
+import { CACHED, WIDGET_VOICE } from "./widget-instructions.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
@@ -475,9 +475,7 @@ export const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the
 
 ${WIDGET_VOICE}
 
-Your knowledge of Acquisity is the product guide below, distilled from the help center. Workspace facts come only from the findings; product facts (where something is, what a feature does, who can use it, steps, limits, plans and prices) come from the findings or the guide, never from memory. Copy page, menu, button and setting names exactly as the guide writes them. To the customer it is the help center: never call it "the guide", never write "Get here", and never copy its {slug} markers or web addresses into the reply.
-
-${PRODUCT_GUIDE}`;
+Your knowledge of Acquisity is the product guide below, distilled from the help center. Workspace facts come only from the findings; product facts (where something is, what a feature does, who can use it, steps, limits, plans and prices) come from the findings or the guide, never from memory. Copy page, menu, button and setting names exactly as the guide writes them. To the customer it is the help center: never call it "the guide", never write "Get here", and never copy its {slug} markers or web addresses into the reply.`;
 
 // The judge returns a verdict and, for a rewrite, the numbers of the items to
 // remove. It used to return the findings themselves, and re-emitted every one of
@@ -588,6 +586,25 @@ const NO_TICKET_CORRECTION =
  */
 const COMPOSE_TIMEOUT_MS = 25_000;
 
+/**
+ * The guide leads the user message with a cache breakpoint and the
+ * instructions stay in system: the CLI Proxy moves system behind the first
+ * user message and fingerprints that message's first block, so this is the
+ * prefix every reply shares.
+ */
+export const composerRequest = (input: object) => ({
+  messages: [
+    {
+      content: [
+        { providerOptions: CACHED, text: PRODUCT_GUIDE, type: "text" as const },
+        { text: JSON.stringify(input), type: "text" as const },
+      ],
+      role: "user" as const,
+    },
+  ],
+  system: COMPOSER_PROMPT,
+});
+
 export const defaultGateDeps: GateDeps = {
   async compose({
     askedForChange,
@@ -603,7 +620,7 @@ export const defaultGateDeps: GateDeps = {
       abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
       model: modelFor(model),
       ...fastCallOptions(model),
-      prompt: JSON.stringify({
+      ...composerRequest({
         askedForChange: askedForChange === true,
         ...(correction ? { correction } : {}),
         findings,
@@ -611,13 +628,6 @@ export const defaultGateDeps: GateDeps = {
         recordingOffered,
         workspace: organizationName,
       }),
-      // The prompt and its guide are the same for every reply: one breakpoint
-      // at their end lets each reply read them from the provider's cache.
-      system: {
-        content: COMPOSER_PROMPT,
-        providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-        role: "system",
-      },
     });
     return text.trim();
   },

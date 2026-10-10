@@ -560,7 +560,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     "widget_account_access",
     "widget_read_help_article",
   ];
-  const eveParams = (userId: string, reads: number) => {
+  const eveParams = (userId: string, reads: number, question: string) => {
     const history = READS.slice(0, reads).flatMap((toolName, n) => [
       {
         content: [
@@ -587,7 +587,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     ]);
     const messages = [
       {
-        content: [{ text: "Why was I charged?", type: "text" as const }],
+        content: [{ text: question, type: "text" as const }],
         role: "user" as const,
       },
       ...history,
@@ -610,11 +610,17 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     } as Parameters<ReturnType<typeof wrapLanguageModel>["doGenerate"]>[0];
   };
   interface Body {
+    messages: { content: { cache_control?: unknown; text?: string }[] }[];
     model: string;
     system: { cache_control?: unknown; text: string }[];
     tools?: unknown[];
   }
-  const session = async (userId: string, picks: string[], steps: number[]) => {
+  const session = async (
+    userId: string,
+    picks: string[],
+    steps: number[],
+    question = "Why was I charged?"
+  ) => {
     const bodies: Body[] = [];
     const warnings: unknown[] = [];
     const provider = createAnthropic({
@@ -670,7 +676,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     });
     for (const reads of steps) {
       // biome-ignore lint/performance/noAwaitInLoops: one session's steps run in order.
-      const output = await model.doGenerate(eveParams(userId, reads));
+      const output = await model.doGenerate(eveParams(userId, reads, question));
       warnings.push(...output.warnings);
     }
     return Object.assign(bodies, { warnings });
@@ -719,14 +725,18 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     assert.equal(JSON.stringify(bodies.warnings).includes("breakpoint"), false);
   });
 
-  it("keeps tools and system through the shared breakpoint byte-identical across steps and sessions", async () => {
+  it("leads the first user message with the cached guide, byte-identical across questions, workspaces and steps", async () => {
     const prefixes = new Map<string, string>();
-    for (const userId of [A, B]) {
+    for (const [userId, question] of [
+      [A, "Why was I charged?"],
+      [B, "My campaign stopped sending"],
+    ]) {
       // biome-ignore lint/performance/noAwaitInLoops: compare consecutive steps of each session.
       const bodies = await session(
         userId,
         ["widget_billing_summary", "widget_account_access", "finish"],
-        [0, 1, 2, 3]
+        [0, 1, 2, 3],
+        question
       );
       assert.deepEqual(
         bodies.map((body) => body.model),
@@ -738,19 +748,22 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
         ]
       );
       for (const body of bodies) {
-        const end = body.system.findIndex((block) => block.cache_control);
-        assert.ok(end >= 0);
-        const system = body.system.slice(0, end + 1);
-        if (body.model === "claude-sonnet-5-5") {
-          assert.ok(system.at(-1)?.text.endsWith(PRODUCT_GUIDE));
-        }
-        const prefix = JSON.stringify({ system, tools: body.tools });
-        assert.equal(prefix.includes(userId), false);
-        assert.ok(
-          body.system
-            .slice(end + 1)
-            .some((block) => block.text.includes(userId))
+        assert.equal(
+          JSON.stringify(body.system).includes(PRODUCT_GUIDE),
+          false
         );
+        assert.ok(body.system.some((block) => block.text.includes(userId)));
+        const [first, next] = body.messages[0].content;
+        if (body.model === "claude-haiku-5-5") {
+          // The step-filler only fills in the chosen read: it gets no guide.
+          assert.equal(JSON.stringify(body).includes(PRODUCT_GUIDE), false);
+          assert.equal(first.text, question);
+          continue;
+        }
+        assert.ok(first.text?.endsWith(PRODUCT_GUIDE));
+        assert.ok(first.cache_control);
+        assert.equal(next.text, question);
+        const prefix = JSON.stringify({ guide: first, tools: body.tools });
         const previous = prefixes.get(body.model);
         if (previous !== undefined) {
           assert.equal(prefix, previous);
@@ -758,5 +771,6 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
         prefixes.set(body.model, prefix);
       }
     }
+    assert.equal(prefixes.size, 1);
   });
 });
