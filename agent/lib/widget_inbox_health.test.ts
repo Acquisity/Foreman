@@ -59,6 +59,7 @@ const baseRow = (overrides: Record<string, unknown> = {}) => ({
   recentWebhookErrorCount: 0,
   recentWebhookEventCount: 0,
   reconnectAttempts: [],
+  savedInboxes: { inboxes: [], total: 0 },
   webhookRegisteredCount: 0,
   workspaceId: null,
   ...overrides,
@@ -349,6 +350,7 @@ test("a system-provisioned active connection runs a live check and flags the sta
       email: "Warmup@example.test",
       errorCode: null,
       lastUsedAt: null,
+      senderName: null,
       setupPending: null,
       slowRampEnabled: true,
       status: 1,
@@ -605,4 +607,107 @@ test("a cut-off warmup list leaves active accounts unknown instead of ready", as
   assert.equal(result.accounts.initialWarmup, 1);
   assert.equal(result.accounts.ready, 0);
   assert.equal(result.accounts.unknown, 1);
+});
+
+test("sender names reach the result from the live accounts and the saved purchased inboxes", async (t) => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  for (const required of [
+    "from mail_inbox mi join authorized a on a.id = mi.organization_id",
+    "left(mi.first_name, 100)",
+    "left(mi.last_name, 100)",
+    "limit 100",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  const saved = {
+    connected: false,
+    email: "jane@example.test",
+    firstName: "Jane",
+    lastName: "Doe",
+    mailboxType: "dfy",
+    status: "error",
+  };
+  const row = baseRow({
+    accountType: "system_provisioned",
+    connectionUpdatedAt: observedAt,
+    hasConnectionError: false,
+    isActive: true,
+    savedInboxes: { inboxes: [saved], total: 1 },
+    workspaceId: WORKSPACE_ID,
+  });
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [
+            {
+              email: "jane@example.test",
+              first_name: " Jane ",
+              last_name: "Doe",
+              status: 1,
+            },
+            { email: "nameless@example.test", status: 1 },
+          ],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    assert.fail("expected a live account read");
+  }
+  assert.deepEqual(
+    result.accounts.details.map((detail) => detail.senderName),
+    ["Jane Doe", null]
+  );
+  assert.deepEqual(result.savedInboxes, { inboxes: [saved], total: 1 });
+});
+
+test("saved inbox names are returned even when the live check cannot run", async (t) => {
+  const saved = {
+    connected: true,
+    email: "own@example.test",
+    firstName: "Sam",
+    lastName: null,
+    mailboxType: "prewarmed",
+    status: "active",
+  };
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(
+          baseRow({
+            accountType: "user_owned",
+            connectionUpdatedAt: observedAt,
+            hasConnectionError: false,
+            isActive: true,
+            savedInboxes: { inboxes: [saved], total: 1 },
+          })
+        ),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.equal(result.accounts.available, false);
+    assert.deepEqual(result.savedInboxes.inboxes, [saved]);
+  }
 });

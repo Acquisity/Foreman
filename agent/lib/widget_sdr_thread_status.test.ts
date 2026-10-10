@@ -515,6 +515,7 @@ test("actual thread messages are bounded and arbitrary fields are stripped", () 
         content: "Why was this lead escalated?",
         contentTruncated: false,
         direction: "received",
+        fromAddress: "prospect@example.test",
         hasHtmlOnly: false,
         headers: "secret",
         id: threadId,
@@ -560,6 +561,7 @@ test("a message cut at the SQL character limit with an emoji in it still reads",
             content,
             contentTruncated: true,
             direction: "received",
+            fromAddress: null,
             hasHtmlOnly: false,
             id: threadId,
           },
@@ -570,4 +572,41 @@ test("a message cut at the SQL character limit with an emoji in it still reads",
     { threadId }
   );
   assert.equal(result.status, "ok");
+});
+
+test("a sent message names the inbox it went out from", () => {
+  assert.ok(
+    buildWidgetSdrQuery(scope, { threadId }).includes(
+      'left(m.from_address, 320) as "fromAddress"'
+    )
+  );
+  const result = parseWidgetSdrEvidence(
+    envelope([
+      {
+        ...detail,
+        messages: [
+          {
+            at: observedAt,
+            content: "Quick question",
+            contentTruncated: false,
+            direction: "sent",
+            fromAddress: "jane@sender.example.test",
+            hasHtmlOnly: false,
+            id: threadId,
+          },
+        ],
+      },
+    ]),
+    scope,
+    { threadId }
+  );
+  assert.equal(result.status, "ok");
+  if (result.status === "ok" && result.evidence.read === "thread") {
+    assert.equal(
+      result.evidence.messages[0]?.fromAddress,
+      "jane@sender.example.test"
+    );
+  } else {
+    assert.fail("expected a thread read");
+  }
 });
