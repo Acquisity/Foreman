@@ -207,7 +207,8 @@ export const liveIdentitySchema = z.strictObject({
 
 /**
  * A live re-run's scope: the production run's recorded scope, sent base64url-encoded as the
- * bearer token, on the request's own conversation and always as a team-only inbox run.
+ * bearer token, on the request's own conversation and always as a team-only inbox run. A
+ * recorded `recordingId` stays, as production verified it, so the recording stays readable.
  */
 export function liveContext(input: {
   conversationId: string;
@@ -228,7 +229,6 @@ export function liveContext(input: {
       ...recorded,
       conversationId: input.conversationId,
       liveAsOf: sentAt,
-      recordingId: undefined,
       replayCaseId: undefined,
       source: "inbox",
     })

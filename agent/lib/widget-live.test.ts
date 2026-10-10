@@ -17,6 +17,7 @@ import {
 import {
   assertReplayAllowed,
   LIVE_TICKET,
+  liveContext,
   replayable,
 } from "./widget-replay.js";
 import { widgetAuth } from "./widget-scope.js";
@@ -348,4 +349,19 @@ test("picks sentences that say something could not be confirmed", () => {
       "No send activity was recorded for that week.",
     ]
   );
+});
+
+test("a live re-run keeps the recorded screen recording so its reader is offered", () => {
+  const sentAt = "2026-10-07T12:00:00.000Z";
+  const scope = liveContext({
+    conversationId: "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
+    organizationId: fixture.organizationId,
+    staff: true,
+    userToken: Buffer.from(
+      JSON.stringify({ scope: { ...fixture, recordingId: "jam-abc" }, sentAt })
+    ).toString("base64url"),
+  });
+  assert.equal(scope.recordingId, "jam-abc");
+  assert.equal(scope.source, "inbox");
+  assert.equal(scope.liveAsOf, sentAt);
 });
