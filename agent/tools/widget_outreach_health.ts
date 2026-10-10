@@ -21,6 +21,20 @@ import {
 
 const CAMPAIGN_PAGE_SIZE = 20;
 const RECENT_SEND_DAYS = 7;
+const PAUSE_REASON_CHARS = 300;
+const STATUS_HISTORY_LIMIT = 10;
+const STATUS_MESSAGE_CHARS = 200;
+/** Instantly campaign status codes, as Acquisity's mapInstantlyStatusToOur reads them. */
+const PROVIDER_STATUS_BY_CODE: Record<number, string> = {
+  [-99]: "account_suspended",
+  [-2]: "bounce_protect",
+  [-1]: "accounts_unhealthy",
+  0: "draft",
+  1: "active",
+  2: "paused",
+  3: "completed",
+  4: "running_subsequences",
+};
 
 const metricDate = z.iso.date();
 export const widgetOutreachHealthInput = z
@@ -113,6 +127,7 @@ const liveCampaign = z.union([
     notSendingReason,
     notSendingReasonCode: z.number().int().nullable(),
     observedAt: timestamp,
+    providerStatus: z.string().max(40).nullable(),
     statusCode: z.number().int(),
     updatedAt: timestamp.nullable(),
   }),
@@ -159,6 +174,15 @@ const campaignDiagnostics = z
       .nullable(),
     sequenceStepDelays: z.array(count.nullable()).max(20).nullable(),
     startDate: dateStr,
+    statusHistory: z
+      .array(
+        z.object({
+          at: timestamp,
+          message: z.string().max(STATUS_MESSAGE_CHARS * 2),
+          status: z.string().max(40).nullable(),
+        })
+      )
+      .max(STATUS_HISTORY_LIMIT),
     stepSends: z
       .array(
         z.object({ sent: count, snapshotAt: timestamp.nullable(), step: count })
@@ -174,6 +198,10 @@ const campaignHealth = z.object({
   name: z.string().max(600),
   notSendingReason,
   notSendingReasonCode: z.number().int().nullable(),
+  pauseReason: z
+    .string()
+    .max(PAUSE_REASON_CHARS * 2)
+    .nullable(),
   recentSends: z.array(dailySend).max(RECENT_SEND_DAYS),
   savedDailyLimitPerInbox: count.nullable(),
   schedule: schedule.nullable(),
@@ -188,7 +216,7 @@ const inboxes = z.object({
 export const widgetOutreachHealthOutput = z.union([
   z.object({
     campaigns: z.array(campaignHealth).max(CAMPAIGN_PAGE_SIZE),
-    caveats: z.array(z.string()).max(6),
+    caveats: z.array(z.string()).max(8),
     inboxes,
     nextAfter: z.uuid().nullable(),
     observedAt: timestamp,
@@ -251,6 +279,14 @@ export function buildWidgetOutreachHealthQuery(
         and cm.date >= (${startDate})::text and cm.date <= (${endDate})::text
       order by cm.date limit 31
     ) d), '[]'::jsonb),
+    'statusHistory', coalesce((select jsonb_agg(to_jsonb(h) order by h.at desc) from (
+      select coalesce(ca.occurred_at, ca.created_at) as at, ca.status,
+        left(ca.message, ${STATUS_MESSAGE_CHARS}) as message
+      from outreach_campaign_activity ca
+      where ca.organization_id = c.organization_id and ca.campaign_id = c.id
+        and (ca.message like 'Campaign status updated to %' or ca.message like 'Campaign launch failed: %')
+      order by coalesce(ca.occurred_at, ca.created_at) desc limit ${STATUS_HISTORY_LIMIT}
+    ) h), '[]'::jsonb),
     'stepSends', coalesce((select jsonb_agg(to_jsonb(s) order by s.step) from (
       select sv.step::int as step, sum(sv.sent) as sent, max(sv.snapshot_at) as "snapshotAt"
       from outreach_campaign_step_variant_metrics sv
@@ -289,6 +325,7 @@ export function buildWidgetOutreachHealthQuery(
   )`
     : "null::jsonb";
   const selection = `select ${diagnostics} as diagnostics, c.id, left(c.name, 300) as name, c.status,
+      left(c.pause_reason, ${PAUSE_REASON_CHARS}) as "pauseReason",
       c.provider_campaign_id as "providerCampaignId", p.provider,
       p.account_type as "accountType", p.workspace_id as "providerWorkspaceId",
       c.total_leads as "totalLeads", c.updated_at as "updatedAt",
@@ -351,6 +388,10 @@ const campaignRow = z.object({
   leadsNotPushedCount: count,
   name: z.string().max(600),
   notSendingStatusRaw: z.string().nullable(),
+  pauseReason: z
+    .string()
+    .max(PAUSE_REASON_CHARS * 2)
+    .nullable(),
   provider: z.string().max(100),
   providerCampaignId: z.string().max(200),
   providerWorkspaceId: z.string().max(200).nullable(),
@@ -419,6 +460,7 @@ export function parseWidgetOutreachHealthEvidence(
       name: row.name,
       notSendingReason: reason,
       notSendingReasonCode: code,
+      pauseReason: row.pauseReason,
       recentSends: row.recentSends,
       // 0 is the settings column's empty default, not a cap: live 2026-09-23 it
       // was read as "your limit is 0, which stops all sending".
@@ -443,6 +485,7 @@ export function parseWidgetOutreachHealthEvidence(
     campaigns,
     caveats: [
       "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
+      "pauseReason is the reason Acquisity saved when it paused the campaign itself or the provider did (for example accounts unhealthy, bounce protection, a high bounce rate, a subscription ending, or completed with nothing sent); the customer also sees it on the campaign's status badge. null means no reason was saved, which is what a pause the customer made themselves looks like: say no automatic pause reason is recorded, never that the cause is unknown to everyone. diagnostics.statusHistory lists the campaign's last 10 saved status changes, newest first, with when each happened; it shows when a campaign was paused or resumed, not who did it. live.providerStatus names Instantly's current status code (accounts_unhealthy, bounce_protect and account_suspended are provider pauses).",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers only the last saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
@@ -518,6 +561,7 @@ async function readLiveCampaign(
           notSendingReason: reason.reason as z.infer<typeof notSendingReason>,
           notSendingReasonCode: reason.code,
           observedAt: new Date().toISOString(),
+          providerStatus: PROVIDER_STATUS_BY_CODE[campaign.status] ?? null,
           statusCode: campaign.status,
           updatedAt: campaign.timestamp_updated ?? null,
         };
@@ -622,7 +666,7 @@ export async function readWidgetOutreachHealth(
 
 export const tool = defineTool({
   description:
-    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), campaign-specific inbox assignments, saved sends per sequence step and each step's configured delay in days; use those step figures for 'follow-ups are not sending' or 'only step 1 sends' questions. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. This also fetches live provider status, campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads, and pauseReason: why Acquisity or the provider paused it, when saved) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts, and a count of that campaign's leads never pushed to the provider (null provider lead id). Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), campaign-specific inbox assignments, the last 10 status changes with dates (statusHistory: when it was paused or resumed), saved sends per sequence step and each step's configured delay in days; use those step figures for 'follow-ups are not sending' or 'only step 1 sends' questions. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. This also fetches live provider status (providerStatus names it, including accounts_unhealthy, bounce_protect and account_suspended), campaign daily limit and not-sending code for that owned campaign. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetOutreachHealth(
       ctx,

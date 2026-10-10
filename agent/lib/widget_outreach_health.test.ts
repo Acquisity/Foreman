@@ -65,6 +65,7 @@ const row = {
   leadsNotPushedCount: 12,
   name: "Customer campaign",
   notSendingStatusRaw: "1",
+  pauseReason: null,
   provider: "instantly",
   providerCampaignId: campaignId,
   providerWorkspaceId: "e05cbe7b-67db-4b07-b712-46b9365dc83f",
@@ -400,6 +401,7 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
   assert.equal(campaign.live.campaignDailyLimit, 150);
   assert.equal(campaign.live.notSendingReasonCode, 3);
   assert.equal(campaign.live.statusCode, 1);
+  assert.equal(campaign.live.providerStatus, "active");
 });
 
 test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {
@@ -505,6 +507,7 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
           overview: null,
           sequenceStepDelays: null,
           startDate: "2026-09-01",
+          statusHistory: [],
           stepSends: [],
         },
       },
@@ -578,6 +581,7 @@ test("step sends, first-touch counts and step delays round-trip through the outp
     overview: null,
     sequenceStepDelays: [2, 2, 3],
     startDate: "2026-09-23",
+    statusHistory: [],
     stepSends: [{ sent: 1003, snapshotAt: observedAt, step: 0 }],
   };
   const result = parseWidgetOutreachHealthEvidence(
@@ -589,7 +593,7 @@ test("step sends, first-touch counts and step delays round-trip through the outp
     assert.fail("Expected saved diagnostics");
   }
   assert.deepEqual(result.campaigns[0].diagnostics, diagnostics);
-  assert.ok(result.caveats.length <= 6);
+  assert.ok(result.caveats.length <= 8);
   assert.ok(
     result.caveats.some((text) =>
       text.includes("no saved numeric-step evidence of follow-up sends")
@@ -601,4 +605,59 @@ test("step sends, first-touch counts and step delays round-trip through the outp
     assert.fail("Expected ok evidence");
   }
   assert.equal(list.campaigns[0].diagnostics, null);
+});
+
+test("a paused campaign carries its saved pause reason and dated status changes", () => {
+  const query = buildWidgetOutreachHealthQuery(scope, { campaignId });
+  for (const required of [
+    'left(c.pause_reason, 300) as "pauseReason"',
+    "from outreach_campaign_activity ca",
+    "ca.organization_id = c.organization_id and ca.campaign_id = c.id",
+    "ca.message like 'Campaign status updated to %'",
+    "limit 10",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  const statusHistory = [
+    {
+      at: observedAt,
+      message: "Campaign status updated to paused",
+      status: "paused",
+    },
+  ];
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          endDate: "2026-09-30",
+          overview: null,
+          sequenceStepDelays: null,
+          startDate: "2026-09-24",
+          statusHistory,
+          stepSends: [],
+        },
+        pauseReason: "Accounts unhealthy",
+        status: "paused",
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.equal(result.campaigns[0].pauseReason, "Accounts unhealthy");
+  assert.deepEqual(
+    result.campaigns[0].diagnostics?.statusHistory,
+    statusHistory
+  );
 });
