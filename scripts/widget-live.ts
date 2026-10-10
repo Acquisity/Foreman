@@ -82,6 +82,7 @@ import {
   NEEDS_HUMAN,
   rankSet,
   splitNeedsHuman,
+  twoColumnScorecard,
 } from "../agent/lib/widget-live-score.js";
 import { MAX_WIDGET_TOOL_CALLS } from "../agent/lib/widget-next-action.js";
 import { replyElapsed } from "../agent/lib/widget-replay-timing.js";
@@ -363,6 +364,7 @@ async function pickSet(path: string): Promise<LiveSet> {
       cases.push({
         cassette: raw.cassette,
         question: raw.question,
+        reason: row.outcome?.reason ?? null,
         reply: row.outcome?.message ?? null,
         runId: row.session_id ?? "",
         scope,
@@ -399,6 +401,7 @@ async function liveStoreRun(id: string) {
 
 interface Scored {
   conversation: ConversationExport;
+  production: ScoredReplay;
   replay: ScoredReplay;
 }
 
@@ -407,7 +410,8 @@ async function judgeLive(
   name: string,
   scrubbed: WidgetCase,
   answer: string | null,
-  citations: string[]
+  citations: string[],
+  directory = outputDirectory
 ) {
   const articles = await citedArticles(citations);
   if (!answer) {
@@ -438,7 +442,7 @@ async function judgeLive(
     verdicts,
     judged.gaps
   );
-  saveRecord(outputDirectory, record);
+  saveRecord(directory, record);
   return { needsHuman, reason, record };
 }
 
@@ -489,24 +493,62 @@ async function scoreCase(snapshot: LiveSnapshot) {
     message ?? "",
     snapshot.reply ?? "",
   ]);
-  const judging = async (): Promise<Scored> => {
-    let judged: Awaited<ReturnType<typeof judgeLive>> = {
-      needsHuman: undefined,
-      reason: null,
-      record: null,
-    };
-    if (scrubbed) {
+  // The original reply, judged the same way against its own production tool results.
+  const productionRaw = liveCase({
+    cassette: snapshot.cassette,
+    question: snapshot.question,
+    runId: snapshot.runId,
+    scope,
+  });
+  const productionTools = snapshot.cassette.map(({ tool }) => tool);
+  const productionRow = {
+    answer: snapshot.reply,
+    budgetHit: productionTools.length >= MAX_WIDGET_TOOL_CALLS,
+    citations: [],
+    finalReplyMs: null,
+    firstReplyMs: null,
+    handedOff:
+      snapshot.reason === undefined
+        ? undefined
+        : handedOff("investigate", snapshot.reason, productionTools),
+    leaks: leaks(snapshot.reply, productionRaw).length ? "fail" : "pass",
+    rawFields: rawFields(snapshot.reply).length ? "fail" : "pass",
+    scored: true,
+  };
+  const productionScrubbed = scrubTexts(productionRaw, snapshot.scope, [
+    snapshot.reply ?? "",
+  ]);
+  const judgeOrMissing = async (
+    texts: typeof scrubbed,
+    answer: string | null,
+    urls: string[],
+    directory: string
+  ): Promise<Awaited<ReturnType<typeof judgeLive>>> => {
+    if (texts) {
       try {
-        judged = await judgeLive(
+        return await judgeLive(
           snapshot.runId,
-          scrubbed.case,
-          message && scrubbed.texts[0],
-          citations
+          texts.case,
+          answer && (texts.texts[0] ?? null),
+          urls,
+          directory
         );
       } catch {
         console.log(`${snapshot.runId}: judge_failed (missing coverage)`);
       }
     }
+    return { needsHuman: undefined, reason: null, record: null };
+  };
+  const judging = async (): Promise<Scored> => {
+    const [judged, original] = await Promise.all([
+      judgeOrMissing(scrubbed, message, citations, outputDirectory),
+      judgeOrMissing(
+        productionScrubbed,
+        snapshot.reply,
+        [],
+        `${outputDirectory}/production`
+      ),
+    ]);
     const request = toRequest(scrubbed?.case.question ?? WITHHELD);
     return {
       conversation: {
@@ -517,13 +559,32 @@ async function scoreCase(snapshot: LiveSnapshot) {
         liveReply: message && (scrubbed?.texts[0] ?? WITHHELD),
         newToolCalls: tools,
         originalReply: snapshot.reply && (scrubbed?.texts[1] ?? WITHHELD),
-        originalToolCalls: snapshot.cassette.map(({ tool }) => tool),
+        originalToolCalls: productionTools,
+        originalVerdicts: exportVerdicts(original.record, {
+          reason: original.reason,
+          value: original.needsHuman,
+        }),
         runId: snapshot.runId,
         topic: snapshot.topic,
         verdicts: exportVerdicts(judged.record, {
           reason: judged.reason,
           value: judged.needsHuman,
         }),
+      },
+      production: {
+        caseName: snapshot.runId,
+        record: original.record,
+        recorded: liveCase(
+          {
+            cassette: snapshot.cassette,
+            question: snapshot.question,
+            runId: snapshot.runId,
+            scope,
+          },
+          original.needsHuman
+        ),
+        row: productionRow,
+        runDir: `${outputDirectory}/production`,
       },
       replay: {
         caseName: snapshot.runId,
@@ -579,13 +640,21 @@ async function score() {
       failed.push(runId);
     }
   }
+  const live = liveScorecard(scorecard(done.map(({ replay }) => replay)));
+  const production = liveScorecard(
+    scorecard(done.map(({ production: original }) => original))
+  );
   const text = [
     `Live set ${setName}, ${done.length} of ${set.cases.length} re-run (run_failed: ${failed.join(", ") || "none"}).`,
     "",
-    renderScorecard(
-      liveScorecard(scorecard(done.map(({ replay }) => replay))),
-      LIVE_TARGETS
-    ),
+    twoColumnScorecard(production, live),
+    "",
+    "## Live at HEAD",
+    "",
+    renderScorecard(live, LIVE_TARGETS),
+    "## Production (the original replies)",
+    "",
+    renderScorecard(production, LIVE_TARGETS),
   ].join("\n");
   await writeFile(`${outputDirectory}/scorecard.md`, text, { mode: 0o600 });
   await writeFile(

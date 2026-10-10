@@ -117,4 +117,6 @@ Live cases have no hand-written expectations, so nothing is invented as ground t
 - Answered what was needed is one fixed claim (the reply answers what was asked, or asks one clarifying question the tool results justify), plus context and reask on a later turn. Per-cause-type rows are dropped: live cases have no cause type.
 - Handed off only when needed compares the run's handoff with one extra judge verdict, `needs_human`, decided from the customer's messages and tool results only. A run that sent no message gets that verdict alone.
 
+Each case's original production reply is judged the same way against its own snapshotted tool results, into `production/` beside the live records, and `scorecard.md` opens with both side by side: production (what the customer got) and live at HEAD, then each column's full scorecard. The original's handoff reads the snapshot's saved outcome reason; it has no reply time. `conversations.json` carries the original's verdicts as `originalVerdicts`.
+
 A live run that fails or does not complete is listed as `run_failed` and left out, as replay leaves out a run that does not complete; a judge failure leaves the case as missing coverage, which withholds hit or miss.

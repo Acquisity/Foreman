@@ -21,6 +21,7 @@ import {
   rankSet,
   splitNeedsHuman,
   topicOf,
+  twoColumnScorecard,
 } from "./widget-live-score.js";
 
 const LIVE_CAUSE_ROW =
@@ -28,6 +29,12 @@ const LIVE_CAUSE_ROW =
 const HANDOFF_ROW =
   /\| handed off only when needed \| 100\.0% \| 2 \| 90\.0% \| hit \|/;
 const REPLAY_CAUSE_ROW = /found the real cause/;
+const PRODUCTION_HANDOFF_ROW =
+  /\| handed off only when needed \| 50\.0% of 2, miss \| 100\.0% of 2, hit \| 90\.0% \|/;
+const PRODUCTION_LEAK_ROW =
+  /\| no leaks \| 50\.0% of 2, miss \| 100\.0% of 2, hit \| 100\.0% \|/;
+const PRODUCTION_TIME_ROW =
+  /\| reply time, final reply \| n\/a \| p50 30\.0s, p90 30\.0s \|/;
 const ORG = "06c49b56-44bc-4b46-8b6d-87e089c7b694";
 const TEST_ORG = "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5";
 let serial = 0;
@@ -240,4 +247,53 @@ test("the live scorecard relabels the cause goal, keeps targets and drops per-ca
   assert.match(text, LIVE_CAUSE_ROW);
   assert.match(text, HANDOFF_ROW);
   assert.doesNotMatch(text, REPLAY_CAUSE_ROW);
+});
+
+test("the two-column scorecard puts production beside live at HEAD per goal", () => {
+  const record = reviewedSample(
+    "wrun_41M4C65K460GV34YR42A4W6NAN",
+    live(),
+    "answer",
+    claimsFor(live()).map(({ id }) => ({
+      id,
+      reason: "ok",
+      verdict: "yes" as const,
+    })),
+    []
+  );
+  const replay = (handed: boolean, leak: "fail" | "pass"): ScoredReplay => ({
+    caseName: "wrun_41M4C65K460GV34YR42A4W6NAN",
+    record,
+    recorded: live(),
+    row: {
+      answer: "answer",
+      budgetHit: false,
+      finalReplyMs: 30_000,
+      handedOff: handed,
+      leaks: leak,
+      rawFields: "pass",
+      scored: true,
+    },
+  });
+  const production = liveScorecard(
+    scorecard([replay(true, "fail"), replay(false, "pass")])
+  );
+  const head = liveScorecard(
+    scorecard([replay(false, "pass"), replay(false, "pass")])
+  );
+  const text = twoColumnScorecard(
+    {
+      ...production,
+      replies: production.replies.map((reply) => ({
+        ...reply,
+        p50: null,
+        p90: null,
+        samples: 0,
+      })),
+    },
+    head
+  );
+  assert.match(text, PRODUCTION_HANDOFF_ROW);
+  assert.match(text, PRODUCTION_LEAK_ROW);
+  assert.match(text, PRODUCTION_TIME_ROW);
 });

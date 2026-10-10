@@ -129,6 +129,8 @@ export const liveSnapshotSchema = z.strictObject({
   /** The original investigation's tool calls, as the session stream recorded them. */
   cassette: widgetCaseSchema.shape.cassette,
   question: z.string().min(1),
+  /** The original outcome's reason ("needs_human" is a handoff); absent on sets picked before it was kept. */
+  reason: z.string().nullable().optional(),
   reply: z.string().nullable(),
   runId: z.string().regex(/^wrun_[0-9A-Z]{26}$/),
   /** The verified scope production ran with, including any recordingId. */
@@ -225,9 +227,55 @@ export interface ConversationExport {
   newToolCalls: string[];
   originalReply: string | null;
   originalToolCalls: string[];
+  /** The same judge on the original production reply and its own tool results. */
+  originalVerdicts: { goal: string; reason: string; verdict: string }[];
   runId: string;
   topic: Topic;
   verdicts: { goal: string; reason: string; verdict: string }[];
+}
+
+/**
+ * Production (what the customer got) beside live at HEAD, one row per goal.
+ * A cell is the pass rate and its n; hit or miss only where a target is set
+ * and the column has full judge coverage.
+ */
+export function twoColumnScorecard(
+  production: ReturnType<typeof liveScorecard>,
+  live: ReturnType<typeof liveScorecard>,
+  targets = LIVE_TARGETS
+) {
+  const cell = (card: typeof live, goal: string) => {
+    const rate = card.rates.find((entry) => entry.goal === goal);
+    if (!rate?.total) {
+      return "n/a";
+    }
+    const target = targets[goal];
+    let mark = "";
+    if (target !== undefined && card.missingCoverage === 0) {
+      mark = rate.pass / rate.total >= target ? ", hit" : ", miss";
+    }
+    return `${((rate.pass / rate.total) * 100).toFixed(1)}% of ${rate.total}${mark}`;
+  };
+  const time = (card: typeof live, key: string) => {
+    const reply = card.replies.find((entry) => entry.key === key);
+    return typeof reply?.p50 !== "number" || typeof reply.p90 !== "number"
+      ? "n/a"
+      : `p50 ${reply.p50.toFixed(1)}s, p90 ${reply.p90.toFixed(1)}s`;
+  };
+  return [
+    `Judged: production ${production.scored} (${production.missingCoverage} missing coverage), live ${live.scored} (${live.missingCoverage} missing coverage)`,
+    "",
+    "| goal | production | live at HEAD | target |",
+    "| --- | --- | --- | --- |",
+    ...live.rates.map(({ goal }) => {
+      const target = targets[goal];
+      return `| ${goal} | ${cell(production, goal)} | ${cell(live, goal)} | ${target === undefined ? "" : `${(target * 100).toFixed(1)}%`} |`;
+    }),
+    ...live.replies.map(
+      ({ key }) =>
+        `| reply time, ${key} | ${time(production, key)} | ${time(live, key)} |  |`
+    ),
+  ].join("\n");
 }
 
 /** The judge's verdicts in a record, for the export. */
