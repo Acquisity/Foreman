@@ -20,6 +20,8 @@ const NEXT_STEP_RULE =
   /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
 const STATED_FINDING_RULE =
   /a recorded count, status or absence[^;]*goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it/;
+const SUPPORTED_CONCLUSION_RULE =
+  /When the results you read support a conclusion, state it plainly as the likely cause with the facts it rests on, and keep uncertainty only for what you did not check: the distinctions below limit what a claim may say, they are not a reason to hold back a conclusion the results support/;
 const UNFILED_TICKET_RULE =
   /When ticketFiled is absent, nothing was reported[^.]*never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one/;
 
@@ -106,4 +108,11 @@ test("the write-up and the reply both end with what the customer does next", () 
 
 test("the composer reports a stated finding, never as could not confirm", () => {
   assert.match(COMPOSER_PROMPT, STATED_FINDING_RULE);
+});
+
+test("the investigator states a conclusion its reads support, hedging only what it did not check", () => {
+  assert.match(
+    widgetInstructions(widgetAuth(scope)),
+    SUPPORTED_CONCLUSION_RULE
+  );
 });
