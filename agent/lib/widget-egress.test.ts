@@ -1278,3 +1278,50 @@ test("a sending account or lead from another org still blocks", async () => {
   assert.equal(result.reason, `foreign_identifier:${other}`);
   assert.equal(calls.compose.length, 0);
 });
+
+test("an email the customer typed in this conversation may be repeated back", async () => {
+  const typed = "fredy.host@gmail.com";
+  const { deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    `Fredy (${typed}) says the campaign still names Tammy as host.`,
+    findings({
+      facts: [],
+      recommendation: `No AI SDR threads are saved for ${typed}.`,
+    }),
+    d
+  );
+  assert.notEqual(result.decision, "block");
+});
+
+test("an email the customer never typed still blocks beside one they did", async () => {
+  const other = "someone@other-tenant.net";
+  const { deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    "Why does fredy.host@gmail.com get no replies?",
+    findings({
+      facts: [],
+      recommendation: `fredy.host@gmail.com has no threads, and ${other} does.`,
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.equal(result.reason, `foreign_identifier:${other}`);
+});

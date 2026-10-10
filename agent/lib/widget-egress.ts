@@ -648,6 +648,27 @@ export const defaultGateDeps: GateDeps = {
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
 
+/**
+ * An identifier the customer typed in this conversation is their own input, and
+ * repeating it discloses nothing: a reply quoting the email in a thread they
+ * pasted was blocked whole (wrun_41M4DWMXRT0GKGYCZG5WMT5N25). Anything else
+ * still needs the verified workspace to own it.
+ */
+const vouchingTyped =
+  (resolve: GateDeps["resolve"], customerInput: string): GateDeps["resolve"] =>
+  async (scope, candidates, signal) => {
+    const owned = await resolve(scope, candidates, signal);
+    const typed = scanIdentifiers(customerInput).candidates;
+    const add = (set: Set<string>, ids: string[] = []) =>
+      new Set([...set, ...ids]);
+    return {
+      domains: add(owned.domains, typed.domains),
+      emails: add(owned.emails, typed.emails),
+      slugs: add(owned.slugs, typed.slugs),
+      uuids: add(owned.uuids, typed.uuids),
+    };
+  };
+
 const handoffOnly = (findings: WidgetFindings) =>
   findings.needsHuman && findings.facts.length === 0;
 
@@ -748,9 +769,12 @@ export async function gate(
   /** Whether the app shows its screen recording button under this reply. */
   recordingOffered = false,
   /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
-  finishAt?: number
+  finishAt?: number,
+  /** Everything the customer wrote in this conversation, the latest message included. */
+  customerInput: string = question
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
+  const resolve = vouchingTyped(deps.resolve, customerInput);
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     signal?.throwIfAborted();
@@ -764,7 +788,7 @@ export async function gate(
   const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
     let reason = await timed("scan", () =>
-      deterministicReason(scope, findings, deps.resolve, signal)
+      deterministicReason(scope, findings, resolve, signal)
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
@@ -782,7 +806,7 @@ export async function gate(
       const current = findings;
       // biome-ignore lint/performance/noAwaitInLoops: each pass scans what the last one left.
       reason = await timed("scan", () =>
-        deterministicReason(scope, current, deps.resolve, signal)
+        deterministicReason(scope, current, resolve, signal)
       );
     }
     if (reason) {
@@ -820,7 +844,7 @@ export async function gate(
       }
       gated = rewritten;
       const again = await timed("scan", () =>
-        deterministicReason(scope, gated, deps.resolve, signal)
+        deterministicReason(scope, gated, resolve, signal)
       );
       if (again) {
         return done(blocked(findings, again));
@@ -850,7 +874,7 @@ export async function gate(
     // Timed apart from the findings scan: one finish spent 27.7s in "scan" with
     // no way to tell which of the two ownership reads was slow.
     const egress = await timed("reply_scan", () =>
-      deterministicTextReason(scope, message, deps.resolve, undefined, signal)
+      deterministicTextReason(scope, message, resolve, undefined, signal)
     );
     if (egress) {
       return done(blocked(findings, `composed:${egress}`));

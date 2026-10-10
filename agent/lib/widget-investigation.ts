@@ -777,10 +777,8 @@ export async function finishWidgetRun(
     // conversation, so a reply continues the thread instead of starting over.
     // A failed read costs only that context, never the reply. The judge still
     // gets the question alone: it rules on the findings, not the conversation.
-    const conversation = withHistory(
-      run.question,
-      await deps.history(run).catch(() => [])
-    );
+    const history = await deps.history(run).catch(() => []);
+    const conversation = withHistory(run.question, history);
     // Asked alongside the write-up passes, so it costs no wait.
     const changeAsked = (
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
@@ -814,7 +812,13 @@ export async function finishWidgetRun(
         await changeAsked,
         deadline,
         run.recording_requested === true,
-        cutoff
+        cutoff,
+        [
+          ...history.flatMap(({ role, text }) =>
+            role === "customer" ? [text] : []
+          ),
+          run.question,
+        ].join("\n")
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
