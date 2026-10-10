@@ -48,8 +48,10 @@ const USER_MANAGED = /user-managed/;
 const TURNED_OFF = /turned off/;
 const observedAt = "2026-09-17T10:00:00.000Z";
 const baseRow = (overrides: Record<string, unknown> = {}) => ({
+  accountErrors: [],
   accountType: null,
   authorized: true,
+  connectionError: null,
   connectionUpdatedAt: null,
   hasConnectionError: null,
   initialWarmupEmails: [],
@@ -621,10 +623,13 @@ test("sender names reach the result from the live accounts and the saved purchas
   }
   const saved = {
     connected: false,
+    connectionError: null,
     email: "jane@example.test",
     firstName: "Jane",
     lastName: "Doe",
+    lastRetryAt: null,
     mailboxType: "dfy",
+    retryCount: 0,
     status: "error",
   };
   const row = baseRow({
@@ -680,10 +685,13 @@ test("sender names reach the result from the live accounts and the saved purchas
 test("saved inbox names are returned even when the live check cannot run", async (t) => {
   const saved = {
     connected: true,
+    connectionError: null,
     email: "own@example.test",
     firstName: "Sam",
     lastName: null,
+    lastRetryAt: null,
     mailboxType: "prewarmed",
+    retryCount: 0,
     status: "active",
   };
   t.mock.method(
@@ -710,4 +718,64 @@ test("saved inbox names are returned even when the live check cannot run", async
     assert.equal(result.accounts.available, false);
     assert.deepEqual(result.savedInboxes.inboxes, [saved]);
   }
+});
+
+test("saved connection error text and provider account errors reach the result, bounded", async (t) => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  for (const required of [
+    "left(nullif(p.connection_error, ''), 200)",
+    "left(nullif(mi.connection_error, ''), 200)",
+    "e.provider_id = (select id from provider) and e.event_type = 'account_error'",
+    "e.payload->>'email_account'",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  assert.equal(query.includes("unibox_url"), false);
+  const saved = {
+    connected: false,
+    connectionError: "Mailbox removed because the domain subscription ended",
+    email: "gone@example.test",
+    firstName: "Jane",
+    lastName: "Doe",
+    lastRetryAt: observedAt,
+    mailboxType: "dfy",
+    retryCount: 3,
+    status: "error",
+  };
+  const accountErrors = [
+    { count: 2, email: "own@example.test", lastAt: observedAt },
+  ];
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(
+          baseRow({
+            accountErrors,
+            accountType: "user_owned",
+            connectionError:
+              "The request was rejected by Instantly. Please verify your API key.",
+            connectionUpdatedAt: observedAt,
+            hasConnectionError: true,
+            isActive: true,
+            savedInboxes: { inboxes: [saved], total: 1 },
+          })
+        ),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    return;
+  }
+  assert.equal(
+    result.connection?.connectionError,
+    "The request was rejected by Instantly. Please verify your API key."
+  );
+  assert.deepEqual(result.savedInboxes.inboxes, [saved]);
+  assert.deepEqual(result.accountErrors, accountErrors);
 });
