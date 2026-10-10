@@ -65,6 +65,16 @@ const workspace = {
     workHoursDays: ["monday", "tuesday"],
   },
   hostResolution: "workspace",
+  recording: {
+    announceWhenJoining: true,
+    autoJoinCrmLinkedMeetings: true,
+    autoJoinExternalMeetings: true,
+    autoJoinInternalMeetings: false,
+    hasSavedSettings: false,
+    membersOptedOut: 0,
+    recentMeetings: [],
+    requesterOptedOut: false,
+  },
 };
 const thread = {
   campaignId: null,
@@ -608,5 +618,52 @@ test("a sent message names the inbox it went out from", () => {
     );
   } else {
     assert.fail("expected a thread read");
+  }
+});
+
+test("the notetaker's settings and recent meeting outcomes are read for this workspace only", () => {
+  const query = buildWidgetSdrQuery(scope, {});
+  for (const required of [
+    "left join crm_recall_calendar_recording_settings rs on rs.organization_id = a.id",
+    "from crm_recall_calendar_recording r",
+    "where r.organization_id = a.id",
+    `up.user_id = '${scope.userId}'::uuid`,
+    "r.terminal_reason",
+    "limit 10",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  for (const forbidden of [
+    "event_title",
+    "attendee_emails",
+    "organizer_email",
+    "r.meeting_url",
+    "bot_display_name",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  const recording = {
+    ...workspace.recording,
+    membersOptedOut: 1,
+    recentMeetings: [
+      {
+        matchStatus: "matched",
+        platform: "zoom",
+        recordingReadiness: "not_recorded",
+        startsAt: observedAt,
+        status: "failed",
+        terminalReason: "waiting_room_timeout",
+      },
+    ],
+    requesterOptedOut: true,
+  };
+  const result = parseWidgetSdrEvidence(
+    envelope([detail], { workspace: { ...workspace, recording } }),
+    scope,
+    { threadId }
+  );
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.deepEqual(result.evidence.workspace.recording, recording);
   }
 });
