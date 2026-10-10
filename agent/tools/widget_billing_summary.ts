@@ -54,7 +54,25 @@ const chargeSummarySchema = z.object({
   amountRefundedCents: z.number().nullable(),
   createdAt: z.string().nullable(),
   currency: z.string().nullable(),
+  declineReason: z
+    .string()
+    .nullable()
+    .describe(
+      "Stripe's decline reason for a failed charge (for example insufficient_funds or do_not_honor). null when the charge did not fail, Stripe gave none, or Stripe's risk screening blocked it"
+    ),
+  declineType: z
+    .string()
+    .nullable()
+    .describe(
+      "issuer_declined: the customer's bank refused it. blocked: Stripe's risk screening stopped it; never describe this as fraud, say the payment was declined and to try another card or contact their bank. invalid: the payment method could not be used"
+    ),
   description: z.string().nullable(),
+  failureMessage: z
+    .string()
+    .nullable()
+    .describe(
+      "Stripe's customer-safe explanation of why the charge failed, such as 'Your card has insufficient funds.'"
+    ),
   id: z.string(),
   refunded: z.boolean(),
   status: z.string().nullable(),
@@ -217,16 +235,31 @@ const stripeListRows = (section: StripeSection): Record<string, unknown>[] => {
   return Array.isArray(rows) ? rows.map(asRow) : [];
 };
 
-const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => ({
-  amountCents: asNumber(row.amount),
-  amountRefundedCents: asNumber(row.amount_refunded),
-  createdAt: asUnixIso(row.created),
-  currency: asText(row.currency),
-  description: asText(row.description),
-  id: asText(row.id) ?? "",
-  refunded: row.refunded === true,
-  status: asText(row.status),
-});
+const DECLINE_TEXT_CHARS = 300;
+const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => {
+  const outcome = asRow(row.outcome);
+  const declineType = asText(outcome.type);
+  const failed = row.status === "failed";
+  return {
+    amountCents: asNumber(row.amount),
+    amountRefundedCents: asNumber(row.amount_refunded),
+    createdAt: asUnixIso(row.created),
+    currency: asText(row.currency),
+    // A risk block's reason names Stripe's fraud screening; it stays out of the result.
+    declineReason:
+      failed && declineType !== "blocked"
+        ? (asText(outcome.reason)?.slice(0, 64) ?? null)
+        : null,
+    declineType: failed ? (declineType?.slice(0, 32) ?? null) : null,
+    description: asText(row.description),
+    failureMessage: failed
+      ? (asText(row.failure_message)?.slice(0, DECLINE_TEXT_CHARS) ?? null)
+      : null,
+    id: asText(row.id) ?? "",
+    refunded: row.refunded === true,
+    status: asText(row.status),
+  };
+};
 
 const stripeListHasMore = (section: StripeSection): boolean =>
   asRow(section?.data).has_more === true;
@@ -684,7 +717,7 @@ export const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {

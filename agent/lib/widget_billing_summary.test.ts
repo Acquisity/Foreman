@@ -169,7 +169,17 @@ const stripeFixture = {
           created: 1_726_100_000,
           currency: "usd",
           description: "Domain add-on",
+          failure_code: "card_declined",
+          failure_message:
+            "Your card has insufficient funds. Use a different payment method to complete this purchase.",
           id: "ch_2",
+          outcome: {
+            network_status: "declined_by_network",
+            reason: "insufficient_funds",
+            risk_score: 12,
+            seller_message: "The bank returned the decline code.",
+            type: "issuer_declined",
+          },
           refunded: false,
           status: "failed",
         },
@@ -644,4 +654,49 @@ test("the renewal date comes from a live subscription, never a newer canceled on
     withSubscriptions([canceled])
   );
   assert.equal(none.credits?.renewsAt, null);
+});
+
+const INSUFFICIENT_FUNDS = /insufficient funds/;
+
+test("a failed payment says why it was declined, without risk-screening detail", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps()
+  );
+  const [failed] = result.failedPayments;
+  assert.equal(failed?.declineReason, "insufficient_funds");
+  assert.equal(failed?.declineType, "issuer_declined");
+  assert.match(failed?.failureMessage ?? "", INSUFFICIENT_FUNDS);
+  assert.equal(
+    JSON.stringify(result.failedPayments).includes("risk_score"),
+    false
+  );
+  const succeeded = result.recentCharges.find((charge) => charge.id === "ch_1");
+  assert.equal(succeeded?.declineReason, null);
+  assert.equal(succeeded?.failureMessage, null);
+});
+
+test("a payment Stripe's risk screening blocked keeps its reason out of the result", async () => {
+  const blocked = {
+    amount: 1900,
+    created: 1_726_300_000,
+    failure_code: "payment_intent_payment_attempt_failed",
+    failure_message: "The payment failed.",
+    id: "ch_4",
+    outcome: { reason: "highest_risk_level", type: "blocked" },
+    status: "failed",
+  };
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getStripeCustomerBilling: () =>
+        Promise.resolve({
+          ...stripeFixture,
+          charges: { data: { data: [blocked], object: "list" } },
+        }),
+    })
+  );
+  assert.equal(result.failedPayments[0]?.declineType, "blocked");
+  assert.equal(result.failedPayments[0]?.declineReason, null);
+  assert.equal(JSON.stringify(result).includes("highest_risk_level"), false);
 });
