@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
-import type { CandidateRow } from "./widget-candidates.js";
+import { type CandidateRow, parseExcludedOrgs } from "./widget-candidates.js";
 import {
   claimsFor,
   judgeAnswer,
@@ -85,6 +85,25 @@ test("set selection keeps one customer investigation per conversation, spread ac
   );
   assert.equal(topicOf("My website will not publish"), "website");
   assert.equal(topicOf("hello"), "other");
+});
+
+test("the live picker leaves out Aaron's workspace and the Trivox AI demo workspace by default", () => {
+  const internal = [
+    "af11d514-3fbd-459c-8425-81b6b80929a0",
+    "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5",
+  ];
+  const kept = row({});
+  const ranked = rankSet([
+    kept,
+    ...internal.map((id) => row({ organization_id: id })),
+  ]);
+  assert.deepEqual(
+    ranked.map(({ row: picked }) => picked.id),
+    [kept.id]
+  );
+  for (const id of internal) {
+    assert.ok(parseExcludedOrgs(undefined).has(id));
+  }
 });
 
 test("a set snapshot round-trips through its file with the verified scope intact", () => {
