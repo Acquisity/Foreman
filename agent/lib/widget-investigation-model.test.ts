@@ -622,6 +622,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     question = "Why was I charged?"
   ) => {
     const bodies: Body[] = [];
+    const conversations: string[] = [];
     const warnings: unknown[] = [];
     const provider = createAnthropic({
       apiKey: "test",
@@ -647,8 +648,9 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
         );
       },
     });
-    const jev = () =>
-      Promise.resolve({
+    const jev = (_url: string, init: { body: string }) => {
+      conversations.push(JSON.parse(JSON.parse(init.body).state).conversation);
+      return Promise.resolve({
         json: () =>
           Promise.resolve({
             answers: {
@@ -659,6 +661,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
         ok: true,
         status: 200,
       });
+    };
     const model = wrapLanguageModel({
       middleware: [
         widgetInvestigationMiddleware(),
@@ -679,10 +682,32 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
       const output = await model.doGenerate(eveParams(userId, reads, question));
       warnings.push(...output.warnings);
     }
-    return Object.assign(bodies, { warnings });
+    return Object.assign(bodies, { conversations, warnings });
   };
   const A = "00000000-0000-4000-8000-00000000000a";
   const B = "00000000-0000-4000-8000-00000000000b";
+
+  it("sends Jev the customer conversation without the cached guide on initial and tool-result steps", async () => {
+    const questions = ["Why was I charged?", "My campaign stopped sending"];
+    const conversations = await Promise.all(
+      questions.map(async (question) => {
+        const bodies = await session(
+          A,
+          ["widget_billing_summary", "finish"],
+          [0, 1],
+          question
+        );
+        assert.equal(bodies.conversations.length, 2);
+        for (const conversation of bodies.conversations) {
+          assert.ok(conversation.includes(question));
+          assert.equal(conversation.includes("# Product guide"), false);
+          assert.equal(conversation, question);
+        }
+        return bodies.conversations;
+      })
+    );
+    assert.notDeepEqual(conversations[0], conversations[1]);
+  });
 
   it("lists the same tools across forced reads and terminal steps", async () => {
     // Two picked reads on the step model, then the write-up and an article read

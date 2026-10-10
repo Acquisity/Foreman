@@ -250,7 +250,7 @@ export const gathering = (tool: string) =>
 
 /** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
 export function turnEvidence(withControl: Params["prompt"]) {
-  const prompt = withoutNotes(withControl);
+  const prompt = withoutNotes(withoutGuide({ prompt: withControl }).prompt);
   const start = prompt.map((message) => message.role).lastIndexOf("user");
   const user = prompt[start];
   const question =
