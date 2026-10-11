@@ -333,9 +333,43 @@ test("a name shortened with an ellipsis takes the name's own placeholder", () =>
       ),
       scope
     );
-    assert.equal(scrubbed.case.question, `Raise "Name 2${ellipsis}" please`);
+    assert.equal(
+      scrubbed.case.question,
+      `Raise "Name 2 | Name 3${ellipsis}" please`
+    );
     serializeCase(scrubbed);
   }
+});
+
+test("a reply naming a campaign by its first part gets the placeholder the tool result shows", () => {
+  const scrubbed = scrubCase(
+    rawCase(
+      {
+        campaigns: [
+          { name: "MedTech |  Podcast | United States | July 2026" },
+          { name: "MedTech | US Based | 1-50" },
+          { name: "HVAC | US | 1-50" },
+          { name: "V2 | Retry" },
+        ],
+      },
+      "Why are MedTech and HVAC paused? And V2?"
+    ),
+    scope
+  );
+  assert.equal(
+    scrubbed.case.question,
+    "Why are Name 1 and Name 4 paused? And V2?"
+  );
+  const names = JSON.stringify(scrubbed.case);
+  for (const shown of [
+    '"Name 1 | Name 2"',
+    '"Name 1 | Name 3"',
+    '"Name 4 | Name 5"',
+    '"Name 6"',
+  ]) {
+    assert.ok(names.includes(shown), shown);
+  }
+  serializeCase(scrubbed);
 });
 
 test("a name too long to match inline is replaced as a whole field and fails closed elsewhere", () => {

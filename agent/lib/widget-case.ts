@@ -81,6 +81,8 @@ export interface ScrubbedCase {
 
 /** Keys whose string values name a person, company, campaign or workspace, or hold a phone number. */
 const NAME_KEY = /(?:name|workspace|company)$/i;
+/** A name part worth its own placeholder: three or more characters, at least one a letter. */
+const NAMED_PART = /^(?=.*\p{L}).{3,}$/u;
 const PHONE_KEY = /phone(?:_?number)?$/i;
 /** A catalog entry's own id ("website_credit"): a name spelling one ("Website Credit") labels a product, not a customer. */
 const CATALOG_ID = /^[a-z_]+$/;
@@ -336,6 +338,25 @@ const shownPrefix = (text: string, name: string) => {
   return null;
 };
 
+/**
+ * A reply names a campaign by its first part ("MedTech" for "MedTech | Podcast
+ * | US"): that part keeps one placeholder, alone and inside the name's own.
+ */
+const addName = (
+  name: string,
+  add: (value: string, placeholder: () => string) => void,
+  placeholder: () => string,
+  replacements: Map<string, string>
+) => {
+  const head = name.split("|")[0]?.trim() ?? "";
+  if (!(name.includes("|") && NAMED_PART.test(head))) {
+    add(name, placeholder);
+    return;
+  }
+  add(head, placeholder);
+  add(name, () => `${replacements.get(head.toLowerCase())} | ${placeholder()}`);
+};
+
 /** Map each ellipsis-shortened name in `text` to that name's placeholder. */
 const addShortenedNames = (
   text: string,
@@ -492,7 +513,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     if (catalogNames.get(name) === count) {
       continue;
     }
-    add(name, () => `Name ${next("name")}`);
+    addName(name, add, () => `Name ${next("name")}`, replacements);
   }
   // A reply shortens a long name with an ellipsis ("Information Technology…"):
   // the shown prefix takes the name's own placeholder, so it is neither kept nor
