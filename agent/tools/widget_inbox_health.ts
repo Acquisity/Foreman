@@ -9,6 +9,7 @@ import {
 import {
   InstantlyApiError,
   readInstantlySubworkspace,
+  resolveInstantlySubworkspace,
 } from "#lib/instantly-api.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
@@ -456,13 +457,18 @@ async function readAccountsEvidence(
   try {
     const items: unknown[] = [];
     let startingAfter: string | undefined;
+    const options = { client: executorClient(ctx), signal: ctx.abortSignal };
+    const workspace = await resolveInstantlySubworkspace(
+      { id: row.workspaceId },
+      options
+    );
     for (let page = 0; page < MAX_ACCOUNT_PAGES; page += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: each page needs the previous cursor.
       const read = await readInstantlySubworkspace(
-        { id: row.workspaceId },
+        workspace,
         "accounts",
         { limit: ACCOUNTS_LIMIT, startingAfter },
-        { client: executorClient(ctx), signal: ctx.abortSignal }
+        options
       );
       items.push(...read.items);
       startingAfter = read.nextStartingAfter ?? undefined;

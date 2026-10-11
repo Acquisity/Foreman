@@ -604,6 +604,19 @@ export async function listInstantlySubworkspaces(
   }
 }
 
+/** Workspaces this module resolved from a complete group; only these skip a fresh resolve. */
+const resolvedWorkspaces = new WeakSet<InstantlyWorkspace>();
+
+/** Resolves an accepted subworkspace once, so a multi-page read can reuse it. */
+export const resolveInstantlySubworkspace = async (
+  selector: InstantlyWorkspaceSelector,
+  options: InstantlyApiOptions = {}
+): Promise<InstantlyWorkspace> => {
+  const workspace = await resolveWorkspace(selector, options);
+  resolvedWorkspaces.add(workspace);
+  return workspace;
+};
+
 const resolveWorkspace = async (
   selector: InstantlyWorkspaceSelector,
   options: InstantlyApiOptions
@@ -714,16 +727,18 @@ const resourceRequest = (
   };
 };
 
-/** Reads one bounded resource page as an accepted subworkspace. */
+/** Reads one bounded resource page as an accepted subworkspace, resolving it unless this module already did. */
 export async function readInstantlySubworkspace(
-  selector: InstantlyWorkspaceSelector,
+  selector: InstantlyWorkspaceSelector | InstantlyWorkspace,
   resource: InstantlyResource,
   query: InstantlyResourceQuery = {},
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyResourcePage> {
   // Validate the query before any membership request.
   const limit = resourceLimit(query.limit);
-  const workspace = await resolveWorkspace(selector, options);
+  const workspace = resolvedWorkspaces.has(selector as InstantlyWorkspace)
+    ? (selector as InstantlyWorkspace)
+    : await resolveWorkspace(selector as InstantlyWorkspaceSelector, options);
   const page = await callPage(
     resourceRequest(resource, query, workspace.id, limit),
     options

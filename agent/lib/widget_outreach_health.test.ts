@@ -445,6 +445,43 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
   assert.ok(!JSON.stringify(result).includes("Instantly"));
 });
 
+test("a multi-page live scan resolves the workspace group once", async (t) => {
+  // Round 10c: a group walk on every page took about 20 s each and blew the scan deadline.
+  let groupWalks = 0;
+  const campaignPages: unknown[] = [];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string, input: Record<string, unknown>) => {
+      if (path.includes("planetscale")) {
+        return { data: envelope([row]), ok: true };
+      }
+      if (path.includes("workspaceGroupMembers")) {
+        groupWalks += 1;
+        return { data: { items: [member()] }, ok: true };
+      }
+      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
+      campaignPages.push(input.starting_after);
+      return input.starting_after === "page-3"
+        ? { data: { items: [{ id: campaignId, status: 1 }] }, ok: true }
+        : {
+            data: {
+              items: [{ id: "other-campaign", status: 1 }],
+              next_starting_after: `page-${campaignPages.length + 1}`,
+            },
+            ok: true,
+          };
+    }
+  );
+  const result = await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(groupWalks, 1);
+  assert.deepEqual(campaignPages, [undefined, "page-2", "page-3"]);
+  assert.equal(
+    result.status === "ok" && result.campaigns[0].live.available,
+    true
+  );
+});
+
 test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {
   const state = { accountType: "system_provisioned" };
   const call = t.mock.method(

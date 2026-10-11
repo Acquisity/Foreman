@@ -6,7 +6,10 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
-import { readInstantlySubworkspace } from "#lib/instantly-api.js";
+import {
+  readInstantlySubworkspace,
+  resolveInstantlySubworkspace,
+} from "#lib/instantly-api.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
@@ -744,13 +747,19 @@ async function scanProviderCampaigns(
   const found = new Map<string, unknown>();
   let startingAfter: string | undefined;
   const cursors = new Set<string>();
+  const options = { client: executorClient(ctx), signal };
+  // The complete group walk takes about 20 s live, so it runs once per scan, not per page.
+  const workspace = await resolveInstantlySubworkspace(
+    { id: workspaceId },
+    options
+  );
   for (let page = 0; page < 3; page += 1) {
     // biome-ignore lint/performance/noAwaitInLoops: the provider cursor determines the next page.
     const result = await readInstantlySubworkspace(
-      { id: workspaceId },
+      workspace,
       "campaigns",
       { limit: 100, startingAfter },
-      { client: executorClient(ctx), signal }
+      options
     );
     for (const item of result.items) {
       const id = z.object({ id: z.string() }).safeParse(item).data?.id;
@@ -787,9 +796,10 @@ async function readLiveCampaigns(
       byWorkspace.set(row.providerWorkspaceId, wanted);
     }
   }
+  // One cold workspace resolve alone takes about 20 s live; 35 s leaves room for three pages.
   const signal = AbortSignal.any([
     ctx.abortSignal,
-    AbortSignal.timeout(20_000),
+    AbortSignal.timeout(35_000),
   ]);
   const scans = new Map(
     await Promise.all(
