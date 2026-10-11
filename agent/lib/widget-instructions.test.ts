@@ -13,6 +13,7 @@ import {
 } from "./widget-instructions.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { widgetAuth } from "./widget-scope.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const FAILED_STEP_RULE =
   /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and set needsHuman true/;
@@ -78,7 +79,7 @@ test("the investigator leads the first user message with the cached guide, the s
     text: string;
   }[];
   assert.deepEqual(guide, (second[1].content as unknown[])[0]);
-  assert.ok(guide.text.endsWith(PRODUCT_GUIDE));
+  assert.ok(guide.text.endsWith(SUPPORT_GUIDE));
   assert.deepEqual(guide.providerOptions, {
     anthropic: { cacheControl: { type: "ephemeral" } },
   });
@@ -102,7 +103,7 @@ test("every composer reply shares one cached guide-first prefix and keeps the gu
   assert.equal(first.system, second.system);
   const [guide, rest] = first.messages[0].content;
   assert.deepEqual(guide, second.messages[0].content[0]);
-  assert.equal(guide.text, PRODUCT_GUIDE);
+  assert.equal(guide.text, SUPPORT_GUIDE);
   assert.ok(guide.providerOptions);
   assert.ok(rest.text.includes("Why was I charged?"));
 });

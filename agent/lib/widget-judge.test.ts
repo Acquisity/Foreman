@@ -41,7 +41,7 @@ import {
   toGold,
   writeGold,
 } from "./widget-judge-calibration.js";
-import { PRODUCT_GUIDE } from "./widget-product-guide.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const GOLD_REFUSAL = /Gold not saved/;
 const present = <T>(value: T | undefined): T => {
@@ -965,7 +965,7 @@ test("the judge reads the product guide for investigate replies only", async () 
     );
   }
   assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
-  assert.equal(JSON.parse(present(inputs[1])).productGuide, PRODUCT_GUIDE);
+  assert.equal(JSON.parse(present(inputs[1])).productGuide, SUPPORT_GUIDE);
 });
 
 test("the judge gets the guide section a plainly worded answer relies on", () => {

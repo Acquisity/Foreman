@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
-import { PRODUCT_GUIDE } from "./widget-product-guide.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5.5
@@ -294,7 +294,7 @@ export const judgeInput = (
     claims,
     ...(recorded.mode === "investigate"
       ? {
-          productGuide: PRODUCT_GUIDE,
+          productGuide: SUPPORT_GUIDE,
         }
       : {}),
     question: recorded.question,

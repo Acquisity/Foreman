@@ -14,10 +14,10 @@ import {
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import { CACHED, WIDGET_VOICE } from "./widget-instructions.js";
-import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
 export interface GateResult {
@@ -597,7 +597,7 @@ export const composerRequest = (input: object) => ({
   messages: [
     {
       content: [
-        { providerOptions: CACHED, text: PRODUCT_GUIDE, type: "text" as const },
+        { providerOptions: CACHED, text: SUPPORT_GUIDE, type: "text" as const },
         { text: JSON.stringify(input), type: "text" as const },
       ],
       role: "user" as const,
