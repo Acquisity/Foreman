@@ -17,6 +17,7 @@ import definition, {
 } from "../tools/widget_outreach_health.js";
 
 const scope = verifiedWidgetContext;
+const WAITING_LEADS = /12 leads have not had a first email yet/;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
@@ -211,7 +212,7 @@ test("a paused campaign, the one that stopped sending, is listed and readable by
 
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {
   const call = t.mock.method(executorTransport, "call", async () => ({
-    data: envelope([row]),
+    data: envelope([{ ...row, accountType: "user_owned" }]),
     ok: true,
   }));
   const result = await readWidgetOutreachHealth(ctx, {});
@@ -437,6 +438,8 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
     minutesBetweenEmails: 10,
     newLeadsFirst: true,
     randomExtraMinutesMax: 5,
+    reading:
+      "New leads come first and 12 leads have not had a first email yet, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.",
   });
   // A Pro customer must never see the provider's name, even in authored text.
   assert.ok(!JSON.stringify(result).includes("Instantly"));
@@ -880,4 +883,74 @@ test("early follow-ups are found across the selected campaign's leads without a 
     earlyFollowUps
   );
   assert.ok(result.caveats.some((text) => text.includes("sameDayCount")));
+});
+
+test("the listing reads each provisioned workspace's campaign list once and reads the rules for every campaign", async (t) => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD never selected the campaign, so it never saw the rules.
+  const second = "55555555-5555-4555-8555-555555555555";
+  const created = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const call = t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string) => {
+      if (path.includes("planetscale")) {
+        return {
+          data: envelope([
+            row,
+            {
+              ...row,
+              createdAt: created,
+              id: second,
+              leadsNotPushedCount: 0,
+              providerCampaignId: second,
+              recentSends: [
+                { date: "2026-09-17", emailsSent: 117 },
+                { date: "2026-09-16", emailsSent: 0 },
+              ],
+            },
+          ]),
+          ok: true,
+        };
+      }
+      if (path.includes("workspaceGroupMembers")) {
+        return { data: { items: [member()] }, ok: true };
+      }
+      return {
+        data: {
+          items: [
+            {
+              daily_max_leads: 40,
+              id: campaignId,
+              prioritize_new_leads: true,
+              status: 1,
+            },
+            {
+              daily_max_leads: 120,
+              id: second,
+              prioritize_new_leads: true,
+              status: 1,
+            },
+          ],
+        },
+        ok: true,
+      };
+    }
+  );
+  const result = await readWidgetOutreachHealth(ctx, {
+    endDate: "2026-09-17",
+    startDate: "2026-09-11",
+  });
+  assert.equal(call.mock.callCount(), 3);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  const readings = result.campaigns.map((campaign) =>
+    campaign.live.available ? campaign.live.sendingRules.reading : "missing"
+  );
+  assert.match(String(readings[0]), WAITING_LEADS);
+  assert.equal(
+    readings[1],
+    "This campaign is new and its daily sends are at or near its cap of 120 new leads a day, so that daily new-lead cap is what limits first emails."
+  );
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
 });
