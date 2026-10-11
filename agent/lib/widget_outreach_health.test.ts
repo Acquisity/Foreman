@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
+import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
@@ -44,6 +45,9 @@ after(() => {
     process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
   }
 });
+
+// Resolved workspaces are cached per process; no test may see another's.
+beforeEach(resetInstantlyWorkspaceCache);
 
 const campaignId = "44444444-4444-4444-8444-444444444444";
 const observedAt = "2026-09-17T10:00:00.000Z";
@@ -480,6 +484,38 @@ test("a multi-page live scan resolves the workspace group once", async (t) => {
     result.status === "ok" && result.campaigns[0].live.available,
     true
   );
+});
+
+test("a resolved workspace is reused across calls for its organization only", async (t) => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD made two campaign reads; each walked the group (about 20 s) before round 11.
+  let groupWalks = 0;
+  t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
+    if (path.includes("planetscale")) {
+      return { data: envelope([row]), ok: true };
+    }
+    if (path.includes("workspaceGroupMembers")) {
+      groupWalks += 1;
+      return { data: { items: [member()] }, ok: true };
+    }
+    return { data: { items: [{ id: campaignId, status: 1 }] }, ok: true };
+  });
+  await readWidgetOutreachHealth(ctx, {});
+  await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(groupWalks, 1);
+  const otherOrganization = {
+    ...ctx,
+    session: {
+      auth: {
+        current: null,
+        initiator: widgetAuth({
+          ...scope,
+          organizationId: "55555555-5555-4555-8555-555555555555",
+        }),
+      },
+    },
+  } as unknown as ProviderContext;
+  await readWidgetOutreachHealth(otherOrganization, { campaignId });
+  assert.equal(groupWalks, 2);
 });
 
 test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {

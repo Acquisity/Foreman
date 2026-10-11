@@ -607,13 +607,49 @@ export async function listInstantlySubworkspaces(
 /** Workspaces this module resolved from a complete group; only these skip a fresh resolve. */
 const resolvedWorkspaces = new WeakSet<InstantlyWorkspace>();
 
-/** Resolves an accepted subworkspace once, so a multi-page read can reuse it. */
+const RESOLVED_TTL_MS = 5 * 60_000;
+const RESOLVED_CAP = 200;
+/** Resolved workspaces by organization and workspace ID: one cold group walk is about 20 s live. */
+const resolvedByOrganization = new Map<
+  string,
+  { expiresAt: number; workspace: InstantlyWorkspace }
+>();
+
+/** Tests only: forget every cached resolve. */
+export const resetInstantlyWorkspaceCache = () =>
+  resolvedByOrganization.clear();
+
+/**
+ * Resolves an accepted subworkspace once, so a multi-page read can reuse it.
+ * With an organization, an ID resolve is reused for a few minutes, keyed by
+ * that organization and ID, so another organization never shares it.
+ */
 export const resolveInstantlySubworkspace = async (
   selector: InstantlyWorkspaceSelector,
-  options: InstantlyApiOptions = {}
+  options: InstantlyApiOptions = {},
+  organizationId?: string
 ): Promise<InstantlyWorkspace> => {
+  const key =
+    organizationId && selector.id ? `${organizationId}\n${selector.id}` : null;
+  const cached = key ? resolvedByOrganization.get(key) : undefined;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.workspace;
+  }
   const workspace = await resolveWorkspace(selector, options);
   resolvedWorkspaces.add(workspace);
+  if (key) {
+    resolvedByOrganization.delete(key);
+    resolvedByOrganization.set(key, {
+      expiresAt: Date.now() + RESOLVED_TTL_MS,
+      workspace,
+    });
+    // Map order is insertion order, so the first key is the oldest.
+    if (resolvedByOrganization.size > RESOLVED_CAP) {
+      resolvedByOrganization.delete(
+        resolvedByOrganization.keys().next().value as string
+      );
+    }
+  }
   return workspace;
 };
 

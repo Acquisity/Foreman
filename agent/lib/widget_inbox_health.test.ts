@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
+import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
+
+// Resolved workspaces are cached per process; no test may see another's.
+beforeEach(resetInstantlyWorkspaceCache);
+
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {

@@ -742,7 +742,8 @@ async function scanProviderCampaigns(
   ctx: ProviderContext,
   workspaceId: string,
   wanted: Set<string>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  organizationId: string
 ): Promise<{ found: Map<string, unknown>; truncated: boolean }> {
   const found = new Map<string, unknown>();
   let startingAfter: string | undefined;
@@ -751,7 +752,8 @@ async function scanProviderCampaigns(
   // The complete group walk takes about 20 s live, so it runs once per scan, not per page.
   const workspace = await resolveInstantlySubworkspace(
     { id: workspaceId },
-    options
+    options,
+    organizationId
   );
   for (let page = 0; page < 3; page += 1) {
     // biome-ignore lint/performance/noAwaitInLoops: the provider cursor determines the next page.
@@ -782,7 +784,8 @@ async function scanProviderCampaigns(
 /** Match only the provider identity read from the authorized campaigns, never a model-supplied provider ID. */
 async function readLiveCampaigns(
   ctx: ProviderContext,
-  rows: z.infer<typeof campaignRow>[]
+  rows: z.infer<typeof campaignRow>[],
+  organizationId: string
 ): Promise<z.infer<typeof liveCampaign>[]> {
   const byWorkspace = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -807,7 +810,13 @@ async function readLiveCampaigns(
         try {
           return [
             workspaceId,
-            await scanProviderCampaigns(ctx, workspaceId, wanted, signal),
+            await scanProviderCampaigns(
+              ctx,
+              workspaceId,
+              wanted,
+              signal,
+              organizationId
+            ),
           ] as const;
         } catch (error) {
           if (ctx.abortSignal.aborted) {
@@ -885,7 +894,8 @@ export async function readWidgetOutreachHealth(
         .parse(providerData(result.data));
       const live = await readLiveCampaigns(
         ctx,
-        db.rows[0].records.slice(0, evidence.campaigns.length)
+        db.rows[0].records.slice(0, evidence.campaigns.length),
+        scope.organizationId
       );
       evidence.campaigns.forEach((campaign, index) => {
         campaign.live = live[index];

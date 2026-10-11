@@ -433,7 +433,8 @@ function bucketAccounts(
 /** Live Instantly account check, only for a workspace Acquisity itself provisioned. */
 async function readAccountsEvidence(
   ctx: ProviderContext,
-  row: z.infer<typeof dbRow>
+  row: z.infer<typeof dbRow>,
+  organizationId: string
 ): Promise<z.infer<typeof accounts>> {
   if (row.accountType === "user_owned") {
     return {
@@ -460,7 +461,8 @@ async function readAccountsEvidence(
     const options = { client: executorClient(ctx), signal: ctx.abortSignal };
     const workspace = await resolveInstantlySubworkspace(
       { id: row.workspaceId },
-      options
+      options,
+      organizationId
     );
     for (let page = 0; page < MAX_ACCOUNT_PAGES; page += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: each page needs the previous cursor.
@@ -609,7 +611,7 @@ export async function readWidgetInboxHealth(
   }
   return widgetInboxHealthOutput.parse({
     accountErrors: row.accountErrors,
-    accounts: await readAccountsEvidence(ctx, row),
+    accounts: await readAccountsEvidence(ctx, row, scope.organizationId),
     caveats: CAVEATS,
     connection: {
       accountType: row.accountType,
