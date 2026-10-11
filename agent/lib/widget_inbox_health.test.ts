@@ -14,6 +14,7 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetInboxHealthQuery,
+  readMailboxNotFound,
   readWidgetInboxHealth,
   widgetInboxHealthInput,
   widgetInboxHealthOutput,
@@ -791,4 +792,43 @@ test("saved connection error text and provider account errors reach the result, 
   );
   assert.deepEqual(result.savedInboxes.inboxes, [saved]);
   assert.deepEqual(result.accountErrors, accountErrors);
+});
+
+test("reconnects that failed with mailbox not found say Reconnect can't fix it and to check non-payment first", () => {
+  // wrun_41M4G6PZ3P0GT4KHVEA0STAT0M: the raw text carries "exception", so the shared filter made it generic.
+  const attempts = [
+    {
+      email: "a@example.com",
+      error: "Manually fix required",
+    },
+    {
+      email: "A@example.com",
+      error:
+        "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=1",
+    },
+  ];
+  const inboxes = [
+    { connectionError: "account_error", email: "a@example.com" },
+  ];
+  const reading = readMailboxNotFound(attempts, inboxes);
+  assert.ok(
+    String(reading).includes(
+      "a@example.com because the email provider reported the mailbox not found"
+    )
+  );
+  assert.ok(String(reading).includes("so Reconnect can't fix it"));
+  assert.ok(
+    String(reading).includes("whether they were cancelled for non-payment")
+  );
+  assert.ok(
+    String(
+      readMailboxNotFound(attempts, [
+        {
+          connectionError: "Mailbox cancelled after unpaid cleanup",
+          email: "a@example.com",
+        },
+      ])
+    ).includes("likely cancelled for non-payment")
+  );
+  assert.equal(readMailboxNotFound([attempts[0]], inboxes), null);
 });
