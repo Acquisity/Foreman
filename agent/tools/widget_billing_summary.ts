@@ -838,6 +838,38 @@ export async function composeWidgetBillingSummary(
   };
 }
 
+/** Long enough for one investigation, short enough that a later turn reads billing afresh. */
+const SESSION_READ_MS = 180_000;
+const sessionReads = new Map<string, { at: number; value: Promise<unknown> }>();
+
+/**
+ * A repeated billing read in one session (wrun ...MAF4Z47 read it twice, about
+ * 14 s each) reuses the provider and product rows the first call loaded. The
+ * membership check and the credit window still run on every call. A failed read
+ * is forgotten, so the next call tries again.
+ */
+// ponytail: in-process only, so a call on another instance reads again; a
+// shared cache if repeats there turn out to matter.
+export function sessionRead<T>(
+  key: string,
+  read: () => Promise<T>,
+  now = Date.now()
+): Promise<T> {
+  for (const [stale, { at }] of sessionReads) {
+    if (now - at > SESSION_READ_MS) {
+      sessionReads.delete(stale);
+    }
+  }
+  const hit = sessionReads.get(key);
+  if (hit) {
+    return hit.value as Promise<T>;
+  }
+  const value = read();
+  sessionReads.set(key, { at: now, value });
+  value.catch(() => sessionReads.delete(key));
+  return value;
+}
+
 /** The same live owner/admin membership check the other widget tools read through. */
 const authorizedCte = (context: WidgetContext): string => {
   const scope = widgetContextSchema.parse(context);
@@ -889,20 +921,28 @@ export const tool = defineTool({
     if (!scope) {
       throw new Error("Support widget identity required.");
     }
+    const once = <T>(read: string, id: string, run: () => Promise<T>) =>
+      ctx.session.id
+        ? sessionRead(`${ctx.session.id}:${read}:${id}`, run)
+        : run();
     return composeWidgetBillingSummary(
       scope.organizationId,
       {
         getAutumnCustomer: (customerId) =>
-          readAutumnCustomer(customerId, {
-            client: executorClient(ctx),
-            signal: ctx.abortSignal,
-          }),
-        getBillingAccount: (organizationId) =>
-          readBillingAccount(organizationId, (query) =>
-            callPlanetscaleReadQuery(ctx, {
-              ...PRODUCTION_READ_QUERY_ARGS,
-              query,
+          once("autumn", customerId, () =>
+            readAutumnCustomer(customerId, {
+              client: executorClient(ctx),
+              signal: ctx.abortSignal,
             })
+          ),
+        getBillingAccount: (organizationId) =>
+          once("account", organizationId, () =>
+            readBillingAccount(organizationId, (query) =>
+              callPlanetscaleReadQuery(ctx, {
+                ...PRODUCTION_READ_QUERY_ARGS,
+                query,
+              })
+            )
           ),
         getCreditHistory: (organizationId, window) =>
           readBillingCreditHistory(organizationId, window, (query) =>
@@ -911,20 +951,24 @@ export const tool = defineTool({
               query,
             })
           ),
-        getErroredInboxes: async (organizationId) =>
-          erroredInboxesSchema.parse(
-            parseReadQueryResult(
-              await callPlanetscaleReadQuery(ctx, {
-                ...PRODUCTION_READ_QUERY_ARGS,
-                query: buildErroredInboxesQuery({ ...scope, organizationId }),
-              })
-            ).rows[0]
+        getErroredInboxes: (organizationId) =>
+          once("errored", organizationId, async () =>
+            erroredInboxesSchema.parse(
+              parseReadQueryResult(
+                await callPlanetscaleReadQuery(ctx, {
+                  ...PRODUCTION_READ_QUERY_ARGS,
+                  query: buildErroredInboxesQuery({ ...scope, organizationId }),
+                })
+              ).rows[0]
+            )
           ),
         getStripeCustomerBilling: (customerId) =>
-          readStripeCustomerBilling(customerId, {
-            client: executorClient(ctx),
-            signal: ctx.abortSignal,
-          }),
+          once("stripe", customerId, () =>
+            readStripeCustomerBilling(customerId, {
+              client: executorClient(ctx),
+              signal: ctx.abortSignal,
+            })
+          ),
         isAuthorized: async (organizationId) => {
           const [row] = parseReadQueryResult(
             await callPlanetscaleReadQuery(ctx, {

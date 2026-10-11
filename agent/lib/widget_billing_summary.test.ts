@@ -7,6 +7,7 @@ import definition, {
   buildBillingAuthorizationQuery,
   buildErroredInboxesQuery,
   composeWidgetBillingSummary,
+  sessionRead,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
   widgetBillingSummaryOutputSchema,
@@ -873,4 +874,26 @@ test("the errored-inbox read is scoped to the verified owner or admin and leaves
   assert.ok(query.includes("m.role in ('owner', 'admin')"));
   assert.ok(query.includes("join authorized a on a.id = mi.organization_id"));
   assert.ok(query.includes("!~* '(cancel|removed)'"));
+});
+
+test("a repeated billing read in one session reuses the first, until it fails or goes stale", async () => {
+  let reads = 0;
+  const read = () => {
+    reads += 1;
+    return Promise.resolve(reads);
+  };
+  const at = 1_000_000;
+  assert.equal(await sessionRead("s1:stripe:cus", read, at), 1);
+  assert.equal(await sessionRead("s1:stripe:cus", read, at + 60_000), 1);
+  // Another session, or another customer, reads for itself.
+  assert.equal(await sessionRead("s2:stripe:cus", read, at), 2);
+  // Three minutes on, a later turn reads billing afresh.
+  assert.equal(await sessionRead("s1:stripe:cus", read, at + 181_000), 3);
+  const failed = sessionRead(
+    "s1:autumn:cus",
+    () => Promise.reject(new Error("down")),
+    at
+  );
+  await assert.rejects(failed);
+  assert.equal(await sessionRead("s1:autumn:cus", read, at), 4);
 });
