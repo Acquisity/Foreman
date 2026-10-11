@@ -20,8 +20,26 @@ const NEXT_STEP_RULE =
   /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
 const STATED_FINDING_RULE =
   /a recorded count, status or absence[^;]*goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it/;
+const NO_INVENTION_RULES = [
+  /Never explain why data is missing unless/,
+  /never offer a service, migration or team action/,
+  /never promise to report[^.]* it later/,
+];
 const UNFILED_TICKET_RULE =
   /When ticketFiled is absent, nothing was reported[^.]*never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one/;
+
+test("both lanes forbid unbacked reasons for missing data, invented services and report promises", () => {
+  // Round 9: "may have been cleared when the subscription was cancelled",
+  // "ask for that here in the chat" to move domains, "I'll report it to engineering".
+  for (const prompt of [
+    composePrompt(sessionLane(widgetAuth(scope))),
+    COMPOSER_PROMPT,
+  ]) {
+    for (const rule of NO_INVENTION_RULES) {
+      assert.match(prompt, rule);
+    }
+  }
+});
 
 test("a failed documented step is reported and handed to a person, never repeated", () => {
   assert.match(widgetInstructions(widgetAuth(scope)), FAILED_STEP_RULE);
