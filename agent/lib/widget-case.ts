@@ -320,6 +320,41 @@ const hasValue = (text: string, value: string) => {
 
 const OWN_DOMAIN_PERSON = /^person-\d+@(.+)$/;
 
+const ELLIPSIS = /…|\.\.\./g;
+/** Shorter than this, a shared opening ("The ") is not evidence of the name. */
+const MIN_SHOWN = 12;
+
+/** The longest proper prefix of `name` that `text` ends with, if long enough to identify it. */
+const shownPrefix = (text: string, name: string) => {
+  const lower = text.toLowerCase();
+  const target = name.toLowerCase();
+  for (let length = target.length - 1; length >= MIN_SHOWN; length -= 1) {
+    if (lower.endsWith(target.slice(0, length))) {
+      return text.slice(-length);
+    }
+  }
+  return null;
+};
+
+/** Map each ellipsis-shortened name in `text` to that name's placeholder. */
+const addShortenedNames = (
+  text: string,
+  names: Iterable<string>,
+  replacements: Map<string, string>
+) => {
+  const all = [...names];
+  for (const { index } of text.matchAll(ELLIPSIS)) {
+    const before = text.slice(Math.max(0, index - MAX_LITERAL), index);
+    for (const name of all) {
+      const shown = shownPrefix(before, name)?.toLowerCase();
+      const placeholder = replacements.get(name.toLowerCase());
+      if (shown && placeholder && !replacements.has(shown)) {
+        replacements.set(shown, placeholder);
+      }
+    }
+  }
+};
+
 /** A screen recording is titled "<recorder's name> · <workspace name>", often inside a JSON-encoded string. */
 const recorderNames = (draft: unknown, organizationName: string) =>
   Array.from(
@@ -459,6 +494,10 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     }
     add(name, () => `Name ${next("name")}`);
   }
+  // A reply shortens a long name with an ellipsis ("Information Technology…"):
+  // the shown prefix takes the name's own placeholder, so it is neither kept nor
+  // read as a different name.
+  addShortenedNames(decoded, found.names.keys(), replacements);
   for (const phone of found.phones) {
     add(phone, () => `Phone ${next("phone")}`);
   }

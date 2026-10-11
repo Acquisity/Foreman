@@ -323,6 +323,21 @@ test("the outside-call inventory documents the converter and both subprocess bou
   assert.ok(entry.includes("Biome"));
 });
 
+test("a name shortened with an ellipsis takes the name's own placeholder", () => {
+  const name = "Information Technology and Services | CEO, Founder";
+  for (const ellipsis of ["…", "..."]) {
+    const scrubbed = scrubCase(
+      rawCase(
+        { campaigns: [{ name: "Spring Promo" }, { name }] },
+        `Raise "Information Technology and Services | CEO${ellipsis}" please`
+      ),
+      scope
+    );
+    assert.equal(scrubbed.case.question, `Raise "Name 2${ellipsis}" please`);
+    serializeCase(scrubbed);
+  }
+});
+
 test("a name too long to match inline is replaced as a whole field and fails closed elsewhere", () => {
   const long = `Spring ${"Promo ".repeat(60)}`.trim();
   const saved = JSON.parse(
