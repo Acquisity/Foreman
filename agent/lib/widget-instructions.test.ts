@@ -25,6 +25,8 @@ const NO_INVENTION_RULES = [
   /Never explain why data is missing unless/,
   /never offer a service, migration or team action/,
   /never promise to report[^.]* it later/,
+  // wrun_41M4EWN90A0GKYHE33ARYJJB31 stated a pasted blocklist listing as fact.
+  /pasted from another tool[^.]* is their report, not something checked here/,
 ];
 const UNFILED_TICKET_RULE =
   /When ticketFiled is absent, nothing was reported[^.]*never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one/;
