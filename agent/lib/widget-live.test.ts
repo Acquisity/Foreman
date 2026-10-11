@@ -307,7 +307,10 @@ test("live tool boundary enforces historical date windows and preserves explicit
     startDate: "2026-09-01",
   };
   assert.deepEqual(await outreach.execute(window, ctx), window);
-  assert.deepEqual(await outreach.execute({}, ctx), {});
+  assert.deepEqual(await outreach.execute({}, ctx), {
+    endDate: "2026-10-09",
+    startDate: "2026-10-03",
+  });
   await resolveTool(billingDefinition).execute({}, ctx);
   assert.equal(
     queries.some(

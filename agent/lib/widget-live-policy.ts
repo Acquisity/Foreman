@@ -69,7 +69,7 @@ export function hasMovingWindow(tool: string, input: unknown) {
 /**
  * Preserve explicit windows. Otherwise billing reads the original UTC day
  * [midnight, next midnight); campaign metrics read seven calendar days ending
- * on that day, inclusive. Campaign listing has no date filter in today's API.
+ * on that day, inclusive, for a selected campaign and for the listing's daily sends.
  */
 export function pinLiveInput(
   tool: string,
@@ -95,15 +95,11 @@ export function pinLiveInput(
   if (parsed.startDate || parsed.endDate) {
     throw new Error("A historical campaign window must include both dates.");
   }
-  return parsed.campaignId
-    ? {
-        ...(input as object),
-        endDate: day,
-        startDate: new Date(midnight - 6 * 86_400_000)
-          .toISOString()
-          .slice(0, 10),
-      }
-    : input;
+  return {
+    ...(input as object),
+    endDate: day,
+    startDate: new Date(midnight - 6 * 86_400_000).toISOString().slice(0, 10),
+  };
 }
 
 /** The authored tool boundary calls this; flag-free customer reads keep their exact inputs. */

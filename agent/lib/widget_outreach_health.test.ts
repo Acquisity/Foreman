@@ -103,19 +103,29 @@ const ctx = {
   session: { auth: { current: null, initiator: widgetAuth(scope) } },
 } as unknown as ProviderContext;
 
-test("date-only rejection names campaignId and tells the investigator to list campaigns first", () => {
-  const result = widgetOutreachHealthInput.safeParse({
-    endDate: "2026-10-07",
-    startDate: "2026-10-01",
-  });
-  assert.equal(result.success, false);
-  if (result.success) {
-    assert.fail("Dates without campaignId must be rejected");
-  }
-  const { message } = result.error.issues[0];
-  assert.ok(message.includes("require campaignId"));
+test("dates without campaignId read every listed campaign's daily sends for the window", () => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD: the dated first call was rejected and the investigator asked the customer instead.
+  const input = { endDate: "2026-09-30", startDate: "2026-09-20" };
+  assert.equal(widgetOutreachHealthInput.safeParse(input).success, true);
+  const query = buildWidgetOutreachHealthQuery(scope, input);
   assert.ok(
-    message.includes("without dates first to list campaigns and their ids")
+    query.includes(
+      "and cm.date >= ('2026-09-20'::date)::text and cm.date <= ('2026-09-30'::date)::text"
+    )
+  );
+  assert.ok(query.includes("order by cm.date desc limit 31"));
+  assert.ok(query.includes("null::jsonb as diagnostics"));
+  const lead = widgetOutreachHealthInput.safeParse({
+    leadEmail: "lead@example.com",
+  });
+  assert.equal(lead.success, false);
+  if (lead.success) {
+    assert.fail("A lead's history without campaignId must be rejected");
+  }
+  assert.ok(lead.error.issues[0].message.includes("require campaignId"));
+  assert.equal(
+    widgetOutreachHealthInput.safeParse({ startDate: "2026-09-20" }).success,
+    false
   );
 });
 
@@ -478,7 +488,7 @@ test("a denied or absent target cannot trigger a provider read", async (t) => {
   assert.equal(call.mock.callCount(), 1);
 });
 
-test("date windows require a selected campaign, real dates and no more than 31 inclusive days", () => {
+test("date windows require real dates and no more than 31 inclusive days", () => {
   assert.ok(
     widgetOutreachHealthInput.safeParse({ after: null, campaignId: null })
       .success
@@ -486,7 +496,6 @@ test("date windows require a selected campaign, real dates and no more than 31 i
   const valid = { campaignId, endDate: "2026-09-30", startDate: "2026-09-01" };
   assert.ok(widgetOutreachHealthInput.safeParse(valid).success);
   for (const input of [
-    { ...valid, campaignId: null },
     { ...valid, startDate: "2026-09-31" },
     { ...valid, endDate: null },
     { ...valid, endDate: "2026-08-31" },
