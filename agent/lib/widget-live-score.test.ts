@@ -171,6 +171,8 @@ const live = (needsHuman?: boolean, runId = RUN, labels: CauseLabels = {}) =>
     labels[runId]
   );
 
+const CORRECT_REPLY_CLAIM =
+  /what they needed, as support describes it: Names the sending rules/;
 const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
 const OLD_TEAM_FIX = /needs the Acquisity team/;
 
@@ -444,4 +446,43 @@ test("the two-column scorecard puts production beside live at HEAD per goal", ()
   assert.match(text, PRODUCTION_HANDOFF_ROW);
   assert.match(text, PRODUCTION_LEAK_ROW);
   assert.match(text, PRODUCTION_TIME_ROW);
+});
+
+test("a label's correctReply grades the answered claim and makes the saved verdict stale", () => {
+  const label = {
+    cause: "the sending rules",
+    causeType: "platform_limitation" as const,
+    correctReply: "Names the sending rules as the first thing to check.",
+    source: "Aaron",
+    status: "confirmed" as const,
+  };
+  const unlabeled = live();
+  const labeled = live(false, RUN, { [RUN]: label });
+  assert.match(labeled.expectations.claims[0], CORRECT_REPLY_CLAIM);
+  // An excluded case keeps the generic claim; it leaves the answered rows anyway.
+  assert.equal(
+    live(false, RUN, { [RUN]: { ...label, exclude: true } }).expectations
+      .claims[0],
+    unlabeled.expectations.claims[0]
+  );
+  const old = reviewedSample(
+    RUN,
+    unlabeled,
+    "answer",
+    liveClaims(unlabeled).map(({ id }) => ({
+      id,
+      reason: id,
+      verdict: "yes" as const,
+    })),
+    []
+  );
+  const carried = carriedVerdicts(old, labeled);
+  assert.equal(carried.has("case-1"), false);
+  assert.equal(carried.get("facts")?.reason, "facts");
+  assert.ok(carriedVerdicts(old, unlabeled).has("case-1"));
+  assert.ok(
+    rejudgedClaims(liveClaims(labeled), carried, new Set(), labeled)
+      .map(({ id }) => id)
+      .includes("case-1")
+  );
 });

@@ -175,6 +175,8 @@ export const NEEDS_HUMAN: Claim = {
 export const causeLabelSchema = z.object({
   cause: z.string().min(1),
   causeType: z.enum(["user_error", "platform_limitation", "bug", "unclear"]),
+  /** What the reply should give the customer; it grades "answered what was needed". */
+  correctReply: z.string().min(1).optional(),
   exclude: z.boolean().optional(),
   source: z.string(),
   status: z.enum(["confirmed", "draft"]),
@@ -203,7 +205,11 @@ export const liveCase = (
     expectations: {
       cause: graded?.cause ?? null,
       ...(graded ? { causeType: graded.causeType } : {}),
-      claims: [LIVE_ANSWERED],
+      claims: [
+        graded?.correctReply
+          ? `The message gives the customer what they needed, as support describes it: ${graded.correctReply}`
+          : LIVE_ANSWERED,
+      ],
       fileTicket: null,
       foreignIdentifiers: [],
       gateVerdict: null,
@@ -237,8 +243,9 @@ export const liveClaims = (recorded: WidgetCase) => [
 
 /**
  * A saved record's verdicts that still hold for this case. A changed cause
- * label drops the cause verdict; an unlabeled record's cause verdict was the
- * evidence-read conclusion, so it carries over as that.
+ * label drops the cause verdict, and a changed case claim (a label's
+ * correctReply) drops that claim's verdict; an unlabeled record's cause
+ * verdict was the evidence-read conclusion, so it carries over as that.
  */
 export function carriedVerdicts(old: JudgeRecord | null, recorded: WidgetCase) {
   const carried = new Map<string, Verdict>(
@@ -255,6 +262,11 @@ export function carriedVerdicts(old: JudgeRecord | null, recorded: WidgetCase) {
     }
     carried.delete("cause");
   }
+  recorded.expectations.claims.forEach((text, n) => {
+    if (old?.recorded.expectations.claims[n] !== text) {
+      carried.delete(`case-${n + 1}`);
+    }
+  });
   return carried;
 }
 
