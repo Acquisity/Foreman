@@ -1,7 +1,7 @@
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 /**
- * Support facts Aaron confirmed (ENG-15044 round 10) that the help center does
+ * Support facts Aaron confirmed (ENG-15044 round 10, CRM email sync added the same day) that the help center does
  * not state. Hand-maintained: widget-product-guide.ts is generated and must not
  * be edited by hand. The unpaid-inbox line follows Acquisity's weekly
  * audit-cmr-domain-subscriptions job and unpaid-managed-domain-cancellation.
@@ -18,7 +18,8 @@ Confirmed by Acquisity's support team. They count as product facts, like the gui
 - Lead credits and website credits come from one shared pool. Check how many credits went to websites before calling a credit gap a double count.
 - A published site without its own domain gets a free generic web address that the customer does not control. A custom domain is a separate purchase.
 - In the Cold Email Writer, the referrer fields are required. Generic values do not block sending, but they should name a real person at the customer's company.
-- When a sending account was connected directly on a Legacy plan, never tell the customer someone at their company set it up: it may have been set up and managed for them.`;
+- When a sending account was connected directly on a Legacy plan, never tell the customer someone at their company set it up: it may have been set up and managed for them.
+- Personal emails in the CRM: the CRM copies email from every inbox connected in Settings > Email & Calendar, and anyone in the workspace who can open a record can read those emails. Each connected inbox has two settings. Email sync is an On/Off switch: Off means no new emails are copied, and Gmail itself is never changed; the inbox's owner switches their own address Off and confirms with "Turn off". New people from email is Selective (the default: people you emailed or who replied), All (anyone on a thread, including CC) or Off (add people yourself). Neither setting removes what is already copied: to clean up, delete the contacts in People and the conversations in Communications, and deleting a conversation removes it for everyone. For the calendar, keep "Show my event names to my team" Off, and teammates then see "External Event".`;
 
 /** What the investigator, the reply composer and the judge read as product knowledge. */
 export const SUPPORT_GUIDE = `${SUPPORT_FACTS}\n\n${PRODUCT_GUIDE}`;
