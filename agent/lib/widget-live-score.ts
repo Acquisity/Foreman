@@ -4,9 +4,12 @@ import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { parseFindings } from "./widget-findings.js";
 import {
   type Claim,
+  CONCLUSION_CLAIM,
+  claimsFor,
   type JudgeRecord,
   SCORECARD_TARGETS,
-  type scorecard,
+  type ScoredReplay,
+  scorecard,
   type Verdict,
 } from "./widget-judge.js";
 import { gapSentences } from "./widget-live.js";
@@ -163,17 +166,43 @@ export const NEEDS_HUMAN: Claim = {
   text: `Judging only the customer's messages and the tool results, not the answer, a person is needed only when this holds: ${ELIGIBLE_INSTRUCTIONS} A refund request on its own, a fault the customer cannot fix, and a billing correction the customer did not dispute are not this either: they are answered, and a refund request is filed to billing, not handed to a person.`,
 };
 
-/** A live run as a case: the question, the run's own tool results, and no authored expectations. */
+/**
+ * The causes Aaron labels while he reviews a set, in
+ * `.eve/widget-live/sets/<name>/cause-labels.json` (ENG-15044 round 9). A
+ * confirmed label grades "found the real cause"; a draft one only its own row;
+ * an excluded case leaves the cause and answered rows.
+ */
+export const causeLabelSchema = z.object({
+  cause: z.string().min(1),
+  causeType: z.enum(["user_error", "platform_limitation", "bug", "unclear"]),
+  exclude: z.boolean().optional(),
+  source: z.string(),
+  status: z.enum(["confirmed", "draft"]),
+});
+export type CauseLabel = z.infer<typeof causeLabelSchema>;
+export type CauseLabels = Record<string, CauseLabel>;
+/** The labels by run id; a missing file is no labels. */
+export const parseCauseLabels = (text: string | null): CauseLabels =>
+  text === null
+    ? {}
+    : z
+        .object({ labels: z.record(z.string(), causeLabelSchema) })
+        .parse(JSON.parse(text)).labels;
+
+/** A live run as a case: the question, the run's own tool results and its cause label, if any. */
 export const liveCase = (
   input: Pick<WidgetCase, "cassette" | "question" | "scope"> & {
     runId: string;
   },
-  needsHuman = false
-): WidgetCase =>
-  widgetCaseSchema.parse({
+  needsHuman = false,
+  label?: CauseLabel
+): WidgetCase => {
+  const graded = label && !label.exclude ? label : undefined;
+  return widgetCaseSchema.parse({
     cassette: input.cassette,
     expectations: {
-      cause: null,
+      cause: graded?.cause ?? null,
+      ...(graded ? { causeType: graded.causeType } : {}),
       claims: [LIVE_ANSWERED],
       fileTicket: null,
       foreignIdentifiers: [],
@@ -192,6 +221,59 @@ export const liveCase = (
       tools: [...new Set(input.cassette.map(({ tool }) => tool))],
     },
   });
+};
+
+/**
+ * With no labeled cause, the cause claim already asks for the conclusion the
+ * evidence supports; a labeled case asks that separately, as this claim.
+ */
+export const SUPPORTED: Claim = { id: "supported", text: CONCLUSION_CLAIM };
+
+/** The claims a live run is judged on, before needs_human. */
+export const liveClaims = (recorded: WidgetCase) => [
+  ...claimsFor(recorded),
+  ...(recorded.expectations.cause ? [SUPPORTED] : []),
+];
+
+/**
+ * A saved record's verdicts that still hold for this case. A changed cause
+ * label drops the cause verdict; an unlabeled record's cause verdict was the
+ * evidence-read conclusion, so it carries over as that.
+ */
+export function carriedVerdicts(old: JudgeRecord | null, recorded: WidgetCase) {
+  const carried = new Map<string, Verdict>(
+    (old?.verdicts ?? []).map(({ id, reason, verdict }) => [
+      id,
+      { id, reason, verdict },
+    ])
+  );
+  const oldCause = old?.recorded.expectations.cause ?? null;
+  if (oldCause !== recorded.expectations.cause) {
+    const conclusion = carried.get("cause");
+    if (oldCause === null && conclusion) {
+      carried.set(SUPPORTED.id, { ...conclusion, id: SUPPORTED.id });
+    }
+    carried.delete("cause");
+  }
+  return carried;
+}
+
+/**
+ * The claims a rejudge asks again: any with no carried verdict, and the forced
+ * ones. Unlabeled, the cause claim is the conclusion, which "supported" forces.
+ */
+export const rejudgedClaims = (
+  claims: Claim[],
+  carried: Map<string, Verdict>,
+  forced: Set<string>,
+  recorded: WidgetCase
+) =>
+  claims.filter(
+    ({ id }) =>
+      !carried.has(id) ||
+      (forced.has(id) &&
+        (id !== "cause" || Boolean(recorded.expectations.cause)))
+  );
 
 /** The judge's needs_human verdict split from the claims the scorecard reads. */
 export function splitNeedsHuman(verdicts: Verdict[]) {
@@ -203,24 +285,85 @@ export function splitNeedsHuman(verdicts: Verdict[]) {
   };
 }
 
-/** Graded from the evidence read, not an authored cause: never the replay goal. */
+/** Graded from the evidence read, not a labeled cause; it has no target. */
 export const LIVE_CAUSE_GOAL = "conclusion supported by the evidence read";
-export const LIVE_TARGETS: Partial<Record<string, number>> = {
-  ...SCORECARD_TARGETS,
-  [LIVE_CAUSE_GOAL]: SCORECARD_TARGETS["found the real cause"],
-};
+export const DRAFT_CAUSE_GOAL = "found the real cause (draft labels)";
 
-/** The replay scorecard relabeled for live runs; per-cause-type rows need authored cause types, so they go. */
-export const liveScorecard = (card: ReturnType<typeof scorecard>) => ({
-  ...card,
-  rates: card.rates
-    .filter(({ goal }) => !goal.startsWith("answered what was needed ("))
-    .map((rate) =>
-      rate.goal === "found the real cause"
-        ? { ...rate, goal: LIVE_CAUSE_GOAL }
-        : rate
-    ),
-});
+/** The evidence-read verdict: its own claim on a labeled case, else the unlabeled cause claim. */
+const conclusionVerdict = (record: JudgeRecord) =>
+  record.verdicts.find(({ id }) => id === SUPPORTED.id)?.verdict ??
+  (record.recorded.expectations.cause === null
+    ? record.verdicts.find(({ id }) => id === "cause")?.verdict
+    : undefined);
+
+/**
+ * The replay scorecard for live runs. "Found the real cause" counts confirmed,
+ * non-excluded labels only; draft labels get their own row; excluded cases
+ * leave the cause and answered rows; the conclusion row covers every case.
+ */
+export function liveScorecard(
+  replays: readonly ScoredReplay[],
+  labels: CauseLabels
+) {
+  const labelOf = ({ recorded }: ScoredReplay) =>
+    labels[recorded.source.runId ?? ""];
+  const kept = replays.filter((replay) => !labelOf(replay)?.exclude);
+  const all = scorecard(replays);
+  const answered = scorecard(kept).rates.filter(({ goal }) =>
+    goal.startsWith("answered what was needed")
+  );
+  const cause = (status: CauseLabel["status"], goal: string) => {
+    const rate = scorecard(
+      kept.filter((replay) => labelOf(replay)?.status === status)
+    ).rates.find((entry) => entry.goal === "found the real cause");
+    return { goal, pass: rate?.pass ?? 0, total: rate?.total ?? 0 };
+  };
+  const scored = replays.filter(({ row }) => row.scored !== false);
+  const conclusions = scored.map(({ record, recorded, row }) => {
+    if (!record) {
+      return row.answer === null
+        ? row.handedOff === true && recorded.expectations.lane === "human"
+        : undefined;
+    }
+    const verdict = conclusionVerdict(record);
+    return verdict === undefined ? undefined : verdict === "yes";
+  });
+  const rest = (goals: string[]) =>
+    all.rates.filter(({ goal }) => goals.includes(goal));
+  return {
+    ...all,
+    labels: {
+      confirmed: kept.filter(
+        (replay) => labelOf(replay)?.status === "confirmed"
+      ).length,
+      draft: kept.filter((replay) => labelOf(replay)?.status === "draft")
+        .length,
+      excluded: replays.length - kept.length,
+      unlabeled: replays.filter((replay) => !labelOf(replay)).length,
+    },
+    rates: [
+      cause("confirmed", "found the real cause"),
+      cause("draft", DRAFT_CAUSE_GOAL),
+      {
+        goal: LIVE_CAUSE_GOAL,
+        pass: conclusions.filter((ok) => ok === true).length,
+        total: conclusions.length,
+      },
+      ...rest(["nothing made up"]),
+      ...answered,
+      ...rest([
+        "handed off only when needed",
+        "no leaks",
+        "stayed in budget",
+        "no tool gaps",
+      ]),
+    ],
+  };
+}
+
+/** How many cases each kind of label covers; unlabeled cases get no cause verdict. */
+export const labelLine = ({ labels }: ReturnType<typeof liveScorecard>) =>
+  `Cause labels: ${labels.confirmed} confirmed, ${labels.draft} draft, ${labels.excluded} excluded, ${labels.unlabeled} unlabeled (no cause verdict).`;
 
 /** One case of the review export: scrubbed text only. */
 export interface ConversationExport {
@@ -244,7 +387,7 @@ export interface ConversationExport {
 export function twoColumnScorecard(
   production: ReturnType<typeof liveScorecard>,
   live: ReturnType<typeof liveScorecard>,
-  targets = LIVE_TARGETS
+  targets = SCORECARD_TARGETS
 ) {
   const cell = (card: typeof live, goal: string) => {
     const rate = card.rates.find((entry) => entry.goal === goal);
@@ -286,7 +429,11 @@ export const exportVerdicts = (
   needsHuman: { reason: string | null; value: boolean | undefined }
 ) => [
   ...(record?.verdicts.map(({ id, reason, verdict }) => ({
-    goal: id === "cause" ? LIVE_CAUSE_GOAL : id,
+    goal:
+      id === SUPPORTED.id ||
+      (id === "cause" && !record?.recorded.expectations.cause)
+        ? LIVE_CAUSE_GOAL
+        : id,
     reason,
     verdict,
   })) ?? []),

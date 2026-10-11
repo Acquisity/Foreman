@@ -95,9 +95,9 @@ export function reviewedSample(
   recorded: WidgetCase,
   answer: string,
   verdicts: Verdict[],
-  gaps?: Gap[]
+  gaps?: Gap[],
+  claims = claimsFor(recorded)
 ): JudgeRecord {
-  const claims = claimsFor(recorded);
   return judgeRecordSchema.parse({
     answer,
     case: name,
@@ -155,6 +155,10 @@ const LIMITED: Claim = {
   text: "Every statement is supported by a cited help article and no account data appears.",
 };
 
+/** The cause claim when no cause is authored: the conclusion the evidence supports. */
+export const CONCLUSION_CLAIM =
+  "The answer draws the conclusion warranted by the question and tool results, including a justified clarifying question when the subject is ambiguous or explicit uncertainty when a cause cannot be established.";
+
 /** The shared claims for an answered case, then the case's own. */
 export function claimsFor(recorded: WidgetCase): Claim[] {
   const { cause, causeType, claims } = recorded.expectations;
@@ -166,7 +170,7 @@ export function claimsFor(recorded: WidgetCase): Claim[] {
       // Null means no authored cause, not a label saying no cause was found.
       text: cause
         ? `The message names the expected cause (${cause}), or says plainly that it could not find one when that is what the case expects.`
-        : "The answer draws the conclusion warranted by the question and tool results, including a justified clarifying question when the subject is ambiguous or explicit uncertainty when a cause cannot be established.",
+        : CONCLUSION_CLAIM,
     },
     ...SHARED,
     ...(limited ? [LIMITED] : []),

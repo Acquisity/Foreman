@@ -7,18 +7,23 @@ import {
   judgeAnswer,
   renderScorecard,
   reviewedSample,
+  SCORECARD_TARGETS,
   type ScoredReplay,
-  scorecard,
 } from "./widget-judge.js";
 import {
+  type CauseLabels,
+  carriedVerdicts,
+  DRAFT_CAUSE_GOAL,
   LIVE_ANSWERED,
   LIVE_CAUSE_GOAL,
-  LIVE_TARGETS,
+  labelLine,
   liveCase,
+  liveClaims,
   liveScorecard,
   liveSetSchema,
   NEEDS_HUMAN,
   rankSet,
+  rejudgedClaims,
   splitNeedsHuman,
   topicOf,
   twoColumnScorecard,
@@ -26,10 +31,16 @@ import {
 import { ELIGIBLE_INSTRUCTIONS } from "./widget-next-action.js";
 
 const LIVE_CAUSE_ROW =
-  /\| conclusion supported by the evidence read \| 100\.0% \| 2 \| 90\.0% \| hit \|/;
+  /\| conclusion supported by the evidence read \| 50\.0% \| 4 \| {2}\| {2}\|/;
+const REAL_CAUSE_ROW =
+  /\| found the real cause \| 0\.0% \| 1 \| 90\.0% \| miss \|/;
+const DRAFT_CAUSE_ROW =
+  /\| found the real cause \(draft labels\) \| 100\.0% \| 1 \| {2}\| {2}\|/;
+const ANSWERED_ROW =
+  /\| answered what was needed \| 100\.0% \| 3 \| 90\.0% \| hit \|/;
+const BUG_ROW = /\| answered what was needed \(bug\) \| 100\.0% \| 1 \|/;
 const HANDOFF_ROW =
-  /\| handed off only when needed \| 100\.0% \| 2 \| 90\.0% \| hit \|/;
-const REPLAY_CAUSE_ROW = /found the real cause/;
+  /\| handed off only when needed \| 100\.0% \| 3 \| 90\.0% \| hit \|/;
 const PRODUCTION_HANDOFF_ROW =
   /\| handed off only when needed \| 50\.0% of 2, miss \| 100\.0% of 2, hit \| 90\.0% \|/;
 const PRODUCTION_LEAK_ROW =
@@ -147,15 +158,17 @@ test("a set snapshot round-trips through its file with the verified scope intact
   assert.throws(() => liveSetSchema.parse({ ...set, cases: [] }));
 });
 
-const live = (needsHuman?: boolean) =>
+const RUN = "wrun_41M4C65K460GV34YR42A4W6NAN";
+const live = (needsHuman?: boolean, runId = RUN, labels: CauseLabels = {}) =>
   liveCase(
     {
       cassette: [],
       question: "Why did my follow-ups go out early?",
-      runId: "wrun_41M4C65K460GV34YR42A4W6NAN",
+      runId,
       scope: { role: "owner", workspace: "workspace-1" },
     },
-    needsHuman
+    needsHuman,
+    labels[runId]
   );
 
 const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
@@ -214,50 +227,172 @@ test("live judging needs no authored expectation and decides the handoff from th
   assert.equal(live().expectations.lane, null);
 });
 
-test("the live scorecard relabels the cause goal, keeps targets and drops per-cause-type rows", () => {
-  const record = reviewedSample(
-    "wrun_41M4C65K460GV34YR42A4W6NAN",
-    live(),
-    "answer",
-    claimsFor(live()).map(({ id }) => ({
-      id,
-      reason: "ok",
-      verdict: "yes" as const,
-    })),
-    []
-  );
-  const replay = (needsHuman: boolean, handed: boolean): ScoredReplay => ({
-    caseName: "wrun_41M4C65K460GV34YR42A4W6NAN",
-    record,
-    recorded: live(needsHuman),
-    row: {
-      answer: "answer",
-      budgetHit: false,
-      handedOff: handed,
-      leaks: "pass",
-      rawFields: "pass",
-      scored: true,
+test("the live scorecard grades the real cause on confirmed labels only and drops excluded cases", () => {
+  const [confirmed, draft, excluded, unlabeled] = [
+    RUN,
+    "wrun_41M4C65K460GV34YR42A4W6NAA",
+    "wrun_41M4C65K460GV34YR42A4W6NAB",
+    "wrun_41M4C65K460GV34YR42A4W6NAC",
+  ] as const;
+  const label = { cause: "the sending rules", source: "Aaron" };
+  const labels: CauseLabels = {
+    [confirmed]: { ...label, causeType: "user_error", status: "confirmed" },
+    [draft]: { ...label, causeType: "bug", status: "draft" },
+    [excluded]: {
+      ...label,
+      causeType: "unclear",
+      exclude: true,
+      status: "confirmed",
     },
-  });
+  };
+  const recorded = live(false, confirmed, labels);
+  assert.equal(recorded.expectations.cause, "the sending rules");
+  assert.equal(recorded.expectations.causeType, "user_error");
+  // A labeled case is judged on the labeled cause and, separately, on the evidence read.
+  assert.deepEqual(
+    liveClaims(recorded).map(({ id }) => id),
+    [
+      "cause",
+      "actions",
+      "facts",
+      "steps",
+      "jargon",
+      "caveats",
+      "invented",
+      "fix",
+      "case-1",
+      "supported",
+    ]
+  );
+  assert.equal(live(false, excluded, labels).expectations.cause, null);
+  const replay = (runId: string, wrongCause: boolean): ScoredReplay => {
+    const graded = live(false, runId, labels);
+    const claims = liveClaims(graded);
+    return {
+      caseName: runId,
+      record: reviewedSample(
+        runId,
+        graded,
+        "answer",
+        claims.map(({ id }) => ({
+          id,
+          reason: "ok",
+          verdict: wrongCause && id === "cause" ? "no" : "yes",
+        })),
+        [],
+        claims
+      ),
+      recorded: graded,
+      row: {
+        answer: "answer",
+        budgetHit: false,
+        handedOff: false,
+        leaks: "pass",
+        rawFields: "pass",
+        scored: true,
+      },
+    };
+  };
   const card = liveScorecard(
-    scorecard([replay(true, true), replay(false, false)])
+    [
+      replay(confirmed, true),
+      replay(draft, false),
+      replay(excluded, true),
+      replay(unlabeled, true),
+    ],
+    labels
+  );
+  assert.deepEqual(card.labels, {
+    confirmed: 1,
+    draft: 1,
+    excluded: 1,
+    unlabeled: 1,
+  });
+  assert.equal(
+    labelLine(card),
+    "Cause labels: 1 confirmed, 1 draft, 1 excluded, 1 unlabeled (no cause verdict)."
   );
   assert.deepEqual(
     card.rates.map(({ goal }) => goal),
     [
+      "found the real cause",
+      DRAFT_CAUSE_GOAL,
       LIVE_CAUSE_GOAL,
       "nothing made up",
       "answered what was needed",
+      "answered what was needed (user_error)",
+      "answered what was needed (platform_limitation)",
+      "answered what was needed (bug)",
+      "answered what was needed (unclear)",
       "handed off only when needed",
       "no leaks",
       "stayed in budget",
       "no tool gaps",
     ]
   );
-  const text = renderScorecard(card, LIVE_TARGETS);
+  const conclusion = card.rates.find(({ goal }) => goal === LIVE_CAUSE_GOAL);
+  assert.deepEqual(conclusion, { goal: LIVE_CAUSE_GOAL, pass: 2, total: 4 });
+  const text = renderScorecard(card, SCORECARD_TARGETS);
   assert.match(text, LIVE_CAUSE_ROW);
-  assert.match(text, HANDOFF_ROW);
-  assert.doesNotMatch(text, REPLAY_CAUSE_ROW);
+  assert.match(text, REAL_CAUSE_ROW);
+  assert.match(text, DRAFT_CAUSE_ROW);
+  assert.match(text, BUG_ROW);
+  const handoffs = renderScorecard(
+    liveScorecard(
+      [
+        replay(confirmed, false),
+        replay(draft, false),
+        replay(unlabeled, false),
+      ],
+      labels
+    ),
+    SCORECARD_TARGETS
+  );
+  assert.match(handoffs, HANDOFF_ROW);
+  assert.match(handoffs, ANSWERED_ROW);
+});
+
+test("a rejudge asks only the labeled cause and claims the record lacks, carrying the old conclusion", () => {
+  const unlabeled = live();
+  const old = reviewedSample(
+    RUN,
+    unlabeled,
+    "answer",
+    claimsFor(unlabeled).map(({ id }) => ({
+      id,
+      reason: id,
+      verdict: "yes" as const,
+    })),
+    []
+  );
+  const forced = new Set(["cause"]);
+  // Unlabeled, forcing the cause asks nothing: that verdict is the conclusion.
+  assert.deepEqual(
+    rejudgedClaims(
+      liveClaims(unlabeled),
+      carriedVerdicts(old, unlabeled),
+      forced,
+      unlabeled
+    ),
+    []
+  );
+  const labeled = live(false, RUN, {
+    [RUN]: {
+      cause: "the sending rules",
+      causeType: "platform_limitation",
+      source: "Aaron",
+      status: "confirmed",
+    },
+  });
+  const carried = carriedVerdicts(old, labeled);
+  assert.equal(carried.get("supported")?.reason, "cause");
+  assert.equal(carried.has("cause"), false);
+  assert.deepEqual(
+    rejudgedClaims(liveClaims(labeled), carried, forced, labeled).map(
+      ({ id }) => id
+    ),
+    ["cause", "fix"]
+  );
 });
 
 test("the two-column scorecard puts production beside live at HEAD per goal", () => {
@@ -287,10 +422,12 @@ test("the two-column scorecard puts production beside live at HEAD per goal", ()
     },
   });
   const production = liveScorecard(
-    scorecard([replay(true, "fail"), replay(false, "pass")])
+    [replay(true, "fail"), replay(false, "pass")],
+    {}
   );
   const head = liveScorecard(
-    scorecard([replay(false, "pass"), replay(false, "pass")])
+    [replay(false, "pass"), replay(false, "pass")],
+    {}
   );
   const text = twoColumnScorecard(
     {
