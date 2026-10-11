@@ -1,7 +1,7 @@
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 /**
- * Support facts Aaron confirmed (ENG-15044 round 10, CRM email sync added the same day) that the help center does
+ * Support facts Aaron confirmed (ENG-15044 round 10, CRM email sync added the same day; the promo code and Email Accounts & Domains lines in round 12 from Acquisity source) that the help center does
  * not state. Hand-maintained: widget-product-guide.ts is generated and must not
  * be edited by hand. The unpaid-inbox line follows Acquisity's weekly
  * audit-cmr-domain-subscriptions job and unpaid-managed-domain-cancellation.
@@ -15,6 +15,8 @@ Confirmed by Acquisity's support team. They count as product facts, like the gui
 - A first email, and every other sequence step, comes from the campaign's email copy and its variants, never from the AI SDR. The AI SDR only writes replies after a prospect responds, and its persona comes from its Knowledge Base and its Assigned Call Handler. When a wrong name or wrong text shows up, first find out which of the two it is in.
 - Done-for-you inboxes in Error, with Reconnect failing because the mailbox was not found: first check whether they were cancelled for non-payment. A weekly check flags unpaid done-for-you domains, and after a grace period Acquisity cancels them: the domain is suspended, its inboxes go to Error with the saved connection error "Mailbox cancelled after unpaid cleanup", and the order shows as cancelled. Read each inbox's saved connection error (widget_inbox_health), the order's status and domain errors (widget_provisioning_status) and the order's billing subscriptions (widget_billing_summary) before anything else. Reconnect cannot bring back a cancelled mailbox.
 - "No email accounts connected" can show while accounts are connected and sending fine. It is a known display bug: trust the inbox read over that message.
+- The upgrade checkout ("Confirm Upgrade") has a "Promo Code (Optional)" field. Leaving it empty is fine. A code typed in must be applied with "Apply" first: "Confirm Upgrade" stays disabled while a typed code is not applied, so clear the field to upgrade without one.
+- Settings > Billing > "Email Accounts & Domains" shows Total Domains and Total Inboxes, then one row per managed domain with its inbox count, yearly domain price, monthly inbox total and a billing badge: Paid, Partially paid, Unpaid, "Cancels <date>" for a cancellation that has not taken effect, "Inactive" or "Ended <date>" for a domain no longer active, or "Still billed" next to it when an ended domain is still being charged. A pre-warmed domain also shows "Active until <date>" or "Ended <date>". Expanding a row lists each inbox with its type (Pre-warmed, Normal or External), its status (Active, Pre-warmed, Pending, Error, or Ended once the domain has ended), when it was bought or added, and when its next payment is due. Domains cancelled for non-payment (suspended) are not listed on the card at all.
 - Lead credits and website credits come from one shared pool. Check how many credits went to websites before calling a credit gap a double count.
 - A published site without its own domain gets a free generic web address that the customer does not control. A custom domain is a separate purchase.
 - In the Cold Email Writer, the referrer fields are required. Generic values do not block sending, but they should name a real person at the customer's company.
