@@ -391,46 +391,81 @@ export interface ConversationExport {
   verdicts: { goal: string; reason: string; verdict: string }[];
 }
 
+type LiveCard = ReturnType<typeof liveScorecard>;
+
 /**
  * Production (what the customer got) beside live at HEAD, one row per goal.
  * A cell is the pass rate and its n; hit or miss only where a target is set
- * and the column has full judge coverage.
+ * and the column has full judge coverage. Given several runs of the same set,
+ * a cell is the mean pass rate over runs with the min and max, and hit or miss
+ * is judged on the mean.
  */
 export function twoColumnScorecard(
-  production: ReturnType<typeof liveScorecard>,
-  live: ReturnType<typeof liveScorecard>,
+  production: LiveCard | readonly LiveCard[],
+  live: LiveCard | readonly LiveCard[],
   targets = SCORECARD_TARGETS
 ) {
-  const cell = (card: typeof live, goal: string) => {
-    const rate = card.rates.find((entry) => entry.goal === goal);
-    if (!rate?.total) {
+  const productionRuns: readonly LiveCard[] = Array.isArray(production)
+    ? production
+    : [production];
+  const liveRuns: readonly LiveCard[] = Array.isArray(live) ? live : [live];
+  const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
+  const cell = (cards: readonly LiveCard[], goal: string) => {
+    const rates = cards.flatMap(
+      (card) => card.rates.find((entry) => entry.goal === goal) ?? []
+    );
+    const counted = rates.filter(({ total }) => total);
+    if (!counted.length) {
       return "n/a";
     }
+    const each = counted.map(({ pass, total }) => pass / total);
+    const mean = each.reduce((sum, rate) => sum + rate, 0) / each.length;
     const target = targets[goal];
     let mark = "";
-    if (target !== undefined && card.missingCoverage === 0) {
-      mark = rate.pass / rate.total >= target ? ", hit" : ", miss";
+    if (
+      target !== undefined &&
+      cards.every(({ missingCoverage }) => missingCoverage === 0)
+    ) {
+      mark = mean >= target ? ", hit" : ", miss";
     }
-    return `${((rate.pass / rate.total) * 100).toFixed(1)}% of ${rate.total}${mark}`;
+    if (cards.length === 1) {
+      return `${pct(mean)} of ${counted[0]?.total}${mark}`;
+    }
+    const totals = [...new Set(counted.map(({ total }) => total))].join("/");
+    return `${pct(mean)} (${pct(Math.min(...each))}-${pct(Math.max(...each))}) over ${counted.length} runs of ${totals}${mark}`;
   };
-  const time = (card: typeof live, key: string) => {
-    const reply = card.replies.find((entry) => entry.key === key);
-    return typeof reply?.p50 !== "number" || typeof reply.p90 !== "number"
-      ? "n/a"
-      : `p50 ${reply.p50.toFixed(1)}s, p90 ${reply.p90.toFixed(1)}s`;
+  const time = (cards: readonly LiveCard[], key: string) => {
+    const replies = cards.flatMap(
+      (card) => card.replies.find((entry) => entry.key === key) ?? []
+    );
+    const p50s = replies.flatMap(({ p50 }) =>
+      typeof p50 === "number" ? p50 : []
+    );
+    const p90s = replies.flatMap(({ p90 }) =>
+      typeof p90 === "number" ? p90 : []
+    );
+    const average = (values: number[]) =>
+      values.reduce((sum, value) => sum + value, 0) / values.length;
+    return p50s.length && p90s.length
+      ? `p50 ${average(p50s).toFixed(1)}s, p90 ${average(p90s).toFixed(1)}s`
+      : "n/a";
   };
+  const judged = (cards: readonly LiveCard[]) =>
+    `${cards.reduce((sum, card) => sum + card.scored, 0)} (${cards.reduce((sum, card) => sum + card.missingCoverage, 0)} missing coverage)`;
+  const goals = liveRuns[0]?.rates ?? [];
   return [
-    `Judged: production ${production.scored} (${production.missingCoverage} missing coverage), live ${live.scored} (${live.missingCoverage} missing coverage)`,
+    `Runs: ${liveRuns.length}${liveRuns.length > 1 ? " (each cell is the mean pass rate over runs, min-max in brackets; reply times are mean p50 and p90)" : ""}`,
+    `Judged: production ${judged(productionRuns)}, live ${judged(liveRuns)}`,
     "",
     "| goal | production | live at HEAD | target |",
     "| --- | --- | --- | --- |",
-    ...live.rates.map(({ goal }) => {
+    ...goals.map(({ goal }) => {
       const target = targets[goal];
-      return `| ${goal} | ${cell(production, goal)} | ${cell(live, goal)} | ${target === undefined ? "" : `${(target * 100).toFixed(1)}%`} |`;
+      return `| ${goal} | ${cell(productionRuns, goal)} | ${cell(liveRuns, goal)} | ${target === undefined ? "" : pct(target)} |`;
     }),
-    ...live.replies.map(
+    ...(liveRuns[0]?.replies ?? []).map(
       ({ key }) =>
-        `| reply time, ${key} | ${time(production, key)} | ${time(live, key)} |  |`
+        `| reply time, ${key} | ${time(productionRuns, key)} | ${time(liveRuns, key)} |  |`
     ),
   ].join("\n");
 }

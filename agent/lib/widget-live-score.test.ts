@@ -47,6 +47,9 @@ const PRODUCTION_LEAK_ROW =
   /\| no leaks \| 50\.0% of 2, miss \| 100\.0% of 2, hit \| 100\.0% \|/;
 const PRODUCTION_TIME_ROW =
   /\| reply time, final reply \| n\/a \| p50 30\.0s, p90 30\.0s \|/;
+const RUNS_HEADER = /^Runs: 2 /;
+const RUNS_HANDOFF_ROW =
+  /\| handed off only when needed \| 75\.0% \(50\.0%-100\.0%\) over 2 runs of 2, miss \| 100\.0% \(100\.0%-100\.0%\) over 2 runs of 2, hit \| 90\.0% \|/;
 const ORG = "06c49b56-44bc-4b46-8b6d-87e089c7b694";
 const TEST_ORG = "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5";
 let serial = 0;
@@ -450,6 +453,10 @@ test("the two-column scorecard puts production beside live at HEAD per goal", ()
   assert.match(text, PRODUCTION_HANDOFF_ROW);
   assert.match(text, PRODUCTION_LEAK_ROW);
   assert.match(text, PRODUCTION_TIME_ROW);
+  // Two runs of the same set: the mean over runs, with the min and max.
+  const runs = twoColumnScorecard([production, head], [head, head]);
+  assert.match(runs, RUNS_HEADER);
+  assert.match(runs, RUNS_HANDOFF_ROW);
 });
 
 test("a label's correctReply grades the answered claim and makes the saved verdict stale", () => {
