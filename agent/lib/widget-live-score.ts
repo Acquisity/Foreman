@@ -163,7 +163,7 @@ export const LIVE_ANSWERED =
  */
 export const NEEDS_HUMAN: Claim = {
   id: "needs_human",
-  text: `Judging only the customer's messages and the tool results, not the answer, a person is needed only when this holds: ${ELIGIBLE_INSTRUCTIONS} A refund request on its own, a fault the customer cannot fix, and a billing correction the customer did not dispute are not this either: they are answered, and a refund request is filed to billing, not handed to a person.`,
+  text: `A person is needed for this conversation. Judge only the customer's messages and the tool results, not the answer. Answer yes only when this is true: ${ELIGIBLE_INSTRUCTIONS} A refund request on its own, a fault the customer cannot fix, and a billing correction the customer did not dispute are not this either: they are answered, and a refund request is filed to billing, not handed to a person. In every other case answer no, including when the reasoning finds that no person is needed.`,
 };
 
 /**

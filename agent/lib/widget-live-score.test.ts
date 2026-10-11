@@ -175,12 +175,16 @@ const CORRECT_REPLY_CLAIM =
   /the main thing support says they needed \(Names the sending rules[^)]*\)\. Missing a secondary detail is fine/;
 const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
 const OLD_TEAM_FIX = /needs the Acquisity team/;
+const YES_MEANS_PERSON_NEEDED =
+  /^A person is needed for this conversation\. .*Answer yes only when/s;
 
 test("the live handoff criterion is the product's own handoff rule", () => {
   // Aaron, 2026-10-10: a person only on an explicit ask or a concrete billing dispute.
   assert.ok(NEEDS_HUMAN.text.includes(ELIGIBLE_INSTRUCTIONS));
   assert.match(NEEDS_HUMAN.text, REFUND_NOT_A_HANDOFF);
   assert.doesNotMatch(NEEDS_HUMAN.text, OLD_TEAM_FIX);
+  // Round 11: yes must mean "a person is needed", never "the rule is respected".
+  assert.match(NEEDS_HUMAN.text, YES_MEANS_PERSON_NEEDED);
 });
 
 test("live judging needs no authored expectation and decides the handoff from the evidence", async () => {
