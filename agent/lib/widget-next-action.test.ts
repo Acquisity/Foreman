@@ -600,6 +600,30 @@ describe("widget next-action selector", () => {
     assert.deepEqual(other.sent(1).toolChoice, { type: "none" });
   });
 
+  it("the write-up runs at medium effort and a forced read keeps the default", async () => {
+    const effort = (h: ReturnType<typeof harness>) =>
+      (
+        h.base.doGenerateCalls[0]?.providerOptions?.anthropic as
+          | { effort?: string }
+          | undefined
+      )?.effort;
+    const read = harness(jev("read"), call("widget_outreach_health", {}));
+    await read.model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", []),
+      tools: TOOLS,
+    });
+    assert.equal(read.base.doGenerateCalls.length, 1);
+    assert.equal(effort(read), undefined);
+    const writeUp = harness(jev("finish"), text("findings"));
+    await writeUp.model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: {}, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(effort(writeUp), "medium");
+  });
+
   it("a model that rejects a forced tool_choice is asked unforced, with only the pick admitted", async () => {
     const ASK = {
       inputSchema: { type: "object" as const },

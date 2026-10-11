@@ -33,6 +33,13 @@ const MODEL_CALL_TIMEOUT_MS = 15_000;
 // model, which took 12 to 20s for a full write-up. Held to the step bar, every
 // write-up timed out and retried until the deadline (2026-09-23).
 const WRITE_CALL_TIMEOUT_MS = 60_000;
+/**
+ * The write-up's reasoning effort. On wrun ...MAF4Z47 the write-up after a
+ * question spent 5.9k to 8.2k output tokens and 78 to 133 s at the default
+ * effort (round 12: about 4.6k and 35 s), past the deadline in 2 of 3 runs.
+ * Medium, not low: the write-up applies the billing and evidence rules.
+ */
+const WRITE_UP_EFFORT = "medium";
 const STATE_RESULT_CHARS = 48_000;
 // renderConversation already budgets this below 12,000 with the latest message first.
 const CONVERSATION_CHARS = 12_000;
@@ -707,6 +714,13 @@ export function widgetNextActionMiddleware(
       {
         ...params,
         prompt: [...params.prompt, note(NOTES[action])],
+        providerOptions: {
+          ...params.providerOptions,
+          anthropic: {
+            ...params.providerOptions?.anthropic,
+            effort: WRITE_UP_EFFORT,
+          },
+        },
         // Even with no tool left the tools stay listed (toolChoice none would
         // make the provider drop them): a call is refused instead.
         toolChoice: undefined,
