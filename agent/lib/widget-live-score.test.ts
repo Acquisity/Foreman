@@ -172,7 +172,7 @@ const live = (needsHuman?: boolean, runId = RUN, labels: CauseLabels = {}) =>
   );
 
 const CORRECT_REPLY_CLAIM =
-  /what they needed, as support describes it: Names the sending rules/;
+  /the main thing support says they needed \(Names the sending rules[^)]*\)\. Missing a secondary detail is fine/;
 const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
 const OLD_TEAM_FIX = /needs the Acquisity team/;
 

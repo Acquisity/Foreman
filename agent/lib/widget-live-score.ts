@@ -207,7 +207,7 @@ export const liveCase = (
       ...(graded ? { causeType: graded.causeType } : {}),
       claims: [
         graded?.correctReply
-          ? `The message gives the customer what they needed, as support describes it: ${graded.correctReply}`
+          ? `The message gives the customer the main thing support says they needed (${graded.correctReply}). Missing a secondary detail is fine; missing, contradicting or replacing the main point is not.`
           : LIVE_ANSWERED,
       ],
       fileTicket: null,
