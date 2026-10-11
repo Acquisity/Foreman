@@ -29,7 +29,8 @@ const KEY_VALUE = /(?:"[a-z_]\w*"\s*:\s*|\b[A-Za-z_]\w*:)\S/;
 const SNAKE_CASE_PAIR = /\b[A-Za-z_]\w*_\w*:\s+\S/;
 const RAW_BLOCK = /{[^{}]*}|`[^`]*`/g;
 const SPACED_PAIR = /\b[A-Za-z_]\w*:\s+\S/;
-const URL = /\bhttps?:\/\/[^\s)>"']+/gi;
+// A bare scheme in prose ("include https://") is a URL too, not a key:value.
+const URL = /\bhttps?:\/\/[^\s)>"']*/gi;
 const LITERAL = /\b(?:true|false|null)\b/;
 // Only the sequence variable names documented in widget-product-guide.ts.
 const MERGE_TAG =

@@ -874,10 +874,15 @@ async function rejudge() {
       const { cassette, row } = savedRunSchema.parse(
         JSON.parse(await readFile(runFile(snapshot.runId) as string, "utf8"))
       );
+      const saved = row as ReplayRow;
+      // The raw-field grade is deterministic: regrade it so a grader fix shows.
       return judgeCase(
         snapshot,
         cassette as WidgetCase["cassette"],
-        row as ReplayRow,
+        {
+          ...saved,
+          rawFields: rawFields(saved.answer ?? null).length ? "fail" : "pass",
+        },
         rejudged
       );
     })

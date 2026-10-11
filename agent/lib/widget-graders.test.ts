@@ -168,6 +168,20 @@ test("answered lane comes from the run row", () => {
   );
 });
 
+test("a bare URL scheme in prose is not a raw field, and a real one beside it still fails", () => {
+  // Round 9, wrun ...YJJB31: forwarding steps said "(include https://)".
+  const message =
+    "Enter your website address as the Forwarding URL (include https://).";
+  assert.equal(gradeRun(run({ message }), recorded).rawFields, "pass");
+  assert.equal(
+    gradeRun(
+      run({ message: `${message} The inbox shows status:error.` }),
+      recorded
+    ).rawFields,
+    "fail"
+  );
+});
+
 test("raw field names fail camelCase, key:value and JSON literals", () => {
   assert.equal(gradeRun(run(), recorded).rawFields, "pass");
   for (const message of [
