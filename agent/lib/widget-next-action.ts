@@ -36,9 +36,11 @@ const WRITE_CALL_TIMEOUT_MS = 60_000;
 const STATE_RESULT_CHARS = 48_000;
 // renderConversation already budgets this below 12,000 with the latest message first.
 const CONVERSATION_CHARS = 12_000;
-// The tools describe what they read, and what they cannot show, in 700 to 1,400
-// characters. A 300-character cut left Jev choosing reads from a first sentence.
-const DESCRIPTION_CHARS = 1500;
+// Jev sees each whole tool description. At 1,500 it never saw outreach's
+// sending-rules guidance (from character 3,800) and asked the customer instead
+// (ENG-15044 round 10). Logged Jev latency stays near 350 ms at p90 on steps
+// carrying up to 48K characters of reads, so the extra 5.5K costs little.
+export const DESCRIPTION_CHARS = 5000;
 /** Below this, a `human` pick was not an explicit ask or a billing dispute, and becomes `finish`. */
 const HANDOFF_ELIGIBLE = 0.5;
 /**

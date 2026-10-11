@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
@@ -6,6 +7,7 @@ import { WIDGET_GUIDE } from "./widget-instructions.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
   askJev,
+  DESCRIPTION_CHARS,
   nextActionEnabled,
   note,
   selectNextAction,
@@ -1418,5 +1420,33 @@ describe("askJev", () => {
     caller.abort(new Error("run ended"));
     await assert.rejects(pending, RUN_ENDED);
     assert.equal(calls, 1);
+  });
+});
+
+describe("tool descriptions Jev reads", () => {
+  it("shows Jev every widget tool's whole description, routing guidance included", async () => {
+    // Round 10: outreach's sending-rules guidance sat past a 1,500 cut, so Jev asked the customer.
+    const dir = new URL("../tools/", import.meta.url);
+    const files = readdirSync(dir).filter(
+      (file) => file.startsWith("widget_") && !file.endsWith(".test.ts")
+    );
+    const tools = await Promise.all(
+      files.map(async (file) => ({
+        file,
+        tool: (await import(new URL(file, dir).href)).tool,
+      }))
+    );
+    for (const { file, tool } of tools) {
+      const description: string = tool?.description ?? "";
+      assert.ok(
+        description.length <= DESCRIPTION_CHARS,
+        `${file}: ${description.length} characters, Jev sees ${DESCRIPTION_CHARS}`
+      );
+    }
+    const { tool } = await import(
+      new URL("widget_outreach_health.ts", dir).href
+    );
+    const guidance = tool.description.indexOf("sendingRules.reading");
+    assert.ok(guidance > 0 && guidance < DESCRIPTION_CHARS);
   });
 });
