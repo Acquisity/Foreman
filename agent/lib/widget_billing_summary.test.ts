@@ -5,6 +5,7 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildBillingAuthorizationQuery,
+  buildErroredInboxesQuery,
   composeWidgetBillingSummary,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
@@ -768,4 +769,108 @@ test("inbox lines state how many inboxes they bill from the plan's per-inbox pri
     deps([dfy], [line("1 × Inbox (DFY) - Inboxes (at $18.00 / month)", 1000)])
   );
   assert.equal(partial.recentInvoices[0]?.inboxCount, null);
+});
+
+test("inboxes in error are tied to the inbox charges covering time after the error began", async () => {
+  // wrun_41M4GJGQB60GNM5W8B3MAF4Z47 listed the errors and the charges and never tied them.
+  const month = (created: string, start: string, end: string) => ({
+    amount_paid: 34_500,
+    created: Date.parse(created) / 1000,
+    id: `in_${created}`,
+    lines: {
+      data: [
+        {
+          amount: 4800,
+          description: "6 × Inbox - Inboxes (at $8.00 / month)",
+          period: {
+            end: Date.parse(end) / 1000,
+            start: Date.parse(start) / 1000,
+          },
+          quantity: 6,
+        },
+        {
+          amount: 29_700,
+          description: "1 × Pro (at $297.00 / month)",
+          period: {
+            end: Date.parse(end) / 1000,
+            start: Date.parse(start) / 1000,
+          },
+          quantity: 1,
+        },
+      ],
+    },
+    status: "paid",
+  });
+  const deps = (errored: { count: number; since: string | null }) =>
+    fakeDeps({
+      getErroredInboxes: () => Promise.resolve(errored),
+      getStripeCustomerBilling: () =>
+        Promise.resolve({
+          ...stripeFixture,
+          invoices: {
+            data: {
+              data: [
+                month(
+                  "2026-10-01T00:00:00Z",
+                  "2026-10-01T00:00:00Z",
+                  "2026-11-01T00:00:00Z"
+                ),
+                month(
+                  "2026-09-01T00:00:00Z",
+                  "2026-09-01T00:00:00Z",
+                  "2026-10-01T00:00:00Z"
+                ),
+                month(
+                  "2026-08-01T00:00:00Z",
+                  "2026-08-01T00:00:00Z",
+                  "2026-09-01T00:00:00Z"
+                ),
+              ],
+              object: "list",
+            },
+          },
+        }),
+    });
+  const tied = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps({ count: 6, since: "2026-09-17T09:00:00.000+00:00" })
+  );
+  widgetBillingSummaryOutputSchema.parse(tied);
+  assert.ok(
+    tied.reconciliation.notes.includes(
+      "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
+    )
+  );
+  // No inbox in error, or an error after every billed period, ties nothing.
+  const quiet = await Promise.all(
+    [
+      { count: 0, since: null },
+      { count: 2, since: "2026-11-02T00:00:00.000+00:00" },
+    ].map((errored) =>
+      composeWidgetBillingSummary(
+        verifiedWidgetContext.organizationId,
+        deps(errored)
+      )
+    )
+  );
+  for (const result of quiet) {
+    assert.ok(
+      !result.reconciliation.notes.some((note) => note.includes("in error"))
+    );
+  }
+  const failed = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({ getErroredInboxes: () => Promise.reject(new Error("down")) })
+  );
+  assert.ok(
+    failed.unavailable.includes("productDb.erroredInboxes read failed")
+  );
+});
+
+test("the errored-inbox read is scoped to the verified owner or admin and leaves out cancelled inboxes", () => {
+  const query = buildErroredInboxesQuery(verifiedWidgetContext);
+  assert.ok(query.includes(verifiedWidgetContext.userId));
+  assert.ok(query.includes("m.role in ('owner', 'admin')"));
+  assert.ok(query.includes("join authorized a on a.id = mi.organization_id"));
+  assert.ok(query.includes("!~* '(cancel|removed)'"));
 });
