@@ -13,14 +13,12 @@ import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   citedArticles,
   claimsFor,
-  guideSections,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
   type JudgeRunner,
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
-  MAX_GUIDE_CHARS,
   parseGaps,
   parseMarks,
   parseVerdicts,
@@ -967,27 +965,19 @@ test("the judge reads the product guide for investigate replies only", async () 
     );
   }
   assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
-  assert.equal(
-    JSON.parse(present(inputs[1])).productGuide,
-    guideSections("An answer.", [])
-  );
+  assert.equal(JSON.parse(present(inputs[1])).productGuide, PRODUCT_GUIDE);
 });
 
-test("the judge gets the guide sections the answer cites or names, under the cap", () => {
-  const guide = guideSections(
-    'Open **AI SDR Inbox** and check "Needs Attention". See Settings > Conferencing.',
-    ["/docs/crm/importing"]
+test("the judge gets the guide section a plainly worded answer relies on", () => {
+  // wrun_41M4EWN90A0GKYHE33ARYJJB31: the keyword slice left out Inbox warmup and the judge called this invented.
+  const input = JSON.parse(
+    judgeInput(
+      { ...smoke, mode: "investigate" },
+      "Your inboxes have a warmup score of 100. That score only reflects warmup traffic.",
+      []
+    )
   );
-  assert.ok(guide.includes("## Navigation"));
-  assert.ok(guide.includes("{slug: crm/importing}"));
-  assert.ok(guide.includes("{slug: ai-sdr/inbox}"));
-  assert.ok(
-    !guide.includes("{slug: niche-researcher/faq/can-i-change-my-niche-later}")
-  );
-  assert.ok(guide.length < PRODUCT_GUIDE.length / 4);
-  assert.ok(
-    guide.length <= guideSections("", []).length + MAX_GUIDE_CHARS + 2000
-  );
+  assert.ok(input.productGuide.includes("It reflects warmup traffic only."));
 });
 
 test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {

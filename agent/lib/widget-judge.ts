@@ -193,11 +193,13 @@ In gaps, list every answer sentence that says something could not be confirmed, 
 
 /**
  * Investigate replies are written with the product guide in hand (ENG-15044), so
- * the judge reads the same guide as a source for product and UI facts: only the
- * sections the answer relies on (guideSections), in the input as productGuide.
+ * the judge reads the same whole guide as a source for product and UI facts, in
+ * the input as productGuide. A keyword-picked 30K slice left out sections a
+ * plainly worded answer relied on and flagged true facts as invented (round 9);
+ * the whole guide judged no slower.
  */
 const INVESTIGATE_JUDGE_PROMPT = `${JUDGE_PROMPT}
-productGuide is the part of the help center, distilled, that bears on this answer: the navigation, roles and availability sections and the articles the answer cites or names. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.`;
+productGuide is the help center, distilled. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
@@ -279,100 +281,6 @@ export async function citedArticles(
   ];
 }
 
-/** Cap on the article sections and limit lines sent with one judgement. */
-export const MAX_GUIDE_CHARS = 30_000;
-const SLUG = /\{slug: ([^}]+)\}/gu;
-const DOCS_PATH = /\/docs\/([a-z0-9/-]+)/gu;
-const QUOTED =
-  /\*\*([^*\n]{2,60})\*\*|"([^"\n]{2,60})"|\u201c([^\u201d\n]{2,60})\u201d/gu;
-const PATH = /[A-Z][\w&' -]*(?:\s*>\s*[A-Z][\w&' -]*)+/gu;
-const TITLE_PHRASE = /\b[A-Z][\w'-]*(?: [A-Z][\w'-]*)+/gu;
-const MAX_TERMS = 40;
-
-const H2 = /\n(?=## )/u;
-const H3 = /\n(?=### )/u;
-const guideParts = (() => {
-  const [head = "", articles = ""] = PRODUCT_GUIDE.split("\n## Articles\n");
-  const sections = head.split(H2).slice(1);
-  const isLimits = (section: string) =>
-    section.startsWith("## What Acquisity cannot do");
-  return {
-    always: sections.filter((section) => !isLimits(section)).join("\n"),
-    units: [
-      ...sections
-        .filter(isLimits)
-        .flatMap((section) => section.split("\n"))
-        .filter((line) => line.startsWith("* ")),
-      ...articles.split(H3).filter((a) => a.startsWith("### ")),
-    ].map((text) => ({
-      lower: text.toLowerCase(),
-      slugs: [...text.matchAll(SLUG)].map((m) => m[1] as string),
-      text,
-    })),
-  };
-})();
-
-/**
- * The part of the product guide one judgement needs, instead of the whole
- * ~250 KB guide. Always: the navigation, roles and availability sections.
- * Then, up to MAX_GUIDE_CHARS: every article or limit line whose slug the
- * answer or its citations name, then the ones matching the answer's UI terms
- * (bold or quoted text, "A > B" path segments and Title Case phrases), ranked
- * by how rare each matched term is across the guide.
- */
-export function guideSections(answer: string, citedUrls: readonly string[]) {
-  const cited = new Set(
-    [
-      ...citedUrls.map((url) => helpArticleSlug(url)),
-      ...[...answer.matchAll(SLUG), ...answer.matchAll(DOCS_PATH)].map(
-        (m) => m[1]
-      ),
-    ].filter((slug): slug is string => Boolean(slug))
-  );
-  const terms = [
-    ...new Set(
-      [
-        ...[...answer.matchAll(QUOTED)].map((m) => m[1] ?? m[2] ?? m[3] ?? ""),
-        ...[...answer.matchAll(PATH)].flatMap((m) => m[0].split(">")),
-        ...[...answer.matchAll(TITLE_PHRASE)].map((m) => m[0]),
-      ]
-        .map((term) => term.trim().toLowerCase())
-        .filter((term) => term.length >= 3)
-    ),
-  ].slice(0, MAX_TERMS);
-  const weight = new Map(
-    terms.map((term) => [
-      term,
-      1 / (guideParts.units.filter((u) => u.lower.includes(term)).length || 1),
-    ])
-  );
-  const scored = guideParts.units.map((unit, index) => ({
-    index,
-    score: unit.slugs.some((slug) => cited.has(slug))
-      ? Number.POSITIVE_INFINITY
-      : terms.reduce(
-          (sum, term) =>
-            unit.lower.includes(term) ? sum + (weight.get(term) ?? 0) : sum,
-          0
-        ),
-    unit,
-  }));
-  const picked: typeof scored = [];
-  let size = 0;
-  for (const entry of scored
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)) {
-    if (size + entry.unit.text.length <= MAX_GUIDE_CHARS) {
-      picked.push(entry);
-      size += entry.unit.text.length;
-    }
-  }
-  return [
-    guideParts.always,
-    ...picked.sort((a, b) => a.index - b.index).map(({ unit }) => unit.text),
-  ].join("\n\n");
-}
-
 /** The judge's user message: the answer, its claims and every piece of evidence it may rely on. */
 export const judgeInput = (
   recorded: WidgetCase,
@@ -386,10 +294,7 @@ export const judgeInput = (
     claims,
     ...(recorded.mode === "investigate"
       ? {
-          productGuide: guideSections(
-            answer,
-            articles.map(({ url }) => url)
-          ),
+          productGuide: PRODUCT_GUIDE,
         }
       : {}),
     question: recorded.question,
