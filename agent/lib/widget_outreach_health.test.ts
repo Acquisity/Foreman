@@ -391,8 +391,12 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
             { daily_limit: 999, id: "other-campaign", status: 2 },
             {
               daily_limit: 150,
+              daily_max_leads: 40,
+              email_gap: 10,
               id: campaignId,
               not_sending_status: 3,
+              prioritize_new_leads: true,
+              random_wait_max: 5,
               status: 1,
             },
           ],
@@ -418,6 +422,12 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
   assert.equal(campaign.live.notSendingReasonCode, 3);
   assert.equal(campaign.live.statusCode, 1);
   assert.equal(campaign.live.providerStatus, "active");
+  assert.deepEqual(campaign.live.sendingRules, {
+    maxNewLeadsPerDay: 40,
+    minutesBetweenEmails: 10,
+    newLeadsFirst: true,
+    randomExtraMinutesMax: 5,
+  });
   // A Pro customer must never see the provider's name, even in authored text.
   assert.ok(!JSON.stringify(result).includes("Instantly"));
 });
