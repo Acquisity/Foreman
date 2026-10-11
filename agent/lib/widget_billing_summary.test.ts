@@ -700,3 +700,72 @@ test("a payment Stripe's risk screening blocked keeps its reason out of the resu
   assert.equal(result.failedPayments[0]?.declineReason, null);
   assert.equal(JSON.stringify(result).includes("highest_risk_level"), false);
 });
+
+test("inbox lines state how many inboxes they bill from the plan's per-inbox price", async () => {
+  // wrun_41M4EBCXG30GWVAHMTAFGQG4GJ said 4 inboxes: each 1 × $18 line is 3 inboxes at $6.
+  const line = (description: string, amount: number) => ({
+    amount,
+    description,
+    period: { end: 1_729_000_000, start: 1_726_000_000 },
+    quantity: 1,
+  });
+  const inboxLine = line("1 × Inbox (DFY) - Inboxes (at $18.00 / month)", 1800);
+  const invoice = (lines: unknown[]) => ({
+    data: {
+      data: [
+        {
+          amount_paid: 13_406,
+          created: 1_726_000_000,
+          id: "in_1",
+          lines: { data: lines },
+          status: "paid",
+        },
+      ],
+      object: "list",
+    },
+  });
+  const deps = (
+    plans: unknown[],
+    lines: unknown[] = [
+      line("1 × Domain - Domains (at $16.74 / year)", 1674),
+      inboxLine,
+      inboxLine,
+      inboxLine,
+      inboxLine,
+    ]
+  ) =>
+    fakeDeps({
+      getAutumnCustomer: () =>
+        Promise.resolve({ stripe_id: "cus_abc", subscriptions: plans }),
+      getStripeCustomerBilling: () =>
+        Promise.resolve({ ...stripeFixture, invoices: invoice(lines) }),
+    });
+  const dfy = {
+    plan: {
+      items: [{ feature_id: "inboxes", price: { amount: 6 } }],
+      name: "Inbox (DFY)",
+    },
+  };
+  const counted = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([dfy])
+  );
+  widgetBillingSummaryOutputSchema.parse(counted);
+  const [paid] = counted.recentInvoices;
+  assert.deepEqual(
+    paid?.lines?.map((entry) => entry.inboxCount),
+    [null, 3, 3, 3, 3]
+  );
+  assert.equal(paid?.inboxCount, 12);
+  // No per-inbox price, or a count that is not whole, states nothing.
+  const unpriced = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([])
+  );
+  assert.equal(unpriced.recentInvoices[0]?.inboxCount, null);
+  const partial = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([dfy], [line("1 × Inbox (DFY) - Inboxes (at $18.00 / month)", 1000)])
+  );
+  assert.equal(partial.recentInvoices[0]?.inboxCount, null);
+});

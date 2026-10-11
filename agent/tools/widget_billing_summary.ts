@@ -87,6 +87,14 @@ const MAX_ORDER_SUBSCRIPTIONS = 50;
 const invoiceLineSchema = z.object({
   amountCents: z.number().nullable(),
   description: z.string().nullable(),
+  // Optional so saved replays from before it existed still parse.
+  inboxCount: z
+    .number()
+    .int()
+    .nullish()
+    .describe(
+      "How many inboxes this line bills: the line amount divided by the per-inbox price of the inbox plan it names. A line's quantity can count bundles, not inboxes (1 × $18 can be 3 inboxes at $6). null when the line is not an inbox plan or the count does not come out whole"
+    ),
   periodEnd: z.string().nullable(),
   periodStart: z.string().nullable(),
   proration: z.boolean().nullable(),
@@ -114,6 +122,13 @@ const invoiceSummarySchema = z.object({
     ),
   discountCents: z.number().nullable(),
   id: z.string(),
+  inboxCount: z
+    .number()
+    .int()
+    .nullish()
+    .describe(
+      "Total inboxes this invoice billed: the sum of its lines' inboxCount. null when no line's inbox count is known; with linesTruncated it covers the shown lines only"
+    ),
   lines: z
     .array(invoiceLineSchema)
     .max(MAX_INVOICE_LINES)
@@ -277,6 +292,7 @@ const toInvoiceLine = (
     amountCents: asNumber(row.amount),
     description:
       asText(row.description)?.slice(0, MAX_DESCRIPTION_LENGTH) ?? null,
+    inboxCount: null,
     periodEnd: asUnixIso(period.end),
     periodStart: asUnixIso(period.start),
     proration: typeof row.proration === "boolean" ? row.proration : null,
@@ -327,6 +343,7 @@ const toInvoiceSummary = (
         0
       ) ?? null,
     id: asText(row.id) ?? "",
+    inboxCount: null,
     lines: lineRows?.slice(0, MAX_INVOICE_LINES).map(toInvoiceLine) ?? null,
     linesTruncated:
       lineList.has_more === true || (lineRows?.length ?? 0) > MAX_INVOICE_LINES,
@@ -334,6 +351,58 @@ const toInvoiceSummary = (
     settlement: invoiceSettlement(status, amountPaidCents),
     status,
     totalCents: asNumber(row.total),
+  };
+};
+
+// Stripe names a plan line "<quantity> × <plan name> - <feature> (at $x / month)".
+const LINE_PLAN = /^(?:Remaining time on )?[\d,]+ × (.+?) - /u;
+
+/** Per-inbox price in cents for each inbox plan Autumn lists, keyed by plan name. */
+const inboxPlanPrices = (data: unknown): Map<string, number> => {
+  const prices = new Map<string, number>();
+  const { subscriptions } = asRow(data);
+  for (const subscription of Array.isArray(subscriptions)
+    ? subscriptions
+    : []) {
+    const plan = asRow(asRow(subscription).plan);
+    const name = asText(plan.name);
+    const items = Array.isArray(plan.items) ? plan.items.map(asRow) : [];
+    const amount = asNumber(
+      asRow(items.find((item) => item.feature_id === "inboxes")?.price).amount
+    );
+    if (name && amount && amount > 0) {
+      prices.set(name, Math.round(amount * 100));
+    }
+  }
+  return prices;
+};
+
+/**
+ * Count inboxes from the line amount and the plan's per-inbox price, so a
+ * 1 × $18 bundle reads as 3 inboxes (wrun ...EBCXG3 said 4 when it was 12).
+ */
+export const withInboxCounts = (
+  invoice: z.infer<typeof invoiceSummarySchema>,
+  prices: Map<string, number>
+): z.infer<typeof invoiceSummarySchema> => {
+  const lines =
+    invoice.lines?.map((line) => {
+      const plan = LINE_PLAN.exec(line.description ?? "")?.[1];
+      const price = plan ? prices.get(plan) : undefined;
+      const count =
+        price && line.amountCents !== null ? line.amountCents / price : null;
+      return {
+        ...line,
+        inboxCount: count && Number.isInteger(count) ? count : null,
+      };
+    }) ?? null;
+  const counted = lines?.filter((line) => line.inboxCount) ?? [];
+  return {
+    ...invoice,
+    inboxCount: counted.length
+      ? counted.reduce((sum, line) => sum + (line.inboxCount ?? 0), 0)
+      : null,
+    lines,
   };
 };
 
@@ -621,7 +690,10 @@ export async function composeWidgetBillingSummary(
   const { stripe } = stripeResolution;
 
   const charges = stripeListRows(stripe?.charges).map(toChargeSummary);
-  const invoices = stripeListRows(stripe?.invoices).map(toInvoiceSummary);
+  const prices = inboxPlanPrices(autumn.data);
+  const invoices = stripeListRows(stripe?.invoices).map((row) =>
+    withInboxCounts(toInvoiceSummary(row), prices)
+  );
   const subscriptions = stripeListRows(stripe?.subscriptions).map(
     toSubscriptionSummary
   );
@@ -718,7 +790,7 @@ export const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {
