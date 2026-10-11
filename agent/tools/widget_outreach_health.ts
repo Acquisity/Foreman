@@ -666,19 +666,64 @@ const providerCampaign = z.object({
 
 const NEW_CAMPAIGN_DAYS = 14;
 
+type RulesRow = Pick<
+  z.infer<typeof campaignRow>,
+  | "createdAt"
+  | "days"
+  | "fromTime"
+  | "leadsNotPushedCount"
+  | "recentSends"
+  | "timezone"
+  | "toTime"
+>;
+
+/**
+ * Saved minutes before the message with nothing sent yet (wrun ...0H5YQP):
+ * the near-cap reading needs sends, so say what governs the first emails.
+ */
+function readStartUp(
+  rules: { maxNewLeadsPerDay: number | null; newLeadsFirst: boolean | null },
+  row: RulesRow,
+  now: number
+): string | null {
+  const age = row.createdAt ? now - Date.parse(row.createdAt) : null;
+  if (
+    age === null ||
+    age >= 86_400_000 ||
+    row.recentSends.some((day) => (day.emailsSent ?? 0) > 0)
+  ) {
+    return null;
+  }
+  const days = Object.entries(namedDays(row.days) ?? {})
+    .filter(([, on]) => on)
+    .map(([day]) => day);
+  const window =
+    row.fromTime && row.toTime
+      ? ` from ${row.fromTime} to ${row.toTime}${row.timezone ? ` ${row.timezone} time` : ""}${days.length ? ` on ${days.join(", ")}` : ""}`
+      : "";
+  const cap = rules.maxNewLeadsPerDay
+    ? `, and at most ${rules.maxNewLeadsPerDay} new leads get a first email each day`
+    : "";
+  const first = rules.newLeadsFirst
+    ? " New leads come first, so follow-ups wait until new leads have had their first email."
+    : "";
+  return `This campaign was created less than a day ago and has no sends yet. First emails go out only inside its sending schedule${window}${cap}. A brand-new campaign can take a while to start sending.${first} This is the likely reason nothing has gone out yet, not a certainty.`;
+}
+
 /**
  * Plain reading of the sending rules from data already in hand, so the model
  * connects them to "not sending" (wrun ...V4AYD, ...0H5YQP read them and didn't).
  */
 export function readSendingRules(
   rules: { maxNewLeadsPerDay: number | null; newLeadsFirst: boolean | null },
-  row: Pick<
-    z.infer<typeof campaignRow>,
-    "createdAt" | "leadsNotPushedCount" | "recentSends"
-  >,
+  row: RulesRow,
   now: number
 ): string | null {
   const readings: string[] = [];
+  const startUp = readStartUp(rules, row, now);
+  if (startUp) {
+    readings.push(startUp);
+  }
   if (rules.newLeadsFirst && row.leadsNotPushedCount > 0) {
     readings.push(
       `New leads come first and ${row.leadsNotPushedCount} leads have not had a first email yet, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.`
@@ -706,7 +751,8 @@ export function readSendingRules(
 /** The provider's campaign object as live evidence, in neutral field names. */
 function liveFromProvider(
   match: unknown,
-  row: z.infer<typeof campaignRow>
+  row: z.infer<typeof campaignRow>,
+  asOf: string | undefined
 ): z.infer<typeof liveCampaign> {
   const campaign = providerCampaign.parse(match);
   const reason = toNotSendingReason(
@@ -730,7 +776,20 @@ function liveFromProvider(
     providerStatus: PROVIDER_STATUS_BY_CODE[campaign.status] ?? null,
     sendingRules: {
       ...rules,
-      reading: readSendingRules(rules, row, Date.now()),
+      reading: readSendingRules(
+        rules,
+        // A live re-run reads at the original message: that day's saved sends
+        // happened after it, so they cannot count as already sending.
+        asOf
+          ? {
+              ...row,
+              recentSends: row.recentSends.filter(
+                (day) => day.date < asOf.slice(0, 10)
+              ),
+            }
+          : row,
+        asOf ? Date.parse(asOf) : Date.now()
+      ),
     },
     statusCode: campaign.status,
     updatedAt: campaign.timestamp_updated ?? null,
@@ -785,7 +844,8 @@ async function scanProviderCampaigns(
 async function readLiveCampaigns(
   ctx: ProviderContext,
   rows: z.infer<typeof campaignRow>[],
-  organizationId: string
+  organizationId: string,
+  asOf: string | undefined
 ): Promise<z.infer<typeof liveCampaign>[]> {
   const byWorkspace = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -845,7 +905,7 @@ async function readLiveCampaigns(
     }
     const match = scan.found.get(row.providerCampaignId);
     if (match) {
-      return liveFromProvider(match, row);
+      return liveFromProvider(match, row, asOf);
     }
     return {
       available: false,
@@ -895,7 +955,8 @@ export async function readWidgetOutreachHealth(
       const live = await readLiveCampaigns(
         ctx,
         db.rows[0].records.slice(0, evidence.campaigns.length),
-        scope.organizationId
+        scope.organizationId,
+        scope.liveAsOf
       );
       evidence.campaigns.forEach((campaign, index) => {
         campaign.live = live[index];

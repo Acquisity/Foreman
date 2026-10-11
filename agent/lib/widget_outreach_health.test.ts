@@ -12,6 +12,7 @@ import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetOutreachHealthQuery,
   parseWidgetOutreachHealthEvidence,
+  readSendingRules,
   readWidgetOutreachHealth,
   widgetOutreachHealthInput,
   widgetOutreachHealthOutput,
@@ -1026,4 +1027,96 @@ test("the listing reads each provisioned workspace's campaign list once and read
     "This campaign is new and its daily sends are at or near its cap of 120 new leads a day, so that daily new-lead cap is what limits first emails."
   );
   assert.ok(!JSON.stringify(result).includes("Instantly"));
+});
+
+test("a campaign created under a day ago with no sends gets the start-up reading with its real numbers", () => {
+  // wrun_41M49GFMPB0GZ0VZ2R080H5YQP: saved about 12 minutes before the message, nothing sent.
+  const now = Date.parse(observedAt);
+  const fresh = {
+    ...row,
+    createdAt: new Date(now - 12 * 60_000).toISOString(),
+    leadsNotPushedCount: 0,
+    recentSends: [],
+  };
+  const rules = { maxNewLeadsPerDay: 117, newLeadsFirst: true };
+  assert.equal(
+    readSendingRules(rules, fresh, now),
+    "This campaign was created less than a day ago and has no sends yet. First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. A brand-new campaign can take a while to start sending. New leads come first, so follow-ups wait until new leads have had their first email. This is the likely reason nothing has gone out yet, not a certainty."
+  );
+  assert.equal(
+    readSendingRules(
+      rules,
+      { ...fresh, recentSends: [{ date: "2026-09-17", emailsSent: 3 }] },
+      now
+    ),
+    null
+  );
+  assert.equal(
+    readSendingRules(
+      rules,
+      { ...fresh, createdAt: new Date(now - 2 * 86_400_000).toISOString() },
+      now
+    ),
+    null
+  );
+});
+
+test("a live re-run leaves out the message day's later sends, so a campaign saved minutes earlier reads as not started", async (t) => {
+  // wrun_41M49GFMPB0GZ0VZ2R080H5YQP: that day's row now holds 196 sends made after the message.
+  const asOf = "2026-10-06T21:03:58.775Z";
+  t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
+    if (path.includes("planetscale")) {
+      return {
+        data: envelope([
+          {
+            ...row,
+            createdAt: "2026-10-06T20:51:00.000Z",
+            leadsNotPushedCount: 0,
+            recentSends: [{ date: "2026-10-06", emailsSent: 196 }],
+          },
+        ]),
+        ok: true,
+      };
+    }
+    if (path.includes("workspaceGroupMembers")) {
+      return { data: { items: [member()] }, ok: true };
+    }
+    return {
+      data: {
+        items: [
+          {
+            daily_max_leads: 117,
+            id: campaignId,
+            prioritize_new_leads: true,
+            status: 1,
+          },
+        ],
+      },
+      ok: true,
+    };
+  });
+  const replay = {
+    ...ctx,
+    session: {
+      auth: {
+        current: null,
+        initiator: widgetAuth({ ...scope, liveAsOf: asOf }),
+      },
+    },
+  } as unknown as ProviderContext;
+  const result = await readWidgetOutreachHealth(replay, {
+    endDate: "2026-10-06",
+    startDate: "2026-09-30",
+  });
+  if (result.status !== "ok" || !result.campaigns[0]?.live.available) {
+    assert.fail("Expected a live campaign");
+  }
+  assert.ok(
+    result.campaigns[0].live.sendingRules.reading?.startsWith(
+      "This campaign was created less than a day ago and has no sends yet."
+    )
+  );
+  assert.deepEqual(result.campaigns[0].recentSends, [
+    { date: "2026-10-06", emailsSent: 196 },
+  ]);
 });
