@@ -58,6 +58,10 @@ const rawOrder = {
   domainRows: 6,
   domainsProvisioned: 0,
   failedDomainRows: 0,
+  forwardingAtPurchase: {
+    domains: [{ domain: "example-outreach.com", forwardTo: null }],
+    truncated: false,
+  },
   hasError: false,
   id: orderId,
   inboxCountPerDomain: 3,
@@ -163,6 +167,9 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "dpo.order_type = 'dfy'",
     "jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'",
     "jsonb_array_length(mb.value)",
+    // Only the forwarding website set at purchase leaves those order blobs.
+    "dpo.selected_domains ->> 'forwardTo'",
+    "select d.value ->> 'forwardTo'",
   ]) {
     assert.ok(query.includes(required), required);
   }
@@ -170,16 +177,34 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "select *",
     "buyer_email",
     "domain_search",
-    "selected_domains",
+    "selected_domains as",
+    "selected_domains -> 'domains'",
     "dfy_config as",
-    "dfy_config -> 'domains'",
     "jsonb_object_keys",
     "checkout_lease",
-    "md.domain",
     "mi.email",
   ]) {
     assert.equal(query.includes(forbidden), false, forbidden);
   }
+});
+
+test("each bought domain carries the forwarding set at purchase, labeled as not current", () => {
+  const result = parseWidgetProvisioningEvidence(envelope([rawOrder]), scope);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.deepEqual(result.orders[0]?.forwardingAtPurchase, {
+    domains: [{ domain: "example-outreach.com", forwardTo: null }],
+    truncated: false,
+  });
+  assert.ok(
+    result.caveats.some(
+      (caveat) =>
+        caveat.includes("not saved here") &&
+        caveat.includes("Domain Forwarding")
+    )
+  );
 });
 
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {
