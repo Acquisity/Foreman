@@ -485,6 +485,28 @@ test("leak scan owns the domain of an address in the evidence and what the custo
   );
 });
 
+test("Instantly may be named only when the case's own results show a connection the customer owns", () => {
+  const owned = (accountType: string): WidgetCase => ({
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      {
+        ...recorded.cassette[0],
+        output: { connection: { accountType, isActive: true } },
+      },
+    ],
+  });
+  const message = "Your Instantly account rejected the connection.";
+  // Legacy: the customer connected their own Instantly account.
+  assert.equal(gradeRun(run({ message }), owned("user_owned")).leaks, "pass");
+  // Pro: provisioned for them, so the name stays hidden.
+  assert.equal(
+    gradeRun(run({ message }), owned("system_provisioned")).leaks,
+    "fail"
+  );
+  assert.equal(gradeRun(run({ message }), recorded).leaks, "fail");
+});
+
 test("a capitalized quoted UI label before a colon is not a raw key", () => {
   assert.equal(
     gradeRun(

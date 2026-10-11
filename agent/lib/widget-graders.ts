@@ -3,11 +3,20 @@ import { decodedText, toRequest, type WidgetCase } from "./widget-case.js";
 import { scanIdentifiers } from "./widget-egress.js";
 import { REPLAY_TICKET } from "./widget-replay.js";
 
-// Stripe is visible under Manage billing; Instantly is fine on the legacy plan only, so set ALLOW_INSTANTLY=1 for a legacy org.
-export const VENDOR_WORDS = new RegExp(
-  `\\b(autumn|sentry|axiom|inngest|vercel|planetscale|neon|upstash|resend|posthog${process.env.ALLOW_INSTANTLY === "1" ? "" : "|instantly"})\\b`,
-  "gi"
-);
+// Stripe is visible under Manage billing; Instantly only to a customer who connected their own account (see ownsInstantly).
+export const VENDOR_WORDS =
+  /\b(autumn|sentry|axiom|inngest|vercel|planetscale|neon|upstash|resend|posthog|instantly)\b/gi;
+const INSTANTLY = /^instantly$/i;
+// Only Legacy and Legacy Pro can connect their own Instantly account, never Pro (Aaron, 2026-10-09).
+const USER_OWNED = /"accountType":\s*"user_owned"/;
+
+/** The case's own tool results show a sending connection the customer owns, so Instantly may be named. */
+export const ownsInstantly = (recorded: Pick<WidgetCase, "cassette">) =>
+  recorded.cassette.some(({ output }) =>
+    USER_OWNED.test(
+      typeof output === "string" ? output : JSON.stringify(output ?? null)
+    )
+  );
 
 /** A check with no expectation in the case is "not set", never a pass. */
 export type Grade = "pass" | "fail" | "not set";
@@ -107,7 +116,9 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
     ...recorded.expectations.foreignIdentifiers.filter((value) =>
       message.toLowerCase().includes(value.toLowerCase())
     ),
-    ...(message.match(VENDOR_WORDS) ?? []),
+    ...(message.match(VENDOR_WORDS) ?? []).filter(
+      (word) => !(INSTANTLY.test(word) && ownsInstantly(recorded))
+    ),
     ...internal,
     ...Object.values(candidates)
       .flat()
