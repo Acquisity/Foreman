@@ -227,6 +227,8 @@ export type WaitOutcome =
       text: string | null;
       /** What widget_file_ticket itself returned during this turn, if it ran. */
       ticket?: FiledTicket | null;
+      /** Each reading the turn's tools computed, as findings facts. */
+      readings?: WidgetFindings["facts"];
     };
 
 const TEXT_MAX = 4000;
@@ -276,6 +278,81 @@ export function filedTicketResult(result: unknown): FiledTicket | null {
 }
 
 /**
+ * The readings a tool computed, read from its own result. The write-up can doubt
+ * a reading (ENG-15044: ...49GFMPB and ...G6PZ3P each set theirs aside in 3 of 3
+ * runs), so each one reaches the composer from the result, tool as evidence.
+ */
+export function toolReadings(result: unknown): WidgetFindings["facts"] {
+  const action = result as {
+    isError?: boolean;
+    kind?: string;
+    output?: unknown;
+    toolName?: string;
+  } | null;
+  if (
+    action?.kind !== "tool-result" ||
+    action.isError ||
+    typeof action.toolName !== "string"
+  ) {
+    return [];
+  }
+  const tool = action.toolName;
+  const output = action.output as {
+    campaigns?: unknown;
+    reading?: unknown;
+  } | null;
+  const fact = (reading: unknown, about?: unknown) =>
+    typeof reading === "string" && reading
+      ? [
+          {
+            claim: (typeof about === "string"
+              ? `Campaign "${about}": ${reading}`
+              : reading
+            ).slice(0, 2000),
+            entityIds: typeof about === "string" ? [about.slice(0, 200)] : [],
+            evidence: { ref: "reading", tool },
+          },
+        ]
+      : [];
+  const campaigns = Array.isArray(output?.campaigns) ? output.campaigns : [];
+  return [
+    ...fact(output?.reading),
+    ...campaigns.flatMap(
+      (
+        campaign: {
+          live?: { sendingRules?: { reading?: unknown } };
+          name?: unknown;
+        } | null
+      ) => fact(campaign?.live?.sendingRules?.reading, campaign?.name)
+    ),
+  ];
+}
+
+const FACTS_MAX = 50;
+/** Every fired reading the findings do not already state, appended within the facts limit. */
+const withReadings = (
+  readings: WidgetFindings["facts"] | undefined,
+  findings: WidgetFindings | null
+): WidgetFindings | null => {
+  if (!(findings && readings?.length)) {
+    return findings;
+  }
+  const claims = new Set(findings.facts.map((fact) => fact.claim));
+  const added = readings.filter((reading) => {
+    const fresh = !claims.has(reading.claim);
+    claims.add(reading.claim);
+    return fresh;
+  });
+  return {
+    ...findings,
+    facts: [
+      ...findings.facts.slice(0, Math.max(0, FACTS_MAX - added.length)),
+      ...added,
+    ].slice(0, FACTS_MAX),
+  };
+};
+
+/**
  * The tool's own result outranks whatever the write-up or the model pass said
  * about a ticket: with no filed ticket, a claimed one is dropped so the customer
  * is never told one was filed. A filed refund ticket is the handoff to billing,
@@ -303,6 +380,7 @@ const withFiledTicket = (
 interface Recorded {
   asked: string | null;
   read: boolean;
+  readings: WidgetFindings["facts"];
   ticket: FiledTicket | null;
 }
 /** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
@@ -315,16 +393,29 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
       (action?.kind === "tool-result" &&
         typeof action.toolName === "string" &&
         gathering(action.toolName)),
+    readings: [...so.readings, ...toolReadings(result)],
     ticket: filedTicketResult(result) ?? so.ticket,
   };
 };
+const nothingRecorded: Recorded = {
+  asked: null,
+  read: false,
+  readings: [],
+  ticket: null,
+};
 const completed = (
-  { asked, read }: Pick<Recorded, "asked" | "read">,
-  outcome: Extract<WaitOutcome, { status: "completed" }>
-): WaitOutcome =>
-  asked
-    ? { ...outcome, asked, ...(read ? { afterReads: true } : {}) }
-    : outcome;
+  { asked, read, readings, ticket }: Recorded,
+  outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
+): WaitOutcome => {
+  const done = {
+    ...outcome,
+    ...(readings.length ? { readings } : {}),
+    ticket,
+  };
+  return asked
+    ? { ...done, asked, ...(read ? { afterReads: true } : {}) }
+    : done;
+};
 
 /**
  * Task completion owns the answer. The structured result is the findings
@@ -346,9 +437,7 @@ export async function waitForWidgetInvestigation(
   const progress = progressFromEvents(planned);
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
-  let ticket: FiledTicket | null = null;
-  let asked: string | null = null;
-  let read = false;
+  let so = nothingRecorded;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -363,29 +452,15 @@ export async function waitForWidgetInvestigation(
       if (event.type === "turn.started") {
         findings = null;
         text = null;
-        ticket = null;
-        asked = null;
-        read = false;
+        so = nothingRecorded;
       } else if (event.type === "action.result") {
-        ({ asked, read, ticket } = recorded(event.data.result, {
-          asked,
-          read,
-          ticket,
-        }));
+        so = recorded(event.data.result, so);
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return completed(
-          { asked, read },
-          {
-            findings,
-            status: "completed",
-            text,
-            ticket,
-          }
-        );
+        return completed(so, { findings, status: "completed", text });
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -678,11 +753,14 @@ async function structureWriteUp(
     // other item and the composer ends the reply with it.
     return {
       gateDeps: undefined,
-      structured: withFiledTicket(outcome.ticket, {
-        ...found,
-        needsHuman: false,
-        recommendation: asked,
-      }),
+      structured: withFiledTicket(
+        outcome.ticket,
+        withReadings(outcome.readings, {
+          ...found,
+          needsHuman: false,
+          recommendation: asked,
+        })
+      ),
     };
   }
   if (asked) {
@@ -710,7 +788,10 @@ async function structureWriteUp(
   return {
     gateDeps: undefined,
     structured: await withEligibleHandoff(
-      withFiledTicket(outcome.ticket, extracted),
+      withFiledTicket(
+        outcome.ticket,
+        withReadings(outcome.readings, extracted)
+      ),
       conversation,
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
       deps.handoffEligible

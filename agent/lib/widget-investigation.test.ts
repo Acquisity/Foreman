@@ -3,7 +3,7 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import type { GateResult } from "./widget-egress.js";
+import { composerInput, type GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
@@ -1464,6 +1464,57 @@ test("a filed ticket is taken from the tool's own result, whatever the write-up 
   for (const none of refused) {
     assert.equal(none.status === "completed" && none.ticket, null);
   }
+});
+
+test("a reading a tool fired reaches the composer even when the write-up set it aside", async () => {
+  const startUp =
+    "This campaign was created less than a day ago and has no sends yet.";
+  const notFound =
+    "Reconnect failed because the email provider reported the mailbox not found.";
+  const result = (toolName: string, output: unknown) =>
+    event("action.result", {
+      result: { callId: toolName, kind: "tool-result", output, toolName },
+    });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      result("widget_outreach_health", {
+        campaigns: [
+          { live: { sendingRules: { reading: startUp } }, name: "Launch" },
+          { live: { sendingRules: { reading: null } }, name: "Quiet" },
+        ],
+      }),
+      // A second read of the same campaign states it once.
+      result("widget_outreach_health", {
+        campaigns: [
+          { live: { sendingRules: { reading: startUp } }, name: "Launch" },
+        ],
+      }),
+      result("widget_inbox_health", { reading: notFound }),
+      event("message.completed", {
+        message: "The live read says no sends yet; I'm not relying on it.",
+      }),
+      event("session.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, gated, run } = dependencies();
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-readings", outcome, deps);
+  }
+  const [raw] = gated as WidgetFindings[];
+  assert.ok(raw);
+  const claims = composerInput(raw).facts.map((fact) => fact.claim);
+  assert.deepEqual(claims.slice(findings.facts.length), [
+    `Campaign "Launch": ${startUp}`,
+    notFound,
+  ]);
+  assert.deepEqual(
+    raw.facts.slice(findings.facts.length).map((fact) => fact.evidence),
+    [
+      { ref: "reading", tool: "widget_outreach_health" },
+      { ref: "reading", tool: "widget_inbox_health" },
+    ]
+  );
 });
 
 test("a filed refund ticket is the handoff to billing, so the customer gets a reply instead of a person", async () => {
