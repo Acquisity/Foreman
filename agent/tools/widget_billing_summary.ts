@@ -221,6 +221,8 @@ export const widgetBillingSummaryOutputSchema = z.object({
   credits: walletSchema.extend({ renewsAt: z.string().nullable() }).nullable(),
   discount: discountSummarySchema.nullable(),
   failedPayments: z.array(chargeSummarySchema),
+  /** With `reading`: the reading names the charges a dispute is about (inboxes billed while broken). */
+  identifiesCharge: z.literal(true).optional(),
   orderSubscriptions: z
     .object({
       available: z.boolean(),
@@ -244,6 +246,8 @@ export const widgetBillingSummaryOutputSchema = z.object({
       status: z.string().nullable(),
     })
     .nullable(),
+  /** What the billing records mean, computed from this result; tell the customer that. */
+  reading: z.string().optional(),
   recentCharges: z.array(chargeSummarySchema),
   recentInvoices: z.array(invoiceSummarySchema),
   recentRefunds: z.array(chargeSummarySchema),
@@ -696,10 +700,8 @@ async function readErroredInboxes(
     ? await deps.getErroredInboxes(organizationId).catch(() => null)
     : undefined;
   return {
-    notes: (invoices: z.infer<typeof invoiceSummarySchema>[]) => {
-      const reading = readInboxErrorBilling(errored ?? null, invoices);
-      return reading ? [reading] : [];
-    },
+    reading: (invoices: z.infer<typeof invoiceSummarySchema>[]) =>
+      readInboxErrorBilling(errored ?? null, invoices),
     unavailable:
       errored === null ? ["productDb.erroredInboxes read failed"] : [],
   };
@@ -822,7 +824,7 @@ export async function composeWidgetBillingSummary(
 
   const errored = await erroredRead;
   unavailable.push(...errored.unavailable);
-  notes.push(...errored.notes(invoices));
+  const reading = errored.reading(invoices);
 
   return {
     autumn: {
@@ -849,6 +851,7 @@ export async function composeWidgetBillingSummary(
     recentCharges: charges,
     recentInvoices: invoices,
     recentRefunds,
+    ...(reading ? { identifiesCharge: true as const, reading } : {}),
     reconciliation: { chargedButNoActiveSubscription, notes },
     stripeSubscriptions: subscriptions,
     truncated,
@@ -933,7 +936,7 @@ export const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. When purchased inboxes are in error, a reconciliation note ties them to the inbox charges covering time after the error began: tell the customer those facts and promise nothing about a refund or credit. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. When purchased inboxes are in error, `reading` ties them to the inbox charges covering time after the error began: tell the customer those facts and promise nothing about a refund or credit. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {

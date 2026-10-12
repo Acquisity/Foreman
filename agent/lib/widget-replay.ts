@@ -38,8 +38,17 @@ export const REPLAY_TICKET = Object.freeze({
  * Live re-run (ENG-15026, `pnpm widget:live`): with WIDGET_LIVE=1 every widget read is live,
  * widget_file_ticket files nothing, and identity is the recorded production scope the
  * harness sends as the bearer token. Local-only.
+ *
+ * The result is a simulated filed ticket, so a correct ticket reaches the composer's
+ * "passed to the team" reply as it would in production (ENG-15044 round 15: with
+ * `filed: false` no live reply could say so). ENG-0 is never a real issue.
  */
-export const LIVE_TICKET = Object.freeze({ filed: false, live: "not filed" });
+export const LIVE_TICKET = Object.freeze({
+  identifier: "ENG-0",
+  live: "simulated: nothing was filed",
+  simulated: true,
+  url: "https://linear.app/acquisity/issue/ENG-0/simulated-live-ticket",
+});
 
 /** Live is local-only; replay is refused on production, and the flags are exclusive. */
 export function assertReplayAllowed(env: NodeJS.ProcessEnv = process.env) {

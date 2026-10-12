@@ -10,6 +10,7 @@ import {
   DESCRIPTION_CHARS,
   nextActionEnabled,
   note,
+  ruledTicket,
   selectNextAction,
   turnEvidence,
   widgetNextActionMiddleware,
@@ -599,6 +600,115 @@ describe("widget next-action selector", () => {
     });
     const menu = Object.keys(seen[0].questions?.action?.criteria ?? {});
     assert.equal(menu.includes("ticket"), false);
+  });
+
+  it("files the ticket in code: a refund ask with a billing reading that names the charge, or a fault reading", async () => {
+    const billed = {
+      identifiesCharge: true,
+      reading:
+        "6 of the purchased inboxes have been in error since 2026-09-18, and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00).",
+      status: "ok",
+    };
+    const early = {
+      campaigns: [
+        {
+          diagnostics: {
+            earlyFollowUps: {
+              platformFault: true,
+              reading: "221 follow-ups went out sooner than the delay.",
+            },
+          },
+          name: "A",
+        },
+      ],
+      status: "ok",
+    };
+    const cases = [
+      {
+        kind: "billing",
+        question:
+          "My inboxes broke in September but I was invoiced anyway. Can you please reimburse the amounts?",
+        reads: [{ input: {}, output: billed, tool: "widget_billing_summary" }],
+      },
+      {
+        kind: "fault",
+        question: "All follow-ups went out 3 hours after the first email.",
+        reads: [{ input: {}, output: early, tool: "widget_outreach_health" }],
+      },
+    ];
+    for (const { question, reads } of cases) {
+      const seen: unknown[] = [];
+      const { model, sent } = harness(
+        jev("clarify", 0.9, seen as never),
+        call("widget_file_ticket", { summary: "s", title: "t" })
+      );
+      // biome-ignore lint/performance/noAwaitInLoops: each case is its own harness.
+      await model.doGenerate({ prompt: prompt(question, reads), tools: TOOLS });
+      assert.deepEqual(sent().toolChoice, forced("widget_file_ticket"));
+      assert.match(sent().note, RE_TICKET_NOTE);
+      // Decided before Jev: a clarify pick can no longer ask which domains.
+      assert.equal(seen.length, 0);
+    }
+    assert.deepEqual(
+      cases.map(({ question, reads }) =>
+        ruledTicket(
+          question,
+          reads.map((read) => ({
+            result: JSON.stringify({ type: "json", value: read.output }),
+            tool: read.tool,
+          }))
+        )
+      ),
+      cases.map(({ kind }) => kind)
+    );
+  });
+
+  it("files nothing in code without a flagged reading, or with a charge reading and no dispute", async () => {
+    const result = (value: object) => JSON.stringify({ type: "json", value });
+    // The billing reading alone, with no refund ask, is not a dispute.
+    assert.equal(
+      ruledTicket("How many inboxes am I paying for?", [
+        {
+          result: result({ identifiesCharge: true, reading: "r" }),
+          tool: "widget_billing_summary",
+        },
+      ]),
+      null
+    );
+    // A refund ask with no reading naming the charge: Jev still decides (clarify).
+    assert.equal(
+      ruledTicket("I want a refund.", [
+        { result: result({ status: "ok" }), tool: "widget_billing_summary" },
+      ]),
+      null
+    );
+    // A mailbox-not-found reading is not a fault: Reconnect can't help, check non-payment.
+    assert.equal(
+      ruledTicket("Reconnect keeps failing.", [
+        {
+          result: result({ reading: "mailbox not found" }),
+          tool: "widget_inbox_health",
+        },
+      ]),
+      null
+    );
+    const seen: unknown[] = [];
+    const { model, sent } = harness(
+      jev("finish", 0.9, seen as never),
+      text("findings")
+    );
+    await model.doGenerate({
+      prompt: prompt("How many inboxes am I paying for?", [
+        {
+          input: {},
+          output: { identifiesCharge: true, reading: "r" },
+          tool: "widget_billing_summary",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(seen.length, 1);
+    assert.equal(sent().toolChoice, undefined);
   });
 
   it("a billing dispute is a ticket, not a person: the handoff rule names only an explicit ask", async () => {

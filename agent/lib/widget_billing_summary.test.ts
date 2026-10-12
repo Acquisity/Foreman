@@ -888,11 +888,11 @@ test("inboxes in error are tied to the inbox charges covering time after the err
     deps({ count: 6, since: "2026-09-17T09:00:00.000+00:00" })
   );
   widgetBillingSummaryOutputSchema.parse(tied);
-  assert.ok(
-    tied.reconciliation.notes.includes(
-      "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
-    )
+  assert.equal(
+    tied.reading,
+    "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
   );
+  assert.equal(tied.identifiesCharge, true);
   // No inbox in error, or an error after every billed period, ties nothing.
   const quiet = await Promise.all(
     [
@@ -906,9 +906,8 @@ test("inboxes in error are tied to the inbox charges covering time after the err
     )
   );
   for (const result of quiet) {
-    assert.ok(
-      !result.reconciliation.notes.some((note) => note.includes("in error"))
-    );
+    assert.equal(result.reading, undefined);
+    assert.equal(result.identifiesCharge, undefined);
   }
   const failed = await composeWidgetBillingSummary(
     verifiedWidgetContext.organizationId,

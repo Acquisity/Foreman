@@ -320,10 +320,16 @@ export function toolReadings(result: unknown): WidgetFindings["facts"] {
     ...campaigns.flatMap(
       (
         campaign: {
+          diagnostics?: {
+            earlyFollowUps?: { reading?: unknown } | null;
+          } | null;
           live?: { sendingRules?: { reading?: unknown } };
           name?: unknown;
         } | null
-      ) => fact(campaign?.live?.sendingRules?.reading, campaign?.name)
+      ) => [
+        ...fact(campaign?.live?.sendingRules?.reading, campaign?.name),
+        ...fact(campaign?.diagnostics?.earlyFollowUps?.reading, campaign?.name),
+      ]
     ),
   ];
 }

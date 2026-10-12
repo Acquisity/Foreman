@@ -6,6 +6,7 @@ import billingDefinition from "../tools/widget_billing_summary.js";
 import outreachDefinition from "../tools/widget_outreach_health.js";
 import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
+import { filedTicketResult } from "./widget-investigation.js";
 import { driftVerdict, gapSentences, readResult } from "./widget-live.js";
 import {
   hasMovingWindow,
@@ -339,6 +340,16 @@ test("live tool boundary enforces historical date windows and preserves explicit
   assert.deepEqual(
     await replayable("widget_file_ticket", tool).execute({}, ctx),
     LIVE_TICKET
+  );
+  // Simulated, so the composer's "passed to the team" path runs; nothing is filed.
+  assert.equal(LIVE_TICKET.simulated, true);
+  assert.deepEqual(
+    filedTicketResult({
+      kind: "tool-result",
+      output: LIVE_TICKET,
+      toolName: "widget_file_ticket",
+    }),
+    { id: "ENG-0", url: LIVE_TICKET.url }
   );
 });
 

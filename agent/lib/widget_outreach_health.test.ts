@@ -12,6 +12,7 @@ import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetOutreachHealthQuery,
   parseWidgetOutreachHealthEvidence,
+  readEarlyFollowUps,
   readSendingRules,
   readWidgetOutreachHealth,
   widgetOutreachHealthInput,
@@ -952,11 +953,24 @@ test("early follow-ups are found across the selected campaign's leads without a 
   if (result.status !== "ok") {
     assert.fail("Expected saved evidence");
   }
-  assert.deepEqual(
-    result.campaigns[0].diagnostics?.earlyFollowUps,
-    earlyFollowUps
-  );
+  // Same day against a 3-day delay is the product sending early, marked as a fault.
+  assert.deepEqual(result.campaigns[0].diagnostics?.earlyFollowUps, {
+    ...earlyFollowUps,
+    platformFault: true,
+    reading:
+      "221 follow-ups went out sooner than the campaign's configured delay, 221 of them within 24 hours of the email before them, although that step's delay is set to 3 days. A sending schedule can move a send by hours, not by days, so the product sent these follow-ups early: a platform fault for the team, not something the customer set up wrong.",
+  });
   assert.ok(result.caveats.some((text) => text.includes("sameDayCount")));
+  // A few hours short of a 1-day delay can be the schedule; none found is no fault.
+  for (const early of [
+    {
+      ...earlyFollowUps,
+      examples: [{ ...earlyFollowUps.examples[0], configuredDelayDays: 1 }],
+    },
+    { ...earlyFollowUps, earlyCount: 0, examples: [], sameDayCount: 0 },
+  ]) {
+    assert.equal(readEarlyFollowUps(early), null);
+  }
 });
 
 test("the listing reads each provisioned workspace's campaign list once and reads the rules for every campaign", async (t) => {

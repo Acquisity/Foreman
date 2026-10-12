@@ -602,10 +602,50 @@ const outcomeOf = (decision: string, detail: string) => {
   }
   return detail === "reason=already_finished" ||
     detail === "reason=question_recorded" ||
-    detail === "reason=question_retry"
+    detail === "reason=question_retry" ||
+    detail.startsWith("reason=ticket_rule")
     ? "rule"
     : "jev";
 };
+
+/** The customer asks for money back or disputes a charge, in their own words. */
+const DISPUTE =
+  /\b(?:refund\w*|reimburs\w*|money back|charge ?back|disput\w*|over-?(?:charg|invoic|bill)\w*|charged (?:me )?twice|double[- ]charg\w*)/iu;
+
+/** Whether a field named `key` anywhere in a result is literally true. */
+const flagged = (value: unknown, key: string, depth = 0): boolean => {
+  if (depth > 8 || !value || typeof value !== "object") {
+    return false;
+  }
+  return (
+    (value as Record<string, unknown>)[key] === true ||
+    Object.values(value).some((inner) => flagged(inner, key, depth + 1))
+  );
+};
+
+/**
+ * The ticket the reads already settle, decided in code before Jev is asked.
+ * Jev picked `ticket` 2 times in 60 live runs and missed both clear cases
+ * (ENG-15044 round 15): wrun ...MAF4Z47, a refund ask whose billing reading
+ * names the inbox charges billed while broken, where it asked which domains;
+ * and wrun ...4W6NAN, follow-ups sent days before their delay. A tool marks
+ * those readings with a field (`identifiesCharge`, `platformFault`), never text.
+ */
+export function ruledTicket(
+  question: string,
+  reads: Pick<Read, "result" | "tool">[]
+): "billing" | "fault" | null {
+  const results = reads.flatMap((read) =>
+    gathering(read.tool) ? [parsed(read.result)] : []
+  );
+  if (results.some((result) => flagged(result, "platformFault"))) {
+    return "fault";
+  }
+  return DISPUTE.test(question.slice(0, CONVERSATION_CHARS)) &&
+    results.some((result) => flagged(result, "identifiesCharge"))
+    ? "billing"
+    : null;
+}
 
 interface Plan {
   original: Params;
@@ -817,6 +857,34 @@ export function widgetNextActionMiddleware(
     }
     return null;
   };
+  /** A ticket the reads settle in code (see `ruledTicket`), forced without asking Jev. */
+  const ticketByRule = (
+    params: Params,
+    question: string,
+    reads: Read[]
+  ): Params | null => {
+    const kind = canFile(params, reads) && ruledTicket(question, reads);
+    if (!kind) {
+      return null;
+    }
+    log(
+      "ticket",
+      { ms: 0, step: reads.length, tool: TICKET_TOOL },
+      `reason=ticket_rule kind=${kind}`
+    );
+    return remember(
+      {
+        params: {
+          ...params,
+          prompt: [...params.prompt, note(NOTES.ticket)],
+          toolChoice: { toolName: TICKET_TOOL, type: "tool" },
+        },
+        tool: TICKET_TOOL,
+      },
+      params,
+      reads
+    );
+  };
   return {
     specificationVersion: "v4",
     async transformParams({ params: incoming }) {
@@ -860,6 +928,10 @@ export function widgetNextActionMiddleware(
       });
       if (settled) {
         return settled;
+      }
+      const ruled = !initial && ticketByRule(params, question, reads);
+      if (ruled) {
+        return ruled;
       }
       const startedAt = Date.now();
       const fields = () => ({
