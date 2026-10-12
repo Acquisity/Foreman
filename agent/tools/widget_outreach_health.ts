@@ -686,14 +686,20 @@ type RulesRow = Pick<
   | "toTime"
 >;
 
+type RecentSends = RulesRow["recentSends"];
+
 /**
  * Saved minutes before the message with nothing sent yet (wrun ...0H5YQP):
  * the near-cap reading needs sends, so say what governs the first emails.
+ * `later` holds sends recorded on or after the message day; when there are
+ * some, the campaign has since started, so "no sends yet" would contradict
+ * them (wrun ...0H5YQP said it against 196 sends that day, 2 of 3 runs).
  */
 function readStartUp(
   rules: { maxNewLeadsPerDay: number | null; newLeadsFirst: boolean | null },
   row: RulesRow,
-  now: number
+  now: number,
+  later: RecentSends
 ): string | null {
   const age = row.createdAt ? now - Date.parse(row.createdAt) : null;
   if (
@@ -716,7 +722,14 @@ function readStartUp(
   const first = rules.newLeadsFirst
     ? " New leads come first, so follow-ups wait until new leads have had their first email."
     : "";
-  return `This campaign was created less than a day ago and has no sends yet. First emails go out only inside its sending schedule${window}${cap}. A brand-new campaign can take a while to start sending.${first} This is the likely reason nothing has gone out yet, not a certainty.`;
+  const created = `This campaign was created on ${row.createdAt?.slice(0, 10)} at ${row.createdAt?.slice(11, 16)} UTC, less than a day before the customer's message`;
+  const sent = later
+    .map((day) => `${day.emailsSent} on ${day.date}`)
+    .join(", ");
+  if (sent) {
+    return `${created}, and had no sends before it. Sends recorded since then show it has started sending (emails sent: ${sent}). First emails go out only inside its sending schedule${window}${cap}.${first} So it was new rather than stuck when the customer wrote.`;
+  }
+  return `${created}, and has no sends yet. First emails go out only inside its sending schedule${window}${cap}. A brand-new campaign can take a while to start sending.${first} This is the likely reason nothing has gone out yet, not a certainty.`;
 }
 
 type EarlyFollowUps = NonNullable<
@@ -754,10 +767,11 @@ export function readEarlyFollowUps(
 export function readSendingRules(
   rules: { maxNewLeadsPerDay: number | null; newLeadsFirst: boolean | null },
   row: RulesRow,
-  now: number
+  now: number,
+  later: RecentSends = []
 ): string | null {
   const readings: string[] = [];
-  const startUp = readStartUp(rules, row, now);
+  const startUp = readStartUp(rules, row, now, later);
   if (startUp) {
     readings.push(startUp);
   }
@@ -833,7 +847,13 @@ function liveFromProvider(
               ),
             }
           : row,
-        asOf ? Date.parse(asOf) : Date.now()
+        asOf ? Date.parse(asOf) : Date.now(),
+        asOf
+          ? row.recentSends.filter(
+              (day) =>
+                day.date >= asOf.slice(0, 10) && (day.emailsSent ?? 0) > 0
+            )
+          : []
       ),
     },
     statusCode: campaign.status,

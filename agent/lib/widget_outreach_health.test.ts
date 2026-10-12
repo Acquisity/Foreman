@@ -1055,7 +1055,7 @@ test("a campaign created under a day ago with no sends gets the start-up reading
   const rules = { maxNewLeadsPerDay: 117, newLeadsFirst: true };
   assert.equal(
     readSendingRules(rules, fresh, now),
-    "This campaign was created less than a day ago and has no sends yet. First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. A brand-new campaign can take a while to start sending. New leads come first, so follow-ups wait until new leads have had their first email. This is the likely reason nothing has gone out yet, not a certainty."
+    `This campaign was created on ${fresh.createdAt.slice(0, 10)} at ${fresh.createdAt.slice(11, 16)} UTC, less than a day before the customer's message, and has no sends yet. First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. A brand-new campaign can take a while to start sending. New leads come first, so follow-ups wait until new leads have had their first email. This is the likely reason nothing has gone out yet, not a certainty.`
   );
   assert.equal(
     readSendingRules(
@@ -1075,7 +1075,7 @@ test("a campaign created under a day ago with no sends gets the start-up reading
   );
 });
 
-test("a live re-run leaves out the message day's later sends, so a campaign saved minutes earlier reads as not started", async (t) => {
+test("a live re-run reads a campaign saved minutes before the message as new, and states the sends recorded since", async (t) => {
   // wrun_41M49GFMPB0GZ0VZ2R080H5YQP: that day's row now holds 196 sends made after the message.
   const asOf = "2026-10-06T21:03:58.775Z";
   t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
@@ -1125,10 +1125,10 @@ test("a live re-run leaves out the message day's later sends, so a campaign save
   if (result.status !== "ok" || !result.campaigns[0]?.live.available) {
     assert.fail("Expected a live campaign");
   }
-  assert.ok(
-    result.campaigns[0].live.sendingRules.reading?.startsWith(
-      "This campaign was created less than a day ago and has no sends yet."
-    )
+  // It was new at the message, but the sends recorded since then are stated, never "no sends yet".
+  assert.equal(
+    result.campaigns[0].live.sendingRules.reading,
+    "This campaign was created on 2026-10-06 at 20:51 UTC, less than a day before the customer's message, and had no sends before it. Sends recorded since then show it has started sending (emails sent: 196 on 2026-10-06). First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. New leads come first, so follow-ups wait until new leads have had their first email. So it was new rather than stuck when the customer wrote."
   );
   assert.deepEqual(result.campaigns[0].recentSends, [
     { date: "2026-10-06", emailsSent: 196 },
