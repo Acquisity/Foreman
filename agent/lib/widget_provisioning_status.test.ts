@@ -7,6 +7,7 @@ import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
 import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import { toolReadings } from "#lib/widget-investigation.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetProvisioningQuery,
@@ -189,19 +190,62 @@ test("the statement checks membership and scopes every provisioning join", () =>
 });
 
 test("each bought domain carries the forwarding set at purchase, labeled as not current", () => {
-  const result = parseWidgetProvisioningEvidence(envelope([rawOrder]), scope);
+  // Rounds 14 and 15: replies stated the purchase value as the current setting.
+  const result = parseWidgetProvisioningEvidence(
+    envelope([
+      {
+        ...rawOrder,
+        forwardingAtPurchase: {
+          domains: [
+            { domain: "example-outreach.com", forwardTo: null },
+            {
+              domain: "example-reach.com",
+              forwardTo: "https://www.example.com",
+            },
+          ],
+          truncated: false,
+        },
+      },
+    ]),
+    scope
+  );
   assert.equal(result.status, "ok");
   if (result.status !== "ok") {
     assert.fail("Expected saved evidence");
   }
   assert.deepEqual(result.orders[0]?.forwardingAtPurchase, {
-    domains: [{ domain: "example-outreach.com", forwardTo: null }],
+    domains: [
+      {
+        currentForwarding: null,
+        domain: "example-outreach.com",
+        forwardToAtPurchase: null,
+      },
+      {
+        currentForwarding: null,
+        domain: "example-reach.com",
+        forwardToAtPurchase: "https://www.example.com",
+      },
+    ],
     truncated: false,
   });
+  // The purchase value appears only under its purchase name, and no reading
+  // carries it to the composer as a fact.
+  const text = JSON.stringify(result);
+  assert.equal(text.split("https://www.example.com").length, 2);
+  assert.ok(text.includes('"forwardToAtPurchase":"https://www.example.com"'));
+  assert.ok(!text.includes('"forwardTo"'));
+  assert.deepEqual(
+    toolReadings({
+      kind: "tool-result",
+      output: result,
+      toolName: "widget_provisioning_status",
+    }),
+    []
+  );
   assert.ok(
     result.caveats.some(
       (caveat) =>
-        caveat.includes("not saved here") &&
+        caveat.includes("cannot be checked here") &&
         caveat.includes("Domain Forwarding")
     )
   );
