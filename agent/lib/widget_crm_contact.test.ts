@@ -3,8 +3,6 @@ import { after, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
-import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
-import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetInstructions } from "#lib/widget-instructions.js";
 import { widgetAuth } from "#lib/widget-scope.js";
@@ -75,11 +73,7 @@ test("tool is exposed only for the widget support initiator", () => {
   const resolve = definition.events["step.started"];
   assert.ok(resolve);
   assert.ok(resolve({} as never, ctx as never));
-  for (const initiator of [
-    null,
-    finInvestigationAuth(verifiedFinContext),
-    { attributes: {}, issuer: "slack" },
-  ]) {
+  for (const initiator of [null, { attributes: {}, issuer: "slack" }]) {
     assert.equal(
       resolve(
         {} as never,
@@ -204,16 +198,18 @@ test("non-widget session is refused before dispatch", async (t) => {
     data: envelope([]),
     ok: true,
   }));
-  const finCtx = {
+  const otherCtx = {
     ...ctx,
     session: {
       auth: {
         current: null,
-        initiator: finInvestigationAuth(verifiedFinContext),
+        initiator: { attributes: {}, issuer: "slack" },
       },
     },
   } as unknown as ProviderContext;
-  await assert.rejects(() => readWidgetCrmContact(finCtx, { email: "a@b.co" }));
+  await assert.rejects(() =>
+    readWidgetCrmContact(otherCtx, { email: "a@b.co" })
+  );
   assert.equal(call.mock.callCount(), 0);
 });
 

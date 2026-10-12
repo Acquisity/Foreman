@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import { sandboxSessionOptions } from "../sandbox.js";
-import { isFinInvestigation } from "./fin-investigation-auth.js";
 import { sessionLane } from "./session-lane.js";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext } from "./widget.fixture.js";
@@ -28,10 +27,8 @@ test("stamps the verified scope, unattended, under the widget issuer", () => {
   assert.deepEqual(requireWidgetContext(auth), verifiedWidgetContext);
 });
 
-test("a widget session is not a Fin investigation and never gets the Fin model", () => {
-  const auth = widgetAuth(verifiedWidgetContext);
-  assert.equal(isWidgetSupport(auth), true);
-  assert.equal(isFinInvestigation(auth), false);
+test("a widget session is recognized as widget support", () => {
+  assert.equal(isWidgetSupport(widgetAuth(verifiedWidgetContext)), true);
 });
 
 test("the widget lane keeps Executor helpers and strips repository and sandbox network", () => {
