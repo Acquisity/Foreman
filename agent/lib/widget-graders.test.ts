@@ -520,3 +520,28 @@ test("a capitalized quoted UI label before a colon is not a raw key", () => {
     "fail"
   );
 });
+
+test("a url in the workspace's own read owns its bare domain, and no other", () => {
+  // Round 15 run 3 (wrun ...STAT0M): the order read had the forwarding target as a www url.
+  const withForward: WidgetCase = {
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      {
+        input: {},
+        output: { forwardTo: "https://www.forward-target.example" },
+        tool: "widget_provisioning_status",
+      } as WidgetCase["cassette"][number],
+    ],
+  };
+  const message = "Your order forwards to forward-target.example.";
+  assert.equal(gradeRun(run({ message }), recorded).leaks, "fail");
+  assert.equal(gradeRun(run({ message }), withForward).leaks, "pass");
+  assert.equal(
+    gradeRun(
+      run({ message: "It forwards to other-target.example." }),
+      withForward
+    ).leaks,
+    "fail"
+  );
+});

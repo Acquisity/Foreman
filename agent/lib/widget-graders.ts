@@ -45,6 +45,7 @@ const LITERAL = /\b(?:true|false|null)\b/;
 const MERGE_TAG =
   /\{\{\s*(?:firstName|lastName|companyName|industry|jobTitle|sendingAccountName|sendingAccountFirstName)\s*\}\}/g;
 
+const WWW = /^www\./u;
 const grade = (ok: boolean): Grade => (ok ? "pass" : "fail");
 const NOT_ALPHANUMERIC = /[^\p{L}\p{N}]+/gu;
 const normalized = (text: string) =>
@@ -101,6 +102,11 @@ export function leaks(message: string | null, recorded: WidgetCase): string[] {
   ).candidates;
   for (const value of Object.values(known).flat()) {
     owned.add(value ?? "");
+  }
+  // A url in a read owns its bare domain too: wrun ...STAT0M's order read had
+  // "https://www.<domain>" and the reply named "<domain>" (round 15 run 3).
+  for (const domain of known.domains ?? []) {
+    owned.add(domain.replace(WWW, ""));
   }
   for (const email of known.emails) {
     owned.add(email.slice(email.lastIndexOf("@") + 1));
