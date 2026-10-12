@@ -17,6 +17,7 @@ import {
   waitForWidgetInvestigation,
   widgetRunResponse,
   withHistory,
+  withReadings,
 } from "./widget-investigation.js";
 import type { KbAnswer, KbCustomer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
@@ -1503,18 +1504,59 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
   }
   const [raw] = gated as WidgetFindings[];
   assert.ok(raw);
-  const claims = composerInput(raw).facts.map((fact) => fact.claim);
-  assert.deepEqual(claims.slice(findings.facts.length), [
-    `Campaign "Launch": ${startUp}`,
-    notFound,
+  // Readings lead the facts, marked for the composer.
+  assert.deepEqual(composerInput(raw).facts.slice(0, 2), [
+    { claim: `Campaign "Launch": ${startUp}`, reading: true },
+    { claim: notFound, reading: true },
   ]);
   assert.deepEqual(
-    raw.facts.slice(findings.facts.length).map((fact) => fact.evidence),
+    raw.facts.slice(0, 2).map((fact) => fact.evidence),
     [
       { ref: "reading", tool: "widget_outreach_health" },
       { ref: "reading", tool: "widget_inbox_health" },
     ]
   );
+});
+
+test("a fired reading leads the composer's facts and a write-up fact calling it unconfirmed is dropped", () => {
+  const fact = (claim: string, ref = "") => ({
+    claim,
+    entityIds: [],
+    evidence: { ref, tool: "widget_inbox_health" },
+  });
+  const notFound =
+    "Reconnect failed because the email provider reported the mailbox not found. The mailbox no longer exists at the provider, so Reconnect can't fix it.";
+  const likely =
+    "New leads come first, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.";
+  const written: WidgetFindings = {
+    confidence: "medium",
+    facts: [
+      fact("All three sending accounts read as error."),
+      fact(
+        "The inbox read's interpretation says the mailbox was not found at the provider, while the recorded reconnect errors say authorization needs manual attention, so the cause is unconfirmed"
+      ),
+      fact(
+        "The tool's own reading says the mailbox may no longer exist, but the recorded error text does not say that directly, so that cause is unconfirmed"
+      ),
+      // Unrelated uncertainty stays: only doubt about a reading is dropped.
+      fact("Whether the refund covered this order could not be confirmed."),
+    ],
+    needsHuman: false,
+    recommendation: "Stop retrying Reconnect.",
+    report: "r",
+  };
+  const merged = withReadings(
+    [fact(notFound, "reading"), fact(likely, "reading")],
+    written
+  );
+  assert.ok(merged);
+  assert.deepEqual(composerInput(merged).facts, [
+    { claim: notFound, reading: true },
+    // The tool's own hedge is kept word for word.
+    { claim: likely, reading: true },
+    { claim: "All three sending accounts read as error." },
+    { claim: "Whether the refund covered this order could not be confirmed." },
+  ]);
 });
 
 test("a filed refund ticket is the handoff to billing, so the customer gets a reply instead of a person", async () => {

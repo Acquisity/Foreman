@@ -329,25 +329,41 @@ export function toolReadings(result: unknown): WidgetFindings["facts"] {
 }
 
 const FACTS_MAX = 50;
-/** Every fired reading the findings do not already state, appended within the facts limit. */
-const withReadings = (
+/**
+ * A write-up fact that calls a tool's reading or interpretation unconfirmed. On
+ * wrun ...STAT0M the write-up said the mailbox-not-found reading was unconfirmed
+ * because the raw reconnect lines under the same tool were worded differently,
+ * and the reply then said it could not confirm why (round 14, 2 of 3 runs).
+ */
+const ABOUT_READING = /\b(?:reading|interpretation)\b/iu;
+const DOUBTS =
+  /\b(?:unconfirmed|not confirmed|uncertain|can(?:not|'t|’t) (?:be )?(?:confirm|verif)\w*|could not (?:be )?(?:confirm|verif)\w*)\b/iu;
+const doubtsReading = (claim: string) =>
+  ABOUT_READING.test(claim) && DOUBTS.test(claim);
+
+/**
+ * Every fired reading leads the facts. The tool computed it from the workspace
+ * data, so it outranks a write-up fact that calls it unconfirmed, which is
+ * dropped; a reading the tool itself words as likely keeps that wording.
+ */
+export const withReadings = (
   readings: WidgetFindings["facts"] | undefined,
   findings: WidgetFindings | null
 ): WidgetFindings | null => {
   if (!(findings && readings?.length)) {
     return findings;
   }
-  const claims = new Set(findings.facts.map((fact) => fact.claim));
-  const added = readings.filter((reading) => {
-    const fresh = !claims.has(reading.claim);
-    claims.add(reading.claim);
-    return fresh;
-  });
+  const lead = [
+    ...new Map(readings.map((reading) => [reading.claim, reading])).values(),
+  ];
+  const claims = new Set(lead.map((reading) => reading.claim));
   return {
     ...findings,
     facts: [
-      ...findings.facts.slice(0, Math.max(0, FACTS_MAX - added.length)),
-      ...added,
+      ...lead,
+      ...findings.facts.filter(
+        (fact) => !(claims.has(fact.claim) || doubtsReading(fact.claim))
+      ),
     ].slice(0, FACTS_MAX),
   };
 };
