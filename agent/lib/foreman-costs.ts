@@ -497,8 +497,10 @@ const trend = (cost: number, average: number | null): string => {
     return `7-day avg ${usd(0)}`;
   }
   const pct = Math.round(((cost - average) / average) * 100);
-  const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "=";
-  return `${arrow} ${Math.abs(pct)}% vs ${COMPARISON_DAYS}-day avg ${usd(average)}`;
+  if (pct === 0) {
+    return `even with ${COMPARISON_DAYS}-day avg ${usd(average)}`;
+  }
+  return `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}% vs ${COMPARISON_DAYS}-day avg ${usd(average)}`;
 };
 
 const mrkdwn = (text: string) => ({ text, type: "mrkdwn" });

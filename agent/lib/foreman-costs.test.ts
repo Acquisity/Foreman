@@ -424,7 +424,8 @@ describe("cost message", () => {
     const json = JSON.stringify(blocks);
     const [header, total] = blocks as { text: { text: string } }[];
     assert.equal(header.text.text, "Foreman running costs · Sunday, Oct 11");
-    assert.match(total.text.text, /^\*\$7\.28\* .*partial/u);
+    assert.ok(total.text.text.startsWith("*$7.28* total"));
+    assert.ok(total.text.text.includes("partial"));
     assert.ok(json.includes("•  openai/gpt-5.6-sol   $4.18"));
     assert.ok(!json.includes("x/fourth"));
     assert.ok(
