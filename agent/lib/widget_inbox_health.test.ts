@@ -17,6 +17,7 @@ import definition, {
   NO_SENDING_ACCOUNT,
   readMailboxNotFound,
   readWidgetInboxHealth,
+  USER_OWNED_ACCOUNT,
   widgetInboxHealthInput,
   widgetInboxHealthOutput,
 } from "../tools/widget_inbox_health.js";
@@ -246,6 +247,8 @@ test("a user-managed connection reports saved facts but skips the live account c
     return;
   }
   assert.equal(result.connection?.accountType, "user_owned");
+  // wrun ...T9QSHV: the addresses live in that provider account, and closing Acquisity does not stop them.
+  assert.equal(result.reading, USER_OWNED_ACCOUNT);
   assert.equal(result.webhook?.registeredCount, 1);
   assert.equal(result.accounts.available, false);
   if (result.accounts.available === false) {

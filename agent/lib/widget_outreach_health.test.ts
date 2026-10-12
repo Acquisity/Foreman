@@ -445,7 +445,7 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
     newLeadsFirst: true,
     randomExtraMinutesMax: 5,
     reading:
-      "New leads come first and 12 leads have not had a first email yet, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.",
+      "New leads come first and 12 leads have not had a first email yet, so follow-ups wait until those leads get one, and pick up once the list has been contacted. At up to 40 new leads a day, that is about 1 more sending day. Acquisity sets these sending rules and they can't be changed in the product, so there is nothing for the customer to change. This is the likely reason follow-ups are low, not a certainty.",
   });
   // A Pro customer must never see the provider's name, even in authored text.
   assert.ok(!JSON.stringify(result).includes("Instantly"));

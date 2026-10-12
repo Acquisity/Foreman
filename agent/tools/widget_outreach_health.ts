@@ -762,8 +762,16 @@ export function readSendingRules(
     readings.push(startUp);
   }
   if (rules.newLeadsFirst && row.leadsNotPushedCount > 0) {
+    // Acquisity sets these rules (Aaron, 2026-10-12): explain when follow-ups
+    // start, never offer a change (wrun ...V4AYD asked a question instead).
+    const days = rules.maxNewLeadsPerDay
+      ? Math.ceil(row.leadsNotPushedCount / rules.maxNewLeadsPerDay)
+      : null;
+    const wait = days
+      ? ` At up to ${rules.maxNewLeadsPerDay} new leads a day, that is about ${days} more sending day${days === 1 ? "" : "s"}.`
+      : "";
     readings.push(
-      `New leads come first and ${row.leadsNotPushedCount} leads have not had a first email yet, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.`
+      `New leads come first and ${row.leadsNotPushedCount} leads have not had a first email yet, so follow-ups wait until those leads get one, and pick up once the list has been contacted.${wait} Acquisity sets these sending rules and they can't be changed in the product, so there is nothing for the customer to change. This is the likely reason follow-ups are low, not a certainty.`
     );
   }
   // ponytail: "new" is created in the last 14 days and "near" is 90% of the
