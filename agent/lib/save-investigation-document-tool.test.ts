@@ -75,6 +75,7 @@ describe("save_investigation_document tool", () => {
         requested = true;
         throw new Error("no");
       },
+      session: { auth: { current: null, initiator: null } },
     } as unknown as Context;
     const results = (await Promise.all(
       [

@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
-const { default: rootAgent } = await import("./agent.js");
+const { default: rootAgent, rootModelSlot } = await import("./agent.js");
 
 describe("root agent limits", () => {
   it("disables the default 40M per-session input budget and nothing else", () => {
@@ -12,6 +12,33 @@ describe("root agent limits", () => {
     // Approve/Stop card the channel cannot answer. Pin the exact object so no
     // other limit (output cap, session timeout) gets configured by accident.
     assert.deepEqual(rootAgent.limits, { maxInputTokensPerSession: false });
+  });
+});
+
+describe("root model slot", () => {
+  it("puts triage intake on Opus and leaves widget and other sessions alone", async () => {
+    const [{ MODELS }, { stampTriageIntake }, { WIDGET_SUPPORT_ISSUER }] =
+      await Promise.all([
+        import("./lib/models.js"),
+        import("./lib/trust.js"),
+        import("./lib/widget-scope.js"),
+      ]);
+    const auth = {
+      attributes: {},
+      authenticator: "slack",
+      issuer: "slack",
+      principalId: "U123",
+      principalType: "user",
+    } as unknown as Parameters<typeof rootModelSlot>[0] & object;
+    const triage = rootModelSlot(stampTriageIntake(auth));
+    assert.equal(triage, "triage");
+    assert.equal(MODELS[triage], "anthropic/claude-opus-5.5");
+    assert.equal(rootModelSlot(auth), "orchestrator");
+    assert.equal(rootModelSlot(null), "orchestrator");
+    assert.equal(
+      rootModelSlot({ ...auth, issuer: WIDGET_SUPPORT_ISSUER }),
+      "widget"
+    );
   });
 });
 

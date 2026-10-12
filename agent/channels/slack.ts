@@ -16,6 +16,7 @@ import {
   admitsSlackMention,
   FINAL_SLACK_POST_RULE,
   QUESTIONS_ONLY_CHANNELS,
+  RECEIVER_ONLY_CHANNELS,
   slackAttachmentContext,
   slackIntakeContext,
 } from "../lib/slack-intake.js";
@@ -35,7 +36,7 @@ import {
   postStopConfirmation,
   stopSlackSession,
 } from "../lib/slack-stop.js";
-import { isIntakeOnly } from "../lib/trust.js";
+import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -147,12 +148,17 @@ export const dispatch = async (
   const questionsOnly = QUESTIONS_ONLY_CHANNELS.has(message.channelId);
   const intakeOnly =
     questionsOnly || SLACK_INTAKE_ONLY_CHANNELS.has(message.channelId);
-  const stamped = slackSessionAuth(auth, {
+  const sessionAuth = slackSessionAuth(auth, {
     intakeOnly,
     questionsOnly,
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,
   });
+  // The receiver's mention in a triage intake channel runs on the triage
+  // models (ENG-15226); admitsSlackMention already kept everyone else out.
+  const stamped = RECEIVER_ONLY_CHANNELS.has(message.channelId)
+    ? stampTriageIntake(sessionAuth)
+    : sessionAuth;
   // One line naming any attached files, because eve stages them in the
   // sandbox without telling the text-only chat model that they exist. Only
   // the triggering message is read here: eve's own thread lookback, which

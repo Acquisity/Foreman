@@ -79,7 +79,7 @@ export const SLACK_INTAKE_WORKFLOWS: Readonly<
  * Linear rejects a delegation. A person tagging Foreman would start a second,
  * independent investigation, so that mention is ignored.
  */
-const RECEIVER_ONLY_CHANNELS: ReadonlySet<string> = new Set([
+export const RECEIVER_ONLY_CHANNELS: ReadonlySet<string> = new Set([
   "C0BBPVC3N2X",
   "C0BC011NAQL",
 ]);

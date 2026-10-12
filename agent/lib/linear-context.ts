@@ -1,4 +1,5 @@
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
+import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
 
 // Kept in its own module so linear-context.test.ts can import it without
 // pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
@@ -22,6 +23,24 @@ export const askFromName = (titles: readonly string[]): string | null => {
   }
   return null;
 };
+
+// A Slack permalink's channel id. Anchored and bounded: the URL comes from the ticket.
+const SLACK_ARCHIVE =
+  /^https:\/\/[a-z0-9-]{1,63}\.slack\.com\/archives\/([A-Z0-9]{1,20})\//u;
+
+/**
+ * Whether an 'Ask from' attachment links a thread in a triage intake channel
+ * (feedback, refunds), which puts the session on the triage models (ENG-15226).
+ */
+export const isTriageIntakeAsk = (
+  attachments: readonly { title: string; url: string }[]
+): boolean =>
+  attachments.some(
+    ({ title, url }) =>
+      ASK_FROM.test(title.trim()) &&
+      url.length <= 2048 &&
+      RECEIVER_ONLY_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
+  );
 
 /**
  * @param route - Replaces the triage line for a session whose issue has its
