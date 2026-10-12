@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
+import { ExecutorError } from "./executor/transport.js";
 import {
   COMPARISON_DAYS,
   costWindow,
   FOREMAN_PROJECT_ID,
+  failureReason,
   NOT_TRACKED,
   readVercelCharges,
+  renderCostCard,
   renderCostReport,
   summarizeGatewaySpend,
   summarizeVercelCharges,
@@ -392,5 +395,76 @@ describe("cost tool error boundary", () => {
         process.env.EXECUTOR_MCP_CONNECTOR = previousConnector;
       }
     }
+  });
+});
+
+describe("cost card", () => {
+  const report = {
+    credits: { balance: 550.42 },
+    gateway: {
+      averageCost: 146.09,
+      cost: 7.28,
+      lines: [
+        { cost: 4.18, name: "openai/gpt-5.6-sol" },
+        { cost: 1.24, name: "deepseek/deepseek-v4.1-flash" },
+        { cost: 0.88, name: "google/gemini-3.5-flash-lite" },
+        { cost: 0.5, name: "x/fourth" },
+      ],
+    },
+    reportDay: "2026-10-11",
+    vercel: { error: "operation_not_bound" },
+  };
+
+  it("posts an Item Work Object whose display order covers every field", () => {
+    const { metadata, text } = renderCostCard(report);
+    assert.equal(
+      text,
+      "Foreman running costs for 2026-10-11: $7.28 (7-day avg $146.09, -95%)"
+    );
+    const [entity] = (metadata as { entities: Record<string, any>[] }).entities;
+    assert.equal(entity.entity_type, "slack#/entities/item");
+    assert.deepEqual(entity.external_ref, {
+      id: "foreman-costs-2026-10-11",
+      type: "cost_report",
+    });
+    assert.equal(
+      entity.entity_payload.attributes.title.text,
+      "Foreman running costs, 2026-10-11 (USD)"
+    );
+    const fields = entity.entity_payload.custom_fields as {
+      key: string;
+      label: string;
+      value: unknown;
+    }[];
+    assert.deepEqual(
+      entity.entity_payload.display_order,
+      fields.map(({ key }) => key)
+    );
+    assert.ok(
+      fields.every(({ value }) => typeof value === "string" && value.length > 0)
+    );
+    const fieldValue = (key: string) =>
+      fields.find((field) => field.key === key)?.value;
+    assert.equal(
+      fieldValue("ai_gateway_top"),
+      "openai/gpt-5.6-sol $4.18 · deepseek/deepseek-v4.1-flash $1.24 · google/gemini-3.5-flash-lite $0.88"
+    );
+    assert.equal(fieldValue("vercel"), "Unavailable: operation_not_bound");
+    assert.equal(fieldValue("vercel_top"), undefined);
+    assert.equal(fields[0].label, "Total (partial)");
+  });
+
+  it("reports an Executor code as the failure reason", () => {
+    assert.equal(
+      failureReason(new ExecutorError("operation_not_bound"), "fallback"),
+      "operation_not_bound"
+    );
+    assert.equal(
+      failureReason(
+        new Error("x", { cause: new ExecutorError("executor_not_configured") }),
+        "fallback"
+      ),
+      "executor_not_configured"
+    );
   });
 });
