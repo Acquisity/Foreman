@@ -453,14 +453,11 @@ test("a reply that repeats the previous one fails, ignoring case, spacing and pu
   );
 });
 
-test("a handoff is the human lane, a reply held for a person, or a filed ticket", () => {
-  assert.equal(handedOff("human", null, []), true);
-  assert.equal(handedOff("investigate", "needs_human", []), true);
-  assert.equal(handedOff("investigate", "allow", ["widget_file_ticket"]), true);
-  assert.equal(
-    handedOff("investigate", "allow", ["widget_inbox_health"]),
-    false
-  );
+test("a handoff is the human lane or a reply held for a person, never a filed ticket", () => {
+  assert.equal(handedOff("human", null), true);
+  assert.equal(handedOff("investigate", "needs_human"), true);
+  // A ticket filed with the reply allowed is not a person taking over.
+  assert.equal(handedOff("investigate", "allow"), false);
 });
 
 test("leak scan owns the domain of an address in the evidence and what the customer wrote", () => {

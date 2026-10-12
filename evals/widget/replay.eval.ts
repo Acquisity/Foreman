@@ -238,7 +238,7 @@ async function gradeReplay(
       budgetHit: tools.length >= MAX_WIDGET_TOOL_CALLS,
       // The gate's reason names the items a rewrite removed, e.g. jev:remove_items:2,3.
       gateReason: run.outcome?.reason ?? null,
-      handedOff: handedOff(lane, run.outcome?.reason ?? null, tools),
+      handedOff: handedOff(lane, run.outcome?.reason ?? null),
       toolCalls: tools.length,
       ...replyTimes,
       ...usageRow(events),

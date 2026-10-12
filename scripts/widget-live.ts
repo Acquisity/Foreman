@@ -536,7 +536,7 @@ async function scoreCase(snapshot: LiveSnapshot) {
     citations,
     finalReplyMs,
     firstReplyMs,
-    handedOff: handedOff(answeredLane(run), run.outcome?.reason ?? null, tools),
+    handedOff: handedOff(answeredLane(run), run.outcome?.reason ?? null),
     leaks: leaks(message, raw).length ? "fail" : "pass",
     rawFields: rawFields(message).length ? "fail" : "pass",
     scored: true,
@@ -602,7 +602,7 @@ function judgeCase(
     handedOff:
       snapshot.reason === undefined
         ? undefined
-        : handedOff("investigate", snapshot.reason, productionTools),
+        : handedOff("investigate", snapshot.reason),
     leaks: leaks(snapshot.reply, productionRaw).length ? "fail" : "pass",
     rawFields: rawFields(snapshot.reply).length ? "fail" : "pass",
     scored: true,

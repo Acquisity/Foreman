@@ -16,7 +16,7 @@ import { widgetAuth } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const FAILED_STEP_RULE =
-  /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and set needsHuman true/;
+  /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and file it with widget_file_ticket/;
 const NEXT_STEP_RULE =
   /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
 const STATED_FINDING_RULE =
@@ -44,7 +44,7 @@ test("both lanes forbid unbacked reasons for missing data, invented services and
   }
 });
 
-test("a failed documented step is reported and handed to a person, never repeated", () => {
+test("a failed documented step is reported and filed as a ticket, never repeated", () => {
   assert.match(widgetInstructions(widgetAuth(scope)), FAILED_STEP_RULE);
 });
 

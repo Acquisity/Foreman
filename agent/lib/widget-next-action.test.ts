@@ -159,6 +159,11 @@ const RE_7 = /could not be checked/;
 const RE_8 = /not a reason for a person/;
 const RE_9 = /A person should take over/;
 const RE_10 = /Stop gathering/;
+const RE_TICKET_NOTE = /Call widget_file_ticket once now/;
+const RE_ONLY_EXPLICIT =
+  /^The customer explicitly asked to talk to a person\. A billing dispute/;
+const RE_DUPLICATE = /duplicate charge/;
+const RE_DISPUTE = /disputes a charge/;
 
 /** Every step lists the same tools, the allowlisted ones, in order. */
 const LISTED = TOOLS.map((tool) => tool.name).filter(
@@ -523,10 +528,100 @@ describe("widget next-action selector", () => {
     assert.equal(menu.includes("widget_outreach_health"), true);
     assert.equal(
       menu.some(
-        (key) => key.includes("help_article") || key.includes("ticket")
+        (key) => key.includes("help_article") || key === "widget_file_ticket"
       ),
       false
     );
+    // Filing is its own choice, never a read.
+    assert.equal(menu.includes("ticket"), true);
+  });
+
+  it("a ticket pick forces widget_file_ticket on the investigator, then the write-up", async () => {
+    const { base, model, sent } = harness(
+      jev("ticket", 0),
+      call("widget_file_ticket", { summary: "s", title: "t" }),
+      text("findings")
+    );
+    const reconnects = [
+      {
+        input: {},
+        output: { reconnects: "all 3 failed", status: "error" },
+        tool: "widget_inbox_health",
+      },
+    ];
+    const out = await model.doGenerate({
+      prompt: prompt(
+        "I reconnected my inbox three times and it still fails.",
+        reconnects
+      ),
+      tools: TOOLS,
+    });
+    assert.deepEqual(sent().toolChoice, forced("widget_file_ticket"));
+    assert.match(sent().note, RE_TICKET_NOTE);
+    assert.equal(out.content[0]?.type, "tool-call");
+    // The ticket result leads to the findings, never to another selector pick or ticket.
+    const after = harness(jev("ticket", 0), text("findings"));
+    await after.model.doGenerate({
+      prompt: prompt("I reconnected my inbox three times and it still fails.", [
+        ...reconnects,
+        {
+          input: { summary: "s", title: "t" },
+          output: { identifier: "ENG-1", url: "u" },
+          tool: "widget_file_ticket",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(after.sent().toolChoice, undefined);
+    assert.match(after.sent().note, RE_10);
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.equal(after.base.doGenerateCalls.length, 1);
+  });
+
+  it("a ticket already filed this turn takes the ticket choice off the menu", async () => {
+    const seen: { questions?: { action?: { criteria?: object } } }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("It still fails.", [
+        { input: {}, output: { status: "error" }, tool: "widget_inbox_health" },
+        {
+          input: {},
+          output: { identifier: "ENG-1", url: "u" },
+          tool: "widget_file_ticket",
+        },
+        {
+          input: {},
+          output: { status: "error" },
+          tool: "widget_outreach_health",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    const menu = Object.keys(seen[0].questions?.action?.criteria ?? {});
+    assert.equal(menu.includes("ticket"), false);
+  });
+
+  it("a billing dispute is a ticket, not a person: the handoff rule names only an explicit ask", async () => {
+    const seen: {
+      questions?: Record<
+        string,
+        { instructions?: string; criteria?: Record<string, string> }
+      >;
+    }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("I was charged twice for the same inbox order.", [
+        { input: {}, output: { charges: 2 }, tool: "widget_billing_summary" },
+      ]),
+      tools: TOOLS,
+    });
+    const { action, handoff_eligible } = seen[0].questions as {
+      action: { criteria: Record<string, string> };
+      handoff_eligible: { instructions: string };
+    };
+    assert.match(handoff_eligible.instructions, RE_ONLY_EXPLICIT);
+    assert.doesNotMatch(action.criteria.human, RE_DUPLICATE);
+    assert.match(action.criteria.ticket, RE_DISPUTE);
   });
 
   it("the selector reads each tool's whole description, caveats included", async () => {
@@ -795,11 +890,8 @@ describe("widget next-action selector", () => {
     assert.equal(sent().toolChoice, undefined);
   });
 
-  it("a human pick stands for an explicit request and for a complex billing dispute", async () => {
-    for (const question of [
-      "Please connect me with a person.",
-      "I was charged twice for the same inbox order across my workspaces.",
-    ]) {
+  it("a human pick stands for an explicit request for a person", async () => {
+    for (const question of ["Please connect me with a person."]) {
       const { base, model, sent } = harness(
         jev("human", 0.9),
         call("widget_billing_summary", {}),

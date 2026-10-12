@@ -199,11 +199,13 @@ test("an explicit request for a person still hands off with its findings", async
   assert.equal((response.findings as { facts: unknown[] }).facts.length, 2);
 });
 
-test("a complex billing dispute hands off and the unconfirmed attribution survives in the teammate findings", async (t) => {
+test("a billing dispute with no ask for a person is answered, not handed off, and the unconfirmed attribution survives", async (t) => {
   const claim =
     "An order for 18 inboxes exists and 6 inboxes were created. Which charge paid for that order could not be confirmed.";
-  const { response } = await finish(t, {
-    eligible: 0.9,
+  // Aaron, 2026-10-12: a billing dispute is a billing ticket, and a person
+  // takes over only on an explicit ask, so eligibility reads it as no.
+  const { asked, response } = await finish(t, {
+    eligible: 0.1,
     extracted: {
       facts: [{ claim }],
       needsHuman: true,
@@ -213,7 +215,8 @@ test("a complex billing dispute hands off and the unconfirmed attribution surviv
     },
     question: "I paid for 18 inboxes and only got 6.",
   });
-  assert.equal(acquisityHandsOff(response), true);
+  assert.equal(asked.length, 1);
+  assert.equal(acquisityHandsOff(response), false);
   assert.ok("findings" in response);
   const stored = response.findings as {
     facts: { claim: string }[];

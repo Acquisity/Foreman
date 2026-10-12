@@ -667,8 +667,9 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   };
   const noAnswer = ({ record, row }: ScoredReplay) =>
     !record && row.answer === null;
+  // A ticket is not a handoff: only a person taking over the conversation is.
   const handoffExpected = ({ expectations }: WidgetCase) =>
-    expectations.lane === "human" || expectations.fileTicket === true;
+    expectations.lane === "human";
   const missingCoverage = scored.filter((replay) => {
     if (noAnswer(replay)) {
       return false;

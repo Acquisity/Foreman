@@ -176,13 +176,14 @@ const live = (needsHuman?: boolean, runId = RUN, labels: CauseLabels = {}) =>
 
 const CORRECT_REPLY_CLAIM =
   /the main thing support says they needed \(Names the sending rules[^)]*\)\. Missing a secondary detail is fine/;
-const REFUND_NOT_A_HANDOFF = /refund request on its own.*not this/;
+const REFUND_NOT_A_HANDOFF =
+  /refund request or billing dispute is filed to billing.*a ticket is not a person/;
 const OLD_TEAM_FIX = /needs the Acquisity team/;
 const YES_MEANS_PERSON_NEEDED =
   /^A person is needed for this conversation\. .*Answer yes only when/s;
 
 test("the live handoff criterion is the product's own handoff rule", () => {
-  // Aaron, 2026-10-10: a person only on an explicit ask or a concrete billing dispute.
+  // Aaron, 2026-10-12: a person only on an explicit ask; a billing dispute is a ticket.
   assert.ok(NEEDS_HUMAN.text.includes(ELIGIBLE_INSTRUCTIONS));
   assert.match(NEEDS_HUMAN.text, REFUND_NOT_A_HANDOFF);
   assert.doesNotMatch(NEEDS_HUMAN.text, OLD_TEAM_FIX);
