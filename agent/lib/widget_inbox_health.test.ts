@@ -14,6 +14,7 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetInboxHealthQuery,
+  NO_SENDING_ACCOUNT,
   readMailboxNotFound,
   readWidgetInboxHealth,
   widgetInboxHealthInput,
@@ -173,6 +174,8 @@ test("no connection is reported distinctly from an unreadable connection", async
   if (result.accounts.available === false) {
     assert.match(result.accounts.reason, NO_CONNECTION);
   }
+  // No sending account at all means the Cold Email Agent is off (no paid plan).
+  assert.equal(result.reading, NO_SENDING_ACCOUNT);
 });
 
 test("recent failed reconnect attempts reach the result without OAuth secrets", async (t) => {
