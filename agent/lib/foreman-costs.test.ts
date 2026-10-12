@@ -9,7 +9,7 @@ import {
   failureReason,
   NOT_TRACKED,
   readVercelCharges,
-  renderCostCard,
+  renderCostBlocks,
   renderCostReport,
   summarizeGatewaySpend,
   summarizeVercelCharges,
@@ -398,7 +398,7 @@ describe("cost tool error boundary", () => {
   });
 });
 
-describe("cost card", () => {
+describe("cost message", () => {
   const report = {
     credits: { balance: 550.42 },
     gateway: {
@@ -415,43 +415,22 @@ describe("cost card", () => {
     vercel: { error: "operation_not_bound" },
   };
 
-  it("posts an Item Work Object whose display order covers every field", () => {
-    const { metadata, text } = renderCostCard(report);
+  it("renders Block Kit with a header, partial total, and unavailable source", () => {
+    const { blocks, text } = renderCostBlocks(report);
     assert.equal(
       text,
-      "Foreman running costs for 2026-10-11: $7.28 (7-day avg $146.09, -95%)"
+      "Foreman running costs for 2026-10-11: $7.28 (▼ 95% vs 7-day avg $146.09)"
     );
-    const [entity] = (metadata as { entities: Record<string, any>[] }).entities;
-    assert.equal(entity.entity_type, "slack#/entities/item");
-    assert.deepEqual(entity.external_ref, {
-      id: "foreman-costs-2026-10-11",
-      type: "cost_report",
-    });
-    assert.equal(
-      entity.entity_payload.attributes.title.text,
-      "Foreman running costs, 2026-10-11 (USD)"
-    );
-    const fields = entity.entity_payload.custom_fields as {
-      key: string;
-      label: string;
-      value: unknown;
-    }[];
-    assert.deepEqual(
-      entity.entity_payload.display_order,
-      fields.map(({ key }) => key)
-    );
+    const json = JSON.stringify(blocks);
+    const [header, total] = blocks as { text: { text: string } }[];
+    assert.equal(header.text.text, "Foreman running costs · Sunday, Oct 11");
+    assert.match(total.text.text, /^\*\$7\.28\* .*partial/u);
+    assert.ok(json.includes("•  openai/gpt-5.6-sol   $4.18"));
+    assert.ok(!json.includes("x/fourth"));
     assert.ok(
-      fields.every(({ value }) => typeof value === "string" && value.length > 0)
+      json.includes("*Vercel platform*   unavailable\\n_operation_not_bound_")
     );
-    const fieldValue = (key: string) =>
-      fields.find((field) => field.key === key)?.value;
-    assert.equal(
-      fieldValue("ai_gateway_top"),
-      "openai/gpt-5.6-sol $4.18 · deepseek/deepseek-v4.1-flash $1.24 · google/gemini-3.5-flash-lite $0.88"
-    );
-    assert.equal(fieldValue("vercel"), "Unavailable: operation_not_bound");
-    assert.equal(fieldValue("vercel_top"), undefined);
-    assert.equal(fields[0].label, "Total (partial)");
+    assert.ok(json.includes("Not tracked: Neon"));
   });
 
   it("reports an Executor code as the failure reason", () => {

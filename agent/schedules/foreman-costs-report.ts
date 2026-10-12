@@ -4,7 +4,7 @@ import { resolveSlackBotToken } from "eve/channels/slack";
 import { defineSchedule } from "eve/schedules";
 import { executorClient } from "../lib/executor/client.js";
 import { ExecutorError } from "../lib/executor/transport.js";
-import { readCostReport, renderCostCard } from "../lib/foreman-costs.js";
+import { readCostReport, renderCostBlocks } from "../lib/foreman-costs.js";
 
 /** The override exists only so the Preview bot can post into its sandbox channel for UAT. */
 const FOREMAN_COSTS_CHANNEL =
@@ -13,7 +13,7 @@ const FOREMAN_COSTS_CHANNEL =
 /** Bounds every read; the Vercel reads take up to 50 s each under Executor. */
 const REPORT_TIMEOUT_MS = 120_000;
 
-/** Reads the report under the app principal and posts the card, with no model turn. */
+/** Reads the report under the app principal and posts the message, with no model turn. */
 const postCostReport = async (): Promise<void> => {
   const signal = AbortSignal.timeout(REPORT_TIMEOUT_MS);
   const report = await readCostReport(
@@ -31,7 +31,7 @@ const postCostReport = async (): Promise<void> => {
     }),
     signal
   );
-  const { metadata, text } = renderCostCard(report);
+  const { blocks, text } = renderCostBlocks(report);
   const token = await resolveSlackBotToken(
     connectSlackCredentials(
       process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
@@ -39,8 +39,8 @@ const postCostReport = async (): Promise<void> => {
   );
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     body: new URLSearchParams({
+      blocks: JSON.stringify(blocks),
       channel: FOREMAN_COSTS_CHANNEL,
-      metadata: JSON.stringify(metadata),
       text,
       unfurl_links: "false",
       unfurl_media: "false",

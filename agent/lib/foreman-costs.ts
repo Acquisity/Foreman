@@ -473,84 +473,106 @@ export const renderCostReport = (report: CostReport): string => {
   ].join("\n");
 };
 
-/** Lines named on the card per source. */
-const CARD_LINES = 3;
+/** Lines named per source in the Slack message. */
+const SLACK_LINES = 3;
 
-/** Where the card links: the team's Vercel usage page. */
+/** Where the message links: the team's Vercel usage page. */
 const USAGE_URL = "https://vercel.com/acquisity/~/usage";
 
-interface CardField {
-  key: string;
-  label: string;
-  type: "string";
-  value: string;
-}
+/** "Sunday, Oct 11" for a YYYY-MM-DD report day. */
+const longDay = (day: string): string =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    weekday: "long",
+  });
+
+/** "▲ 27% vs 7-day avg $11.47", or a note when there is no comparison. */
+const trend = (cost: number, average: number | null): string => {
+  if (average === null) {
+    return "no 7-day comparison yet";
+  }
+  if (average === 0) {
+    return `7-day avg ${usd(0)}`;
+  }
+  const pct = Math.round(((cost - average) / average) * 100);
+  const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "=";
+  return `${arrow} ${Math.abs(pct)}% vs ${COMPARISON_DAYS}-day avg ${usd(average)}`;
+};
+
+const mrkdwn = (text: string) => ({ text, type: "mrkdwn" });
+
+/** One section per source: figure and trend, then its top lines. */
+const sourceBlock = (label: string, summary: Source, reportDay: string) => {
+  if (!isPriced(summary)) {
+    return {
+      text: mrkdwn(
+        `*${label}*   unavailable\n_${unavailable(summary, reportDay)}_`
+      ),
+      type: "section",
+    };
+  }
+  const lines = summary.lines
+    .filter(({ name }) => name !== "other")
+    .slice(0, SLACK_LINES)
+    .map(({ name, cost }) => `•  ${name}   ${usd(cost)}`);
+  return {
+    text: mrkdwn(
+      [
+        `*${label}*   ${usd(summary.cost)}   _${trend(summary.cost, summary.averageCost)}_`,
+        ...lines,
+      ].join("\n")
+    ),
+    type: "section",
+  };
+};
 
 /**
- * The daily Slack message: a headline plus a Work Object card (entity type
- * Item). Slack has no currency or decimal type, so every value is a string.
- * Message metadata is visible workspace-wide; it carries only these figures.
+ * The daily Slack message as Block Kit: a header, the day's total, one
+ * section per source, credits, and a footer naming what is not tracked.
+ * `text` is the notification and accessibility fallback.
  */
-export const renderCostCard = (
+export const renderCostBlocks = (
   report: CostReport
-): { metadata: unknown; text: string } => {
-  const sum = total(report);
-  const fields: CardField[] = [];
-  const add = (key: string, label: string, value: string) =>
-    fields.push({ key, label, type: "string", value });
-  add(
-    "total",
-    sum?.partial ? "Total (partial)" : "Total",
-    sum ? sum.value : "Unavailable"
-  );
-  const source = (
-    key: string,
-    label: string,
-    linesLabel: string,
-    summary: Source
-  ) => {
-    if (!isPriced(summary)) {
-      add(key, label, `Unavailable: ${unavailable(summary, report.reportDay)}`);
-      return;
-    }
-    add(key, label, sourceCost(summary));
-    const top = summary.lines.filter(({ name }) => name !== "other");
-    if (top.length > 0) {
-      add(`${key}_top`, linesLabel, lineList(top.slice(0, CARD_LINES)));
-    }
-  };
-  source("ai_gateway", "AI Gateway", "Top models", report.gateway);
-  source("vercel", "Vercel platform", "Top Vercel services", report.vercel);
-  add(
-    "credits",
-    "Credits left",
+): { blocks: unknown[]; text: string } => {
+  const parts = [report.gateway, report.vercel].filter(isPriced);
+  const sum = parts.reduce((acc, { cost }) => acc + cost, 0);
+  const averages = parts.map(({ averageCost }) => averageCost);
+  const average = averages.includes(null)
+    ? null
+    : averages.reduce<number>((acc, value) => acc + (value ?? 0), 0);
+  const headline =
+    parts.length === 0
+      ? "*Total unavailable*"
+      : `*${usd(sum)}* total   ${trend(sum, average)}${parts.length === 1 ? "   (partial: one source unavailable)" : ""}`;
+  const credits =
     "error" in report.credits
-      ? `Unavailable: ${report.credits.error}`
-      : creditsLeft(report, report.credits.balance)
-  );
-  add("not_tracked", "Not tracked", UNTRACKED);
+      ? `*AI Gateway credits*   unavailable\n_${report.credits.error}_`
+      : `*AI Gateway credits*   ${creditsLeft(report, report.credits.balance)}`;
   return {
-    metadata: {
-      entities: [
-        {
-          entity_payload: {
-            attributes: {
-              title: {
-                text: `Foreman running costs, ${report.reportDay} (USD)`,
-              },
-            },
-            custom_fields: fields,
-            display_order: fields.map(({ key }) => key),
-          },
-          entity_type: "slack#/entities/item",
-          external_ref: {
-            id: `foreman-costs-${report.reportDay}`,
-            type: "cost_report",
-          },
-          url: USAGE_URL,
+    blocks: [
+      {
+        text: {
+          text: `Foreman running costs · ${longDay(report.reportDay)}`,
+          type: "plain_text",
         },
-      ],
-    },
-    text: `Foreman running costs for ${report.reportDay}: ${sum ? sum.value : "unavailable"}`,
+        type: "header",
+      },
+      { text: mrkdwn(headline), type: "section" },
+      { type: "divider" },
+      sourceBlock("AI Gateway", report.gateway, report.reportDay),
+      sourceBlock("Vercel platform", report.vercel, report.reportDay),
+      { text: mrkdwn(credits), type: "section" },
+      {
+        elements: [
+          mrkdwn(
+            `${report.reportDay} (USD)  ·  Not tracked: ${UNTRACKED}  ·  <${USAGE_URL}|Vercel usage>`
+          ),
+        ],
+        type: "context",
+      },
+    ],
+    text: `Foreman running costs for ${report.reportDay}: ${parts.length === 0 ? "unavailable" : `${usd(sum)} (${trend(sum, average)})`}`,
   };
 };
