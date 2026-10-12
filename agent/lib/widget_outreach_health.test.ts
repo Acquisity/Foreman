@@ -3,8 +3,6 @@ import { after, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
-import { verifiedFinContext } from "#lib/fin-investigation.fixture.js";
-import { finInvestigationAuth } from "#lib/fin-investigation-auth.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
@@ -107,17 +105,16 @@ test("tool is exposed only for the widget support initiator", async () => {
   assert.ok(resolve);
   assert.ok(await resolve({} as never, ctx as never));
   const results = await Promise.all(
-    [null, { issuer: "slack" }, finInvestigationAuth(verifiedFinContext)].map(
-      (initiator) =>
-        resolve(
-          {} as never,
-          {
-            session: { auth: { current: widgetAuth(scope), initiator } },
-          } as never
-        )
+    [null, { issuer: "slack" }].map((initiator) =>
+      resolve(
+        {} as never,
+        {
+          session: { auth: { current: widgetAuth(scope), initiator } },
+        } as never
+      )
     )
   );
-  assert.deepEqual(results, [null, null, null]);
+  assert.deepEqual(results, [null, null]);
 });
 
 test("inputs accept an owned campaign ID or page cursor, never SQL or workspace selectors", () => {
@@ -346,7 +343,7 @@ test("non-widget sessions are refused before any dispatch", async (t) => {
         session: {
           auth: {
             current: null,
-            initiator: finInvestigationAuth(verifiedFinContext),
+            initiator: { attributes: {}, issuer: "slack" },
           },
         },
       } as unknown as ProviderContext,

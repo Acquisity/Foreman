@@ -127,25 +127,6 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 `agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.
 
-## Fin identity verification
-
-`agent/lib/fin-context.ts` bounds native Intercom conversation/contact reads and the Acquisity context request with a composed 50-second abort signal. App responses reject redirects and are bounded to 4 KiB while streaming, including cancellation during body consumption. The fixed reads in `agent/lib/executor/dispatch.ts` reuse the existing Executor transport and shared toolkit. Vercel Connect `getToken` exposes no cancellation option; credential resolution retains the existing Connect exemption, with the signal checked before and after resolution. No customer token or provider error is logged. This route starts no model, callback or Slack delivery.
-
-## Fin customer investigation delivery
-
-`readFinEvidence` in `agent/lib/executor/dispatch.ts` uses the existing shared Executor transport with a 50-second deadline, caller cancellation and a 128 KiB response cap. It accepts only fixed outreach read purposes and validated local UUIDs, constructs its own SQL, and checks active owner/admin membership in the same statement as the evidence. Credentials retain the existing Vercel Connect exemption. No raw provider response or failure body is returned to the model.
-
-`agent/lib/fin-investigation-callback.ts` posts only a generic ready signal to an allowlisted Intercom Procedure callback URL. The signal contains no findings or run reference; the receiving Procedure must authenticate a result lookup with its own saved reference and native conversation. The request rejects redirects and has a five-second deadline. `agent/lib/fin-investigation-slack.ts` posts and updates one receipt in the configured internal channel with a five-second HTTP deadline; Slack token resolution retains the Vercel Connect exemption above. These delivery calls carry no customer token, workspace identifier, provider result or tool output.
-
-## Fin run ownership additions (ENG-13766)
-
-| Call | Bound | Reason |
-| --- | --- | --- |
-| `fin-run-store.ts` operational run reads/writes | 15 seconds per private Postgres operation via `privateDatabase` | Atomic start ownership and immutable saved result; failure must not dispatch replacement work. |
-| `fin-delivery.ts` native conversation/contact reads | Shared 50-second AbortSignal plus existing Executor transport bounds | Recheck original destination and public human replies; failure suppresses customer delivery. |
-| Result recovery event stream | Eight-second observation bound | Reads the exact existing session only; cancellation closes the reader, never the investigation. |
-`receiveFinInvestigation` runs late identity and delivery checks concurrently with a shared five-second abort signal and response race. The race also bounds response waiting if credential resolution ignores cancellation; it never authorizes disclosure on timeout. Initial checks retain their existing deadlines.
-
 Widget progress writes use the same private-DB transport with a 1.5-second deadline. Progress storage failure never blocks the investigation result.
 
 ## Local widget live harness (ENG-15026)

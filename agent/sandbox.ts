@@ -4,7 +4,6 @@ import {
 } from "@agent-browser/eve/sandbox";
 import { defineSandbox, type SandboxBootstrapContext } from "eve/sandbox";
 import { vercel } from "eve/sandbox/vercel";
-import { isFinInvestigation } from "#lib/fin-investigation-auth.js";
 import { warmSnapshotRevalidationKey } from "#lib/repository-warmup.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
 import { isWidgetSupport } from "#lib/widget-scope.js";
@@ -60,9 +59,9 @@ const backend = snapshotId
   : vercel({ resources: { vcpus: 2 } });
 
 export const sandboxSessionOptions = (
-  initiator: Parameters<typeof isFinInvestigation>[0]
+  initiator: Parameters<typeof isWidgetSupport>[0]
 ) =>
-  isFinInvestigation(initiator) || isWidgetSupport(initiator)
+  isWidgetSupport(initiator)
     ? { networkPolicy: "deny-all" as const }
     : undefined;
 

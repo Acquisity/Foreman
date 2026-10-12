@@ -1,6 +1,4 @@
 import { defineAgent, defineDynamic } from "eve";
-import { isFinInvestigation } from "./lib/fin-investigation-auth.js";
-import { finInvestigationModel } from "./lib/fin-investigation-model.js";
 import { fastCallOptions, gatewayRouting, resolveModel } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 import { widgetInvestigationModel } from "./lib/widget-investigation-model.js";
@@ -14,9 +12,6 @@ function investigationModel(
 ) {
   if (isWidgetSupport(auth)) {
     return widgetInvestigationModel(id, sessionId, stepsId);
-  }
-  if (isFinInvestigation(auth)) {
-    return finInvestigationModel(id);
   }
   return ticketLinkedModel(id);
 }
