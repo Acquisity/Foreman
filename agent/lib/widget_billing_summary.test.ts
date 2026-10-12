@@ -80,11 +80,10 @@ const creditWindow = {
   to: "2026-09-22T00:00:00Z",
 };
 
-test("credit windows reject injection, reversed dates, and unbounded periods", () => {
+test("credit windows reject injection and reversed dates", () => {
   for (const window of [
     { from: "2026-08-22'", to: creditWindow.to },
     { from: creditWindow.to, to: creditWindow.from },
-    { from: "2025-01-01T00:00:00Z", to: creditWindow.to },
   ]) {
     assert.equal(
       widgetBillingSummaryInputSchema.safeParse({ creditWindow: window })
@@ -313,6 +312,58 @@ test("requested history is scoped, separate from lifetime totals, and unavailabl
     { creditWindow }
   );
   assert.equal(denied.available, false);
+});
+
+test("a window longer than 93 days is shortened to the 93 days ending at its end, and the result says so", async () => {
+  const seen: unknown[] = [];
+  const requested = {
+    from: "2026-07-01T00:00:00Z",
+    to: "2026-10-10T00:00:00Z",
+  };
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: (_organizationId, window) => {
+        seen.push(window);
+        return Promise.resolve({
+          available: true,
+          completedManualGrants: [],
+          transactionTotals: [],
+          truncated: false,
+          window,
+        });
+      },
+    }),
+    { creditWindow: requested }
+  );
+  const covered = { from: "2026-07-09T00:00:00.000Z", to: requested.to };
+  assert.deepEqual(seen, [covered]);
+  assert.deepEqual(result.creditHistory?.window, covered);
+  assert.ok(
+    result.reconciliation.notes.includes(
+      "The credit window asked for (2026-07-01T00:00:00Z to 2026-10-10T00:00:00Z) is longer than 93 days, so it was shortened to the 93 days from 2026-07-09T00:00:00.000Z to 2026-10-10T00:00:00Z. Credit activity before 2026-07-09T00:00:00.000Z is not covered."
+    )
+  );
+  // A window within 93 days is read as asked, with no note.
+  const exact = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: (_organizationId, window) =>
+        Promise.resolve({
+          available: true,
+          completedManualGrants: [],
+          transactionTotals: [],
+          truncated: false,
+          window,
+        }),
+    }),
+    { creditWindow }
+  );
+  assert.deepEqual(exact.creditHistory?.window, creditWindow);
+  assert.equal(
+    exact.reconciliation.notes.some((entry) => entry.includes("shortened")),
+    false
+  );
 });
 
 test("missing Autumn Stripe identity does not trigger a guessed customer lookup", async () => {

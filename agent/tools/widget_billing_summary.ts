@@ -4,8 +4,9 @@ import {
   type BillingAccountResult,
   type CreditHistoryResult,
   type CreditHistoryWindow,
+  clampCreditWindow,
   creditHistoryResultSchema,
-  creditHistoryWindowSchema,
+  creditWindowRequestSchema,
   readBillingAccount,
   readBillingCreditHistory,
 } from "#lib/billing-account.js";
@@ -178,15 +179,32 @@ const walletSchema = z.object({
 });
 
 export const widgetBillingSummaryInputSchema = z.strictObject({
-  creditWindow: creditHistoryWindowSchema
+  creditWindow: creditWindowRequestSchema
     .optional()
     .describe(
-      "Optional credit ledger window, from inclusive and to exclusive, at most 93 days. Does not filter Stripe lists or current/lifetime balances."
+      "Optional credit ledger window, from inclusive and to exclusive, at most 93 days; a longer one is shortened to the 93 days ending at `to`. Does not filter Stripe lists or current/lifetime balances."
     ),
 });
 export type WidgetBillingSummaryInput = z.infer<
   typeof widgetBillingSummaryInputSchema
 >;
+
+/** The credit window to read, clamped to 93 days, and a note when it was shortened. */
+const requestedWindow = (input: WidgetBillingSummaryInput) => {
+  const requested = widgetBillingSummaryInputSchema.parse(input).creditWindow;
+  if (!requested) {
+    return { creditWindow: undefined, windowNotes: [] as string[] };
+  }
+  const { shortened, window } = clampCreditWindow(requested);
+  return {
+    creditWindow: window,
+    windowNotes: shortened
+      ? [
+          `The credit window asked for (${requested.from} to ${requested.to}) is longer than 93 days, so it was shortened to the 93 days from ${window.from} to ${window.to}. Credit activity before ${window.from} is not covered.`,
+        ]
+      : [],
+  };
+};
 
 export const widgetBillingSummaryOutputSchema = z.object({
   autumn: z.object({
@@ -700,7 +718,7 @@ export async function composeWidgetBillingSummary(
   deps: WidgetBillingSummaryDeps,
   input: WidgetBillingSummaryInput = {}
 ): Promise<WidgetBillingSummary> {
-  const { creditWindow } = widgetBillingSummaryInputSchema.parse(input);
+  const { creditWindow, windowNotes } = requestedWindow(input);
   const unavailable: string[] = [];
   // Every other widget tool hangs its reads off a live membership check. The
   // billing reads are keyed by organization id alone, so the check runs first,
@@ -720,7 +738,7 @@ export async function composeWidgetBillingSummary(
     return { ...EMPTY_SUMMARY, available: false, unavailable };
   }
 
-  const notes: string[] = [];
+  const notes = windowNotes;
   let creditHistory: CreditHistoryResult | null = null;
   if (creditWindow) {
     creditHistory = (await deps

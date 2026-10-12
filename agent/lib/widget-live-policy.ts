@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { creditHistoryWindowSchema } from "./billing-account.js";
+import { creditWindowRequestSchema } from "./billing-account.js";
 
 /** Live investigations require the local Workflow world and local file storage. */
 export function assertLiveAllowed(env: NodeJS.ProcessEnv = process.env) {
@@ -51,7 +51,7 @@ export async function verifyLiveServer(
 
 const datedInput = z.object({
   campaignId: z.uuid().nullish(),
-  creditWindow: creditHistoryWindowSchema.optional(),
+  creditWindow: creditWindowRequestSchema.optional(),
   endDate: z.iso.date().nullish(),
   startDate: z.iso.date().nullish(),
 });
