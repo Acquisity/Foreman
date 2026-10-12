@@ -50,7 +50,17 @@ export default defineTool({
     "Returns documentId and updatedAt, which is the version pin the critic packet needs, plus the url for the ticket comment. " +
     "Do not call this in a read-only validation run.",
   async execute(draft, ctx) {
-    // Reworded before the card check, so the check sees the text that is saved.
+    const refuses = (document: typeof draft) =>
+      document.lane === "billing" &&
+      (hasCardNumber(document.content) || IBAN.test(document.content));
+    const refusal = {
+      error:
+        "The document contains a card or bank account number. Remove it; ids, amounts, and dates are enough.",
+      saved: false as const,
+    };
+    if (refuses(draft)) {
+      return refusal;
+    }
     const input = isTriageIntake(ctx.session.auth.initiator ?? null)
       ? {
           ...draft,
@@ -61,15 +71,8 @@ export default defineTool({
           ),
         }
       : draft;
-    if (
-      input.lane === "billing" &&
-      (hasCardNumber(input.content) || IBAN.test(input.content))
-    ) {
-      return {
-        error:
-          "The document contains a card or bank account number. Remove it; ids, amounts, and dates are enough.",
-        saved: false as const,
-      };
+    if (refuses(input)) {
+      return refusal;
     }
     try {
       const result = await saveInvestigationDocument(input, {

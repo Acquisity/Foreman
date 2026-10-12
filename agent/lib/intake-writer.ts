@@ -13,8 +13,8 @@ Return only the rewritten text.`;
  * Rewords a triage-intake session's requester reply or investigation document
  * on the `writer` slot before it is posted (ENG-15226). Opus drafts; the
  * writer only changes wording. Fails open: an error, a timeout, an empty
- * result, or one longer than `maxChars` returns the draft unchanged. A
- * cancelled turn still throws.
+ * result, an incomplete finish, or one longer than `maxChars` returns the
+ * draft unchanged. A cancelled turn still throws.
  */
 export async function rewriteDraft(
   draft: string,
@@ -23,7 +23,7 @@ export async function rewriteDraft(
   model?: LanguageModel
 ): Promise<string> {
   try {
-    const { text } = await generateText({
+    const { finishReason, text } = await generateText({
       abortSignal: AbortSignal.any([
         signal,
         AbortSignal.timeout(WRITER_TIMEOUT_MS),
@@ -32,7 +32,9 @@ export async function rewriteDraft(
       prompt: `${WRITER_PROMPT}\n\n${draft}`,
     });
     const rewritten = text.trim();
-    return rewritten && rewritten.length <= maxChars ? rewritten : draft;
+    return finishReason === "stop" && rewritten && rewritten.length <= maxChars
+      ? rewritten
+      : draft;
   } catch {
     signal.throwIfAborted();
     return draft;
