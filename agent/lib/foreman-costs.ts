@@ -76,10 +76,15 @@ export interface SourceSummary {
   lines: CostLine[];
 }
 
-export class CostSourceError extends Error {
-  readonly reason: "unreadable billing export" | `HTTP ${number}`;
+type CostSourceReason =
+  | "unreadable billing export"
+  | "unreadable credit balance"
+  | `HTTP ${number}`;
 
-  constructor(reason: "unreadable billing export" | `HTTP ${number}`) {
+export class CostSourceError extends Error {
+  readonly reason: CostSourceReason;
+
+  constructor(reason: CostSourceReason) {
     super(reason);
     this.reason = reason;
   }
