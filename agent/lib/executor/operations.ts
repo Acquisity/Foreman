@@ -79,6 +79,11 @@ export const operationInputs = {
   "stripe.promotion_codes.list": z.object({ code: id, limit }),
   "stripe.refunds.get": z.object({ refund_id: id }),
   "stripe.subscriptions.list": history.extend({ status: z.literal("all") }),
+  "vercel.billingCharges": z.object({
+    from: z.iso.datetime(),
+    teamId: id,
+    to: z.iso.datetime(),
+  }),
 };
 
 type ApiRequest = {
@@ -100,7 +105,13 @@ export interface ProviderResult {
 }
 export type ProviderClient = (
   request: OperationRequest,
-  options?: { signal?: AbortSignal; maxBytes?: number }
+  options?: {
+    signal?: AbortSignal;
+    /** Caps the parsed result. */
+    maxBytes?: number;
+    /** Caps the transport body instead of its 8 MiB default. */
+    wireMaxBytes?: number;
+  }
 ) => Promise<ProviderResult>;
 export function requiredClient(client?: ProviderClient): ProviderClient {
   if (!client) {

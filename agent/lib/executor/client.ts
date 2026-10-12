@@ -63,7 +63,9 @@ export function executorClient(ctx: ProviderContext): ProviderClient {
           session: ctx.session,
         },
         path,
-        input
+        input,
+        undefined,
+        { maxBytes: options.wireMaxBytes }
       );
     } catch (error) {
       if (

@@ -106,5 +106,8 @@
   },
   "sentry.issueRead": {
     "path": "sentry.user.personalSentry.execute_sentry_tool"
+  },
+  "vercel.billingCharges": {
+    "path": "foreman_vercel_api.user.foremanVercelBilling.billing.listBillingCharges"
   }
 }
