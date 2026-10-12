@@ -9,6 +9,7 @@ import {
   type GateDeps,
   gate,
   guardedJudge,
+  reaskedDetails,
   redactableItems,
   removeItems,
   scanIdentifiers,
@@ -1367,4 +1368,67 @@ test("a compose that times out retries once in what the finish has left, never p
   finish.abort();
   await assert.rejects(pending);
   assert.equal(calls, 1);
+});
+
+// Round 16 replies that re-asked what the conversation already held (redacted).
+const HELD =
+  "LATEST CUSTOMER MESSAGE (the one to work on):\nWhen will this be reviewed?\n\nEARLIER TURNS (context only):\nCustomer: I still got charged today even though I cancelled\nSupport: The charge was $54 which is for your email inboxes.";
+const REASKED =
+  "The most recent charge is $54 on 2026-09-20. Which charge are you asking about? If you can tell me the amount and date as you see them under Settings > Billing, I can work from that.";
+
+test("a reply asking for a detail the conversation holds is found, with the values given", () => {
+  assert.deepEqual(reaskedDetails(REASKED, HELD), [
+    "amount ($54)",
+    "date (today)",
+  ]);
+  assert.deepEqual(
+    reaskedDetails(
+      "Tell me the dates and the balance you saw on screen.",
+      "I only have 8,017 and not the 8,647"
+    ),
+    ["balance (8,017, 8,647)"]
+  );
+  assert.deepEqual(
+    reaskedDetails(
+      "Then reply here with the 3 domains you still use and the dates you believe you were over-charged.",
+      "invoiced both for the monthly plan and inboxes as if they were both in Sept and Oct"
+    ),
+    ["date (Sept, Oct)"]
+  );
+  assert.deepEqual(
+    reaskedDetails(
+      "Search People and tell me the exact address shown on the row.",
+      "Customer: person-1@domain-1.example"
+    ),
+    ["email address (person-1@domain-1.example)"]
+  );
+  // Not given, or not asked for: nothing.
+  assert.deepEqual(reaskedDetails(REASKED, "Why was I charged?"), []);
+  assert.deepEqual(
+    reaskedDetails("The charge was $54 on 2026-09-20.", HELD),
+    []
+  );
+});
+
+test("a reply re-asking a detail the conversation holds is recomposed once with what was given", async () => {
+  const { calls, d } = claimingDeps([
+    REASKED,
+    "The most recent charge is $54 on 2026-09-20, and none is dated today.",
+  ]);
+  const result = await gate(scope, question, findings(), d, HELD);
+  assert.equal(
+    result.message,
+    "The most recent charge is $54 on 2026-09-20, and none is dated today."
+  );
+  assert.equal(calls.compose.length, 2);
+  assert.ok(
+    String(corrections(calls)[1]).includes("amount ($54); date (today)")
+  );
+});
+
+test("a reply that asks for nothing already given is composed once", async () => {
+  const { calls, d } = claimingDeps([REASKED]);
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.message, REASKED);
+  assert.deepEqual(corrections(calls), [undefined]);
 });

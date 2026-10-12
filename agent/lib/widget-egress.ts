@@ -587,6 +587,62 @@ const NO_TICKET_CORRECTION =
   "No ticket was filed and nothing was reported or passed on to anyone. Rewrite the reply without saying or suggesting that it was reported, filed, escalated or passed to engineering, billing or a person.";
 
 /**
+ * Details the conversation already holds, by the words a request for each uses.
+ * Round 16 re-asked the dates (wrun ...MAF4Z47), the balance (...N35DNCX), the
+ * address (...GGP3SS) and the amount and date (...R4N3DC). Each request came
+ * from the write-up's recommendation, which the composer keeps, so it is caught
+ * on the reply, where every answer passes, rather than in one investigation path.
+ */
+const GIVEN_DETAILS = [
+  {
+    ask: /\baddress(?:es)?\b/iu,
+    given: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu,
+    kind: "email address",
+  },
+  {
+    ask: /\b(?:amounts?|how much)\b/iu,
+    given: /\$\s?\d[\d,]*(?:\.\d{2})?/gu,
+    kind: "amount",
+  },
+  {
+    ask: /\bdates?\b/iu,
+    given:
+      /\b(?:today|yesterday|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may \d{1,2}|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/giu,
+    kind: "date",
+  },
+  {
+    ask: /\bbalances?\b/iu,
+    given: /\b\d{1,3}(?:,\d{3})+\b|\b\d+(?= (?:credits|leads)\b)/gu,
+    kind: "balance",
+  },
+];
+
+/** A sentence asking the customer for something ("I can't confirm" is not one). */
+const REQUEST =
+  /\?\s*$|\b(?:tell me|send me|reply (?:here )?with|let me know|share|paste|give me)\b/iu;
+
+/**
+ * What the reply asks the customer for that the conversation already gives,
+ * with the values given, e.g. `date (Sept, Oct)`. Empty when nothing is re-asked.
+ */
+export function reaskedDetails(reply: string, conversation: string): string[] {
+  const requests = (reply.match(/[^.!?\n]+[.!?]?/gu) ?? []).filter((sentence) =>
+    REQUEST.test(sentence)
+  );
+  return GIVEN_DETAILS.flatMap(({ ask, given, kind }) => {
+    const values = [
+      ...new Set(conversation.slice(0, 20_000).match(given) ?? []),
+    ].slice(0, 5);
+    return values.length && requests.some((sentence) => ask.test(sentence))
+      ? [`${kind} (${values.join(", ")})`]
+      : [];
+  });
+}
+
+const reaskCorrection = (given: string[]) =>
+  `The customer already gave these in the conversation: ${given.join("; ")}. Rewrite the reply without asking for them again: use what they gave, and end with the next step, or a question about something they have not given.`;
+
+/**
  * A stalled model call must fail closed as gate_unavailable, not hold the reply
  * past the app's last poll. The judge gets what the finish has left less the
  * composer's time (see `judgeBudgetMs`).
@@ -776,7 +832,7 @@ function itemsCarrying(
     .map((item) => item.n);
 }
 
-/** The composed reply; one claiming a ticket nobody filed is recomposed once, then trimmed. */
+/** The composed reply; one claiming a ticket nobody filed, or asking again for a detail already given, is recomposed once. */
 async function composedReply(
   compose: GateDeps["compose"],
   input: Parameters<GateDeps["compose"]>[0],
@@ -788,10 +844,15 @@ async function composedReply(
       input.askedForChange === true
     );
   const message = await reply();
-  if (ticketFiled || withoutTicketClaims(message) === message) {
+  if (!ticketFiled && withoutTicketClaims(message) !== message) {
+    return withoutTicketClaims(await reply(NO_TICKET_CORRECTION));
+  }
+  const given = reaskedDetails(message, input.question);
+  if (given.length === 0) {
     return message;
   }
-  return withoutTicketClaims(await reply(NO_TICKET_CORRECTION));
+  const again = await reply(reaskCorrection(given));
+  return ticketFiled ? again : withoutTicketClaims(again);
 }
 
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
