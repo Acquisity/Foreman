@@ -8,6 +8,7 @@ import definition, {
   buildErroredInboxesQuery,
   composeWidgetBillingSummary,
   readCreditGap,
+  readCreditUsage,
   sessionRead,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
@@ -974,4 +975,41 @@ test("a gap between the provider's credit balance and the product ledger is a re
     null
   );
   assert.equal(readCreditGap(undefined, wallet), null);
+});
+
+test("the ledger's credit usage is read by what each entry was spent on", () => {
+  const usage = (reference_type: string | null, amount: number) => ({
+    amount,
+    reference_type,
+    resource: "credits",
+    type: "usage",
+  });
+  const spent = readCreditUsage(
+    [
+      ...Array.from({ length: 8 }, () => usage("campaign_lead_ingestion", -70)),
+      usage("website_agent_run", -70),
+      usage(null, -5),
+      { amount: 500, resource: "credits", type: "grant" },
+      { ...usage("campaign_lead_ingestion", -9), resource: "inboxes" },
+    ],
+    false
+  );
+  assert.equal(
+    spent,
+    "The ledger records that credit usage as 560 for leads added to campaigns (8 entries); 70 for website builder runs (1 entry); 5 for usage with no recorded source (1 entry)."
+  );
+  assert.ok(
+    readCreditUsage([usage("llm_usage", -3)], true)?.startsWith(
+      "In its most recent entries, the ledger records"
+    )
+  );
+  assert.equal(readCreditUsage([], false), null);
+  const gap = readCreditGap(
+    {
+      balances: { credits: { granted: 10_000, remaining: 8157, usage: 1843 } },
+    },
+    { balance: -630, lifetimeUsed: 630 },
+    spent
+  );
+  assert.ok(gap?.includes(`those 630 credits. ${spent} Lead credits`));
 });

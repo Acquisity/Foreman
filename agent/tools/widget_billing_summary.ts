@@ -571,7 +571,8 @@ const autumnCredits = z.object({
  */
 export function readCreditGap(
   autumnData: unknown,
-  wallet: { balance: number; lifetimeUsed: number } | null | undefined
+  wallet: { balance: number; lifetimeUsed: number } | null | undefined,
+  spentOn: string | null = null
 ): string | null {
   const provider = autumnCredits.safeParse(autumnData);
   if (
@@ -583,7 +584,54 @@ export function readCreditGap(
   const { granted, remaining, usage } = provider.data.balances.credits;
   const used = wallet.lifetimeUsed;
   const n = (value: number) => value.toLocaleString("en-US");
-  return `The billing provider counts ${n(granted)} credits granted, ${n(usage)} used and ${n(remaining)} remaining. The product's own credit ledger separately records ${n(used)} credits used. If that usage is on top of the provider's count, the balance is ${n(remaining - used)}, so the gap between the two is those ${n(used)} credits. Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling the ${n(used)} a double count.`;
+  return `The billing provider counts ${n(granted)} credits granted, ${n(usage)} used and ${n(remaining)} remaining. The product's own credit ledger separately records ${n(used)} credits used. If that usage is on top of the provider's count, the balance is ${n(remaining - used)}, so the gap between the two is those ${n(used)} credits. ${spentOn ? `${spentOn} ` : ""}Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling the ${n(used)} a double count.`;
+}
+
+/** What each ledger usage source is, in the customer's words (Acquisity's credit_transaction reference types). */
+const USAGE_SOURCES: Record<string, string> = {
+  campaign_lead_ingestion: "leads added to campaigns",
+  llm_usage: "AI usage",
+  outreach_lead_capacity: "campaign lead capacity",
+  website_agent_run: "website builder runs",
+  workflow_ai_agent_run: "AI workflow runs",
+};
+
+/**
+ * What the ledger's credit usage was spent on, from the reference type each
+ * entry records (wrun ...35DNCX: Aaron asked where the 630 went). Reads the
+ * transactions the billing account read already returns; null when there is
+ * no credit usage among them.
+ */
+export function readCreditUsage(
+  transactions: Record<string, unknown>[],
+  truncated: boolean
+): string | null {
+  const totals = new Map<string, { amount: number; entries: number }>();
+  for (const entry of transactions) {
+    const amount = Number(entry.amount);
+    if (
+      entry.type !== "usage" ||
+      entry.resource !== "credits" ||
+      !Number.isFinite(amount)
+    ) {
+      continue;
+    }
+    const source =
+      typeof entry.reference_type === "string" ? entry.reference_type : "";
+    const total = totals.get(source) ?? { amount: 0, entries: 0 };
+    totals.set(source, {
+      amount: total.amount + Math.abs(amount),
+      entries: total.entries + 1,
+    });
+  }
+  if (totals.size === 0) {
+    return null;
+  }
+  const parts = [...totals].map(
+    ([source, { amount, entries }]) =>
+      `${amount.toLocaleString("en-US")} for ${USAGE_SOURCES[source] ?? (source ? source.replaceAll("_", " ") : "usage with no recorded source")} (${entries} ${entries === 1 ? "entry" : "entries"})`
+  );
+  return `${truncated ? "In its most recent entries, the ledger" : "The ledger"} records that credit usage as ${parts.join("; ")}.`;
 }
 
 /** The fired readings as one, and whether one names a disputable charge. */
@@ -868,7 +916,11 @@ export async function composeWidgetBillingSummary(
   unavailable.push(...errored.unavailable);
   const readings = billingReadings(
     errored.reading(invoices),
-    readCreditGap(autumn.data, credits)
+    readCreditGap(
+      autumn.data,
+      credits,
+      readCreditUsage(account.transactions, account.truncated.transactions)
+    )
   );
 
   return {
@@ -981,7 +1033,7 @@ export const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. When purchased inboxes are in error, `reading` ties them to the inbox charges covering time after the error began: tell the customer those facts and promise nothing about a refund or credit. When the billing provider's credit balance and the product's credit ledger disagree, `reading` names the gap with both numbers: lead with it, and check website credit spend before calling it a double count. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. When purchased inboxes are in error, `reading` ties them to the inbox charges covering time after the error began: tell the customer those facts and promise nothing about a refund or credit. When the billing provider's credit balance and the product's credit ledger disagree, `reading` names the gap with both numbers and what the ledger records that usage as spent on: lead with it, and check website credit spend before calling it a double count. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {
