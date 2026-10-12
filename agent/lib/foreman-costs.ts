@@ -366,8 +366,9 @@ export const readCostReport = async (
     ),
     settle(
       async () => {
-        const balance = Number((await gateway.getCredits()).balance);
-        if (!Number.isFinite(balance)) {
+        const raw = String((await gateway.getCredits()).balance).trim();
+        const balance = Number(raw);
+        if (raw === "" || !Number.isFinite(balance)) {
           throw new CostSourceError("unreadable credit balance");
         }
         return { balance };
