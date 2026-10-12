@@ -16,7 +16,11 @@ import type { FollowUpOutcome } from "../lib/jev-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
-import { stampInvestigationMemory, stampTrusted } from "../lib/trust.js";
+import {
+  stampInvestigationMemory,
+  stampTriageIntake,
+  stampTrusted,
+} from "../lib/trust.js";
 import { widgetFeedbackContext } from "../lib/widget-feedback.js";
 
 const credentials = connectLinearCredentials(
@@ -88,8 +92,13 @@ const followUpOutcome = (
   );
 };
 
-/** Names the intake requester before the model runs (ENG-14588). */
-const askFrom = (event: LinearAgentSessionEvent): Promise<string | null> => {
+/**
+ * Names the intake requester before the model runs (ENG-14588), and whether
+ * the ask came from a triage intake channel (ENG-15226).
+ */
+const askFrom = (
+  event: LinearAgentSessionEvent
+): Promise<{ requester: string | null; triageIntake: boolean } | null> => {
   const issue = issueOf(event);
   return issue
     ? withinGate(() => readAskFrom(issue, credentials))
@@ -134,7 +143,7 @@ export const onAgentSession = async (
   // ends here with a line in the session chat, never on the ticket.
   // If the line cannot be posted, dispatch rather than leave the session
   // with nothing.
-  const [outcome, requester, route] = await Promise.all([
+  const [outcome, ask, route] = await Promise.all([
     followUpOutcome(event),
     askFrom(event),
     widgetRoute(event),
@@ -159,14 +168,17 @@ export const onAgentSession = async (
   // Every Agent Session is opened by a workspace member, which is the same
   // gate triage itself runs behind, so Linear is an authorized investigation
   // memory surface.
-  const auth = stampInvestigationMemory(stampTrusted(defaultLinearAuth(event)));
+  const trusted = stampInvestigationMemory(
+    stampTrusted(defaultLinearAuth(event))
+  );
+  const auth = ask?.triageIntake ? stampTriageIntake(trusted) : trusted;
   const [repository] = repositories;
   const withRepository =
     repositories.length === 1 && repository
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
   const context =
-    buildLinearContext(event, requester, route ?? undefined) ?? [];
+    buildLinearContext(event, ask?.requester ?? null, route ?? undefined) ?? [];
   return {
     auth: withRepository,
     context: withFollowUpOutcome(context, outcome, Boolean(route)),

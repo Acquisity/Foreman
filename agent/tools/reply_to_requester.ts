@@ -2,8 +2,12 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
+import { rewriteDraft } from "#lib/intake-writer.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { replyToRequester } from "#lib/requester-reply.js";
+import { isTriageIntake } from "#lib/trust.js";
+
+const MESSAGE_MAX_CHARS = 4000;
 
 export default defineTool({
   approval: questionsOnlyPolicy,
@@ -16,7 +20,10 @@ export default defineTool({
         issue,
         message,
         (await ctx.getToken(linearAuth)).token,
-        ctx.abortSignal
+        ctx.abortSignal,
+        isTriageIntake(ctx.session.auth.initiator ?? null)
+          ? (draft) => rewriteDraft(draft, MESSAGE_MAX_CHARS, ctx.abortSignal)
+          : undefined
       );
     } catch (error) {
       if (ctx.abortSignal.aborted) {
@@ -38,7 +45,7 @@ export default defineTool({
       .string()
       .trim()
       .min(1)
-      .max(4000)
+      .max(MESSAGE_MAX_CHARS)
       .describe("The one requester-facing message, in plain words."),
   }),
 });

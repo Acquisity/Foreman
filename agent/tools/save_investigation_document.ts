@@ -2,11 +2,13 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
+import { rewriteDraft } from "#lib/intake-writer.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
   DOCUMENT_MAX_CHARS,
   saveInvestigationDocument,
 } from "#lib/linear-api.js";
+import { isTriageIntake } from "#lib/trust.js";
 
 /** 13 to 19 digits with optional separators; only a Luhn-valid run counts as a card number. */
 const DIGIT_RUN = /\b(?:\d[ -]?){12,18}\d\b/gu;
@@ -47,16 +49,30 @@ export default defineTool({
     "Send the whole document each time; the first call creates it and later calls replace its content, never a second document. " +
     "Returns documentId and updatedAt, which is the version pin the critic packet needs, plus the url for the ticket comment. " +
     "Do not call this in a read-only validation run.",
-  async execute(input, ctx) {
-    if (
-      input.lane === "billing" &&
-      (hasCardNumber(input.content) || IBAN.test(input.content))
-    ) {
-      return {
-        error:
-          "The document contains a card or bank account number. Remove it; ids, amounts, and dates are enough.",
-        saved: false as const,
-      };
+  async execute(draft, ctx) {
+    const refuses = (document: typeof draft) =>
+      document.lane === "billing" &&
+      (hasCardNumber(document.content) || IBAN.test(document.content));
+    const refusal = {
+      error:
+        "The document contains a card or bank account number. Remove it; ids, amounts, and dates are enough.",
+      saved: false as const,
+    };
+    if (refuses(draft)) {
+      return refusal;
+    }
+    const input = isTriageIntake(ctx.session.auth.initiator ?? null)
+      ? {
+          ...draft,
+          content: await rewriteDraft(
+            draft.content,
+            DOCUMENT_MAX_CHARS,
+            ctx.abortSignal
+          ),
+        }
+      : draft;
+    if (refuses(input)) {
+      return refusal;
     }
     try {
       const result = await saveInvestigationDocument(input, {
