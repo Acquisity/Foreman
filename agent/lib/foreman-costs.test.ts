@@ -16,7 +16,8 @@ import {
 /** 13:00 UTC on 2026-08-28, the production tick. */
 const NOW = Date.parse("2026-08-28T13:00:00.000Z");
 const WINDOW = costWindow(NOW);
-const REFUSED = /Vercel billing responded HTTP 404/u;
+const UNREADABLE = /unreadable billing export/u;
+const REFUSED = /HTTP 404/u;
 const TOTAL_WITHOUT_COMPARISON = /^Total: \$35\.00 \(no comparison yet\)$/mu;
 const GATEWAY_WITH_COMPARISON =
   /^AI Gateway: \$30\.00 \(7-day avg \$20\.00, \+50%\)$/mu;
@@ -38,9 +39,7 @@ describe("cost window", () => {
   it("reports yesterday in UTC with seven comparison days before it", () => {
     assert.deepEqual(WINDOW, {
       firstDay: "2026-08-20",
-      from: "2026-08-20T00:00:00.000Z",
       reportDay: "2026-08-27",
-      to: "2026-08-28T13:00:00.000Z",
     });
     assert.equal(COMPARISON_DAYS, 7);
   });
@@ -69,23 +68,73 @@ describe("cost window", () => {
 });
 
 describe("Vercel charges", () => {
-  it("reads the team's export over the window through Executor", async () => {
-    const calls: unknown[] = [];
-    const client: ProviderClient = (request, options) => {
-      calls.push({ options, request });
-      return Promise.resolve({ data: "{}\n", status: 200 });
-    };
-    const { signal } = new AbortController();
-    assert.equal(await readVercelCharges(client, WINDOW, signal), "{}\n");
-    assert.deepEqual(calls, [
-      {
-        options: { signal, wireMaxBytes: 32 * 1024 * 1024 },
-        request: {
-          input: { from: WINDOW.from, teamId: VERCEL_TEAM_ID, to: WINDOW.to },
-          operation: "vercel.billingCharges",
-        },
-      },
-    ]);
+  it("reads separate exact Pacific report and comparison windows in summer and winter", async () => {
+    await Promise.all(
+      (
+        [
+          [
+            "2026-08-28T13:00:00Z",
+            "2026-08-27T07:00:00.000Z",
+            "2026-08-28T07:00:00.000Z",
+            "2026-08-20T07:00:00.000Z",
+          ],
+          [
+            "2026-12-12T13:00:00Z",
+            "2026-12-11T08:00:00.000Z",
+            "2026-12-12T08:00:00.000Z",
+            "2026-12-04T08:00:00.000Z",
+          ],
+          [
+            "2026-11-02T13:00:00Z",
+            "2026-11-01T07:00:00.000Z",
+            "2026-11-02T08:00:00.000Z",
+            "2026-10-25T07:00:00.000Z",
+          ],
+          [
+            "2026-03-09T13:00:00Z",
+            "2026-03-08T08:00:00.000Z",
+            "2026-03-09T07:00:00.000Z",
+            "2026-03-01T08:00:00.000Z",
+          ],
+        ] as const
+      ).map(async ([now, reportFrom, reportTo, comparisonFrom]) => {
+        const window = costWindow(Date.parse(now));
+        const calls: unknown[] = [];
+        const client: ProviderClient = (request, options) => {
+          calls.push({ options, request });
+          assert.ok("from" in request.input);
+          const day =
+            request.input.from === reportFrom
+              ? window.reportDay
+              : window.firstDay;
+          const cost = request.input.from === reportFrom ? 14.56 : 70;
+          return Promise.resolve({
+            data: focus(day, "Storage", cost),
+            status: 200,
+          });
+        };
+        const { signal } = new AbortController();
+        assert.deepEqual(await readVercelCharges(client, window, signal), {
+          averageCost: 10,
+          cost: 14.56,
+          lines: [{ cost: 14.56, name: "Storage" }],
+        });
+        assert.deepEqual(
+          calls,
+          [reportFrom, comparisonFrom].map((from, index) => ({
+            options: { signal, wireMaxBytes: 32 * 1024 * 1024 },
+            request: {
+              input: {
+                from,
+                teamId: VERCEL_TEAM_ID,
+                to: index === 0 ? reportTo : reportFrom,
+              },
+              operation: "vercel.billingCharges",
+            },
+          }))
+        );
+      })
+    );
   });
 
   it("names the status when the export is refused", async () => {
@@ -113,7 +162,7 @@ describe("Vercel charges", () => {
     ].join("\n");
     const summary = summarizeVercelCharges(jsonl, WINDOW);
     assert.deepEqual(summary, {
-      averageCost: 4,
+      averageCost: 8 / 7,
       cost: 11,
       lines: [
         { cost: 7, name: "Snapshot Storage" },
@@ -129,14 +178,75 @@ describe("Vercel charges", () => {
     const summary = summarizeVercelCharges(jsonl, WINDOW);
     assert.equal(summary.lines.length, 6);
     assert.deepEqual(summary.lines.at(-1), { cost: 9, name: "other" });
-    assert.equal(summary.averageCost, null);
+    assert.equal(summary.averageCost, 0);
     assert.equal(summarizeVercelCharges("", WINDOW).cost, null);
-    assert.equal(summarizeVercelCharges(null, WINDOW).cost, null);
+    assert.throws(() => summarizeVercelCharges(null, WINDOW), UNREADABLE);
   });
 
   it("accepts rows the transport already parsed", () => {
     const rows = [JSON.parse(focus("2026-08-27", "Functions", 3))];
     assert.equal(summarizeVercelCharges(rows, WINDOW).cost, 3);
+  });
+});
+
+describe("source completeness", () => {
+  it("averages sparse successful gateway and Vercel histories over seven calendar days", () => {
+    assert.equal(
+      summarizeGatewaySpend(
+        [{ day: WINDOW.firstDay, totalCost: 70 }],
+        [],
+        WINDOW
+      ).averageCost,
+      10
+    );
+    assert.equal(
+      summarizeVercelCharges(focus(WINDOW.firstDay, "Storage", 70), WINDOW)
+        .averageCost,
+      10
+    );
+    assert.equal(summarizeGatewaySpend([], [], WINDOW).averageCost, 0);
+    assert.equal(summarizeVercelCharges([], WINDOW).averageCost, 0);
+  });
+
+  it("renders missing report-day rows unavailable and totals only numeric sources", () => {
+    const missing = { averageCost: 0, cost: null, lines: [] };
+    const base = {
+      credits: { error: "unavailable" },
+      gateway: missing,
+      reportDay: WINDOW.reportDay,
+      vercel: missing,
+    };
+    const absent = renderCostReport(base);
+    assert.ok(absent.includes("Total: unavailable"));
+    assert.ok(!absent.includes("$0.00"));
+    assert.ok(
+      absent.includes(
+        `AI Gateway: unavailable (no rows for ${WINDOW.reportDay} yet)`
+      )
+    );
+    assert.ok(
+      absent.includes(
+        `Vercel platform: unavailable (no rows for ${WINDOW.reportDay} yet)`
+      )
+    );
+    for (const source of ["gateway", "vercel"]) {
+      const partial = renderCostReport({
+        ...base,
+        [source]: { averageCost: 10, cost: 20, lines: [] },
+      });
+      assert.ok(partial.includes("Total (partial): $20.00"));
+    }
+  });
+
+  it("rejects wholly unreadable nonempty billing exports and unsupported shapes", () => {
+    for (const body of [
+      "<html>bad body</html>",
+      "{}\n{broken",
+      [{ unrelated: true }],
+      { data: [] },
+    ]) {
+      assert.throws(() => summarizeVercelCharges(body, WINDOW), UNREADABLE);
+    }
   });
 });
 
@@ -155,7 +265,7 @@ describe("gateway spend", () => {
       WINDOW
     );
     assert.deepEqual(summary, {
-      averageCost: 15,
+      averageCost: 30 / 7,
       cost: 30,
       lines: [
         { cost: 25, name: "deepseek/deepseek-v4-pro-0813" },
@@ -168,7 +278,7 @@ describe("gateway spend", () => {
 describe("rendered report", () => {
   it("totals both sources, shows deltas, and estimates credit runway", () => {
     const text = renderCostReport({
-      credits: { balance: 50, totalUsed: 500 },
+      credits: { balance: 50 },
       gateway: {
         averageCost: 20,
         cost: 30,
@@ -199,7 +309,7 @@ describe("rendered report", () => {
 
   it("withholds the total comparison when one source has no history", () => {
     const text = renderCostReport({
-      credits: { balance: 50, totalUsed: 500 },
+      credits: { balance: 50 },
       gateway: { averageCost: 20, cost: 30, lines: [] },
       reportDay: "2026-08-27",
       vercel: { averageCost: null, cost: 5, lines: [] },
@@ -219,12 +329,68 @@ describe("rendered report", () => {
       text,
       [
         "*Foreman running costs for 2026-08-27* (USD)",
-        "Total: $30.00 (no comparison yet), one source missing",
+        "Total (partial): $30.00 (no comparison yet)",
         "AI Gateway: $30.00 (no comparison yet)",
         "Vercel platform: unavailable (Vercel billing responded HTTP 404.)",
         "AI Gateway credits: unavailable (AI Gateway credits read could not run.)",
         "Not tracked: Neon (Foreman memory and support Postgres), CLI Proxy on Railway (Claude models), GitHub Actions CI",
       ].join("\n")
     );
+  });
+});
+
+describe("cost tool error boundary", () => {
+  it("keeps gateway secret messages and nested response bodies out of tool output and logs", async (t) => {
+    const previousKey = process.env.AI_GATEWAY_API_KEY;
+    const previousConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+    process.env.AI_GATEWAY_API_KEY = "fixture-key";
+    process.env.EXECUTOR_MCP_CONNECTOR ??= "executor/test";
+    const marker = "SECRET_GATEWAY_DIAGNOSTIC_MARKER";
+    const logs: unknown[][] = [];
+    t.mock.method(console, "error", (...args: unknown[]) => logs.push(args));
+    t.mock.method(
+      globalThis,
+      "fetch",
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: { message: marker, type: "internal_server_error" },
+            privateRows: [marker],
+          }),
+          { headers: { "content-type": "application/json" }, status: 500 }
+        )
+    );
+    try {
+      const { default: tool } = await import("../tools/read_foreman_costs.js");
+      const context = {
+        abortSignal: new AbortController().signal,
+        getToken: () => {
+          throw new Error("fixture Executor unavailable");
+        },
+        session: {
+          auth: { current: { attributes: {}, authenticator: "local-dev" } },
+        },
+      } as unknown as Parameters<typeof tool.execute>[1];
+      const output = await tool.execute({}, context);
+      assert.ok("available" in output);
+      assert.equal(output.available, true);
+      assert.ok(output.report?.includes("AI Gateway: unavailable (HTTP 500)"));
+      assert.ok(!JSON.stringify(output).includes(marker));
+      assert.ok(!JSON.stringify(logs).includes(marker));
+      assert.ok(
+        logs.every((args) => args.length === 1 && typeof args[0] === "string")
+      );
+    } finally {
+      if (previousKey === undefined) {
+        delete process.env.AI_GATEWAY_API_KEY;
+      } else {
+        process.env.AI_GATEWAY_API_KEY = previousKey;
+      }
+      if (previousConnector === undefined) {
+        delete process.env.EXECUTOR_MCP_CONNECTOR;
+      } else {
+        process.env.EXECUTOR_MCP_CONNECTOR = previousConnector;
+      }
+    }
   });
 });

@@ -44,12 +44,8 @@ const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 export interface CostWindow {
   /** First day of the comparison range, inclusive (YYYY-MM-DD). */
   firstDay: string;
-  /** Inclusive start of the charges query. */
-  from: string;
   /** The day being reported, yesterday in UTC (YYYY-MM-DD). */
   reportDay: string;
-  /** Exclusive end of the charges query: now, so today's partial day is fetched and dropped by label. */
-  to: string;
 }
 
 /** The report day plus the comparison days before it. */
@@ -59,9 +55,7 @@ export const costWindow = (now: number): CostWindow => {
   const firstDay = dayOf(today - (COMPARISON_DAYS + 1) * DAY_MS);
   return {
     firstDay,
-    from: `${firstDay}T00:00:00.000Z`,
     reportDay,
-    to: new Date(now).toISOString(),
   };
 };
 
@@ -71,7 +65,7 @@ export interface CostLine {
 }
 
 export interface SourceSummary {
-  /** Mean daily cost over the comparison days that had any data. */
+  /** Mean daily cost over all seven calendar days in the comparison window. */
   averageCost: number | null;
   /** Report-day cost, or null when the source has no row for that day. */
   cost: number | null;
@@ -79,23 +73,61 @@ export interface SourceSummary {
   lines: CostLine[];
 }
 
-/** Reads the team's FOCUS export over the window; the body is JSONL text or already-parsed rows. */
+export class CostSourceError extends Error {
+  readonly reason: "unreadable billing export" | `HTTP ${number}`;
+
+  constructor(reason: "unreadable billing export" | `HTTP ${number}`) {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+/** Pacific midnight in UTC, including the offset in force at midnight on DST-change days. */
+const pacificMidnight = (day: string): string => {
+  const midnight = Date.parse(`${day}T00:00:00.000Z`);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    timeZoneName: "shortOffset",
+  });
+  let candidate = midnight + 8 * 60 * 60 * 1000;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const offset = formatter
+      .formatToParts(candidate)
+      .find((part) => part.type === "timeZoneName")?.value;
+    const hours = Number(offset?.replace("GMT", ""));
+    candidate = midnight - hours * 60 * 60 * 1000;
+  }
+  return new Date(candidate).toISOString();
+};
+
+/** Exact Pacific windows prevent FOCUS storage proration from changing the headline cost. */
 export const readVercelCharges = async (
   client: ProviderClient,
   window: CostWindow,
   signal: AbortSignal
-): Promise<unknown> => {
-  const { data, status } = await client(
-    {
-      input: { from: window.from, teamId: VERCEL_TEAM_ID, to: window.to },
-      operation: "vercel.billingCharges",
-    },
-    { signal, wireMaxBytes: MAX_WIRE_BYTES }
+): Promise<SourceSummary> => {
+  const read = async (from: string, to: string): Promise<SourceSummary> => {
+    const { data, status } = await client(
+      {
+        input: { from, teamId: VERCEL_TEAM_ID, to },
+        operation: "vercel.billingCharges",
+      },
+      { signal, wireMaxBytes: MAX_WIRE_BYTES }
+    );
+    if (status < 200 || status >= 300) {
+      throw new CostSourceError(`HTTP ${status}`);
+    }
+    return summarizeVercelCharges(data, window);
+  };
+  const boundary = pacificMidnight(window.reportDay);
+  const nextDay = dayOf(
+    Date.parse(`${window.reportDay}T00:00:00.000Z`) + DAY_MS
   );
-  if (status < 200 || status >= 300) {
-    throw new Error(`Vercel billing responded HTTP ${status}.`);
-  }
-  return data;
+  const [report, comparison] = await Promise.all([
+    read(boundary, pacificMidnight(nextDay)),
+    read(pacificMidnight(window.firstDay), boundary),
+  ]);
+  return { ...report, averageCost: comparison.averageCost };
 };
 
 const parseLine = (line: string): unknown => {
@@ -110,7 +142,13 @@ const focusRows = (data: unknown): unknown[] => {
   if (Array.isArray(data)) {
     return data;
   }
-  return typeof data === "string" ? data.split("\n").map(parseLine) : [];
+  if (typeof data === "string") {
+    return data
+      .split("\n")
+      .filter((line) => line.trim())
+      .map(parseLine);
+  }
+  throw new CostSourceError("unreadable billing export");
 };
 
 interface FocusRow {
@@ -125,6 +163,7 @@ const isFocusRow = (value: unknown): value is FocusRow =>
   value !== null &&
   typeof (value as FocusRow).ChargePeriodStart === "string" &&
   typeof (value as FocusRow).EffectiveCost === "number" &&
+  Number.isFinite((value as FocusRow).EffectiveCost) &&
   typeof (value as FocusRow).ServiceName === "string";
 
 /** Report-day and comparison figures for one project out of the team's FOCUS export. */
@@ -135,7 +174,11 @@ export const summarizeVercelCharges = (
 ): SourceSummary => {
   const byDay = new Map<string, number>();
   const services = new Map<string, number>();
-  for (const row of focusRows(data)) {
+  const rows = focusRows(data);
+  if (rows.length > 0 && !rows.some(isFocusRow)) {
+    throw new CostSourceError("unreadable billing export");
+  }
+  for (const row of rows) {
     if (!isFocusRow(row) || row.Tags?.ProjectId !== projectId) {
       continue;
     }
@@ -188,9 +231,7 @@ const summarizeDays = (
     ([day]) => day >= window.firstDay && day < window.reportDay
   );
   const averageCost =
-    comparison.length === 0
-      ? null
-      : comparison.reduce((sum, [, cost]) => sum + cost, 0) / comparison.length;
+    comparison.reduce((sum, [, cost]) => sum + cost, 0) / COMPARISON_DAYS;
   const sorted = [...lines]
     .map(([name, cost]) => ({ cost, name }))
     .sort((a, b) => b.cost - a.cost);
@@ -207,7 +248,7 @@ const summarizeDays = (
 };
 
 export interface CostReport {
-  credits: { balance: number; totalUsed: number } | { error: string };
+  credits: { balance: number } | { error: string };
   gateway: SourceSummary | { error: string };
   reportDay: string;
   vercel: SourceSummary | { error: string };
@@ -233,13 +274,14 @@ const delta = (cost: number, average: number | null): string => {
 
 const sourceLine = (
   label: string,
-  summary: SourceSummary | { error: string }
+  summary: SourceSummary | { error: string },
+  reportDay: string
 ): string => {
   if ("error" in summary) {
     return `${label}: unavailable (${summary.error})`;
   }
   if (summary.cost === null) {
-    return `${label}: no charges recorded yet`;
+    return `${label}: unavailable (no rows for ${reportDay} yet)`;
   }
   const lines = summary.lines
     .map(({ name, cost }) => `${name} ${usd(cost)}`)
@@ -250,7 +292,8 @@ const sourceLine = (
 /** The Slack message, rendered here so the model posts it unchanged. */
 export const renderCostReport = (report: CostReport): string => {
   const parts = [report.gateway, report.vercel].filter(
-    (source): source is SourceSummary => !("error" in source)
+    (source): source is SourceSummary =>
+      !("error" in source) && source.cost !== null
   );
   const total = parts.reduce((sum, { cost }) => sum + (cost ?? 0), 0);
   const averages = parts.map(({ averageCost }) => averageCost);
@@ -262,9 +305,9 @@ export const renderCostReport = (report: CostReport): string => {
     `*Foreman running costs for ${report.reportDay}* (USD)`,
     parts.length === 0
       ? "Total: unavailable"
-      : `Total: ${usd(total)} (${delta(total, average)})${parts.length === 1 ? ", one source missing" : ""}`,
-    sourceLine("AI Gateway", report.gateway),
-    sourceLine("Vercel platform", report.vercel),
+      : `Total${parts.length === 1 ? " (partial)" : ""}: ${usd(total)} (${delta(total, average)})`,
+    sourceLine("AI Gateway", report.gateway, report.reportDay),
+    sourceLine("Vercel platform", report.vercel, report.reportDay),
   ];
   if ("error" in report.credits) {
     lines.push(`AI Gateway credits: unavailable (${report.credits.error})`);
