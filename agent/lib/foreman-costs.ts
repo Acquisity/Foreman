@@ -361,8 +361,11 @@ export const readCostReport = async (
     ),
     settle(
       async () => {
-        const { balance } = await gateway.getCredits();
-        return { balance: Number(balance) };
+        const balance = Number((await gateway.getCredits()).balance);
+        if (!Number.isFinite(balance)) {
+          throw new CostSourceError("unreadable credit balance");
+        }
+        return { balance };
       },
       "AI Gateway credits read could not run.",
       signal
