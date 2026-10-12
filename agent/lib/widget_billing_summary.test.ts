@@ -7,6 +7,7 @@ import definition, {
   buildBillingAuthorizationQuery,
   buildErroredInboxesQuery,
   composeWidgetBillingSummary,
+  readCreditGap,
   sessionRead,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
@@ -946,4 +947,31 @@ test("a repeated billing read in one session reuses the first, until it fails or
   );
   await assert.rejects(failed);
   assert.equal(await sessionRead("s1:autumn:cus", read, at), 4);
+});
+
+test("a gap between the provider's credit balance and the product ledger is a reading with both numbers", () => {
+  const autumn = (remaining: number, usage: number) => ({
+    balances: { credits: { granted: 10_000, remaining, usage } },
+  });
+  const wallet = {
+    balance: -630,
+    lifetimeGranted: 0,
+    lifetimePurchased: 0,
+    lifetimeUsed: 630,
+  };
+  // wrun ...35DNCX: the customer saw 8,017, which is 8,647 less the ledger's 630.
+  assert.equal(
+    readCreditGap(autumn(8647, 1353), wallet),
+    "The billing provider counts 10,000 credits granted, 1,353 used and 8,647 remaining. The product's own credit ledger separately records 630 credits used. If that usage is on top of the provider's count, the balance is 8,017, so the gap between the two is those 630 credits. Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling the 630 a double count."
+  );
+  // Agreeing balances, no ledger usage, or no provider record: no reading.
+  assert.equal(
+    readCreditGap(autumn(9370, 630), { ...wallet, balance: 9370 }),
+    null
+  );
+  assert.equal(
+    readCreditGap(autumn(8647, 1353), { ...wallet, lifetimeUsed: 0 }),
+    null
+  );
+  assert.equal(readCreditGap(undefined, wallet), null);
 });
