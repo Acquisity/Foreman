@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
   composerInput,
+  composeWithin,
   defaultGateDeps,
   extractIdentifiers,
   type GateDeps,
@@ -1324,4 +1325,46 @@ test("an email the customer never typed still blocks beside one they did", async
   );
   assert.equal(result.decision, "block");
   assert.equal(result.reason, `foreign_identifier:${other}`);
+});
+
+test("a compose that times out retries once in what the finish has left, never past it", async () => {
+  // Hangs until aborted, like the round 15 composes cut at exactly 25.0 s.
+  const stall = (abortSignal: AbortSignal) =>
+    new Promise<string>((_resolve, reject) =>
+      abortSignal.addEventListener("abort", () => reject(abortSignal.reason))
+    );
+  let calls = 0;
+  const reply = await composeWithin(
+    (abortSignal) => {
+      calls += 1;
+      return calls === 1 ? stall(abortSignal) : Promise.resolve("reply");
+    },
+    { finishAt: Date.now() + 60_000, firstMs: 20 }
+  );
+  assert.deepEqual([reply, calls], ["reply", 2]);
+  // Under 10 s left after the reply scan's 20 s reserve: no retry, the gate fails closed.
+  calls = 0;
+  await assert.rejects(
+    composeWithin(
+      (abortSignal) => {
+        calls += 1;
+        return stall(abortSignal);
+      },
+      { finishAt: Date.now() + 25_000, firstMs: 20 }
+    )
+  );
+  assert.equal(calls, 1);
+  // The finish deadline itself passing is never retried.
+  const finish = new AbortController();
+  calls = 0;
+  const pending = composeWithin(
+    (abortSignal) => {
+      calls += 1;
+      return stall(abortSignal);
+    },
+    { finishAt: Date.now() + 60_000, firstMs: 5000, signal: finish.signal }
+  );
+  finish.abort();
+  await assert.rejects(pending);
+  assert.equal(calls, 1);
 });

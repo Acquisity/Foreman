@@ -41,6 +41,8 @@ export interface GateDeps {
     recordingOffered: boolean;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
+    /** When that deadline passes (epoch ms), so a timed-out compose can retry in what is left. */
+    finishAt?: number;
   }) => Promise<string>;
   judge: (input: {
     findings: WidgetFindings;
@@ -590,6 +592,38 @@ const NO_TICKET_CORRECTION =
  * composer's time (see `judgeBudgetMs`).
  */
 const COMPOSE_TIMEOUT_MS = 25_000;
+/** Kept back after the composer for the reply scan's ownership reads (20.6 s at most in round 15). */
+const REPLY_SCAN_RESERVE_MS = 20_000;
+/** A retry with less than this left cannot finish a reply. */
+const MIN_COMPOSE_RETRY_MS = 10_000;
+
+/**
+ * One compose request at COMPOSE_TIMEOUT_MS, and after its own timeout one more
+ * in whatever the finish deadline has left less the reply scan's reserve. Round
+ * 15 lost two replies (wrun ...MAF4Z47's proof run, ...YJJB31 run 1) to a
+ * compose aborted at exactly 25.0 s with about 100 s of the finish still left.
+ * The finish signal still bounds both, so no reply lands after the last poll.
+ */
+export async function composeWithin<T>(
+  run: (abortSignal: AbortSignal) => Promise<T>,
+  opts: { finishAt?: number; firstMs?: number; signal?: AbortSignal }
+): Promise<T> {
+  const first = AbortSignal.timeout(opts.firstMs ?? COMPOSE_TIMEOUT_MS);
+  try {
+    return await run(
+      opts.signal ? AbortSignal.any([first, opts.signal]) : first
+    );
+  } catch (error) {
+    const left =
+      opts.finishAt === undefined
+        ? 0
+        : opts.finishAt - REPLY_SCAN_RESERVE_MS - Date.now();
+    if (opts.signal?.aborted || !first.aborted || left < MIN_COMPOSE_RETRY_MS) {
+      throw error;
+    }
+    return run(within(left, opts.signal));
+  }
+}
 
 /**
  * The guide leads the user message with a cache breakpoint and the
@@ -619,21 +653,26 @@ export const defaultGateDeps: GateDeps = {
     question,
     recordingOffered,
     signal,
+    finishAt,
   }) {
     const model = await resolveModel("widget");
-    const { text } = await generateText({
-      abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
-      model: modelFor(model),
-      ...fastCallOptions(model),
-      ...composerRequest({
-        askedForChange: askedForChange === true,
-        ...(correction ? { correction } : {}),
-        findings,
-        question,
-        recordingOffered,
-        workspace: organizationName,
-      }),
-    });
+    const { text } = await composeWithin(
+      (abortSignal) =>
+        generateText({
+          abortSignal,
+          model: modelFor(model),
+          ...fastCallOptions(model),
+          ...composerRequest({
+            askedForChange: askedForChange === true,
+            ...(correction ? { correction } : {}),
+            findings,
+            question,
+            recordingOffered,
+            workspace: organizationName,
+          }),
+        }),
+      { finishAt, signal }
+    );
     return text.trim();
   },
   judge: (input) => {
@@ -860,6 +899,7 @@ export async function gate(
         {
           askedForChange,
           findings: composerInput(gated),
+          finishAt,
           organizationName: scope.organizationName,
           question: conversation,
           recordingOffered,
