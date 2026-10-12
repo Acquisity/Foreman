@@ -439,6 +439,7 @@
       "foreman_vercel_api.user.foremanVercel.webhooks.createWebhook",
       "foreman_vercel_api.user.foremanVercel.webhooks.getWebhook",
       "foreman_vercel_api.user.foremanVercel.webhooks.getWebhooks",
+      "foreman_vercel_api.user.foremanVercelBilling.billing.listBillingCharges",
       "inngest.org.foremanInngest.fetch_account",
       "inngest.org.foremanInngest.get_app",
       "inngest.org.foremanInngest.get_apps",
