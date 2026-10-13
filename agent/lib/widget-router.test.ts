@@ -110,6 +110,20 @@ describe("routeWidgetMessage", () => {
     assert.equal((await route({})).noNeed, undefined);
   });
 
+  it("never flags a refund or ticket ask as stating no need", async () => {
+    for (const ask of ["asks_for_refund", "asks_for_ticket"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: two independent asks.
+      const route = await routeWidgetMessage("refund me, I need a person", {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(
+            jevReply({ [ask]: { noul: 0.95 }, states_need: { noul: 0.1 } })
+          ),
+      });
+      assert.equal(route.noNeed, undefined);
+    }
+  });
+
   it("scores everything zero without a key and never calls out", async () => {
     let called = false;
     const route = await routeWidgetMessage("hello", {

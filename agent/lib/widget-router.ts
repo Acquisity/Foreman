@@ -326,22 +326,22 @@ export async function routeWidgetMessage(
     const { answers } = responseSchema.parse(response);
     const flag = (score: number | undefined, bar: number) =>
       (score ?? 0) >= bar;
+    const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
+    const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
     return {
       asksForHuman: answers.asks_for_human.noul,
       source: "jev",
       ...(flag(answers.reports_bug?.noul, BUG_REPORT) ? { bug: true } : {}),
-      ...(answers.states_need && !flag(answers.states_need.noul, NEED_STATED)
+      // A refund or ticket ask is a need, whatever states_need scored.
+      ...(answers.states_need &&
+      !(refund || ticket || flag(answers.states_need.noul, NEED_STATED))
         ? { noNeed: true }
         : {}),
       ...(flag(answers.offers_recording?.noul, RECORDING_REQUEST)
         ? { recording: true }
         : {}),
-      ...(flag(answers.asks_for_refund?.noul, REFUND_REQUEST)
-        ? { refund: true }
-        : {}),
-      ...(flag(answers.asks_for_ticket?.noul, TICKET_REQUEST)
-        ? { ticket: true }
-        : {}),
+      ...(refund ? { refund: true } : {}),
+      ...(ticket ? { ticket: true } : {}),
     };
   } catch (error) {
     return {
