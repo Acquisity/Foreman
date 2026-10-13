@@ -1688,10 +1688,18 @@ it("ticket rules inspect only customer messages for a billing dispute", () => {
   const supportOnly =
     "LATEST CUSTOMER MESSAGE (the one to work on):\nWhat plan am I on?\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: You can request a refund.\nSend us a dispute.";
   assert.equal(ruledTicket(supportOnly, [billing]), null);
+  // An earlier turn's refund ask does not force another ticket on a follow-up.
   assert.equal(
     ruledTicket(
       supportOnly +
         "\nCustomer: Please refund those charges.\nI was billed while the inboxes were broken.",
+      [billing]
+    ),
+    null
+  );
+  assert.equal(
+    ruledTicket(
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nPlease refund those charges.\n\nEARLIER TURNS (context only):\nSupport: Which inboxes?",
       [billing]
     ),
     "billing"

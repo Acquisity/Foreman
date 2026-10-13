@@ -654,8 +654,11 @@ export function ruledTicket(
   ) {
     return "fault";
   }
+  // The latest message only: an earlier turn's dispute already had its ticket.
   return DISPUTE.test(
-    customerMessages(question.slice(0, CONVERSATION_CHARS))
+    customerMessages(
+      question.slice(0, CONVERSATION_CHARS).split("\nEARLIER TURNS (")[0] ?? ""
+    )
   ) &&
     results.some(
       ({ tool, output }) =>
