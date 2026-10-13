@@ -1108,3 +1108,31 @@ test("credit readings combine the offset balance without inventing a lifetime-us
   );
   assert.ok(offset?.includes("come to 8,017 credits"));
 });
+
+test("resolved billing failures and unavailable results are not cached", async () => {
+  await Promise.all(
+    [{ available: true, error: "down" }, { available: false }].map(
+      async (failure) => {
+        let reads = 0;
+        const read = () => {
+          reads += 1;
+          return Promise.resolve(reads === 1 ? failure : { available: true });
+        };
+        const cacheable = (value: { error?: string; available: boolean }) =>
+          !value.error && value.available;
+        const key = `resolved-failure:${failure.error ?? "unavailable"}`;
+        assert.deepEqual(
+          await sessionRead(key, read, 1_000_000, cacheable),
+          failure
+        );
+        assert.deepEqual(await sessionRead(key, read, 1_001_000, cacheable), {
+          available: true,
+        });
+        assert.deepEqual(await sessionRead(key, read, 1_002_000, cacheable), {
+          available: true,
+        });
+        assert.equal(reads, 2);
+      }
+    )
+  );
+});

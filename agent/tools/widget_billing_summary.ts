@@ -973,7 +973,8 @@ const sessionReads = new Map<string, { at: number; value: Promise<unknown> }>();
 export function sessionRead<T>(
   key: string,
   read: () => Promise<T>,
-  now = Date.now()
+  now = Date.now(),
+  cacheable: (value: T) => boolean = () => true
 ): Promise<T> {
   for (const [stale, { at }] of sessionReads) {
     if (now - at > SESSION_READ_MS) {
@@ -984,7 +985,12 @@ export function sessionRead<T>(
   if (hit) {
     return hit.value as Promise<T>;
   }
-  const value = read();
+  const value = read().then((result) => {
+    if (!cacheable(result)) {
+      sessionReads.delete(key);
+    }
+    return result;
+  });
   sessionReads.set(key, { at: now, value });
   value.catch(() => sessionReads.delete(key));
   return value;
@@ -1041,28 +1047,47 @@ export const tool = defineTool({
     if (!scope) {
       throw new Error("Support widget identity required.");
     }
-    const once = <T>(read: string, id: string, run: () => Promise<T>) =>
+    const once = <T>(
+      read: string,
+      id: string,
+      run: () => Promise<T>,
+      cacheable: (value: T) => boolean = () => true
+    ) =>
       ctx.session.id
-        ? sessionRead(`${ctx.session.id}:${read}:${id}`, run)
+        ? sessionRead(
+            `${ctx.session.id}:${read}:${id}`,
+            run,
+            Date.now(),
+            cacheable
+          )
         : run();
     return composeWidgetBillingSummary(
       scope.organizationId,
       {
         getAutumnCustomer: (customerId) =>
-          once("autumn", customerId, () =>
-            readAutumnCustomer(customerId, {
-              client: executorClient(ctx),
-              signal: ctx.abortSignal,
-            })
+          once(
+            "autumn",
+            customerId,
+            () =>
+              readAutumnCustomer(customerId, {
+                client: executorClient(ctx),
+                signal: ctx.abortSignal,
+              }),
+            (value) => !asRow(value).error && asRow(value).available !== false
           ),
         getBillingAccount: (organizationId) =>
-          once("account", organizationId, () =>
-            readBillingAccount(organizationId, (query) =>
-              callPlanetscaleReadQuery(ctx, {
-                ...PRODUCTION_READ_QUERY_ARGS,
-                query,
-              })
-            )
+          once(
+            "account",
+            organizationId,
+            () =>
+              readBillingAccount(organizationId, (query) =>
+                callPlanetscaleReadQuery(ctx, {
+                  ...PRODUCTION_READ_QUERY_ARGS,
+                  query,
+                })
+              ),
+            (value) =>
+              value.found && !value.error && value.unavailable.length === 0
           ),
         getCreditHistory: (organizationId, window) =>
           readBillingCreditHistory(organizationId, window, (query) =>
@@ -1083,11 +1108,15 @@ export const tool = defineTool({
             )
           ),
         getStripeCustomerBilling: (customerId) =>
-          once("stripe", customerId, () =>
-            readStripeCustomerBilling(customerId, {
-              client: executorClient(ctx),
-              signal: ctx.abortSignal,
-            })
+          once(
+            "stripe",
+            customerId,
+            () =>
+              readStripeCustomerBilling(customerId, {
+                client: executorClient(ctx),
+                signal: ctx.abortSignal,
+              }),
+            (value) => Object.values(value).every((section) => !section.error)
           ),
         isAuthorized: async (organizationId) => {
           const [row] = parseReadQueryResult(
