@@ -187,7 +187,10 @@ export async function fileWidgetTicket(
         refund,
         ...confirmedIssue(result.data),
       });
-    } catch {
+    } catch (error) {
+      if (ctx.abortSignal.aborted) {
+        throw error;
+      }
       return {
         error:
           "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",

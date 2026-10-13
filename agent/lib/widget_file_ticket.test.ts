@@ -162,3 +162,36 @@ test("a confirmed ticket stays confirmed when its receipt cannot be saved", asyn
   assert.ok(!("error" in filed));
   assert.equal("identifier" in filed && filed.identifier, "ENG-43");
 });
+
+test("an abort during the receipt save propagates instead of becoming a ticket error", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const controller = new AbortController();
+  await assert.rejects(
+    fileTicketFor(
+      scope,
+      { summary: "The customer asked for a person.", title: "Support" },
+      controller.signal,
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      {
+        create: () =>
+          Promise.resolve({
+            data: {
+              id: "ENG-44",
+              url: "https://linear.app/acquisity/issue/ENG-44/support",
+            },
+            ok: true as const,
+          }),
+        readReceipt: async () => null,
+        refund: () => Promise.resolve(false),
+        saveReceipt: () => {
+          controller.abort();
+          return Promise.reject(new Error("aborted"));
+        },
+        search: () =>
+          Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+      }
+    )
+  );
+});
