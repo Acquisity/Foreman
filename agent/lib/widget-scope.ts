@@ -36,7 +36,8 @@ export const officeHoursSchema = z.strictObject({
   upcomingClosures: z
     .array(
       z.strictObject({
-        date: scheduleText,
+        // A real calendar date: Zod rejects 2026-02-30 as well as a bad shape.
+        date: z.iso.date(),
         hours: scheduleText,
         label: z.string().regex(CLOSURE_LABEL).nullable(),
       })

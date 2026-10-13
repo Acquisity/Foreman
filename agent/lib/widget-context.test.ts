@@ -204,6 +204,11 @@ test("the app's schedule fields ride on the office hours; a malformed one reads 
     { timeZoneName: 5 },
     { upcomingClosures: [{ date: "2026-11-26", hours: "Closed all day" }] },
     { upcomingClosures: [{ ...schedule.upcomingClosures[0], extra: 1 }] },
+    {
+      upcomingClosures: [
+        { ...schedule.upcomingClosures[0], date: "2026-02-30" },
+      ],
+    },
   ]) {
     const hours = { ...officeHours, ...schedule, ...malformed };
     // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
