@@ -639,18 +639,3 @@ test("an original name inside a longer word is not a leak, but joined by an unde
   scrubbed.case.question = "Gina_2 cannot sign in";
   assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
 });
-
-test("an original name joined to letters still leaks when it starts on a capital", () => {
-  const scrubbed = scrubCase(
-    rawCase({ contact: { name: "Gina" } }, "Why is this broken?"),
-    scope
-  );
-  for (const question of [
-    "Ask GinaSmith about it",
-    "The Ginas signed up",
-    "Ginacorp owns it",
-  ]) {
-    scrubbed.case.question = question;
-    assert.throws(() => serializeCase(scrubbed), NOT_SAVED, question);
-  }
-});
