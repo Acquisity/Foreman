@@ -298,16 +298,19 @@ export const decodedText = (value: unknown) => {
 };
 
 const LETTER = /[a-z]/;
+const CAPITAL = /[A-Z]/;
 /**
  * The value occurs other than inside a longer word ("gina" in "pagination"),
  * which the scrub deliberately leaves. Joined by "_" or a digit ("li_us") it
- * is still the value.
+ * is still the value, and so is a match starting on a capital in `original`
+ * (the same text before lowercasing): "GinaSmith", "Smiths", "Northwindcorp".
  */
-const hasValue = (text: string, value: string) => {
+const hasValue = (text: string, value: string, original = text) => {
   const inWord = (at: number) =>
-    (LETTER.test(value[0] ?? "") && LETTER.test(text[at - 1] ?? "")) ||
-    (LETTER.test(value.at(-1) ?? "") &&
-      LETTER.test(text[at + value.length] ?? ""));
+    !CAPITAL.test(original[at] ?? "") &&
+    ((LETTER.test(value[0] ?? "") && LETTER.test(text[at - 1] ?? "")) ||
+      (LETTER.test(value.at(-1) ?? "") &&
+        LETTER.test(text[at + value.length] ?? "")));
   for (
     let at = text.indexOf(value);
     at >= 0;
@@ -565,13 +568,14 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
           let rest = lower;
           for (const fixed of FIXTURE_VALUES) {
             if (fixed.includes(original)) {
+              // Same-length padding keeps offsets aligned with the original casing.
               rest = rest.replace(
                 new RegExp(`(?<![a-z0-9_])${literal(fixed)}(?![a-z0-9_])`, "g"),
-                "\0"
+                (match) => "\0".repeat(match.length)
               );
             }
           }
-          return hasValue(rest, original);
+          return hasValue(rest, original, value);
         })
       );
       return value;
