@@ -339,73 +339,63 @@ const queued: (() => void)[] = [];
  * stripped so it can only use the local Claude Code login.
  */
 export const claudeJudge: JudgeRunner = async (system, input, signal) => {
-  while (running >= JUDGE_CONCURRENCY) {
-    // biome-ignore lint/performance/noAwaitInLoops: wait for a free slot.
-    await new Promise<void>((resolve) => queued.push(resolve));
+  const env = { ...process.env };
+  for (const key of [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+  ]) {
+    delete env[key];
   }
-  running += 1;
-  try {
-    const env = { ...process.env };
-    for (const key of [
-      "ANTHROPIC_API_KEY",
-      "ANTHROPIC_AUTH_TOKEN",
-      "ANTHROPIC_BASE_URL",
-    ]) {
-      delete env[key];
+  const child = spawn(
+    "claude",
+    [
+      "-p",
+      "--model",
+      CLAUDE_MODEL,
+      "--system-prompt",
+      system,
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--no-session-persistence",
+      "--output-format",
+      "json",
+      "--json-schema",
+      JUDGE_JSON_SCHEMA,
+    ],
+    { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  const out: Buffer[] = [];
+  const err: Buffer[] = [];
+  child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+  child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+  child.stdin.on("error", () => undefined);
+  child.stdin.end(input);
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", resolve);
+  });
+  const text = Buffer.concat(out).toString("utf8");
+  const result = (() => {
+    try {
+      return JSON.parse(text) as {
+        is_error?: boolean;
+        result?: string;
+        structured_output?: unknown;
+      };
+    } catch {
+      return null;
     }
-    const child = spawn(
-      "claude",
-      [
-        "-p",
-        "--model",
-        CLAUDE_MODEL,
-        "--system-prompt",
-        system,
-        "--tools",
-        "",
-        "--setting-sources",
-        "",
-        "--strict-mcp-config",
-        "--no-session-persistence",
-        "--output-format",
-        "json",
-        "--json-schema",
-        JUDGE_JSON_SCHEMA,
-      ],
-      { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
+  })();
+  if (code !== 0 || !result || result.is_error || !result.structured_output) {
+    throw new Error(
+      `claude -p failed (exit ${code}): ${(result?.result ?? Buffer.concat(err).toString("utf8")).slice(0, 300)}`
     );
-    const out: Buffer[] = [];
-    const err: Buffer[] = [];
-    child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
-    child.stdin.on("error", () => undefined);
-    child.stdin.end(input);
-    const code = await new Promise<number | null>((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", resolve);
-    });
-    const text = Buffer.concat(out).toString("utf8");
-    const result = (() => {
-      try {
-        return JSON.parse(text) as {
-          is_error?: boolean;
-          result?: string;
-          structured_output?: unknown;
-        };
-      } catch {
-        return null;
-      }
-    })();
-    if (code !== 0 || !result || result.is_error || !result.structured_output) {
-      throw new Error(
-        `claude -p failed (exit ${code}): ${(result?.result ?? Buffer.concat(err).toString("utf8")).slice(0, 300)}`
-      );
-    }
-    return result.structured_output;
-  } finally {
-    running -= 1;
-    queued.shift()?.();
   }
+  return result.structured_output;
 };
 
 const MAX_REASON = 240;
@@ -458,15 +448,31 @@ export async function judgeAnswer(
   run: JudgeRunner = claudeJudge,
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
-  const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
-  const object = judgeSchema.parse(
-    await run(
-      recorded.mode === "investigate" ? INVESTIGATE_JUDGE_PROMPT : JUDGE_PROMPT,
-      judgeInput(recorded, answer, claims, articles),
-      abortSignal ? AbortSignal.any([abortSignal, deadline]) : deadline
-    )
-  );
-  return { gaps: parseGaps(object), verdicts: parseVerdicts(claims, object) };
+  while (running >= JUDGE_CONCURRENCY) {
+    // biome-ignore lint/performance/noAwaitInLoops: wait for a free slot.
+    await new Promise<void>((resolve) => queued.push(resolve));
+  }
+  running += 1;
+  try {
+    // Started once a slot is free, so time spent queued never counts against it.
+    const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
+    const object = judgeSchema.parse(
+      await run(
+        recorded.mode === "investigate"
+          ? INVESTIGATE_JUDGE_PROMPT
+          : JUDGE_PROMPT,
+        judgeInput(recorded, answer, claims, articles),
+        abortSignal ? AbortSignal.any([abortSignal, deadline]) : deadline
+      )
+    );
+    return {
+      gaps: parseGaps(object),
+      verdicts: parseVerdicts(claims, object),
+    };
+  } finally {
+    running -= 1;
+    queued.shift()?.();
+  }
 }
 
 /** Ignored output root; each eval invocation writes `<root>/<timestamp>/`. */

@@ -469,6 +469,32 @@ for (const cancellation of ["deadline", "caller"] as const) {
   });
 }
 
+test("a judge call waiting for a slot does not start its deadline", async (t) => {
+  let timeouts = 0;
+  t.mock.method(AbortSignal, "timeout", () => {
+    timeouts += 1;
+    return new AbortController().signal;
+  });
+  const holds: (() => void)[] = [];
+  const held: JudgeRunner = () =>
+    new Promise((resolve) =>
+      holds.push(() => resolve({ gaps: [], verdicts: [] }))
+    );
+  const busy = [1, 2, 3].map(() =>
+    judgeAnswer(recorded, "An answer.", [], undefined, held)
+  );
+  const queued = judgeAnswer(recorded, "An answer.", [], undefined, held);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timeouts, 3, "the fourth call is queued with no deadline yet");
+  holds.shift()?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timeouts, 4, "its deadline starts once a slot frees");
+  for (const release of holds.splice(0)) {
+    release();
+  }
+  await Promise.allSettled([...busy, queued]);
+});
+
 test("a cited run's judge input carries the cited article text and the widget affordances", async () => {
   const urls: string[] = [];
   const articles = await citedArticles(
