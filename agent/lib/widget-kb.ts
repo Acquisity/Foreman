@@ -285,6 +285,7 @@ const promptFacts = (customer: KbCustomer | undefined) => [
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
+  ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
 ];
 
 // biome-ignore assist/source/useSortedKeys: claims first, so the model checks before it rewrites.
@@ -374,6 +375,8 @@ export interface KbCustomer {
    * it again. Read from Foreman's own earlier turns, which word it one way.
    */
   glassOffered?: boolean;
+  /** The team's published hours and closures; see officeSchedule. */
+  officeSchedule?: string;
   role: string;
   workspace: string;
 }

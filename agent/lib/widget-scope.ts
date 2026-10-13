@@ -5,6 +5,11 @@ import { stampUnattended } from "./trust.js";
 
 export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 
+// e.g. "Monday–Friday: 9:00 AM–5:00 PM", "Eastern Time", "Closed all day".
+const scheduleText = z.string().regex(/^[\p{L}\p{N}\p{Pd} ,:./()+]{1,200}$/u);
+// An admin's own name for a closure, such as "New Year's Day".
+const CLOSURE_LABEL = /^[^\p{Cc}<>{}]{1,100}$/u;
+
 /**
  * Acquisity's support office hours as its context route computes them per
  * request (ENG-15262). Absent means always open, as before the app sent it.
@@ -12,6 +17,10 @@ export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 export const officeHoursSchema = z.strictObject({
   customerTimeZone: z.string().min(1).max(100),
   enabled: z.boolean(),
+  // The team's published schedule, in its own zone, as customer-facing text.
+  // Optional, since Foreman deploys apart from the app: a malformed one reads
+  // as absent and the rest of the office hours stand. See officeSchedule.
+  hoursText: z.array(scheduleText).max(7).optional().catch(undefined),
   nextOpenAt: z.iso.datetime({ offset: true }).nullable(),
   // Customer-facing text Foreman repeats verbatim, e.g. "Monday, Oct 19 at 9:00 AM EDT".
   nextOpenText: z
@@ -23,6 +32,18 @@ export const officeHoursSchema = z.strictObject({
   replyTimeText: z.string().min(1).max(80),
   showReplyTime: z.boolean(),
   timeZone: z.string().min(1).max(100),
+  timeZoneName: scheduleText.optional().catch(undefined),
+  upcomingClosures: z
+    .array(
+      z.strictObject({
+        date: scheduleText,
+        hours: scheduleText,
+        label: z.string().regex(CLOSURE_LABEL).nullable(),
+      })
+    )
+    .max(20)
+    .optional()
+    .catch(undefined),
 });
 export type OfficeHours = z.infer<typeof officeHoursSchema>;
 

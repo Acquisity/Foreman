@@ -143,6 +143,7 @@ export function chatMessages(
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
         ...(customer?.afterHoursPerson ? [AFTER_HOURS_WRITER_NOTE] : []),
+        ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
         ...(note.role === "owner" || !ROLE_LIMITS
           ? []
           : [`Who can do what, from the guide:\n${ROLE_LIMITS}`]),

@@ -44,6 +44,11 @@ describe("routeWidgetMessage", () => {
       "reports_bug",
       "states_need",
     ]);
+    // A question about when a person is available is a need, not a bare ask (ENG-15262).
+    const need: string = body.questions.states_need.instructions;
+    for (const words of ["is available", "hours", "holiday closures"]) {
+      assert.ok(need.includes(words), words);
+    }
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
       "Bearer test-key"

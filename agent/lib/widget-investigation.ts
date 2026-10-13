@@ -31,6 +31,7 @@ import {
   awayHours,
   awayInvite,
   backAtLine,
+  officeSchedule,
   ticketInsteadOfHandoff,
 } from "./widget-office-hours.js";
 import {
@@ -1232,8 +1233,10 @@ async function answerFromKnowledgeBase(
   deps: WidgetDependencies,
   helpCenterOnly: boolean
 ): Promise<WidgetRun | null> {
+  const schedule = officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
+    ...(schedule ? { officeSchedule: schedule } : {}),
     role: scope.role,
     workspace: scope.organizationName,
   };

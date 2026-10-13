@@ -129,6 +129,27 @@ test("the conversation reaches the model as chat turns after the app's note", ()
   );
 });
 
+test("the team's schedule reaches the guide writer in the app's note only when the server sent one", () => {
+  const customer = { canInvestigate: false, role: "owner", workspace: "w" };
+  const note =
+    "The support team's hours, from the app, in Eastern Time: Monday–Friday: 9:00 AM–5:00 PM.";
+  assert.ok(
+    chatMessages(
+      { latest: "when are you open?" },
+      {
+        ...customer,
+        officeSchedule: note,
+      }
+    )[0].content.includes(note)
+  );
+  assert.ok(
+    !chatMessages(
+      { latest: "when are you open?" },
+      customer
+    )[0].content.includes("support team's hours")
+  );
+});
+
 test("a failed model call is a short ask to send again", async () => {
   const answer = await answerFromGuide(
     "hi",

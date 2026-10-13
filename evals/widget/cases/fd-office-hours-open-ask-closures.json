@@ -1,0 +1,57 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Names the upcoming closures: Thanksgiving on Nov 26, closed all day, and Christmas Eve on Dec 24, open only 9:00 AM to 12:00 PM, in Eastern Time.",
+      "States no closure, holiday or hours other than those two closures and Monday to Friday 9:00 AM to 5:00 PM Eastern Time.",
+      "Does not say the support team is away right now.",
+      "Does not promise that a person will reply soon or right away."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": null,
+    "toolBudget": null
+  },
+  "officeHours": {
+    "customerTimeZone": "America/New_York",
+    "enabled": true,
+    "hoursText": ["Monday–Friday: 9:00 AM–5:00 PM"],
+    "nextOpenAt": null,
+    "nextOpenText": null,
+    "open": true,
+    "replyTimeMinutes": 20,
+    "replyTimeText": "20 minutes",
+    "showReplyTime": true,
+    "timeZone": "America/New_York",
+    "timeZoneName": "Eastern Time",
+    "upcomingClosures": [
+      {
+        "date": "2026-11-26",
+        "hours": "Closed all day",
+        "label": "Thanksgiving"
+      },
+      {
+        "date": "2026-12-24",
+        "hours": "9:00 AM–12:00 PM",
+        "label": "Christmas Eve"
+      }
+    ]
+  },
+  "question": "Is support closed for any holidays coming up?",
+  "scope": {
+    "role": "owner",
+    "workspace": "Company One"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "kb",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

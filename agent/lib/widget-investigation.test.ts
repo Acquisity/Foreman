@@ -2461,6 +2461,53 @@ test("after hours, an ask for a person is answered with the back-at line and fil
   assert.ok(filed[0].summary.includes("Connect your calendar first"));
 });
 
+test("a question about when a person is available gets the team's schedule in the writer's note, and after hours the away line follows the answer", async (t) => {
+  enabled(t);
+  const schedule = {
+    hoursText: ["Monday–Friday: 9:00 AM–5:00 PM"],
+    timeZoneName: "Eastern Time",
+    upcomingClosures: [
+      { date: "2026-11-26", hours: "Closed all day", label: "Thanksgiving" },
+    ],
+  };
+  for (const [officeHours, scheduled] of [
+    [{ ...closedHours, ...schedule }, true],
+    [{ ...closedHours, ...schedule, enabled: false }, false],
+    [closedHours, false],
+  ] as const) {
+    const { deps } = dependencies();
+    deps.route = () =>
+      Promise.resolve({ asksForHuman: 0.93, source: "jev" as const });
+    deps.fileTicket = ticketFiler().fileTicket;
+    const notes: (string | undefined)[] = [];
+    deps.answerChat = (_ask, _log, customer) => {
+      notes.push(customer?.officeSchedule);
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        question: "What are the times a human is available?",
+      }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, officeHours }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    const note = notes.at(-1);
+    if (scheduled) {
+      assert.ok(note?.includes("Monday–Friday: 9:00 AM–5:00 PM"));
+      assert.ok(note?.includes("Eastern Time"));
+      assert.ok(note?.includes("2026-11-26 (Thanksgiving): Closed all day"));
+      assert.equal(body.message, `${kbAnswer.message}\n\n${AWAY}`);
+    } else {
+      assert.ok(notes.every((n) => n === undefined));
+    }
+  }
+});
+
 test("after hours, an ask for a person that states no need leads with the away line and an invitation, with no ticket, writer, or sources", async (t) => {
   enabled(t);
   for (const mode of [undefined, "investigate"] as const) {
