@@ -46,7 +46,11 @@ const REFUND_REQUEST = 0.5;
 const BUG_REPORT = 0.7;
 /** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
 const RECORDING_REQUEST = 0.5;
-/** Below this, the customer has said nothing they need beyond a person. */
+/**
+ * Below this, the customer has said nothing they need beyond a person.
+ * Measured 2026-10-13: bare asks and greetings scored 0.06 to 0.16; a person
+ * plus a question, a problem or an earlier problem scored 0.68 to 0.95.
+ */
 const NEED_STATED = 0.5;
 
 /**
@@ -214,7 +218,7 @@ const QUESTIONS = {
   // after-hours ask for a person gets when there is nothing to act on (ENG-15262).
   states_need: {
     instructions:
-      "The customer has said, in the latest message or the earlier turns, what they need help with: a question, a problem, something that went wrong, or a task. A message that only asks to talk to a person, a human or support, or only greets, is NOT this.",
+      "Ignoring any request to talk to a person, the customer still asks something about the product or describes a problem, in the latest message or earlier in the conversation. Asking where to find or how to use a named feature counts, as does 'my campaign stopped'; 'can I talk to someone' alone does not.",
     type: "noul",
   },
 } as const;
