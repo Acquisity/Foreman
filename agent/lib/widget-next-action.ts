@@ -2,7 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
-import { withoutGuide } from "./widget-instructions.js";
+import { customerMessages, withoutGuide } from "./widget-instructions.js";
 
 /**
  * Preview pilot: at the first investigation step and after results, Jev picks the
@@ -612,17 +612,6 @@ const outcomeOf = (decision: string, detail: string) => {
 const DISPUTE =
   /\b(?:refund\w*|reimburs\w*|money back|charge ?back|disput\w*|over-?(?:charg|invoic|bill)\w*|charged (?:me )?twice|double[- ]charg\w*)/iu;
 
-/** Whether a field named `key` anywhere in a result is literally true. */
-const flagged = (value: unknown, key: string, depth = 0): boolean => {
-  if (depth > 8 || !value || typeof value !== "object") {
-    return false;
-  }
-  return (
-    (value as Record<string, unknown>)[key] === true ||
-    Object.values(value).some((inner) => flagged(inner, key, depth + 1))
-  );
-};
-
 /**
  * The ticket the reads already settle, decided in code before Jev is asked.
  * Jev picked `ticket` 2 times in 60 live runs and missed both clear cases
@@ -635,14 +624,45 @@ export function ruledTicket(
   question: string,
   reads: Pick<Read, "result" | "tool">[]
 ): "billing" | "fault" | null {
-  const results = reads.flatMap((read) =>
-    gathering(read.tool) ? [parsed(read.result)] : []
-  );
-  if (results.some((result) => flagged(result, "platformFault"))) {
+  const results = reads.map((read) => {
+    const result = parsed(read.result) as {
+      type?: string;
+      value?: unknown;
+    } | null;
+    return {
+      output: result?.type === "json" ? result.value : result,
+      tool: read.tool,
+    };
+  });
+  if (
+    results.some(
+      ({ tool, output }) =>
+        tool === "widget_outreach_health" &&
+        (
+          output as {
+            campaigns?: {
+              diagnostics?: {
+                earlyFollowUps?: { platformFault?: boolean } | null;
+              } | null;
+            }[];
+          } | null
+        )?.campaigns?.some(
+          (campaign) =>
+            campaign.diagnostics?.earlyFollowUps?.platformFault === true
+        )
+    )
+  ) {
     return "fault";
   }
-  return DISPUTE.test(question.slice(0, CONVERSATION_CHARS)) &&
-    results.some((result) => flagged(result, "identifiesCharge"))
+  return DISPUTE.test(
+    customerMessages(question.slice(0, CONVERSATION_CHARS))
+  ) &&
+    results.some(
+      ({ tool, output }) =>
+        tool === "widget_billing_summary" &&
+        (output as { identifiesCharge?: boolean } | null)?.identifiesCharge ===
+          true
+    )
     ? "billing"
     : null;
 }

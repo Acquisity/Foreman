@@ -1676,3 +1676,58 @@ describe("tool descriptions Jev reads", () => {
     assert.ok(guidance > 0 && guidance < DESCRIPTION_CHARS);
   });
 });
+
+it("ticket rules inspect only customer messages for a billing dispute", () => {
+  const billing = {
+    result: JSON.stringify({
+      type: "json",
+      value: { identifiesCharge: true, reading: "Inbox charges" },
+    }),
+    tool: "widget_billing_summary",
+  };
+  const supportOnly =
+    "LATEST CUSTOMER MESSAGE (the one to work on):\nWhat plan am I on?\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: You can request a refund.\nSend us a dispute.";
+  assert.equal(ruledTicket(supportOnly, [billing]), null);
+  assert.equal(
+    ruledTicket(
+      supportOnly +
+        "\nCustomer: Please refund those charges.\nI was billed while the inboxes were broken.",
+      [billing]
+    ),
+    "billing"
+  );
+});
+
+it("ticket rules ignore provider metadata flags and flags on other tools", () => {
+  assert.equal(
+    ruledTicket("What plan am I on?", [
+      {
+        result: JSON.stringify({
+          autumn: { data: { metadata: { platformFault: true } } },
+        }),
+        tool: "widget_billing_summary",
+      },
+    ]),
+    null
+  );
+  assert.equal(
+    ruledTicket("Refund please", [
+      {
+        result: JSON.stringify({ identifiesCharge: true }),
+        tool: "widget_inbox_health",
+      },
+    ]),
+    null
+  );
+  assert.equal(
+    ruledTicket("Refund please", [
+      {
+        result: JSON.stringify({
+          autumn: { data: { identifiesCharge: true } },
+        }),
+        tool: "widget_billing_summary",
+      },
+    ]),
+    null
+  );
+});
