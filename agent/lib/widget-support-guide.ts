@@ -1,0 +1,31 @@
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
+
+/**
+ * Support facts Aaron confirmed (ENG-15044 round 10; the support chat's own limits moved here from the investigator's instructions in round 14 so the judge reads them too, CRM email sync added the same day; the promo code and Email Accounts & Domains lines in round 12 from Acquisity source, the Cold Email Agent plan line on 2026-10-12, the sending-rules, plan-unlock and Legacy provider account lines on 2026-10-12) that the help center does
+ * not state. Hand-maintained: widget-product-guide.ts is generated and must not
+ * be edited by hand. The unpaid-inbox line follows Acquisity's weekly
+ * audit-cmr-domain-subscriptions job and unpaid-managed-domain-cancellation.
+ */
+const SUPPORT_FACTS = `# Support facts
+
+Confirmed by Acquisity's support team. They count as product facts, like the guide that follows.
+
+- Writing copy for a prospect or a campaign is not something an account investigation does. Point the customer to the AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar.
+- A message like "You're back with Acquisity Foreman" is a system notice: the chat with a person ended and the AI took over again.
+- A first email, and every other sequence step, comes from the campaign's email copy and its variants, never from the AI SDR. The AI SDR only writes replies after a prospect responds, and its persona comes from its Knowledge Base and its Assigned Call Handler. When a wrong name or wrong text shows up, first find out which of the two it is in.
+- Done-for-you inboxes in Error, with Reconnect failing because the mailbox was not found: first check whether they were cancelled for non-payment. A weekly check flags unpaid done-for-you domains, and after a grace period Acquisity cancels them: the domain is suspended, its inboxes go to Error with the saved connection error "Mailbox cancelled after unpaid cleanup", and the order shows as cancelled. Reconnect cannot bring back a cancelled mailbox.
+- In the support chat the customer can attach up to three screenshots to a message. They cannot attach video or other files there. To show their screen, they use the Record my screen button the app can show at the bottom of Support's reply.
+- The support chat covers only the workspace the customer is in. To ask about another workspace, they switch to it from the workspace switcher and ask again there.
+- "No email accounts connected" can show while accounts are connected and sending fine. It is a known display bug: trust the inbox read over that message.
+- The upgrade checkout ("Confirm Upgrade") has a "Promo Code (Optional)" field. Leaving it empty is fine. A code typed in must be applied with "Apply" first: "Confirm Upgrade" stays disabled while a typed code is not applied, so clear the field to upgrade without one.
+- Settings > Billing > "Email Accounts & Domains" shows Total Domains and Total Inboxes, then one row per managed domain with its inbox count, yearly domain price, monthly inbox total and a billing badge: Paid, Partially paid, Unpaid, "Cancels <date>" for a cancellation that has not taken effect, "Inactive" or "Ended <date>" for a domain no longer active, or "Still billed" next to it when an ended domain is still being charged. A pre-warmed domain also shows "Active until <date>" or "Ended <date>". Expanding a row lists each inbox with its type (Pre-warmed, Normal or External), its status (Active, Pre-warmed, Pending, Error, or Ended once the domain has ended), when it was bought or added, and when its next payment is due. Domains cancelled for non-payment (suspended) are not listed on the card at all.
+- The Cold Email Agent needs an enabled paid plan. Without one it is fully blocked: Email Accounts can't be added and New Campaign isn't clickable. Acquisity sets up the workspace's sending account only once the plan is enabled, so a workspace with no sending account at all has the Cold Email Agent off. The fix is enabling a paid plan in Settings > Billing. Once a paid plan is enabled, everything in the Cold Email Agent and AI SDR unlocks, Email Accounts and New Campaign included, with no extra setup step.
+- A campaign's sending rules (Prioritize New Leads, and the most new leads that get a first email each day) are set by Acquisity. The customer can't change them: explain what they mean for the campaign, and never tell the customer to change them.
+- Lead credits and website credits come from one shared pool. Check how many credits went to websites before calling a credit gap a double count.
+- A published site without its own domain gets a free generic web address that the customer does not control. A custom domain is a separate purchase.
+- In the Cold Email Writer, the referrer fields are required. Generic values do not block sending, but they should name a real person at the customer's company.
+- When a sending account was connected directly on a Legacy plan, never tell the customer someone at their company set it up: it may have been set up and managed for them. Its addresses and inboxes live in that sending-provider account, where they are managed and billed. Closing Acquisity does not stop them; they are stopped or cancelled in that provider account.
+- Personal emails in the CRM: the CRM copies email from every inbox connected in Settings > Email & Calendar, and anyone in the workspace who can open a record can read those emails. Each connected inbox has two settings. Email sync is an On/Off switch: Off means no new emails are copied, and Gmail itself is never changed; the inbox's owner switches their own address Off and confirms with "Turn off". New people from email is Selective (the default: people you emailed or who replied), Everyone new (anyone new on a thread, including CC) or Off (add people yourself). Neither setting removes what is already copied, and there is no way to delete a single conversation: to clean up, delete the unwanted person in CRM > People, which deletes their email threads with them for everyone and cannot be undone. For the calendar, keep "Show my event names to my team" Off, and teammates then see "External Event".`;
+
+/** What the investigator, the reply composer and the judge read as product knowledge. */
+export const SUPPORT_GUIDE = `${SUPPORT_FACTS}\n\n${PRODUCT_GUIDE}`;

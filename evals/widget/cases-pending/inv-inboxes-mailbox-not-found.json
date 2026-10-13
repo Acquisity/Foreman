@@ -362,7 +362,7 @@
         "existing": false,
         "refund": false,
         "identifier": "ENG-1",
-        "url": "https://internal.example/1"
+        "url": "https://linear.app/acquisity/issue/ENG-1"
       },
       "requestedAt": "2026-10-07T15:06:58.388Z",
       "resultAt": "2026-10-07T15:07:03.869Z",

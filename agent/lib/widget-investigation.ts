@@ -20,6 +20,7 @@ import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
 import {
   askedResult,
+  gathering,
   handoffEligible,
   nextActionEnabled,
   validAsk,
@@ -219,11 +220,15 @@ export type WaitOutcome =
   | {
       /** The question widget_ask_customer recorded during this turn, if a clarify decision ran. */
       asked?: string;
+      /** The turn read the workspace, so a question goes out after what the reads found. */
+      afterReads?: true;
       findings: WidgetFindings | null;
       status: "completed";
       text: string | null;
       /** What widget_file_ticket itself returned during this turn, if it ran. */
       ticket?: FiledTicket | null;
+      /** Each reading the turn's tools computed, as findings facts. */
+      readings?: WidgetFindings["facts"];
     };
 
 const TEXT_MAX = 4000;
@@ -273,6 +278,103 @@ export function filedTicketResult(result: unknown): FiledTicket | null {
 }
 
 /**
+ * The readings a tool computed, read from its own result. The write-up can doubt
+ * a reading (ENG-15044: ...49GFMPB and ...G6PZ3P each set theirs aside in 3 of 3
+ * runs), so each one reaches the composer from the result, tool as evidence.
+ */
+export function toolReadings(result: unknown): WidgetFindings["facts"] {
+  const action = result as {
+    isError?: boolean;
+    kind?: string;
+    output?: unknown;
+    toolName?: string;
+  } | null;
+  if (
+    action?.kind !== "tool-result" ||
+    action.isError ||
+    typeof action.toolName !== "string"
+  ) {
+    return [];
+  }
+  const tool = action.toolName;
+  const output = action.output as {
+    campaigns?: unknown;
+    reading?: unknown;
+  } | null;
+  const fact = (reading: unknown, about?: unknown) =>
+    typeof reading === "string" && reading
+      ? [
+          {
+            claim: (typeof about === "string"
+              ? `Campaign "${about}": ${reading}`
+              : reading
+            ).slice(0, 2000),
+            entityIds: typeof about === "string" ? [about.slice(0, 200)] : [],
+            evidence: { ref: "reading", tool },
+          },
+        ]
+      : [];
+  const campaigns = Array.isArray(output?.campaigns) ? output.campaigns : [];
+  return [
+    ...fact(output?.reading),
+    ...campaigns.flatMap(
+      (
+        campaign: {
+          diagnostics?: {
+            earlyFollowUps?: { reading?: unknown } | null;
+          } | null;
+          live?: { sendingRules?: { reading?: unknown } };
+          name?: unknown;
+        } | null
+      ) => [
+        ...fact(campaign?.live?.sendingRules?.reading, campaign?.name),
+        ...fact(campaign?.diagnostics?.earlyFollowUps?.reading, campaign?.name),
+      ]
+    ),
+  ];
+}
+
+const FACTS_MAX = 50;
+/**
+ * A write-up fact that calls a tool's reading or interpretation unconfirmed. On
+ * wrun ...STAT0M the write-up said the mailbox-not-found reading was unconfirmed
+ * because the raw reconnect lines under the same tool were worded differently,
+ * and the reply then said it could not confirm why (round 14, 2 of 3 runs).
+ */
+const ABOUT_READING = /\b(?:reading|interpretation)\b/iu;
+const DOUBTS =
+  /\b(?:unconfirmed|not confirmed|uncertain|can(?:not|'t|’t) (?:be )?(?:confirm|verif)\w*|could not (?:be )?(?:confirm|verif)\w*)\b/iu;
+const doubtsReading = (claim: string) =>
+  ABOUT_READING.test(claim) && DOUBTS.test(claim);
+
+/**
+ * Every fired reading leads the facts. The tool computed it from the workspace
+ * data, so it outranks a write-up fact that calls it unconfirmed, which is
+ * dropped; a reading the tool itself words as likely keeps that wording.
+ */
+export const withReadings = (
+  readings: WidgetFindings["facts"] | undefined,
+  findings: WidgetFindings | null
+): WidgetFindings | null => {
+  if (!(findings && readings?.length)) {
+    return findings;
+  }
+  const lead = [
+    ...new Map(readings.map((reading) => [reading.claim, reading])).values(),
+  ];
+  const claims = new Set(lead.map((reading) => reading.claim));
+  return {
+    ...findings,
+    facts: [
+      ...lead,
+      ...findings.facts.filter(
+        (fact) => !(claims.has(fact.claim) || doubtsReading(fact.claim))
+      ),
+    ].slice(0, FACTS_MAX),
+  };
+};
+
+/**
  * The tool's own result outranks whatever the write-up or the model pass said
  * about a ticket: with no filed ticket, a claimed one is dropped so the customer
  * is never told one was filed. A filed refund ticket is the handoff to billing,
@@ -299,17 +401,43 @@ const withFiledTicket = (
 
 interface Recorded {
   asked: string | null;
+  read: boolean;
+  readings: WidgetFindings["facts"];
   ticket: FiledTicket | null;
 }
-/** What the turn's own tool results recorded: a filed ticket, a question for the customer. */
-const recorded = (result: unknown, so: Recorded): Recorded => ({
-  asked: askedResult(result) ?? so.asked,
-  ticket: filedTicketResult(result) ?? so.ticket,
-});
+/** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
+const recorded = (result: unknown, so: Recorded): Recorded => {
+  const action = result as { kind?: string; toolName?: unknown } | null;
+  return {
+    asked: askedResult(result) ?? so.asked,
+    read:
+      so.read ||
+      (action?.kind === "tool-result" &&
+        typeof action.toolName === "string" &&
+        gathering(action.toolName)),
+    readings: [...so.readings, ...toolReadings(result)],
+    ticket: filedTicketResult(result) ?? so.ticket,
+  };
+};
+const nothingRecorded: Recorded = {
+  asked: null,
+  read: false,
+  readings: [],
+  ticket: null,
+};
 const completed = (
-  asked: string | null,
-  outcome: Extract<WaitOutcome, { status: "completed" }>
-): WaitOutcome => (asked ? { ...outcome, asked } : outcome);
+  { asked, read, readings, ticket }: Recorded,
+  outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
+): WaitOutcome => {
+  const done = {
+    ...outcome,
+    ...(readings.length ? { readings } : {}),
+    ticket,
+  };
+  return asked
+    ? { ...done, asked, ...(read ? { afterReads: true } : {}) }
+    : done;
+};
 
 /**
  * Task completion owns the answer. The structured result is the findings
@@ -331,8 +459,7 @@ export async function waitForWidgetInvestigation(
   const progress = progressFromEvents(planned);
   let findings: WidgetFindings | null = null;
   let text: string | null = null;
-  let ticket: FiledTicket | null = null;
-  let asked: string | null = null;
+  let so = nothingRecorded;
   try {
     for (;;) {
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
@@ -347,21 +474,15 @@ export async function waitForWidgetInvestigation(
       if (event.type === "turn.started") {
         findings = null;
         text = null;
-        ticket = null;
-        asked = null;
+        so = nothingRecorded;
       } else if (event.type === "action.result") {
-        ({ asked, ticket } = recorded(event.data.result, { asked, ticket }));
+        so = recorded(event.data.result, so);
       } else if (event.type === "result.completed") {
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "session.completed") {
-        return completed(asked, {
-          findings,
-          status: "completed",
-          text,
-          ticket,
-        });
+        return completed(so, { findings, status: "completed", text });
       } else if (event.type === "session.failed") {
         return { status: "failed" };
       }
@@ -607,10 +728,12 @@ async function withEligibleHandoff(
 }
 
 /**
- * A post-tool clarify decision is answered with one question. That question is
- * the whole reply, so it skips the two slow model passes that only exist to turn
- * a report into a reply (structuring it, then composing from it). It still goes
- * through the ownership scan, the reviewer and the final text scan.
+ * A clarify decision with no reads behind it is answered with one question.
+ * That question is the whole reply, so it skips the two slow model passes that
+ * only exist to turn a report into a reply (structuring it, then composing from
+ * it). It still goes through the ownership scan, the reviewer and the final text
+ * scan. After reads, the investigator also wrote what they found, and the reply
+ * states that before the question (ENG-15044: 23 replies dropped the findings).
  */
 const askedFindings = (asked: string) =>
   parseFindings({
@@ -626,7 +749,7 @@ const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
   return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
-/** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
+/** A lone clarify question as it stands, findings then the question after reads; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
 async function structureWriteUp(
   run: Pick<WidgetRun, "id" | "scope">,
   sessionId: string,
@@ -637,6 +760,31 @@ async function structureWriteUp(
   signal?: AbortSignal
 ) {
   const asked = nextActionEnabled() ? outcome.asked : null;
+  const found =
+    asked && outcome.afterReads && outcome.text
+      ? (outcome.findings ??
+        (await deps.extract({
+          investigatorText: outcome.text,
+          question: conversation,
+          scope: run.scope,
+          signal,
+        })))
+      : null;
+  if (asked && found) {
+    // The question is the recommendation, so the reviewer reads it like any
+    // other item and the composer ends the reply with it.
+    return {
+      gateDeps: undefined,
+      structured: withFiledTicket(
+        outcome.ticket,
+        withReadings(outcome.readings, {
+          ...found,
+          needsHuman: false,
+          recommendation: asked,
+        })
+      ),
+    };
+  }
   if (asked) {
     return {
       // What is delivered is what the reviewer left, never the text as written:
@@ -662,7 +810,10 @@ async function structureWriteUp(
   return {
     gateDeps: undefined,
     structured: await withEligibleHandoff(
-      withFiledTicket(outcome.ticket, extracted),
+      withFiledTicket(
+        outcome.ticket,
+        withReadings(outcome.readings, extracted)
+      ),
       conversation,
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
       deps.handoffEligible
@@ -729,10 +880,8 @@ export async function finishWidgetRun(
     // conversation, so a reply continues the thread instead of starting over.
     // A failed read costs only that context, never the reply. The judge still
     // gets the question alone: it rules on the findings, not the conversation.
-    const conversation = withHistory(
-      run.question,
-      await deps.history(run).catch(() => [])
-    );
+    const history = await deps.history(run).catch(() => []);
+    const conversation = withHistory(run.question, history);
     // Asked alongside the write-up passes, so it costs no wait.
     const changeAsked = (
       deps.changeRequested?.(conversation) ?? Promise.resolve(false)
@@ -766,7 +915,13 @@ export async function finishWidgetRun(
         await changeAsked,
         deadline,
         run.recording_requested === true,
-        cutoff
+        cutoff,
+        [
+          ...history.flatMap(({ role, text }) =>
+            role === "customer" ? [text] : []
+          ),
+          run.question,
+        ].join("\n")
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per

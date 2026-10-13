@@ -5,6 +5,7 @@ import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import { toolReadings } from "#lib/widget-investigation.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetProvisioningQuery,
@@ -56,6 +57,10 @@ const rawOrder = {
   domainRows: 6,
   domainsProvisioned: 0,
   failedDomainRows: 0,
+  forwardingAtPurchase: {
+    domains: [{ domain: "example-outreach.com", forwardTo: null }],
+    truncated: false,
+  },
   hasError: false,
   id: orderId,
   inboxCountPerDomain: 3,
@@ -160,6 +165,9 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "dpo.order_type = 'dfy'",
     "jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'",
     "jsonb_array_length(mb.value)",
+    // Only the forwarding website set at purchase leaves those order blobs.
+    "dpo.selected_domains ->> 'forwardTo'",
+    "select d.value ->> 'forwardTo'",
   ]) {
     assert.ok(query.includes(required), required);
   }
@@ -167,16 +175,77 @@ test("the statement checks membership and scopes every provisioning join", () =>
     "select *",
     "buyer_email",
     "domain_search",
-    "selected_domains",
+    "selected_domains as",
+    "selected_domains -> 'domains'",
     "dfy_config as",
-    "dfy_config -> 'domains'",
     "jsonb_object_keys",
     "checkout_lease",
-    "md.domain",
     "mi.email",
   ]) {
     assert.equal(query.includes(forbidden), false, forbidden);
   }
+});
+
+test("each bought domain carries the forwarding set at purchase, labeled as not current", () => {
+  // Rounds 14 and 15: replies stated the purchase value as the current setting.
+  const result = parseWidgetProvisioningEvidence(
+    envelope([
+      {
+        ...rawOrder,
+        forwardingAtPurchase: {
+          domains: [
+            { domain: "example-outreach.com", forwardTo: null },
+            {
+              domain: "example-reach.com",
+              forwardTo: "https://www.example.com",
+            },
+          ],
+          truncated: false,
+        },
+      },
+    ]),
+    scope
+  );
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.deepEqual(result.orders[0]?.forwardingAtPurchase, {
+    domains: [
+      {
+        currentForwarding: null,
+        domain: "example-outreach.com",
+        forwardToAtPurchase: null,
+      },
+      {
+        currentForwarding: null,
+        domain: "example-reach.com",
+        forwardToAtPurchase: "https://www.example.com",
+      },
+    ],
+    truncated: false,
+  });
+  // The purchase value appears only under its purchase name, and no reading
+  // carries it to the composer as a fact.
+  const text = JSON.stringify(result);
+  assert.equal(text.split("https://www.example.com").length, 2);
+  assert.ok(text.includes('"forwardToAtPurchase":"https://www.example.com"'));
+  assert.ok(!text.includes('"forwardTo"'));
+  assert.deepEqual(
+    toolReadings({
+      kind: "tool-result",
+      output: result,
+      toolName: "widget_provisioning_status",
+    }),
+    []
+  );
+  assert.ok(
+    result.caveats.some(
+      (caveat) =>
+        caveat.includes("cannot be checked here") &&
+        caveat.includes("Domain Forwarding")
+    )
+  );
 });
 
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {

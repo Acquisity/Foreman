@@ -323,6 +323,55 @@ test("the outside-call inventory documents the converter and both subprocess bou
   assert.ok(entry.includes("Biome"));
 });
 
+test("a name shortened with an ellipsis takes the name's own placeholder", () => {
+  const name = "Information Technology and Services | CEO, Founder";
+  for (const ellipsis of ["…", "..."]) {
+    const scrubbed = scrubCase(
+      rawCase(
+        { campaigns: [{ name: "Spring Promo" }, { name }] },
+        `Raise "Information Technology and Services | CEO${ellipsis}" please`
+      ),
+      scope
+    );
+    assert.equal(
+      scrubbed.case.question,
+      `Raise "Name 2 | Name 3${ellipsis}" please`
+    );
+    serializeCase(scrubbed);
+  }
+});
+
+test("a reply naming a campaign by its first part gets the placeholder the tool result shows", () => {
+  const scrubbed = scrubCase(
+    rawCase(
+      {
+        campaigns: [
+          { name: "MedTech |  Podcast | United States | July 2026" },
+          { name: "MedTech | US Based | 1-50" },
+          { name: "HVAC | US | 1-50" },
+          { name: "V2 | Retry" },
+        ],
+      },
+      "Why are MedTech and HVAC paused? And V2?"
+    ),
+    scope
+  );
+  assert.equal(
+    scrubbed.case.question,
+    "Why are Name 1 and Name 4 paused? And V2?"
+  );
+  const names = JSON.stringify(scrubbed.case);
+  for (const shown of [
+    '"Name 1 | Name 2"',
+    '"Name 1 | Name 3"',
+    '"Name 4 | Name 5"',
+    '"Name 6"',
+  ]) {
+    assert.ok(names.includes(shown), shown);
+  }
+  serializeCase(scrubbed);
+});
+
 test("a name too long to match inline is replaced as a whole field and fails closed elsewhere", () => {
   const long = `Spring ${"Promo ".repeat(60)}`.trim();
   const saved = JSON.parse(
@@ -383,6 +432,9 @@ test("internal ticket refs and links are replaced", () => {
   );
   assert.ok(!text.includes("ENG-14665"));
   assert.ok(!text.includes("spring-promo"));
+  // The filed ticket's link keeps a ticket's shape and agrees with its ref.
+  const { ticket, url } = JSON.parse(text).cassette[0].output;
+  assert.equal(url, `https://linear.app/acquisity/issue/${ticket}`);
 });
 
 test("an id joined to a domain with hyphens is replaced inside the composite", () => {
@@ -563,4 +615,27 @@ test("causeType is optional and limited to the four cause types", () => {
     assert.ok(withType(type));
   }
   assert.ok(!withType("misconfiguration"));
+});
+
+test("an email that starts a line is replaced whole, and its placeholder is not read as a leak", () => {
+  const saved = JSON.parse(
+    serializeCase(
+      scrubCase(
+        rawCase({ page: "Sender email\nwesley@northwind.io\nPhone" }),
+        scope
+      )
+    )
+  ).cassette[0].output;
+  assert.match(saved.page.split("\n")[1], EMAIL_PLACEHOLDER);
+});
+
+test("an original name inside a longer word is not a leak, but joined by an underscore it is", () => {
+  const scrubbed = scrubCase(
+    rawCase({ contact: { name: "Gina" } }, "Why is this broken?"),
+    scope
+  );
+  scrubbed.case.question = "Dates and inbox pagination need a campaign.";
+  serializeCase(scrubbed);
+  scrubbed.case.question = "Gina_2 cannot sign in";
+  assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
 });

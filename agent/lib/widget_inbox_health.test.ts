@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { executorTransport } from "#lib/executor/transport.js";
+import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
+
+// Resolved workspaces are cached per process; no test may see another's.
+beforeEach(resetInstantlyWorkspaceCache);
+
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetInboxHealthQuery,
+  NO_SENDING_ACCOUNT,
+  readMailboxNotFound,
   readWidgetInboxHealth,
+  USER_OWNED_ACCOUNT,
   widgetInboxHealthInput,
   widgetInboxHealthOutput,
 } from "../tools/widget_inbox_health.js";
@@ -41,13 +49,15 @@ after(() => {
   }
 });
 
-const NO_CONNECTION = /No Instantly connection/;
+const NO_CONNECTION = /No sending-provider connection/;
 const USER_MANAGED = /user-managed/;
 const TURNED_OFF = /turned off/;
 const observedAt = "2026-09-17T10:00:00.000Z";
 const baseRow = (overrides: Record<string, unknown> = {}) => ({
+  accountErrors: [],
   accountType: null,
   authorized: true,
+  connectionError: null,
   connectionUpdatedAt: null,
   hasConnectionError: null,
   initialWarmupEmails: [],
@@ -57,6 +67,7 @@ const baseRow = (overrides: Record<string, unknown> = {}) => ({
   recentWebhookErrorCount: 0,
   recentWebhookEventCount: 0,
   reconnectAttempts: [],
+  savedInboxes: { inboxes: [], total: 0 },
   webhookRegisteredCount: 0,
   workspaceId: null,
   ...overrides,
@@ -161,6 +172,8 @@ test("no connection is reported distinctly from an unreadable connection", async
   if (result.accounts.available === false) {
     assert.match(result.accounts.reason, NO_CONNECTION);
   }
+  // No sending account at all means the Cold Email Agent is off (no paid plan).
+  assert.equal(result.reading, NO_SENDING_ACCOUNT);
 });
 
 test("recent failed reconnect attempts reach the result without OAuth secrets", async (t) => {
@@ -201,7 +214,13 @@ test("recent failed reconnect attempts reach the result without OAuth secrets", 
   const result = await readWidgetInboxHealth(ctx);
   assert.equal(result.status, "ok");
   if (result.status === "ok") {
-    assert.deepEqual(result.reconnectAttempts, [failed]);
+    assert.deepEqual(result.reconnectAttempts, [
+      {
+        ...failed,
+        error:
+          "A diagnostic was recorded; its technical details are unavailable",
+      },
+    ]);
   }
 });
 
@@ -225,6 +244,8 @@ test("a user-managed connection reports saved facts but skips the live account c
     return;
   }
   assert.equal(result.connection?.accountType, "user_owned");
+  // wrun ...T9QSHV: the addresses live in that provider account, and closing Acquisity does not stop them.
+  assert.equal(result.reading, USER_OWNED_ACCOUNT);
   assert.equal(result.webhook?.registeredCount, 1);
   assert.equal(result.accounts.available, false);
   if (result.accounts.available === false) {
@@ -346,6 +367,7 @@ test("a system-provisioned active connection runs a live check and flags the sta
       email: "Warmup@example.test",
       errorCode: null,
       lastUsedAt: null,
+      senderName: null,
       setupPending: null,
       slowRampEnabled: true,
       status: 1,
@@ -369,6 +391,8 @@ test("a system-provisioned active connection runs a live check and flags the sta
   assert.equal(result.accounts.error, 3);
   assert.equal(result.accounts.unknown, 2);
   assert.ok(!JSON.stringify(result).includes("secret smtp"));
+  // A Pro customer must never see the provider's name, even in authored text.
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
   assert.equal(result.accounts.staleSyncAccounts.length, 1);
   assert.equal(
     result.accounts.staleSyncAccounts[0].email,
@@ -602,4 +626,261 @@ test("a cut-off warmup list leaves active accounts unknown instead of ready", as
   assert.equal(result.accounts.initialWarmup, 1);
   assert.equal(result.accounts.ready, 0);
   assert.equal(result.accounts.unknown, 1);
+});
+
+test("sender names reach the result from the live accounts and the saved purchased inboxes", async (t) => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  for (const required of [
+    "from mail_inbox mi join authorized a on a.id = mi.organization_id",
+    "left(mi.first_name, 100)",
+    "left(mi.last_name, 100)",
+    "limit 100",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  const saved = {
+    connected: false,
+    connectionError: null,
+    email: "jane@example.test",
+    firstName: "Jane",
+    lastName: "Doe",
+    lastRetryAt: null,
+    mailboxType: "dfy",
+    retryCount: 0,
+    status: "error",
+  };
+  const row = baseRow({
+    accountType: "system_provisioned",
+    connectionUpdatedAt: observedAt,
+    hasConnectionError: false,
+    isActive: true,
+    savedInboxes: { inboxes: [saved], total: 1 },
+    workspaceId: WORKSPACE_ID,
+  });
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [
+            {
+              email: "jane@example.test",
+              first_name: " Jane ",
+              last_name: "Doe",
+              status: 1,
+            },
+            { email: "nameless@example.test", status: 1 },
+          ],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    assert.fail("expected a live account read");
+  }
+  assert.deepEqual(
+    result.accounts.details.map((detail) => detail.senderName),
+    ["Jane Doe", null]
+  );
+  assert.deepEqual(result.savedInboxes, { inboxes: [saved], total: 1 });
+});
+
+test("saved inbox names are returned even when the live check cannot run", async (t) => {
+  const saved = {
+    connected: true,
+    connectionError: null,
+    email: "own@example.test",
+    firstName: "Sam",
+    lastName: null,
+    lastRetryAt: null,
+    mailboxType: "prewarmed",
+    retryCount: 0,
+    status: "active",
+  };
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(
+          baseRow({
+            accountType: "user_owned",
+            connectionUpdatedAt: observedAt,
+            hasConnectionError: false,
+            isActive: true,
+            savedInboxes: { inboxes: [saved], total: 1 },
+          })
+        ),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.equal(result.accounts.available, false);
+    assert.deepEqual(result.savedInboxes.inboxes, [saved]);
+  }
+});
+
+test("saved connection error text and provider account errors reach the result, bounded", async (t) => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  for (const required of [
+    "left(nullif(p.connection_error, ''), 200)",
+    "left(nullif(mi.connection_error, ''), 200)",
+    "e.provider_id = (select id from provider) and e.event_type = 'account_error'",
+    "e.payload->>'email_account'",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  assert.equal(query.includes("unibox_url"), false);
+  const saved = {
+    connected: false,
+    connectionError: "Mailbox removed because the domain subscription ended",
+    email: "gone@example.test",
+    firstName: "Jane",
+    lastName: "Doe",
+    lastRetryAt: observedAt,
+    mailboxType: "dfy",
+    retryCount: 3,
+    status: "error",
+  };
+  const accountErrors = [
+    { count: 2, email: "own@example.test", lastAt: observedAt },
+  ];
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(
+          baseRow({
+            accountErrors,
+            accountType: "user_owned",
+            connectionError:
+              "The request was rejected by Instantly. Please verify your API key.",
+            connectionUpdatedAt: observedAt,
+            hasConnectionError: true,
+            isActive: true,
+            savedInboxes: { inboxes: [saved], total: 1 },
+          })
+        ),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") {
+    return;
+  }
+  assert.equal(
+    result.connection?.connectionError,
+    "The sending-account connection was rejected"
+  );
+  assert.deepEqual(result.savedInboxes.inboxes, [saved]);
+  assert.deepEqual(result.accountErrors, accountErrors);
+});
+
+test("reconnects that failed with mailbox not found say Reconnect can't fix it and to check non-payment first", () => {
+  // wrun_41M4G6PZ3P0GT4KHVEA0STAT0M: the raw text carries "exception", so the shared filter made it generic.
+  const attempts = [
+    {
+      completedAt: null,
+      email: "a@example.com",
+      error:
+        "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=1",
+    },
+    {
+      completedAt: null,
+      email: "A@example.com",
+      error: "Manually fix required",
+    },
+  ];
+  const inboxes = [
+    { connectionError: "account_error", email: "a@example.com" },
+  ];
+  const reading = readMailboxNotFound(attempts, inboxes);
+  assert.ok(
+    String(reading).includes(
+      "a@example.com because the email provider reported the mailbox not found"
+    )
+  );
+  assert.ok(String(reading).includes("so Reconnect can't fix it"));
+  assert.ok(
+    String(reading).includes("whether they were cancelled for non-payment")
+  );
+  assert.ok(
+    String(
+      readMailboxNotFound(attempts, [
+        {
+          connectionError: "Mailbox cancelled after unpaid cleanup",
+          email: "a@example.com",
+        },
+      ])
+    ).includes("likely cancelled for non-payment")
+  );
+  assert.equal(readMailboxNotFound([attempts[1]], inboxes), null);
+});
+
+test("a newer successful reconnect suppresses an older mailbox-not-found reading", () => {
+  const done = "2026-10-08T15:00:00Z";
+  assert.equal(
+    readMailboxNotFound(
+      [
+        { completedAt: done, email: "A@example.com", error: null },
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox not found",
+        },
+      ],
+      []
+    ),
+    null
+  );
+  // wrun ...STAT0M: newer attempts expired with another error, so not found stands.
+  assert.ok(
+    readMailboxNotFound(
+      [
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox authorization requires manual attention",
+        },
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox not found",
+        },
+      ],
+      []
+    )?.includes("The mailbox no longer exists at the provider")
+  );
+  const reading = readMailboxNotFound(
+    [{ completedAt: null, email: "a@example.com", error: "Mailbox not found" }],
+    [
+      {
+        connectionError: "Mailbox cancelled after unpaid cleanup",
+        email: "b@example.com",
+      },
+    ]
+  );
+  assert.ok(reading?.includes("whether they were cancelled for non-payment"));
+  assert.equal(reading?.includes("likely cancelled for non-payment"), false);
 });

@@ -13,9 +13,15 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
+import {
+  CACHED,
+  customerMessages,
+  WIDGET_VOICE,
+} from "./widget-instructions.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 export type GateDecision = "allow" | "rewrite" | "block";
 export interface GateResult {
@@ -30,6 +36,8 @@ export interface GateDeps {
   compose: (input: {
     /** Jev read the conversation as a request to change something on the account. */
     askedForChange?: boolean;
+    /** Set on the one recompose after a reply claimed an unfiled ticket. */
+    correction?: string;
     findings: ComposerInput;
     organizationName: string;
     question: string;
@@ -37,6 +45,8 @@ export interface GateDeps {
     recordingOffered: boolean;
     /** The run's remaining finish deadline, when the caller has one. */
     signal?: AbortSignal;
+    /** When that deadline passes (epoch ms), so a timed-out compose can retry in what is left. */
+    finishAt?: number;
   }) => Promise<string>;
   judge: (input: {
     findings: WidgetFindings;
@@ -61,7 +71,8 @@ export type ComposerInput = Omit<
   WidgetFindings,
   "facts" | "report" | "ticket"
 > & {
-  facts: { claim: string }[];
+  /** `reading` marks the tool's own computed conclusion, which the reply leads with. */
+  facts: { claim: string; reading?: true }[];
   ticketFiled?: true;
 };
 
@@ -192,7 +203,8 @@ function classifyDomains(
       domains.add(host);
     }
   }
-  for (const match of uniqueLower(text.match(DOMAIN))) {
+  // An email's dotted local part ("first.last@") is not a domain; its domain is in emailDomains.
+  for (const match of uniqueLower(text.replace(EMAIL, " ").match(DOMAIN))) {
     const domain = fileStem(match);
     if (domain === null) {
       continue;
@@ -283,7 +295,10 @@ export function extractIdentifiers(findings: WidgetFindings): {
 // for a ticket is not told it could not be done.
 export const composerInput = (findings: WidgetFindings): ComposerInput => ({
   confidence: findings.confidence,
-  facts: findings.facts.map((fact) => ({ claim: fact.claim })),
+  facts: findings.facts.map((fact) => ({
+    claim: fact.claim,
+    ...(fact.evidence.ref === "reading" ? { reading: true as const } : {}),
+  })),
   needsHuman: findings.needsHuman,
   ...(findings.needsWrite ? { needsWrite: findings.needsWrite } : {}),
   recommendation: findings.recommendation,
@@ -467,7 +482,11 @@ ${LIMITATION_POLICY}
 Also remove an item that tells the customer to buy again, place a new order or pay again while the findings leave the original payment or delivery unresolved, and an item that promises sending or other activity will resume.
 Rewrite when removing a few items makes the rest safe: list in "remove" the numbers of the items to delete, using the numbering in "items", and everything you do not list is shown to the customer unchanged. You cannot reword anything, only remove it. Allow when everything is about the verified workspace and its own user, and leave "remove" empty. When you cannot tell whether something belongs to a different workspace or customer, block. When you block, also list in "remove" the numbers of the items that cause the block. The reason is one short sentence for internal staff.`;
 
-const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. Never add a product step the findings do not give. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give only the article-backed steps already present in the findings. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When the findings lack applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have reported this to the engineering team as a ticket, without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and say you will report it to engineering if that shows a fault on our side; this is the one allowed exception to the rule against promises, because it happens in this chat when they reply, not later. If confidence is low, say what is uncertain. The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the findings come from a screen recording the customer already sent, call it their screen recording, never name the service that made it or link to it, and do not ask for another one. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No greetings, no sign-off, no em dashes.`;
+export const COMPOSER_PROMPT = `You write Acquisity's reply to a customer in the in-app support chat. You receive only gated findings about the customer's own workspace and their question. Write a short, plain, warm reply in the second person that answers the question from the facts, states the recommendation, and says clearly what could not be checked. Never mention internal tools, systems, employees, or how the investigation was done. Speak in Acquisity product terms and do not name the outside services behind the product (billing and credit systems, error tracking, logs, job runners, hosting, databases): say "your credits", "your billing", "your sending accounts", not the vendor. Two exceptions: Stripe may be named for billing, since the customer sees it under Manage billing; Instantly may be named only when the findings already name it, otherwise say "your sending accounts" or "your inboxes". Never add facts, links, or identifiers that are not in the findings. Never explain why data is missing unless the findings say why, and never offer a service, migration or team action that neither the findings nor the product guide describe. A report the customer pasted from another tool, such as a blocklist check, is their report, not something checked here: never state it as fact. A READY deployment is not proof that a website works or is publicly live. Incomplete provisioning is not proof it never started. A missing execution-run reference is not proof that no run exists or that no run started. A timezone hypothesis is not a confirmed cause. Keep uncertainty specific to the missing check: an unknown edit history or propagation state does not mean observed public DNS could not be verified. Never turn an omitted fact into a claim that its check failed or could not be performed. Keep the certainty the findings have: never turn saved settings into live health, inactive into missing, or an unconfirmed payment into a paid order, never say that sending or other activity will resume, and never suggest buying again or placing a new order unless the recommendation says to. A fact with reading true is the tool's own conclusion computed from the workspace data: lead the reply with it as the cause or main finding, in its own words, and keep exactly the hedge it carries (a reading worded as likely, not a certainty, stays likely); never call it unconfirmed, unknown or uncertain because another fact is worded differently, and leave out any fact that only says so. Report every finding that bears on the question as the finding it is: a recorded count, status or absence (for example none of the 3 sending accounts are healthy, no email accounts were found, there is no subscription, the connection is one the customer manages themselves) goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it. No recorded problem is not proof that nothing is wrong: never say that nothing needs changing, that no action is needed or that everything is fine unless a fact says a live check showed it; say that no problem was recorded, and what could not be checked. Never promise that a teammate, the team, support, or you will make a change, look into something later, or follow up: nobody will, so the customer must leave knowing what to do themselves. When a change is needed, give the steps already present in the findings; when the findings name the change but not its steps, give the steps the product guide below gives for it. Never add a product step neither gives. If needsWrite is present, it describes a needed change, not instructions for carrying it out; never invent steps from it. When neither gives applicable instructions, acknowledge that gap. If askedForChange is true, the customer asked you to make a change for them: apologise in one short sentence, say you are not able to make changes to their account, and then give the steps. If askedForChange is false, never say you cannot make changes to their account or apologise for something they did not ask for. Filing a ticket is the one thing that may have been done for them: when ticketFiled is true, say in one short sentence that you have passed this to the team as a ticket (the billing team when it is about a charge or a refund, otherwise the engineering team), without a ticket number, a link, a timeline or a promise of a follow-up, and never say you cannot open a ticket; then still give the customer what they can do themselves. When ticketFiled is absent, nothing was reported, filed or passed on to anyone: never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one. When the customer asked for a ticket and ticketFiled is absent, never say a ticket cannot be opened and never refuse: say in one short sentence that you want to pin down what is going wrong first so engineering gets something they can act on, then ask for the specific details the findings say are missing or give the fix to try, and never promise to report or escalate it later. If confidence is low, say what is uncertain. The customer can attach screenshots, up to the limit the support facts give. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} When the findings come from a screen recording the customer already sent, call it their screen recording, never name the service that made it or link to it, and do not ask for another one. The question may come with the earlier turns of the conversation: you are continuing that conversation, not starting a new one. Never repeat a fact, a step or a warning that Support already said earlier unless it has changed. When the customer is reporting what they saw or did (for example that something shows as connected, or that a step is done), acknowledge it in a few words, accept it as true, and move them to the next thing to check or do; do not re-explain the original problem. When the way forward is troubleshooting, give the next one or two things to check, not the whole list, and ask what they see so you can guide them from there. Every reply with findings ends with what the customer should do next: the steps for the change, the workaround for a product limitation, or the single most useful check they can make themselves. Never end on the diagnosis alone. Ask a clarifying question instead only when the findings point to no step, workaround or check at all. When the recommendation is itself a question for the customer, say what the facts found (or plainly that nothing was found for what they asked about) and then end with that question, keeping its meaning, with no other step. When the findings give a message for the customer to paste into the website builder's chat, the customer cannot fix code themselves and cannot see build logs: say in one plain sentence what broke, tell them to open the website in the builder and paste the message into its chat, then give that message on its own line in quotation marks, keeping any file name and error wording it contains, and tell them to publish again once the builder finishes. Never tell them to fix code, check a build log or find an error themselves. No em dashes.
+
+${WIDGET_VOICE}
+
+Your knowledge of Acquisity is the product guide below, distilled from the help center. Workspace facts come only from the findings; product facts (where something is, what a feature does, who can use it, steps, limits, plans and prices) come from the findings or the guide, never from memory. Copy page, menu, button and setting names exactly as the guide writes them. To the customer it is the help center: never call it "the guide", never write "Get here", and never copy its {slug} markers or web addresses into the reply.`;
 
 // The judge returns a verdict and, for a rewrite, the numbers of the items to
 // remove. It used to return the findings themselves, and re-emitted every one of
@@ -559,35 +578,160 @@ const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
   askedForChange ? composed : composed.replace(CANT_CHANGE, "").trim();
 
 /**
+ * A reply saying this was reported, filed or passed on. Without a filed ticket
+ * it is false, and a prompt rule did not stop it (ENG-15044: 6 of 159 replies),
+ * so the gate recomposes once with NO_TICKET_CORRECTION and then deletes any
+ * such sentence left. "I'll report it to engineering if..." is not a claim.
+ */
+const TICKET_CLAIM =
+  /[^.!?\n]*\b(?:I(?:'|’)ve|I have|I(?:'|’)m|I am|we(?:'|’)ve|we have|has been|have been|was|is now)\s+(?:also\s+)?(?:reported|passed|filed|sent|flagged|escalated|raised|logged|opened|submitted|reporting|passing|filing|escalating|flagging)\b[^.!?\n]{0,100}?\b(?:engineering|ticket|billing team|team)\b[^.!?\n]*[.!?]?/giu;
+const withoutTicketClaims = (text: string) =>
+  text.replace(TICKET_CLAIM, "").trim();
+const NO_TICKET_CORRECTION =
+  "No ticket was filed and nothing was reported or passed on to anyone. Rewrite the reply without saying or suggesting that it was reported, filed, escalated or passed to engineering, billing or a person.";
+
+/**
+ * Details the conversation already holds, by the words a request for each uses.
+ * Round 16 re-asked the dates (wrun ...MAF4Z47), the balance (...N35DNCX), the
+ * address (...GGP3SS) and the amount and date (...R4N3DC). Each request came
+ * from the write-up's recommendation, which the composer keeps, so it is caught
+ * on the reply, where every answer passes, rather than in one investigation path.
+ */
+const GIVEN_DETAILS = [
+  {
+    ask: /\baddress(?:es)?\b/iu,
+    given: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu,
+    kind: "email address",
+  },
+  {
+    ask: /\b(?:amounts?|how much)\b/iu,
+    given: /\$\s?\d[\d,]*(?:\.\d{2})?/gu,
+    kind: "amount",
+  },
+  {
+    ask: /\bdates?\b/iu,
+    given:
+      /\b(?:today|yesterday|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may \d{1,2}|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/giu,
+    kind: "date",
+  },
+  {
+    ask: /\bbalances?\b/iu,
+    given: /\b\d{1,3}(?:,\d{3})+\b|\b\d+(?= (?:credits|leads)\b)/gu,
+    kind: "balance",
+  },
+];
+
+/** A sentence asking the customer for something ("I can't confirm" is not one). */
+const REQUEST =
+  /\?\s*$|\b(?:tell me|send me|reply (?:here )?with|let me know|share|paste|give me)\b/iu;
+
+/**
+ * What the reply asks the customer for that the conversation already gives,
+ * with the values given, e.g. `date (Sept, Oct)`. Empty when nothing is re-asked.
+ */
+export function reaskedDetails(reply: string, conversation: string): string[] {
+  const requests = (reply.match(/[^.!?\n]+[.!?]?/gu) ?? []).filter((sentence) =>
+    REQUEST.test(sentence)
+  );
+  const customer = customerMessages(conversation.slice(0, 20_000));
+  return GIVEN_DETAILS.flatMap(({ ask, given, kind }) => {
+    const values = [...new Set(customer.match(given) ?? [])].slice(0, 5);
+    return values.length && requests.some((sentence) => ask.test(sentence))
+      ? [`${kind} (${values.join(", ")})`]
+      : [];
+  });
+}
+
+const reaskCorrection = (given: string[]) =>
+  `The customer already gave these in the conversation: ${given.join("; ")}. Rewrite the reply without asking for them again: use what they gave, and end with the next step, or a question about something they have not given.`;
+
+/**
  * A stalled model call must fail closed as gate_unavailable, not hold the reply
  * past the app's last poll. The judge gets what the finish has left less the
  * composer's time (see `judgeBudgetMs`).
  */
 const COMPOSE_TIMEOUT_MS = 25_000;
+/** Kept back after the composer for the reply scan's ownership reads (20.6 s at most in round 15). */
+const REPLY_SCAN_RESERVE_MS = 20_000;
+/** A retry with less than this left cannot finish a reply. */
+const MIN_COMPOSE_RETRY_MS = 10_000;
+
+/**
+ * One compose request at COMPOSE_TIMEOUT_MS, and after its own timeout one more
+ * in whatever the finish deadline has left less the reply scan's reserve. Round
+ * 15 lost two replies (wrun ...MAF4Z47's proof run, ...YJJB31 run 1) to a
+ * compose aborted at exactly 25.0 s with about 100 s of the finish still left.
+ * The finish signal still bounds both, so no reply lands after the last poll.
+ */
+export async function composeWithin<T>(
+  run: (abortSignal: AbortSignal) => Promise<T>,
+  opts: { finishAt?: number; firstMs?: number; signal?: AbortSignal }
+): Promise<T> {
+  const first = AbortSignal.timeout(opts.firstMs ?? COMPOSE_TIMEOUT_MS);
+  try {
+    return await run(
+      opts.signal ? AbortSignal.any([first, opts.signal]) : first
+    );
+  } catch (error) {
+    const left =
+      opts.finishAt === undefined
+        ? 0
+        : opts.finishAt - REPLY_SCAN_RESERVE_MS - Date.now();
+    if (opts.signal?.aborted || !first.aborted || left < MIN_COMPOSE_RETRY_MS) {
+      throw error;
+    }
+    return run(within(left, opts.signal));
+  }
+}
+
+/**
+ * The guide leads the user message with a cache breakpoint and the
+ * instructions stay in system: the CLI Proxy moves system behind the first
+ * user message and fingerprints that message's first block, so this is the
+ * prefix every reply shares.
+ */
+export const composerRequest = (input: object) => ({
+  messages: [
+    {
+      content: [
+        { providerOptions: CACHED, text: SUPPORT_GUIDE, type: "text" as const },
+        { text: JSON.stringify(input), type: "text" as const },
+      ],
+      role: "user" as const,
+    },
+  ],
+  system: COMPOSER_PROMPT,
+});
 
 export const defaultGateDeps: GateDeps = {
   async compose({
     askedForChange,
+    correction,
     findings,
     organizationName,
     question,
     recordingOffered,
     signal,
+    finishAt,
   }) {
     const model = await resolveModel("widget");
-    const { text } = await generateText({
-      abortSignal: within(COMPOSE_TIMEOUT_MS, signal),
-      model: modelFor(model),
-      ...fastCallOptions(model),
-      prompt: JSON.stringify({
-        askedForChange: askedForChange === true,
-        findings,
-        question,
-        recordingOffered,
-        workspace: organizationName,
-      }),
-      system: COMPOSER_PROMPT,
-    });
+    const { text } = await composeWithin(
+      (abortSignal) =>
+        generateText({
+          abortSignal,
+          model: modelFor(model),
+          ...fastCallOptions(model),
+          ...composerRequest({
+            askedForChange: askedForChange === true,
+            ...(correction ? { correction } : {}),
+            findings,
+            question,
+            recordingOffered,
+            workspace: organizationName,
+          }),
+        }),
+      { finishAt, signal }
+    );
     return text.trim();
   },
   judge: (input) => {
@@ -605,6 +749,27 @@ export const defaultGateDeps: GateDeps = {
   resolve: (scope, candidates, signal) =>
     resolveOwnedIdentifiers(scope, candidates, within(50_000, signal)),
 };
+
+/**
+ * An identifier the customer typed in this conversation is their own input, and
+ * repeating it discloses nothing: a reply quoting the email in a thread they
+ * pasted was blocked whole (wrun_41M4DWMXRT0GKGYCZG5WMT5N25). Anything else
+ * still needs the verified workspace to own it.
+ */
+const vouchingTyped =
+  (resolve: GateDeps["resolve"], customerInput: string): GateDeps["resolve"] =>
+  async (scope, candidates, signal) => {
+    const owned = await resolve(scope, candidates, signal);
+    const typed = scanIdentifiers(customerInput).candidates;
+    const add = (set: Set<string>, ids: string[] = []) =>
+      new Set([...set, ...ids]);
+    return {
+      domains: add(owned.domains, typed.domains),
+      emails: add(owned.emails, typed.emails),
+      slugs: add(owned.slugs, typed.slugs),
+      uuids: add(owned.uuids, typed.uuids),
+    };
+  };
 
 const handoffOnly = (findings: WidgetFindings) =>
   findings.needsHuman && findings.facts.length === 0;
@@ -670,6 +835,29 @@ function itemsCarrying(
     .map((item) => item.n);
 }
 
+/** The composed reply; one claiming a ticket nobody filed, or asking again for a detail already given, is recomposed once. */
+async function composedReply(
+  compose: GateDeps["compose"],
+  input: Parameters<GateDeps["compose"]>[0],
+  ticketFiled: boolean
+) {
+  const reply = async (correction?: string) =>
+    unaskedChangeRemoved(
+      await compose(correction ? { ...input, correction } : input),
+      input.askedForChange === true
+    );
+  const message = await reply();
+  if (!ticketFiled && withoutTicketClaims(message) !== message) {
+    return withoutTicketClaims(await reply(NO_TICKET_CORRECTION));
+  }
+  const given = reaskedDetails(message, input.question);
+  if (given.length === 0) {
+    return message;
+  }
+  const again = await reply(reaskCorrection(given));
+  return ticketFiled ? again : withoutTicketClaims(again);
+}
+
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
 export async function gate(
   scope: WidgetContext,
@@ -688,9 +876,12 @@ export async function gate(
   /** Whether the app shows its screen recording button under this reply. */
   recordingOffered = false,
   /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
-  finishAt?: number
+  finishAt?: number,
+  /** Everything the customer wrote in this conversation, the latest message included. */
+  customerInput: string = question
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
+  const resolve = vouchingTyped(deps.resolve, customerInput);
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     signal?.throwIfAborted();
@@ -704,7 +895,7 @@ export async function gate(
   const done = (result: GateResult): GateResult => ({ ...result, timings });
   try {
     let reason = await timed("scan", () =>
-      deterministicReason(scope, findings, deps.resolve, signal)
+      deterministicReason(scope, findings, resolve, signal)
     );
     // A how-to answer was blocked whole, and the thread handed to a person,
     // because one item named "accounts.google.com". An identifier the workspace
@@ -722,7 +913,7 @@ export async function gate(
       const current = findings;
       // biome-ignore lint/performance/noAwaitInLoops: each pass scans what the last one left.
       reason = await timed("scan", () =>
-        deterministicReason(scope, current, deps.resolve, signal)
+        deterministicReason(scope, current, resolve, signal)
       );
     }
     if (reason) {
@@ -760,23 +951,27 @@ export async function gate(
       }
       gated = rewritten;
       const again = await timed("scan", () =>
-        deterministicReason(scope, gated, deps.resolve, signal)
+        deterministicReason(scope, gated, resolve, signal)
       );
       if (again) {
         return done(blocked(findings, again));
       }
     }
-    const composed = await timed("compose", () =>
-      deps.compose({
-        askedForChange,
-        findings: composerInput(gated),
-        organizationName: scope.organizationName,
-        question: conversation,
-        recordingOffered,
-        signal,
-      })
+    const message = await timed("compose", () =>
+      composedReply(
+        deps.compose,
+        {
+          askedForChange,
+          findings: composerInput(gated),
+          finishAt,
+          organizationName: scope.organizationName,
+          question: conversation,
+          recordingOffered,
+          signal,
+        },
+        Boolean(gated.ticket)
+      )
     );
-    const message = unaskedChangeRemoved(composed, askedForChange);
     if (!message) {
       return done(blocked(findings, "empty_reply"));
     }
@@ -787,7 +982,7 @@ export async function gate(
     // Timed apart from the findings scan: one finish spent 27.7s in "scan" with
     // no way to tell which of the two ownership reads was slow.
     const egress = await timed("reply_scan", () =>
-      deterministicTextReason(scope, message, deps.resolve, undefined, signal)
+      deterministicTextReason(scope, message, resolve, undefined, signal)
     );
     if (egress) {
       return done(blocked(findings, `composed:${egress}`));

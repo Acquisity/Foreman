@@ -9,10 +9,12 @@ import {
 import {
   InstantlyApiError,
   readInstantlySubworkspace,
+  resolveInstantlySubworkspace,
 } from "#lib/instantly-api.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
@@ -48,6 +50,12 @@ const INITIAL_WARMUP_LIMIT = 1000;
 const RECONNECT_WINDOW_DAYS = 7;
 const RECONNECT_LIMIT = 25;
 const RECONNECT_ERROR_CHARS = 200;
+/** Acquisity-purchased inboxes read from the product database, disconnected first. */
+const SAVED_INBOX_LIMIT = 100;
+const NAME_CHARS = 100;
+const SAVED_ERROR_CHARS = 200;
+/** Sending accounts the provider reported an account_error for, most recent first. */
+const ACCOUNT_ERROR_LIMIT = 25;
 
 export const widgetInboxHealthInput = z.strictObject({});
 export type WidgetInboxHealthInput = z.infer<typeof widgetInboxHealthInput>;
@@ -59,6 +67,10 @@ const timestamp = z
 
 const connection = z.object({
   accountType: z.enum(["user_owned", "system_provisioned"]),
+  connectionError: z
+    .string()
+    .max(SAVED_ERROR_CHARS * 2)
+    .nullable(),
   hasConnectionError: z.boolean(),
   isActive: z.boolean(),
   updatedAt: timestamp,
@@ -82,6 +94,39 @@ const reconnectAttempt = z.object({
   status: z.string().max(32),
 });
 const reconnectAttempts = z.array(reconnectAttempt).max(RECONNECT_LIMIT);
+const savedInbox = z.object({
+  connected: z.boolean(),
+  connectionError: z
+    .string()
+    .max(SAVED_ERROR_CHARS * 2)
+    .nullable(),
+  email: z.string().max(320),
+  firstName: z
+    .string()
+    .max(NAME_CHARS * 2)
+    .nullable(),
+  lastName: z
+    .string()
+    .max(NAME_CHARS * 2)
+    .nullable(),
+  lastRetryAt: timestamp.nullable(),
+  mailboxType: z.string().max(32),
+  retryCount: z.number().int().nonnegative(),
+  status: z.string().max(32),
+});
+const accountErrors = z
+  .array(
+    z.object({
+      count: z.number().int().positive(),
+      email: z.string().max(320),
+      lastAt: timestamp,
+    })
+  )
+  .max(ACCOUNT_ERROR_LIMIT);
+const savedInboxes = z.object({
+  inboxes: z.array(savedInbox).max(SAVED_INBOX_LIMIT),
+  total: z.number().int().nonnegative(),
+});
 const accountDetail = z.object({
   bucket: z.enum([
     "error",
@@ -95,6 +140,10 @@ const accountDetail = z.object({
   email: z.string().max(320).nullable(),
   errorCode: z.string().max(64).nullable(),
   lastUsedAt: timestamp.nullable(),
+  senderName: z
+    .string()
+    .max(NAME_CHARS * 4)
+    .nullable(),
   setupPending: z.boolean().nullable(),
   slowRampEnabled: z.boolean().nullable(),
   status: z.number().nullable(),
@@ -121,13 +170,17 @@ const accounts = z.discriminatedUnion("available", [
 ]);
 export const widgetInboxHealthOutput = z.union([
   z.object({
+    accountErrors,
     accounts,
-    caveats: z.array(z.string()).max(6),
+    caveats: z.array(z.string()).max(8),
     connection: connection.nullable(),
     observedAt: timestamp,
+    // Optional so saved replays from before it existed still parse.
+    reading: z.string().nullish(),
     reconnectAttempts,
+    savedInboxes,
     source: z.literal(
-      "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections"
+      "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections"
     ),
     status: z.literal("ok"),
     webhook: webhook.nullable(),
@@ -136,6 +189,55 @@ export const widgetInboxHealthOutput = z.union([
   z.object({ message: z.string(), status: z.enum(["unavailable", "denied"]) }),
 ]);
 export type WidgetInboxHealthOutput = z.infer<typeof widgetInboxHealthOutput>;
+
+const MAILBOX_NOT_FOUND = /mailbox not found/i;
+const UNPAID_CLEANUP = /unpaid cleanup/i;
+
+/**
+ * Reconnect attempts that failed because the provider no longer has the
+ * mailbox (wrun ...STAT0M): read from the raw saved text, which the shared
+ * diagnostic filter turns generic when it carries technical wording.
+ */
+export function readMailboxNotFound(
+  attempts: Pick<
+    z.infer<typeof reconnectAttempt>,
+    "completedAt" | "email" | "error"
+  >[],
+  inboxes: Pick<z.infer<typeof savedInbox>, "connectionError" | "email">[]
+): string | null {
+  // Attempts come newest first. A not-found counts unless a newer attempt on the
+  // same mailbox completed without error; a newer failed or expired one does not
+  // clear it (wrun ...STAT0M: not found on Oct 6, then expired on Oct 8).
+  const reconnected = new Set<string>();
+  const notFound = new Set<string>();
+  for (const attempt of attempts) {
+    const email = attempt.email?.toLowerCase() ?? "an inbox";
+    if (!attempt.error && attempt.completedAt) {
+      reconnected.add(email);
+    } else if (
+      !reconnected.has(email) &&
+      MAILBOX_NOT_FOUND.test(attempt.error ?? "")
+    ) {
+      notFound.add(email);
+    }
+  }
+  const emails = [...notFound];
+  if (!emails.length) {
+    return null;
+  }
+  const unpaid = emails.filter((email) =>
+    inboxes.some(
+      (inbox) =>
+        inbox.email.toLowerCase() === email &&
+        UNPAID_CLEANUP.test(inbox.connectionError ?? "")
+    )
+  );
+  return `Reconnect failed for ${emails.join(", ")} because the email provider reported the mailbox not found. The mailbox no longer exists at the provider, so Reconnect can't fix it. ${
+    unpaid.length
+      ? `Saved records show ${unpaid.join(", ")} cancelled after unpaid cleanup, so those mailboxes were likely cancelled for non-payment.`
+      : "The first thing to check is whether they were cancelled for non-payment: after a grace period Acquisity cancels unpaid done-for-you domains, and their order then shows as cancelled. Check the order status and the billing for these inboxes."
+  }`;
+}
 
 /**
  * One fixed statement: this organization's saved Instantly connection, its registered
@@ -162,6 +264,7 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
     (select p.account_type from provider p) as "accountType",
     (select p.is_active from provider p) as "isActive",
     (select (nullif(p.connection_error, '') is not null) from provider p) as "hasConnectionError",
+    (select left(nullif(p.connection_error, ''), ${SAVED_ERROR_CHARS}) from provider p) as "connectionError",
     (select p.workspace_id from provider p) as "workspaceId",
     (select p.updated_at from provider p) as "connectionUpdatedAt",
     (select count(*)::int from outreach_webhook w
@@ -185,12 +288,35 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
         s.created_at as "createdAt", s.completed_at as "completedAt"
       from cea_oauth_sessions s join authorized a on a.id = s.organization_id
       where s.created_at > current_timestamp - interval '${RECONNECT_WINDOW_DAYS} days'
-      order by s.created_at desc limit ${RECONNECT_LIMIT}) r) as "reconnectAttempts"`;
+      order by s.created_at desc limit ${RECONNECT_LIMIT}) r) as "reconnectAttempts",
+    (select jsonb_build_object(
+      'total', (select count(*) from mail_inbox mi join authorized a on a.id = mi.organization_id),
+      'inboxes', coalesce((select jsonb_agg(to_jsonb(i) order by i.connected, i.email) from (
+        select left(mi.email, 320) as email, left(mi.first_name, ${NAME_CHARS}) as "firstName",
+          left(mi.last_name, ${NAME_CHARS}) as "lastName", mi.status, mi.connected,
+          mi.mailbox_type as "mailboxType",
+          left(nullif(mi.connection_error, ''), ${SAVED_ERROR_CHARS}) as "connectionError",
+          mi.retry_count as "retryCount", mi.last_retry_at as "lastRetryAt"
+        from mail_inbox mi join authorized a on a.id = mi.organization_id
+        order by mi.connected, mi.email limit ${SAVED_INBOX_LIMIT}) i), '[]'::jsonb))) as "savedInboxes",
+    (select coalesce(jsonb_agg(to_jsonb(ae) order by ae."lastAt" desc), '[]'::jsonb) from (
+      select left(e.payload->>'email_account', 320) as email, count(*)::int as count,
+        max(e.created_at) as "lastAt"
+      from outreach_webhook_event e
+      where e.provider_id = (select id from provider) and e.event_type = 'account_error'
+        and e.created_at > current_timestamp - interval '${RECENT_WEBHOOK_WINDOW_DAYS} days'
+        and nullif(e.payload->>'email_account', '') is not null
+      group by 1 order by max(e.created_at) desc limit ${ACCOUNT_ERROR_LIMIT}) ae) as "accountErrors"`;
 }
 
 const dbRow = z.object({
+  accountErrors,
   accountType: z.enum(["user_owned", "system_provisioned"]).nullable(),
   authorized: z.boolean(),
+  connectionError: z
+    .string()
+    .max(SAVED_ERROR_CHARS * 2)
+    .nullable(),
   connectionUpdatedAt: timestamp.nullable(),
   hasConnectionError: z.boolean().nullable(),
   initialWarmupEmails: z
@@ -202,6 +328,7 @@ const dbRow = z.object({
   recentWebhookErrorCount: z.number().int().nonnegative(),
   recentWebhookEventCount: z.number().int().nonnegative(),
   reconnectAttempts,
+  savedInboxes,
   webhookRegisteredCount: z.number().int().nonnegative(),
   workspaceId: z.string().min(1).max(200).nullable(),
 });
@@ -211,6 +338,8 @@ const instantlyAccount = z.object({
   daily_limit: z.number().nullish().catch(null),
   email: z.string().max(320).optional(),
   enable_slow_ramp: z.boolean().nullish().catch(null),
+  first_name: z.string().nullish().catch(null),
+  last_name: z.string().nullish().catch(null),
   setup_pending: z.boolean().nullish(),
   stat_warmup_score: z.number().nullish().catch(null),
   status: z.number().optional(),
@@ -222,12 +351,23 @@ const instantlyAccount = z.object({
 
 const CAVEATS = [
   "Connection and webhook facts are saved product state, not a live provider check.",
-  "A saved connection error does not establish a current failure by itself.",
-  "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means Instantly reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
+  "A saved connection error does not establish a current failure by itself. connection.connectionError is the saved message for the whole sending-provider connection (for example an API key the provider rejected, or a webhook out of sync); savedInboxes[].connectionError is the saved reason one purchased inbox is not connected (for example cancelled by the user, removed when its domain subscription ended, or an OAuth failure), with retryCount and lastRetryAt for Acquisity's own reconnect retries. Describe these in plain words; never paste raw technical error text. accountErrors lists sending accounts the provider reported an account error for in the last 7 days (count and last time), from the connection's own webhook, so it works for user-managed workspaces too; it says which account errored and when, not why.",
+  "Each account read lands in exactly one of ready, paused, setupPending, initialWarmup, error or unknown, using Acquisity's own rules. ready means the sending provider reports it active, with no error, setup finished, and not a done-for-you inbox in its first 14 days; it does not prove mail is being delivered. paused is switched off, not broken. setupPending is not warmup. unknown means the evidence was missing or unrecognized: never describe it as healthy or as broken.",
   "The counts cover the accounts that were read. With accounts.truncated false that is every account. With truncated true it is a sample: say how many were checked, and never that all accounts are healthy or that nothing needs fixing.",
-  "Account details come from the live Instantly read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them in Instantly.",
-  "Live account status is only checked for Acquisity-provisioned connections; a user-managed Instantly workspace cannot be verified as belonging to this organization.",
+  "Account details come from the live provider read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them anywhere.",
+  "senderName is the From name each live account sends with (its saved first and last name). savedInboxes lists the inboxes the customer bought through Acquisity, from saved records (total counts all of them; at most 100 shown, disconnected first), with the first and last name each was provisioned with: that is the sender name recipients see, and it was set at purchase, not taken from the customer's profile. Signature text is not readable here.",
+  "Live account status is only checked for Acquisity-provisioned connections; a user-managed sending-provider workspace cannot be verified as belonging to this organization.",
 ];
+
+/** The From display name Instantly sends with: first and last name as saved on the account. */
+const senderName = (
+  first: string | null | undefined,
+  last: string | null | undefined
+): string | null =>
+  [first, last]
+    .map((part) => part?.trim().slice(0, NAME_CHARS))
+    .filter(Boolean)
+    .join(" ") || null;
 
 type Bucket =
   | "error"
@@ -304,6 +444,7 @@ function bucketAccounts(
         .nullable()
         .catch(null)
         .parse(account.timestamp_last_used),
+      senderName: senderName(account.first_name, account.last_name),
       setupPending: account.setup_pending ?? null,
       slowRampEnabled: account.enable_slow_ramp ?? null,
       status: account.status ?? null,
@@ -343,37 +484,44 @@ function bucketAccounts(
 /** Live Instantly account check, only for a workspace Acquisity itself provisioned. */
 async function readAccountsEvidence(
   ctx: ProviderContext,
-  row: z.infer<typeof dbRow>
+  row: z.infer<typeof dbRow>,
+  organizationId: string
 ): Promise<z.infer<typeof accounts>> {
   if (row.accountType === "user_owned") {
     return {
       available: false,
       reason:
-        "This organization's Instantly workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections.",
+        "This organization's sending-provider workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections.",
     };
   }
   if (row.isActive === false) {
     return {
       available: false,
-      reason: "This organization's Instantly connection is turned off.",
+      reason: "This organization's sending-provider connection is turned off.",
     };
   }
   if (!row.workspaceId) {
     return {
       available: false,
-      reason: "No Instantly workspace is linked to this connection.",
+      reason: "No sending-provider workspace is linked to this connection.",
     };
   }
   try {
     const items: unknown[] = [];
     let startingAfter: string | undefined;
+    const options = { client: executorClient(ctx), signal: ctx.abortSignal };
+    const workspace = await resolveInstantlySubworkspace(
+      { id: row.workspaceId },
+      options,
+      organizationId
+    );
     for (let page = 0; page < MAX_ACCOUNT_PAGES; page += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: each page needs the previous cursor.
       const read = await readInstantlySubworkspace(
-        { id: row.workspaceId },
+        workspace,
         "accounts",
         { limit: ACCOUNTS_LIMIT, startingAfter },
-        { client: executorClient(ctx), signal: ctx.abortSignal }
+        options
       );
       items.push(...read.items);
       startingAfter = read.nextStartingAfter ?? undefined;
@@ -412,8 +560,8 @@ async function readAccountsEvidence(
       available: false,
       reason:
         error instanceof InstantlyApiError
-          ? error.message
-          : "Instantly could not be read.",
+          ? `The sending provider read failed (${error.kind}).`
+          : "The sending provider could not be read.",
     };
   }
 }
@@ -476,36 +624,67 @@ export async function readWidgetInboxHealth(
       status: "denied",
     };
   }
+  const reading = readMailboxNotFound(
+    row.reconnectAttempts,
+    row.savedInboxes.inboxes
+  );
+  const sanitized = {
+    reconnectAttempts: row.reconnectAttempts.map((attempt) => ({
+      ...attempt,
+      error: diagnosticText(attempt.error, RECONNECT_ERROR_CHARS),
+    })),
+    savedInboxes: {
+      ...row.savedInboxes,
+      inboxes: row.savedInboxes.inboxes.map((inbox) => ({
+        ...inbox,
+        connectionError: diagnosticText(
+          inbox.connectionError,
+          SAVED_ERROR_CHARS
+        ),
+      })),
+    },
+  };
   if (row.accountType === null) {
     return widgetInboxHealthOutput.parse({
+      accountErrors: row.accountErrors,
       accounts: {
         available: false,
-        reason: "No Instantly connection is configured for this organization.",
+        reason:
+          "No sending-provider connection is configured for this organization.",
       },
       caveats: CAVEATS,
       connection: null,
       observedAt: row.observedAt,
-      reconnectAttempts: row.reconnectAttempts,
+      reading: [reading, NO_SENDING_ACCOUNT].filter(Boolean).join(" "),
+      reconnectAttempts: sanitized.reconnectAttempts,
+      savedInboxes: sanitized.savedInboxes,
       source:
-        "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+        "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
       status: "ok",
       webhook: null,
       workspace: scope.organizationName,
     });
   }
   return widgetInboxHealthOutput.parse({
-    accounts: await readAccountsEvidence(ctx, row),
+    accountErrors: row.accountErrors,
+    accounts: await readAccountsEvidence(ctx, row, scope.organizationId),
     caveats: CAVEATS,
     connection: {
       accountType: row.accountType,
+      connectionError: diagnosticText(row.connectionError, SAVED_ERROR_CHARS),
       hasConnectionError: row.hasConnectionError ?? false,
       isActive: row.isActive ?? false,
       updatedAt: row.connectionUpdatedAt ?? row.observedAt,
     },
     observedAt: row.observedAt,
-    reconnectAttempts: row.reconnectAttempts,
+    reading:
+      row.accountType === "user_owned"
+        ? [reading, USER_OWNED_ACCOUNT].filter(Boolean).join(" ")
+        : reading,
+    reconnectAttempts: sanitized.reconnectAttempts,
+    savedInboxes: sanitized.savedInboxes,
     source:
-      "Acquisity product database, plus a live Instantly read for Acquisity-provisioned connections",
+      "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
     status: "ok",
     webhook: {
       lastEventAt: row.lastWebhookEventAt,
@@ -517,8 +696,24 @@ export async function readWidgetInboxHealth(
   });
 }
 
+/**
+ * No sending account at all, neither user-owned nor provisioned: Acquisity
+ * provisions it only once a paid plan is enabled (Aaron, 2026-10-12; wrun
+ * ...R35S90). It names the billing read so the plan is read next.
+ */
+export const NO_SENDING_ACCOUNT =
+  "No sending account is set up for this workspace, which means the Cold Email Agent isn't enabled here. It needs a paid plan, and the sending account is set up only once the plan is enabled, so until then Email Accounts and New Campaign stay locked. Enabling a paid plan unlocks Email Accounts and New Campaign, with no extra setup step. Check the plan in Settings > Billing; a billing read shows which plan the workspace is on.";
+
+/**
+ * A sending account connected directly (user-owned) is the Legacy setup: its
+ * addresses live in that provider account, not with Acquisity (Aaron,
+ * 2026-10-12; wrun ...T9QSHV hedged on whether closing stops them).
+ */
+export const USER_OWNED_ACCOUNT =
+  "This workspace's sending account was connected directly from its own sending-provider account (the Legacy setup), not set up by Acquisity. The addresses and inboxes in it live in that provider account, where they are managed and billed. Closing Acquisity does not stop them; they are stopped or cancelled in that provider account.";
+
 export const tool = defineTool({
-  description: `Diagnose "my inbox disconnected" and "it says no email accounts connected but they're sending" only for this chat's verified workspace. Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, saved error presence, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. reconnectAttempts lists this workspace's own mailbox reconnect attempts from the last ${RECONNECT_WINDOW_DAYS} days, newest first (at most ${RECONNECT_LIMIT}: email, status, error, created and completed times); when the recent attempts failed, the customer already tried reconnecting and it did not work. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `The status of every sending account, inbox and mailbox in this chat's verified workspace: connected, disconnected, erroring, paused or warming, and why. Use it for any inbox or sending-account question, including "my inbox disconnected", "my accounts show Error" and "it says no email accounts connected but they're sending". Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, the saved connection error message, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. Each live account includes senderName, the From display name recipients see. savedInboxes lists every Acquisity-purchased inbox from saved records, even when the live check cannot run (user-managed or turned off): email, status, connected, the first and last name it was provisioned with, and the saved reason it is not connected (connectionError, retryCount, lastRetryAt). accountErrors lists sending accounts the provider flagged with an account error in the last ${RECENT_WEBHOOK_WINDOW_DAYS} days, including user-managed workspaces: use it to say which accounts errored and when. Use these for "whose name is on my emails", "my inboxes have someone else's name", or "change my sender name": the names come from the inbox, not the user's profile; signature text is not available. reconnectAttempts lists this workspace's own mailbox reconnect attempts from the last ${RECONNECT_WINDOW_DAYS} days, newest first (at most ${RECONNECT_LIMIT}: email, status, error, created and completed times); when the recent attempts failed, the customer already tried reconnecting and it did not work. reading, when present, says what those failures mean and what to check first: tell the customer that. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,

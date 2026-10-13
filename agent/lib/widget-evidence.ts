@@ -9,6 +9,11 @@ const EMAIL = /^[^\s'"\\{},@]+@[^\s'"\\{},@]+$/;
 const SLUG = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
 const DOMAIN = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
 const CANDIDATE_LIMIT = 100;
+// ponytail: sending accounts are vouched from this org's own recent webhook rows only
+// (accountErrors reads 7 days; earlyFollowUps defaults to the last week plus up to
+// 31 days of lookback). An account seen only in an older explicit date window
+// still blocks; widen this if that shows up.
+const WEBHOOK_ACCOUNT_DAYS = 62;
 
 export interface IdentifierCandidates {
   /** Bare domain names. Optional so callers that never see one need not pass it. */
@@ -56,6 +61,12 @@ const literalArray = (values: string[], pattern: RegExp, cast: string) => {
  * were blocking an owned answer as foreign.
  * These are small per-workspace tables; prospect and contact domains are left
  * out on purpose, since vouching for them means scanning every lead.
+ *
+ * Campaign leads and the sending accounts this org's own provider webhooks name
+ * are here because `widget_outreach_health` (earlyFollowUps) and
+ * `widget_inbox_health` (accountErrors) return them: a lead with no CRM row and
+ * a sending account with no saved inbox were blocking an owned answer. Each
+ * branch filters by the candidates itself so an index serves it.
  */
 export function buildOwnershipQuery(
   context: WidgetContext,
@@ -101,6 +112,14 @@ export function buildOwnershipQuery(
       union select lower(ce.email) from crm_email ce
         join crm_lead l on l.id = ce.lead_id join authorized a on a.id = l.organization_id
       union select lower(i.email) from mail_inbox i join authorized a on a.id = i.organization_id
+      union select lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id
+        where cl.deleted_at is null and lower(cl.email) = any(${emails})
+      union select lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id
+        where lower(e.lead_email) = any(${emails})
+      union select lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id
+        where e.event_type in ('account_error', 'email_sent')
+          and e.created_at > current_timestamp - interval '${WEBHOOK_ACCOUNT_DAYS} days'
+          and lower(e.payload->>'email_account') = any(${emails})
     ) e where e.email = any(${emails})), '[]'::jsonb) as emails,
     coalesce((select jsonb_agg(distinct x.domain) from (
       select lower(d.domain) as domain from mail_domain d join authorized a on a.id = d.organization_id

@@ -369,11 +369,15 @@ const SAFE_ITEM_FIELDS: Record<InstantlyResource, readonly string[]> = {
   ],
   campaigns: [
     "daily_limit",
+    "daily_max_leads",
+    "email_gap",
     "not_sending_status",
     "id",
     "is_evergreen",
     "name",
     "pl_value",
+    "prioritize_new_leads",
+    "random_wait_max",
     "status",
     "timestamp_created",
     "timestamp_updated",
@@ -600,6 +604,55 @@ export async function listInstantlySubworkspaces(
   }
 }
 
+/** Workspaces this module resolved from a complete group; only these skip a fresh resolve. */
+const resolvedWorkspaces = new WeakSet<InstantlyWorkspace>();
+
+const RESOLVED_TTL_MS = 5 * 60_000;
+const RESOLVED_CAP = 200;
+/** Resolved workspaces by organization and workspace ID: one cold group walk is about 20 s live. */
+const resolvedByOrganization = new Map<
+  string,
+  { expiresAt: number; workspace: InstantlyWorkspace }
+>();
+
+/** Tests only: forget every cached resolve. */
+export const resetInstantlyWorkspaceCache = () =>
+  resolvedByOrganization.clear();
+
+/**
+ * Resolves an accepted subworkspace once, so a multi-page read can reuse it.
+ * With an organization, an ID resolve is reused for a few minutes, keyed by
+ * that organization and ID, so another organization never shares it.
+ */
+export const resolveInstantlySubworkspace = async (
+  selector: InstantlyWorkspaceSelector,
+  options: InstantlyApiOptions = {},
+  organizationId?: string
+): Promise<InstantlyWorkspace> => {
+  const key =
+    organizationId && selector.id ? `${organizationId}\n${selector.id}` : null;
+  const cached = key ? resolvedByOrganization.get(key) : undefined;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.workspace;
+  }
+  const workspace = await resolveWorkspace(selector, options);
+  resolvedWorkspaces.add(workspace);
+  if (key) {
+    resolvedByOrganization.delete(key);
+    resolvedByOrganization.set(key, {
+      expiresAt: Date.now() + RESOLVED_TTL_MS,
+      workspace,
+    });
+    // Map order is insertion order, so the first key is the oldest.
+    if (resolvedByOrganization.size > RESOLVED_CAP) {
+      resolvedByOrganization.delete(
+        resolvedByOrganization.keys().next().value as string
+      );
+    }
+  }
+  return workspace;
+};
+
 const resolveWorkspace = async (
   selector: InstantlyWorkspaceSelector,
   options: InstantlyApiOptions
@@ -710,16 +763,18 @@ const resourceRequest = (
   };
 };
 
-/** Reads one bounded resource page as an accepted subworkspace. */
+/** Reads one bounded resource page as an accepted subworkspace, resolving it unless this module already did. */
 export async function readInstantlySubworkspace(
-  selector: InstantlyWorkspaceSelector,
+  selector: InstantlyWorkspaceSelector | InstantlyWorkspace,
   resource: InstantlyResource,
   query: InstantlyResourceQuery = {},
   options: InstantlyApiOptions = {}
 ): Promise<InstantlyResourcePage> {
   // Validate the query before any membership request.
   const limit = resourceLimit(query.limit);
-  const workspace = await resolveWorkspace(selector, options);
+  const workspace = resolvedWorkspaces.has(selector as InstantlyWorkspace)
+    ? (selector as InstantlyWorkspace)
+    : await resolveWorkspace(selector as InstantlyWorkspaceSelector, options);
   const page = await callPage(
     resourceRequest(resource, query, workspace.id, limit),
     options

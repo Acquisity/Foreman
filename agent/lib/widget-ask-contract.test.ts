@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { gate } from "./widget-egress.js";
+import { type ComposerInput, gate } from "./widget-egress.js";
+import type { WidgetFindings } from "./widget-findings.js";
 import {
   finishWidgetRun,
   waitForWidgetInvestigation,
@@ -121,9 +122,28 @@ async function nextStep(outputs: unknown[]) {
   };
 }
 
-async function deliver(output: unknown, closing: string) {
+async function deliver(
+  output: unknown,
+  closing: string,
+  found: WidgetFindings | null = null
+) {
   const events = [
     { data: {}, type: "turn.started" },
+    ...(found
+      ? [
+          {
+            data: {
+              result: {
+                callId: "r",
+                kind: "tool-result",
+                output: { campaigns: ["A", "B"] },
+                toolName: "widget_outreach_health",
+              },
+            },
+            type: "action.result",
+          },
+        ]
+      : []),
     {
       data: {
         result: {
@@ -164,6 +184,7 @@ async function deliver(output: unknown, closing: string) {
     stream_index: 0,
   };
   let extracted = 0;
+  let composed: ComposerInput | null = null;
   const stages: string[] = [];
   const finished = await finishWidgetRun(run, "s", outcome, {
     claimFinish: () => Promise.resolve(true),
@@ -174,7 +195,7 @@ async function deliver(output: unknown, closing: string) {
     },
     extract: () => {
       extracted += 1;
-      return Promise.resolve(null);
+      return Promise.resolve(found);
     },
     gate: (gateScope, question, findings, deps, conversation) =>
       gate(
@@ -183,7 +204,14 @@ async function deliver(output: unknown, closing: string) {
         findings,
         {
           compose:
-            deps?.compose ?? (() => assert.fail("a question is not composed")),
+            deps?.compose ??
+            (({ findings: input }) => {
+              assert.ok(found, "a lone question is not composed");
+              composed = input;
+              return Promise.resolve(
+                `Both campaigns are paused. ${input.recommendation}`
+              );
+            }),
           judge: () => Promise.resolve({ decision: "allow", reason: "ok" }),
           resolve: () =>
             Promise.resolve({
@@ -202,7 +230,12 @@ async function deliver(output: unknown, closing: string) {
     },
   });
   assert.ok(finished);
-  return { extracted, response: widgetRunResponse(finished), stages };
+  return {
+    composed: composed as ComposerInput | null,
+    extracted,
+    response: widgetRunResponse(finished),
+    stages,
+  };
 }
 
 test("the exact live ask payload is recorded by the tool, ends the turn, and reaches the customer with no extraction or composing", async () => {
@@ -210,7 +243,12 @@ test("the exact live ask payload is recorded by the tool, ends the turn, and rea
   assert.deepEqual(output, { asked: LIVE });
 
   const step = await nextStep([output]);
-  assert.deepEqual(step.tools, []);
+  // The tools stay listed for the cache; a call to any of them is refused.
+  assert.deepEqual(step.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
+  assert.equal(step.toolChoice, undefined);
   assert.equal(step.jevCalls, 0);
 
   const { extracted, response, stages } = await deliver(output, "asked");
@@ -228,7 +266,10 @@ test("a question the tool does not record comes back as an error, is retried onc
 
   // First failure: the ask tool is forced again, not an empty last step.
   const retry = await nextStep([rejected]);
-  assert.deepEqual(retry.tools, ["widget_ask_customer"]);
+  assert.deepEqual(retry.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
   assert.deepEqual(retry.toolChoice, {
     toolName: "widget_ask_customer",
     type: "tool",
@@ -236,7 +277,6 @@ test("a question the tool does not record comes back as an error, is retried onc
 
   // Second failure: the ordinary write-up, with its note, and no "asked" step.
   const gaveUp = await nextStep([rejected, rejected]);
-  assert.equal(gaveUp.tools.includes("widget_ask_customer"), false);
   assert.equal(gaveUp.toolChoice, undefined);
   assert.equal(gaveUp.note.includes("Write your findings now"), true);
 
@@ -273,4 +313,41 @@ test("an errored tool call is not a recorded question either", async () => {
       ),
   } as never);
   assert.equal(outcome.status === "completed" && outcome.asked, undefined);
+});
+
+test("a question after reads goes out after what the reads found, as the composed reply's ending", async () => {
+  const output = await execute(LIVE);
+  const step = await nextStep([output]);
+  // The tools stay listed for the cache; a call to any of them is refused.
+  assert.deepEqual(step.tools, [
+    "widget_outreach_health",
+    "widget_ask_customer",
+  ]);
+  assert.equal(step.toolChoice, undefined);
+  assert.equal(step.note.includes("what the completed reads showed"), true);
+
+  const found: WidgetFindings = {
+    confidence: "medium",
+    facts: [
+      {
+        claim: "Both campaigns are paused.",
+        entityIds: [],
+        evidence: { ref: "", tool: "widget_outreach_health" },
+      },
+    ],
+    needsHuman: true,
+    recommendation: "Resume a campaign.",
+    report: "Both campaigns are paused.",
+  };
+  const { composed, extracted, response } = await deliver(
+    output,
+    "Both campaigns A and B are paused.",
+    found
+  );
+  assert.equal(extracted, 1);
+  assert.deepEqual(composed?.facts, [{ claim: "Both campaigns are paused." }]);
+  assert.equal(composed?.recommendation, LIVE);
+  assert.equal(composed?.needsHuman, false);
+  assert.ok("message" in response);
+  assert.equal(response.message, `Both campaigns are paused. ${LIVE}`);
 });

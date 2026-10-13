@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -5,22 +6,24 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { generateObject, type LanguageModel } from "ai";
+import { tmpdir } from "node:os";
 import { z } from "zod";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
-import { modelFor } from "./models.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 /**
  * The claims judge's model. The widget writes with anthropic/claude-sonnet-5.5
  * and its egress gate reviews with openai/gpt-5.6-sol, so the judge is a tier
- * above both and from neither the gate's vendor nor the composer's model:
- * Opus 5.5 is the strongest Anthropic model the gateway serves, at the gate's
- * price ($4/$20 per million tokens on 2026-10-04). A change here reruns
- * against the gold file first (`pnpm widget:judge rerun`).
+ * above both and from neither the gate's vendor nor the composer's model.
+ * It runs through headless Claude Code on the local machine (`claude -p`, the
+ * operator's subscription), never the AI Gateway: the Gateway key is for
+ * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it). A
+ * change here reruns against the gold file first (`pnpm widget:judge rerun`).
  */
-export const JUDGE_MODEL = "anthropic/claude-opus-5.5";
+const CLAUDE_MODEL = "opus";
+export const JUDGE_MODEL = `claude-code/${CLAUDE_MODEL}`;
 
 export interface Claim {
   /** Stable across runs: a shared claim's name, or `case-<n>` for a case's own claim. */
@@ -68,6 +71,8 @@ export const judgeRecordSchema = z
     judgedAt: z.iso.datetime(),
     model: z.string().min(1),
     recorded: widgetCaseSchema,
+    // Replay repetition within one eval run; absent on the first run and on older records.
+    run: z.number().int().positive().optional(),
     verdicts: z
       .array(verdictSchema.extend({ claim: z.string().min(1) }))
       .min(1),
@@ -90,9 +95,9 @@ export function reviewedSample(
   recorded: WidgetCase,
   answer: string,
   verdicts: Verdict[],
-  gaps?: Gap[]
+  gaps?: Gap[],
+  claims = claimsFor(recorded)
 ): JudgeRecord {
-  const claims = claimsFor(recorded);
   return judgeRecordSchema.parse({
     answer,
     case: name,
@@ -150,6 +155,10 @@ const LIMITED: Claim = {
   text: "Every statement is supported by a cited help article and no account data appears.",
 };
 
+/** The cause claim when no cause is authored: the conclusion the evidence supports. */
+export const CONCLUSION_CLAIM =
+  "The answer draws the conclusion warranted by the question and tool results, including a justified clarifying question when the subject is ambiguous or explicit uncertainty when a cause cannot be established.";
+
 /** The shared claims for an answered case, then the case's own. */
 export function claimsFor(recorded: WidgetCase): Claim[] {
   const { cause, causeType, claims } = recorded.expectations;
@@ -161,7 +170,7 @@ export function claimsFor(recorded: WidgetCase): Claim[] {
       // Null means no authored cause, not a label saying no cause was found.
       text: cause
         ? `The message names the expected cause (${cause}), or says plainly that it could not find one when that is what the case expects.`
-        : "The answer draws the conclusion warranted by the question and tool results, including a justified clarifying question when the subject is ambiguous or explicit uncertainty when a cause cannot be established.",
+        : CONCLUSION_CLAIM,
     },
     ...SHARED,
     ...(limited ? [LIMITED] : []),
@@ -181,6 +190,16 @@ Return exactly one verdict per claim id, in the order given.
 citedArticles is the text of the help-center articles the answer cited; a fact one of them states is supported only for the situation the article states it for, so an article sentence applied to a different situation is unsupported. An Acquisity product fact no cited article, tool result or conversation turn states is unsupported.
 widgetAffordances are real parts of the support widget the answer may mention.
 In gaps, list every answer sentence that says something could not be confirmed, checked or found, or was not available, with its kind: out_of_scope when the data is outside the customer’s own Acquisity workspace and the widget investigator must not have it (another workspace or organization, the customer’s external bank, card issuer or mailbox provider records, or Acquisity-internal operations such as ticket handling), tool_gap only for data about the customer’s own Acquisity workspace when no tool in widgetToolCapabilities reads it, unused_capability when a tool covers it but the investigation did not call it or lacked a required input it could have asked the customer for, tool_failure when a tool that reads it errored or came back empty, real_unknown when the data does not exist. Use the authoritative widgetToolCapabilities descriptions and input schemas to establish coverage and prerequisites, not absence from toolResults. For a tool_gap, unused_capability or out_of_scope, capability is a short generic name for the kind of data no tool read, such as "campaign sequence content", never a specific record, campaign or person; otherwise null. An answer with no such sentence has an empty list.`;
+
+/**
+ * Investigate replies are written with the product guide in hand (ENG-15044), so
+ * the judge reads the same whole guide as a source for product and UI facts, in
+ * the input as productGuide. A keyword-picked 30K slice left out sections a
+ * plainly worded answer relied on and flagged true facts as invented (round 9);
+ * the whole guide judged no slower.
+ */
+const INVESTIGATE_JUDGE_PROMPT = `${JUDGE_PROMPT}
+productGuide is the help center, distilled. For an Acquisity product or UI fact (where a page, menu, button or setting is, a path, steps, what a feature does, who can use it, limits, plans and prices), a statement the guide makes supports the answer the way a cited article does, for the situation it states it for. It never supports a fact about the customer's own workspace: those are held to the tool results.`;
 
 /** The support widget's own affordances the judge may treat as real. Nothing else. */
 const WIDGET_AFFORDANCES = [
@@ -273,6 +292,11 @@ export const judgeInput = (
     answer,
     citedArticles: articles,
     claims,
+    ...(recorded.mode === "investigate"
+      ? {
+          productGuide: SUPPORT_GUIDE,
+        }
+      : {}),
     question: recorded.question,
     role: recorded.scope.role,
     toolResults: recorded.cassette.map(({ input, output, status, tool }) => ({
@@ -290,7 +314,89 @@ const judgeSchema = z.strictObject({
   verdicts: z.array(verdictSchema),
 });
 
-export const JUDGE_TIMEOUT_MS = 60_000;
+/** A headless Claude Code start plus an Opus answer on a large input. */
+export const JUDGE_TIMEOUT_MS = 240_000;
+/** Concurrent `claude -p` processes; a replay batch runs up to eight cases at once. */
+const JUDGE_CONCURRENCY = 3;
+
+/** One judge call: the system prompt and input in, the structured object out. */
+export type JudgeRunner = (
+  system: string,
+  input: string,
+  signal: AbortSignal
+) => Promise<unknown>;
+
+// Claude Code's validator does not load the draft 2020-12 meta-schema $schema names.
+const { $schema: _draft, ...judgeJsonSchema } = z.toJSONSchema(judgeSchema);
+const JUDGE_JSON_SCHEMA = JSON.stringify(judgeJsonSchema);
+
+let running = 0;
+const queued: (() => void)[] = [];
+
+/**
+ * `claude -p` with no tools, settings, MCP servers or saved session, the input
+ * on stdin and the reply held to the judge schema. Anthropic credentials are
+ * stripped so it can only use the local Claude Code login.
+ */
+export const claudeJudge: JudgeRunner = async (system, input, signal) => {
+  const env = { ...process.env };
+  for (const key of [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+  ]) {
+    delete env[key];
+  }
+  const child = spawn(
+    "claude",
+    [
+      "-p",
+      "--model",
+      CLAUDE_MODEL,
+      "--system-prompt",
+      system,
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--no-session-persistence",
+      "--output-format",
+      "json",
+      "--json-schema",
+      JUDGE_JSON_SCHEMA,
+    ],
+    { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  const out: Buffer[] = [];
+  const err: Buffer[] = [];
+  child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+  child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+  child.stdin.on("error", () => undefined);
+  child.stdin.end(input);
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", resolve);
+  });
+  const text = Buffer.concat(out).toString("utf8");
+  const result = (() => {
+    try {
+      return JSON.parse(text) as {
+        is_error?: boolean;
+        result?: string;
+        structured_output?: unknown;
+      };
+    } catch {
+      return null;
+    }
+  })();
+  if (code !== 0 || !result || result.is_error || !result.structured_output) {
+    throw new Error(
+      `claude -p failed (exit ${code}): ${(result?.result ?? Buffer.concat(err).toString("utf8")).slice(0, 300)}`
+    );
+  }
+  return result.structured_output;
+};
 
 const MAX_REASON = 240;
 
@@ -339,20 +445,34 @@ export async function judgeAnswer(
   answer: string,
   claims: Claim[],
   abortSignal?: AbortSignal,
-  model: LanguageModel = modelFor(JUDGE_MODEL),
+  run: JudgeRunner = claudeJudge,
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
-  const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
-  const { object } = await generateObject({
-    abortSignal: abortSignal
-      ? AbortSignal.any([abortSignal, deadline])
-      : deadline,
-    model,
-    prompt: judgeInput(recorded, answer, claims, articles),
-    schema: judgeSchema,
-    system: JUDGE_PROMPT,
-  });
-  return { gaps: parseGaps(object), verdicts: parseVerdicts(claims, object) };
+  while (running >= JUDGE_CONCURRENCY) {
+    // biome-ignore lint/performance/noAwaitInLoops: wait for a free slot.
+    await new Promise<void>((resolve) => queued.push(resolve));
+  }
+  running += 1;
+  try {
+    // Started once a slot is free, so time spent queued never counts against it.
+    const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
+    const object = judgeSchema.parse(
+      await run(
+        recorded.mode === "investigate"
+          ? INVESTIGATE_JUDGE_PROMPT
+          : JUDGE_PROMPT,
+        judgeInput(recorded, answer, claims, articles),
+        abortSignal ? AbortSignal.any([abortSignal, deadline]) : deadline
+      )
+    );
+    return {
+      gaps: parseGaps(object),
+      verdicts: parseVerdicts(claims, object),
+    };
+  } finally {
+    running -= 1;
+    queued.shift()?.();
+  }
 }
 
 /** Ignored output root; each eval invocation writes `<root>/<timestamp>/`. */
@@ -368,12 +488,16 @@ export const readRecords = (dir: string): JudgeRecord[] =>
       )
     );
 
+/** A record's file: one per case and run, so a repeated replay keeps its own verdicts. */
+export const recordFile = (name: string, run?: number) =>
+  `${name}${run ? `.run${run}` : ""}.json`;
+
 /** Save one case's record and regenerate the run's review page from every record so far. */
 export function saveRecord(dir: string, input: JudgeRecord) {
   const record = judgeRecordSchema.parse(input);
   mkdirSync(`${dir}/records`, { recursive: true });
   writeFileSync(
-    `${dir}/records/${record.case}.json`,
+    `${dir}/records/${recordFile(record.case, record.run)}`,
     `${JSON.stringify(record, null, 2)}\n`
   );
   writeFileSync(`${dir}/review.md`, renderReview(readRecords(dir)));
@@ -477,6 +601,8 @@ export interface ReplayRow {
   handedOff?: boolean;
   leaks?: string;
   rawFields?: string;
+  /** Repetition within the eval run, from 0; absent on rows written before ENG-15044 round 4. */
+  run?: number;
   scored?: boolean;
 }
 
@@ -547,6 +673,9 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   };
   const noAnswer = ({ record, row }: ScoredReplay) =>
     !record && row.answer === null;
+  // A ticket is not a handoff: only a person taking over the conversation is.
+  const handoffExpected = ({ expectations }: WidgetCase) =>
+    expectations.lane === "human";
   const missingCoverage = scored.filter((replay) => {
     if (noAnswer(replay)) {
       return false;
@@ -565,7 +694,12 @@ export function scorecard(replays: readonly ScoredReplay[]) {
     goal: keyof ReturnType<typeof required>
   ) => {
     if (noAnswer(replay)) {
-      return false;
+      // A reply never sent made nothing up. A correct handoff answered what
+      // was needed and did not miss the cause: a person takes it from here.
+      return (
+        goal === "nothing made up" ||
+        (replay.row.handedOff === true && handoffExpected(replay.recorded))
+      );
     }
     const ids = required(replay)[goal];
     const { record } = replay;
@@ -599,11 +733,10 @@ export function scorecard(replays: readonly ScoredReplay[]) {
   }
   rate(
     "handed off only when needed",
-    scored.map(({ recorded: { expectations }, row }) =>
+    scored.map(({ recorded, row }) =>
       row.handedOff === undefined
         ? undefined
-        : row.handedOff ===
-          (expectations.lane === "human" || expectations.fileTicket === true)
+        : row.handedOff === handoffExpected(recorded)
     )
   );
   rate(
@@ -678,7 +811,10 @@ export function scorecard(replays: readonly ScoredReplay[]) {
 }
 
 /** The scorecard as text: one pass rate per goal, target and hit/miss only where a target is set. */
-export function renderScorecard(card: ReturnType<typeof scorecard>) {
+export function renderScorecard(
+  card: ReturnType<typeof scorecard>,
+  targets = SCORECARD_TARGETS
+) {
   const pct = (part: number, whole: number) =>
     whole ? `${((part / whole) * 100).toFixed(1)}%` : "n/a";
   const seconds = (value: number | null) =>
@@ -689,7 +825,7 @@ export function renderScorecard(card: ReturnType<typeof scorecard>) {
     "| goal | pass rate | n | target | hit |",
     "| --- | --- | --- | --- | --- |",
     ...card.rates.map(({ goal, pass, total }) => {
-      const target = SCORECARD_TARGETS[goal];
+      const target = targets[goal];
       if (target === undefined || !total || card.missingCoverage > 0) {
         return `| ${goal} | ${pct(pass, total)} | ${total} |  |  |`;
       }

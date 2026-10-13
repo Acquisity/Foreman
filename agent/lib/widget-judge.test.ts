@@ -8,7 +8,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { MockLanguageModelV4 } from "ai/test";
 import { tool as sdrTool } from "../tools/widget_sdr_thread_status.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
@@ -16,6 +15,7 @@ import {
   claimsFor,
   JUDGE_TIMEOUT_MS,
   type JudgeRecord,
+  type JudgeRunner,
   judgeAnswer,
   judgeInput,
   judgeRecordSchema,
@@ -23,14 +23,15 @@ import {
   parseMarks,
   parseVerdicts,
   readRecords,
+  recordFile,
   renderReview,
   renderScorecard,
   reviewedSample,
   SCORECARD_TARGETS,
+  type ScoredReplay,
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
-
 import {
   calibrated,
   type GoldEntry,
@@ -40,6 +41,7 @@ import {
   toGold,
   writeGold,
 } from "./widget-judge-calibration.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const GOLD_REFUSAL = /Gold not saved/;
 const present = <T>(value: T | undefined): T => {
@@ -186,6 +188,22 @@ test("saveRecord writes the record and regenerates the review", () => {
   );
   const review = readFileSync(`${dir}/review.md`, "utf8");
   assert.ok(review.indexOf("## a") < review.indexOf("## b"));
+});
+
+test("saveRecord keeps each run of a repeated case", () => {
+  const dir = mkdtempSync(`${tmpdir()}/judge-`);
+  saveRecord(dir, record("a"));
+  saveRecord(dir, { ...record("a", [0]), run: 1 });
+  const saved = readRecords(dir);
+  assert.deepEqual(
+    saved.map((r) => [r.run, r.verdicts[0]?.verdict]),
+    [
+      [undefined, "yes"],
+      [1, "no"],
+    ]
+  );
+  assert.equal(recordFile("a", 1), "a.run1.json");
+  assert.equal(recordFile("a", 0), "a.json");
 });
 
 const labelled = (sample: JudgeRecord): GoldEntry =>
@@ -422,24 +440,21 @@ for (const cancellation of ["deadline", "caller"] as const) {
     const ready = new Promise<void>((resolve) => {
       started = resolve;
     });
-    const model = new MockLanguageModelV4({
-      doGenerate: ({ abortSignal }) =>
-        new Promise((_resolve, reject) => {
-          assert.ok(abortSignal);
-          abortSignal.addEventListener(
-            "abort",
-            () => reject(abortSignal.reason),
-            { once: true }
-          );
-          started();
-        }),
-    });
+    let calls = 0;
+    const pendingRun: JudgeRunner = (_system, _input, signal) =>
+      new Promise((_resolve, reject) => {
+        calls += 1;
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+        started();
+      });
     const pending = judgeAnswer(
       recorded,
       "An answer.",
       claims,
       cancellation === "caller" ? caller.signal : undefined,
-      model
+      pendingRun
     );
     const rejected = assert.rejects(
       pending,
@@ -450,9 +465,35 @@ for (const cancellation of ["deadline", "caller"] as const) {
       new DOMException("Cancelled", "AbortError")
     );
     await rejected;
-    assert.equal(model.doGenerateCalls.length, 1);
+    assert.equal(calls, 1);
   });
 }
+
+test("a judge call waiting for a slot does not start its deadline", async (t) => {
+  let timeouts = 0;
+  t.mock.method(AbortSignal, "timeout", () => {
+    timeouts += 1;
+    return new AbortController().signal;
+  });
+  const holds: (() => void)[] = [];
+  const held: JudgeRunner = () =>
+    new Promise((resolve) =>
+      holds.push(() => resolve({ gaps: [], verdicts: [] }))
+    );
+  const busy = [1, 2, 3].map(() =>
+    judgeAnswer(recorded, "An answer.", [], undefined, held)
+  );
+  const queued = judgeAnswer(recorded, "An answer.", [], undefined, held);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timeouts, 3, "the fourth call is queued with no deadline yet");
+  holds.shift()?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(timeouts, 4, "its deadline starts once a slot frees");
+  for (const release of holds.splice(0)) {
+    release();
+  }
+  await Promise.allSettled([...busy, queued]);
+});
 
 test("a cited run's judge input carries the cited article text and the widget affordances", async () => {
   const urls: string[] = [];
@@ -749,7 +790,6 @@ test("scorecard keeps unanswered and unjudged scored replays in denominators and
   assert.equal(card.missingCoverage, 1);
   for (const goal of [
     "found the real cause",
-    "nothing made up",
     "answered what was needed",
     "no tool gaps",
   ]) {
@@ -757,6 +797,11 @@ test("scorecard keeps unanswered and unjudged scored replays in denominators and
     assert.equal(rate?.total, 3);
     assert.equal(rate?.pass, 1);
   }
+  // A reply that was never sent made nothing up.
+  assert.deepEqual(
+    card.rates.find((r) => r.goal === "nothing made up"),
+    { goal: "nothing made up", pass: 2, total: 3 }
+  );
   assert.ok(renderScorecard(card).includes("1 missing judge coverage"));
   const previousTarget = SCORECARD_TARGETS["found the real cause"];
   SCORECARD_TARGETS["found the real cause"] = 1;
@@ -928,4 +973,79 @@ test("leak failures identify each replay and failed check without exposing reply
   assert.ok(rendered.includes("failed-both | run-c | leaks, rawFields"));
   assert.ok(!rendered.includes("private reply text"));
   assert.ok(!rendered.includes("passed | run-d"));
+});
+
+test("the judge reads the product guide for investigate replies only", async () => {
+  const inputs: string[] = [];
+  const capture: JudgeRunner = (_system, input) => {
+    inputs.push(input);
+    return Promise.reject(new Error("captured"));
+  };
+  for (const replay of [
+    { ...smoke, mode: undefined },
+    { ...smoke, mode: "investigate" as const },
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: two calls, in order.
+    await assert.rejects(
+      judgeAnswer(replay, "An answer.", [], undefined, capture)
+    );
+  }
+  assert.equal(JSON.parse(present(inputs[0])).productGuide, undefined);
+  assert.equal(JSON.parse(present(inputs[1])).productGuide, SUPPORT_GUIDE);
+});
+
+test("the judge gets the guide section a plainly worded answer relies on", () => {
+  // wrun_41M4EWN90A0GKYHE33ARYJJB31: the keyword slice left out Inbox warmup and the judge called this invented.
+  const input = JSON.parse(
+    judgeInput(
+      { ...smoke, mode: "investigate" },
+      "Your inboxes have a warmup score of 100. That score only reflects warmup traffic.",
+      []
+    )
+  );
+  assert.ok(input.productGuide.includes("It reflects warmup traffic only."));
+});
+
+test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {
+  const sample = scoredSample();
+  const silent = { ...sample, record: null };
+  const handoff = {
+    ...silent,
+    recorded: {
+      ...sample.recorded,
+      expectations: { ...sample.recorded.expectations, lane: "human" as const },
+    },
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const unexpected = {
+    ...silent,
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const answered = (replay: ScoredReplay) =>
+    scorecard([replay]).rates.find((r) => r.goal === "answered what was needed")
+      ?.pass;
+  assert.equal(answered(handoff), 1);
+  assert.equal(answered(unexpected), 0);
+});
+
+test("a correct handoff does not fail found the real cause, and an unexpected one still does", () => {
+  const sample = scoredSample();
+  const silent = { ...sample, record: null };
+  const handoff = {
+    ...silent,
+    recorded: {
+      ...sample.recorded,
+      expectations: { ...sample.recorded.expectations, lane: "human" as const },
+    },
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const unexpected = {
+    ...silent,
+    row: { ...sample.row, answer: null, handedOff: true },
+  };
+  const cause = (replay: ScoredReplay) =>
+    scorecard([replay]).rates.find((r) => r.goal === "found the real cause")
+      ?.pass;
+  assert.equal(cause(handoff), 1);
+  assert.equal(cause(unexpected), 0);
 });

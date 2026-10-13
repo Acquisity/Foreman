@@ -7,8 +7,9 @@
 //                                   investigate scorecard (ENG-15024) over one or more replay runs
 //
 // [dir] defaults to the newest run under .eve/widget-judge/; [eval dir] to the
-// newest `eve eval` run under .eve/evals/. rerun calls the default Opus 5.5
-// judge through the CLI Proxy, so it needs CLIPROXY_BASE_URL and CLIPROXY_API_KEY.
+// newest `eve eval` run under .eve/evals/. rerun and rejudge call the judge
+// through headless Claude Code (`claude -p`), so they need a local Claude Code
+// login and never the AI Gateway.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { widgetCaseSchema } from "../agent/lib/widget-case.js";
 import {
@@ -22,6 +23,7 @@ import {
   parseMarks,
   type ReplayRow,
   readRecords,
+  recordFile,
   renderReview,
   renderScorecard,
   reviewedSample,
@@ -90,13 +92,31 @@ const RESULT_FILE = /^\d+\.json$/;
 const REVIEW_PAGE = /\/review\.md$/;
 const CASE_FILE = /\.json$/;
 
+/** Legacy rows keep the answer in the outcome log. */
+function recoverLegacyAnswer(row: ReplayRow, logs: string[]) {
+  if (row.answer !== undefined) {
+    return;
+  }
+  const outcome = logs.find((log) => log.startsWith("outcome: "));
+  if (outcome) {
+    const saved = JSON.parse(outcome.slice("outcome: ".length));
+    row.answer = saved.message ?? null;
+    row.citations = (saved.citations ?? []).map(
+      ({ url }: { url: string }) => url
+    );
+  }
+}
+
 /** Every investigate case one `eve eval` run replayed: its row, its case file and its judge record. */
 function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
   const replay = `${dir}/evals/widget/replay`;
   if (!existsSync(replay)) {
     throw new Error(`${replay} has no widget replay results.`);
   }
+  // Rows without a run index are numbered by repetition: replay files follow definition order.
+  const seen = new Map<string, number>();
   return readdirSync(replay)
+    .sort()
     .filter((file) => RESULT_FILE.test(file))
     .flatMap((file) => {
       const logs: string[] =
@@ -109,17 +129,9 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
       const row = JSON.parse(line.slice(ROW.length)) as ReplayRow & {
         case: string;
       };
-      // Legacy rows keep the answer in the outcome log.
-      if (row.answer === undefined) {
-        const outcome = logs.find((log) => log.startsWith("outcome: "));
-        if (outcome) {
-          const saved = JSON.parse(outcome.slice("outcome: ".length));
-          row.answer = saved.message ?? null;
-          row.citations = (saved.citations ?? []).map(
-            ({ url }: { url: string }) => url
-          );
-        }
-      }
+      row.run ??= seen.get(row.case) ?? 0;
+      seen.set(row.case, row.run + 1);
+      recoverLegacyAnswer(row, logs);
       // A case moved to cases-pending since the run no longer counts.
       if (!existsSync(row.case)) {
         return [];
@@ -135,7 +147,7 @@ function replaysIn(dir: string, judgeDir?: string): ScoredReplay[] {
         ?.slice(REVIEW.length)
         .replace(REVIEW_PAGE, "");
       const name = row.case.split("/").at(-1)?.replace(CASE_FILE, "");
-      const path = `${judgeDir ?? review}/records/${name}.json`;
+      const path = `${judgeDir ?? review}/records/${recordFile(name ?? "", row.run)}`;
       return [
         {
           caseName: name,
@@ -176,8 +188,21 @@ async function rejudgeReplay(replay: ScoredReplay, output: string) {
   if (!name) {
     throw new Error("Saved replay has no case name.");
   }
-  saveRecord(output, reviewedSample(name, recorded, answer, verdicts, gaps));
+  saveRecord(output, {
+    ...reviewedSample(name, recorded, answer, verdicts, gaps),
+    run: replay.row.run || undefined,
+  });
 }
+
+/** WIDGET_REPLAY_CASES limits re-judging and the scorecard to the named cases, as it limits replay. */
+const selected = (() => {
+  const names = process.env.WIDGET_REPLAY_CASES?.split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names?.length
+    ? ({ caseName }: ScoredReplay) => names.includes(caseName ?? "")
+    : () => true;
+})();
 
 async function rejudge(dirs: string[]) {
   if (!dirs.length) {
@@ -189,7 +214,11 @@ async function rejudge(dirs: string[]) {
     let judged = 0;
     let failed = 0;
     for (const replay of replaysIn(dir)) {
-      if (replay.row.scored === false || !replay.row.answer) {
+      if (
+        replay.row.scored === false ||
+        !replay.row.answer ||
+        !selected(replay)
+      ) {
         continue;
       }
       try {
@@ -264,7 +293,9 @@ async function main() {
     console.log(
       renderScorecard(
         scorecard(
-          dirs.flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+          dirs
+            .flatMap((dir, index) => replaysIn(dir, judgeDirs[index]))
+            .filter(selected)
         )
       )
     );

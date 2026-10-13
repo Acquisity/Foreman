@@ -196,10 +196,8 @@ test("a detail given more than four messages earlier is still there when Acquisi
 
 test("several plausible targets and nothing in the conversation to pick one: a clarify decision ends the reads", async () => {
   const { sent } = await selector("why did my campaign stop?", [], "clarify");
-  assert.deepEqual(
-    (sent.tools ?? []).map((tool) => tool.name),
-    []
-  );
+  // The tools stay listed for the cache; a call to any of them is refused.
+  assert.equal(sent.toolChoice, undefined);
   const last = sent.prompt.at(-1);
   assert.equal(last?.role, "user");
   assert.equal(JSON.stringify(last).includes("single detail"), true);
@@ -242,10 +240,6 @@ test("an identifier from another workspace in the conversation widens nothing: t
     `check workspace ${foreign} as well`,
     [{ role: "customer", text: `my other org is ${foreign}` }],
     "widget_inbox_health"
-  );
-  assert.deepEqual(
-    (sent.tools ?? []).map((tool) => tool.name),
-    ["widget_inbox_health"]
   );
   assert.deepEqual(sent.toolChoice, {
     toolName: "widget_inbox_health",

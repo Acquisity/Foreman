@@ -1,20 +1,24 @@
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "#lib/executor/endpoint.js";
 import { executorTransport } from "#lib/executor/transport.js";
+import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetOutreachHealthQuery,
   parseWidgetOutreachHealthEvidence,
+  readEarlyFollowUps,
+  readSendingRules,
   readWidgetOutreachHealth,
   widgetOutreachHealthInput,
   widgetOutreachHealthOutput,
 } from "../tools/widget_outreach_health.js";
 
 const scope = verifiedWidgetContext;
+const WAITING_LEADS = /12 leads have not had a first email yet/;
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
@@ -42,6 +46,9 @@ after(() => {
   }
 });
 
+// Resolved workspaces are cached per process; no test may see another's.
+beforeEach(resetInstantlyWorkspaceCache);
+
 const campaignId = "44444444-4444-4444-8444-444444444444";
 const observedAt = "2026-09-17T10:00:00.000Z";
 const inboxes = { healthyAccounts: 3, totalSendingAccounts: 5 };
@@ -63,6 +70,7 @@ const row = {
   leadsNotPushedCount: 12,
   name: "Customer campaign",
   notSendingStatusRaw: "1",
+  pauseReason: null,
   provider: "instantly",
   providerCampaignId: campaignId,
   providerWorkspaceId: "e05cbe7b-67db-4b07-b712-46b9365dc83f",
@@ -99,6 +107,32 @@ const ctx = {
   getToken: async () => ({ token: "test-token" }),
   session: { auth: { current: null, initiator: widgetAuth(scope) } },
 } as unknown as ProviderContext;
+
+test("dates without campaignId read every listed campaign's daily sends for the window", () => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD: the dated first call was rejected and the investigator asked the customer instead.
+  const input = { endDate: "2026-09-30", startDate: "2026-09-20" };
+  assert.equal(widgetOutreachHealthInput.safeParse(input).success, true);
+  const query = buildWidgetOutreachHealthQuery(scope, input);
+  assert.ok(
+    query.includes(
+      "and cm.date >= ('2026-09-20'::date)::text and cm.date <= ('2026-09-30'::date)::text"
+    )
+  );
+  assert.ok(query.includes("order by cm.date desc limit 31"));
+  assert.ok(query.includes("null::jsonb as diagnostics"));
+  const lead = widgetOutreachHealthInput.safeParse({
+    leadEmail: "lead@example.com",
+  });
+  assert.equal(lead.success, false);
+  if (lead.success) {
+    assert.fail("A lead's history without campaignId must be rejected");
+  }
+  assert.ok(lead.error.issues[0].message.includes("require campaignId"));
+  assert.equal(
+    widgetOutreachHealthInput.safeParse({ startDate: "2026-09-20" }).success,
+    false
+  );
+});
 
 test("tool is exposed only for the widget support initiator", async () => {
   const resolve = definition.events["step.started"];
@@ -181,7 +215,7 @@ test("a paused campaign, the one that stopped sending, is listed and readable by
 
 test("dispatch sends the org-scoped query through the widget toolkit", async (t) => {
   const call = t.mock.method(executorTransport, "call", async () => ({
-    data: envelope([row]),
+    data: envelope([{ ...row, accountType: "user_owned" }]),
     ok: true,
   }));
   const result = await readWidgetOutreachHealth(ctx, {});
@@ -371,8 +405,12 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
             { daily_limit: 999, id: "other-campaign", status: 2 },
             {
               daily_limit: 150,
+              daily_max_leads: 40,
+              email_gap: 10,
               id: campaignId,
               not_sending_status: 3,
+              prioritize_new_leads: true,
+              random_wait_max: 5,
               status: 1,
             },
           ],
@@ -397,6 +435,86 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
   assert.equal(campaign.live.campaignDailyLimit, 150);
   assert.equal(campaign.live.notSendingReasonCode, 3);
   assert.equal(campaign.live.statusCode, 1);
+  assert.equal(campaign.live.providerStatus, "active");
+  assert.deepEqual(campaign.live.sendingRules, {
+    maxNewLeadsPerDay: 40,
+    minutesBetweenEmails: 10,
+    newLeadsFirst: true,
+    randomExtraMinutesMax: 5,
+    reading:
+      "New leads come first and 12 leads have not had a first email yet, so follow-ups wait until those leads get one, and pick up once the list has been contacted. At up to 40 new leads a day, that is about 1 more sending day. Acquisity sets these sending rules and they can't be changed in the product, so there is nothing for the customer to change. This is the likely reason follow-ups are low, not a certainty.",
+  });
+  // A Pro customer must never see the provider's name, even in authored text.
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
+});
+
+test("a multi-page live scan resolves the workspace group once", async (t) => {
+  // Round 10c: a group walk on every page took about 20 s each and blew the scan deadline.
+  let groupWalks = 0;
+  const campaignPages: unknown[] = [];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string, input: Record<string, unknown>) => {
+      if (path.includes("planetscale")) {
+        return { data: envelope([row]), ok: true };
+      }
+      if (path.includes("workspaceGroupMembers")) {
+        groupWalks += 1;
+        return { data: { items: [member()] }, ok: true };
+      }
+      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
+      campaignPages.push(input.starting_after);
+      return input.starting_after === "page-3"
+        ? { data: { items: [{ id: campaignId, status: 1 }] }, ok: true }
+        : {
+            data: {
+              items: [{ id: "other-campaign", status: 1 }],
+              next_starting_after: `page-${campaignPages.length + 1}`,
+            },
+            ok: true,
+          };
+    }
+  );
+  const result = await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(groupWalks, 1);
+  assert.deepEqual(campaignPages, [undefined, "page-2", "page-3"]);
+  assert.equal(
+    result.status === "ok" && result.campaigns[0].live.available,
+    true
+  );
+});
+
+test("a resolved workspace is reused across calls for its organization only", async (t) => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD made two campaign reads; each walked the group (about 20 s) before round 11.
+  let groupWalks = 0;
+  t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
+    if (path.includes("planetscale")) {
+      return { data: envelope([row]), ok: true };
+    }
+    if (path.includes("workspaceGroupMembers")) {
+      groupWalks += 1;
+      return { data: { items: [member()] }, ok: true };
+    }
+    return { data: { items: [{ id: campaignId, status: 1 }] }, ok: true };
+  });
+  await readWidgetOutreachHealth(ctx, {});
+  await readWidgetOutreachHealth(ctx, { campaignId });
+  assert.equal(groupWalks, 1);
+  const otherOrganization = {
+    ...ctx,
+    session: {
+      auth: {
+        current: null,
+        initiator: widgetAuth({
+          ...scope,
+          organizationId: "55555555-5555-4555-8555-555555555555",
+        }),
+      },
+    },
+  } as unknown as ProviderContext;
+  await readWidgetOutreachHealth(otherOrganization, { campaignId });
+  assert.equal(groupWalks, 2);
 });
 
 test("live failure preserves saved evidence and user-owned connections never dispatch", async (t) => {
@@ -445,7 +563,7 @@ test("a denied or absent target cannot trigger a provider read", async (t) => {
   assert.equal(call.mock.callCount(), 1);
 });
 
-test("date windows require a selected campaign, real dates and no more than 31 inclusive days", () => {
+test("date windows require real dates and no more than 31 inclusive days", () => {
   assert.ok(
     widgetOutreachHealthInput.safeParse({ after: null, campaignId: null })
       .success
@@ -453,7 +571,6 @@ test("date windows require a selected campaign, real dates and no more than 31 i
   const valid = { campaignId, endDate: "2026-09-30", startDate: "2026-09-01" };
   assert.ok(widgetOutreachHealthInput.safeParse(valid).success);
   for (const input of [
-    { ...valid, campaignId: null },
     { ...valid, startDate: "2026-09-31" },
     { ...valid, endDate: null },
     { ...valid, endDate: "2026-08-31" },
@@ -498,10 +615,13 @@ test("saved diagnostics preserve missing metrics and page assignments without tr
             nextAfterInboxId: null,
           },
           dailyMetrics: [],
+          earlyFollowUps: null,
           endDate: "2026-09-30",
+          lead: null,
           overview: null,
           sequenceStepDelays: null,
           startDate: "2026-09-01",
+          statusHistory: [],
           stepSends: [],
         },
       },
@@ -531,7 +651,6 @@ test("per-step sends, first-touch counts and step delays are read only for the o
   const listed = buildWidgetOutreachHealthQuery(scope, {});
   for (const text of [
     "outreach_campaign_step_variant_metrics",
-    "new_leads_contacted_count",
     "'sequences'",
   ]) {
     assert.equal(listed.includes(text), false, text);
@@ -571,10 +690,13 @@ test("step sends, first-touch counts and step delays round-trip through the outp
         updatedAt: observedAt,
       },
     ],
+    earlyFollowUps: null,
     endDate: "2026-09-30",
+    lead: null,
     overview: null,
     sequenceStepDelays: [2, 2, 3],
     startDate: "2026-09-23",
+    statusHistory: [],
     stepSends: [{ sent: 1003, snapshotAt: observedAt, step: 0 }],
   };
   const result = parseWidgetOutreachHealthEvidence(
@@ -586,7 +708,7 @@ test("step sends, first-touch counts and step delays round-trip through the outp
     assert.fail("Expected saved diagnostics");
   }
   assert.deepEqual(result.campaigns[0].diagnostics, diagnostics);
-  assert.ok(result.caveats.length <= 6);
+  assert.ok(result.caveats.length <= 8);
   assert.ok(
     result.caveats.some((text) =>
       text.includes("no saved numeric-step evidence of follow-up sends")
@@ -598,4 +720,454 @@ test("step sends, first-touch counts and step delays round-trip through the outp
     assert.fail("Expected ok evidence");
   }
   assert.equal(list.campaigns[0].diagnostics, null);
+});
+
+test("a paused campaign carries its saved pause reason and dated status changes", () => {
+  const query = buildWidgetOutreachHealthQuery(scope, { campaignId });
+  for (const required of [
+    'left(c.pause_reason, 300) as "pauseReason"',
+    "from outreach_campaign_activity ca",
+    "ca.organization_id = c.organization_id and ca.campaign_id = c.id",
+    "ca.message like 'Campaign status updated to %'",
+    "limit 10",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  const statusHistory = [
+    {
+      at: observedAt,
+      message: "Campaign status updated to paused",
+      status: "paused",
+    },
+  ];
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          earlyFollowUps: null,
+          endDate: "2026-09-30",
+          lead: null,
+          overview: null,
+          sequenceStepDelays: null,
+          startDate: "2026-09-24",
+          statusHistory,
+          stepSends: [],
+        },
+        pauseReason: "Accounts unhealthy",
+        status: "paused",
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.equal(result.campaigns[0].pauseReason, "Accounts unhealthy");
+  assert.deepEqual(
+    result.campaigns[0].diagnostics?.statusHistory,
+    statusHistory
+  );
+});
+
+test("a lead's own history is read only inside the selected owned campaign, without email text", () => {
+  assert.equal(
+    widgetOutreachHealthInput.safeParse({ leadEmail: "lead@example.test" })
+      .success,
+    false
+  );
+  const query = buildWidgetOutreachHealthQuery(scope, {
+    campaignId,
+    leadEmail: "O'Neil@Example.test",
+  });
+  for (const required of [
+    "from outreach_webhook_event e",
+    "e.organization_id = c.organization_id and e.provider_id = c.provider_id",
+    "e.provider_campaign_id = c.provider_campaign_id",
+    "array['O''Neil@Example.test', lower('O''Neil@Example.test')]",
+    "cl.organization_id = c.organization_id and cl.campaign_id = c.id",
+    "e.payload->>'email_account'",
+    "limit 25",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  for (const forbidden of [
+    "email_text",
+    "reply_text",
+    "email_html",
+    "unibox_url",
+    "email_subject",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  assert.equal(
+    buildWidgetOutreachHealthQuery(scope, { campaignId }).includes(
+      "e.lead_email = any("
+    ),
+    false
+  );
+  const lead = {
+    bounceCount: 0,
+    email: "lead@example.test",
+    events: [
+      {
+        at: observedAt,
+        eventType: "email_sent",
+        sendingInbox: "jane@sender.example.test",
+        step: 2,
+        variant: 0,
+      },
+    ],
+    inCampaign: true,
+    openCount: 1,
+    pushedToProvider: true,
+    status: "contacted",
+    statusAt: observedAt,
+  };
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          earlyFollowUps: null,
+          endDate: "2026-09-30",
+          lead,
+          overview: null,
+          sequenceStepDelays: null,
+          startDate: "2026-09-24",
+          statusHistory: [],
+          stepSends: [],
+        },
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  assert.deepEqual(result.campaigns[0].diagnostics?.lead, lead);
+});
+
+test("early follow-ups are found across the selected campaign's leads without a lead email", () => {
+  // Live wrun_41M4C65K460GV34YR42A4W6NAN: follow-ups went out three hours after
+  // the first email on a 3-day delay, and the widget asked the customer for a
+  // lead email because only one named lead's history was readable.
+  assert.equal(
+    buildWidgetOutreachHealthQuery(scope, {}).includes(
+      "outreach_webhook_event"
+    ),
+    false
+  );
+  const query = buildWidgetOutreachHealthQuery(scope, {
+    campaignId,
+    endDate: "2026-10-07",
+    startDate: "2026-10-07",
+  });
+  for (const required of [
+    "e.organization_id = c.organization_id and e.provider_id = c.provider_id",
+    "e.provider_campaign_id = c.provider_campaign_id and e.event_type = 'email_sent'",
+    "e.created_at < ('2026-10-07'::date) + 1",
+    "s.at >= ('2026-10-07'::date)",
+    "p.step = s.step - 1 and p.at <= s.at",
+    "from s join d on d.step = s.step",
+    'f.at - f."previousAt" < make_interval(days => f.delay)',
+    "limit 10",
+    "join authorized a on a.id = c.organization_id",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+  for (const forbidden of [
+    "email_text",
+    "reply_text",
+    "email_html",
+    "unibox_url",
+  ]) {
+    assert.equal(query.includes(forbidden), false, forbidden);
+  }
+  const earlyFollowUps = {
+    earlyCount: 221,
+    earlyLeads: 221,
+    examples: [
+      {
+        at: "2026-10-07T15:08:00.000Z",
+        configuredDelayDays: 3,
+        leadEmail: "lead@example.test",
+        previousAt: "2026-10-07T12:00:00.000Z",
+        sendingInbox: "jane@sender.example.test",
+        step: 2,
+      },
+    ],
+    followUpsChecked: 221,
+    sameDayCount: 221,
+    withoutPreviousSend: 0,
+  };
+  const result = parseWidgetOutreachHealthEvidence(
+    envelope([
+      {
+        ...row,
+        diagnostics: {
+          assignedInboxes: {
+            accounts: [],
+            configuredCount: null,
+            healthyCount: 0,
+            matchedCount: 0,
+            nextAfterInboxId: null,
+          },
+          dailyMetrics: [],
+          earlyFollowUps,
+          endDate: "2026-10-07",
+          lead: null,
+          overview: null,
+          sequenceStepDelays: [0, 3, 3],
+          startDate: "2026-10-07",
+          statusHistory: [],
+          stepSends: [],
+        },
+        // wrun ...4W6NAN: the campaign row was updated after the early sends.
+        updatedAt: "2026-10-13T00:00:00.000Z",
+      },
+    ]),
+    scope
+  );
+  assert.ok(widgetOutreachHealthOutput.safeParse(result).success);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  // Same day against a 3-day delay is the product sending early, marked as a
+  // fault however recently the campaign row was updated (routine syncs move it).
+  assert.deepEqual(result.campaigns[0].diagnostics?.earlyFollowUps, {
+    ...earlyFollowUps,
+    platformFault: true,
+    reading:
+      "221 follow-ups went out sooner than the campaign's configured delay, 221 of them within 24 hours of the email before them, although that step's delay is set to 3 days. A sending schedule can move a send by hours, not by days, so the product sent these follow-ups early: a platform fault for the team, not something the customer set up wrong.",
+  });
+  assert.ok(result.caveats.some((text) => text.includes("sameDayCount")));
+  // A few hours short of a 1-day delay can be the schedule; none found is no fault.
+  for (const early of [
+    {
+      ...earlyFollowUps,
+      examples: [{ ...earlyFollowUps.examples[0], configuredDelayDays: 1 }],
+    },
+    { ...earlyFollowUps, earlyCount: 0, examples: [], sameDayCount: 0 },
+  ]) {
+    assert.equal(readEarlyFollowUps(early), null);
+  }
+});
+
+test("the listing reads each provisioned workspace's campaign list once and reads the rules for every campaign", async (t) => {
+  // wrun_41M48DWE6T0GW384F9JHWV4AYD never selected the campaign, so it never saw the rules.
+  const second = "55555555-5555-4555-8555-555555555555";
+  const created = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const call = t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string) => {
+      if (path.includes("planetscale")) {
+        return {
+          data: envelope([
+            row,
+            {
+              ...row,
+              createdAt: created,
+              id: second,
+              leadsNotPushedCount: 0,
+              providerCampaignId: second,
+              recentSends: [
+                { date: "2026-09-17", emailsSent: 117, newLeadsContacted: 117 },
+                { date: "2026-09-16", emailsSent: 0 },
+              ],
+            },
+          ]),
+          ok: true,
+        };
+      }
+      if (path.includes("workspaceGroupMembers")) {
+        return { data: { items: [member()] }, ok: true };
+      }
+      return {
+        data: {
+          items: [
+            {
+              daily_max_leads: 40,
+              id: campaignId,
+              prioritize_new_leads: true,
+              status: 1,
+            },
+            {
+              daily_max_leads: 120,
+              id: second,
+              prioritize_new_leads: true,
+              status: 1,
+            },
+          ],
+        },
+        ok: true,
+      };
+    }
+  );
+  const result = await readWidgetOutreachHealth(ctx, {
+    endDate: "2026-09-17",
+    startDate: "2026-09-11",
+  });
+  assert.equal(call.mock.callCount(), 3);
+  if (result.status !== "ok") {
+    assert.fail("Expected saved evidence");
+  }
+  const readings = result.campaigns.map((campaign) =>
+    campaign.live.available ? campaign.live.sendingRules.reading : "missing"
+  );
+  assert.match(String(readings[0]), WAITING_LEADS);
+  assert.equal(
+    readings[1],
+    "This campaign is new and its first emails are at or near its cap of 120 new leads a day, so that daily new-lead cap is what limits first emails."
+  );
+  assert.ok(!JSON.stringify(result).includes("Instantly"));
+});
+
+test("a campaign created under a day ago with no sends gets the start-up reading with its real numbers", () => {
+  // wrun_41M49GFMPB0GZ0VZ2R080H5YQP: saved about 12 minutes before the message, nothing sent.
+  const now = Date.parse(observedAt);
+  const fresh = {
+    ...row,
+    createdAt: new Date(now - 12 * 60_000).toISOString(),
+    leadsNotPushedCount: 0,
+    recentSends: [],
+  };
+  const rules = { maxNewLeadsPerDay: 117, newLeadsFirst: true };
+  assert.equal(
+    readSendingRules(rules, fresh, now),
+    `This campaign was created on ${fresh.createdAt.slice(0, 10)} at ${fresh.createdAt.slice(11, 16)} UTC, less than a day before the customer's message, and has no sends yet. First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. A brand-new campaign can take a while to start sending. New leads come first, so follow-ups wait until new leads have had their first email. This is the likely reason nothing has gone out yet, not a certainty.`
+  );
+  assert.equal(
+    readSendingRules(
+      rules,
+      { ...fresh, recentSends: [{ date: "2026-09-17", emailsSent: 3 }] },
+      now
+    ),
+    null
+  );
+  assert.equal(
+    readSendingRules(
+      rules,
+      { ...fresh, createdAt: new Date(now - 2 * 86_400_000).toISOString() },
+      now
+    ),
+    null
+  );
+});
+
+test("a live re-run reads a campaign saved minutes before the message as new, and states the sends recorded since", async (t) => {
+  // wrun_41M49GFMPB0GZ0VZ2R080H5YQP: that day's row now holds 196 sends made after the message.
+  const asOf = "2026-10-06T21:03:58.775Z";
+  t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
+    if (path.includes("planetscale")) {
+      return {
+        data: envelope([
+          {
+            ...row,
+            createdAt: "2026-10-06T20:51:00.000Z",
+            leadsNotPushedCount: 0,
+            recentSends: [{ date: "2026-10-06", emailsSent: 196 }],
+          },
+        ]),
+        ok: true,
+      };
+    }
+    if (path.includes("workspaceGroupMembers")) {
+      return { data: { items: [member()] }, ok: true };
+    }
+    return {
+      data: {
+        items: [
+          {
+            daily_max_leads: 117,
+            id: campaignId,
+            prioritize_new_leads: true,
+            status: 1,
+          },
+        ],
+      },
+      ok: true,
+    };
+  });
+  const replay = {
+    ...ctx,
+    session: {
+      auth: {
+        current: null,
+        initiator: widgetAuth({ ...scope, liveAsOf: asOf }),
+      },
+    },
+  } as unknown as ProviderContext;
+  const result = await readWidgetOutreachHealth(replay, {
+    endDate: "2026-10-06",
+    startDate: "2026-09-30",
+  });
+  if (result.status !== "ok" || !result.campaigns[0]?.live.available) {
+    assert.fail("Expected a live campaign");
+  }
+  // It was new at the message, but the sends recorded since then are stated, never "no sends yet".
+  assert.equal(
+    result.campaigns[0].live.sendingRules.reading,
+    "This campaign was created on 2026-10-06 at 20:51 UTC, less than a day before the customer's message, and had no sends before it. Sends recorded since then show it has started sending (emails sent: 196 on 2026-10-06). First emails go out only inside its sending schedule from 09:00 to 17:00 Etc/GMT+12 time on monday, tuesday, wednesday, thursday, friday, and at most 117 new leads get a first email each day. New leads come first, so follow-ups wait until new leads have had their first email. So it was new rather than stuck when the customer wrote."
+  );
+  assert.deepEqual(result.campaigns[0].recentSends, [
+    { date: "2026-10-06", emailsSent: 196 },
+  ]);
+});
+
+test("a first-email cap reading uses first touches on the same day, not total emails", () => {
+  const rules = { maxNewLeadsPerDay: 100, newLeadsFirst: false };
+  const campaign = {
+    ...row,
+    createdAt: "2026-10-12T00:00:00Z",
+    leadsNotPushedCount: 0,
+    recentSends: [{ date: "2026-10-12", emailsSent: 300 }],
+  };
+  const now = Date.parse("2026-10-13T00:00:00Z");
+  assert.equal(readSendingRules(rules, campaign, now), null);
+  assert.equal(
+    readSendingRules(
+      rules,
+      {
+        ...campaign,
+        recentSends: [{ ...campaign.recentSends[0], newLeadsContacted: 0 }],
+      },
+      now
+    ),
+    null
+  );
+  assert.ok(
+    readSendingRules(
+      rules,
+      {
+        ...campaign,
+        recentSends: [{ ...campaign.recentSends[0], newLeadsContacted: 100 }],
+      },
+      now
+    )?.includes("first emails are at or near its cap")
+  );
+  assert.ok(
+    buildWidgetOutreachHealthQuery(scope, {}).includes(
+      'cm.new_leads_contacted_count as "newLeadsContacted"'
+    )
+  );
 });

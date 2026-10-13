@@ -38,8 +38,17 @@ export const REPLAY_TICKET = Object.freeze({
  * Live re-run (ENG-15026, `pnpm widget:live`): with WIDGET_LIVE=1 every widget read is live,
  * widget_file_ticket files nothing, and identity is the recorded production scope the
  * harness sends as the bearer token. Local-only.
+ *
+ * The result is a simulated filed ticket, so a correct ticket reaches the composer's
+ * "passed to the team" reply as it would in production (ENG-15044 round 15: with
+ * `filed: false` no live reply could say so). ENG-0 is never a real issue.
  */
-export const LIVE_TICKET = Object.freeze({ filed: false, live: "not filed" });
+export const LIVE_TICKET = Object.freeze({
+  identifier: "ENG-0",
+  live: "simulated: nothing was filed",
+  simulated: true,
+  url: "https://linear.app/acquisity/issue/ENG-0/simulated-live-ticket",
+});
 
 /** Live is local-only; replay is refused on production, and the flags are exclusive. */
 export function assertReplayAllowed(env: NodeJS.ProcessEnv = process.env) {
@@ -95,6 +104,9 @@ export function replayCase(caseId?: string): WidgetCase {
  * (ids, dates, urls) must still match exactly.
  */
 const FREE_TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  // A filing is replayed whatever the investigator wrote in it, so a case that
+  // recorded a real ticket replays as filed.
+  widget_file_ticket: ["summary", "title"],
   widget_help_article: ["query"],
   widget_known_issues: ["query"],
 };
@@ -204,7 +216,8 @@ export const liveIdentitySchema = z.strictObject({
 
 /**
  * A live re-run's scope: the production run's recorded scope, sent base64url-encoded as the
- * bearer token, on the request's own conversation and always as a team-only inbox run.
+ * bearer token, on the request's own conversation and always as a team-only inbox run. A
+ * recorded `recordingId` stays, as production verified it, so the recording stays readable.
  */
 export function liveContext(input: {
   conversationId: string;
@@ -225,7 +238,6 @@ export function liveContext(input: {
       ...recorded,
       conversationId: input.conversationId,
       liveAsOf: sentAt,
-      recordingId: undefined,
       replayCaseId: undefined,
       source: "inbox",
     })

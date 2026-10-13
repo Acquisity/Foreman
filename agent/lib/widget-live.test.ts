@@ -6,6 +6,7 @@ import billingDefinition from "../tools/widget_billing_summary.js";
 import outreachDefinition from "../tools/widget_outreach_health.js";
 import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
+import { filedTicketResult } from "./widget-investigation.js";
 import { driftVerdict, gapSentences, readResult } from "./widget-live.js";
 import {
   hasMovingWindow,
@@ -17,6 +18,7 @@ import {
 import {
   assertReplayAllowed,
   LIVE_TICKET,
+  liveContext,
   replayable,
 } from "./widget-replay.js";
 import { widgetAuth } from "./widget-scope.js";
@@ -306,7 +308,10 @@ test("live tool boundary enforces historical date windows and preserves explicit
     startDate: "2026-09-01",
   };
   assert.deepEqual(await outreach.execute(window, ctx), window);
-  assert.deepEqual(await outreach.execute({}, ctx), {});
+  assert.deepEqual(await outreach.execute({}, ctx), {
+    endDate: "2026-10-09",
+    startDate: "2026-10-03",
+  });
   await resolveTool(billingDefinition).execute({}, ctx);
   assert.equal(
     queries.some(
@@ -336,6 +341,16 @@ test("live tool boundary enforces historical date windows and preserves explicit
     await replayable("widget_file_ticket", tool).execute({}, ctx),
     LIVE_TICKET
   );
+  // Simulated, so the composer's "passed to the team" path runs; nothing is filed.
+  assert.equal(LIVE_TICKET.simulated, true);
+  assert.deepEqual(
+    filedTicketResult({
+      kind: "tool-result",
+      output: LIVE_TICKET,
+      toolName: "widget_file_ticket",
+    }),
+    { id: "ENG-0", url: LIVE_TICKET.url }
+  );
 });
 
 test("picks sentences that say something could not be confirmed", () => {
@@ -348,4 +363,19 @@ test("picks sentences that say something could not be confirmed", () => {
       "No send activity was recorded for that week.",
     ]
   );
+});
+
+test("a live re-run keeps the recorded screen recording so its reader is offered", () => {
+  const sentAt = "2026-10-07T12:00:00.000Z";
+  const scope = liveContext({
+    conversationId: "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b",
+    organizationId: fixture.organizationId,
+    staff: true,
+    userToken: Buffer.from(
+      JSON.stringify({ scope: { ...fixture, recordingId: "jam-abc" }, sentAt })
+    ).toString("base64url"),
+  });
+  assert.equal(scope.recordingId, "jam-abc");
+  assert.equal(scope.source, "inbox");
+  assert.equal(scope.liveAsOf, sentAt);
 });

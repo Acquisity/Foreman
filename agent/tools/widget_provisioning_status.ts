@@ -5,10 +5,10 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "#lib/executor/dispatch.js";
-import { redact } from "#lib/investigation-memory/case.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
@@ -18,6 +18,7 @@ import {
 } from "#lib/widget-scope.js";
 
 const ORDER_LIMIT = 25;
+const FORWARDING_DOMAIN_LIMIT = 20;
 // Provisioning is driven by the Acquisity Inngest function whose id is
 // CAMPAIGN_FUNCTION_IDS.DOMAIN_PURCHASE_ORDER; DFY orders are first created by
 // CAMPAIGN_FUNCTION_IDS.CREATE_DFY_ORDER. We return the id, not raw runs: the
@@ -39,6 +40,24 @@ const DFY_INBOX_COUNT = `(select case when count(*) > 0 and bool_and(
       from jsonb_each(case when dpo.order_type = 'dfy'
         and jsonb_typeof(dpo.dfy_config -> 'mailboxes') = 'object'
         then dpo.dfy_config -> 'mailboxes' else '{}'::jsonb end) mb)`;
+
+// The forwarding URL chosen at purchase, per bought domain: a DFY order keeps
+// one per domain in dfy_config, a pre-warmed order one for all in
+// selected_domains. Domain Forwarding's Update writes only to the mail
+// provider, so a later change is not here.
+const FORWARDING = `(select jsonb_build_object(
+      'truncated', count(*) > ${FORWARDING_DOMAIN_LIMIT},
+      'domains', coalesce(jsonb_agg(jsonb_build_object('domain', f.domain, 'forwardTo', f."forwardTo")
+        order by f.domain) filter (where f.n <= ${FORWARDING_DOMAIN_LIMIT}), '[]'::jsonb))
+      from (select md.domain, row_number() over (order by md.domain) as n,
+        nullif(left(case when dpo.order_type = 'dfy' then (
+          select d.value ->> 'forwardTo' from jsonb_array_elements(
+            case when jsonb_typeof(dpo.dfy_config -> 'domains') = 'array'
+              then dpo.dfy_config -> 'domains' else '[]'::jsonb end) d
+          where lower(d.value ->> 'domain') = lower(md.domain) limit 1)
+          else dpo.selected_domains ->> 'forwardTo' end, 500), '') as "forwardTo"
+        from mail_domain md
+        where md.organization_id = dpo.organization_id and md.order_id = dpo.id) f)`;
 
 export const widgetProvisioningInput = z.strictObject({
   orderId: z
@@ -101,17 +120,6 @@ const reconciliation = z.object({
   invisibleInboxes: z.boolean(),
 });
 
-function diagnosticText(value: string | null): string | null {
-  return value === null
-    ? null
-    : redact(value)
-        .replace(/https?:\/\/[^\s"'<>]+/gi, "[redacted URL]")
-        .replace(
-          /"(?:api[_-]?key|secret|password|token)"\s*:\s*"[^"\n]*"/gi,
-          '"credential":"[redacted]"'
-        )
-        .slice(0, 500);
-}
 const inboxDiagnostic = z.object({
   connected: z.boolean().nullable(),
   connectionError: z.string().max(500).nullable(),
@@ -133,6 +141,41 @@ const diagnostics = z.object({
   domainsTruncated: z.boolean(),
 });
 
+const forwardingAtPurchase = z.object({
+  domains: z
+    .array(
+      z.object({
+        domain: z.string().max(253),
+        forwardTo: z.string().max(500).nullable(),
+      })
+    )
+    .max(FORWARDING_DOMAIN_LIMIT),
+  truncated: z.boolean(),
+});
+
+/**
+ * Output form: the purchase value is named as one, beside a current setting
+ * that is always null. Forwarding is changed at the domain provider, which
+ * offers no read of it (only DNS records), and rounds 14 and 15 replies stated
+ * the purchase value as the current setting.
+ */
+const forwardingOut = z.object({
+  domains: z
+    .array(
+      z.object({
+        currentForwarding: z
+          .null()
+          .describe(
+            "Never read: the current forwarding is set at the domain provider and cannot be checked here."
+          ),
+        domain: z.string().max(253),
+        forwardToAtPurchase: z.string().max(500).nullable(),
+      })
+    )
+    .max(FORWARDING_DOMAIN_LIMIT),
+  truncated: z.boolean(),
+});
+
 const order = z.object({
   billingAccountId: z.uuid().nullable(),
   completedAt: timestamp.nullable(),
@@ -140,6 +183,7 @@ const order = z.object({
   diagnostics: diagnostics.nullable(),
   dismissed: z.boolean(),
   error: z.string().max(500).nullable(),
+  forwardingAtPurchase: forwardingOut,
   hasError: z.boolean(),
   id: z.uuid(),
   mailProvider: z.string().max(64),
@@ -160,7 +204,7 @@ const order = z.object({
 
 export const widgetProvisioningOutput = z.union([
   z.object({
-    caveats: z.array(z.string()).max(6),
+    caveats: z.array(z.string()).max(7),
     observedAt: timestamp,
     orders: z.array(order).max(ORDER_LIMIT),
     source: z.literal(
@@ -221,6 +265,7 @@ export function buildWidgetProvisioningQuery(
       dpo.domains_provisioned as "domainsProvisioned", dpo.inboxes_provisioned as "inboxesProvisioned",
       ${DFY_INBOX_COUNT} as "dfyInboxCount",
       ${detail} as diagnostics, left(dpo.error, 2000) as error,
+      ${FORWARDING} as "forwardingAtPurchase",
       dpo.dismissed, (dpo.error is not null and dpo.error <> '') as "hasError",
       coalesce(case when jsonb_typeof(dpo.provisioning_log -> 'totalAttempts') = 'number'
         and (dpo.provisioning_log ->> 'totalAttempts') ~ '^[0-9]{1,9}$'
@@ -277,6 +322,7 @@ const rawOrder = z.object({
   domainsProvisioned: count,
   error: z.string().max(2000).nullable().default(null),
   failedDomainRows: count,
+  forwardingAtPurchase,
   hasError: z.boolean(),
   id: z.uuid(),
   inboxCountPerDomain: count,
@@ -350,6 +396,16 @@ function toOrder(row: RawOrder, observedAtMs: number): z.infer<typeof order> {
       : null,
     dismissed: row.dismissed,
     error: diagnosticText(row.error),
+    forwardingAtPurchase: {
+      domains: row.forwardingAtPurchase.domains.map(
+        ({ domain, forwardTo }) => ({
+          currentForwarding: null,
+          domain,
+          forwardToAtPurchase: forwardTo,
+        })
+      ),
+      truncated: row.forwardingAtPurchase.truncated,
+    },
     hasError: row.hasError,
     id: row.id,
     mailProvider: row.mailProvider,
@@ -394,6 +450,7 @@ const CAVEATS = [
   "runState 'stalled' is an age heuristic, not a confirmed hung job. provisioningStartedAt records that provisioning started; incomplete steps or zero inbox rows do not mean it never started. A missing start timestamp does not prove no attempt occurred.",
   "The counters (domainsProvisionedCounter/inboxesProvisionedCounter) are the order's own tallies; domainsActive/inboxesActive count live mail rows and can differ when rows failed or were never created.",
   "submissionId and provisioningFunctionId are saved references only. Neither identifies an Inngest run. Saved domain/inbox errors and retry details are available with orderId; null diagnostics means detail was not requested or the saved domain log is missing. Truncated logs are incomplete. This tool cannot inspect live run steps without a durable owned run reference. No cross-workspace run list is returned here.",
+  "forwardingAtPurchase lists each domain bought in the order with forwardToAtPurchase, the website it was set to forward to when it was bought, or null for none. currentForwarding is always null: the current forwarding is set at the domain provider and cannot be checked here, so say what was set at purchase and that the current setting could not be checked, never that the purchase value is the current setting. A bought domain with no forwarding shows no website to outside checkers, which spam filters can treat as a warning sign. The customer adds one in Email Accounts with Domain Forwarding.",
   "An empty orders list means no matching provisioning orders in this workspace, not that a purchase failed silently or that the workspace has no other orders.",
 ];
 
@@ -491,7 +548,7 @@ export async function readWidgetProvisioningStatus(
 
 export const tool = defineTool({
   description:
-    "Diagnose stuck domain and inbox provisioning only in this chat's verified workspace, for the 'I paid but my domains/inboxes are still provisioning' problem. Lists up to 25 recent domain-purchase orders (pre-warmed and DFY) newest first, each with: order type, status and a derived run state (awaiting_payment, queued, running, stalled, completed, failed, cancelled), the current step such as 3/6, created/paid/started/completed timestamps, the order id plus its billing-account (Autumn customer) and provider-order links and background submission id, and a reconciliation of what was charged versus what is actually provisioned (domains and inboxes charged, provisioned counters, live active rows, connected inboxes, missing counts, and an invisibleInboxes flag for charged-but-absent inboxes). Saved order state, not a live provisioning or billing check. Unavailable is not empty. Pass an orderId from these results to inspect up to 10 saved domain log entries and 5 inbox connection/retry entries per domain, with sanitized errors and explicit truncation. These are saved diagnostic observations, not live Inngest traces. No SQL, workspace or field selector is accepted.",
+    "The history of every domain and inbox purchase order in this chat's verified workspace, finished or stuck: what was ordered and paid for, and what was actually provisioned. Use it for 'I paid but my domains/inboxes are still provisioning', 'where are the inboxes I bought' and any question about a past inbox or domain order. Lists up to 25 recent domain-purchase orders (pre-warmed and DFY) newest first, each with: order type, status and a derived run state (awaiting_payment, queued, running, stalled, completed, failed, cancelled), the current step such as 3/6, created/paid/started/completed timestamps, the order id plus its billing-account (Autumn customer) and provider-order links and background submission id, and a reconciliation of what was charged versus what is actually provisioned (domains and inboxes charged, provisioned counters, live active rows, connected inboxes, missing counts, and an invisibleInboxes flag for charged-but-absent inboxes). Saved order state, not a live provisioning or billing check. Unavailable is not empty. Each order also lists its domains with the forwarding website set at purchase (forwardingAtPurchase.domains[].forwardToAtPurchase), or null when none was set; later changes in Domain Forwarding are not saved there, and currentForwarding is always null because the current setting cannot be checked here. Use it when a checker shows the domain has no website: a bought domain with no forwarding can look suspicious to spam filters, and the fix is Email Accounts, then Domain Forwarding. Pass an orderId from these results to inspect up to 10 saved domain log entries and 5 inbox connection/retry entries per domain, with sanitized errors and explicit truncation. These are saved diagnostic observations, not live Inngest traces. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetProvisioningStatus(ctx, input),
   inputSchema: widgetProvisioningInput,

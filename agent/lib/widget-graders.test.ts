@@ -168,6 +168,20 @@ test("answered lane comes from the run row", () => {
   );
 });
 
+test("a bare URL scheme in prose is not a raw field, and a real one beside it still fails", () => {
+  // Round 9, wrun ...YJJB31: forwarding steps said "(include https://)".
+  const message =
+    "Enter your website address as the Forwarding URL (include https://).";
+  assert.equal(gradeRun(run({ message }), recorded).rawFields, "pass");
+  assert.equal(
+    gradeRun(
+      run({ message: `${message} The inbox shows status:error.` }),
+      recorded
+    ).rawFields,
+    "fail"
+  );
+});
+
 test("raw field names fail camelCase, key:value and JSON literals", () => {
   assert.equal(gradeRun(run(), recorded).rawFields, "pass");
   for (const message of [
@@ -279,6 +293,64 @@ test("raw-field checks cover quoted keys, spaced pairs and hyphen-adjacent camel
   }
 });
 
+test("bold labels and merge tags are not raw fields; a real field still is", () => {
+  for (const message of [
+    "1. **Leads tab:** Make sure Leads Uploaded is above zero.",
+    "Use {{sendingAccountFirstName}} in the signature, then click Save.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "pass",
+      message
+    );
+  }
+  for (const message of [
+    "The record shows organization_id: 123.",
+    "It saved sendingAccountId=abc.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "fail",
+      message
+    );
+  }
+});
+
+test("bold raw keys and undocumented merge variables still fail the grader", () => {
+  for (const message of [
+    "**organization_id:** 123",
+    "**sendingAccountId:** abc",
+    "The internal field is {{sendingAccountId}}.",
+  ]) {
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "fail",
+      message
+    );
+  }
+  for (const name of [
+    "firstName",
+    "lastName",
+    "companyName",
+    "industry",
+    "jobTitle",
+    "sendingAccountName",
+    "sendingAccountFirstName",
+  ]) {
+    const message = `Use {{${name}}} in the email.`;
+    assert.equal(
+      gradeRun(run({ message }), recorded).rawFields,
+      "pass",
+      message
+    );
+  }
+  assert.equal(
+    gradeRun(run({ message: "**Leads tab:** Check uploaded leads." }), recorded)
+      .rawFields,
+    "pass"
+  );
+});
+
 test("missing step usage is distinguishable from reported zero tokens", () => {
   const event = {
     data: {},
@@ -381,12 +453,95 @@ test("a reply that repeats the previous one fails, ignoring case, spacing and pu
   );
 });
 
-test("a handoff is the human lane, a reply held for a person, or a filed ticket", () => {
-  assert.equal(handedOff("human", null, []), true);
-  assert.equal(handedOff("investigate", "needs_human", []), true);
-  assert.equal(handedOff("investigate", "allow", ["widget_file_ticket"]), true);
+test("a handoff is the human lane or a reply held for a person, never a filed ticket", () => {
+  assert.equal(handedOff("human", null), true);
+  assert.equal(handedOff("investigate", "needs_human"), true);
+  // A ticket filed with the reply allowed is not a person taking over.
+  assert.equal(handedOff("investigate", "allow"), false);
+});
+
+test("leak scan owns the domain of an address in the evidence and what the customer wrote", () => {
+  const evidence: WidgetCase = {
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      { ...recorded.cassette[0], output: "Sender\nsam@shop-one.co" },
+    ],
+    question: "A prospect asked who deals-two.com is.",
+  };
+  for (const message of [
+    "The sam@shop-one.co inbox and other shop-one.co addresses are cancelled.",
+    "Tell them deals-two.com is the address you send from.",
+  ]) {
+    assert.equal(gradeRun(run({ message }), evidence).leaks, "pass", message);
+  }
   assert.equal(
-    handedOff("investigate", "allow", ["widget_inbox_health"]),
-    false
+    gradeRun(run({ message: "Write to other-company.com first." }), evidence)
+      .leaks,
+    "fail"
+  );
+});
+
+test("Instantly may be named only when the case's own results show a connection the customer owns", () => {
+  const owned = (accountType: string): WidgetCase => ({
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      {
+        ...recorded.cassette[0],
+        output: { connection: { accountType, isActive: true } },
+      },
+    ],
+  });
+  const message = "Your Instantly account rejected the connection.";
+  // Legacy: the customer connected their own Instantly account.
+  assert.equal(gradeRun(run({ message }), owned("user_owned")).leaks, "pass");
+  // Pro: provisioned for them, so the name stays hidden.
+  assert.equal(
+    gradeRun(run({ message }), owned("system_provisioned")).leaks,
+    "fail"
+  );
+  assert.equal(gradeRun(run({ message }), recorded).leaks, "fail");
+});
+
+test("a capitalized quoted UI label before a colon is not a raw key", () => {
+  assert.equal(
+    gradeRun(
+      run({
+        message:
+          'The help center lists three options under "Sites" > "Domains": a live URL or your own domain.',
+      }),
+      recorded
+    ).rawFields,
+    "pass"
+  );
+  assert.equal(
+    gradeRun(run({ message: '{"status": "error"}' }), recorded).rawFields,
+    "fail"
+  );
+});
+
+test("a url in the workspace's own read owns its bare domain, and no other", () => {
+  // Round 15 run 3 (wrun ...STAT0M): the order read had the forwarding target as a www url.
+  const withForward: WidgetCase = {
+    ...recorded,
+    cassette: [
+      ...recorded.cassette,
+      {
+        input: {},
+        output: { forwardTo: "https://www.forward-target.example" },
+        tool: "widget_provisioning_status",
+      } as WidgetCase["cassette"][number],
+    ],
+  };
+  const message = "Your order forwards to forward-target.example.";
+  assert.equal(gradeRun(run({ message }), recorded).leaks, "fail");
+  assert.equal(gradeRun(run({ message }), withForward).leaks, "pass");
+  assert.equal(
+    gradeRun(
+      run({ message: "It forwards to other-target.example." }),
+      withForward
+    ).leaks,
+    "fail"
   );
 });

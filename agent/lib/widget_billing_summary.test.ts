@@ -5,10 +5,16 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildBillingAuthorizationQuery,
+  buildErroredInboxesQuery,
   composeWidgetBillingSummary,
+  readCreditGap,
+  readCreditUsage,
+  readInboxErrorBilling,
+  sessionRead,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
   widgetBillingSummaryOutputSchema,
+  withInboxCounts,
 } from "../tools/widget_billing_summary.js";
 
 const widgetCtx = {
@@ -78,11 +84,10 @@ const creditWindow = {
   to: "2026-09-22T00:00:00Z",
 };
 
-test("credit windows reject injection, reversed dates, and unbounded periods", () => {
+test("credit windows reject injection and reversed dates", () => {
   for (const window of [
     { from: "2026-08-22'", to: creditWindow.to },
     { from: creditWindow.to, to: creditWindow.from },
-    { from: "2025-01-01T00:00:00Z", to: creditWindow.to },
   ]) {
     assert.equal(
       widgetBillingSummaryInputSchema.safeParse({ creditWindow: window })
@@ -169,7 +174,17 @@ const stripeFixture = {
           created: 1_726_100_000,
           currency: "usd",
           description: "Domain add-on",
+          failure_code: "card_declined",
+          failure_message:
+            "Your card has insufficient funds. Use a different payment method to complete this purchase.",
           id: "ch_2",
+          outcome: {
+            network_status: "declined_by_network",
+            reason: "insufficient_funds",
+            risk_score: 12,
+            seller_message: "The bank returned the decline code.",
+            type: "issuer_declined",
+          },
           refunded: false,
           status: "failed",
         },
@@ -301,6 +316,58 @@ test("requested history is scoped, separate from lifetime totals, and unavailabl
     { creditWindow }
   );
   assert.equal(denied.available, false);
+});
+
+test("a window longer than 93 days is shortened to the 93 days ending at its end, and the result says so", async () => {
+  const seen: unknown[] = [];
+  const requested = {
+    from: "2026-07-01T00:00:00Z",
+    to: "2026-10-10T00:00:00Z",
+  };
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: (_organizationId, window) => {
+        seen.push(window);
+        return Promise.resolve({
+          available: true,
+          completedManualGrants: [],
+          transactionTotals: [],
+          truncated: false,
+          window,
+        });
+      },
+    }),
+    { creditWindow: requested }
+  );
+  const covered = { from: "2026-07-09T00:00:00.000Z", to: requested.to };
+  assert.deepEqual(seen, [covered]);
+  assert.deepEqual(result.creditHistory?.window, covered);
+  assert.ok(
+    result.reconciliation.notes.includes(
+      "The credit window asked for (2026-07-01T00:00:00Z to 2026-10-10T00:00:00Z) is longer than 93 days, so it was shortened to the 93 days from 2026-07-09T00:00:00.000Z to 2026-10-10T00:00:00Z. Credit activity before 2026-07-09T00:00:00.000Z is not covered."
+    )
+  );
+  // A window within 93 days is read as asked, with no note.
+  const exact = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getCreditHistory: (_organizationId, window) =>
+        Promise.resolve({
+          available: true,
+          completedManualGrants: [],
+          transactionTotals: [],
+          truncated: false,
+          window,
+        }),
+    }),
+    { creditWindow }
+  );
+  assert.deepEqual(exact.creditHistory?.window, creditWindow);
+  assert.equal(
+    exact.reconciliation.notes.some((entry) => entry.includes("shortened")),
+    false
+  );
 });
 
 test("missing Autumn Stripe identity does not trigger a guessed customer lookup", async () => {
@@ -644,4 +711,428 @@ test("the renewal date comes from a live subscription, never a newer canceled on
     withSubscriptions([canceled])
   );
   assert.equal(none.credits?.renewsAt, null);
+});
+
+const INSUFFICIENT_FUNDS = /insufficient funds/;
+
+test("a failed payment says why it was declined, without risk-screening detail", async () => {
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps()
+  );
+  const [failed] = result.failedPayments;
+  assert.equal(failed?.declineReason, "insufficient_funds");
+  assert.equal(failed?.declineType, "issuer_declined");
+  assert.match(failed?.failureMessage ?? "", INSUFFICIENT_FUNDS);
+  assert.equal(
+    JSON.stringify(result.failedPayments).includes("risk_score"),
+    false
+  );
+  const succeeded = result.recentCharges.find((charge) => charge.id === "ch_1");
+  assert.equal(succeeded?.declineReason, null);
+  assert.equal(succeeded?.failureMessage, null);
+});
+
+test("a payment Stripe's risk screening blocked keeps its reason out of the result", async () => {
+  const blocked = {
+    amount: 1900,
+    created: 1_726_300_000,
+    failure_code: "payment_intent_payment_attempt_failed",
+    failure_message: "The payment failed.",
+    id: "ch_4",
+    outcome: { reason: "highest_risk_level", type: "blocked" },
+    status: "failed",
+  };
+  const result = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({
+      getStripeCustomerBilling: () =>
+        Promise.resolve({
+          ...stripeFixture,
+          charges: { data: { data: [blocked], object: "list" } },
+        }),
+    })
+  );
+  assert.equal(result.failedPayments[0]?.declineType, "blocked");
+  assert.equal(result.failedPayments[0]?.declineReason, null);
+  assert.equal(JSON.stringify(result).includes("highest_risk_level"), false);
+});
+
+test("inbox lines state how many inboxes they bill from the plan's per-inbox price", async () => {
+  // wrun_41M4EBCXG30GWVAHMTAFGQG4GJ said 4 inboxes: each 1 × $18 line is 3 inboxes at $6.
+  const line = (description: string, amount: number) => ({
+    amount,
+    description,
+    period: { end: 1_729_000_000, start: 1_726_000_000 },
+    quantity: 1,
+  });
+  const inboxLine = line("1 × Inbox (DFY) - Inboxes (at $18.00 / month)", 1800);
+  const invoice = (lines: unknown[]) => ({
+    data: {
+      data: [
+        {
+          amount_paid: 13_406,
+          created: 1_726_000_000,
+          id: "in_1",
+          lines: { data: lines },
+          status: "paid",
+        },
+      ],
+      object: "list",
+    },
+  });
+  const deps = (
+    plans: unknown[],
+    lines: unknown[] = [
+      line("1 × Domain - Domains (at $16.74 / year)", 1674),
+      inboxLine,
+      inboxLine,
+      inboxLine,
+      inboxLine,
+    ]
+  ) =>
+    fakeDeps({
+      getAutumnCustomer: () =>
+        Promise.resolve({ stripe_id: "cus_abc", subscriptions: plans }),
+      getStripeCustomerBilling: () =>
+        Promise.resolve({ ...stripeFixture, invoices: invoice(lines) }),
+    });
+  const dfy = {
+    plan: {
+      items: [{ feature_id: "inboxes", price: { amount: 6 } }],
+      name: "Inbox (DFY)",
+    },
+  };
+  const counted = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([dfy])
+  );
+  widgetBillingSummaryOutputSchema.parse(counted);
+  const [paid] = counted.recentInvoices;
+  assert.deepEqual(
+    paid?.lines?.map((entry) => entry.inboxCount),
+    [null, 3, 3, 3, 3]
+  );
+  assert.equal(paid?.inboxCount, 12);
+  // No per-inbox price, or a count that is not whole, states nothing.
+  const unpriced = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([])
+  );
+  assert.equal(unpriced.recentInvoices[0]?.inboxCount, null);
+  const partial = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps([dfy], [line("1 × Inbox (DFY) - Inboxes (at $18.00 / month)", 1000)])
+  );
+  assert.equal(partial.recentInvoices[0]?.inboxCount, null);
+});
+
+test("inboxes in error are tied to the inbox charges covering time after the error began", async () => {
+  // wrun_41M4GJGQB60GNM5W8B3MAF4Z47 listed the errors and the charges and never tied them.
+  const month = (created: string, start: string, end: string) => ({
+    amount_paid: 34_500,
+    created: Date.parse(created) / 1000,
+    id: `in_${created}`,
+    lines: {
+      data: [
+        {
+          amount: 4800,
+          description: "6 × Inbox - Inboxes (at $8.00 / month)",
+          period: {
+            end: Date.parse(end) / 1000,
+            start: Date.parse(start) / 1000,
+          },
+          quantity: 6,
+        },
+        {
+          amount: 29_700,
+          description: "1 × Pro (at $297.00 / month)",
+          period: {
+            end: Date.parse(end) / 1000,
+            start: Date.parse(start) / 1000,
+          },
+          quantity: 1,
+        },
+      ],
+    },
+    status: "paid",
+  });
+  const deps = (errored: { count: number; since: string | null }) =>
+    fakeDeps({
+      getErroredInboxes: () => Promise.resolve(errored),
+      getStripeCustomerBilling: () =>
+        Promise.resolve({
+          ...stripeFixture,
+          invoices: {
+            data: {
+              data: [
+                month(
+                  "2026-10-01T00:00:00Z",
+                  "2026-10-01T00:00:00Z",
+                  "2026-11-01T00:00:00Z"
+                ),
+                month(
+                  "2026-09-01T00:00:00Z",
+                  "2026-09-01T00:00:00Z",
+                  "2026-10-01T00:00:00Z"
+                ),
+                month(
+                  "2026-08-01T00:00:00Z",
+                  "2026-08-01T00:00:00Z",
+                  "2026-09-01T00:00:00Z"
+                ),
+              ],
+              object: "list",
+            },
+          },
+        }),
+    });
+  const tied = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    deps({ count: 6, since: "2026-09-17T09:00:00.000+00:00" })
+  );
+  widgetBillingSummaryOutputSchema.parse(tied);
+  assert.equal(
+    tied.reading,
+    "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and the workspace was billed for inbox charges covering time after that: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
+  );
+  assert.equal(tied.identifiesCharge, true);
+  // No inbox in error, or an error after every billed period, ties nothing.
+  const quiet = await Promise.all(
+    [
+      { count: 0, since: null },
+      { count: 2, since: "2026-11-02T00:00:00.000+00:00" },
+    ].map((errored) =>
+      composeWidgetBillingSummary(
+        verifiedWidgetContext.organizationId,
+        deps(errored)
+      )
+    )
+  );
+  for (const result of quiet) {
+    assert.equal(result.reading, undefined);
+    assert.equal(result.identifiesCharge, undefined);
+  }
+  const failed = await composeWidgetBillingSummary(
+    verifiedWidgetContext.organizationId,
+    fakeDeps({ getErroredInboxes: () => Promise.reject(new Error("down")) })
+  );
+  assert.ok(
+    failed.unavailable.includes("productDb.erroredInboxes read failed")
+  );
+});
+
+test("the errored-inbox read is scoped to the verified owner or admin and leaves out cancelled inboxes", () => {
+  const query = buildErroredInboxesQuery(verifiedWidgetContext);
+  assert.ok(query.includes(verifiedWidgetContext.userId));
+  assert.ok(query.includes("m.role in ('owner', 'admin')"));
+  assert.ok(query.includes("join authorized a on a.id = mi.organization_id"));
+  assert.ok(query.includes("!~* '(cancel|removed)'"));
+});
+
+test("a repeated billing read in one session reuses the first, until it fails or goes stale", async () => {
+  let reads = 0;
+  const read = () => {
+    reads += 1;
+    return Promise.resolve(reads);
+  };
+  const at = 1_000_000;
+  assert.equal(await sessionRead("s1:stripe:cus", read, at), 1);
+  assert.equal(await sessionRead("s1:stripe:cus", read, at + 60_000), 1);
+  // Another session, or another customer, reads for itself.
+  assert.equal(await sessionRead("s2:stripe:cus", read, at), 2);
+  // Three minutes on, a later turn reads billing afresh.
+  assert.equal(await sessionRead("s1:stripe:cus", read, at + 181_000), 3);
+  const failed = sessionRead(
+    "s1:autumn:cus",
+    () => Promise.reject(new Error("down")),
+    at
+  );
+  await assert.rejects(failed);
+  assert.equal(await sessionRead("s1:autumn:cus", read, at), 4);
+});
+
+test("a gap between the provider's credit balance and the product ledger is a reading with both numbers", () => {
+  const autumn = (remaining: number, usage: number) => ({
+    balances: { credits: { granted: 10_000, remaining, usage } },
+  });
+  const wallet = {
+    balance: -630,
+    lifetimeGranted: 0,
+    lifetimePurchased: 0,
+    lifetimeUsed: 630,
+  };
+  // wrun ...35DNCX: the customer saw 8,017, which is 8,647 less the ledger's 630.
+  assert.equal(
+    readCreditGap(autumn(8647, 1353), wallet),
+    "The billing provider counts 10,000 credits granted, 1,353 used and 8,647 remaining. The product's own credit ledger records a balance of -630 credits and 630 lifetime credits used. Together, the provider's remaining balance and the ledger balance come to 8,017 credits. Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling a difference a double count."
+  );
+  // Agreeing balances, no ledger usage, or no provider record: no reading.
+  assert.equal(
+    readCreditGap(autumn(9370, 630), { ...wallet, balance: 9370 }),
+    null
+  );
+  assert.equal(
+    readCreditGap(autumn(8647, 1353), { ...wallet, lifetimeUsed: 0 }),
+    null
+  );
+  assert.equal(readCreditGap(undefined, wallet), null);
+});
+
+test("the ledger's credit usage is read by what each entry was spent on", () => {
+  const usage = (reference_type: string | null, amount: number) => ({
+    amount,
+    reference_type,
+    resource: "credits",
+    type: "usage",
+  });
+  const spent = readCreditUsage(
+    [
+      ...Array.from({ length: 8 }, () => usage("campaign_lead_ingestion", -70)),
+      usage("website_agent_run", -70),
+      usage(null, -5),
+      { amount: 500, resource: "credits", type: "grant" },
+      { ...usage("campaign_lead_ingestion", -9), resource: "inboxes" },
+    ],
+    false
+  );
+  assert.equal(
+    spent,
+    "The ledger records that credit usage as 560 for leads added to campaigns (8 entries); 70 for website builder runs (1 entry); 5 for usage with no recorded source (1 entry)."
+  );
+  assert.ok(
+    readCreditUsage([usage("llm_usage", -3)], true)?.startsWith(
+      "In its most recent entries, the ledger records"
+    )
+  );
+  assert.equal(readCreditUsage([], false), null);
+  const gap = readCreditGap(
+    {
+      balances: { credits: { granted: 10_000, remaining: 8157, usage: 1843 } },
+    },
+    { balance: -630, lifetimeUsed: 630 },
+    spent
+  );
+  assert.ok(gap?.includes(`credits. ${spent} Lead credits`));
+});
+
+test("inbox error billing does not attribute another order's invoice to the errored inbox", () => {
+  const reading = readInboxErrorBilling(
+    { count: 1, since: "2026-10-01T00:00:00Z" },
+    [
+      {
+        ...invoiceForErrorTest,
+        lines: [
+          {
+            ...invoiceForErrorTest.lines[0],
+            description: "Inboxes for another order",
+          },
+        ],
+      },
+    ]
+  );
+  assert.ok(
+    reading?.includes(
+      "the workspace was billed for inbox charges covering time after that"
+    )
+  );
+  assert.equal(reading?.includes("for them"), false);
+});
+
+test("prorated inbox charges do not become a smaller inbox count", () => {
+  const counted = withInboxCounts(
+    {
+      ...invoiceForErrorTest,
+      lines: [
+        {
+          ...invoiceForErrorTest.lines[0],
+          amountCents: 600,
+          description: "Remaining time on 3 × Inbox Plan - inboxes",
+          proration: true,
+          quantity: 3,
+        },
+      ],
+    },
+    new Map([["Inbox Plan", 600]])
+  );
+  assert.equal(counted.lines?.[0].inboxCount, null);
+  assert.equal(counted.inboxCount, null);
+});
+
+const invoiceForErrorTest = {
+  amountDueCents: 1800,
+  amountPaidCents: 1800,
+  amountRemainingCents: 0,
+  billingReason: null,
+  chargeId: null,
+  createdAt: "2026-10-02T00:00:00Z",
+  currency: "usd",
+  customerBalanceAppliedCents: null,
+  discountCents: null,
+  id: "in_fixture",
+  inboxCount: null,
+  lines: [
+    {
+      amountCents: 1800,
+      description: "3 inboxes",
+      inboxCount: null,
+      periodEnd: "2026-11-01T00:00:00Z",
+      periodStart: "2026-10-01T00:00:00Z",
+      proration: false,
+      quantity: 3,
+    },
+  ],
+  linesTruncated: false,
+  paidAt: "2026-10-02T00:00:00Z",
+  settlement: "money_collected" as const,
+  status: "paid",
+  totalCents: 1800,
+};
+
+test("credit readings combine the offset balance without inventing a lifetime-usage gap", () => {
+  const reading = readCreditGap(
+    { balances: { credits: { granted: 1000, remaining: 800, usage: 200 } } },
+    { balance: 790, lifetimeUsed: 300 }
+  );
+  assert.ok(reading?.includes("come to 1,590 credits"));
+  assert.ok(
+    reading?.includes("balance of 790 credits and 300 lifetime credits used")
+  );
+  assert.equal(reading?.includes("the gap"), false);
+  assert.equal(reading?.includes("500"), false);
+  const offset = readCreditGap(
+    {
+      balances: { credits: { granted: 10_000, remaining: 8647, usage: 1353 } },
+    },
+    { balance: -630, lifetimeUsed: 630 }
+  );
+  assert.ok(offset?.includes("come to 8,017 credits"));
+});
+
+test("resolved billing failures and unavailable results are not cached", async () => {
+  await Promise.all(
+    [{ available: true, error: "down" }, { available: false }].map(
+      async (failure) => {
+        let reads = 0;
+        const read = () => {
+          reads += 1;
+          return Promise.resolve(reads === 1 ? failure : { available: true });
+        };
+        const cacheable = (value: { error?: string; available: boolean }) =>
+          !value.error && value.available;
+        const key = `resolved-failure:${failure.error ?? "unavailable"}`;
+        assert.deepEqual(
+          await sessionRead(key, read, 1_000_000, cacheable),
+          failure
+        );
+        assert.deepEqual(await sessionRead(key, read, 1_001_000, cacheable), {
+          available: true,
+        });
+        assert.deepEqual(await sessionRead(key, read, 1_002_000, cacheable), {
+          available: true,
+        });
+        assert.equal(reads, 2);
+      }
+    )
+  );
 });

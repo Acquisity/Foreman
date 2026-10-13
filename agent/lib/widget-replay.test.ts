@@ -417,3 +417,41 @@ test("a reworded search replays its recording; a different record still misses",
     rmSync(directory, { force: true, recursive: true });
   }
 });
+
+test("a recorded ticket filing replays as filed whatever the summary says", () => {
+  const directory = mkdtempSync(join(tmpdir(), "widget-replay-ticket-"));
+  const path = join(directory, "case.json");
+  const filed = {
+    existing: false,
+    identifier: "ENG-1",
+    refund: false,
+    url: "https://linear.app/acquisity/issue/ENG-1",
+  };
+  writeFileSync(
+    path,
+    JSON.stringify({
+      ...recorded,
+      cassette: [
+        {
+          ...recorded.cassette[0],
+          input: { summary: "Recorded summary.", title: "Recorded title" },
+          output: filed,
+          tool: "widget_file_ticket",
+        },
+      ],
+    })
+  );
+  process.env.WIDGET_REPLAY_CASE = path;
+  try {
+    assert.deepEqual(
+      replayRead("widget_file_ticket", {
+        summary: "A reworded summary.",
+        title: "Another title",
+      }),
+      filed
+    );
+  } finally {
+    Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
+    rmSync(directory, { force: true, recursive: true });
+  }
+});

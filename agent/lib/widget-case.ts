@@ -81,6 +81,8 @@ export interface ScrubbedCase {
 
 /** Keys whose string values name a person, company, campaign or workspace, or hold a phone number. */
 const NAME_KEY = /(?:name|workspace|company)$/i;
+/** A name part worth its own placeholder: three or more characters, at least one a letter. */
+const NAMED_PART = /^(?=.*\p{L}).{3,}$/u;
 const PHONE_KEY = /phone(?:_?number)?$/i;
 /** A catalog entry's own id ("website_credit"): a name spelling one ("Website Credit") labels a product, not a customer. */
 const CATALOG_ID = /^[a-z_]+$/;
@@ -116,6 +118,8 @@ const AUTHORED_REFERENCES = new Set([
   "the-growth-plan-creator-shows-an-application-error.mdx",
 ]);
 const LINEAR_REF = /^ENG-\d+$/;
+const TICKET_LINK =
+  /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
 const isInternalLink = (value: string) =>
   LINEAR_REF.test(value) || value.startsWith("http");
 const OPS_ID = /^(?:[a-z]+_[a-z0-9]+|01[0-9a-z]{24})$/;
@@ -279,7 +283,98 @@ const mapStrings = (
   return walk(value);
 };
 
+/**
+ * Every decoded string and key, one per line. JSON text writes a newline as
+ * backslash-n, so a line starting "wesley@x.com" scanned as "nwesley@x.com"
+ * and the real address was never replaced.
+ */
+export const decodedText = (value: unknown) => {
+  const strings: string[] = [];
+  mapStrings(value, (text) => {
+    strings.push(text);
+    return text;
+  });
+  return strings.join("\n");
+};
+
+const LETTER = /[a-z]/;
+/**
+ * The value occurs other than inside a longer word ("gina" in "pagination"),
+ * which the scrub deliberately leaves. Joined by "_" or a digit ("li_us") it
+ * is still the value.
+ */
+const hasValue = (text: string, value: string) => {
+  const inWord = (at: number) =>
+    (LETTER.test(value[0] ?? "") && LETTER.test(text[at - 1] ?? "")) ||
+    (LETTER.test(value.at(-1) ?? "") &&
+      LETTER.test(text[at + value.length] ?? ""));
+  for (
+    let at = text.indexOf(value);
+    at >= 0;
+    at = text.indexOf(value, at + 1)
+  ) {
+    if (!inWord(at)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const OWN_DOMAIN_PERSON = /^person-\d+@(.+)$/;
+
+const ELLIPSIS = /…|\.\.\./g;
+/** Shorter than this, a shared opening ("The ") is not evidence of the name. */
+const MIN_SHOWN = 12;
+
+/** The longest proper prefix of `name` that `text` ends with, if long enough to identify it. */
+const shownPrefix = (text: string, name: string) => {
+  const lower = text.toLowerCase();
+  const target = name.toLowerCase();
+  for (let length = target.length - 1; length >= MIN_SHOWN; length -= 1) {
+    if (lower.endsWith(target.slice(0, length))) {
+      return text.slice(-length);
+    }
+  }
+  return null;
+};
+
+/**
+ * A reply names a campaign by its first part ("MedTech" for "MedTech | Podcast
+ * | US"): that part keeps one placeholder, alone and inside the name's own.
+ */
+const addName = (
+  name: string,
+  add: (value: string, placeholder: () => string) => void,
+  placeholder: () => string,
+  replacements: Map<string, string>
+) => {
+  const head = name.split("|")[0]?.trim() ?? "";
+  if (!(name.includes("|") && NAMED_PART.test(head))) {
+    add(name, placeholder);
+    return;
+  }
+  add(head, placeholder);
+  add(name, () => `${replacements.get(head.toLowerCase())} | ${placeholder()}`);
+};
+
+/** Map each ellipsis-shortened name in `text` to that name's placeholder. */
+const addShortenedNames = (
+  text: string,
+  names: Iterable<string>,
+  replacements: Map<string, string>
+) => {
+  const all = [...names];
+  for (const { index } of text.matchAll(ELLIPSIS)) {
+    const before = text.slice(Math.max(0, index - MAX_LITERAL), index);
+    for (const name of all) {
+      const shown = shownPrefix(before, name)?.toLowerCase();
+      const placeholder = replacements.get(name.toLowerCase());
+      if (shown && placeholder && !replacements.has(shown)) {
+        replacements.set(shown, placeholder);
+      }
+    }
+  }
+};
 
 /** A screen recording is titled "<recorder's name> · <workspace name>", often inside a JSON-encoded string. */
 const recorderNames = (draft: unknown, organizationName: string) =>
@@ -359,7 +454,8 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     return replacements.get(value.toLowerCase()) as string;
   };
 
-  const { candidates, internal } = scanIdentifiers(JSON.stringify(draft));
+  const decoded = decodedText(draft);
+  const { candidates, internal } = scanIdentifiers(decoded);
   const localParts = new Map<string, string>();
   for (const email of candidates.emails) {
     const at = email.lastIndexOf("@");
@@ -385,7 +481,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     add(slug, () => `workspace-${next("workspace")}`);
   }
   const opaqueIds = new Set([
-    ...(JSON.stringify(draft).match(PROVIDER_ID) ?? []),
+    ...(decoded.match(PROVIDER_ID) ?? []),
     ...internal.filter((value) => OPS_ID.test(value)),
   ]);
   for (const id of opaqueIds) {
@@ -394,12 +490,22 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   }
   // Internal ticket refs and internal links (a filed ticket's Linear URL) are not customer data,
   // but a ticket URL's slug repeats the customer's wording, so neither is kept.
+  // A filed ticket's own link keeps its shape, without the slug, so a replay of
+  // the filing still reads as a real ticket.
+  const ticketRef = (value: string) => {
+    add(value, () => `ENG-${next("ticket")}`);
+    return replacements.get(value.toLowerCase());
+  };
   for (const value of internal.filter(isInternalLink)) {
-    add(value, () =>
-      LINEAR_REF.test(value)
-        ? `ENG-${next("ticket")}`
-        : `https://internal.example/${next("link")}`
-    );
+    const linked = TICKET_LINK.exec(value)?.[1];
+    add(value, () => {
+      if (LINEAR_REF.test(value)) {
+        return `ENG-${next("ticket")}`;
+      }
+      return linked
+        ? `https://linear.app/acquisity/issue/${ticketRef(linked)}`
+        : `https://internal.example/${next("link")}`;
+    });
   }
   const catalogNames = billingCatalogNames(raw);
   for (const [name, count] of found.names) {
@@ -407,8 +513,12 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     if (catalogNames.get(name) === count) {
       continue;
     }
-    add(name, () => `Name ${next("name")}`);
+    addName(name, add, () => `Name ${next("name")}`, replacements);
   }
+  // A reply shortens a long name with an ellipsis ("Information Technology…"):
+  // the shown prefix takes the name's own placeholder, so it is neither kept nor
+  // read as a different name.
+  addShortenedNames(decoded, found.names.keys(), replacements);
   for (const phone of found.phones) {
     add(phone, () => `Phone ${next("phone")}`);
   }
@@ -436,7 +546,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
 
 /** Everything identifier-shaped in a scrubbed case that is not a placeholder or a fixture value. */
 export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
-  const text = JSON.stringify(scrubbed);
+  const text = decodedText(scrubbed);
   const { candidates, internal } = scanIdentifiers(text);
   const leaks = [
     ...candidates.emails,
@@ -461,7 +571,7 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
               );
             }
           }
-          return rest.includes(original);
+          return hasValue(rest, original);
         })
       );
       return value;
