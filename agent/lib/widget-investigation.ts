@@ -33,6 +33,7 @@ import {
   backAtLine,
   officeSchedule,
   ticketInsteadOfHandoff,
+  withBackAt,
 } from "./widget-office-hours.js";
 import {
   type CheckId,
@@ -891,7 +892,8 @@ async function withAwayLine(
   run: Pick<WidgetRun, "id" | "scope">,
   ticket: FiledTicket | null | undefined,
   read: WidgetDependencies["readTicket"],
-  signal: AbortSignal
+  signal: AbortSignal,
+  history: WidgetAsk["turns"]
 ): Promise<WidgetOutcome> {
   const hours = awayHours(run.scope);
   if (!(hours && result.message) || result.decision === "block") {
@@ -911,7 +913,7 @@ async function withAwayLine(
   return line
     ? {
         ...result,
-        message: `${result.message}\n\n${line}`,
+        message: withBackAt(result.message, line, history),
         reason: `${AFTER_HOURS_TICKET} ${result.reason}`,
       }
     : result;
@@ -1050,7 +1052,8 @@ export async function finishWidgetRun(
         run,
         outcome.ticket,
         deps.readTicket,
-        deadline
+        deadline,
+        history
       );
     } else if (handoff) {
       ({ findings, result } = handoff);
@@ -1270,7 +1273,7 @@ async function answerFromKnowledgeBase(
       {
         citations: [],
         decision: "allow",
-        message: awayInvite(hours, log),
+        message: awayInvite(hours, log, ask.turns),
         reason: AFTER_HOURS_INVITE,
         status: "completed",
       },
@@ -1320,7 +1323,11 @@ async function answerFromKnowledgeBase(
       deps.fileTicket
     );
     return awayLine
-      ? complete(`${message}\n\n${awayLine}`, AFTER_HOURS_TICKET, citations)
+      ? complete(
+          withBackAt(message, awayLine, ask.turns),
+          AFTER_HOURS_TICKET,
+          citations
+        )
       : requestedHumanHandoff(run, route, deps);
   };
   // An explicit ask for a person is honoured at once. The note tells the
@@ -1521,10 +1528,14 @@ async function toggledPersonAsk(
       {
         citations: [],
         decision: "allow",
-        message: awayInvite(hours, {
-          conversationId: scope.conversationId,
-          runId: run.id,
-        }),
+        message: awayInvite(
+          hours,
+          {
+            conversationId: scope.conversationId,
+            runId: run.id,
+          },
+          ask.turns
+        ),
         reason: AFTER_HOURS_INVITE,
         status: "completed",
       },

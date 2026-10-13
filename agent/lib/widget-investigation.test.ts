@@ -2544,6 +2544,51 @@ test("after hours, an ask for a person that states no need leads with the away l
   }
 });
 
+test("after hours, the away line is not repeated in a conversation that already has it, unless the back-at time changed", async (t) => {
+  enabled(t);
+  const invite =
+    "Tell me what you need help with and I'll try to sort it out now.";
+  const earlier = (line: string) => [
+    { role: "customer" as const, text: "can i speak with human" },
+    {
+      role: "assistant" as const,
+      text: `${line} In the meantime, ${invite[0].toLowerCase()}${invite.slice(1)}`,
+    },
+  ];
+  const moved = AWAY.replace("Monday, Oct 19", "Tuesday, Oct 20");
+  for (const [history, noNeed, expected] of [
+    [earlier(AWAY), false, kbAnswer.message],
+    [earlier(moved), false, `${kbAnswer.message}\n\n${AWAY}`],
+    [earlier(AWAY), true, invite],
+  ] as const) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = () =>
+      Promise.resolve({ asksForHuman: 0.95, noNeed, source: "jev" as const });
+    deps.fileTicket = fileTicket;
+    deps.answerChat = () => Promise.resolve(kbAnswer);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        history,
+        question: "What are the times a human is available?",
+      }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, officeHours: closedHours }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.message, expected);
+    assert.equal(
+      run.outcome?.reason,
+      noNeed ? "after_hours_invite" : "after_hours_ticket"
+    );
+    assert.equal(filed.length, noNeed ? 0 : 1);
+  }
+});
+
 test("an ask for a person still hands off in office hours, with no office hours sent, or when the after-hours ticket fails", async (t) => {
   enabled(t);
   for (const [officeHours, fails] of [

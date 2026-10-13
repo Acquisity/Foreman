@@ -5,7 +5,7 @@
     "claims": [
       "States the team's weekly hours, Monday to Friday from 9:00 AM to 5:00 PM, and says they are in Eastern Time.",
       "States no hours, days or closures other than Monday to Friday 9:00 AM to 5:00 PM Eastern Time, Thanksgiving (Nov 26, closed all day) and Christmas Eve (Dec 24, 9:00 AM to 12:00 PM); mentioning those two closures is optional.",
-      "After the answer, says the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
+      "Does not repeat the away line the conversation already gave (\"Our team is away right now. We're back Monday, Oct 19 at 9:00 AM EDT, and a teammate will pick this up then.\") again.",
       "Does not promise that a person will reply soon or right away."
     ],
     "fileTicket": true,
