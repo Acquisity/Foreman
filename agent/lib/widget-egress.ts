@@ -13,7 +13,11 @@ import {
   resolveOwnedIdentifiers,
 } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { CACHED, WIDGET_VOICE } from "./widget-instructions.js";
+import {
+  CACHED,
+  customerMessages,
+  WIDGET_VOICE,
+} from "./widget-instructions.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -629,10 +633,9 @@ export function reaskedDetails(reply: string, conversation: string): string[] {
   const requests = (reply.match(/[^.!?\n]+[.!?]?/gu) ?? []).filter((sentence) =>
     REQUEST.test(sentence)
   );
+  const customer = customerMessages(conversation.slice(0, 20_000));
   return GIVEN_DETAILS.flatMap(({ ask, given, kind }) => {
-    const values = [
-      ...new Set(conversation.slice(0, 20_000).match(given) ?? []),
-    ].slice(0, 5);
+    const values = [...new Set(customer.match(given) ?? [])].slice(0, 5);
     return values.length && requests.some((sentence) => ask.test(sentence))
       ? [`${kind} (${values.join(", ")})`]
       : [];

@@ -1377,10 +1377,7 @@ const REASKED =
   "The most recent charge is $54 on 2026-09-20. Which charge are you asking about? If you can tell me the amount and date as you see them under Settings > Billing, I can work from that.";
 
 test("a reply asking for a detail the conversation holds is found, with the values given", () => {
-  assert.deepEqual(reaskedDetails(REASKED, HELD), [
-    "amount ($54)",
-    "date (today)",
-  ]);
+  assert.deepEqual(reaskedDetails(REASKED, HELD), ["date (today)"]);
   assert.deepEqual(
     reaskedDetails(
       "Tell me the dates and the balance you saw on screen.",
@@ -1421,9 +1418,7 @@ test("a reply re-asking a detail the conversation holds is recomposed once with 
     "The most recent charge is $54 on 2026-09-20, and none is dated today."
   );
   assert.equal(calls.compose.length, 2);
-  assert.ok(
-    String(corrections(calls)[1]).includes("amount ($54); date (today)")
-  );
+  assert.ok(String(corrections(calls)[1]).includes("date (today)"));
 });
 
 test("a reply that asks for nothing already given is composed once", async () => {
@@ -1431,4 +1426,26 @@ test("a reply that asks for nothing already given is composed once", async () =>
   const result = await gate(scope, question, findings(), d);
   assert.equal(result.message, REASKED);
   assert.deepEqual(corrections(calls), [undefined]);
+});
+
+test("re-ask repairs ignore details supplied only by Support or screenshot readings", () => {
+  const conversation =
+    "LATEST CUSTOMER MESSAGE (the one to work on):\nA CRM email edit will not save.\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (context):\nThe image shows screenshot@example.com.\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: Your sending inbox is support@example.com.\nThe charge was $54 on 2026-09-20 with a balance of 8,017 credits.";
+  assert.deepEqual(
+    reaskedDetails(
+      "Which email address did you try to add to the CRM?",
+      conversation
+    ),
+    []
+  );
+  assert.deepEqual(reaskedDetails(REASKED, conversation), []);
+  assert.deepEqual(reaskedDetails("Tell me the balance.", conversation), []);
+  assert.deepEqual(
+    reaskedDetails(
+      "Which email address did you try to add to the CRM?",
+      conversation +
+        "\nCustomer: It was customer@example.com.\nI used that address yesterday."
+    ),
+    ["email address (customer@example.com)"]
+  );
 });
