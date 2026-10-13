@@ -3,7 +3,8 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Opens by saying the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
+      "Opens by saying the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT.",
+      "Does not say a teammate will pick this up or follow up.",
       "Then invites the customer to say what they need help with in the meantime.",
       "Does not introduce the assistant or describe what it can and cannot do.",
       "Gives no product answer and cites no help-center article.",

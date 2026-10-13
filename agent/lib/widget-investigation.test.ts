@@ -2536,7 +2536,7 @@ test("after hours, an ask for a person that states no need leads with the away l
     assert.equal(body.decision, "allow");
     assert.equal(
       body.message,
-      `${AWAY} In the meantime, tell me what you need help with and I'll try to sort it out now.`
+      "Our team is away right now. We're back Monday, Oct 19 at 9:00 AM EDT. In the meantime, tell me what you need help with and I'll try to sort it out now."
     );
     assert.deepEqual(run.outcome?.citations ?? [], []);
     assert.equal(run.outcome?.reason, "after_hours_invite");
@@ -2552,7 +2552,7 @@ test("after hours, the away line is not repeated in a conversation that already 
     { role: "customer" as const, text: "can i speak with human" },
     {
       role: "assistant" as const,
-      text: `${line} In the meantime, ${invite[0].toLowerCase()}${invite.slice(1)}`,
+      text: `${line.replace(", and a teammate will pick this up then.", ".")} In the meantime, ${invite[0].toLowerCase()}${invite.slice(1)}`,
     },
   ];
   const moved = AWAY.replace("Monday, Oct 19", "Tuesday, Oct 20");

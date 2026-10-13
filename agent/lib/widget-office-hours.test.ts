@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { scanIdentifiers } from "./widget-egress.js";
 import {
+  awayInvite,
   backAtLine,
   officeSchedule,
   ticketInsteadOfHandoff,
@@ -47,6 +48,18 @@ test("the after-hours line names the app's back-at time only when reply times ar
     assert.deepEqual(internal, []);
     assert.deepEqual(Object.values(candidates).flat(), []);
   }
+});
+
+test("the no-ticket invitation says when the team is back but promises no pickup", () => {
+  const run = { conversationId: "c", runId: "r" };
+  assert.equal(
+    awayInvite(closed, run, undefined),
+    "Our team is away right now. We're back Monday, Oct 19 at 9:00 AM EDT. In the meantime, tell me what you need help with and I'll try to sort it out now."
+  );
+  assert.equal(
+    awayInvite({ ...closed, showReplyTime: false }, run, undefined),
+    "Our team is away right now. In the meantime, tell me what you need help with and I'll try to sort it out now."
+  );
 });
 
 test("only a customer turn after hours files the ticket in place of a handoff", async () => {

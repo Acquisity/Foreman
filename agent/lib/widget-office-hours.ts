@@ -51,15 +51,24 @@ export const backAtLine = (hours: OfficeHours) =>
     ? `Our team is away right now. We're back ${hours.nextOpenText}, and a teammate will pick this up then.`
     : "Our team is away right now, and a teammate will pick this up when they're back.";
 
+const PICKUP =
+  /, and a teammate will pick this up (?:then|when they're back)\.$/;
+
+/** The away line without the pickup, for a reply that filed nothing for a teammate to pick up. */
+const awayOnly = (line: string) => line.replace(PICKUP, ".");
+
 type Turns = { role: "customer" | "assistant"; text: string }[] | undefined;
 
 /**
- * Whether an earlier reply in this conversation already gave this exact line.
- * Compared with the line built now, so a changed back-at time shows again.
+ * Whether an earlier reply in this conversation already gave this line, with
+ * or without its pickup. Compared with the line built now, so a changed
+ * back-at time shows again.
  */
 const toldAlready = (line: string, turns: Turns) =>
   turns?.some(
-    (turn) => turn.role === "assistant" && turn.text.includes(line)
+    (turn) =>
+      turn.role === "assistant" &&
+      (turn.text.includes(line) || turn.text.includes(awayOnly(line)))
   ) ?? false;
 
 /** A reply with the away line after it, once per conversation (ENG-15262). */
@@ -71,7 +80,8 @@ export const AFTER_HOURS_INVITE = "after_hours_invite";
 
 /**
  * The whole reply to an after-hours ask for a person that says nothing else
- * (ENG-15262), or the invitation alone once the line was given. No ticket:
+ * (ENG-15262), or the invitation alone once the line was given. No ticket, so
+ * the away line promises no pickup:
  * one is filed later only if the customer then describes a problem Foreman
  * cannot resolve.
  */
@@ -84,7 +94,7 @@ export const awayInvite = (
   const line = backAtLine(hours);
   return toldAlready(line, turns)
     ? "Tell me what you need help with and I'll try to sort it out now."
-    : `${line} In the meantime, tell me what you need help with and I'll try to sort it out now.`;
+    : `${awayOnly(line)} In the meantime, tell me what you need help with and I'll try to sort it out now.`;
 };
 
 /**
