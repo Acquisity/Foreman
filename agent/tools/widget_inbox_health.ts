@@ -202,22 +202,30 @@ export function readMailboxNotFound(
   attempts: Pick<z.infer<typeof reconnectAttempt>, "email" | "error">[],
   inboxes: Pick<z.infer<typeof savedInbox>, "connectionError" | "email">[]
 ): string | null {
-  const emails = [
-    ...new Set(
-      attempts
-        .filter((attempt) => MAILBOX_NOT_FOUND.test(attempt.error ?? ""))
-        .map((attempt) => attempt.email?.toLowerCase() ?? "an inbox")
-    ),
-  ];
+  // The query returns attempts newest first. Keep only the latest per mailbox.
+  const latest = new Map<string, (typeof attempts)[number]>();
+  for (const attempt of attempts) {
+    const email = attempt.email?.toLowerCase() ?? "an inbox";
+    if (!latest.has(email)) {
+      latest.set(email, attempt);
+    }
+  }
+  const emails = [...latest.entries()]
+    .filter(([, attempt]) => MAILBOX_NOT_FOUND.test(attempt.error ?? ""))
+    .map(([email]) => email);
   if (!emails.length) {
     return null;
   }
-  const unpaid = inboxes.some((inbox) =>
-    UNPAID_CLEANUP.test(inbox.connectionError ?? "")
+  const unpaid = emails.filter((email) =>
+    inboxes.some(
+      (inbox) =>
+        inbox.email.toLowerCase() === email &&
+        UNPAID_CLEANUP.test(inbox.connectionError ?? "")
+    )
   );
   return `Reconnect failed for ${emails.join(", ")} because the email provider reported the mailbox not found. The mailbox no longer exists at the provider, so Reconnect can't fix it. ${
-    unpaid
-      ? "Saved records show inboxes cancelled after unpaid cleanup, so these were likely cancelled for non-payment."
+    unpaid.length
+      ? `Saved records show ${unpaid.join(", ")} cancelled after unpaid cleanup, so those mailboxes were likely cancelled for non-payment.`
       : "The first thing to check is whether they were cancelled for non-payment: after a grace period Acquisity cancels unpaid done-for-you domains, and their order then shows as cancelled. Check the order status and the billing for these inboxes."
   }`;
 }

@@ -802,12 +802,12 @@ test("reconnects that failed with mailbox not found say Reconnect can't fix it a
   const attempts = [
     {
       email: "a@example.com",
-      error: "Manually fix required",
+      error:
+        "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=1",
     },
     {
       email: "A@example.com",
-      error:
-        "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=1",
+      error: "Manually fix required",
     },
   ];
   const inboxes = [
@@ -833,5 +833,29 @@ test("reconnects that failed with mailbox not found say Reconnect can't fix it a
       ])
     ).includes("likely cancelled for non-payment")
   );
-  assert.equal(readMailboxNotFound([attempts[0]], inboxes), null);
+  assert.equal(readMailboxNotFound([attempts[1]], inboxes), null);
+});
+
+test("a newer successful reconnect suppresses an older mailbox-not-found reading", () => {
+  assert.equal(
+    readMailboxNotFound(
+      [
+        { email: "A@example.com", error: null },
+        { email: "a@example.com", error: "Mailbox not found" },
+      ],
+      []
+    ),
+    null
+  );
+  const reading = readMailboxNotFound(
+    [{ email: "a@example.com", error: "Mailbox not found" }],
+    [
+      {
+        connectionError: "Mailbox cancelled after unpaid cleanup",
+        email: "b@example.com",
+      },
+    ]
+  );
+  assert.ok(reading?.includes("whether they were cancelled for non-payment"));
+  assert.equal(reading?.includes("likely cancelled for non-payment"), false);
 });
