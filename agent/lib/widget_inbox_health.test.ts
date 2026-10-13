@@ -801,11 +801,13 @@ test("reconnects that failed with mailbox not found say Reconnect can't fix it a
   // wrun_41M4G6PZ3P0GT4KHVEA0STAT0M: the raw text carries "exception", so the shared filter made it generic.
   const attempts = [
     {
+      completedAt: null,
       email: "a@example.com",
       error:
         "Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=1",
     },
     {
+      completedAt: null,
       email: "A@example.com",
       error: "Manually fix required",
     },
@@ -837,18 +839,41 @@ test("reconnects that failed with mailbox not found say Reconnect can't fix it a
 });
 
 test("a newer successful reconnect suppresses an older mailbox-not-found reading", () => {
+  const done = "2026-10-08T15:00:00Z";
   assert.equal(
     readMailboxNotFound(
       [
-        { email: "A@example.com", error: null },
-        { email: "a@example.com", error: "Mailbox not found" },
+        { completedAt: done, email: "A@example.com", error: null },
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox not found",
+        },
       ],
       []
     ),
     null
   );
+  // wrun ...STAT0M: newer attempts expired with another error, so not found stands.
+  assert.ok(
+    readMailboxNotFound(
+      [
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox authorization requires manual attention",
+        },
+        {
+          completedAt: null,
+          email: "a@example.com",
+          error: "Mailbox not found",
+        },
+      ],
+      []
+    )?.includes("The mailbox no longer exists at the provider")
+  );
   const reading = readMailboxNotFound(
-    [{ email: "a@example.com", error: "Mailbox not found" }],
+    [{ completedAt: null, email: "a@example.com", error: "Mailbox not found" }],
     [
       {
         connectionError: "Mailbox cancelled after unpaid cleanup",

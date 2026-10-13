@@ -199,20 +199,29 @@ const UNPAID_CLEANUP = /unpaid cleanup/i;
  * diagnostic filter turns generic when it carries technical wording.
  */
 export function readMailboxNotFound(
-  attempts: Pick<z.infer<typeof reconnectAttempt>, "email" | "error">[],
+  attempts: Pick<
+    z.infer<typeof reconnectAttempt>,
+    "completedAt" | "email" | "error"
+  >[],
   inboxes: Pick<z.infer<typeof savedInbox>, "connectionError" | "email">[]
 ): string | null {
-  // The query returns attempts newest first. Keep only the latest per mailbox.
-  const latest = new Map<string, (typeof attempts)[number]>();
+  // Attempts come newest first. A not-found counts unless a newer attempt on the
+  // same mailbox completed without error; a newer failed or expired one does not
+  // clear it (wrun ...STAT0M: not found on Oct 6, then expired on Oct 8).
+  const reconnected = new Set<string>();
+  const notFound = new Set<string>();
   for (const attempt of attempts) {
     const email = attempt.email?.toLowerCase() ?? "an inbox";
-    if (!latest.has(email)) {
-      latest.set(email, attempt);
+    if (!attempt.error && attempt.completedAt) {
+      reconnected.add(email);
+    } else if (
+      !reconnected.has(email) &&
+      MAILBOX_NOT_FOUND.test(attempt.error ?? "")
+    ) {
+      notFound.add(email);
     }
   }
-  const emails = [...latest.entries()]
-    .filter(([, attempt]) => MAILBOX_NOT_FOUND.test(attempt.error ?? ""))
-    .map(([email]) => email);
+  const emails = [...notFound];
   if (!emails.length) {
     return null;
   }
