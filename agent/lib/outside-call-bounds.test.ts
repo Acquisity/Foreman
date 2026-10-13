@@ -75,7 +75,12 @@ const MUTATIONS: Array<{
   {
     file: "agent/lib/private-postgres.ts",
     into: "",
-    remove: "    fetchOptions: { signal: AbortSignal.timeout(timeoutMs) },\n",
+    remove: `    fetchOptions: {
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs),
+    },
+`,
     rule: /neon client/u,
     what: "the shared private Postgres client losing its request deadline",
   },

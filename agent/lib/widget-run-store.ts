@@ -50,6 +50,71 @@ export const widgetRunSchema = z.object({
 });
 export type WidgetRun = z.infer<typeof widgetRunSchema>;
 
+/** Server-owned confirmation, kept in the existing findings JSON until the run finishes. */
+export const widgetTicketReceiptSchema = z.union([
+  z.object({
+    existing: z.boolean(),
+    identifier: z.string().regex(/^ENG-\d+$/u),
+    refund: z.boolean(),
+    url: z.string().url().max(500),
+  }),
+  z.object({ filed: z.literal(false), replay: z.literal("recorded") }),
+  z.object({
+    identifier: z.literal("ENG-0"),
+    live: z.literal("simulated: nothing was filed"),
+    simulated: z.literal(true),
+    url: z.literal(
+      "https://linear.app/acquisity/issue/ENG-0/simulated-live-ticket"
+    ),
+  }),
+]);
+export type WidgetTicketReceipt = z.infer<typeof widgetTicketReceiptSchema>;
+
+export const ticketReceipt = (
+  findings: unknown
+): WidgetTicketReceipt | null => {
+  const parsed = z
+    .object({ ticketReceipt: widgetTicketReceiptSchema })
+    .safeParse(findings);
+  return parsed.success ? parsed.data.ticketReceipt : null;
+};
+
+export async function readWidgetTicketReceipt(
+  scope: WidgetContext,
+  id: string,
+  signal?: AbortSignal
+) {
+  const run = await readWidgetRun(id, signal);
+  assertWidgetRunOwner(run, scope);
+  if (run.scope.source !== scope.source) {
+    throw new Error("Investigation source mismatch.");
+  }
+  return ticketReceipt(run.findings);
+}
+
+export async function saveWidgetTicketReceipt(
+  scope: WidgetContext,
+  id: string,
+  receipt: WidgetTicketReceipt,
+  signal?: AbortSignal
+) {
+  const rows = await privateDatabase(15_000, signal).query(
+    `UPDATE widget_support_runs SET findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{ticketReceipt}', $4::jsonb)
+     WHERE id = $1 AND organization_id = $2 AND conversation_id = $3 AND scope->>'source' = $5
+       AND completed_at IS NULL RETURNING id`,
+    [
+      z.uuid().parse(id),
+      scope.organizationId,
+      scope.conversationId,
+      JSON.stringify(widgetTicketReceiptSchema.parse(receipt)),
+      scope.source,
+    ]
+  );
+  if (rows.length !== 1) {
+    throw new Error("Ticket confirmation could not be saved for this run.");
+  }
+}
+
 export function assertWidgetRunOwner(
   run: WidgetRun,
   scope: WidgetContext,
@@ -178,8 +243,11 @@ export async function claimWidgetRun(
   return { busy: rows[0].request_key !== requestKey, fresh: false, run };
 }
 
-export async function readWidgetRun(id: string): Promise<WidgetRun> {
-  const rows = await privateDatabase().query(
+export async function readWidgetRun(
+  id: string,
+  signal?: AbortSignal
+): Promise<WidgetRun> {
+  const rows = await privateDatabase(15_000, signal).query(
     "SELECT * FROM widget_support_runs WHERE id = $1",
     [z.uuid().parse(id)]
   );

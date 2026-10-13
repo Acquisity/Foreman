@@ -5,10 +5,56 @@ import { stampUnattended } from "./trust.js";
 
 export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 
+// e.g. "Monday–Friday: 9:00 AM–5:00 PM", "Eastern Time", "Closed all day".
+const scheduleText = z.string().regex(/^[\p{L}\p{N}\p{Pd} ,:./()+]{1,200}$/u);
+// An admin's own name for a closure, such as "New Year's Day".
+const CLOSURE_LABEL = /^[^\p{Cc}<>{}]{1,100}$/u;
+
+/**
+ * Acquisity's support office hours as its context route computes them per
+ * request (ENG-15262). Absent means always open, as before the app sent it.
+ */
+export const officeHoursSchema = z.strictObject({
+  customerTimeZone: z.string().min(1).max(100),
+  enabled: z.boolean(),
+  // The team's published schedule, in its own zone, as customer-facing text.
+  // Optional, since Foreman deploys apart from the app: a malformed one reads
+  // as absent and the rest of the office hours stand. See officeSchedule.
+  hoursText: z.array(scheduleText).max(7).optional().catch(undefined),
+  nextOpenAt: z.iso.datetime({ offset: true }).nullable(),
+  // Customer-facing text Foreman repeats verbatim, e.g. "Monday, Oct 19 at 9:00 AM EDT".
+  nextOpenText: z
+    .string()
+    .regex(/^[\p{L}\p{N} ,:./()+-]{1,80}$/u)
+    .nullable(),
+  open: z.boolean(),
+  replyTimeMinutes: z.int().min(1).max(10_080),
+  replyTimeText: z.string().min(1).max(80),
+  showReplyTime: z.boolean(),
+  timeZone: z.string().min(1).max(100),
+  timeZoneName: scheduleText.optional().catch(undefined),
+  upcomingClosures: z
+    .array(
+      z.strictObject({
+        // A real calendar date: Zod rejects 2026-02-30 as well as a bad shape.
+        date: z.iso.date(),
+        hours: scheduleText,
+        label: z.string().regex(CLOSURE_LABEL).nullable(),
+      })
+    )
+    .max(20)
+    .optional()
+    .catch(undefined),
+});
+export type OfficeHours = z.infer<typeof officeHoursSchema>;
+
 const shape = {
   conversationId: z.uuid(),
   // Only the local live harness stamps the original conversation date.
   liveAsOf: z.iso.datetime().optional(),
+  // Kept on the run so its finish reads the hours the message was sent in.
+  // Never stamped on the session: auth attributes hold strings only.
+  officeHours: officeHoursSchema.optional(),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
@@ -67,10 +113,16 @@ export function requireWidgetContext(
 }
 
 /** Stamp only server-verified context, unattended so no write policy treats the run as watched. */
-export function widgetAuth(scope: WidgetContext): SessionAuthContext {
-  const verified = widgetContextSchema.parse(scope);
+export function widgetAuth(
+  scope: WidgetContext,
+  runId?: string
+): SessionAuthContext {
+  const { officeHours: _hours, ...verified } = widgetContextSchema.parse(scope);
   return stampUnattended({
-    attributes: { ...verified },
+    attributes: {
+      ...verified,
+      ...(runId ? { widgetRunId: z.uuid().parse(runId) } : {}),
+    },
     authenticator: "bearer",
     issuer: WIDGET_SUPPORT_ISSUER,
     principalId: verified.userId,

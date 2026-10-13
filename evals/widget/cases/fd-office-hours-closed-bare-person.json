@@ -1,0 +1,59 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Opens by saying the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT.",
+      "Does not say a teammate will pick this up or follow up.",
+      "Then invites the customer to say what they need help with in the meantime.",
+      "Does not introduce the assistant or describe what it can and cannot do.",
+      "Gives no product answer and cites no help-center article.",
+      "Does not promise that a person will reply soon or right away."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": null
+  },
+  "officeHours": {
+    "customerTimeZone": "America/New_York",
+    "enabled": true,
+    "hoursText": ["Monday–Friday: 9:00 AM–5:00 PM"],
+    "nextOpenAt": "2026-10-19T13:00:00.000Z",
+    "nextOpenText": "Monday, Oct 19 at 9:00 AM EDT",
+    "open": false,
+    "replyTimeMinutes": 20,
+    "replyTimeText": "20 minutes",
+    "showReplyTime": true,
+    "timeZone": "America/New_York",
+    "timeZoneName": "Eastern Time",
+    "upcomingClosures": [
+      {
+        "date": "2026-11-26",
+        "hours": "Closed all day",
+        "label": "Thanksgiving"
+      },
+      {
+        "date": "2026-12-24",
+        "hours": "9:00 AM–12:00 PM",
+        "label": "Christmas Eve"
+      }
+    ]
+  },
+  "question": "I'd like to speak with a person.",
+  "scope": {
+    "role": "owner",
+    "workspace": "Company One"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "asked_for_human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

@@ -4,6 +4,7 @@ import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
+  AFTER_HOURS_WRITER_NOTE,
   hedged,
   type KbAnswer,
   type KbCustomer,
@@ -79,10 +80,18 @@ ${PRODUCT_GUIDE}`;
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
+    afterHoursPerson?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
   }) => Promise<ChatAttempt>;
 }
+
+const CHAT_FOLLOWUP_RULE =
+  "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
+export const chatPrompt = (afterHoursPerson?: true) =>
+  afterHoursPerson
+    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
+    : CHAT_PROMPT;
 
 interface ChatMessage {
   content: string;
@@ -133,6 +142,8 @@ export function chatMessages(
       content: [
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
+        ...(customer?.afterHoursPerson ? [AFTER_HOURS_WRITER_NOTE] : []),
+        ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
         ...(note.role === "owner" || !ROLE_LIMITS
           ? []
           : [`Who can do what, from the guide:\n${ROLE_LIMITS}`]),
@@ -225,7 +236,7 @@ const chatFailure = (error: unknown) => {
 
 export const defaultChatDeps = {
   async generate(
-    { messages, signal }: Parameters<ChatDeps["generate"]>[0],
+    { afterHoursPerson, messages, signal }: Parameters<ChatDeps["generate"]>[0],
     languageModel?: LanguageModel
   ) {
     const model =
@@ -240,7 +251,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: CHAT_PROMPT,
+          content: chatPrompt(afterHoursPerson),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -313,7 +324,11 @@ export async function answerFromGuide(
   try {
     const messages = chatMessages(ask, reader);
     const attempt = await hedged("chat", scoped, (abortSignal) =>
-      deps.generate({ messages, signal: abortSignal })
+      deps.generate({
+        messages,
+        signal: abortSignal,
+        ...(reader?.afterHoursPerson ? { afterHoursPerson: true } : {}),
+      })
     );
     const { articles, numbered } = numberSlugs(
       customerWords(attempt.text.slice(0, MAX_ANSWER_CHARS * 2))

@@ -214,6 +214,15 @@ const LATEST_SUBJECT = `The input is the support conversation so far, oldest fir
 const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-app chat. You know how the product works, campaigns, the AI SDR, inboxes and domains, websites, the CRM, billing and the rest, and you help customers understand and use it. You are not a sales, strategy or copywriting coach. Talk like a knowledgeable colleague: warm, direct, in the second person, in short paragraphs. Answer first, with no preamble and no sign-off. Use a numbered list only for a real procedure. You are continuing the conversation you are given: never ask for something it already gave, never repeat your previous reply, and when the customer reports what they saw or did, accept it and give the next step. When they sound frustrated, acknowledge it in a few words and try a different approach.`;
 
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
+export const AFTER_HOURS_WRITER_NOTE =
+  "The app verified that the team is away and the customer explicitly asked for a person. Code handles filing this conversation and appends its availability line after your answer. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address the request for a person again or draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
+export const KB_FOLLOWUP_RULE =
+  "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified.";
+export const replyPrompt = (customer: KbCustomer | undefined) =>
+  customer?.afterHoursPerson
+    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
+    : REPLY_PROMPT;
+
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
 The input is JSON: conversation, customer (their workspace name, their role, canInvestigate and glassOffered), recordingOffered, and articles, the numbered help-center articles found for this conversation. ${LATEST_SUBJECT}
@@ -276,6 +285,7 @@ const promptFacts = (customer: KbCustomer | undefined) => [
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
+  ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
 ];
 
 // biome-ignore assist/source/useSortedKeys: claims first, so the model checks before it rewrites.
@@ -356,6 +366,8 @@ export async function hedged<T>(
 
 /** Who is writing in, from the verified widget scope: never from the message. */
 export interface KbCustomer {
+  /** Server-owned exception for an after-hours explicit ask for a person. */
+  afterHoursPerson?: true;
   /** An owner or admin outside help-center mode, who can start a look with the magnifying glass. */
   canInvestigate: boolean;
   /**
@@ -363,6 +375,8 @@ export interface KbCustomer {
    * it again. Read from Foreman's own earlier turns, which word it one way.
    */
   glassOffered?: boolean;
+  /** The team's published hours and closures; see officeSchedule. */
+  officeSchedule?: string;
   role: string;
   workspace: string;
 }
@@ -431,6 +445,9 @@ export const defaultKbDeps: KbDeps = {
         workspace: "unknown",
       },
       recordingOffered: recordingOffered === true,
+      ...(customer?.afterHoursPerson
+        ? { responseBoundary: AFTER_HOURS_WRITER_NOTE }
+        : {}),
     });
     const { object } = await hedged("generate", signal, (abortSignal) =>
       generateObject({
@@ -440,7 +457,7 @@ export const defaultKbDeps: KbDeps = {
         model: modelFor(model),
         ...fastCallOptions(model),
         schema: replySchema,
-        system: withImages(REPLY_PROMPT, images),
+        system: withImages(replyPrompt(customer), images),
       })
     );
     return object;

@@ -129,6 +129,27 @@ test("the conversation reaches the model as chat turns after the app's note", ()
   );
 });
 
+test("the team's schedule reaches the guide writer in the app's note only when the server sent one", () => {
+  const customer = { canInvestigate: false, role: "owner", workspace: "w" };
+  const note =
+    "The support team's hours, from the app, in Eastern Time: Monday–Friday: 9:00 AM–5:00 PM.";
+  assert.ok(
+    chatMessages(
+      { latest: "when are you open?" },
+      {
+        ...customer,
+        officeSchedule: note,
+      }
+    )[0].content.includes(note)
+  );
+  assert.ok(
+    !chatMessages(
+      { latest: "when are you open?" },
+      customer
+    )[0].content.includes("support team's hours")
+  );
+});
+
 test("a failed model call is a short ask to send again", async () => {
   const answer = await answerFromGuide(
     "hi",
@@ -159,4 +180,39 @@ test("the guide's own words never reach the customer", () => {
   const glass =
     "Tap the magnifying glass next to the message box and send your message again to have your account investigated.";
   assert.equal(customerWords(glass), glass);
+});
+
+test("the guide writer's after-hours person note replaces the no-notification rule while its default prompt stays identical", async () => {
+  const { CHAT_PROMPT, chatPrompt } = await import("./widget-chat.js");
+  assert.equal(chatPrompt(), CHAT_PROMPT);
+  assert.ok(CHAT_PROMPT.includes("nobody is notified"));
+  assert.ok(!chatPrompt(true).includes("nobody is notified"));
+  assert.ok(chatPrompt(true).includes("Do not deny notification or follow-up"));
+  assert.ok(chatPrompt(true).includes("do not introduce yourself"));
+  const calls: Parameters<
+    import("./widget-chat.js").ChatDeps["generate"]
+  >[0][] = [];
+  await answerFromGuide(
+    "Where do I find the AI Consultant?",
+    { conversationId: "c", runId: "r" },
+    {
+      afterHoursPerson: true,
+      canInvestigate: true,
+      role: "owner",
+      workspace: "Company One",
+    },
+    undefined,
+    {
+      generate: (input) => {
+        calls.push(input);
+        return Promise.reject(new Error("mock"));
+      },
+    }
+  );
+  assert.equal(calls[0].afterHoursPerson, true);
+  assert.ok(
+    calls[0].messages[0].content.includes(
+      "Code handles filing this conversation"
+    )
+  );
 });

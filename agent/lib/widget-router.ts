@@ -46,6 +46,14 @@ const REFUND_REQUEST = 0.5;
 const BUG_REPORT = 0.7;
 /** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
 const RECORDING_REQUEST = 0.5;
+/**
+ * Below this, the customer has said nothing they need beyond a person.
+ * Measured 2026-10-13: bare asks and greetings scored 0.06 to 0.16; a person
+ * plus a question, a problem or an earlier problem scored 0.68 to 0.95.
+ * Asking when a person is available, the hours or holiday closures scored
+ * below it until the wording named them.
+ */
+const NEED_STATED = 0.5;
 
 /**
  * One customer message, kept apart from the conversation around it. Every
@@ -208,6 +216,13 @@ const QUESTIONS = {
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
     type: "noul",
   },
+  // Asked in the same request, so it costs nothing. It only decides what an
+  // after-hours ask for a person gets when there is nothing to act on (ENG-15262).
+  states_need: {
+    instructions:
+      "Ignoring any request to talk to a person, the customer still asks something about the product or describes a problem, in the latest message or earlier in the conversation. Asking where to find or how to use a named feature counts, as does 'my campaign stopped', and so does asking when the team or a person is available, the support hours, or holiday closures; 'can I talk to someone' alone does not.",
+    type: "noul",
+  },
 } as const;
 
 const responseSchema = z.object({
@@ -217,6 +232,7 @@ const responseSchema = z.object({
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    states_need: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
 
@@ -226,6 +242,8 @@ export interface WidgetRoute {
   bug?: boolean;
   /** Why Jev gave no route, for the log: a fixed code and the time it took. */
   failure?: string;
+  /** Scored and below the bar: the customer has said nothing they need beyond a person. */
+  noNeed?: boolean;
   /** The customer asks or offers to send a screen recording, so an investigation offers one. */
   recording?: boolean;
   /** The customer asked for a refund, which only an investigation can file. */
@@ -308,19 +326,22 @@ export async function routeWidgetMessage(
     const { answers } = responseSchema.parse(response);
     const flag = (score: number | undefined, bar: number) =>
       (score ?? 0) >= bar;
+    const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
+    const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
     return {
       asksForHuman: answers.asks_for_human.noul,
       source: "jev",
       ...(flag(answers.reports_bug?.noul, BUG_REPORT) ? { bug: true } : {}),
+      // A refund or ticket ask is a need, whatever states_need scored.
+      ...(answers.states_need &&
+      !(refund || ticket || flag(answers.states_need.noul, NEED_STATED))
+        ? { noNeed: true }
+        : {}),
       ...(flag(answers.offers_recording?.noul, RECORDING_REQUEST)
         ? { recording: true }
         : {}),
-      ...(flag(answers.asks_for_refund?.noul, REFUND_REQUEST)
-        ? { refund: true }
-        : {}),
-      ...(flag(answers.asks_for_ticket?.noul, TICKET_REQUEST)
-        ? { ticket: true }
-        : {}),
+      ...(refund ? { refund: true } : {}),
+      ...(ticket ? { ticket: true } : {}),
     };
   } catch (error) {
     return {
@@ -389,7 +410,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.source,
-    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.failure ? ` ${route.failure}` : ""}`,
+    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.noNeed ? " no_need" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

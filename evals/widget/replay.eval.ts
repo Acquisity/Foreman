@@ -30,6 +30,7 @@ import {
   saveRecord,
 } from "#lib/widget-judge.js";
 import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-next-action.js";
+import { AFTER_HOURS_TICKET } from "#lib/widget-office-hours.js";
 import { replayRecording } from "#lib/widget-replay.js";
 import { replyElapsed } from "#lib/widget-replay-timing.js";
 import { readWidgetRun, type WidgetRun } from "#lib/widget-run-store.js";
@@ -205,7 +206,14 @@ async function gradeReplay(
     .map(
       (event) => event.data.result as { output?: unknown; toolName?: string }
     );
-  const tools = results.map((call) => call.toolName ?? "");
+  // An after-hours ticket filed from code (front door or finish) counts as the ticket tool.
+  const tools = [
+    ...results.map((call) => call.toolName ?? ""),
+    ...(run.outcome?.reason?.startsWith(AFTER_HOURS_TICKET) &&
+    !results.some((call) => call.toolName === "widget_file_ticket")
+      ? ["widget_file_ticket"]
+      : []),
+  ];
   const grades = gradeRun(
     {
       decision: run.outcome?.decision ?? "block",

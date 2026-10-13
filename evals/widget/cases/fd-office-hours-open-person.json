@@ -1,0 +1,52 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": ["Hands the conversation to a person right away."],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "block",
+    "lane": "human",
+    "toolBudget": null
+  },
+  "officeHours": {
+    "customerTimeZone": "America/New_York",
+    "enabled": true,
+    "hoursText": ["Monday–Friday: 9:00 AM–5:00 PM"],
+    "nextOpenAt": null,
+    "nextOpenText": null,
+    "open": true,
+    "replyTimeMinutes": 20,
+    "replyTimeText": "20 minutes",
+    "showReplyTime": true,
+    "timeZone": "America/New_York",
+    "timeZoneName": "Eastern Time",
+    "upcomingClosures": [
+      {
+        "date": "2026-11-26",
+        "hours": "Closed all day",
+        "label": "Thanksgiving"
+      },
+      {
+        "date": "2026-12-24",
+        "hours": "9:00 AM–12:00 PM",
+        "label": "Christmas Eve"
+      }
+    ]
+  },
+  "question": "I'd like to speak with a person. Where do I find the AI Consultant?",
+  "scope": {
+    "role": "owner",
+    "workspace": "Company One"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "asked_for_human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

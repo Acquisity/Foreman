@@ -42,7 +42,13 @@ describe("routeWidgetMessage", () => {
       "asks_for_ticket",
       "offers_recording",
       "reports_bug",
+      "states_need",
     ]);
+    // A question about when a person is available is a need, not a bare ask (ENG-15262).
+    const need: string = body.questions.states_need.instructions;
+    for (const words of ["is available", "hours", "holiday closures"]) {
+      assert.ok(need.includes(words), words);
+    }
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
       "Bearer test-key"
@@ -88,6 +94,34 @@ describe("routeWidgetMessage", () => {
       [below.bug, below.recording, below.refund, below.ticket],
       [undefined, undefined, undefined, undefined]
     );
+  });
+
+  it("flags a message that states no need beyond a person only when Jev scored it below the bar", async () => {
+    const route = (answers: Record<string, unknown>) =>
+      routeWidgetMessage("can I talk to a person", {
+        apiKey: "test-key",
+        fetch: () => Promise.resolve(jevReply(answers)),
+      });
+    assert.equal((await route({ states_need: { noul: 0.1 } })).noNeed, true);
+    assert.equal(
+      (await route({ states_need: { noul: 0.8 } })).noNeed,
+      undefined
+    );
+    assert.equal((await route({})).noNeed, undefined);
+  });
+
+  it("never flags a refund or ticket ask as stating no need", async () => {
+    for (const ask of ["asks_for_refund", "asks_for_ticket"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: two independent asks.
+      const route = await routeWidgetMessage("refund me, I need a person", {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(
+            jevReply({ [ask]: { noul: 0.95 }, states_need: { noul: 0.1 } })
+          ),
+      });
+      assert.equal(route.noNeed, undefined);
+    }
   });
 
   it("scores everything zero without a key and never calls out", async () => {

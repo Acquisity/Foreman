@@ -137,3 +137,85 @@ test("the replay case selector is ignored when replay is disabled", async (conte
     false
   );
 });
+
+const officeHours = {
+  customerTimeZone: "America/New_York",
+  enabled: true,
+  nextOpenAt: "2026-10-19T13:00:00.000Z",
+  nextOpenText: "Monday, Oct 19 at 9:00 AM EDT",
+  open: false,
+  replyTimeMinutes: 20,
+  replyTimeText: "20 minutes",
+  showReplyTime: true,
+  timeZone: "America/New_York",
+};
+
+test("the app's office hours ride on the verified scope; absent or malformed hours read as absent", async (context) => {
+  configure(context);
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  assert.deepEqual(
+    (await verify({ ...appContext, officeHours })).officeHours,
+    officeHours
+  );
+  assert.equal("officeHours" in (await verify(appContext)), false);
+  for (const malformed of [
+    { ...officeHours, open: "no" },
+    { ...officeHours, extra: true },
+    { ...officeHours, nextOpenText: "<b>soon</b>" },
+    "closed",
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const scope = await verify({ ...appContext, officeHours: malformed });
+    assert.equal("officeHours" in scope, false);
+    assert.equal(scope.organizationId, organizationId);
+  }
+});
+
+test("the app's schedule fields ride on the office hours; a malformed one reads as absent and the rest stand", async (context) => {
+  configure(context);
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  const schedule = {
+    hoursText: ["Monday–Friday: 9:00 AM–5:00 PM"],
+    timeZoneName: "Eastern Time",
+    upcomingClosures: [
+      { date: "2026-11-26", hours: "Closed all day", label: "New Year's Day" },
+    ],
+  };
+  assert.deepEqual(
+    (
+      await verify({
+        ...appContext,
+        officeHours: { ...officeHours, ...schedule },
+      })
+    ).officeHours,
+    { ...officeHours, ...schedule }
+  );
+  for (const malformed of [
+    { hoursText: "Monday–Friday: 9–5" },
+    { hoursText: ["<b>always</b>"] },
+    { timeZoneName: 5 },
+    { upcomingClosures: [{ date: "2026-11-26", hours: "Closed all day" }] },
+    { upcomingClosures: [{ ...schedule.upcomingClosures[0], extra: 1 }] },
+    {
+      upcomingClosures: [
+        { ...schedule.upcomingClosures[0], date: "2026-02-30" },
+      ],
+    },
+  ]) {
+    const hours = { ...officeHours, ...schedule, ...malformed };
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const verified = (await verify({ ...appContext, officeHours: hours }))
+      .officeHours;
+    assert.equal(verified?.open, false);
+    const [key] = Object.keys(malformed) as (keyof typeof schedule)[];
+    assert.equal(verified?.[key], undefined);
+  }
+});

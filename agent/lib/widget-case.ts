@@ -2,7 +2,7 @@ import { z } from "zod";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { PUBLIC_HOSTS, scanIdentifiers } from "./widget-egress.js";
 import { renderConversation } from "./widget-router.js";
-import type { WidgetContext } from "./widget-scope.js";
+import { officeHoursSchema, type WidgetContext } from "./widget-scope.js";
 
 /**
  * One widget eval case: a real run's question and tool calls with every
@@ -41,6 +41,8 @@ export const widgetCaseSchema = z.strictObject({
    * my workspace" toggle. Without it a message never starts an investigation.
    */
   mode: z.literal("investigate").optional(),
+  /** The app's office hours for this turn, as its context route sends them; absent means open (ENG-15262). */
+  officeHours: officeHoursSchema.optional(),
   question: z.string().min(1),
   scope: z.strictObject({
     role: z.enum(["owner", "admin", "member", "client"]),
