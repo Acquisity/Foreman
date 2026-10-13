@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { composePrompt } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
@@ -11,6 +12,8 @@ import {
   widgetInstructions,
   withoutGuide,
 } from "./widget-instructions.js";
+import { JUDGE_TIMEOUT_MS } from "./widget-judge.js";
+import { DESCRIPTION_CHARS } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { widgetAuth } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
@@ -141,4 +144,30 @@ test("the write-up and the reply both end with what the customer does next", () 
 
 test("the composer reports a stated finding, never as could not confirm", () => {
   assert.match(COMPOSER_PROMPT, STATED_FINDING_RULE);
+});
+
+test("outside-call inventory matches local judge and widget retry contracts", () => {
+  const lines = readFileSync(
+    new URL("../../.github/OUTSIDE-CALLS.md", import.meta.url),
+    "utf8"
+  ).split("\n");
+  const judge =
+    lines.find((line) => line.startsWith("| `agent/lib/widget-judge.ts`")) ??
+    "";
+  assert.ok(judge.includes(`${JUDGE_TIMEOUT_MS / 1000}s per judge call`));
+  assert.ok(judge.includes("three concurrent local processes"));
+  assert.ok(judge.includes("local `claude -p --model opus`"));
+  const proxy = lines.find((line) => line.startsWith("| CLI Proxy (`")) ?? "";
+  assert.equal(proxy.includes("eval judge"), false);
+  assert.ok(proxy.includes("one timeout retry"));
+  assert.ok(proxy.includes("20s reply-scan reserve"));
+  const selector =
+    lines.find((line) =>
+      line.startsWith("| `agent/lib/widget-next-action.ts`")
+    ) ?? "";
+  assert.ok(
+    selector.includes(
+      `${DESCRIPTION_CHARS.toLocaleString("en-US")} characters each`
+    )
+  );
 });
