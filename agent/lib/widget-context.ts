@@ -7,10 +7,16 @@ import {
   liveContext,
   replayContext,
 } from "./widget-replay.js";
-import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
+import {
+  officeHoursSchema,
+  type WidgetContext,
+  widgetContextSchema,
+} from "./widget-scope.js";
 
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
 const appContextSchema = z.looseObject({
+  // Any problem with it reads as absent: support counts as open, as before.
+  officeHours: officeHoursSchema.optional().catch(undefined),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
@@ -93,6 +99,7 @@ export async function verifyWidgetContext(
       organizationId: verified.organizationId,
       organizationName: verified.organizationName,
       organizationSlug: verified.organizationSlug,
+      ...(verified.officeHours ? { officeHours: verified.officeHours } : {}),
       partnerId: verified.partnerId,
       role: verified.role,
       source: input.staff ? "inbox" : "widget",

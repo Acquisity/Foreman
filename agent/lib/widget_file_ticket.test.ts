@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existingTicket, inRefundQueue } from "../tools/widget_file_ticket.js";
+import { existingTicket, inRefundQueue } from "./widget-ticket.js";
 
 const SUPPORT = "4534deb2-6bbc-4e30-ad38-48963f414d14";
 const REFUND_LABEL = "9120e30d-e188-4972-940b-20005b7f6d03";

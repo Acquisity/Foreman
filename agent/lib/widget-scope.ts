@@ -5,10 +5,34 @@ import { stampUnattended } from "./trust.js";
 
 export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 
+/**
+ * Acquisity's support office hours as its context route computes them per
+ * request (ENG-15262). Absent means always open, as before the app sent it.
+ */
+export const officeHoursSchema = z.strictObject({
+  customerTimeZone: z.string().min(1).max(100),
+  enabled: z.boolean(),
+  nextOpenAt: z.iso.datetime({ offset: true }).nullable(),
+  // Customer-facing text Foreman repeats verbatim, e.g. "Monday, Oct 19 at 9:00 AM EDT".
+  nextOpenText: z
+    .string()
+    .regex(/^[\p{L}\p{N} ,:./()+-]{1,80}$/u)
+    .nullable(),
+  open: z.boolean(),
+  replyTimeMinutes: z.int().min(1).max(10_080),
+  replyTimeText: z.string().min(1).max(80),
+  showReplyTime: z.boolean(),
+  timeZone: z.string().min(1).max(100),
+});
+export type OfficeHours = z.infer<typeof officeHoursSchema>;
+
 const shape = {
   conversationId: z.uuid(),
   // Only the local live harness stamps the original conversation date.
   liveAsOf: z.iso.datetime().optional(),
+  // Kept on the run so its finish reads the hours the message was sent in.
+  // Never stamped on the session: auth attributes hold strings only.
+  officeHours: officeHoursSchema.optional(),
   organizationId: z.uuid(),
   organizationName: z.string().min(1).max(500),
   organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
@@ -68,7 +92,7 @@ export function requireWidgetContext(
 
 /** Stamp only server-verified context, unattended so no write policy treats the run as watched. */
 export function widgetAuth(scope: WidgetContext): SessionAuthContext {
-  const verified = widgetContextSchema.parse(scope);
+  const { officeHours: _hours, ...verified } = widgetContextSchema.parse(scope);
   return stampUnattended({
     attributes: { ...verified },
     authenticator: "bearer",

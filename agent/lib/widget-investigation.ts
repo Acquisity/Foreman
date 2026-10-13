@@ -25,6 +25,11 @@ import {
   validAsk,
 } from "./widget-next-action.js";
 import {
+  AFTER_HOURS_TICKET,
+  awayHours,
+  ticketInsteadOfHandoff,
+} from "./widget-office-hours.js";
+import {
   type CheckId,
   planWidgetChecks,
   progressFromEvents,
@@ -66,6 +71,7 @@ import {
   widgetAuth,
 } from "./widget-scope.js";
 import { serviceSecretRefusal } from "./widget-service-secret.js";
+import { fileTicketFor } from "./widget-ticket.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
@@ -387,6 +393,8 @@ export const defaultWidgetDependencies = {
   expire: expireSessionlessWidgetRun,
   expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
+  /** Files the conversation's ticket from code, for the after-hours rule. */
+  fileTicket: fileTicketFor,
   gate: egressGate,
   handoffEligible,
   history: recentWidgetTurns,
@@ -405,6 +413,7 @@ export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
   | "answerChat"
   | "changeRequested"
+  | "fileTicket"
   | "inboxHistory"
   | "plan"
   | "progress"
@@ -415,6 +424,7 @@ export type WidgetDependencies = Omit<
       typeof defaultWidgetDependencies,
       | "answerChat"
       | "changeRequested"
+      | "fileTicket"
       | "inboxHistory"
       | "plan"
       | "progress"
@@ -557,13 +567,20 @@ function humanHandoff(
     : null;
 }
 
+const asksForPerson = (route: WidgetRoute) =>
+  route.asksForHuman >= HUMAN_REQUEST_SCORE;
+
+/** The investigator's note when an after-hours ask for a person was turned into a ticket. */
+const AWAY_PERSON_NOTE =
+  "\n\nThe customer asked to speak with a person, and the support team is away right now, so nobody can take over this turn. Investigate as usual and answer what you can, and set needsHuman true so a teammate picks it up when the team is back.";
+
 /** An explicit ask for a person returns its completion promise; other intents return null. */
 function requestedHumanHandoff(
   run: WidgetRun,
   route: WidgetRoute,
   deps: Pick<WidgetDependencies, "complete">
 ): Promise<WidgetRun | null> | null {
-  if (route.asksForHuman < HUMAN_REQUEST_SCORE) {
+  if (!asksForPerson(route)) {
     return null;
   }
   const handoff = humanHandoff(HUMAN_REQUEST_NOTE, "asked_for_human");
@@ -626,16 +643,46 @@ const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
   return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
+/** After hours, findings that still need a person file the ticket instead and say when the team is back. */
+async function withAfterHoursTicket(
+  findings: WidgetFindings | null,
+  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  sessionId: string,
+  file: WidgetDependencies["fileTicket"],
+  signal?: AbortSignal
+): Promise<{ awayLine?: string; structured: WidgetFindings | null }> {
+  if (!findings?.needsHuman) {
+    return { structured: findings };
+  }
+  const awayLine = await ticketInsteadOfHandoff(
+    run.scope,
+    {
+      summary: `The customer wrote: ${run.question}\n\nWhat Foreman found: ${findings.report}\n\nRecommendation: ${findings.recommendation}`,
+      title: `Support chat after hours: ${findings.report}`,
+    },
+    { runId: run.id, sessionId },
+    signal,
+    file
+  );
+  return awayLine
+    ? { awayLine, structured: { ...findings, needsHuman: false } }
+    : { structured: findings };
+}
+
 /** A lone clarify question as it stands; otherwise the write-up structured by a model pass, then held to handoff eligibility. */
 async function structureWriteUp(
-  run: Pick<WidgetRun, "id" | "scope">,
+  run: Pick<WidgetRun, "id" | "question" | "scope">,
   sessionId: string,
   outcome: Extract<WaitOutcome, { status: "completed" }>,
   conversation: string,
   deps: Pick<WidgetDependencies, "extract"> &
-    Partial<Pick<WidgetDependencies, "handoffEligible">>,
+    Partial<Pick<WidgetDependencies, "fileTicket" | "handoffEligible">>,
   signal?: AbortSignal
-) {
+): Promise<{
+  awayLine?: string;
+  gateDeps: GateDeps | undefined;
+  structured: WidgetFindings | null;
+}> {
   const asked = nextActionEnabled() ? outcome.asked : null;
   if (asked) {
     return {
@@ -661,14 +708,36 @@ async function structureWriteUp(
       : null);
   return {
     gateDeps: undefined,
-    structured: await withEligibleHandoff(
-      withFiledTicket(outcome.ticket, extracted),
-      conversation,
-      { conversationId: run.scope.conversationId, runId: run.id, sessionId },
-      deps.handoffEligible
-    ),
+    ...(await withAfterHoursTicket(
+      await withEligibleHandoff(
+        withFiledTicket(outcome.ticket, extracted),
+        conversation,
+        { conversationId: run.scope.conversationId, runId: run.id, sessionId },
+        deps.handoffEligible
+      ),
+      run,
+      sessionId,
+      deps.fileTicket,
+      signal
+    )),
   };
 }
+
+/**
+ * The away line is fixed text added after the gate: a blocked reply stays
+ * blocked, and the app's own after-hours handoff line covers it.
+ */
+const withAwayLine = (
+  result: WidgetOutcome,
+  awayLine: string | undefined
+): WidgetOutcome =>
+  awayLine && result.message
+    ? {
+        ...result,
+        message: `${result.message}\n\n${awayLine}`,
+        reason: `${AFTER_HOURS_TICKET} ${result.reason}`,
+      }
+    : result;
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
@@ -685,7 +754,7 @@ export async function finishWidgetRun(
     Partial<
       Pick<
         WidgetDependencies,
-        "changeRequested" | "handoffEligible" | "progress"
+        "changeRequested" | "fileTicket" | "handoffEligible" | "progress"
       >
     >,
   clock: FinishClock = systemClock
@@ -741,7 +810,7 @@ export async function finishWidgetRun(
     const cutoff = finishCutoff(run, claimedAt);
     const deadline = clock.timeout(Math.max(0, cutoff - clock.now()));
     const extractStartedAt = Date.now();
-    const { gateDeps, structured } = await structureWriteUp(
+    const { awayLine, gateDeps, structured } = await structureWriteUp(
       run,
       sessionId,
       outcome,
@@ -784,12 +853,15 @@ export async function finishWidgetRun(
         runId: run.id,
         sessionId,
       });
-      result = {
-        decision: gated.decision,
-        message: gated.message,
-        reason: gated.reason,
-        status: "completed",
-      };
+      result = withAwayLine(
+        {
+          decision: gated.decision,
+          message: gated.message,
+          reason: gated.reason,
+          status: "completed",
+        },
+        awayLine
+      );
     } else if (handoff) {
       ({ findings, result } = handoff);
     } else {
@@ -994,10 +1066,13 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
-  const reply = (
+  // After hours nobody can take an ask for a person: the message is answered
+  // as any other, and the reply files the ticket (see ticketInsteadOfHandoff).
+  const away = asksForPerson(route) && awayHours(scope) !== null;
+  const complete = (
     message: string,
     reason: string,
-    citations: KbAnswer["citations"] = []
+    citations: KbAnswer["citations"]
   ) =>
     deps.complete(
       run.id,
@@ -1006,9 +1081,31 @@ async function answerFromKnowledgeBase(
       // No session exists on this lane, so the run id is the fencing session id.
       run.id
     );
+  const reply = async (
+    message: string,
+    reason: string,
+    citations: KbAnswer["citations"] = []
+  ) => {
+    if (!away) {
+      return complete(message, reason, citations);
+    }
+    const awayLine = await ticketInsteadOfHandoff(
+      scope,
+      {
+        summary: `The customer asked for a person after hours and wrote: ${ask.latest}\n\nForeman's reply: ${message}`,
+        title: "Support chat after hours: the customer asked for a person",
+      },
+      log,
+      signal,
+      deps.fileTicket
+    );
+    return awayLine
+      ? complete(`${message}\n\n${awayLine}`, AFTER_HOURS_TICKET, citations)
+      : requestedHumanHandoff(run, route, deps);
+  };
   // An explicit ask for a person is honoured at once. The note tells the
   // teammate why nothing was looked up.
-  const handoff = requestedHumanHandoff(run, route, deps);
+  const handoff = away ? null : requestedHumanHandoff(run, route, deps);
   if (handoff) {
     drafting.abort();
     return handoff;
@@ -1180,6 +1277,37 @@ async function investigationDenied(
 }
 
 /**
+ * A toggled ask for a person: in office hours the completed handoff. After
+ * hours the ticket is filed now, the investigation still runs, and the note
+ * returned for the investigator says why nobody takes over; "" for any other ask.
+ */
+async function toggledPersonAsk(
+  run: WidgetRun,
+  scope: WidgetContext,
+  route: WidgetRoute,
+  ask: WidgetAsk,
+  signal: AbortSignal,
+  deps: WidgetDependencies
+): Promise<string | WidgetRun | null> {
+  if (!asksForPerson(route)) {
+    return "";
+  }
+  const awayLine = await ticketInsteadOfHandoff(
+    scope,
+    {
+      summary: `The customer asked for a person after hours and wrote: ${ask.latest}\n\nAn investigation of their workspace is running for this message.`,
+      title: "Support chat after hours: the customer asked for a person",
+    },
+    { runId: run.id },
+    signal,
+    deps.fileTicket
+  );
+  return awayLine
+    ? AWAY_PERSON_NOTE
+    : ((await requestedHumanHandoff(run, route, deps)) ?? null);
+}
+
+/**
  * A fresh run. Only an explicit investigation reaches the investigator: a
  * teammate's, or an owner or admin's toggle (`mode: "investigate"`) or the
  * recording an earlier investigation asked for. Every other message ends at
@@ -1232,6 +1360,7 @@ async function answerFreshRun(
   // the message while access is checked; the button is asked for only once the
   // look is allowed, so a help-center reply never carries it.
   const routing = toggled ? deps.route(ask, { signal }) : null;
+  let personNote = "";
   const denied = await investigationDenied(run, scope, deps, helpCenter);
   if (denied) {
     return denied;
@@ -1242,12 +1371,11 @@ async function answerFreshRun(
       { conversationId: scope.conversationId, runId: run.id },
       route
     );
-    const handoff = requestedHumanHandoff(run, route, deps);
-    if (handoff) {
-      return json(
-        widgetRunResponse((await handoff) ?? (await deps.read(run.id)))
-      );
+    const person = await toggledPersonAsk(run, scope, route, ask, signal, deps);
+    if (typeof person !== "string") {
+      return json(widgetRunResponse(person ?? (await deps.read(run.id))));
     }
+    personNote = person;
     if (!input.recording) {
       await offerRecording(run, route, ask, deps);
     }
@@ -1262,7 +1390,7 @@ async function answerFreshRun(
               message,
               (await deps.inboxHistory?.(run).catch(() => [])) ?? []
             )
-          : message,
+          : `${message}${personNote}`,
         handlers,
         responseWaitMs,
         deps

@@ -186,12 +186,14 @@ export function replayContext(input: {
   if (input.organizationId !== fixture.organizationId) {
     throw new Error("Replay serves the fixture workspace only.");
   }
+  const recorded = replayCase(input.replayCaseId);
   return Object.freeze(
     widgetContextSchema.parse({
       ...fixture,
       conversationId: input.conversationId,
+      ...(recorded.officeHours ? { officeHours: recorded.officeHours } : {}),
       replayCaseId: input.replayCaseId,
-      role: replayCase(input.replayCaseId).scope.role,
+      role: recorded.scope.role,
       source: input.staff ? "inbox" : "widget",
     })
   );

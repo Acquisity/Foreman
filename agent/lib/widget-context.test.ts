@@ -137,3 +137,40 @@ test("the replay case selector is ignored when replay is disabled", async (conte
     false
   );
 });
+
+const officeHours = {
+  customerTimeZone: "America/New_York",
+  enabled: true,
+  nextOpenAt: "2026-10-19T13:00:00.000Z",
+  nextOpenText: "Monday, Oct 19 at 9:00 AM EDT",
+  open: false,
+  replyTimeMinutes: 20,
+  replyTimeText: "20 minutes",
+  showReplyTime: true,
+  timeZone: "America/New_York",
+};
+
+test("the app's office hours ride on the verified scope; absent or malformed hours read as absent", async (context) => {
+  configure(context);
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  assert.deepEqual(
+    (await verify({ ...appContext, officeHours })).officeHours,
+    officeHours
+  );
+  assert.equal("officeHours" in (await verify(appContext)), false);
+  for (const malformed of [
+    { ...officeHours, open: "no" },
+    { ...officeHours, extra: true },
+    { ...officeHours, nextOpenText: "<b>soon</b>" },
+    "closed",
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const scope = await verify({ ...appContext, officeHours: malformed });
+    assert.equal("officeHours" in scope, false);
+    assert.equal(scope.organizationId, organizationId);
+  }
+});
