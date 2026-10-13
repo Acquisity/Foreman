@@ -15,6 +15,20 @@ import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { widgetAuth } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
+test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
+  for (const tool of [
+    "widget_inbox_health",
+    "widget_provisioning_status",
+    "widget_billing_summary",
+  ]) {
+    assert.equal(SUPPORT_GUIDE.includes(tool), false);
+  }
+  assert.equal(SUPPORT_GUIDE.includes("before anything else"), false);
+  assert.ok(
+    SUPPORT_GUIDE.includes("Reconnect cannot bring back a cancelled mailbox")
+  );
+});
+
 const FAILED_STEP_RULE =
   /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and file it with widget_file_ticket/;
 const NEXT_STEP_RULE =
