@@ -586,7 +586,7 @@ export function readCreditGap(
   const { granted, remaining, usage } = provider.data.balances.credits;
   const used = wallet.lifetimeUsed;
   const n = (value: number) => value.toLocaleString("en-US");
-  return `The billing provider counts ${n(granted)} credits granted, ${n(usage)} used and ${n(remaining)} remaining. The product's own credit ledger separately records ${n(used)} credits used. If that usage is on top of the provider's count, the balance is ${n(remaining - used)}, so the gap between the two is those ${n(used)} credits. ${spentOn ? `${spentOn} ` : ""}Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling the ${n(used)} a double count.`;
+  return `The billing provider counts ${n(granted)} credits granted, ${n(usage)} used and ${n(remaining)} remaining. The product's own credit ledger records a balance of ${n(wallet.balance)} credits and ${n(used)} lifetime credits used. Together, the provider's remaining balance and the ledger balance come to ${n(remaining + wallet.balance)} credits. ${spentOn ? `${spentOn} ` : ""}Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling a difference a double count.`;
 }
 
 /** What each ledger usage source is, in the customer's words (Acquisity's credit_transaction reference types). */

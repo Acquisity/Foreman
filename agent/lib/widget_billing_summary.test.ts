@@ -965,7 +965,7 @@ test("a gap between the provider's credit balance and the product ledger is a re
   // wrun ...35DNCX: the customer saw 8,017, which is 8,647 less the ledger's 630.
   assert.equal(
     readCreditGap(autumn(8647, 1353), wallet),
-    "The billing provider counts 10,000 credits granted, 1,353 used and 8,647 remaining. The product's own credit ledger separately records 630 credits used. If that usage is on top of the provider's count, the balance is 8,017, so the gap between the two is those 630 credits. Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling the 630 a double count."
+    "The billing provider counts 10,000 credits granted, 1,353 used and 8,647 remaining. The product's own credit ledger records a balance of -630 credits and 630 lifetime credits used. Together, the provider's remaining balance and the ledger balance come to 8,017 credits. Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling a difference a double count."
   );
   // Agreeing balances, no ledger usage, or no provider record: no reading.
   assert.equal(
@@ -1013,7 +1013,7 @@ test("the ledger's credit usage is read by what each entry was spent on", () => 
     { balance: -630, lifetimeUsed: 630 },
     spent
   );
-  assert.ok(gap?.includes(`those 630 credits. ${spent} Lead credits`));
+  assert.ok(gap?.includes(`credits. ${spent} Lead credits`));
 });
 
 test("inbox error billing does not attribute another order's invoice to the errored inbox", () => {
@@ -1088,3 +1088,23 @@ const invoiceForErrorTest = {
   status: "paid",
   totalCents: 1800,
 };
+
+test("credit readings combine the offset balance without inventing a lifetime-usage gap", () => {
+  const reading = readCreditGap(
+    { balances: { credits: { granted: 1000, remaining: 800, usage: 200 } } },
+    { balance: 790, lifetimeUsed: 300 }
+  );
+  assert.ok(reading?.includes("come to 1,590 credits"));
+  assert.ok(
+    reading?.includes("balance of 790 credits and 300 lifetime credits used")
+  );
+  assert.equal(reading?.includes("the gap"), false);
+  assert.equal(reading?.includes("500"), false);
+  const offset = readCreditGap(
+    {
+      balances: { credits: { granted: 10_000, remaining: 8647, usage: 1353 } },
+    },
+    { balance: -630, lifetimeUsed: 630 }
+  );
+  assert.ok(offset?.includes("come to 8,017 credits"));
+});
