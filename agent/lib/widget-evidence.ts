@@ -115,7 +115,7 @@ export function buildOwnershipQuery(
       union select lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id
         where cl.deleted_at is null and lower(cl.email) = any(${emails})
       union select lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id
-        where e.lead_email = any(${emails})
+        where lower(e.lead_email) = any(${emails})
       union select lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id
         where e.event_type in ('account_error', 'email_sent')
           and e.created_at > current_timestamp - interval '${WEBHOOK_ACCOUNT_DAYS} days'

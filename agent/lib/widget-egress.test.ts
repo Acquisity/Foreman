@@ -1254,6 +1254,8 @@ test("leads of this org's own campaigns are vouched for only through the verifie
       "lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id"
     )
   );
+  // A webhook row with a mixed-case lead email still matches the lowercased list.
+  assert.ok(query.includes("where lower(e.lead_email) = any("));
 });
 
 test("a sending account or lead from another org still blocks", async () => {
