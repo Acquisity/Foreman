@@ -894,9 +894,16 @@ async function withAwayLine(
   if (!(hours && result.message) || result.decision === "block") {
     return result;
   }
+  // An unreadable receipt counts as none; it must not fail an allowed reply.
   const receipt = awayLine
     ? null
-    : (ticket ?? (await read?.(run.scope, run.id, signal)));
+    : (ticket ??
+      (await read?.(run.scope, run.id, signal).catch((error) => {
+        if (signal.aborted) {
+          throw error;
+        }
+        return null;
+      })));
   const line = awayLine ?? (receipt ? backAtLine(hours) : undefined);
   return line
     ? {

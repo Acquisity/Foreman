@@ -2693,3 +2693,17 @@ test("only a closed-hours explicit-person route restarts the guide draft with th
     );
   }
 });
+
+test("an unreadable after-hours receipt still returns the allowed reply", async () => {
+  const { deps, run } = dependencies();
+  run.scope = { ...scope, officeHours: closedHours };
+  deps.readTicket = () => Promise.reject(new Error("db down"));
+  await finishWidgetRun(
+    run,
+    "session-away",
+    { findings: null, status: "completed", text: "Done." },
+    deps
+  );
+  assert.equal(run.outcome?.decision, allowed.decision);
+  assert.equal(run.outcome?.message, allowed.message);
+});
