@@ -412,7 +412,9 @@ export const withInboxCounts = (
       const plan = LINE_PLAN.exec(line.description ?? "")?.[1];
       const price = plan ? prices.get(plan) : undefined;
       const count =
-        price && line.amountCents !== null ? line.amountCents / price : null;
+        price && line.amountCents !== null && line.proration !== true
+          ? line.amountCents / price
+          : null;
       return {
         ...line,
         inboxCount: count && Number.isInteger(count) ? count : null,
@@ -550,7 +552,7 @@ export function readInboxErrorBilling(
   if (!charges.length) {
     return null;
   }
-  return `${errored.count} of the purchased inboxes have been in error since ${errored.since.slice(0, 10)} (the latest of their first saved errors), and inbox charges covering time after that were billed for them: ${charges.join(", ")}. These are billing facts; they decide nothing about a refund or credit.`;
+  return `${errored.count} of the purchased inboxes have been in error since ${errored.since.slice(0, 10)} (the latest of their first saved errors), and the workspace was billed for inbox charges covering time after that: ${charges.join(", ")}. These are billing facts; they decide nothing about a refund or credit.`;
 }
 
 const autumnCredits = z.object({

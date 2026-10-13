@@ -9,10 +9,12 @@ import definition, {
   composeWidgetBillingSummary,
   readCreditGap,
   readCreditUsage,
+  readInboxErrorBilling,
   sessionRead,
   type WidgetBillingSummaryDeps,
   widgetBillingSummaryInputSchema,
   widgetBillingSummaryOutputSchema,
+  withInboxCounts,
 } from "../tools/widget_billing_summary.js";
 
 const widgetCtx = {
@@ -892,7 +894,7 @@ test("inboxes in error are tied to the inbox charges covering time after the err
   widgetBillingSummaryOutputSchema.parse(tied);
   assert.equal(
     tied.reading,
-    "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
+    "6 of the purchased inboxes have been in error since 2026-09-17 (the latest of their first saved errors), and the workspace was billed for inbox charges covering time after that: 2026-10-01 ($48.00), 2026-09-01 ($48.00). These are billing facts; they decide nothing about a refund or credit."
   );
   assert.equal(tied.identifiesCharge, true);
   // No inbox in error, or an error after every billed period, ties nothing.
@@ -1013,3 +1015,76 @@ test("the ledger's credit usage is read by what each entry was spent on", () => 
   );
   assert.ok(gap?.includes(`those 630 credits. ${spent} Lead credits`));
 });
+
+test("inbox error billing does not attribute another order's invoice to the errored inbox", () => {
+  const reading = readInboxErrorBilling(
+    { count: 1, since: "2026-10-01T00:00:00Z" },
+    [
+      {
+        ...invoiceForErrorTest,
+        lines: [
+          {
+            ...invoiceForErrorTest.lines[0],
+            description: "Inboxes for another order",
+          },
+        ],
+      },
+    ]
+  );
+  assert.ok(
+    reading?.includes(
+      "the workspace was billed for inbox charges covering time after that"
+    )
+  );
+  assert.equal(reading?.includes("for them"), false);
+});
+
+test("prorated inbox charges do not become a smaller inbox count", () => {
+  const counted = withInboxCounts(
+    {
+      ...invoiceForErrorTest,
+      lines: [
+        {
+          ...invoiceForErrorTest.lines[0],
+          amountCents: 600,
+          description: "Remaining time on 3 × Inbox Plan - inboxes",
+          proration: true,
+          quantity: 3,
+        },
+      ],
+    },
+    new Map([["Inbox Plan", 600]])
+  );
+  assert.equal(counted.lines?.[0].inboxCount, null);
+  assert.equal(counted.inboxCount, null);
+});
+
+const invoiceForErrorTest = {
+  amountDueCents: 1800,
+  amountPaidCents: 1800,
+  amountRemainingCents: 0,
+  billingReason: null,
+  chargeId: null,
+  createdAt: "2026-10-02T00:00:00Z",
+  currency: "usd",
+  customerBalanceAppliedCents: null,
+  discountCents: null,
+  id: "in_fixture",
+  inboxCount: null,
+  lines: [
+    {
+      amountCents: 1800,
+      description: "3 inboxes",
+      inboxCount: null,
+      periodEnd: "2026-11-01T00:00:00Z",
+      periodStart: "2026-10-01T00:00:00Z",
+      proration: false,
+      quantity: 3,
+    },
+  ],
+  linesTruncated: false,
+  paidAt: "2026-10-02T00:00:00Z",
+  settlement: "money_collected" as const,
+  status: "paid",
+  totalCents: 1800,
+};
